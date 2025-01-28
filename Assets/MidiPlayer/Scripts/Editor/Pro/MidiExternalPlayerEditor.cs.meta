@@ -1,0 +1,20 @@
+fileFormatVersion: 2
+guid: 08044c1f384701642895179f816c605e
+timeCreated: 1540929022
+licenseType: Store
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.14.0
+  assetPath: Assets/MidiPlayer/Scripts/Editor/Pro/MidiExternalPlayerEditor.cs
+  uploadId: 719089

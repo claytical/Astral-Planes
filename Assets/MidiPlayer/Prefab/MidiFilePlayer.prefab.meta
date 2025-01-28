@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 32a8d8859acf18d4ba134834a876d5ea
+timeCreated: 1520494665
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.14.0
+  assetPath: Assets/MidiPlayer/Prefab/MidiFilePlayer.prefab
+  uploadId: 719089

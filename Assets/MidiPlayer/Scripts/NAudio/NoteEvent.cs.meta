@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 688a534eed7e8de4d858afda091965f9
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.14.0
+  assetPath: Assets/MidiPlayer/Scripts/NAudio/NoteEvent.cs
+  uploadId: 719089

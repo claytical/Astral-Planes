@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<MidiSet xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SoundFonts>
+    <SoundFontInfo>
+      <Name>GeneralUser-GS</Name>
+      <PatchCount>287</PatchCount>
+      <WaveCount>920</WaveCount>
+      <WaveSize>36724496</WaveSize>
+      <SF2Path>C:/Users/imfaculty/AppData/LocalLow/Clay Ewing/Astral Planes\SoundFont\GeneralUser-GS.sf2</SF2Path>
+    </SoundFontInfo>
+  </SoundFonts>
+  <IndexSelectedSF>0</IndexSelectedSF>
+  <MidiFiles>
+    <string>JX - Bass - 03</string>
+    <string>JX - Bass - 04</string>
+    <string>JX - Bass - 05</string>
+    <string>JX - Bass - 06</string>
+    <string>JX - Bass - 08</string>
+    <string>JX - Bass - 09</string>
+    <string>JX - Bass - 10</string>
+    <string>JX - Bass - 11</string>
+    <string>JX - Bass - 12</string>
+    <string>JX - Bass - 13</string>
+    <string>JX - Bass - 15</string>
+    <string>JX - Bass - 16</string>
+    <string>JX - Bass - 17</string>
+    <string>JX - Bass - 18</string>
+    <string>JX - Bass - 19</string>
+    <string>JX - Bass - 20</string>
+    <string>JX - Bass - 21</string>
+    <string>JX - Bass - 22</string>
+    <string>JX - Harmony - 02</string>
+    <string>JX - Harmony - 06</string>
+    <string>JX - Harmony - 08</string>
+    <string>JX - Harmony - 09</string>
+    <string>JX - Harmony - 11</string>
+    <string>JX - Harmony - 14</string>
+    <string>JX - Harmony - 15</string>
+    <string>JX - Harmony - 16</string>
+    <string>JX - Harmony - 17</string>
+    <string>JX - Harmony - 18</string>
+    <string>JX - Harmony - 19</string>
+    <string>JX - Harmony - 20</string>
+    <string>JX - Lead - 00</string>
+    <string>JX - Lead - 01</string>
+    <string>JX - Lead - 06</string>
+    <string>JX - Lead - 08</string>
+    <string>JX - Lead - 09</string>
+    <string>JX - Lead - 11</string>
+    <string>JX - Lead - 12</string>
+    <string>JX - Lead - 13</string>
+    <string>JX - Lead - 15</string>
+    <string>JX - Lead - 16</string>
+    <string>JX - Lead - 17</string>
+    <string>JX - Lead - 18</string>
+    <string>JX - Lead - 19</string>
+    <string>JX - Lead - 20</string>
+    <string>JX - Lead - 21</string>
+    <string>JX - Lead - 22</string>
+  </MidiFiles>
+</MidiSet>

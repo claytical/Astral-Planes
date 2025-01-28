@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 52bdef4667d9efd4ca1fdf445349edb3
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.14.0
+  assetPath: Assets/MidiPlayer/MPTK-API-V2.chm
+  uploadId: 719089
