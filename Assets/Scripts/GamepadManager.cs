@@ -140,7 +140,7 @@ public class GamepadManager : MonoBehaviour
     private void StartGame()
     {
         Debug.Log("All players are ready. Starting the game!");
-        LoadNewScene("Track");
+        LoadNewScene("GeneratedTrack");
     }
 
     public void JoinGame(PlayerInput playerInput)
@@ -230,7 +230,7 @@ public class GamepadManager : MonoBehaviour
 
     private void HandleSceneSetup(string sceneName)
     {
-        if (sceneName.Equals("Track"))
+        if (sceneName.Equals("GeneratedTrack"))
         {
             HandleTrackSceneSetup();
             GameObject go = GameObject.Find("QuoteText");
@@ -261,6 +261,7 @@ public class GamepadManager : MonoBehaviour
     private void HandleTrackSceneSetup()
     {
         Debug.Log("Handle Track Scene Setup");
+     /*
         level = FindAnyObjectByType<ProceduralLevel>();
         if (level == null)
         {
@@ -268,13 +269,14 @@ public class GamepadManager : MonoBehaviour
             return;
         }
 
+        */
         for (int i = 0; i < localPlayers.Count; i++)
         {
             localPlayers[i].Launch();
         }
 
         gameInProgress = true;
-        level.Play();
+//        level.Play();
 //        level.StartSequencer();
 
     }

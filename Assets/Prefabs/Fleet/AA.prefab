@@ -13,9 +13,9 @@ GameObject:
   - component: {fileID: 3138199776794840757}
   - component: {fileID: 6267414685674281640}
   - component: {fileID: 964252887607637339}
-  - component: {fileID: 8480294599126195438}
   - component: {fileID: 2515959493319008489}
   - component: {fileID: 595433701453339581}
+  - component: {fileID: 4290235805061990997}
   m_Layer: 0
   m_Name: AA
   m_TagString: Untagged
@@ -35,8 +35,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 4924665323229759072}
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1970310610805977373
@@ -166,68 +165,6 @@ MonoBehaviour:
     type: 3}
   respawnTimer: 10
   lifetime: 0
---- !u!60 &8480294599126195438
-PolygonCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_SpriteTilingProperty:
-    border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.95, y: 0.26}
-    newSize: {x: 1.3, y: 1.46}
-    adaptiveTilingThreshold: 0.5
-    drawMode: 0
-    adaptiveTiling: 0
-  m_AutoTiling: 0
-  m_Points:
-    m_Paths:
-    - - {x: -0.14, y: 0.07}
-      - {x: -0.24, y: 0.03}
-      - {x: -0.24, y: -0.06}
-      - {x: -0.22999999, y: -0.07}
-      - {x: 0.24, y: -0.07}
-      - {x: 0.24, y: 0.02}
-      - {x: 0.22, y: 0.04}
-      - {x: 0.11, y: 0.07}
-    - - {x: -0.03, y: 0.01}
-      - {x: -0.01, y: 0.01}
-      - {x: 0, y: 0.02}
-      - {x: 0.01, y: 0.01}
-      - {x: 0.03, y: 0.01}
-      - {x: 0.03, y: -0.01}
-      - {x: -0.03, y: -0.01}
-  m_UseDelaunayMesh: 0
 --- !u!82 &2515959493319008489
 AudioSource:
   m_ObjectHideFlags: 0
@@ -338,86 +275,81 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10eade318f31ba248b72c13c52f1c81c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1001 &4919838465035848270
-PrefabInstance:
+--- !u!60 &4290235805061990997
+PolygonCollider2D:
   m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 2614095863033673403}
-    m_Modifications:
-    - target: {fileID: 1830704792651618, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_Name
-      value: MidiListPlayer
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 114736807736466070, guid: 7c80411356e4efa4ba90ae1624e311a6,
-        type: 3}
-      propertyPath: MPTK_PlayList.Array.data[0].EndFrom
-      value: 8000
-      objectReference: {fileID: 0}
-    - target: {fileID: 114736807736466070, guid: 7c80411356e4efa4ba90ae1624e311a6,
-        type: 3}
-      propertyPath: MPTK_PlayList.Array.data[0].LastTick
-      value: 1152
-      objectReference: {fileID: 0}
-    - target: {fileID: 114736807736466070, guid: 7c80411356e4efa4ba90ae1624e311a6,
-        type: 3}
-      propertyPath: MPTK_PlayList.Array.data[0].MidiName
-      value: Begin-Drifter
-      objectReference: {fileID: 0}
-    - target: {fileID: 114736807736466070, guid: 7c80411356e4efa4ba90ae1624e311a6,
-        type: 3}
-      propertyPath: MPTK_PlayList.Array.data[0].RealDurationMs
-      value: 8000
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 7c80411356e4efa4ba90ae1624e311a6, type: 3}
---- !u!4 &4924665323229759072 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4831256240491566, guid: 7c80411356e4efa4ba90ae1624e311a6,
-    type: 3}
-  m_PrefabInstance: {fileID: 4919838465035848270}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 0.95, y: 0.26}
+    newSize: {x: 1.3, y: 1.46}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Points:
+    m_Paths:
+    - - {x: 0.435, y: -0.049999997}
+      - {x: 0.475, y: -0.03}
+      - {x: 0.475, y: 0.03}
+      - {x: 0.45499998, y: 0.049999997}
+      - {x: 0.36499998, y: 0.07}
+      - {x: 0.285, y: 0.089999996}
+      - {x: 0.114999995, y: 0.13}
+      - {x: -0.114999995, y: 0.13}
+      - {x: -0.155, y: 0.12}
+      - {x: -0.465, y: 0.049999997}
+      - {x: -0.475, y: 0.049999997}
+      - {x: -0.475, y: -0.049999997}
+      - {x: -0.39499998, y: -0.06}
+      - {x: -0.085, y: -0.13}
+      - {x: 0.105, y: -0.13}
+      - {x: 0.175, y: -0.12}
+      - {x: 0.255, y: -0.089999996}
+      - {x: 0.355, y: -0.07}
+    - - {x: -0.095, y: -0.04}
+      - {x: -0.095, y: 0.04}
+      - {x: -0.044999998, y: 0.049999997}
+      - {x: -0.035, y: 0.06}
+      - {x: 0.024999999, y: 0.06}
+      - {x: 0.035, y: 0.049999997}
+      - {x: 0.085, y: 0.04}
+      - {x: 0.085, y: -0.04}
+      - {x: 0.065, y: -0.04}
+      - {x: 0.055, y: -0.049999997}
+      - {x: 0.015, y: -0.049999997}
+      - {x: 0.005, y: -0.06}
+      - {x: -0.024999999, y: -0.049999997}
+  m_UseDelaunayMesh: 0

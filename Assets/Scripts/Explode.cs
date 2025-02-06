@@ -72,6 +72,10 @@ public class Explode : MonoBehaviour
 
     public void Permanent()
     {
+        if(GetComponent<Vehicle>())
+        {
+            Destroy(gameObject, 1);
+        }
         if (GetComponent<Platform>())
         {
             Debug.Log("Permanent explosion triggered");
