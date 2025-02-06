@@ -115,7 +115,7 @@ public class SetInfo : MonoBehaviour
             {
                 Debug.Log("Adding Collectable Event");
                 // Subscribe to the OnCollected event
-                collectable.OnCollected += () => Collected(go, spawnIndex);
+//                collectable.OnCollected += () => Collected(go, spawnIndex);
             }
 
             Debug.Log($"{go.name} created at {go.transform.position} in response to MIDI NoteOn.");

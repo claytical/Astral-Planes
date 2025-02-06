@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using MidiPlayerTK;
 
@@ -6,25 +7,13 @@ public class SequenceManager : MonoBehaviour
     [System.Serializable]
     public class MidiInstrument
     {
-        public MidiFilePlayer filePlayer; // The MIDI file player
-        public int instrumentIndex; // Index of the instrument (e.g., 0, 1, 2 for instrumentPlayers)
-        public float volume = .5f;
+        public string name;
+        public MidiFilePlayer filePlayer;
         public int preset;
         public int bank;
+        public float volume = 1.0f;
     }
 
-    public MidiInstrument[] midiInstruments; // Array to define file-to-instrument assignments
-    public int BPM;
-    public float drumVolume = .5f;
-
-    public DrumPatternType drumPattern; // Enum to specify the drum pattern
-
-    public enum DrumPatternType
-    {
-        Heartbeat,
-        Silence,
-        SkipKick,
-        Rock,
-        Custom
-    }
+    public List<MidiInstrument> midiInstruments;
+    public int BPM = 120;
 }

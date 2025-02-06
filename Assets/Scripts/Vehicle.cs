@@ -92,6 +92,15 @@ public class Vehicle : MonoBehaviour
 
     void FixedUpdate()
     {
+        if(energyLevel <= 0)
+        {
+            if(GetComponentInParent<LocalPlayer>()) {
+                GetComponentInParent<LocalPlayer>().Restart();
+                Explode();
+
+            }
+
+        }
         if (boosting && energyLevel > 0)
         {
             float appliedForce = force * burnRateMultiplier * boostMultiplier;
@@ -215,7 +224,7 @@ public class Vehicle : MonoBehaviour
 //        sequencer.NextSet();
         Debug.Log("Next sequence");
 
-        GamepadManager.Instance.CollectedBreakable();
+        //GamepadManager.Instance.CollectedBreakable();
         
         energyLevel += amount;
         /*
@@ -316,6 +325,10 @@ public class Vehicle : MonoBehaviour
         if (audioManager != null)
         {
             audioManager.PlaySound(destroyClip);
+        }
+        if(GetComponent<Explode>())
+        {
+            GetComponent<Explode>().Permanent();
         }
     }
 

@@ -11,6 +11,8 @@
   </SoundFonts>
   <IndexSelectedSF>0</IndexSelectedSF>
   <MidiFiles>
+    <string>Claps-1</string>
+    <string>Drums-KKS</string>
     <string>JX - Bass - 03</string>
     <string>JX - Bass - 04</string>
     <string>JX - Bass - 05</string>
@@ -57,5 +59,8 @@
     <string>JX - Lead - 20</string>
     <string>JX - Lead - 21</string>
     <string>JX - Lead - 22</string>
+    <string>Slow-1</string>
+    <string>Steady-1</string>
+    <string>Toms-1</string>
   </MidiFiles>
 </MidiSet>

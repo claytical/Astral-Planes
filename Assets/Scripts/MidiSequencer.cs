@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using MidiPlayerTK;
@@ -121,45 +121,44 @@ public class MidiSequencer : MonoBehaviour
     }
     public void LoadSequence(SequenceManager sequence)
     {
-        // Clear previous tracks
         instrumentTracks.Clear();
         currentTick = 0;
         bpm = sequence.BPM;
-        // Get the SequenceManager from the parent object
 
-        // Parse and assign instruments dynamically
-        foreach (var midiInstrument in sequence.midiInstruments)
+        for (int i = 0; i < sequence.midiInstruments.Count; i++)
         {
-            if (midiInstrument.filePlayer != null && midiInstrument.instrumentIndex >= 0 && midiInstrument.instrumentIndex < instrumentPlayers.Count)
-            {
-                midiInstrument.filePlayer.MPTK_Volume = midiInstrument.volume;
-                // Configure the MidiStreamPlayer for this instrument
-                StartCoroutine(ConfigureMidiStreamPlayer(instrumentPlayers[midiInstrument.instrumentIndex], midiInstrument));
+            var midiInstrument = sequence.midiInstruments[i];
 
-                // Parse MIDI events for this instrument
-                List<MPTKEvent> trackEvents = ParseMidiEvents(midiInstrument.filePlayer, midiInstrument.instrumentIndex);
+            if (midiInstrument.filePlayer != null && i < instrumentPlayers.Count)
+            {
+                int assignedChannel = i + 1; // Assign MIDI channels as 1, 2, 3... (Avoid Channel 0)
+                midiInstrument.filePlayer.MPTK_Volume = midiInstrument.volume;
+
+                StartCoroutine(ConfigureMidiStreamPlayer(instrumentPlayers[i], assignedChannel, midiInstrument.preset, midiInstrument.bank));
+
+                List<MPTKEvent> trackEvents = ParseMidiEvents(midiInstrument.filePlayer, assignedChannel);
                 instrumentTracks.Add(trackEvents);
 
-             Debug.Log($"Loaded instrument {midiInstrument.instrumentIndex}: Preset {midiInstrument.preset}, Channel {midiInstrument.instrumentIndex}, Events: {trackEvents.Count}");
+                Debug.Log($"✅ Loaded instrument {i}: Preset {midiInstrument.preset}, Channel {assignedChannel}, Events: {trackEvents.Count}");
             }
             else
             {
-                // Skip unassigned or invalid instruments
                 instrumentTracks.Add(null);
-                Debug.Log($"Bypassed instrument at index {midiInstrument.instrumentIndex}");
+                Debug.Log($"⏩ Bypassed instrument at index {i}");
             }
         }
 
-        GenerateDrumPattern(sequence.drumPattern);
-        drums.MPTK_Volume = sequence.drumVolume;
+//        GenerateDrumPattern(sequence.drumPattern);
+//        drums.MPTK_Volume = sequence.drumVolume;
 
         CalculateTotalTicks();
-        // Initialize timing
         nextTickTime = Time.time;
 
-        Debug.Log($"Sequence loaded with {totalTicks} total ticks.");
+        Debug.Log($"✅ Sequence loaded with {totalTicks} total ticks.");
     }
 
+
+    /*
     private void GenerateDrumPattern(SequenceManager.DrumPatternType patternType)
     {
         kickDrums.Clear();
@@ -200,27 +199,34 @@ public class MidiSequencer : MonoBehaviour
 
         Debug.Log($"Drum pattern generated: {patternType}");
     }
+    */
+    private IEnumerator ConfigureMidiStreamPlayer(MidiStreamPlayer player, int assignedChannel, int preset, int bank)
+    {
+        while (player.MPTK_Channels == null || player.MPTK_Channels.Length == 0)
+        {
+            yield return null;
+        }
 
-    private IEnumerator ConfigureMidiStreamPlayer(MidiStreamPlayer player, SequenceManager.MidiInstrument midiInstrument)
-{
-    // Wait until MPTK_Channels is initialized
-    while (player.MPTK_Channels == null || player.MPTK_Channels.Length == 0)
-    {
-        yield return null; // Wait for the next frame
+        if (assignedChannel >= 0 && assignedChannel < player.MPTK_Channels.Length)
+        {
+            player.MPTK_Channels[assignedChannel].PresetNum = preset;
+            player.MPTK_Channels[assignedChannel].BankNum = bank;
+            Debug.Log($"🎵 Configured {player.name} for Channel {assignedChannel}, Preset {preset}, Bank {bank}");
+
+            // 🔥 Force preset change to avoid default piano sound
+            player.MPTK_PlayEvent(new MPTKEvent()
+            {
+                Command = MPTKCommand.PatchChange,
+                Channel = assignedChannel,
+                Value = preset
+            });
+        }
+        else
+        {
+            Debug.LogError($"❌ Invalid channel index {assignedChannel} for {player.name}");
+        }
     }
 
-    // Set the preset and bank for the assigned channel
-    if (midiInstrument.instrumentIndex >= 0 && midiInstrument.instrumentIndex < player.MPTK_Channels.Length)
-    {
-        player.MPTK_Channels[midiInstrument.instrumentIndex].PresetNum = midiInstrument.preset;
-        player.MPTK_Channels[midiInstrument.instrumentIndex].BankNum = midiInstrument.bank;
-        Debug.Log($"Configured player for instrument {midiInstrument.instrumentIndex} with preset {midiInstrument.preset} and bank {midiInstrument.bank}");
-    }
-    else
-    {
-        Debug.LogError($"Invalid channel index {midiInstrument.instrumentIndex} or uninitialized MPTK_Channels.");
-    }
-}
 
     private List<MPTKEvent> ParseMidiEvents(MidiFilePlayer midiFilePlayer, int assignedChannel)
     {
@@ -230,9 +236,12 @@ public class MidiSequencer : MonoBehaviour
 
         foreach (var midiEvent in midiFilePlayer.MPTK_MidiEvents)
         {
-            if (midiEvent.Command == MPTKCommand.NoteOn) // Only consider NoteOn events
+            if (midiEvent.Command == MPTKCommand.NoteOn)
             {
-                midiEvent.Channel = assignedChannel;
+                Debug.Log($"🎵 MIDI Event {midiEvent.Value} originally on Channel {midiEvent.Channel}, assigning to {assignedChannel}");
+
+                midiEvent.Channel = assignedChannel; // 🔥 Assign correct channel
+
                 trackEvents.Add(new MPTKEvent()
                 {
                     Command = midiEvent.Command,
@@ -246,6 +255,7 @@ public class MidiSequencer : MonoBehaviour
 
         return trackEvents;
     }
+
 
     void Update()
     {
@@ -399,19 +409,18 @@ public class MidiSequencer : MonoBehaviour
     }
     private void PlayNotesAtCurrentTick()
     {
-        // Loop through each track in instrumentTracks
         for (int i = 0; i < instrumentTracks.Count; i++)
         {
-            // Ensure the track is valid and contains events
-            if (instrumentTracks[i] != null && currentTick < instrumentTracks[i].Count)
+            if (instrumentTracks[i] != null)
             {
-                // Get the event for the current tick
-                var noteEvent = instrumentTracks[i][currentTick];
-                if (noteEvent != null)
+                foreach (var noteEvent in instrumentTracks[i])
                 {
-                    // Play the event on the corresponding MidiStreamPlayer
-                    instrumentPlayers[i].MPTK_PlayEvent(noteEvent);
-                    OnMidiEventPlayed?.Invoke(noteEvent, i);
+                    if (noteEvent.Tick == currentTick) // 🔥 Ensure notes match the current tick
+                    {
+                        Debug.Log($"🔊 Playing Note {noteEvent.Value} on Channel {noteEvent.Channel} in {instrumentPlayers[i].name}");
+                        instrumentPlayers[i].MPTK_PlayEvent(noteEvent);
+                        OnMidiEventPlayed?.Invoke(noteEvent, i);
+                    }
                 }
             }
         }

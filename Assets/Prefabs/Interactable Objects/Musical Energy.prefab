@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1251085635654659644}
   - component: {fileID: 490612268647739372}
   - component: {fileID: 844496243030750988}
+  - component: {fileID: 2815219136107505695}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Collect
@@ -120,9 +121,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   amount: 1
-  noteDurationTicks: 4
-  assignedNote: 0
-  assignedInstrumentTrack: {fileID: 0}
 --- !u!114 &1251085635654659644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -173,7 +171,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0.000000014901161, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -183,7 +181,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.2101183, y: 0.2}
   m_EdgeRadius: 0
 --- !u!50 &844496243030750988
 Rigidbody2D:
@@ -212,6 +210,18 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
+--- !u!114 &2815219136107505695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1282962054544746}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22d6aa9db8834b846a4ced250787856a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1316711709889716
 GameObject:
   m_ObjectHideFlags: 0
@@ -224,7 +234,7 @@ GameObject:
   - component: {fileID: 82428433568437518}
   - component: {fileID: 6829879192205348174}
   m_Layer: 0
-  m_Name: Yellow Energy - 1 Hit
+  m_Name: Musical Energy
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -239,7 +249,7 @@ Transform:
   m_GameObject: {fileID: 1316711709889716}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 2}
+  m_LocalPosition: {x: -6.8, y: -3.23, z: 2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
