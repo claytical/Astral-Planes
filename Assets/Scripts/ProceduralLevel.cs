@@ -6,7 +6,6 @@ using MidiPlayerTK;
 
 public class ProceduralLevel : MonoBehaviour
 {
-    public MidiSequencer midiSequencer;
     public SetInfo currentSet;
     public Loot[] availableLoot;
 
@@ -45,11 +44,7 @@ public class ProceduralLevel : MonoBehaviour
         {
             currentSet.SetLevel(this);
             currentSet.gameObject.SetActive(true);
-            if (midiSequencer != null)
-            {
-                // Subscribe to the OnMidiEventPlayed event
-                midiSequencer.OnMidiEventPlayed += HandleMidiEventPlayed;
-            }
+
         }
         else
         {
@@ -69,14 +64,7 @@ public class ProceduralLevel : MonoBehaviour
         }
 
     }
-    void OnDestroy()
-    {
-        // Unsubscribe from the event to prevent memory leaks
-        if (midiSequencer != null)
-        {
-            midiSequencer.OnMidiEventPlayed -= HandleMidiEventPlayed;
-        }
-    }
+
     private void SpawnPortal()
     {
         if (portalPrefab != null)
@@ -89,35 +77,7 @@ public class ProceduralLevel : MonoBehaviour
             Debug.LogWarning("Portal prefab is not assigned.");
         }
     }
-    public void TransitionToNextSet(SetInfo nextSet, SequenceManager nextSequence)
-    {
-        Debug.Log("Transitioning to set " + nextSet.name + " and sequence " + nextSequence.name);
-        completedSets++;
 
-        if (completedSets % setsBeforePortal == 0)
-        {
-            SpawnPortal();
-        }
-        else
-        {
-            currentSet.gameObject.SetActive(false);
-
-            // Select the next set using weighted random logic
-            currentSet = nextSet;
-            currentSet.SetLevel(this);
-            midiSequencer.SetNextSequence(nextSequence);
-
-            if (currentSet != null)
-            {
-                currentSet.gameObject.SetActive(true);
-                Debug.Log($"Transitioned to set: {currentSet.name}");
-            }
-            else
-            {
-                Debug.LogWarning("No valid next set was selected.");
-            }
-        }
-    }
     
 
 

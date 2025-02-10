@@ -21,7 +21,6 @@ public class SetInfo : MonoBehaviour
     public GameObject platforms;  // Single GameObject that holds all platform-related objects
     public BreakableInfo[] breakableInfos;  // Array of BreakableInfo to handle weighted breakable spawning
     public List<SetInfo> availableSets;
-    public SequenceManager[] nextPossibleSequences;
 
     public int weight = 1;  // Weight of this set for weighted random selection
     
@@ -54,11 +53,6 @@ public class SetInfo : MonoBehaviour
     public void SetLevel(ProceduralLevel l)
     {
         level = l;
-        if(level?.midiSequencer != null)
-        {
-            level.midiSequencer.OnMidiEventPlayed += HandleMidiEvent;
-            Debug.Log("Subscribing Set to Midi Events");
-        }
     }
     private void HandleMidiEvent(MPTKEvent midiEvent, int trackIndex)
     {
@@ -126,20 +120,6 @@ public class SetInfo : MonoBehaviour
         }
     }
 
-    // Method to handle collection and free up the location
-    private void Collected(GameObject collectedItem, int spawnIndex)
-    {
-        Debug.Log("Collected Object");
-        breakablesCollectedOnSet++;
-        if (breakablesCollectedOnSet >= breakablesRequiredToAdvance)
-        {
-            level.TransitionToNextSet(SelectNextSet(), nextPossibleSequences[Random.Range(0, nextPossibleSequences.Length)]);
-        }
-
-        Destroy(collectedItem);
-        occupiedLocations.Remove(spawnIndex);
-        Debug.Log($"Spawn location {spawnIndex} is now free.");
-    }
 
 
     //Next Level
@@ -252,10 +232,7 @@ public class SetInfo : MonoBehaviour
 
     public void ExplodePlatforms()
     {
-        if(level?.midiSequencer != null)
-        {
-            level.midiSequencer.OnMidiEventPlayed -= HandleMidiEvent;
-        }
+
         Platform[] platformArray = platforms.GetComponentsInChildren<Platform>();
         foreach (Platform platform in platformArray)
         {

@@ -168,7 +168,7 @@ PlayerSettings:
   androidMinAspectRatio: 1
   applicationIdentifier:
     Android: com.NERDLab.AstralPlanes
-    Standalone: com.NERDLab.AstralPlanes
+    Standalone: com.Clay-Ewing.Astral-Planes
     Tizen: edu.nerdlab.astralplanes
     iPhone: edu.nerdlab.astralplanes
     tvOS: edu.nerdlab.astralplanes
@@ -578,6 +578,13 @@ PlayerSettings:
       m_Width: 1920
       m_Height: 720
       m_Kind: 1
+      m_SubKind: 
+  - m_BuildTarget: VisionOS
+    m_Icons:
+    - m_Textures: []
+      m_Width: 1024
+      m_Height: 1024
+      m_Kind: 0
       m_SubKind: 
   m_BuildTargetBatching: []
   m_BuildTargetShaderSettings: []

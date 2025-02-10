@@ -460,41 +460,6 @@ Transform:
   - {fileID: 384890469}
   m_Father: {fileID: 293625920}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9087655
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5fc8a054b054664d86e518b31d75b7c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  applyReverb: 0
-  reverbRoom: 0.9
-  reverbRoomHF: 0.99
-  reverbRoomLF: 1
-  reverbReflectionLevel: 0.67254543
-  reverbReflectionDelay: 0
-  reverbDryLevel: 1
-  reverbDecayTime: 1.49
-  reverbDecayHFRatio: 0.83
-  reverbLevel: 0.85
-  reverbDelay: 0.011
-  reverbHfReference: 5000
-  reverbLfReference: 250
-  reverbDiffusion: 1
-  reverbDensity: 1
-  applyChorus: 0
-  chorusDryMix: 0.5
-  chorusWetMix1: 0.5
-  chorusWetMix2: 0.5
-  chorusWetMix3: 0.5
-  chorusDelay: 40
-  chorusRate: 0.8
-  chorusDepth: 0.03
 --- !u!1001 &9942836
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -670,12 +635,13 @@ MonoBehaviour:
   - notes:
     - noteValue: 24
       weight: 1
-    duration:
-    - durationTicks: 1920
+    - noteValue: 26
       weight: 1
-    - durationTicks: 480
+    - noteValue: 28
       weight: 1
-    lockInThreshold: 2
+    allowedDuration: -1
+    lockInThreshold: 4
+    allowedSteps: 00000000080000001000000018000000
   - notes:
     - noteValue: 60
       weight: 1
@@ -687,10 +653,9 @@ MonoBehaviour:
       weight: 1
     - noteValue: 67
       weight: 1
-    duration:
-    - durationTicks: 96
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 8
+    allowedSteps: 00000000080000001000000018000000
 --- !u!4 &31563535
 Transform:
   m_ObjectHideFlags: 0
@@ -1322,7 +1287,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -3073,7 +3037,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -3839,7 +3802,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -4190,7 +4152,7 @@ Transform:
   m_GameObject: {fileID: 316201584}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: 0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 9, y: 0, z: 0}
+  m_LocalPosition: {x: 5.38, y: 0, z: 0}
   m_LocalScale: {x: 25, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4255,7 +4217,7 @@ Rigidbody2D:
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 0
-  m_Material: {fileID: 6200000, guid: a6996a5fc0da6493ebbc2102a34ffaf4, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -4652,27 +4614,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
-  noteGroupIndex: 0
-  allowedNotes: 
-  allowedDurations: 
   midiStreamPlayer: {fileID: 1798320910}
   channel: 1
   preset: 33
   bank: 0
-  drumTrack: {fileID: 1354683682}
-  availablePatterns:
-  - Claps-1
-  - Slow-1
-  - Steady-1
-  - Drums-KKS
-  - Toms-1
   collectablePrefab: {fileID: 1316711709889716, guid: c5b87dda1b2a50346ac04acbd4a0478a,
     type: 3}
   collectableParent: {fileID: 312963205}
-  maxSpawnedItems: 2
-  fadeDuration: 1
-  currentLoopCount: 0
-  isLocked: 0
+  noteGroupIndex: 0
+  allowedDuration: -1
 --- !u!1 &360857889
 GameObject:
   m_ObjectHideFlags: 0
@@ -6866,8 +6816,6 @@ MonoBehaviour:
     weight: 10
   availableSets:
   - {fileID: 1197176425}
-  nextPossibleSequences:
-  - {fileID: 0}
   weight: 10
   breakablesRequiredToAdvance: 8
   breakablesRequiredForLoot: 8
@@ -7151,7 +7099,7 @@ Transform:
   m_GameObject: {fileID: 561414349}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: -9, y: 0, z: 0}
+  m_LocalPosition: {x: -5.26, y: 0, z: 0}
   m_LocalScale: {x: 25, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7816,27 +7764,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
-  noteGroupIndex: 1
-  allowedNotes: 
-  allowedDurations: 
   midiStreamPlayer: {fileID: 608598250}
   channel: 2
   preset: 68
   bank: 0
-  drumTrack: {fileID: 1354683682}
-  availablePatterns:
-  - Toms-1
-  - Steady-1
-  - Slow-1
-  - Drums-KKS
-  - Claps-1
   collectablePrefab: {fileID: 1316711709889716, guid: 08afbd3a25e32d24880279a992b60e37,
     type: 3}
   collectableParent: {fileID: 2051030397}
-  maxSpawnedItems: 8
-  fadeDuration: 3
-  currentLoopCount: 0
-  isLocked: 0
+  noteGroupIndex: 1
+  allowedDuration: -1
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -8369,8 +8305,6 @@ MonoBehaviour:
     weight: 10
   availableSets:
   - {fileID: 528114999}
-  nextPossibleSequences:
-  - {fileID: 0}
   weight: 10
   breakablesRequiredToAdvance: 4
   breakablesRequiredForLoot: 15
@@ -9863,7 +9797,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -10385,33 +10318,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1353528023}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &876696724
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc2b118d1a6c1154983be5ee4bf1b510, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  applySFReverb: 0
-  applySFChorus: 0
-  applySFFilter: 1
-  FilterFreqOffset: 0
-  ReverbAmplify: 0
-  ChorusAmplify: 0
-  filterQModOffset: 0
-  sfReverbRoomSize: 0.5
-  sfReverbDamp: 0.3
-  sfReverbWidth: 0.8
-  sfReverbLevel: 0.7
-  sfChorusLevel: 0.6
-  sfChorusSpeed: 0.2
-  sfChorusDepth: 4.25
-  sfChorusWidth: 10
 --- !u!1 &880499537
 GameObject:
   m_ObjectHideFlags: 0
@@ -11336,7 +11242,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -11465,24 +11370,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 633046662}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &978429604 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-    type: 3}
-  m_PrefabInstance: {fileID: 997695435}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0fb0999ab241539438b0b012d2ea9779, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &978429605 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea,
-    type: 3}
-  m_PrefabInstance: {fileID: 997695435}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &983978277
 GameObject:
   m_ObjectHideFlags: 0
@@ -11650,108 +11537,6 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 996959901}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &997695435
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1354683683}
-    m_Modifications:
-    - target: {fileID: 1668918397659358, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_Name
-      value: MidiFilePlayer
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4314086310842868, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: showDefault
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: keepEndTrack
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: midiNameToPlay
-      value: Drums-KKS
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: midiAutoRestart
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: midiIndexToPlay
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: MPTK_EffectUnity
-      value: 
-      objectReference: {fileID: 9087655}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: MPTK_ModeStopVoice
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: MPTK_EffectSoundFont
-      value: 
-      objectReference: {fileID: 876696724}
-    - target: {fileID: 114662785300262660, guid: 32a8d8859acf18d4ba134834a876d5ea,
-        type: 3}
-      propertyPath: MPTK_StartPlayAtFirstNote
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 32a8d8859acf18d4ba134834a876d5ea, type: 3}
 --- !u!1 &998985894
 GameObject:
   m_ObjectHideFlags: 0
@@ -11840,8 +11625,6 @@ MonoBehaviour:
     weight: 10
   availableSets:
   - {fileID: 661346079}
-  nextPossibleSequences:
-  - {fileID: 0}
   weight: 10
   breakablesRequiredToAdvance: 1
   breakablesRequiredForLoot: 8
@@ -12694,7 +12477,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -13026,7 +12808,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -13985,7 +13766,6 @@ MonoBehaviour:
     weight: 10
   availableSets:
   - {fileID: 1003758687}
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 1
   breakablesRequiredForLoot: 8
@@ -14475,12 +14255,9 @@ MonoBehaviour:
   - notes:
     - noteValue: 24
       weight: 1
-    duration:
-    - durationTicks: 1920
-      weight: 1
-    - durationTicks: 480
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 2
+    allowedSteps: 040000000c000000140000001c000000
   - notes:
     - noteValue: 60
       weight: 1
@@ -14492,10 +14269,9 @@ MonoBehaviour:
       weight: 1
     - noteValue: 67
       weight: 1
-    duration:
-    - durationTicks: 96
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 8
+    allowedSteps: 040000000c000000140000001c000000
 --- !u!4 &1236497522
 Transform:
   m_ObjectHideFlags: 0
@@ -15483,7 +15259,7 @@ Transform:
   m_GameObject: {fileID: 1337021514}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: 0}
+  m_LocalPosition: {x: 0, y: 2.74, z: 0}
   m_LocalScale: {x: 25, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -15586,7 +15362,7 @@ Transform:
   m_GameObject: {fileID: 1340203576}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -4, z: 0}
+  m_LocalPosition: {x: 0, y: -2.66, z: 0}
   m_LocalScale: {x: 25, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -16023,6 +15799,7 @@ GameObject:
   - component: {fileID: 1354683683}
   - component: {fileID: 1354683682}
   - component: {fileID: 1354683684}
+  - component: {fileID: 1354683685}
   m_Layer: 0
   m_Name: Drums
   m_TagString: Untagged
@@ -16042,18 +15819,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e136d82a23df714ea810b28e4170c3e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  drums: {fileID: 978429604}
+  drums: {fileID: 0}
   beatPrefab: {fileID: 1781116594832268, guid: 930b3edf619309f4b9e970a0703f3968, type: 3}
   activeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   noteColor: {r: 1, g: 0, b: 0, a: 1}
   baseBeatSpeed: 1
   beatSpeedMultiplier: 1
-  beatMoveSpeed: 5
+  beatMoveSpeed: 1
   cyclesToSwitchPattern: 16
-  drumPatterns:
-  - Slow-1
-  - Steady-1
-  - Drums-KKS
+  drumAudioSource: {fileID: 1354683685}
+  drumLoopBPM: 150
+  loopLengthInSeconds: 0
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -16066,8 +15842,7 @@ Transform:
   m_LocalPosition: {x: -8, y: 8, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 978429605}
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1354683684
@@ -16083,9 +15858,110 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   assignedNoteSets:
-  - {fileID: 31563534}
-  - {fileID: 1236497521}
+  - {fileID: 1834431006}
+  - {fileID: 1592356861}
   drumTrack: {fileID: 1354683682}
+  instrumentTracks:
+  - {fileID: 342701841}
+  - {fileID: 627412777}
+  - {fileID: 1690824280}
+--- !u!82 &1354683685
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 8300000, guid: 9830b7b534f034b6eb1549f7e6c9cc64, type: 3}
+  m_Resource: {fileID: 8300000, guid: 9830b7b534f034b6eb1549f7e6c9cc64, type: 3}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 1
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1354844170
 GameObject:
   m_ObjectHideFlags: 0
@@ -17069,7 +16945,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.76, y: 2.01, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1340203577}
@@ -22840,14 +22716,9 @@ MonoBehaviour:
       weight: 1
     - noteValue: 29
       weight: 1
-    duration:
-    - durationTicks: 240
-      weight: 10
-    - durationTicks: 480
-      weight: 20
-    - durationTicks: 48
-      weight: 5
+    allowedDuration: -1
     lockInThreshold: 2
+    allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c000000
   - notes:
     - noteValue: 60
       weight: 1
@@ -22855,12 +22726,9 @@ MonoBehaviour:
       weight: 1
     - noteValue: 64
       weight: 1
-    duration:
-    - durationTicks: 192
-      weight: 1
-    - durationTicks: 480
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 2
+    allowedSteps: 02000000060000000a0000000e00000012000000160000001a0000001e000000
   - notes:
     - noteValue: 71
       weight: 5
@@ -22868,12 +22736,9 @@ MonoBehaviour:
       weight: 1
     - noteValue: 67
       weight: 6
-    duration:
-    - durationTicks: 192
-      weight: 1
-    - durationTicks: 480
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 4
+    allowedSteps: 00000000080000001000000018000000
 --- !u!4 &1592356862
 Transform:
   m_ObjectHideFlags: 0
@@ -24533,27 +24398,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
-  noteGroupIndex: 2
-  allowedNotes: 
-  allowedDurations: 
   midiStreamPlayer: {fileID: 1752260332}
   channel: 3
   preset: 54
   bank: 0
-  drumTrack: {fileID: 1354683682}
-  availablePatterns:
-  - Toms-1
-  - Steady-1
-  - Slow-1
-  - Drums-KKS
-  - Claps-1
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 1845854141}
-  maxSpawnedItems: 4
-  fadeDuration: 4
-  currentLoopCount: 0
-  isLocked: 0
+  noteGroupIndex: 2
+  allowedDuration: -1
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0
@@ -24786,7 +24639,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
@@ -26345,12 +26197,9 @@ MonoBehaviour:
   - notes:
     - noteValue: 24
       weight: 1
-    duration:
-    - durationTicks: 1920
-      weight: 1
-    - durationTicks: 480
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 2
+    allowedSteps: 000000000800000010000000180000000e000000
   - notes:
     - noteValue: 60
       weight: 1
@@ -26362,19 +26211,15 @@ MonoBehaviour:
       weight: 1
     - noteValue: 67
       weight: 1
-    duration:
-    - durationTicks: 96
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 8
+    allowedSteps: 04000000080000001000000014000000
   - notes:
     - noteValue: 76
       weight: 1
-    duration:
-    - durationTicks: 192
-      weight: 1
-    - durationTicks: 480
-      weight: 1
+    allowedDuration: -1
     lockInThreshold: 4
+    allowedSteps: 18000000190000001a0000001b0000001c0000001d000000
 --- !u!4 &1834431007
 Transform:
   m_ObjectHideFlags: 0
@@ -26468,7 +26313,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1845854141
 Transform:
   m_ObjectHideFlags: 0
@@ -26591,7 +26436,6 @@ MonoBehaviour:
       type: 3}
     weight: 0
   availableSets: []
-  nextPossibleSequences: []
   weight: 10
   breakablesRequiredToAdvance: 20
   breakablesRequiredForLoot: 8
