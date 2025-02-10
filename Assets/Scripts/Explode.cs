@@ -90,12 +90,10 @@ public class Explode : MonoBehaviour
 
         if (GetComponentInParent<Remix>())
         {
-            Debug.Log("Would be destroying " + transform.parent.gameObject);
           Destroy(transform.parent.gameObject);
         }
         else
         {
-            Debug.Log("Would be destroying " + this.gameObject);
           Destroy(this.gameObject);
         }
     }

@@ -6,9 +6,9 @@ using System.Collections.Generic;
 public class NoteGroup
 {
     public List<WeightedNote> notes; // 🎵 Notes with weighted probabilities
-    public List<WeightedDuration> duration; // 🎵 Notes with weighted probabilities
+    public int allowedDuration = -1; // 🎵 Notes with weighted probabilities
     public int lockInThreshold = 5; //Number of notes needed to lock in
-
+    public List<int> allowedSteps;
 }
 
 [System.Serializable]

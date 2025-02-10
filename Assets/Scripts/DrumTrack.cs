@@ -7,7 +7,6 @@ public class DrumTrack : MonoBehaviour
 {
     public MidiFilePlayer drums;
     public GameObject beatPrefab; // Prefab for visualization
-    //public Transform beatParent; // Parent for instantiated beats
     public Color activeColor = Color.yellow;
     public Color noteColor = Color.red;
     public float baseBeatSpeed = 1f; // ✅ Base speed (adjustable per pattern)
@@ -25,22 +24,37 @@ public class DrumTrack : MonoBehaviour
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private float stepWidth; // Dynamic width per step
-    public List<string> drumPatterns; // ✅ Store MIDI file names instead of TextAssets
-    private Queue<string> patternQueue = new Queue<string>(); // ✅ Queue for upcoming MIDI switches
     private bool isSwitching = false; // ✅ Prevent multiple switches at once
+
+    public AudioSource drumAudioSource;
+    public float drumLoopBPM = 120f;
+    public float loopLengthInSeconds;
+
+    IEnumerator InitializeDrumLoop()
+    {
+        // ✅ Wait until the AudioSource has a valid clip
+        while (drumAudioSource.clip == null)
+        {
+            Debug.Log("Waiting for drum audio clip to load...");
+            yield return null; // Wait until the next frame
+        }
+
+        loopLengthInSeconds = drumAudioSource.clip.length;
+        drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
+        drumAudioSource.Play();
+
+        Debug.Log($"Drum loop initialized with length {loopLengthInSeconds} seconds.");
+    }
 
     void Start()
     {
-        stepWidth = (screenMaxX - screenMinX) / totalSteps; // Correct step spacing
-        AnalyzeMidiForNotes();
-    }
-    public void QueueDrumPattern(string midiName)
-    {
-        if (!patternQueue.Contains(midiName))
+        if (drumAudioSource == null)
         {
-            patternQueue.Enqueue(midiName);
-            Debug.Log($"Queued new drum pattern: {midiName}");
+            Debug.LogError("DrumTrack: No AudioSource assigned!");
+            return;
         }
+
+        StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
     }
     void MoveBeatsDownward()
     {
@@ -97,9 +111,7 @@ public class DrumTrack : MonoBehaviour
         float startX = screenMinX + (startStep * stepWidth); // Align start position
         float width = durationSteps * stepWidth; // Scale width dynamically
 
-        // **Position & Scale**
         beat.transform.position = new Vector3(startX + (width / 2), 0, 0); // Centered correctly
- //       beat.transform.localScale = new Vector3(width, beat.transform.localScale.y, beat.transform.localScale.z);
 
         // **Change color to indicate it's a note**
         SpriteRenderer sprite = beat.GetComponent<SpriteRenderer>();
@@ -131,44 +143,10 @@ public class DrumTrack : MonoBehaviour
                     lastIndex = currentIndex;
                 }
 
-                // ✅ Switch pattern at end of loop if a new one is queued
-                if (currentTick < 10 && patternQueue.Count > 0 && !isSwitching)
-                {
-                    StartCoroutine(SwitchPattern());
-                }
             }
             MoveBeatsDownward();
         }
     }
-    IEnumerator SwitchPattern()
-    {
-        isSwitching = true;
-
-        if (patternQueue.Count > 0)
-        {
-            string newPattern = patternQueue.Dequeue();
-            Debug.Log($"Seamlessly switching to new drum pattern: {newPattern}");
-
-            // ✅ Preload the new pattern
-            drums.MPTK_MidiName = newPattern;
-            drums.MPTK_Load();
-
-            // ✅ Ensure current loop fully plays out
-            long lastTick = drums.MPTK_TickLast;
-            yield return new WaitUntil(() => drums.MPTK_TickCurrent >= lastTick - 5);
-
-            // ✅ Play new pattern at the correct timing
-            drums.MPTK_Play();
-
-            // ✅ Adjust beat speed
-            beatSpeedMultiplier = GetSpeedForPattern(newPattern);
-
-            Debug.Log($"Switched to {newPattern} with speed multiplier {beatSpeedMultiplier}");
-        }
-
-        isSwitching = false;
-    }
-
     void RestartBeat(GameObject beat)
     {
         beat.transform.position = new Vector3(beat.transform.position.x, screenTopY, beat.transform.position.z);
@@ -181,10 +159,15 @@ public class DrumTrack : MonoBehaviour
             Debug.Log("RESET CYCLE");
 
             completedCycles = 0; // ✅ Reset count
-            QueueDrumPattern(drumPatterns[cycleCount % drumPatterns.Count]);
-            StartCoroutine(SwitchPattern()); // ✅ Change drum pattern
+            StartCoroutine(WaitForLoopRestart());
         }
     }
+    IEnumerator WaitForLoopRestart()
+    {
+        yield return new WaitUntil(() => drums.MPTK_TickCurrent < 10); // ✅ Wait until the new loop starts
+        Debug.Log("Drum loop successfully restarted without stutter.");
+    }
+
 
     float GetSpeedForPattern(string patternName)
     {
@@ -218,6 +201,10 @@ public class DrumTrack : MonoBehaviour
     {
         float stepSize = totalTicks / (float)totalSteps;
         int snappedStep = Mathf.RoundToInt(currentTick / stepSize);
+
+        // ✅ Ensure first step plays correctly when loop restarts
+        if (currentTick < 10) snappedStep = 0;
+
         return Mathf.Clamp(snappedStep, 0, totalSteps - 1);
     }
 }

@@ -23,7 +23,6 @@ public class Collectable : MonoBehaviour
 
         if (coll.gameObject.GetComponent<Vehicle>())
         {
-         //   Debug.Log($"Collision detected between {gameObject.transform.parent.name} and {coll.gameObject.transform.parent.name}");
 
             coll.gameObject.GetComponent<Vehicle>().CollectEnergy(amount);
             OnCollected?.Invoke(noteDurationTicks); // Pass duration when collected
@@ -33,17 +32,6 @@ public class Collectable : MonoBehaviour
             {
                 explode.Permanent();  // Destroy the collectable with an effect
             }
-        }
-        else if(coll.gameObject.GetComponent<Explode>())
-        {
-            OnDestroyed?.Invoke(this); // Destroyed on contact with immobile object
-
-            var explode = GetComponent<Explode>();
-            if (explode != null)
-            {
-                explode.Permanent();  // Destroy the collectable with an effect
-            }
-
         }
     }
 }
