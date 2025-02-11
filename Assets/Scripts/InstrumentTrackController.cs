@@ -34,15 +34,16 @@ public class InstrumentTrackController : MonoBehaviour
 
         NoteSet currentNoteSet = assignedNoteSets[currentSetIndex];
 
-        for (int i = 0; i < instrumentTracks.Count; i++)
+        // ✅ Loop through NoteGroups and assign them dynamically
+        foreach (var noteGroup in currentNoteSet.noteGroups)
         {
-            if(currentNoteSet.noteGroups[i] != null)
+            if (noteGroup.assignedInstrumentTrack != null)
             {
-                instrumentTracks[i].ApplyNoteSet(currentNoteSet.noteGroups[i]);
+                noteGroup.assignedInstrumentTrack.ApplyNoteGroup(noteGroup);
             }
             else
             {
-                Debug.Log("Note Set for NoteGroup is Empty:" + currentNoteSet.noteGroups + " : " + i);
+                Debug.LogWarning($"NoteGroup is missing an assigned InstrumentTrack.");
             }
         }
 

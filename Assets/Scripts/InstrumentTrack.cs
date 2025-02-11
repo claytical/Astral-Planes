@@ -14,7 +14,6 @@ public class InstrumentTrack : MonoBehaviour
     public GameObject collectablePrefab; // Prefab to spawn
     public Transform collectableParent; // Parent object for organization
 
-    public int noteGroupIndex = 0;
     public int allowedDuration = -1;
 
     private NoteGroup currentNoteGroup; // ✅ Add this variable at the top of `InstrumentTrack.cs`
@@ -47,7 +46,20 @@ public class InstrumentTrack : MonoBehaviour
 
         StartCoroutine(DelayedStart()); // ✅ Ensures correct order of execution
     }
+    public void ApplyNoteGroup(NoteGroup noteGroup)
+    {
+        if (noteGroup == null)
+        {
+            Debug.LogWarning($"{gameObject.name} - No NoteGroup assigned.");
+            return;
+        }
 
+        currentNoteGroup = noteGroup;
+        allowedSteps = new List<int>(noteGroup.allowedSteps);
+        allowedNotes = new List<int>(noteGroup.notes.ConvertAll(n => n.noteValue));
+
+        Debug.Log($"{gameObject.name} - Assigned NoteGroup with {allowedNotes.Count} notes.");
+    }
     private IEnumerator DelayedStart()
     {
         yield return StartCoroutine(WaitForDrumLoopAndSpawn());
@@ -222,6 +234,72 @@ public class InstrumentTrack : MonoBehaviour
         hasSpawnedInitialCollectables = true; // ✅ Mark that initial set has been spawned
     }
 
+    GameObject SpawnCollectable(int stepIndex, float tickPosition, int durationTicks)
+    {
+        if (allowedNotes.Count == 0)
+        {
+            Debug.LogWarning($"{gameObject.name} - allowedNotes list is empty! Cannot spawn collectable.");
+            return null;
+        }
+
+        GameObject collectableObj = Instantiate(collectablePrefab, collectableParent);
+
+        // ✅ Convert step index into correct X-position based on expanded steps
+        float stepWidth = (screenMaxX - screenMinX) / (float)totalSteps;
+
+        // 🛠 Adjust stepIndex relative to the expanded section
+        int adjustedStepIndex = stepIndex % totalSteps;  // Ensure it's within visible range
+
+        float posX = screenMinX + (adjustedStepIndex * stepWidth);  // ✅ Align X correctly
+
+        // 🎵 Pick a note and determine Y-position dynamically
+        int assignedNote = allowedNotes[Random.Range(0, allowedNotes.Count)];
+        float posY = MapNoteToYPosition(assignedNote);  // ✅ Dynamically scaled Y-position
+
+        collectableObj.transform.position = new Vector3(posX, posY, 0); // ✅ Correctly positions collectable
+
+        // ✅ Ensure the Collectable component is present
+        Collectable collectable = collectableObj.GetComponentInChildren<Collectable>();
+        if (collectable == null)
+        {
+            Debug.LogError($"Collectable component is missing on {collectableObj.name}. Please check the prefab.");
+            return null;
+        }
+
+        // Assign properties
+        collectable.noteDurationTicks = durationTicks;
+        collectable.Initialize(assignedNote, this);
+        collectableNotes[collectable] = (assignedNote, durationTicks);
+        spawnedCollectables.Add(collectableObj);
+
+        collectable.OnCollected += (int duration) => OnCollectableCollected(collectable, stepIndex, duration);
+        collectable.OnDestroyed += OnCollectableDestroyed;
+
+        return collectableObj;
+    }
+    private float MapNoteToYPosition(int noteValue)
+    {
+        if (allowedNotes == null || allowedNotes.Count == 0)
+        {
+            Debug.LogWarning("MapNoteToYPosition: No allowed notes available.");
+            return 0; // Default to middle if no notes are available
+        }
+
+        // Find the min and max values dynamically from allowedNotes
+        int minNote = allowedNotes.Min();
+        int maxNote = allowedNotes.Max();
+
+        // Prevent division by zero if there's only one note
+        if (minNote == maxNote) return 0;
+
+        // Ensure note is clamped within the dynamically set range
+        noteValue = Mathf.Clamp(noteValue, minNote, maxNote);
+
+        // Map note to range -2 to 2 using linear interpolation
+        return Mathf.Lerp(-2f, 2f, (noteValue - minNote) / (float)(maxNote - minNote));
+    }
+
+
     int GetNextStep(int currentStep, List<int> stepList)
     {
         foreach (int step in stepList)
@@ -303,46 +381,6 @@ public class InstrumentTrack : MonoBehaviour
 
 
 
-
-    GameObject SpawnCollectable(int stepIndex, float tickPosition, int durationTicks)
-    {
-        if (allowedNotes.Count == 0)
-        {
-            Debug.LogWarning($"{gameObject.name} - allowedNotes list is empty! Cannot spawn collectable.");
-            return null;
-        }
-
-        GameObject collectableObj = Instantiate(collectablePrefab, collectableParent);
-
-        // ✅ Convert step index into correct X-position based on expanded steps
-        float stepWidth = (screenMaxX - screenMinX) / (float)totalSteps;
-
-        // 🛠 Adjust stepIndex relative to the expanded section
-        int adjustedStepIndex = stepIndex % totalSteps;  // Ensure it's within visible range
-
-        float posX = screenMinX + (adjustedStepIndex * stepWidth);  // ✅ Align X correctly
-        float posY = collectableParent.position.y; // Keep aligned with parent
-
-        collectableObj.transform.position = new Vector3(posX, posY, 0); // ✅ Corrected X-position
-
-        Collectable collectable = collectableObj.GetComponentInChildren<Collectable>();
-        if (collectable == null)
-        {
-            Debug.LogError($"Collectable component is missing on {collectableObj.name}. Please check the prefab.");
-            return null;
-        }
-
-        collectable.noteDurationTicks = durationTicks;
-        int assignedNote = allowedNotes[Random.Range(0, allowedNotes.Count)]; // ✅ Pick a note from allowedNotes
-        collectable.Initialize(assignedNote, this); // ✅ Assign the note & track
-        collectableNotes[collectable] = (assignedNote, durationTicks);
-        spawnedCollectables.Add(collectableObj);
-
-        collectable.OnCollected += (int duration) => OnCollectableCollected(collectable, stepIndex, duration);
-        collectable.OnDestroyed += OnCollectableDestroyed;
-
-        return collectableObj;
-    }
 
     void OnCollectableDestroyed(Collectable collectable)
     {     
