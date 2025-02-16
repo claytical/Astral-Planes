@@ -28,7 +28,7 @@ public class InstrumentTrack : MonoBehaviour
     private Dictionary<int, (int note, int duration)> noteSequence = new Dictionary<int, (int, int)>(); // Stores collected notes & durations
     private List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private Dictionary<Collectable, (int note, int duration)> collectableNotes = new Dictionary<Collectable, (int, int)>();
-    private int totalSteps = 32;
+    private int totalSteps = 64;
     private int currentLoopCount = 0;
     private int lastStep = -1; // Tracks previous step to prevent duplicate triggers
     private bool isLocked = false;
@@ -139,19 +139,19 @@ public class InstrumentTrack : MonoBehaviour
 
         return snappedStep;
     }
+
     void Update()
     {
         if (controller.drumTrack.drumAudioSource == null) return;
 
         float loopLength = controller.drumTrack.loopLengthInSeconds;
-        float baseStepSize = loopLength / 32f;  // ✅ Keeps original step timing
+        float baseStepSize = loopLength / 64f;  // ✅ Keeps original step timing
 
-        // ✅ Manually track time instead of relying on `loopTime`
-        instrumentElapsedTime += Time.deltaTime;
+        // ✅ Use drum loop's playback time for synchronization
+        float currentTime = controller.drumTrack.drumAudioSource.time % loopLength;
 
         // ✅ Compute step index correctly using totalInstrumentSteps
-        int currentStep = Mathf.FloorToInt(instrumentElapsedTime / baseStepSize) % totalInstrumentSteps;
-
+        int currentStep = Mathf.FloorToInt(currentTime / baseStepSize) % totalInstrumentSteps;
 
         if (currentStep != lastStep)
         {
@@ -161,7 +161,6 @@ public class InstrumentTrack : MonoBehaviour
 
         CheckSectionCompletion();
     }
-
 
     public void ClearLoopNotes()
     {
@@ -345,8 +344,8 @@ public class InstrumentTrack : MonoBehaviour
             currentSectionEnd += totalSteps;  // ✅ Expand section boundary
             totalInstrumentSteps += totalSteps;  // ✅ Ensure total steps increase
 
-            Debug.Log($"{gameObject.name} - New Section Set: {currentSectionStart} → {currentSectionEnd} (Total Steps: {totalInstrumentSteps})");
-            Debug.Log($"{gameObject.name} - Updated Allowed Steps: {string.Join(", ", allowedSteps)}");
+          //  Debug.Log($"{gameObject.name} - New Section Set: {currentSectionStart} → {currentSectionEnd} (Total Steps: {totalInstrumentSteps})");
+          //  Debug.Log($"{gameObject.name} - Updated Allowed Steps: {string.Join(", ", allowedSteps)}");
 
             // 4️⃣ Spawn new collectables for this section using the new NoteSet steps
             SpawnCollectables();
@@ -451,7 +450,7 @@ public class InstrumentTrack : MonoBehaviour
         };
 
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
-        StartCoroutine(DelayedNoteOff(noteOff, durationMs)); // ✅ Ensure delayed stop
+//        StartCoroutine(DelayedNoteOff(noteOff, durationMs)); // ✅ Ensure delayed stop
     }
 
 
