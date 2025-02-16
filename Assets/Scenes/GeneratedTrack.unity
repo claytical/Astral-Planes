@@ -449,9 +449,8 @@ GameObject:
   - component: {fileID: 269415560}
   - component: {fileID: 269415559}
   - component: {fileID: 269415557}
-  - component: {fileID: 269415556}
-  - component: {fileID: 269415561}
   - component: {fileID: 269415558}
+  - component: {fileID: 269415561}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -459,14 +458,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!81 &269415556
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 269415555}
-  m_Enabled: 1
 --- !u!124 &269415557
 Behaviour:
   m_ObjectHideFlags: 0
@@ -558,104 +549,14 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!82 &269415561
-AudioSource:
+--- !u!81 &269415561
+AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 269415555}
   m_Enabled: 1
-  serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -1288484661713814712, guid: 07985bf4f6d469340930e958ef313c14,
-    type: 2}
-  m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 0}
-  m_PlayOnAwake: 1
-  m_Volume: 1
-  m_Pitch: 1
-  Loop: 1
-  Mute: 0
-  Spatialize: 0
-  SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 1
-  MinDistance: 1
-  MaxDistance: 500
-  Pan2D: 0
-  rolloffMode: 0
-  BypassEffects: 0
-  BypassListenerEffects: 0
-  BypassReverbZones: 0
-  rolloffCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  panLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 0
-  spreadCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 0
-  reverbZoneMixCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 0
 --- !u!1 &312963204
 GameObject:
   m_ObjectHideFlags: 0
@@ -2069,8 +1970,8 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 9830b7b534f034b6eb1549f7e6c9cc64, type: 3}
-  m_Resource: {fileID: 8300000, guid: 9830b7b534f034b6eb1549f7e6c9cc64, type: 3}
+  m_audioClip: {fileID: 8300000, guid: b39bb6c3db2e04cf28e2750bdddd90ee, type: 3}
+  m_Resource: {fileID: 8300000, guid: b39bb6c3db2e04cf28e2750bdddd90ee, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -7214,17 +7115,9 @@ MonoBehaviour:
     notes:
     - noteValue: 24
       weight: 10
-    - noteValue: 34
-      weight: 5
-    - noteValue: 27
-      weight: 1
-    - noteValue: 24
-      weight: 1
-    - noteValue: 29
-      weight: 1
     allowedDuration: -1
     lockInThreshold: 2
-    allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c000000
+    allowedSteps: 00000000100000002000000030000000
   - assignedInstrumentTrack: {fileID: 627412777}
     notes:
     - noteValue: 60
@@ -7754,33 +7647,11 @@ MonoBehaviour:
   noteGroups:
   - assignedInstrumentTrack: {fileID: 342701841}
     notes:
-    - noteValue: 24
+    - noteValue: 36
       weight: 1
     allowedDuration: -1
     lockInThreshold: 2
-    allowedSteps: 000000000800000010000000180000000e000000
-  - assignedInstrumentTrack: {fileID: 627412777}
-    notes:
-    - noteValue: 60
-      weight: 1
-    - noteValue: 62
-      weight: 1
-    - noteValue: 64
-      weight: 1
-    - noteValue: 65
-      weight: 1
-    - noteValue: 67
-      weight: 1
-    allowedDuration: -1
-    lockInThreshold: 8
-    allowedSteps: 04000000080000001000000014000000
-  - assignedInstrumentTrack: {fileID: 1690824280}
-    notes:
-    - noteValue: 76
-      weight: 1
-    allowedDuration: -1
-    lockInThreshold: 4
-    allowedSteps: 18000000190000001a0000001b0000001c0000001d000000
+    allowedSteps: 0000000008000000100000001800000020000000280000003000000038000000
 --- !u!4 &1834431007
 Transform:
   m_ObjectHideFlags: 0

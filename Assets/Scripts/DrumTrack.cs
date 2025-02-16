@@ -56,49 +56,7 @@ public class DrumTrack : MonoBehaviour
 
         StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
     }
-    void MoveBeatsDownward()
-    {
-        for (int i = 0; i < spawnedBeats.Count; i++)
-        {
-            GameObject beat = spawnedBeats[i];
-            beat.transform.position += Vector3.down * beatMoveSpeed * Time.deltaTime;
 
-            if (beat.transform.position.y < screenBottomY)
-            {
-                RestartBeat(beat);
-            }
-        }
-    }
-
-
-    void AnalyzeMidiForNotes()
-    {
-        foreach (GameObject obj in spawnedBeats)
-        {
-            if (obj != null)
-                Destroy(obj);
-        }
-        spawnedBeats.Clear();
-
-        if (drums == null) return;
-
-        MidiLoad midiData = drums.MPTK_Load();
-        if (midiData == null) return;
-
-        long totalTicks = drums.MPTK_TickLast;
-
-        foreach (MPTKEvent midiEvent in midiData.MPTK_MidiEvents)
-        {
-            if (midiEvent.Command == MPTKCommand.NoteOn && midiEvent.Channel == 9) // Drum channel
-            {
-                int startStep = SnapToClosestStep(midiEvent.Tick, totalTicks);
-                int endStep = SnapToClosestStep(midiEvent.Tick + midiEvent.Duration, totalTicks);
-                int durationSteps = Mathf.Max(1, endStep - startStep); // Ensure at least 1 step width
-
-                SpawnBeatObject(startStep, durationSteps);
-            }
-        }
-    }
 
     void SpawnBeatObject(int startStep, int durationSteps)
     {
@@ -126,47 +84,6 @@ public class DrumTrack : MonoBehaviour
         spawnedBeats.Add(beat);
     }
 
-    void Update()
-    {
-        if (drums != null && spawnedBeats.Count > 0)
-        {
-            long currentTick = drums.MPTK_TickCurrent;
-            long totalTicks = drums.MPTK_TickLast;
-
-            if (totalTicks > 0)
-            {
-                int currentIndex = SnapToClosestStep(currentTick, totalTicks);
-
-                if (currentIndex != lastIndex)
-                {
-                    HighlightCurrentStep(currentIndex);
-                    lastIndex = currentIndex;
-                }
-
-            }
-            MoveBeatsDownward();
-        }
-    }
-    void RestartBeat(GameObject beat)
-    {
-        beat.transform.position = new Vector3(beat.transform.position.x, screenTopY, beat.transform.position.z);
-
-        completedCycles++;
-        cycleCount = completedCycles;
-        Debug.Log("CYCLES: " + completedCycles + " / "  + cyclesToSwitchPattern + " / "+ cycleCount);
-        if (completedCycles >= cyclesToSwitchPattern)
-        {
-            Debug.Log("RESET CYCLE");
-
-            completedCycles = 0; // ✅ Reset count
-            StartCoroutine(WaitForLoopRestart());
-        }
-    }
-    IEnumerator WaitForLoopRestart()
-    {
-        yield return new WaitUntil(() => drums.MPTK_TickCurrent < 10); // ✅ Wait until the new loop starts
-        Debug.Log("Drum loop successfully restarted without stutter.");
-    }
 
 
     float GetSpeedForPattern(string patternName)
@@ -197,14 +114,4 @@ public class DrumTrack : MonoBehaviour
         }
     }
 
-    int SnapToClosestStep(long currentTick, long totalTicks)
-    {
-        float stepSize = totalTicks / (float)totalSteps;
-        int snappedStep = Mathf.RoundToInt(currentTick / stepSize);
-
-        // ✅ Ensure first step plays correctly when loop restarts
-        if (currentTick < 10) snappedStep = 0;
-
-        return Mathf.Clamp(snappedStep, 0, totalSteps - 1);
-    }
 }

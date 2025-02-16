@@ -54,8 +54,8 @@ public class PlayerStats : MonoBehaviour
         // Continuously update the energy display if the vehicle is active
         if (currentVehicle != null)
         {
-            UpdateEnergyDisplay(currentVehicle.energyLevel);
-            UpdateFuel((int)currentVehicle.energyLevel); // Update the fuel UI based on current energy
+//            UpdateEnergyDisplay(currentVehicle.energyLevel);
+//            UpdateFuel((int)currentVehicle.energyLevel); // Update the fuel UI based on current energy
         }
     }
 
