@@ -8,7 +8,7 @@ public class NoteGroup
     public InstrumentTrack assignedInstrumentTrack;
     public List<WeightedNote> notes; // 🎵 Notes with weighted probabilities
     public int allowedDuration = -1; // 🎵 Notes with weighted probabilities
-    public int lockInThreshold = 5; //Number of notes needed to lock in
+    public int maxExpansionAllowed = 2;
     public List<int> allowedSteps;
 }
 

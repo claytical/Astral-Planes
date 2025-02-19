@@ -21,8 +21,8 @@ public class InstrumentTrack : MonoBehaviour
     private List<int> allowedSteps = new List<int>();
     private List<(int stepIndex, int note, int duration)> persistentLoopNotes = new List<(int, int, int)>();
     private int currentSectionStart = 0; // ✅ The starting step of the current section
-    private int currentSectionEnd = 32; // ✅ The ending step (expands when a section is completed)    
-    private int totalInstrumentSteps = 32; // ✅ This will grow as sections are added
+    private int currentSectionEnd = 64; // ✅ The ending step (expands when a section is completed)    
+    private int totalInstrumentSteps = 64; // ✅ This will grow as sections are added
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private Dictionary<int, (int note, int duration)> noteSequence = new Dictionary<int, (int, int)>(); // Stores collected notes & durations
@@ -32,9 +32,14 @@ public class InstrumentTrack : MonoBehaviour
     private int currentLoopCount = 0;
     private int lastStep = -1; // Tracks previous step to prevent duplicate triggers
     private bool isLocked = false;
-    private int lockInThreshold = -1; // Required notes to lock in this track
+    
     private bool hasSpawnedInitialCollectables = false;
     private float instrumentElapsedTime = 0f;  // ✅ Independent time tracker
+    private int currentExpansionCount = 0;
+    private bool hasStartedNewCollection = false;
+    private bool hasBegun = false; // Guard flag
+    private bool isPlayerControlled = false; // Set this in the inspector or via code.
+    private bool hasCollectedNewNoteThisSet = false;
 
     void Start()
     {
@@ -43,10 +48,48 @@ public class InstrumentTrack : MonoBehaviour
             Debug.LogError($"{gameObject.name} - No InstrumentTrackController assigned!");
             return;
         }
-
-        StartCoroutine(DelayedStart()); // ✅ Ensures correct order of execution
     }
-    public void ApplyNoteGroup(NoteGroup noteGroup)
+
+    public void BeginTrack()
+    {
+        Debug.Log("Begin Track Started");
+        if (hasBegun)
+        {
+            return;
+        }
+        hasBegun = true;
+        isPlayerControlled = true;
+        int trackIndex = controller.instrumentTracks.IndexOf(this);
+        NoteSet currentSet = controller.assignedNoteSets[controller.CurrentNoteSetIndex()];
+
+        // Check if there is a corresponding NoteGroup for this track.
+        if (trackIndex < currentSet.noteGroups.Count)
+            {
+                ApplyNoteGroup(currentSet.noteGroups[trackIndex]);
+                Debug.Log($"{gameObject.name} - NoteGroup applied in BeginTrack.");
+            }
+        else
+            {
+                Debug.Log($"{gameObject.name} - No matching NoteGroup found for track index {trackIndex}. Disabling this track for the current arrangement.");
+                // Optionally disable this track so it doesn't run.
+                gameObject.SetActive(false);
+                return;
+        }
+
+            // Only set hasBegun if allowedSteps is now populated.
+            if (allowedSteps != null && allowedSteps.Count > 0)
+            {
+                hasBegun = true;
+                StartCoroutine(DelayedStart());
+            }
+            else
+            {
+                Debug.Log($"{gameObject.name} is still empty.");
+            }
+
+    }
+
+        public void ApplyNoteGroup(NoteGroup noteGroup)
     {
         if (noteGroup == null)
         {
@@ -56,6 +99,7 @@ public class InstrumentTrack : MonoBehaviour
 
         currentNoteGroup = noteGroup;
         allowedSteps = new List<int>(noteGroup.allowedSteps);
+        allowedSteps.Sort();
         allowedNotes = new List<int>(noteGroup.notes.ConvertAll(n => n.noteValue));
 
         Debug.Log($"{gameObject.name} - Assigned NoteGroup with {allowedNotes.Count} notes.");
@@ -95,7 +139,7 @@ public class InstrumentTrack : MonoBehaviour
         allowedNotes = GenerateWeightedList(noteWeights);
 
         // ✅ Assign the lock-in threshold from the NoteGroup
-        lockInThreshold = selectedGroup.lockInThreshold;
+        //lockInThreshold = selectedGroup.lockInThreshold;
 
     }
 
@@ -144,19 +188,30 @@ public class InstrumentTrack : MonoBehaviour
     {
         if (controller.drumTrack.drumAudioSource == null) return;
 
-        float loopLength = controller.drumTrack.loopLengthInSeconds;
-        float baseStepSize = loopLength / 64f;  // ✅ Keeps original step timing
 
         // ✅ Use drum loop's playback time for synchronization
-        float currentTime = controller.drumTrack.drumAudioSource.time % loopLength;
+        // Calculate step size based on the base loop division (64 steps per loop)
 
-        // ✅ Compute step index correctly using totalInstrumentSteps
-        int currentStep = Mathf.FloorToInt(currentTime / baseStepSize) % totalInstrumentSteps;
+        // Global step accounts for completed loops
+        // drum loop length in seconds (for one 64-tick cycle)
+        float drumLoopLength = controller.drumTrack.loopLengthInSeconds;
 
-        if (currentStep != lastStep)
+        // Calculate how long one full instrument loop lasts.
+        float instrumentLoopLength = drumLoopLength * (totalInstrumentSteps / 64f);
+        float loopLength = controller.drumTrack.loopLengthInSeconds; // length of one measure (64 ticks)
+        // Use dspTime so we have a continuously increasing time value.
+        float elapsedTime = (float)(AudioSettings.dspTime - controller.drumTrack.startDspTime);
+        int measureCount = Mathf.FloorToInt(elapsedTime / loopLength);
+        // Determine the duration of one step in the expanded instrument loop.
+        float baseStepSize = instrumentLoopLength / totalInstrumentSteps;
+
+        // Global step cycles from 0 to totalInstrumentSteps-1
+        int globalStep = Mathf.FloorToInt(elapsedTime / baseStepSize) % totalInstrumentSteps;
+        if (globalStep != lastStep)
         {
-            PlayLoopedNotes(currentStep);
-            lastStep = currentStep;
+            PlayLoopedNotes(globalStep);
+            lastStep = globalStep;
+
         }
 
         CheckSectionCompletion();
@@ -168,6 +223,13 @@ public class InstrumentTrack : MonoBehaviour
         Debug.Log($"{gameObject.name} - Cleared all looping notes for new drum pattern.");
     }
 
+    // Example of resetting state when starting a new NoteSet:
+    public void ResetTrackState()
+    {
+        hasBegun = false;
+        hasSpawnedInitialCollectables = false;
+        // Reset any other state variables (like expansion counters, flags, etc.)
+    }
 
 
     public void ResetCollectables()
@@ -188,6 +250,7 @@ public class InstrumentTrack : MonoBehaviour
 
     public void SpawnCollectables()
     {
+        hasStartedNewCollection = false;
         if (hasSpawnedInitialCollectables && currentSectionStart == 0)
         {
             Debug.LogWarning($"{gameObject.name} - Preventing duplicate spawn on first set.");
@@ -195,7 +258,7 @@ public class InstrumentTrack : MonoBehaviour
         }
 
         Debug.Log($"{gameObject.name} - SpawnCollectables called. Allowed Steps: {string.Join(", ", allowedSteps)}");
-
+        
         if (controller.drumTrack.drumAudioSource == null) return;
         if (allowedSteps == null || allowedSteps.Count == 0)
         {
@@ -223,6 +286,10 @@ public class InstrumentTrack : MonoBehaviour
         foreach (int stepIndex in sectionSteps)
         {
             int nextStep = GetNextStep(stepIndex, sectionSteps);
+            if(nextStep <= stepIndex)
+            {
+                nextStep = currentSectionEnd;
+            }
             int maxAllowedDurationTicks = (nextStep - stepIndex) * (int)(stepSize * 480f);
             int chosenDurationTicks = SelectMaxDuration(maxAllowedDurationTicks);
             float stepTime = stepIndex * stepSize;
@@ -309,46 +376,50 @@ public class InstrumentTrack : MonoBehaviour
     }
     public void CheckSectionCompletion()
     {
+        // Prevent expansion before initial collectables have spawned.
         if (!hasSpawnedInitialCollectables)
         {
-            Debug.Log($"{gameObject.name} - Preventing early CheckSectionCompletion call.");
-            return; // ✅ Ensures expansion only happens *after* the first set is collected
+            return;
         }
 
-        if (spawnedCollectables.Count == 0)
+        // If there are still collectables on screen, don't expand.
+        if (spawnedCollectables.Count > 0)
         {
-            Debug.Log($"{gameObject.name} - Expanding Section: {currentSectionStart} → {currentSectionEnd}");
+            return;
+        }
 
-            // 1️⃣ Fetch the next NoteSet from InstrumentTrackController
-            NoteSet nextNoteSet = controller.GetNextNoteSet();
-            if (nextNoteSet == null)
-            {
-                Debug.LogWarning($"{gameObject.name} - No more NoteSets available, stopping expansion.");
-                return;
-            }
+        // Ensure we have a valid NoteGroup assigned.
+        if (currentNoteGroup == null)
+        {
+            Debug.LogError($"{gameObject.name} - No current NoteGroup assigned!");
+            return;
+        }
 
-            // 2️⃣ Get the next note group's allowed steps
-            int nextIndex = controller.CurrentNoteSetIndex();
-            List<int> nextAllowedSteps = nextNoteSet.noteGroups[nextIndex].allowedSteps;
-            if (nextAllowedSteps == null || nextAllowedSteps.Count == 0)
-            {
-                Debug.LogError($"{gameObject.name} - ERROR: Next NoteSet has no allowed steps!");
-                return;
-            }
+        //For level design, if the max count is set by the designer to 2, we want to make sure it goes twice, not 3 times due to counting from 0. zero based array math versus human counting.
+        if (currentExpansionCount < currentNoteGroup.maxExpansionAllowed - 1)
+        {
+            currentExpansionCount++;
+            Debug.Log($"{gameObject.name} - Expanding section {currentExpansionCount}/{currentNoteGroup.maxExpansionAllowed}: expanding from {currentSectionStart} to {currentSectionEnd + totalSteps}");
 
-            // 🛠 Shift allowed steps by `currentSectionEnd`, NOT `currentSectionStart`
-            allowedSteps = nextAllowedSteps.Select(step => step + currentSectionEnd).ToList();
+            // Offset the allowedSteps by totalSteps so that new collectables fall into the next section.
+            allowedSteps = allowedSteps.Select(step => step + totalSteps).ToList();
 
-            // 3️⃣ Update section boundaries correctly
-            currentSectionStart = currentSectionEnd;  // ✅ Shift start to the next section
-            currentSectionEnd += totalSteps;  // ✅ Expand section boundary
-            totalInstrumentSteps += totalSteps;  // ✅ Ensure total steps increase
-
-          //  Debug.Log($"{gameObject.name} - New Section Set: {currentSectionStart} → {currentSectionEnd} (Total Steps: {totalInstrumentSteps})");
-          //  Debug.Log($"{gameObject.name} - Updated Allowed Steps: {string.Join(", ", allowedSteps)}");
-
-            // 4️⃣ Spawn new collectables for this section using the new NoteSet steps
+            // Update section boundaries and overall instrument steps.
+            currentSectionStart = currentSectionEnd;
+            currentSectionEnd += totalSteps;
+            totalInstrumentSteps += totalSteps;
+            Debug.Log("Total Instrument Steps: " + totalInstrumentSteps + " CURRENT START: " + currentSectionStart + " CURRENT END: " + currentSectionEnd);
+            // Spawn new collectables for the next section.
             SpawnCollectables();
+        }
+        else
+        {
+            // Maximum expansions reached for the current NoteGroup.
+            Debug.Log($"{gameObject.name} - Maximum expansions reached for current NoteGroup. Awaiting new note collection to transition.");
+
+            // Optionally, signal to the controller that this track's expansion for the current NoteGroup is complete.
+            controller.TrackExpansionCompleted(this);
+            // Do not clear persistentLoopNotes here; let them play until new collection starts.
         }
     }
 
@@ -358,17 +429,17 @@ public class InstrumentTrack : MonoBehaviour
 
     IEnumerator WaitForDrumLoopAndSpawn()
     {
-        // ✅ Ensure drum loop is initialized first
-        yield return new WaitUntil(() => controller.drumTrack.loopLengthInSeconds > 0);
+        // Guard: if we've already spawned collectables, exit.
+        if (hasSpawnedInitialCollectables)
+            yield break;
 
-        // ✅ Ensure allowedSteps is populated before spawning
+        yield return new WaitUntil(() => controller.drumTrack.loopLengthInSeconds > 0);
         yield return new WaitUntil(() => allowedSteps != null && allowedSteps.Count > 0);
 
         Debug.Log($"{gameObject.name} - Drum loop initialized. Allowed Steps at spawn: {string.Join(", ", allowedSteps)}");
-
         SpawnCollectables();
+        hasSpawnedInitialCollectables = true;
     }
-
 
     public void UnlockTrack()
     {
@@ -390,30 +461,70 @@ public class InstrumentTrack : MonoBehaviour
 
     void OnCollectableCollected(Collectable collectable, int stepIndex, int durationTicks)
     {
-
-        if (collectable.assignedInstrumentTrack != this) // 🚨 Prevent cross-track confusion!
+        // Verify this collectable belongs to this track.
+        if (collectable.assignedInstrumentTrack != this)
         {
             return;
         }
+        if(!hasCollectedNewNoteThisSet)
+        {
+            Debug.Log("First new collectable received");
+            persistentLoopNotes.Clear();
+            hasCollectedNewNoteThisSet = true;
+        }
+
+        if(!hasStartedNewCollection)
+        {
+            Debug.Log("Starting new collection,");
+
+//            persistentLoopNotes.Clear();
+            hasStartedNewCollection = true;
+        }
+
+        // Here, stepIndex is assumed to be the absolute step for this note (e.g. 0, 48, 64, 112).
+        // If needed, you could adjust by an offset (like currentSectionStart) if your allowedSteps are relative.
+        int absoluteStep = stepIndex;
         int note = collectable.assignedNote;
-        persistentLoopNotes.Add((stepIndex, note, durationTicks));
 
-        // ✅ Remove from tracking
+        // Add the collected note into the persistent loop.
+        persistentLoopNotes.Add((absoluteStep, note, durationTicks));
+
+        Debug.Log($"{gameObject.name} - Collected note {note} at absolute step {absoluteStep} with duration {durationTicks}");
+
+        // Remove the collectable from tracking.
         collectableNotes.Remove(collectable);
-        spawnedCollectables.Remove(collectable.gameObject.transform.parent.gameObject);
-        Destroy(collectable.gameObject.transform.parent.gameObject);
-     }
+        // Remove the spawned collectable by accessing its parent (if that's how your prefab is structured).
+        GameObject parentObj = collectable.gameObject.transform.parent.gameObject;
+        spawnedCollectables.Remove(parentObj);
+        Destroy(parentObj);
+    }
 
-
-    void PlayLoopedNotes(int stepIndex)
+    public void ResetInstrumentLoop()
     {
-        int adjustedStepIndex = stepIndex % totalInstrumentSteps; // ✅ Ensure step wraps over full range
+        if(isPlayerControlled)
+        {
+            hasCollectedNewNoteThisSet = false;
+        }
 
+        // Reset expansion-related variables.
+        currentExpansionCount = 0;
+        hasStartedNewCollection = false;
+
+        // Reset the section boundaries and total steps to the base values.
+        currentSectionStart = 0;
+        // Assume totalSteps is the base length (for example, 64 ticks)
+        currentSectionEnd = totalSteps;
+        totalInstrumentSteps = totalSteps;
+    }
+
+
+    void PlayLoopedNotes(int globalStep)
+    {
+        // Here, persistentLoopNotes stores the absolute step at which each note should play.
         foreach (var (storedStep, note, duration) in persistentLoopNotes)
         {
-            if (storedStep == adjustedStepIndex)
+            if (storedStep == globalStep)
             {
-                Debug.Log($"{gameObject.name} - Playing Note: {note} at Step: {adjustedStepIndex}");
                 PlayNote(note, duration);
             }
         }

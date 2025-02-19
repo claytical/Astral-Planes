@@ -220,19 +220,8 @@ public class Vehicle : MonoBehaviour
 
     public void CollectEnergy(int amount)
     {
-//TODO: Handle Next Set Decision Via SetInfo
-//        sequencer.NextSet();
-        Debug.Log("Next sequence");
-
-        //GamepadManager.Instance.CollectedBreakable();
         
         energyLevel += amount;
-        /*
-        if(energyLevel >= GamepadManager.Instance.level.currentSet.breakablesRequiredForLoot)
-        {
-            GamepadManager.Instance.level.currentSet.DropLoot();
-        }
-        */
         if (energyLevel > capacity)
         {
             energyLevel = capacity;
@@ -252,7 +241,6 @@ public class Vehicle : MonoBehaviour
         {
             localPlayer.EnergyCollected((int)energyLevel);
         }
-        //       ResumeMidiTrack(); // Resume the MIDI track if energy is regained
     }
     public void OnSpecialCollectableCollected()
     {

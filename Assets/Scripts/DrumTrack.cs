@@ -20,15 +20,29 @@ public class DrumTrack : MonoBehaviour
     private float screenBottomY = -10f; // ✅ Adjust based on your screen position
     private List<GameObject> spawnedBeats = new List<GameObject>();
     private int lastIndex = -1;
-    private int totalSteps = 32; // Number of steps in the loop
+    private int totalSteps = 64; // Number of steps in the loop
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private float stepWidth; // Dynamic width per step
     private bool isSwitching = false; // ✅ Prevent multiple switches at once
+    public int loopCounter = 0;
+    private float lastDrumTime = 0f;
 
     public AudioSource drumAudioSource;
     public float drumLoopBPM = 120f;
     public float loopLengthInSeconds;
+    public float startDspTime;
+    private void Update()
+    {
+        if (drumAudioSource == null) return;
+        float currentTime = drumAudioSource.time;
+        if(currentTime < lastDrumTime)
+        {
+
+            loopCounter++;
+        }
+        lastDrumTime = currentTime;
+    }
 
     IEnumerator InitializeDrumLoop()
     {
@@ -42,7 +56,7 @@ public class DrumTrack : MonoBehaviour
         loopLengthInSeconds = drumAudioSource.clip.length;
         drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
         drumAudioSource.Play();
-
+        startDspTime = (float)AudioSettings.dspTime;
         Debug.Log($"Drum loop initialized with length {loopLengthInSeconds} seconds.");
     }
 

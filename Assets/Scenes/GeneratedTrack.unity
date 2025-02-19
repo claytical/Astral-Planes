@@ -159,7 +159,7 @@ MonoBehaviour:
     - noteValue: 28
       weight: 1
     allowedDuration: -1
-    lockInThreshold: 4
+    maxExpansionAllowed: 2
     allowedSteps: 00000000080000001000000018000000
   - assignedInstrumentTrack: {fileID: 0}
     notes:
@@ -174,7 +174,7 @@ MonoBehaviour:
     - noteValue: 67
       weight: 1
     allowedDuration: -1
-    lockInThreshold: 8
+    maxExpansionAllowed: 2
     allowedSteps: 00000000080000001000000018000000
 --- !u!4 &31563535
 Transform:
@@ -1562,7 +1562,7 @@ MonoBehaviour:
     - noteValue: 24
       weight: 1
     allowedDuration: -1
-    lockInThreshold: 2
+    maxExpansionAllowed: 2
     allowedSteps: 040000000c000000140000001c000000
   - assignedInstrumentTrack: {fileID: 0}
     notes:
@@ -1577,7 +1577,7 @@ MonoBehaviour:
     - noteValue: 67
       weight: 1
     allowedDuration: -1
-    lockInThreshold: 8
+    maxExpansionAllowed: 2
     allowedSteps: 040000000c000000140000001c000000
 --- !u!4 &1236497522
 Transform:
@@ -1922,9 +1922,11 @@ MonoBehaviour:
   beatSpeedMultiplier: 1
   beatMoveSpeed: 1
   cyclesToSwitchPattern: 16
+  loopCounter: 0
   drumAudioSource: {fileID: 1354683685}
   drumLoopBPM: 150
   loopLengthInSeconds: 0
+  startDspTime: 0
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -7116,19 +7118,8 @@ MonoBehaviour:
     - noteValue: 24
       weight: 10
     allowedDuration: -1
-    lockInThreshold: 2
+    maxExpansionAllowed: 2
     allowedSteps: 00000000100000002000000030000000
-  - assignedInstrumentTrack: {fileID: 627412777}
-    notes:
-    - noteValue: 60
-      weight: 1
-    - noteValue: 67
-      weight: 1
-    - noteValue: 64
-      weight: 1
-    allowedDuration: -1
-    lockInThreshold: 2
-    allowedSteps: 02000000060000000a0000000e00000012000000160000001a0000001e000000
   - assignedInstrumentTrack: {fileID: 1690824280}
     notes:
     - noteValue: 71
@@ -7138,8 +7129,19 @@ MonoBehaviour:
     - noteValue: 67
       weight: 6
     allowedDuration: -1
-    lockInThreshold: 4
+    maxExpansionAllowed: 2
     allowedSteps: 00000000080000001000000018000000
+  - assignedInstrumentTrack: {fileID: 627412777}
+    notes:
+    - noteValue: 60
+      weight: 1
+    - noteValue: 67
+      weight: 1
+    - noteValue: 64
+      weight: 1
+    allowedDuration: -1
+    maxExpansionAllowed: 2
+    allowedSteps: 02000000060000000a0000000e00000012000000160000001a0000001e000000
 --- !u!4 &1592356862
 Transform:
   m_ObjectHideFlags: 0
@@ -7650,7 +7652,7 @@ MonoBehaviour:
     - noteValue: 36
       weight: 1
     allowedDuration: -1
-    lockInThreshold: 2
+    maxExpansionAllowed: 2
     allowedSteps: 0000000008000000100000001800000020000000280000003000000038000000
 --- !u!4 &1834431007
 Transform:
