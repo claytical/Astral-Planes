@@ -8,16 +8,17 @@ public class Collectable : MonoBehaviour
     public int noteDurationTicks = 4; // Default to a 1/16th note duration (adjustable)
     public int assignedNote; // ✅ Stores the note value
     public InstrumentTrack assignedInstrumentTrack; // ✅ Links to the track that spawned it
-    
     public delegate void OnCollectedHandler(int duration);
+
+    public bool easingComplete = false;
     public event OnCollectedHandler OnCollected;
     public event Action<Collectable> OnDestroyed;
-    
     public void Initialize(int note, InstrumentTrack track)
     {
         assignedNote = note;
         assignedInstrumentTrack = track; // ✅ Store reference for validation
     }
+
     private void OnTriggerEnter2D(Collider2D coll)
     {
 

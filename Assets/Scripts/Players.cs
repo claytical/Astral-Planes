@@ -8,7 +8,6 @@ public class Players : MonoBehaviour
     public GameObject intro;
     //public TextMeshProUGUI startText;
     public GameObject spawnLocations;
-    public ProceduralLevel level;
     public Boundaries boundaries;
     // Start is called before the first frame update
 

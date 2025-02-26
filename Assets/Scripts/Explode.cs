@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class Explode : MonoBehaviour
 {
@@ -38,19 +40,6 @@ public class Explode : MonoBehaviour
         transform.rotation = originalRotation;
     }
 
-    public void Reactivate()
-    {
-        // Reset any other states before reactivating
-        if (GetComponent<Platform>())
-        {
-            GetComponent<Platform>().ResetState();
-        }
-
-        transform.position = originalPosition;
-        transform.rotation = originalRotation;
-        transform.localScale = originalScale;
-        gameObject.SetActive(true);
-    }
 
     public void UntilNextSet()
     {
@@ -72,13 +61,10 @@ public class Explode : MonoBehaviour
 
     public void Permanent()
     {
-        if(GetComponent<Vehicle>())
-        {
+        if (GetComponent<Vehicle>())
+        { 
             Destroy(gameObject, 1);
-        }
-        if (GetComponent<Platform>())
-        {
-            Debug.Log("Permanent explosion triggered");
+            return;
         }
 
         if (GetComponent<Rigidbody2D>())
@@ -87,14 +73,9 @@ public class Explode : MonoBehaviour
         }
 
         Instantiate(explosion, transform.position, Quaternion.identity);
-
-        if (GetComponentInParent<Remix>())
-        {
-          Destroy(transform.parent.gameObject);
-        }
-        else
-        {
-          Destroy(this.gameObject);
-        }
+        Destroy(this.gameObject);
     }
+
+
+
 }

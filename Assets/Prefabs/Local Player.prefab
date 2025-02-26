@@ -29,7 +29,7 @@ Transform:
   m_GameObject: {fileID: 8086964223068625411}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -64,27 +64,27 @@ MonoBehaviour:
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: 4b62fe6d-ebdd-4a7b-af54-8013d7427e4b
-    m_ActionName: Play/Move[/SwitchProControllerHID/leftStick]
+    m_ActionName: 'Play/Move[/SwitchProControllerHID/leftStick]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: f7e61601-7744-4c7c-aa2d-6e067b92a039
-    m_ActionName: Play/Thrust[/SwitchProControllerHID/buttonSouth]
+    m_ActionName: 'Play/Thrust[/SwitchProControllerHID/buttonSouth]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: b83fbf31-e4d1-4467-9bf9-45d9339d830e
-    m_ActionName: Play/Brake[/SwitchProControllerHID/buttonEast]
+    m_ActionName: 'Play/Brake[/SwitchProControllerHID/buttonEast]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: 5b366f64-a70a-49c6-99e6-4932e40dace0
-    m_ActionName: Play/Bomb[/SwitchProControllerHID/buttonWest]
+    m_ActionName: 'Play/Bomb[/SwitchProControllerHID/buttonWest]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: cb8b53fd-a83a-4c89-a2c2-3ef4e7be77a2
-    m_ActionName: Play/Slow Motion[/SwitchProControllerHID/buttonNorth]
+    m_ActionName: 'Play/Slow Motion[/SwitchProControllerHID/buttonNorth]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: dbc1f852-1c7a-4878-a28e-570a2977f1f6
-    m_ActionName: Start/Start[/SwitchProControllerHID/start,/SwitchProControllerHID/buttonEast,/SwitchProControllerHID/buttonNorth,/SwitchProControllerHID/buttonWest]
+    m_ActionName: 'Start/Start[/SwitchProControllerHID/start,/SwitchProControllerHID/buttonEast,/SwitchProControllerHID/buttonNorth,/SwitchProControllerHID/buttonWest]'
   - m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
@@ -100,7 +100,7 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
     m_ActionId: 1abf4dc0-2f1c-4957-b433-053155dcb2f9
-    m_ActionName: Start/Next Vehicle[/SwitchProControllerHID/dpad/right]
+    m_ActionName: 'Start/Next Vehicle[/SwitchProControllerHID/dpad/right]'
   - m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
@@ -116,7 +116,7 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
     m_ActionId: 5b946c89-f459-4d27-acfb-76f2cd8e5c2c
-    m_ActionName: Start/Previous Vehicle[/SwitchProControllerHID/dpad/left]
+    m_ActionName: 'Start/Previous Vehicle[/SwitchProControllerHID/dpad/left]'
   - m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
@@ -132,11 +132,11 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
     m_ActionId: af068420-8c48-4d1b-8c37-b21840a10adc
-    m_ActionName: Start/Choose Vehicle[/SwitchProControllerHID/buttonSouth]
+    m_ActionName: 'Start/Choose Vehicle[/SwitchProControllerHID/buttonSouth]'
   - m_PersistentCalls:
       m_Calls: []
     m_ActionId: 1a63e169-d2d1-48f0-84c4-fa3199363f68
-    m_ActionName: Start/Leave[/SwitchProControllerHID/buttonSouth]
+    m_ActionName: 'Start/Leave[/SwitchProControllerHID/buttonSouth]'
   - m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
@@ -152,7 +152,7 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
     m_ActionId: 7e5987d9-6667-4b82-8c9a-ff55697ed190
-    m_ActionName: Start/Next Vehicle Color[/SwitchProControllerHID/dpad/down]
+    m_ActionName: 'Start/Next Vehicle Color[/SwitchProControllerHID/dpad/down]'
   - m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
@@ -168,7 +168,7 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
     m_ActionId: 43297345-e770-4d26-bd90-2bc2dd9c6a75
-    m_ActionName: Start/Previous Vehicle Color[/SwitchProControllerHID/dpad/up]
+    m_ActionName: 'Start/Previous Vehicle Color[/SwitchProControllerHID/dpad/up]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Start
@@ -193,6 +193,8 @@ MonoBehaviour:
     type: 3}
   clickFx: {fileID: 8300000, guid: 53ecfd42442a5de49ab20834c2e97578, type: 3}
   confirmFx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
+  astralPlaneIndex: 0
+  selfDestructDelay: 1
 --- !u!82 &827239962078650827
 AudioSource:
   m_ObjectHideFlags: 0
@@ -205,6 +207,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: -854998193656957392, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
   m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -309,3 +312,7 @@ MonoBehaviour:
   damageTaken: 0
   assists: 0
   fuelUsed: 0
+  timeTaken: 0
+  maxEnergy: 0
+  maxTime: 0
+  effiencyScore: 0

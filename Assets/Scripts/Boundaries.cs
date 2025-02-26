@@ -14,7 +14,7 @@ public class Boundaries : MonoBehaviour
             {
                 Hazard h = edges[i].gameObject.AddComponent<Hazard>();
                 h.damage = damage;
-                h.hazardType = Hazard.EnemyType.BOUNDARY;
+                h.hazardType = EnemyType.Boundary;
             }
     }
 

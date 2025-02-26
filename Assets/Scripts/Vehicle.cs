@@ -41,12 +41,14 @@ public class Vehicle : MonoBehaviour
     public PlayerStatsTracking playerStats;
 
     private Vector3 lastPosition;
+    public SpriteRenderer soulSprite;
+    private DrumTrack drumTrack;
 
 
-    
-    
+
     void Start()
     {   // Ensure each moodObject has a MidiListPlayer attached
+        // Get the child SpriteRenderer (make sure the child has the component)
 
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -95,8 +97,8 @@ public class Vehicle : MonoBehaviour
         if(energyLevel <= 0)
         {
             if(GetComponentInParent<LocalPlayer>()) {
-                GetComponentInParent<LocalPlayer>().Restart();
-                Explode();
+//                GetComponentInParent<LocalPlayer>().Restart();
+//                Explode();
 
             }
 
@@ -217,7 +219,10 @@ public class Vehicle : MonoBehaviour
         if (energyLevel < 0) energyLevel = 0;
         UpdateFuelUI();
     }
-
+    public void SetDrums(DrumTrack drums)
+    {
+        drumTrack = drums;
+    }
     public void CollectEnergy(int amount)
     {
         
@@ -262,6 +267,14 @@ public class Vehicle : MonoBehaviour
 
     private void UpdateFuelUI()
     {
+        // Map energy level to alpha (clamped between 0 and 1)
+        if (soulSprite != null)
+        {
+            float alpha = Mathf.Clamp01(energyLevel / capacity);
+            Color currentColor = soulSprite.color;
+            currentColor.a = alpha;
+            soulSprite.color = currentColor;
+        }
         if (playerStatsUI != null)
         {
             playerStatsUI.UpdateFuel((int)energyLevel); // Use playerStatsUI to update fuel
@@ -282,6 +295,8 @@ public class Vehicle : MonoBehaviour
         var platform = coll.gameObject.GetComponentInParent<Platform>();
         if (platform != null && !platform.indestructable)
         {
+            drumTrack.RemoveRandomNote();
+
             var explode = coll.gameObject.GetComponent<Explode>();
             if (explode != null)
             {
@@ -300,7 +315,7 @@ public class Vehicle : MonoBehaviour
                     audioManager.PlaySound(destroyClip);
                     break;
                 case "Collect":
-                    audioManager.PlaySound(collectedClip);
+//                    audioManager.PlaySound(collectedClip);
                     break;
                 default:
                     Debug.LogWarning("Unhandled collision tag: " + coll.gameObject.tag);
