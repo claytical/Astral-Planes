@@ -19,8 +19,7 @@ public class GamepadManager : MonoBehaviour
     private List<Gamepad> connectedGamepads;
     private List<LocalPlayer> localPlayers = new List<LocalPlayer>();
     public static GamepadManager Instance { get; private set; }
-    public ProceduralLevel level;
-
+    public DrumTrack drumTrack;
     private bool gameInProgress = false;
 
     private void Awake()
@@ -64,17 +63,7 @@ public class GamepadManager : MonoBehaviour
         StartGame(); // All players are ready
     }
 
-    public void CollectedBreakable() {
-        //        level.breakablesCollected.Add(level.breakablesInSet);
 
-        if (level.breakablesCollected.Count() == level.breakablesInSet.Count())
-        {
-            level.breakablesInSet.gameObject.SetActive(false);
-            level.breakablesCollected.gameObject.SetActive(false);
-            level.breakableMeterFX.Play();
-        }
-
-    }
 
     public void HideAllPlanes()
     {
@@ -261,23 +250,12 @@ public class GamepadManager : MonoBehaviour
     private void HandleTrackSceneSetup()
     {
         Debug.Log("Handle Track Scene Setup");
-     /*
-        level = FindAnyObjectByType<ProceduralLevel>();
-        if (level == null)
-        {
-            Debug.LogError("ProceduralLevel not found in the scene.");
-            return;
-        }
-
-        */
         for (int i = 0; i < localPlayers.Count; i++)
         {
-            localPlayers[i].Launch();
+            localPlayers[i].Launch(drumTrack);
         }
 
         gameInProgress = true;
-//        level.Play();
-//        level.StartSequencer();
 
     }
     private void HandleTrackFinishedSceneSetup()

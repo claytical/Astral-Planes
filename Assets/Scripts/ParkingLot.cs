@@ -12,7 +12,6 @@ public class ParkingLot : MonoBehaviour
     public int energyCollected;
     public float lightYearsTraveled;
     public Damage HP;
-    public UsePowerUps PowerUps;
     private int players = 0;
 
     // Start is called before the first frame update

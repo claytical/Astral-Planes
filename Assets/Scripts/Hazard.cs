@@ -2,23 +2,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum EnemyType
+{
+    Simpleton,
+    Seeker,
+    Drifter,
+    Drone,
+    Anomaly,
+    Charismatic,
+    TimeBomb,
+    Boundary
+
+};
+
 public class Hazard : MonoBehaviour
 {
-    /*    public bool randomGravity;
-        public float timeUntilDestroy;
-    */
-    public enum EnemyType
-    {
-        SIMPLETON = 0,
-        SEEKER = 1,
-        DRIFTER = 2,
-        DRONE = 3,
-        ANOMALY = 4,
-        CHARISMATIC = 5,
-        TIMEBOMB = 6,
-        BOUNDARY = 7
-
-    };
 
     public EnemyType hazardType;
     public int damage;
@@ -37,19 +35,19 @@ public class Hazard : MonoBehaviour
     {
         switch (hazardType)
         {
-            case EnemyType.SEEKER:
-            case EnemyType.CHARISMATIC:
+            case EnemyType.Seeker:
+            case EnemyType.Charismatic:
                 vehicleIndex = FindVehicle();
                 break;
-            case EnemyType.ANOMALY:
+            case EnemyType.Anomaly:
                 //Rigidbody gravity scale is 1 or -1
                 break;
-            case EnemyType.DRIFTER:
+            case EnemyType.Drifter:
                 driftDirection = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f));
                 break;
-            case EnemyType.DRONE:
+            case EnemyType.Drone:
                 break;
-            case EnemyType.SIMPLETON:
+            case EnemyType.Simpleton:
                 break;
         }
 
@@ -114,6 +112,10 @@ public class Hazard : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (hazardType == EnemyType.Simpleton)
+        {
+            return;
+        }
         if (vehicleIndex == -1)
         {
             vehicleIndex = FindVehicle();
@@ -121,23 +123,23 @@ public class Hazard : MonoBehaviour
 
         switch (hazardType)
         {
-            case EnemyType.SEEKER:
+            case EnemyType.Seeker:
                 Seekers();
                 break;
-            case EnemyType.ANOMALY:
+            case EnemyType.Anomaly:
                 transform.parent.position = transform.position;
                 transform.parent.rotation = transform.rotation;
                 break;
-            case EnemyType.CHARISMATIC:                
+            case EnemyType.Charismatic:                
                 //players[vehicleIndex].chosenVehicle.GetComponent<Vehicle>().Drift(transform.position);
 
                 break;
-            case EnemyType.DRIFTER:
+            case EnemyType.Drifter:
                 GetComponent<Rigidbody2D>().AddForce(driftDirection);
                 break;
-            case EnemyType.DRONE:
+            case EnemyType.Drone:
                 break;
-            case EnemyType.SIMPLETON:
+            case EnemyType.Simpleton:
                 break;
         }
 
@@ -166,28 +168,12 @@ public class Hazard : MonoBehaviour
 
     void OnCollisionEnter2D(Collision2D coll)
     {
-        if(hazardType == EnemyType.BOUNDARY)
+        if(hazardType == EnemyType.Boundary)
         {
             if(coll.gameObject.GetComponent<Vehicle>())
             {
                 Camera.main.gameObject.GetComponent<Kino.AnalogGlitch>().colorDrift = .2f;
                 Invoke("ResetGlitch", .2f);
-            }
-        }
-
-        if (GetComponentInParent<Platform>())
-        {
-            if(!GetComponentInParent<Platform>().indestructable)
-            {
-                Debug.Log("Parent should blow up.");
-                gameObject.GetComponent<Explode>().Permanent();
-            }
-            else
-            {
-                //hazard glitch
-                Debug.Log("Platform Glitch");
-                Camera.main.gameObject.GetComponent<Kino.AnalogGlitch>().colorDrift = .2f;
-                Invoke("ResetCamera", .2f);
             }
         }
         
@@ -203,16 +189,13 @@ public class Hazard : MonoBehaviour
                 //EXPLODE
                 if (coll.gameObject.GetComponent<Explode>())
                 {
+                    coll.gameObject.GetComponent<Rigidbody2D>().AddExplosionForce(10f, transform.position, 10f);
                     Debug.Log("PLAY EXPLOSION");
                     coll.gameObject.GetComponent<Explode>().Permanent();
 
                 }
-                else
-                {
-                    coll.gameObject.GetComponent<Rigidbody2D>().AddExplosionForce(10f, transform.position, 10f);
-                }
             }
-            
+
             if (GetComponent<Explode>())
             {
                 GetComponent<Explode>().Permanent();
