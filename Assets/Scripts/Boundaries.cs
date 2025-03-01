@@ -5,22 +5,22 @@ using UnityEngine;
 public class Boundaries : MonoBehaviour
 {
     public int damage = 0;
-    private Transform[] edges;
+    private Collider2D[] edges;
     // Start is called before the first frame update
     void Start()
     {
-        edges = GetComponentsInChildren<Transform>();
-            for(int i = 0; i < edges.Length; i++)
-            {
-                Hazard h = edges[i].gameObject.AddComponent<Hazard>();
-                h.damage = damage;
-                h.hazardType = EnemyType.Boundary;
-            }
+        edges = GetComponentsInChildren<Collider2D>();
     }
 
-    // Update is called once per frame
-    void Update()
+    public void Ignore(Collider2D otherCollider)
     {
-        
+        for (int i = 0; i < edges.Length; i++)
+        {
+            if (edges[i] != otherCollider)
+            {
+                Debug.Log(("Ignoring Collider " + otherCollider.gameObject.name));
+                Physics2D.IgnoreCollision(edges[i], otherCollider);
+            }
+        }
     }
 }

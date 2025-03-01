@@ -30,6 +30,8 @@ public class NoteSet : MonoBehaviour
     public InstrumentTrack assignedInstrumentTrack; // ✅ Each NoteSet is now tied to an InstrumentTrack
     public List<int> allowedSteps = new List<int>(); // ✅ The valid spawn steps for notes
     public List<int> notes = new List<int>(); // ✅ List of possible note values
+    public float speed = .1f;
     public int allowedDuration = -1; // ✅ Default duration for notes
     public int maxExpansionAllowed = 3; // ✅ Limits how many times the loop expands
+    public int dropBackIndex = 0;
 }

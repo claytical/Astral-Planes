@@ -132,7 +132,6 @@ public void CreatePlayerSelect()
         if (vehicle.GetComponent<Vehicle>())
         {
             plane = vehicle.GetComponent<Vehicle>();
-            plane.SetDrums(drums);
             // PlayerStatsTracking component is attached to the plane
             plane.playerStats = playerStats;// = plane.GetComponent<PlayerStatsTracking>();
             plane.playerStatsUI = ui;

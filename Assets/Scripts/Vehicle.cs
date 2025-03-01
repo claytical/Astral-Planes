@@ -128,6 +128,11 @@ public class Vehicle : MonoBehaviour
         audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
     }
 
+    public float GetForce()
+    {
+        return rb.linearVelocity.sqrMagnitude;
+    }
+
     public void Move(Vector2 direction)
     {
         if (rb != null && direction != Vector2.zero)
@@ -219,10 +224,6 @@ public class Vehicle : MonoBehaviour
         if (energyLevel < 0) energyLevel = 0;
         UpdateFuelUI();
     }
-    public void SetDrums(DrumTrack drums)
-    {
-        drumTrack = drums;
-    }
     public void CollectEnergy(int amount)
     {
         
@@ -247,12 +248,6 @@ public class Vehicle : MonoBehaviour
             localPlayer.EnergyCollected((int)energyLevel);
         }
     }
-    public void OnSpecialCollectableCollected()
-    {
-        Debug.Log("Special collectable collected! Drums have been updated.");
-        // Add additional logic if needed
-    }
-   
 
     public void TakeDamage(int damage)
     {
@@ -295,7 +290,6 @@ public class Vehicle : MonoBehaviour
         var platform = coll.gameObject.GetComponentInParent<Platform>();
         if (platform != null && !platform.indestructable)
         {
-            drumTrack.RemoveRandomNote();
 
             var explode = coll.gameObject.GetComponent<Explode>();
             if (explode != null)
@@ -303,42 +297,13 @@ public class Vehicle : MonoBehaviour
                 explode.UntilNextSet();
             }
         }
-
-        if (audioManager != null)
-        {
-            switch (coll.gameObject.tag)
-            {
-                case "Bump":
-                    audioManager.PlaySound(collisionClip);
-                    break;
-                case "Break":
-                    audioManager.PlaySound(destroyClip);
-                    break;
-                case "Collect":
-//                    audioManager.PlaySound(collectedClip);
-                    break;
-                default:
-                    Debug.LogWarning("Unhandled collision tag: " + coll.gameObject.tag);
-                    break;
-            }
-        }
     }
     public void Explode()
     {
-        if (audioManager != null)
-        {
-            audioManager.PlaySound(destroyClip);
-        }
+
         if(GetComponent<Explode>())
         {
             GetComponent<Explode>().Permanent();
         }
-    }
-
-    public void CollectPart(int amount)
-    {
-        int parts = PlayerPrefs.GetInt("parts", 0);
-        parts += amount;
-        PlayerPrefs.SetInt("parts", parts);
     }
 }

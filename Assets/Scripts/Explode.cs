@@ -34,12 +34,6 @@ public class Explode : MonoBehaviour
         }
     }
 
-    public void BackToPosition()
-    {
-        transform.position = originalPosition;
-        transform.rotation = originalRotation;
-    }
-
 
     public void UntilNextSet()
     {

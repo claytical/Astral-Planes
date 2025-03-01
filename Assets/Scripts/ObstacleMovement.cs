@@ -87,12 +87,17 @@ public class ObstacleMovement : MonoBehaviour
 
     public void TryMove()
     {
+        if (!gameObject.activeInHierarchy) // ✅ Ensure object is active
+        {
+            Debug.LogWarning($"{gameObject.name} is inactive. Cannot start MoveLoop coroutine.");
+            return;
+        }
+
         if (isMoving) return;
 
         Vector3 targetPos = transform.position + new Vector3(0, 1.0f, 0); // Move up by 1 unit
         StartCoroutine(MoveToPosition(targetPos));
     }
-
 
     IEnumerator MoveToPosition(Vector3 targetPos)
     {
