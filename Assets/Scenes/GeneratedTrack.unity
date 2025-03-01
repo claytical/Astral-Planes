@@ -149,33 +149,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteGroups:
-  - assignedInstrumentTrack: {fileID: 0}
-    notes:
-    - noteValue: 24
-      weight: 1
-    - noteValue: 26
-      weight: 1
-    - noteValue: 28
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 00000000080000001000000018000000
-  - assignedInstrumentTrack: {fileID: 0}
-    notes:
-    - noteValue: 60
-      weight: 1
-    - noteValue: 62
-      weight: 1
-    - noteValue: 64
-      weight: 1
-    - noteValue: 65
-      weight: 1
-    - noteValue: 67
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 00000000080000001000000018000000
+  assignedInstrumentTrack: {fileID: 0}
+  allowedSteps: 
+  notes: 
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 3
+  dropBackIndex: 0
 --- !u!4 &31563535
 Transform:
   m_ObjectHideFlags: 0
@@ -524,44 +504,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteGroups:
-  - assignedInstrumentTrack: {fileID: 627412777}
-    notes:
-    - noteValue: 61
-      weight: 1
-    - noteValue: 62
-      weight: 1
-    - noteValue: 64
-      weight: 1
-    - noteValue: 65
-      weight: 1
-    - noteValue: 67
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c0000002000000024000000280000002c0000003000000034000000380000003c000000
-  - assignedInstrumentTrack: {fileID: 342701841}
-    notes:
-    - noteValue: 24
-      weight: 1
-    - noteValue: 36
-      weight: 1
-    - noteValue: 45
-      weight: 1
-    - noteValue: 48
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 0000000004000000080000000c00000010000000200000003000000038000000
-  - assignedInstrumentTrack: {fileID: 1690824280}
-    notes:
-    - noteValue: 69
-      weight: 0
-    - noteValue: 71
-      weight: 0
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c00000020000000
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 02000000060000000a0000000e00000012000000160000001a0000001e000000
+  notes: 430000003c000000400000003e000000
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 0
+  dropBackIndex: 0
 --- !u!4 &261861059
 Transform:
   m_ObjectHideFlags: 0
@@ -793,6 +742,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
+  currentNoteSet: {fileID: 0}
+  drumTrack: {fileID: 1354683682}
   channel: 1
   preset: 33
   bank: 0
@@ -804,14 +755,6 @@ MonoBehaviour:
   maxCollectableScale: 4
   minDurationTicks: 4
   maxDurationTicks: 64
-  currentSet: {fileID: 0}
-  group:
-    assignedInstrumentTrack: {fileID: 0}
-    notes: []
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 
-  activeForCollection: 0
 --- !u!1 &414327004
 GameObject:
   m_ObjectHideFlags: 0
@@ -1054,6 +997,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
+  currentNoteSet: {fileID: 0}
+  drumTrack: {fileID: 1354683682}
   channel: 2
   preset: 68
   bank: 0
@@ -1065,14 +1010,6 @@ MonoBehaviour:
   maxCollectableScale: 4
   minDurationTicks: 4
   maxDurationTicks: 64
-  currentSet: {fileID: 0}
-  group:
-    assignedInstrumentTrack: {fileID: 0}
-    notes: []
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 
-  activeForCollection: 0
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -1676,29 +1613,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteGroups:
-  - assignedInstrumentTrack: {fileID: 0}
-    notes:
-    - noteValue: 24
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 040000000c000000140000001c000000
-  - assignedInstrumentTrack: {fileID: 0}
-    notes:
-    - noteValue: 60
-      weight: 1
-    - noteValue: 62
-      weight: 1
-    - noteValue: 64
-      weight: 1
-    - noteValue: 65
-      weight: 1
-    - noteValue: 67
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 040000000c000000140000001c000000
+  assignedInstrumentTrack: {fileID: 0}
+  allowedSteps: 
+  notes: 
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 3
+  dropBackIndex: 0
 --- !u!4 &1236497522
 Transform:
   m_ObjectHideFlags: 0
@@ -1830,7 +1751,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   loopLengthInSeconds: 0
   beatMultiplier: 8
-  drums: {fileID: 0}
   drumLoopCollectablePrefab: {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6,
     type: 3}
   fullLoopClips:
@@ -1871,7 +1791,6 @@ MonoBehaviour:
   drumLoopBPM: 150
   startDspTime: 0
   beatMoveSpeed: 1
-  loopCounter: 0
   spawnCooldown: 12.8
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
@@ -1909,11 +1828,8 @@ MonoBehaviour:
   - {fileID: 1834431006}
   - {fileID: 1592356861}
   - {fileID: 261861058}
-  drumTrack: {fileID: 1354683682}
-  instrumentTracks:
-  - {fileID: 342701841}
-  - {fileID: 1690824280}
-  - {fileID: 627412777}
+  - {fileID: 2110566099}
+  boundaries: {fileID: 1461708765}
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -7390,21 +7306,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteGroups:
-  - assignedInstrumentTrack: {fileID: 342701841}
-    notes:
-    - noteValue: 24
-      weight: 10
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 00000000100000002000000030000000
-  - assignedInstrumentTrack: {fileID: 1690824280}
-    notes:
-    - noteValue: 76
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 02000000060000000a0000001400000016000000180000001a0000001c0000003a0000003c0000003e000000
+  assignedInstrumentTrack: {fileID: 342701841}
+  allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c00000020000000260000002c00000030000000340000003a000000
+  notes: 240000001d0000002900000024000000230000001f000000
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 0
+  dropBackIndex: 0
 --- !u!4 &1592356862
 Transform:
   m_ObjectHideFlags: 0
@@ -7747,6 +7655,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
+  currentNoteSet: {fileID: 0}
+  drumTrack: {fileID: 1354683682}
   channel: 3
   preset: 54
   bank: 0
@@ -7758,14 +7668,6 @@ MonoBehaviour:
   maxCollectableScale: 4
   minDurationTicks: 4
   maxDurationTicks: 64
-  currentSet: {fileID: 1834431006}
-  group:
-    assignedInstrumentTrack: {fileID: 1690824280}
-    notes: []
-    allowedDuration: -1
-    maxExpansionAllowed: 2
-    allowedSteps: 
-  activeForCollection: 0
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0
@@ -8023,6 +7925,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: volumeGlobal
+      value: 0.745
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: MPTK_EffectUnity
       value: 
       objectReference: {fileID: 1248500726}
@@ -8083,14 +7990,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteGroups:
-  - assignedInstrumentTrack: {fileID: 1690824280}
-    notes:
-    - noteValue: 76
-      weight: 1
-    allowedDuration: -1
-    maxExpansionAllowed: 1
-    allowedSteps: 00000000080000001000000018000000200000002800000030000000380000003a0000003c000000
+  assignedInstrumentTrack: {fileID: 1690824280}
+  allowedSteps: 0000000004000000080000001000000018000000200000002800000030000000
+  notes: 4c000000
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 0
+  dropBackIndex: 0
 --- !u!4 &1834431007
 Transform:
   m_ObjectHideFlags: 0
@@ -8098,6 +8004,57 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1834431005}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2110566098
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2110566100}
+  - component: {fileID: 2110566099}
+  m_Layer: 0
+  m_Name: Lead Change
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2110566099
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2110566098}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  assignedInstrumentTrack: {fileID: 1690824280}
+  allowedSteps: 000000000c0000002000000034000000
+  notes: 4a000000
+  speed: 0.1
+  allowedDuration: -1
+  maxExpansionAllowed: 0
+  dropBackIndex: 0
+--- !u!4 &2110566100
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2110566098}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
@@ -8169,5 +8126,6 @@ SceneRoots:
   - {fileID: 1834431007}
   - {fileID: 1592356862}
   - {fileID: 261861059}
+  - {fileID: 2110566100}
   - {fileID: 2130912947}
   - {fileID: 184089748}

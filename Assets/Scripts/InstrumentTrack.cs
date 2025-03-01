@@ -10,6 +10,7 @@ public class InstrumentTrack : MonoBehaviour
     public InstrumentTrackController controller; // 🎛️ Reference to main controller
     public MidiStreamPlayer midiStreamPlayer; // Plays MIDI notes
     public NoteSet currentNoteSet;
+    public DrumTrack drumTrack;
     public int channel;
     public int preset;
     public int bank;
@@ -17,38 +18,32 @@ public class InstrumentTrack : MonoBehaviour
     public Transform collectableParent; // Parent object for organization
 
     public int allowedDuration = -1;
+    
+    public float minCollectableScale = 1.0f;  // Scale for a 1/16th note.
+    public float maxCollectableScale = 4.0f;  // Scale for a whole note.
+
+    // Define the duration range (adjust as needed).
+    public int minDurationTicks = 4;    // 1/16th note duration.
+    public int maxDurationTicks = 64;   // Whole note duration.
 
     private List<int> allowedNotes = new List<int>();
     private List<int> allowedSteps = new List<int>();
-    private List<(int stepIndex, int note, int duration)> persistentLoopNotes = new List<(int, int, int)>();
+    private List<(int stepIndex, int note, int duration, float velocity)> persistentLoopNotes = new List<(int, int, int, float)>();
     private int currentSectionStart = 0; // ✅ The starting step of the current section
     private int currentSectionEnd = 64; // ✅ The ending step (expands when a section is completed)    
-    private int totalInstrumentSteps = 64; // ✅ This will grow as sections are added
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
-    private Dictionary<int, (int note, int duration)> noteSequence = new Dictionary<int, (int, int)>(); // Stores collected notes & durations
     private List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private Dictionary<Collectable, (int note, int duration)> collectableNotes = new Dictionary<Collectable, (int, int)>();
     private int totalSteps = 64;
-    private int currentLoopCount = 0;
-    private int lastStep = -1; // Tracks previous step to prevent duplicate triggers
-    private bool isLocked = false;
-    
-    private bool hasSpawnedInitialCollectables = false;
-    private float instrumentElapsedTime = 0f;  // ✅ Independent time tracker
+    private int lastStep = -1;
     private int currentExpansionCount = 0;
-    private bool hasStartedNewCollection = false;
-    private bool hasBegun = false; // Guard flag
     private bool isPlayerControlled = false; // Set this in the inspector or via code.
     private bool hasCollectedNewNoteThisSet = false;
+    private int freezeIndex = 0;
+    private Boundaries boundaries;
     // Define the smallest and largest scales for collectables.
-    public float minCollectableScale = 1.0f;  // Scale for a 1/16th note.
-    public float maxCollectableScale = 4.0f;  // Scale for a whole note.
-                                              // Define the duration range (adjust as needed).
-    public int minDurationTicks = 4;    // 1/16th note duration.
-    public int maxDurationTicks = 64;   // Whole note duration.
-    public bool activeForCollection = false;
-    void Start()
+     void Start()
     {
         if (controller == null)
         {
@@ -58,7 +53,10 @@ public class InstrumentTrack : MonoBehaviour
         
     }
 
-
+    public void AllowPlayerControl()
+    {
+        isPlayerControlled = true;
+    }
     private IEnumerator DelayedStart()
     {
         yield return StartCoroutine(WaitForDrumLoopAndSpawn());
@@ -67,11 +65,17 @@ public class InstrumentTrack : MonoBehaviour
 
     public void ApplyNoteSet(NoteSet newNoteSet)
     {
+        if (currentNoteSet != null)
+        {
+            ClearLoopNotes();
+        }
+        
+        isPlayerControlled = true;
         currentNoteSet = newNoteSet;
         allowedSteps = new List<int>(newNoteSet.allowedSteps);
         allowedNotes = new List<int>(newNoteSet.notes);
         currentExpansionCount = 0; // ✅ Reset expansions
-        Debug.Log($"{gameObject.name} - Assigned new NoteSet with {allowedNotes.Count} notes.");
+        Debug.Log($"{gameObject.name} - Assigned new NoteSet with {allowedNotes.Count} notes. {currentNoteSet.name}");
     }
 
 
@@ -98,11 +102,6 @@ public class InstrumentTrack : MonoBehaviour
         return weightedList;
     }
 
-    public bool Locked()
-    {
-        return isLocked;
-    }
-
     int SnapToClosestStep(long currentTick, long totalTicks)
     {
         if (totalTicks == 0) return 0; // Prevent division by zero
@@ -115,261 +114,200 @@ public class InstrumentTrack : MonoBehaviour
 
         return snappedStep;
     }
-
     void Update()
     {
-        if (controller.drumTrack.drumAudioSource == null) return;
+        if (drumTrack?.drumAudioSource == null) return;
 
+        // ✅ Use DSP time for accurate synchronization
+        float elapsedTime = (float)(AudioSettings.dspTime - drumTrack.startDspTime);
+        float loopLength = drumTrack.loopLengthInSeconds;
 
-        // ✅ Use drum loop's playback time for synchronization
-        // Calculate step size based on the base loop division (64 steps per loop)
+        // ✅ Prevent division by zero
+        if (loopLength <= 0 || totalSteps <= 0) return;
 
-        // Global step accounts for completed loops
-        // drum loop length in seconds (for one 64-tick cycle)
-        float drumLoopLength = controller.drumTrack.loopLengthInSeconds;
+        // Calculate step size based on the expanded loop
+        float baseStepSize = loopLength / totalSteps;
+        int globalStep = Mathf.FloorToInt(elapsedTime / baseStepSize) % totalSteps;
 
-        // Calculate how long one full instrument loop lasts.
-        float instrumentLoopLength = drumLoopLength * (totalInstrumentSteps / 64f);
-        float loopLength = controller.drumTrack.loopLengthInSeconds; // length of one measure (64 ticks)
-        // Use dspTime so we have a continuously increasing time value.
-        float elapsedTime = (float)(AudioSettings.dspTime - controller.drumTrack.startDspTime);
-        int measureCount = Mathf.FloorToInt(elapsedTime / loopLength);
-        // Determine the duration of one step in the expanded instrument loop.
-        float baseStepSize = instrumentLoopLength / totalInstrumentSteps;
-
-        // Global step cycles from 0 to totalInstrumentSteps-1
-        int globalStep = Mathf.FloorToInt(elapsedTime / baseStepSize) % totalInstrumentSteps;
         if (globalStep != lastStep)
         {
+            
             PlayLoopedNotes(globalStep);
             lastStep = globalStep;
             for (int i = 0; i < spawnedCollectables.Count; i++)
             {
-                if (spawnedCollectables[i].GetComponent<SimpleGravity>())
+                if (freezeIndex % totalSteps == 0)
                 {
-                    spawnedCollectables[i].GetComponent<SimpleGravity>().ActivateGravity();
+                    spawnedCollectables[i].GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeAll;
+                   
                 }
-                
+                else
+                {
+                    spawnedCollectables[i].GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.None;
+                }
+
             }
+
+            freezeIndex++;
         }
+
+        // ✅ Remove offscreen collectables
+        RemoveOffscreenCollectables();
+
+        // ✅ Check for section completion
+        if (isPlayerControlled)
+        {
+            CheckSectionCompletion();
+        }
+    }
+
+    public void SetBoundaries(Boundaries b)
+    {
+        boundaries = b;
+    }
+// ✅ Extract logic into a helper function
+    void RemoveOffscreenCollectables()
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null) return;
+
+        // Get the world Y position of the bottom of the screen
+        float screenBottomY = mainCamera.ViewportToWorldPoint(new Vector3(0, -0.1f, 0)).y;
 
         for (int i = spawnedCollectables.Count - 1; i >= 0; i--)
         {
-            var collectableObj = spawnedCollectables[i];
+            GameObject collectableObj = spawnedCollectables[i];
             if (collectableObj == null) continue;
-            Vector3 viewportPos = Camera.main.WorldToViewportPoint(collectableObj.transform.position);
-    
-            // Get the collectable component and check the flag.
-            Collectable collectable = collectableObj.GetComponentInChildren<Collectable>();
-            if (collectable != null && collectable.easingComplete)
+
+            // Get the collider bounds (works better for Rigidbody objects)
+            Collider2D col = collectableObj.GetComponent<Collider2D>();
+            if (col != null)
             {
-                // Remove if the collectable is offscreen vertically (or horizontally, as needed)
-                if (viewportPos.y < 0 || viewportPos.y > 1)
+                float objectBottomY = col.bounds.min.y; // Bottom of the collider
+
+                // Destroy the collectable if it is fully below the screen
+                if (objectBottomY < screenBottomY)
+                {
+                    RemoveCollectableNote(i);
+                }
+            }
+            else
+            {
+                // Fallback: Use transform position if no collider is found
+                if (collectableObj.transform.position.y < screenBottomY)
                 {
                     RemoveCollectableNote(i);
                 }
             }
         }
-
-
-        CheckSectionCompletion();
     }
 
     public void ClearLoopNotes()
     {
         persistentLoopNotes.Clear();
-        Debug.Log($"{gameObject.name} - Cleared all looping notes for new drum pattern.");
+        Debug.Log($"{gameObject.name} - Cleared all looping notes for new track pattern.");
     }
-
-    // Example of resetting state when starting a new NoteSet:
-    public void ResetTrackState()
-    {
-        hasBegun = false;
-        hasSpawnedInitialCollectables = false;
-        // Reset any other state variables (like expansion counters, flags, etc.)
-    }
-
-
-    public void ResetCollectables()
-    {
-        foreach (GameObject obj in spawnedCollectables)
-        {
-            if (obj != null)
-                Destroy(obj);
-        }
-        spawnedCollectables.Clear();
-        collectableNotes.Clear();
-        noteSequence.Clear();
-        currentLoopCount = 0; // ✅ Reset loop tracking
-//        isFading = false;
-
-        SpawnCollectables(); // ✅ Spawn a new set
-    }
+    
     public void SpawnCollectables()
     {
         if (currentNoteSet == null)
         {
-            Debug.LogError($"{gameObject.name} - No NoteSet assigned!");
+            Debug.LogError($"{gameObject.name} - No NoteSet assigned! Cannot spawn collectables.");
             return;
         }
-        
+
         List<int> sectionSteps = allowedSteps
             .Where(step => step >= currentSectionStart && step < currentSectionEnd)
             .ToList();
 
-        foreach (int stepIndex in sectionSteps)
-        {
-            SpawnCollectable(stepIndex);
-        }
-    }
-    /*
-    public void SpawnCollectables()
-    {
-        hasStartedNewCollection = false;
-        if (hasSpawnedInitialCollectables && currentSectionStart == 0)
-        {
-            Debug.LogWarning($"{gameObject.name} - Preventing duplicate spawn on first set.");
-            return; // ✅ Prevents first set from spawning twice
-        }
-
-        Debug.Log($"{gameObject.name} - SpawnCollectables called. Allowed Steps: {string.Join(", ", allowedSteps)}");
-        
-        if (controller.drumTrack.drumAudioSource == null) return;
-        if (allowedSteps == null || allowedSteps.Count == 0)
-        {
-            Debug.LogWarning($"{gameObject.name} - No allowed steps set in NoteSet.");
-            return;
-        }
-
-        if (allowedNotes == null || allowedNotes.Count == 0)
-        {
-            Debug.LogWarning($"{gameObject.name} - No allowed notes set in NoteSet.");
-            return;
-        }
-
-        float loopLength = controller.drumTrack.loopLengthInSeconds;
-        float stepSize = loopLength / totalSteps; // ✅ Use base drum loop steps
-
-        List<int> sectionSteps = allowedSteps.Where(step => step >= currentSectionStart && step < currentSectionEnd).ToList();
-
         if (sectionSteps.Count == 0)
         {
-            Debug.LogWarning($"{gameObject.name} - No matching section steps, using all allowed steps instead.");
-            sectionSteps = new List<int>(allowedSteps);
+            Debug.LogWarning($"{gameObject.name} - No allowed steps in this section.");
+            return;
         }
+
+        Debug.Log($"{gameObject.name} - Spawning collectables for expansion {currentExpansionCount}");
 
         foreach (int stepIndex in sectionSteps)
         {
-            int nextStep = GetNextStep(stepIndex, sectionSteps);
-            if(nextStep <= stepIndex)
+            // ✅ Ensure no duplicate collectables at this step
+            bool exists = spawnedCollectables.Any(obj => obj != null && Mathf.Abs(obj.transform.position.x - MapStepToX(stepIndex)) < 0.1f);
+            if (!exists)
             {
-                nextStep = currentSectionEnd;
+                GameObject spawned = SpawnCollectable(stepIndex);
+                Collider2D collider = spawned.GetComponent<Collider2D>();
+                boundaries.Ignore(collider);
+                Debug.Log($"Spawned collectable at step index {stepIndex}");
+                spawnedCollectables.Add(spawned);
             }
-            int maxAllowedDurationTicks = (nextStep - stepIndex) * (int)(stepSize * 480f);
-            int chosenDurationTicks = SelectMaxDuration(maxAllowedDurationTicks);
-            float stepTime = stepIndex * stepSize;
-
-            GameObject collectableObj = SpawnCollectable(stepIndex, stepTime, chosenDurationTicks);
+            else
+            {
+                Debug.LogWarning($"{gameObject.name} - Skipping duplicate collectable at step {stepIndex}");
+            }
         }
+        //TODO: WAIT FOR NEXT TRACK
 
-        hasSpawnedInitialCollectables = true; // ✅ Mark that initial set has been spawned
+        
     }
     
-    */
+    private float MapStepToX(int stepIndex)
+    {
+        float stepWidth = (screenMaxX - screenMinX) / (float)totalSteps;
+        int adjustedStepIndex = stepIndex % totalSteps;
+        return screenMinX + (adjustedStepIndex * stepWidth);
+    }
 
     private GameObject SpawnCollectable(int stepIndex)
     {
-        if (currentNoteSet.notes.Count == 0)
+        if (currentNoteSet == null || currentNoteSet.notes.Count == 0)
         {
             Debug.LogWarning($"{gameObject.name} - No notes in current NoteSet! Cannot spawn collectable.");
             return null;
         }
 
-        // ✅ Pick a note from the assigned NoteSet.
         int assignedNote = currentNoteSet.notes[Random.Range(0, currentNoteSet.notes.Count)];
 
         GameObject collectableObj = Instantiate(collectablePrefab, collectableParent);
-
-        // ✅ Convert stepIndex into correct X-position.
+        Collider2D collider = collectableObj.GetComponent<Collider2D>();
+        // Spawn off-screen at the top
+        float spawnOffscreenY = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 1.2f, 0)).y;
         float stepWidth = (screenMaxX - screenMinX) / (float)totalSteps;
         int adjustedStepIndex = stepIndex % totalSteps;
         float posX = screenMinX + (adjustedStepIndex * stepWidth);
 
-        // ✅ Map note to Y-position dynamically.
-        float finalPosY = MapNoteToYPosition(assignedNote);
+        collectableObj.transform.position = new Vector3(posX, spawnOffscreenY, 0);
 
-        // ✅ Spawn offscreen and ease into position.
-        float spawnOffscreenY = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 1.2f, 0)).y;
-        Vector3 initialPos = new Vector3(posX, spawnOffscreenY, 0);
-        Vector3 finalPos = new Vector3(posX, finalPosY, 0);
 
-        collectableObj.transform.position = initialPos;
-        StartCoroutine(EaseToPosition(collectableObj.transform, finalPos, 4f));
-
-        // ✅ Assign properties.
-        Collectable collectable = collectableObj.GetComponentInChildren<Collectable>();
+        // ✅ Assign properties correctly
+        Collectable collectable = collectableObj.GetComponent<Collectable>();
         if (collectable == null)
         {
             Debug.LogError($"Collectable component missing on {collectableObj.name}. Check prefab.");
             return null;
         }
-
+        // ✅ Determine duration (previously `chosenDurationTicks`)
+        int chosenDurationTicks;
+        if (currentNoteSet.allowedDuration == -1)
+        {
+            // ✅ Calculate duration dynamically based on step timing
+            int nextStep = GetNextStep(stepIndex, currentNoteSet.allowedSteps);
+            chosenDurationTicks = (nextStep - stepIndex) * (480 / 64); // Convert step difference to MIDI ticks
+        }
+        else
+        {
+            // ✅ Use explicitly assigned max duration
+            chosenDurationTicks = Mathf.Min(currentNoteSet.allowedDuration, 48); // Limit excessive duration
+        }
+       
+        collectable.noteDurationTicks = chosenDurationTicks; // ✅ Ensures correct duration
         collectable.Initialize(assignedNote, this);
-        collectable.OnCollected += (int duration) => OnCollectableCollected(collectable, stepIndex, duration);
-        collectable.OnDestroyed += OnCollectableDestroyed;
+
+        collectable.OnCollected += (int duration, float force) => OnCollectableCollected(collectable, stepIndex, duration, force);
+                
+        Debug.Log($"Spawned {collectableObj.name} at {collectableObj.transform.position}");
 
         return collectableObj;
-    }
-
-    IEnumerator EaseToPosition(Transform obj, Vector3 target, float duration)
-    {
-        if (obj == null)
-        {
-            yield break;
-        }
-        Vector3 start = obj.position;
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            if(obj == null)
-            {
-                yield break;
-            }
-            elapsed += Time.deltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-            obj.position = Vector3.Lerp(start, target, t);
-            yield return null;
-        }
-        if(obj != null)
-        {
-            obj.position = target;
-        }
-        Collectable collectable = obj.GetComponentInChildren<Collectable>();
-        if(collectable != null) {}
-
-        collectable.easingComplete = true;
-    }
-    private float MapNoteToYPosition(int noteValue)
-    {
-        if (allowedNotes == null || allowedNotes.Count == 0)
-        {
-            Debug.LogWarning("MapNoteToYPosition: No allowed notes available.");
-            return 0; // Default to middle if no notes are available
-        }
-
-        // Find the min and max values dynamically from allowedNotes
-        int minNote = allowedNotes.Min();
-        int maxNote = allowedNotes.Max();
-
-        // Prevent division by zero if there's only one note
-        if (minNote == maxNote) return 0;
-
-        // Ensure note is clamped within the dynamically set range
-        noteValue = Mathf.Clamp(noteValue, minNote, maxNote);
-
-        // Map note to range -2 to 2 using linear interpolation
-        return Mathf.Lerp(-2f, 2f, (noteValue - minNote) / (float)(maxNote - minNote));
-    }
+}
 
 
     int GetNextStep(int currentStep, List<int> stepList)
@@ -380,110 +318,62 @@ public class InstrumentTrack : MonoBehaviour
         }
         return totalSteps; // ✅ If no further step, extend to the end of the loop
     }
-    public void CheckSectionCompletion()
+    private void CheckSectionCompletion()
     {
-        // Prevent expansion before initial collectables have spawned.
-        if (!hasSpawnedInitialCollectables)
+        
+        if (spawnedCollectables.Count > 0) 
         {
             return;
         }
 
-        // If there are still collectables on screen, don't expand.
-        if (spawnedCollectables.Count > 0)
+        if (currentNoteSet == null)
         {
+            Debug.LogError($"{gameObject.name} - No current NoteSet assigned!");
             return;
         }
 
-
-
-        //For level design, if the max count is set by the designer to 2, we want to make sure it goes twice, not 3 times due to counting from 0. zero based array math versus human counting.
         if (currentExpansionCount < currentNoteSet.maxExpansionAllowed - 1)
         {
             currentExpansionCount++;
-
-            // Offset the allowedSteps by totalSteps so that new collectables fall into the next section.
-            allowedSteps = allowedSteps.Select(step => step + totalSteps).ToList();
-
-            // Update section boundaries and overall instrument steps.
             currentSectionStart = currentSectionEnd;
             currentSectionEnd += totalSteps;
+            allowedSteps = allowedSteps.Select(step => step + totalSteps).ToList();
+
+            Debug.Log($"{gameObject.name} - Expanding section {currentExpansionCount}/{currentNoteSet.maxExpansionAllowed}");
+
             SpawnCollectables();
+            //still in control
         }
         else
         {
-            // Maximum expansions reached for the current NoteGroup.
-            Debug.Log($"{gameObject.name} - Maximum expansions reached for current NoteGroup. Awaiting new note collection to transition.");
-
-            // Optionally, signal to the controller that this track's expansion for the current NoteGroup is complete.
+            Debug.Log($"{gameObject.name} - All expansions complete. Moving to next track.");
+            //next track
+            isPlayerControlled = false;
             controller.TrackExpansionCompleted(this);
-            // Do not clear persistentLoopNotes here; let them play until new collection starts.
         }
-    }
-
-
-
-    public void PrepareForNewNoteCollection()
-    {
-        // Clear collectable objects, but keep persistentLoopNotes intact.
-        foreach (GameObject obj in spawnedCollectables)
-        {
-            if (obj != null)
-                Destroy(obj);
-        }
-        spawnedCollectables.Clear();
-        collectableNotes.Clear();
-    
-        // Set this track to be active for new collection.
-        activeForCollection = true;
-    
-        Debug.Log($"{gameObject.name} - Prepared for new note collection. Existing loop notes remain.");
     }
 
 
     IEnumerator WaitForDrumLoopAndSpawn()
     {
         // Guard: if we've already spawned collectables, exit.
-        if (hasSpawnedInitialCollectables)
-        {
-            Debug.Log(("Spawned Initial Collectables"));
-            yield break;
-        }
         // Wait until DrumTrack is fully initialized.
-        yield return new WaitUntil(() => controller.drumTrack.isInitialized);
+        yield return new WaitUntil(() => drumTrack.isInitialized);
         Debug.Log("Drum Track is valid");
 
         yield return new WaitUntil(() => allowedSteps != null && allowedSteps.Count > 0);
         Debug.Log($"{gameObject.name} - Drum loop initialized. Allowed Steps at spawn: {string.Join(", ", allowedSteps)}");
         SpawnCollectables();
-        hasSpawnedInitialCollectables = true;
         
     }
 
-    public void UnlockTrack()
-    {
-        isLocked = false;
-        noteSequence.Clear(); // ✅ Ensure old notes are gone
-        spawnedCollectables.Clear(); // ✅ Clear stale collectables
-        Debug.Log($"{gameObject.name} - Track unlocked, ready to spawn new collectables.");
-    }
-
-    public void ClearCollectablesOnly()
-    {
-        foreach (GameObject obj in spawnedCollectables)
-        {
-            if (obj != null)
-                Destroy(obj);
-        }
-        spawnedCollectables.Clear();
-        collectableNotes.Clear();
-        noteSequence.Clear();
-    }
     public void RemoveCollectableNote(int index = -1)
     {
         if (index < 0)
         {
             if (spawnedCollectables.Count > 0)
             {
+                Debug.Log("Removing Random Spawned Item");
                 index = Random.Range(0, spawnedCollectables.Count);
                 
             }
@@ -509,10 +399,13 @@ public class InstrumentTrack : MonoBehaviour
 
             // Finally, destroy the game object.
             if(noteToRemove.GetComponent<Explode>()) {
+                Debug.Log("Exploding collectable at " + noteToRemove.transform.position);
+
                 noteToRemove.GetComponent<Explode>().Permanent();
             }
             else
             {
+                Debug.Log($"Destroying collectable at {noteToRemove.transform.position}");
                 Destroy(noteToRemove);
 
             }
@@ -525,11 +418,9 @@ public class InstrumentTrack : MonoBehaviour
     void OnCollectableDestroyed(Collectable collectable)
     {     
 
-        spawnedCollectables.Remove(collectable.gameObject.transform.parent.gameObject);
-
     }
 
-    void OnCollectableCollected(Collectable collectable, int stepIndex, int durationTicks)
+    void OnCollectableCollected(Collectable collectable, int stepIndex, int durationTicks, float force)
     {
         // Verify this collectable belongs to this track.
         if (collectable.assignedInstrumentTrack != this)
@@ -538,97 +429,63 @@ public class InstrumentTrack : MonoBehaviour
         }
         if(!hasCollectedNewNoteThisSet)
         {
-            Debug.Log("First new collectable received");
-            persistentLoopNotes.Clear();
+            Debug.Log("First new collectable received, resetting loop for " + gameObject.name + " Expansion Count: " + currentExpansionCount);
             hasCollectedNewNoteThisSet = true;
         }
-
-        if(!hasStartedNewCollection)
-        {
-            Debug.Log("Starting new collection,");
-
-//            persistentLoopNotes.Clear();
-            hasStartedNewCollection = true;
-        }
-
+        
         // Here, stepIndex is assumed to be the absolute step for this note (e.g. 0, 48, 64, 112).
         // If needed, you could adjust by an offset (like currentSectionStart) if your allowedSteps are relative.
         int absoluteStep = stepIndex;
         int note = collectable.assignedNote;
 
         // Add the collected note into the persistent loop.
-        persistentLoopNotes.Add((absoluteStep, note, durationTicks));
-        PlayNote(note, durationTicks);
-        Debug.Log($"{gameObject.name} - Collected note {note} at absolute step {absoluteStep} with duration {durationTicks}");
+        persistentLoopNotes.Add((absoluteStep, note, durationTicks, force));
+        Debug.Log($"{persistentLoopNotes.Count} notes in {gameObject.name} ");
+        PlayNote(note, durationTicks, force);
 
         // Remove the collectable from tracking.
         collectableNotes.Remove(collectable);
         // Remove the spawned collectable by accessing its parent (if that's how your prefab is structured).
-        GameObject parentObj = collectable.gameObject.transform.parent.gameObject;
+        GameObject parentObj = collectable.gameObject;
         spawnedCollectables.Remove(parentObj);
         Destroy(parentObj);
     }
-
-    public void ResetInstrumentLoop()
-    {
-        if (!activeForCollection)
-        {
-            // Only clear persistentLoopNotes if this track is starting fresh.
-            persistentLoopNotes.Clear();
-        }
-        if(isPlayerControlled)
-        {
-            hasCollectedNewNoteThisSet = false;
-        }
-
-        // Reset expansion-related variables.
-        currentExpansionCount = 0;
-        hasStartedNewCollection = false;
-
-        // Reset the section boundaries and total steps to the base values.
-        currentSectionStart = 0;
-        // Assume totalSteps is the base length (for example, 64 ticks)
-        currentSectionEnd = totalSteps;
-        totalInstrumentSteps = totalSteps;
-        
-        
-        
-        
-    }
-
+    
 
     void PlayLoopedNotes(int globalStep)
     {
         // Here, persistentLoopNotes stores the absolute step at which each note should play.
-        foreach (var (storedStep, note, duration) in persistentLoopNotes)
+        foreach (var (storedStep, note, duration, velocity) in persistentLoopNotes)
         {
             if (storedStep == globalStep)
             {
-                PlayNote(note, duration);
+                PlayNote(note, duration, velocity);
             }
         }
     }
 
-    void PlayNote(int note, int durationTicks)
+    void PlayNote(int note, int durationTicks, float velocity)
     {
-        if (controller.drumTrack == null || controller.drumTrack.drumLoopBPM <= 0)
+        if (drumTrack == null || drumTrack.drumLoopBPM <= 0)
         {
             Debug.LogError("Drum track is not initialized or has an invalid BPM.");
             return;
         }
 
         // ✅ Convert durationTicks into milliseconds using WAV BPM
-        int durationMs = Mathf.RoundToInt((float)(durationTicks * (60000f / (controller.drumTrack.drumLoopBPM * 480f))));
+        int durationMs = Mathf.Max(
+            Mathf.RoundToInt(durationTicks * (60000f / (drumTrack.drumLoopBPM * 480f))),
+            200  // ✅ Set a minimum duration of 200ms
+        );
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
-
         MPTKEvent noteOn = new MPTKEvent()
         {
             Command = MPTKCommand.NoteOn,
             Value = note,
             Channel = channel,
             Duration = durationMs, // ✅ Fixed duration scaling
-            Velocity = 100,
+            Velocity = (int)velocity * 10,
         };
 
         MPTKEvent noteOff = new MPTKEvent()
@@ -640,14 +497,6 @@ public class InstrumentTrack : MonoBehaviour
         };
 
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
-//        StartCoroutine(DelayedNoteOff(noteOff, durationMs)); // ✅ Ensure delayed stop
-    }
-
-
-    IEnumerator DelayedNoteOff(MPTKEvent noteOff, int delayMs)
-    {
-        yield return new WaitForSeconds(delayMs / 1000f); // Convert ms to seconds
-        midiStreamPlayer.MPTK_PlayEvent(noteOff);
     }
 
 

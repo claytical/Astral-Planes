@@ -8,11 +8,10 @@ public class Collectable : MonoBehaviour
     public int noteDurationTicks = 4; // Default to a 1/16th note duration (adjustable)
     public int assignedNote; // ✅ Stores the note value
     public InstrumentTrack assignedInstrumentTrack; // ✅ Links to the track that spawned it
-    public delegate void OnCollectedHandler(int duration);
+    public delegate void OnCollectedHandler(int duration, float force);
 
     public bool easingComplete = false;
     public event OnCollectedHandler OnCollected;
-    public event Action<Collectable> OnDestroyed;
     public void Initialize(int note, InstrumentTrack track)
     {
         assignedNote = note;
@@ -21,12 +20,14 @@ public class Collectable : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D coll)
     {
-
-        if (coll.gameObject.GetComponent<Vehicle>())
+        Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
+        if (vehicle)
         {
 
-            coll.gameObject.GetComponent<Vehicle>().CollectEnergy(amount);
-            OnCollected?.Invoke(noteDurationTicks); // Pass duration when collected
+            vehicle.CollectEnergy(amount); 
+            
+            //            vehicle.terminalVelocity
+            OnCollected?.Invoke(noteDurationTicks,vehicle.GetForce()); // Pass duration when collected
 
             var explode = GetComponent<Explode>();
             if (explode != null)

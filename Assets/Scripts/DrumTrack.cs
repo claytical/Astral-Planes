@@ -21,7 +21,6 @@ public class DrumTrack : MonoBehaviour
     // Assuming these are declared and initialized elsewhere:
     public float loopLengthInSeconds;       // Duration of the loop.
     public float beatMultiplier = 8;
-    public MidiFilePlayer drums;
     public GameObject drumLoopCollectablePrefab;
     public AudioClip[] fullLoopClips;
     public AudioClip[] breakbeatClips;
@@ -55,7 +54,6 @@ public class DrumTrack : MonoBehaviour
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private float stepWidth; // Dynamic width per step
-    public int loopCounter = 0;
     private float nextSpawnTime = 0f;  // ✅ Tracks when the next obstacles should spawn
     public float spawnCooldown = 3f;  // ✅ Delay before spawning again (increase for slower spawns)
 
@@ -66,7 +64,6 @@ public class DrumTrack : MonoBehaviour
     public int numVisibleObstacles = 2; // Number of obstacles that should be visible at a time
     private int lastLoopCount = -1;
     private int spawnCycleOffset = 0;
-    private int lastSpawnStep = -1;
     private HashSet<int> occupiedSpawnSteps = new HashSet<int>();
     public List<GameObject> activeObstacles = new List<GameObject>(); // Track spawned obstacles
     private int progressionIndex = 0;
@@ -100,7 +97,10 @@ public class DrumTrack : MonoBehaviour
     {
         if (drumAudioSource == null || drumAudioSource.clip == null)
             return;
-
+        if (!GamepadManager.Instance.ReadyToPlay())
+        {
+            return;
+        }
         float currentTime = drumAudioSource.time;
         float stepDuration = loopLengthInSeconds / totalSteps;
 
@@ -135,7 +135,7 @@ public class DrumTrack : MonoBehaviour
         if (count <= 0 || count > 16) return;
 
         RemoveOffscreenObstacles(); // Ensure old obstacles are cleared
-
+        SpawnDrumLoopCollectable(DrumLoopPattern.Full);
         float screenWidth = screenMaxX - screenMinX;
         float stepWidth = screenWidth / 16f; // Full spacing if 16 obstacles
         float spacingFactor = screenWidth / (float)count; // Ensure even spacing
@@ -186,7 +186,6 @@ public class DrumTrack : MonoBehaviour
     }
     private void CheckForOverlappingObstacles()
     {
-        float checkSize = 1f; // ✅ Adjust based on obstacle size
 
         List<GameObject> toDestroy = new List<GameObject>();
 
@@ -271,11 +270,7 @@ public class DrumTrack : MonoBehaviour
 
         activeObstacles.Clear();
     }
-    
-    public void RemoveRandomNote()
-    {
-        trackController.RemoveCollectableFromActiveTrack();
-    }
+
     GameObject GetObstacle(ObstacleType _obstacleType, Vector3 position)
     {
         switch (_obstacleType)
@@ -303,88 +298,96 @@ public class DrumTrack : MonoBehaviour
         // Start waiting for the current loop to finish.
         StartCoroutine(WaitAndChangeDrumLoop());
     }
-    public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
-    {
-        Vector2 drumTrackPosition = new Vector2(3, 2);
+public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
+{
+    Vector2 drumTrackPosition = new Vector2(Random.Range(-8, 8), Random.Range(-2, -4));
 
-        GameObject newCollectable = Instantiate(drumLoopCollectablePrefab, transform);
-        newCollectable.transform.position = drumTrackPosition;
-        
-        Debug.Log("NEW COLLECTABLE:" + newCollectable.name);
-        DrumLoopCollectable dlc = newCollectable.GetComponent<DrumLoopCollectable>();
-        if (dlc != null)
+    GameObject newCollectable = Instantiate(drumLoopCollectablePrefab, transform);
+    newCollectable.transform.position = drumTrackPosition;
+
+    Debug.Log("NEW COLLECTABLE: " + newCollectable.name);
+    DrumLoopCollectable dlc = newCollectable.GetComponent<DrumLoopCollectable>();
+
+    if (dlc != null)
+    {
+        AudioClip selectedClip = null;
+
+        if (patternToUse == DrumLoopPattern.Full)
         {
-            AudioClip selectedClip = null;
-            if (patternToUse == DrumLoopPattern.Full)
+            if (currentDrumLoopState == DrumLoopState.Progression)
             {
-                if(currentDrumLoopState == DrumLoopState.Progression)
+                if (fullLoopClips.Length > 0)
                 {
-                    // Use the next clip in the progression sequence
-                    if(fullLoopClips.Length > 0 && progressionIndex < fullLoopClips.Length)
+                    // ✅ Ensure progressionIndex does not exceed array bounds
+                    if (progressionIndex < fullLoopClips.Length - 1)
                     {
                         progressionIndex++;
-                        // If we've reached the end, switch to breakbeat next time
-                        if(progressionIndex >= fullLoopClips.Length)
-                        {
-                            currentDrumLoopState = DrumLoopState.Breakbeat;
-                        }
-                        selectedClip = fullLoopClips[progressionIndex];
-
                     }
-                }
-            }
-            else if (patternToUse == DrumLoopPattern.Breakbeat)
-            {
-                if (breakbeatClips.Length > 0)
-                {
-                    selectedClip = breakbeatClips[Random.Range(0, breakbeatClips.Length)];
-                    int newProgressionIndex = Random.Range(fullLoopClips.Length - 4, fullLoopClips.Length);
-                    if (newProgressionIndex < 0)
+                    else
                     {
-                        newProgressionIndex = 0;
+                        progressionIndex = fullLoopClips.Length - 1; // ✅ Stay within bounds
+                        currentDrumLoopState = DrumLoopState.Breakbeat;
                     }
-                    progressionIndex = newProgressionIndex;
-                    currentDrumLoopState = DrumLoopState.Progression;                
+
+                    selectedClip = fullLoopClips[progressionIndex];
                 }
             }
-            else if (patternToUse == DrumLoopPattern.SlowDown)
-            {
-                if (slowDownClips.Length > 0)
-                    selectedClip = slowDownClips[Random.Range(0, slowDownClips.Length)];
-            }
-            
-            dlc.newDrumLoopClip = selectedClip;
-            dlc.SetTrack(this);
         }
+        else if (patternToUse == DrumLoopPattern.Breakbeat)
+        {
+            if (breakbeatClips.Length > 0)
+            {
+                selectedClip = breakbeatClips[Random.Range(0, breakbeatClips.Length)];
+
+                // ✅ Prevent invalid range selection
+                if (fullLoopClips.Length >= 4)
+                {
+                    progressionIndex = Random.Range(fullLoopClips.Length - 4, fullLoopClips.Length);
+                }
+                else
+                {
+                    progressionIndex = Random.Range(0, fullLoopClips.Length); // ✅ Adjust for smaller arrays
+                }
+
+                currentDrumLoopState = DrumLoopState.Progression;
+            }
+        }
+        else if (patternToUse == DrumLoopPattern.SlowDown)
+        {
+            if (slowDownClips.Length > 0)
+                selectedClip = slowDownClips[Random.Range(0, slowDownClips.Length)];
+        }
+
+        dlc.newDrumLoopClip = selectedClip;
+        dlc.SetTrack(this);
     }
+}
+
 
     private IEnumerator WaitAndChangeDrumLoop()
     {
+        // ✅ First, check if `drumAudioSource` is valid
+        if (drumAudioSource == null || drumAudioSource.clip == null)
+        {
+            Debug.LogError("WaitAndChangeDrumLoop: drumAudioSource or its clip is null!");
+            yield break;
+        }
+
         // Wait until the current loop is about to finish.
         while (drumAudioSource.time < drumAudioSource.clip.length - 0.1f)
         {
             yield return null;
         }
-
+        if (pendingDrumLoop == null)
+        {
+            Debug.LogWarning("WaitAndChangeDrumLoop: No new drum loop was assigned!");
+            yield break;
+        }
         // ✅ Change the drum loop to the pending one.
         drumAudioSource.clip = pendingDrumLoop;
         drumAudioSource.Play();
         pendingDrumLoop = null;
-
-        // ✅ Get the currently active `NoteSet` to find which `InstrumentTrack` is playing.
-        if (trackController != null)
-        {
-            NoteSet currentNoteSet = trackController.GetCurrentNoteSet();
-            if (currentNoteSet != null && currentNoteSet.assignedInstrumentTrack != null)
-            {
-                Debug.Log($"Drum loop changed! Advancing from {currentNoteSet.assignedInstrumentTrack.name} to next NoteSet.");
-                trackController.TrackExpansionCompleted(currentNoteSet.assignedInstrumentTrack);
-            }
-            else
-            {
-                Debug.LogWarning("WaitAndChangeDrumLoop: No valid InstrumentTrack found for the current NoteSet.");
-            }
-        }
+        
     }
 
     private IEnumerator InitializeDrumLoop()
@@ -409,20 +412,30 @@ public class DrumTrack : MonoBehaviour
         Debug.Log($"Drum loop initialized with length {loopLengthInSeconds} seconds.");
         isInitialized = true;
         }
-    
+
 
 
     void Start()
+    {
+        if (!GamepadManager.Instance.ReadyToPlay())
+        {
+            return;
+        }    
+    }
+
+    public void ManualStart()
+    {
         {
             if (drumAudioSource == null)
             {
                 Debug.LogError("DrumTrack: No AudioSource assigned!");
                 return;
             }
-        GamepadManager.Instance.drumTrack = this;
-        StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
+            StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
+
         }
-    
+    }
+
     IEnumerator EaseToPosition(Transform obj, Vector3 target, float moveSpeed)
     {
         if (obj == null)

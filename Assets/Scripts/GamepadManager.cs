@@ -19,7 +19,6 @@ public class GamepadManager : MonoBehaviour
     private List<Gamepad> connectedGamepads;
     private List<LocalPlayer> localPlayers = new List<LocalPlayer>();
     public static GamepadManager Instance { get; private set; }
-    public DrumTrack drumTrack;
     private bool gameInProgress = false;
 
     private void Awake()
@@ -211,7 +210,6 @@ public class GamepadManager : MonoBehaviour
             }
             yield return null;
         }
-
         // Scene is now loaded and activated
         Debug.Log("New scene loaded: " + sceneName);
         HandleSceneSetup(sceneName);
@@ -222,6 +220,7 @@ public class GamepadManager : MonoBehaviour
         if (sceneName.Equals("GeneratedTrack"))
         {
             HandleTrackSceneSetup();
+            StartSelectedTrack();
             GameObject go = GameObject.Find("QuoteText");
             if(go)
             {
@@ -247,16 +246,27 @@ public class GamepadManager : MonoBehaviour
         }
     }
 
-    private void HandleTrackSceneSetup()
+    private void StartSelectedTrack()
     {
-        Debug.Log("Handle Track Scene Setup");
+        InstrumentTrackController instrumentTrackController = FindFirstObjectByType<InstrumentTrackController>();
+        DrumTrack drumTrack = FindFirstObjectByType<DrumTrack>();
+        drumTrack.ManualStart();
+        instrumentTrackController.ManualStart();
         for (int i = 0; i < localPlayers.Count; i++)
         {
             localPlayers[i].Launch(drumTrack);
         }
-
+        
+    }
+    private void HandleTrackSceneSetup()
+    {
+        Debug.Log("Handle Track Scene Setup");
         gameInProgress = true;
+    }
 
+    public bool ReadyToPlay()
+    {
+        return gameInProgress;
     }
     private void HandleTrackFinishedSceneSetup()
     {

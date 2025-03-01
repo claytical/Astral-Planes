@@ -2,46 +2,57 @@
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using Unity.Loading;
+using UnityEngine.SceneManagement;
 
 public class InstrumentTrackController : MonoBehaviour
 {
     public List<NoteSet> assignedNoteSets; // 👈 Array of NoteSets
-    public DrumTrack drumTrack;
     private int currentNoteSetIndex = 0; // 👈 Tracks which set is active
-    
-    public List<InstrumentTrack> instrumentTracks = new List<InstrumentTrack>();
+    private HashSet<InstrumentTrack> usedInstrumentTracks = new HashSet<InstrumentTrack>();
+    public Boundaries boundaries;
+
     // This list parallels instrumentTracks; each element is true when that track has completed its expansion.
     
 
     void Start()
     {
-        drumTrack.trackController = this;
-        void Start()
-        {
-            if (assignedNoteSets.Count == 0)
+
+            if (!GamepadManager.Instance.ReadyToPlay())
             {
-                Debug.LogError("No NoteSets assigned to InstrumentTrackController!");
                 return;
             }
-
-            // ✅ Start with the first NoteSet and apply it to its assigned InstrumentTrack.
-            ApplyCurrentNoteSet();
-        }
-        
     }
 
+    public void ManualStart()
+    {
+        if (assignedNoteSets.Count == 0)
+        {
+            Debug.LogError("No NoteSets assigned to InstrumentTrackController!");
+            return;
+        }
+
+        // ✅ Start with the first NoteSet and apply it to its assigned InstrumentTrack.
+        ApplyCurrentNoteSet();
+
+
+    }
     public void ApplyCurrentNoteSet()
     {
+        
         if (currentNoteSetIndex >= assignedNoteSets.Count)
         {
-            Debug.Log("All NoteSets have been used. Looping back.");
-            currentNoteSetIndex = 0; // ✅ Loop back to the beginning
+            Debug.Log("All NoteSets have been used. Stopping expansion.");
+            return; // ✅ Stop instead of looping back
         }
 
         NoteSet currentNoteSet = assignedNoteSets[currentNoteSetIndex];
-
+        currentNoteSet.assignedInstrumentTrack.SetBoundaries(boundaries);
         if (currentNoteSet.assignedInstrumentTrack != null)
         {
+            //            currentNoteSet.assignedInstrumentTrack.ClearLoopNotes();
+            Debug.Log($"Applying NoteSet {currentNoteSetIndex} to {currentNoteSet.assignedInstrumentTrack.name}");
+            
             currentNoteSet.assignedInstrumentTrack.ApplyNoteSet(currentNoteSet);
             currentNoteSet.assignedInstrumentTrack.SpawnCollectables();
         }
@@ -52,14 +63,34 @@ public class InstrumentTrackController : MonoBehaviour
     }
 
 
+
     /// <summary>
     /// Called by an InstrumentTrack when it completes its allowed expansions.
     /// </summary>
-    /// <param name="completedTrack">The track that has finished expanding for the current NoteSet.</param>
+    /// <param name="completedTrack">The track that h
+    ///
     public void TrackExpansionCompleted(InstrumentTrack completedTrack)
     {
         Debug.Log($"Instrument {completedTrack.name} finished. Moving to next NoteSet.");
-        currentNoteSetIndex++; // ✅ Move to the next NoteSet
+        currentNoteSetIndex++;
+
+        if (currentNoteSetIndex >= assignedNoteSets.Count)
+        {
+            Debug.Log("All NoteSets have been completed.");
+            currentNoteSetIndex = completedTrack.currentNoteSet.dropBackIndex;
+        }
+
+        InstrumentTrack nextTrack = assignedNoteSets[currentNoteSetIndex].assignedInstrumentTrack;
+        NoteSet nextNoteSet = assignedNoteSets[currentNoteSetIndex];
+
+        // Check if this instrument is playing a different NoteSet than before
+        if (nextTrack.currentNoteSet != nextNoteSet)
+        {
+            Debug.Log($"Switching {nextTrack.name} to a new NoteSet. Resetting its loop.");
+         //   nextTrack.ClearLoopNotes(); // Reset notes only when the NoteSet is new
+        }
+
+        // Apply the new NoteSet to the InstrumentTrack
         ApplyCurrentNoteSet();
     }
     public NoteSet GetCurrentNoteSet()
@@ -71,25 +102,6 @@ public class InstrumentTrackController : MonoBehaviour
         }
         return assignedNoteSets[currentNoteSetIndex];
     }
-
-    public void RemoveCollectableFromActiveTrack()
-    {
-        if (currentNoteSetIndex >= assignedNoteSets.Count)
-        {
-            Debug.LogWarning("RemoveCollectableFromActiveTrack: No active NoteSet available.");
-            return;
-        }
-
-        NoteSet currentNoteSet = assignedNoteSets[currentNoteSetIndex];
-        if (currentNoteSet.assignedInstrumentTrack != null)
-        {
-            currentNoteSet.assignedInstrumentTrack.RemoveCollectableNote();
-        }
-        else
-        {
-            Debug.LogWarning("RemoveCollectableFromActiveTrack: No assigned InstrumentTrack for current NoteSet.");
-        }
-    }
-
+    
 
 }
