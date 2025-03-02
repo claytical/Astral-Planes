@@ -10,23 +10,36 @@ public class Collectable : MonoBehaviour
     public InstrumentTrack assignedInstrumentTrack; // ✅ Links to the track that spawned it
     public delegate void OnCollectedHandler(int duration, float force);
 
+    public float floatAmplitude = 0.2f; // Adjust for bigger or smaller movement
+    public float floatSpeed = 2f;       // Controls how fast the floating happens
     public bool easingComplete = false;
-    public event OnCollectedHandler OnCollected;
+    private Vector3 startPosition;
+    private float floatTimer = 0f;    public event OnCollectedHandler OnCollected;
     public void Initialize(int note, InstrumentTrack track)
     {
+        startPosition = transform.position;
         assignedNote = note;
         assignedInstrumentTrack = track; // ✅ Store reference for validation
     }
-
+    private void Update()
+    {
+        if (easingComplete)
+        {
+            // Apply sine wave motion to Y-position
+            float newY = startPosition.y + Mathf.Sin(floatTimer * floatSpeed) * floatAmplitude;
+            transform.position = new Vector3(startPosition.x, newY, startPosition.z);
+            
+            // Increment time
+            floatTimer += Time.deltaTime;
+        }
+    }
     private void OnTriggerEnter2D(Collider2D coll)
     {
         Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
         if (vehicle)
         {
 
-            vehicle.CollectEnergy(amount); 
-            
-            //            vehicle.terminalVelocity
+            vehicle.CollectEnergy(amount);
             OnCollected?.Invoke(noteDurationTicks,vehicle.GetForce()); // Pass duration when collected
 
             var explode = GetComponent<Explode>();
