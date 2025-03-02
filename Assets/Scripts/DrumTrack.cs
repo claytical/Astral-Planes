@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using MidiPlayerTK;
 using System.Collections.Generic;
 using System.Collections;
 
@@ -22,6 +21,9 @@ public class DrumTrack : MonoBehaviour
     public float loopLengthInSeconds;       // Duration of the loop.
     public float beatMultiplier = 8;
     public GameObject drumLoopCollectablePrefab;
+    public SpawnGrid spawnGrid;
+    public int gridWidth = 8;
+    public int gridHeight = 4;
     public AudioClip[] fullLoopClips;
     public AudioClip[] breakbeatClips;
     public AudioClip[] slowDownClips;
@@ -47,7 +49,7 @@ public class DrumTrack : MonoBehaviour
     public float drumLoopBPM = 120f;
     public float startDspTime;
     public float beatMoveSpeed = 5f; // ✅ Speed at which beats move down
-
+    
 
     // Tracking which candidate steps are already used in the current loop:
 
@@ -63,12 +65,11 @@ public class DrumTrack : MonoBehaviour
     public InstrumentTrackController trackController;
     public int numVisibleObstacles = 2; // Number of obstacles that should be visible at a time
     private int lastLoopCount = -1;
-    private int spawnCycleOffset = 0;
-    private HashSet<int> occupiedSpawnSteps = new HashSet<int>();
     public List<GameObject> activeObstacles = new List<GameObject>(); // Track spawned obstacles
     private int progressionIndex = 0;
     private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
     public bool isInitialized = false;
+    public float spawnDelay = 5f;
     IEnumerator FollowMovementPattern(Transform obj, List<Vector3> pattern, float segmentDuration)
     {
         if (obj == null) yield break;
@@ -101,6 +102,7 @@ public class DrumTrack : MonoBehaviour
         {
             return;
         }
+
         float currentTime = drumAudioSource.time;
         float stepDuration = loopLengthInSeconds / totalSteps;
 
@@ -117,173 +119,67 @@ public class DrumTrack : MonoBehaviour
         float elapsedTime = (float)(AudioSettings.dspTime - startDspTime);
         int currentLoop = Mathf.FloorToInt(elapsedTime / loopLengthInSeconds);
 
-        // ✅ If loop count increases, spawn obstacles
-        if (currentLoop > lastLoopCount && Time.time >= nextSpawnTime)
+        // ✅ Ensure this only runs once per loop restart
+        if (currentLoop > lastLoopCount)
         {
-            Debug.Log("New Loop Started! Spawning obstacles.");
-            spawnCycleOffset = (spawnCycleOffset + 1) % 16;
+            Debug.Log($"New Loop Started! Current Loop: {currentLoop}");
+
             lastLoopCount = currentLoop;
-            occupiedSpawnSteps.Clear();
-            SpawnObstacles(numVisibleObstacles);
-            CheckForOverlappingObstacles();
-        }
-    }
 
-
-    private void SpawnObstacles(int count)
-    {
-        if (count <= 0 || count > 16) return;
-
-        RemoveOffscreenObstacles(); // Ensure old obstacles are cleared
-        SpawnDrumLoopCollectable(DrumLoopPattern.Full);
-        float screenWidth = screenMaxX - screenMinX;
-        float stepWidth = screenWidth / 16f; // Full spacing if 16 obstacles
-        float spacingFactor = screenWidth / (float)count; // Ensure even spacing
-
-        int gapPosition = spawnCycleOffset % 16; // Shift spawn position each loop
-
-        List<int> spawnedPositions = new List<int>();
-
-        for (int i = 0; i < count; i++)  // ✅ Spawn only `count` obstacles
-        {
-            int spawnIndex = (i + gapPosition) % 16; // Cycle spawn positions
-
-            if (spawnedPositions.Contains(spawnIndex)) continue; // Avoid duplicate positions
-            spawnedPositions.Add(spawnIndex);
-
-            float posX;
-            if (count == 16) 
+            // ✅ Alternate logic for obstacles and collectables
+            if (currentLoop % 2 == 0)
             {
-                posX = screenMinX + (spawnIndex * stepWidth) + xOffset; // Standard spacing for full 16
-            } 
-            else 
-            {
-                posX = screenMinX + (i * spacingFactor) + xOffset; // ✅ Evenly spread out fewer obstacles
+                Debug.Log("Spawning an obstacle.");
+                SpawnObstacle();
             }
-
-            SpawnObstacle(posX); // ✅ Call the improved method
-        }
-    }
-
-    private void RemoveOffscreenObstacles()
-    {
-        float screenTopY = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 1.1f, 0)).y; // Ensure a bit of buffer
-
-        for (int i = activeObstacles.Count - 1; i >= 0; i--)
-        {
-            GameObject obj = activeObstacles[i];
-            if (obj == null || obj.transform.position.y > screenTopY)
+            else
             {
-                Destroy(obj);
-                activeObstacles.RemoveAt(i);
-            }
-        }
-        // ✅ If all obstacles are gone, force a new spawn on next loop restart
-        if (activeObstacles.Count == 0)
-        {
-            Debug.Log("All obstacles removed. Waiting for next loop to spawn new ones.");
-        }
-    }
-    private void CheckForOverlappingObstacles()
-    {
-
-        List<GameObject> toDestroy = new List<GameObject>();
-
-        for (int i = 0; i < activeObstacles.Count; i++)
-        {
-            GameObject obstacleA = activeObstacles[i];
-            if (obstacleA == null) continue;
-
-            Collider2D colA = obstacleA.GetComponent<Collider2D>();
-            if (colA == null) continue;
-
-            for (int j = i + 1; j < activeObstacles.Count; j++)
-            {
-                GameObject obstacleB = activeObstacles[j];
-                if (obstacleB == null) continue;
-
-                Collider2D colB = obstacleB.GetComponent<Collider2D>();
-                if (colB == null) continue;
-
-                if (colA.bounds.Intersects(colB.bounds)) // ✅ Check if two obstacles overlap
-                {
-                    Debug.Log($"{obstacleA.name} is overlapping with {obstacleB.name}!");
-
-                    // ✅ Randomly choose one to destroy
-                    GameObject toExplode = (Random.value > 0.5f) ? obstacleA : obstacleB;
-
-                    Explode explodeScript = toExplode.GetComponent<Explode>();
-                    if (explodeScript != null)
-                    {
-                        toDestroy.Add(toExplode);
-                    }
-                }
-            }
-        }
-
-        // ✅ Destroy the chosen obstacles after checking all overlaps
-        foreach (GameObject obj in toDestroy)
-        {
-            activeObstacles.Remove(obj);
-            obj.GetComponent<Explode>().Permanent();
-        }
-    }
-
-    private void SpawnObstacle(float posX)
-    {
-        Vector3 spawnPos = new Vector3(posX, obstacleInitialY, 0);
-        ObstacleType selectedType = ObstacleType.Standard;
-        if(Random.Range(-1,2) > 0)
-        {
-            selectedType = ObstacleType.Hazard;
-        }
-        GameObject obj = GetObstacle(selectedType, spawnPos);
-        if (obj != null)
-        {
-            ObstacleMovement obstacleMovement = obj.GetComponent<ObstacleMovement>();
-            if (obstacleMovement != null)
-            {
-                obstacleMovement.Init(spawnPos); // Use the new Init method
-                obstacleMovement.SetDrumTrack(this);
-                obstacleMovement.beatInterval = (60f / drumLoopBPM) * beatMultiplier; // ✅ Ensure correct timing
-                activeObstacles.Add(obj); // ✅ Add to list for tracking            }
+                Debug.Log("Spawning a drum loop collectable.");
+                SpawnDrumLoopCollectable(DrumLoopPattern.Full);
             }
         }
     }
 
-    public void RemoveOccupiedStep(int candidateStep)
+    private bool DrumLoopRestarted()
     {
-        if (occupiedSpawnSteps.Contains(candidateStep))
+        float elapsedTime = (float)(AudioSettings.dspTime - startDspTime);
+        int currentLoop = Mathf.FloorToInt(elapsedTime / loopLengthInSeconds);
+
+        if (currentLoop > lastLoopCount)
         {
-            occupiedSpawnSteps.Remove(candidateStep);
-            Debug.Log("DrumTrack: Freed candidate step " + candidateStep);
+            lastLoopCount = currentLoop;
+            return true;
         }
+        return false;
     }
 
-    void OnDrumLoopComplete()
-    {
-        // Clear old obstacles before spawning new ones
-        foreach (var obj in activeObstacles)
-        {
-            if (obj != null) Destroy(obj);
-        }
 
-        activeObstacles.Clear();
+    private void SpawnObstacle()
+    {
+        Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
+
+        if (spawnCell.x == -1) return; // No available space
+
+        Vector3 spawnPosition = GridToWorldPosition(spawnCell);
+        GameObject newObstacle = GetObstacle(ObstacleType.Standard);
+        spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
+
     }
 
-    GameObject GetObstacle(ObstacleType _obstacleType, Vector3 position)
+
+    GameObject GetObstacle(ObstacleType _obstacleType)
     {
         switch (_obstacleType)
         {
             case ObstacleType.Hazard:
-                GameObject obj = Instantiate(hazardPrefab, position, Quaternion.identity);
+                GameObject obj = Instantiate(hazardPrefab, transform.position, Quaternion.identity);
                 return obj;
 
             case ObstacleType.Standard:
-                GameObject objB = Instantiate(obstaclePrefab, position, Quaternion.identity);
+                GameObject objB = Instantiate(obstaclePrefab, transform.position, Quaternion.identity);
                 return objB;
             case ObstacleType.Void:
-                GameObject objC = Instantiate(energyVoidPrefab, position, Quaternion.identity);
+                GameObject objC = Instantiate(energyVoidPrefab, transform.position, Quaternion.identity);
                 return objC;
             default:
                 return null;
@@ -300,12 +196,13 @@ public class DrumTrack : MonoBehaviour
     }
 public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
 {
-    Vector2 drumTrackPosition = new Vector2(Random.Range(-8, 8), Random.Range(-2, -4));
+    Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
 
-    GameObject newCollectable = Instantiate(drumLoopCollectablePrefab, transform);
-    newCollectable.transform.position = drumTrackPosition;
+    if (spawnCell.x == -1) return; // No available space
 
-    Debug.Log("NEW COLLECTABLE: " + newCollectable.name);
+    Vector3 spawnPosition = GridToWorldPosition(spawnCell);
+    GameObject newCollectable = Instantiate(drumLoopCollectablePrefab, spawnPosition, Quaternion.identity);
+    spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.DrumCollectable);
     DrumLoopCollectable dlc = newCollectable.GetComponent<DrumLoopCollectable>();
 
     if (dlc != null)
@@ -314,19 +211,24 @@ public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
 
         if (patternToUse == DrumLoopPattern.Full)
         {
+            Debug.Log(("CURRENT DRUM LOOP STATE: " + currentDrumLoopState));
             if (currentDrumLoopState == DrumLoopState.Progression)
             {
                 if (fullLoopClips.Length > 0)
                 {
+                    Debug.Log(("FULL LENGTH CLIPS AVAILABLE"));
                     // ✅ Ensure progressionIndex does not exceed array bounds
                     if (progressionIndex < fullLoopClips.Length - 1)
                     {
+                        Debug.Log("Progression Index: " + progressionIndex);
                         progressionIndex++;
                     }
                     else
                     {
                         progressionIndex = fullLoopClips.Length - 1; // ✅ Stay within bounds
+                        Debug.Log("Breakbeat Progression Index: " + progressionIndex);
                         currentDrumLoopState = DrumLoopState.Breakbeat;
+                        
                     }
 
                     selectedClip = fullLoopClips[progressionIndex];
@@ -358,11 +260,24 @@ public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
                 selectedClip = slowDownClips[Random.Range(0, slowDownClips.Length)];
         }
 
+        if (selectedClip == null)
+        {
+            Debug.LogWarning("SpawnLoopDrumCollectable no valid clip found for pattern " + patternToUse);
+            if (fullLoopClips.Length > 0)
+            {
+                selectedClip = fullLoopClips[0];
+            }
+        }
         dlc.newDrumLoopClip = selectedClip;
         dlc.SetTrack(this);
     }
 }
-
+private Vector3 GridToWorldPosition(Vector2Int gridPos)
+{
+    float worldX = gridPos.x * 2 - (gridWidth / 2);
+    float worldY = gridPos.y * 2 - (gridHeight / 2);
+    return new Vector3(worldX, worldY, 0);
+}
 
     private IEnumerator WaitAndChangeDrumLoop()
     {
@@ -413,14 +328,21 @@ public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
         isInitialized = true;
         }
 
-
+    void Awake() // ✅ Initialize early
+    {
+        if (spawnGrid == null)
+        {
+            spawnGrid = new SpawnGrid(gridWidth, gridHeight);
+            Debug.Log($"{gameObject.name} - SpawnGrid initialized in Awake().");
+        }
+    }
 
     void Start()
     {
         if (!GamepadManager.Instance.ReadyToPlay())
         {
             return;
-        }    
+        }
     }
 
     public void ManualStart()

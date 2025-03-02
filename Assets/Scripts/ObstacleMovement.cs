@@ -45,13 +45,7 @@ public class ObstacleMovement : MonoBehaviour
             rb.linearVelocity = new Vector2(0.01f, 0.01f); // ✅ Apply tiny force to register collisions
         }
     }
-    void OnDestroy()
-    {
-        if (drumTrack != null)
-        {
-            drumTrack.RemoveOccupiedStep(candidateStep);
-        }
-    }
+
     IEnumerator MoveLoop()
     {
 

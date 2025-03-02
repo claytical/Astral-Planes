@@ -214,7 +214,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 0.01
+  m_GravityScale: 0
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -242,6 +242,8 @@ MonoBehaviour:
   noteDurationTicks: 4
   assignedNote: 0
   assignedInstrumentTrack: {fileID: 0}
+  floatAmplitude: 0.2
+  floatSpeed: 2
   easingComplete: 0
 --- !u!114 &9098591146787267998
 MonoBehaviour:
