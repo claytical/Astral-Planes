@@ -9,6 +9,7 @@ public class Explode : MonoBehaviour
     public GameObject explosion;
     public float respawnTimer = 10f;
     public float lifetime;
+    public bool randomizeLifetimer = false;
     private float explosionTimer;
     private Vector3 originalPosition;
     private Quaternion originalRotation;
@@ -16,7 +17,14 @@ public class Explode : MonoBehaviour
 
     void Start()
     {
-        explosionTimer = Time.time + lifetime;
+        if (randomizeLifetimer)
+        {
+            explosionTimer = Time.time + Random.Range(0f, lifetime);
+        }
+        else
+        {
+            explosionTimer = Time.time + lifetime;
+        }
         originalPosition = transform.position;
         originalRotation = transform.rotation;
         originalScale = transform.localScale;
@@ -69,7 +77,6 @@ public class Explode : MonoBehaviour
         Instantiate(explosion, transform.position, Quaternion.identity);
         Destroy(this.gameObject);
     }
-
 
 
 }

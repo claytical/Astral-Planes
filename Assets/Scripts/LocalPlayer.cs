@@ -91,7 +91,6 @@ public class LocalPlayer : MonoBehaviour
                 // Destroy the vehicle or trigger the explosion
                 if (plane != null)
                 {
-                    TakeDamage(100);
                     Restart();
 //                    plane.Explode();  // Assuming you have an Explode() method in your Vehicle script
                 }
@@ -161,13 +160,7 @@ public void CreatePlayerSelect()
         GetComponent<PlayerInput>().SwitchCurrentActionMap("Start");
         GamepadManager.Instance.CheckAllPlayersGone();
     }
-
-    public bool TakeDamage(int damage)
-    {
-        StartRumble(.25f, .5f, 0.5f);
-        return ui.TakeDamage(damage);
-    }
-
+    
     public void EnergyCollected(int newAmount)
     {
         ui.EnergyCollected(newAmount);

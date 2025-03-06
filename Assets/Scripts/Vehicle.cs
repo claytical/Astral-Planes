@@ -94,15 +94,6 @@ public class Vehicle : MonoBehaviour
 
     void FixedUpdate()
     {
-        if(energyLevel <= 0)
-        {
-            if(GetComponentInParent<LocalPlayer>()) {
-//                GetComponentInParent<LocalPlayer>().Restart();
-//                Explode();
-
-            }
-
-        }
         if (boosting && energyLevel > 0)
         {
             float appliedForce = force * burnRateMultiplier * boostMultiplier;
@@ -130,7 +121,10 @@ public class Vehicle : MonoBehaviour
 
     public float GetForce()
     {
-        return rb.linearVelocity.sqrMagnitude;
+        
+        float speed = rb.linearVelocity.sqrMagnitude;
+        float normalizedSpeed = Mathf.InverseLerp(0, terminalVelocity, speed);
+        return Mathf.Lerp(60f, 127f, normalizedSpeed);
     }
 
     public void Move(Vector2 direction)
@@ -215,7 +209,6 @@ public class Vehicle : MonoBehaviour
         {
             activeTrail.GetComponent<TrailRenderer>().emitting = false;
         }
-//        AdjustMidiTrackVolume(1f); // Restore normal volume when boost stops
     }
 
     private void ConsumeEnergy(float amount)
@@ -236,10 +229,6 @@ public class Vehicle : MonoBehaviour
         UpdateFuelUI();
         playerStats.RecordItemCollected();
 
-        if (audioManager != null)
-        {
-            audioManager.PlaySound(collectedClip);
-        }
 
 
         var localPlayer = GetComponentInParent<LocalPlayer>();
@@ -248,18 +237,7 @@ public class Vehicle : MonoBehaviour
             localPlayer.EnergyCollected((int)energyLevel);
         }
     }
-
-    public void TakeDamage(int damage)
-    {
-        currentHP -= damage;
-        if (currentHP <= 0)
-        {
-            Explode();
-        }
-
-        playerStats.RecordDamage(damage);
-    }
-
+    
     private void UpdateFuelUI()
     {
         // Map energy level to alpha (clamped between 0 and 1)
@@ -297,6 +275,26 @@ public class Vehicle : MonoBehaviour
                 explode.UntilNextSet();
             }
         }
+        if (audioManager != null)
+        {
+            Obstacle obstacle = coll.gameObject.GetComponent<Obstacle>();
+            if (obstacle != null)
+            {
+                audioManager.PlaySound(collisionClip);
+            }            
+            DrumLoopCollectable dlc = coll.gameObject.GetComponent<DrumLoopCollectable>();
+            if (dlc != null)
+            {
+                audioManager.PlaySound(collectedClip);
+            }
+            Hazard hazard = coll.gameObject.GetComponent<Hazard>();
+            if (hazard != null)
+            {
+                audioManager.PlaySound(destroyClip);
+            }
+
+        }
+
     }
     public void Explode()
     {

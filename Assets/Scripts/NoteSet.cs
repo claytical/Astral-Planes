@@ -1,17 +1,16 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-/*
-[System.Serializable]
-public class NoteGroup
+public enum NoteBehavior
 {
-    public InstrumentTrack assignedInstrumentTrack;
-    public List<WeightedNote> notes; // 🎵 Notes with weighted probabilities
-    public int allowedDuration = -1; // 🎵 Notes with weighted probabilities
-    public int maxExpansionAllowed = 2;
-    public List<int> allowedSteps;
+    Bass,       // Sustained, lower-frequency notes
+    Lead,       // Fast-moving, melodic notes
+    Harmony,    // Chord-based behavior
+    Percussion, // Rhythm-based placement
+    Drone       // Continuous background texture
 }
-*/
+
+   
 [System.Serializable]
 public class WeightedNote
 {
@@ -27,11 +26,13 @@ public class WeightedDuration
 }
 public class NoteSet : MonoBehaviour
 {
+    public NoteBehavior noteBehavior;
     public InstrumentTrack assignedInstrumentTrack; // ✅ Each NoteSet is now tied to an InstrumentTrack
     public List<int> allowedSteps = new List<int>(); // ✅ The valid spawn steps for notes
     public List<int> notes = new List<int>(); // ✅ List of possible note values
-    public float speed = .1f;
-    public int allowedDuration = -1; // ✅ Default duration for notes
+    public int dominantNote;
+    public float dominantNoteFrequency = .7f;
     public int maxExpansionAllowed = 3; // ✅ Limits how many times the loop expands
+    public int allowedDuration = -1;
     public int dropBackIndex = 0;
 }
