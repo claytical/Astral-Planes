@@ -8,7 +8,6 @@ using UnityEngine.InputSystem;
 public class PlayerStats : MonoBehaviour
 {
     public Image vehicleIcon;
-    public HP hp;
     public Fuel fuel;
     public TextMeshProUGUI collected;
     public GameObject inactivePanel;
@@ -30,8 +29,6 @@ public class PlayerStats : MonoBehaviour
         vehicleIcon.sprite = vehicle.GetComponent<SpriteRenderer>().sprite;
         UpdateEnergyDisplay(vehicle.energyLevel);
         Debug.Log("Energy collected should be displayed.");
-        hp.SetHPUI(vehicle.currentHP);
-        //fuel.FillTank(50); // Assuming the vehicle starts with a full tank
     }
 
     public void SetColor(Color color)
@@ -39,25 +36,11 @@ public class PlayerStats : MonoBehaviour
         vehicleIcon.color = color;
     }
 
-    public bool TakeDamage(int damage)
-    {
-        return hp.TakeDamage(damage);
-    }
-
     public void Deactivate()
     {
         inactivePanel.SetActive(true);
     }
 
-    void Update()
-    {
-        // Continuously update the energy display if the vehicle is active
-        if (currentVehicle != null)
-        {
-//            UpdateEnergyDisplay(currentVehicle.energyLevel);
-//            UpdateFuel((int)currentVehicle.energyLevel); // Update the fuel UI based on current energy
-        }
-    }
 
     public void EnergyCollected(int amount)
     {

@@ -38,17 +38,7 @@ public class Player : MonoBehaviour
         playerStats.Deactivate();
         SwitchActionMap("Start");
     }
-
-    public bool TakeDamage(int damage)
-    {
-        return playerStats.TakeDamage(damage);
-    }
-
-    public void IncreaseHP()
-    {
-        playerStats.hp.IncreaseHP(1);
-    }
-
+    
     public void EnergyCollected()
     {
         playerStats.EnergyCollected(1);

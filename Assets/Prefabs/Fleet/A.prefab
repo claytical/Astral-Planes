@@ -100,8 +100,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cad4f98b6b9d39b4baa92b0dfd6598b9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  accelerate: {x: 0, y: 0, z: 0}
-  randomizeRotation: 1
+  accelerate: {x: 0, y: 0.02, z: 0.52}
+  randomizeRotation: 0
 --- !u!1 &5120608187766906454
 GameObject:
   m_ObjectHideFlags: 0
@@ -209,7 +209,7 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 100
+  m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0
   m_GravityScale: 0
@@ -238,7 +238,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentHP: 10
   maxHP: 10
-  force: 50
+  force: 5
   terminalVelocity: 30
   boostMultiplier: 2.5
   minimalThrustForce: 0.5
@@ -270,6 +270,7 @@ MonoBehaviour:
     type: 3}
   respawnTimer: 10
   lifetime: 0
+  randomizeLifetimer: 0
 --- !u!82 &7090461230668326449
 AudioSource:
   m_ObjectHideFlags: 0
@@ -279,7 +280,7 @@ AudioSource:
   m_GameObject: {fileID: 5120608187766906454}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -854998193656957392, guid: 07985bf4f6d469340930e958ef313c14,
+  OutputAudioMixerGroup: {fileID: 24300002, guid: 2386beeef947dad45b3332117b558052,
     type: 2}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
@@ -390,7 +391,7 @@ PolygonCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 8a0d22cb4d4334705936f438fc6e3428, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

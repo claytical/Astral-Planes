@@ -67,11 +67,6 @@ public class PlaysWithOthers : MonoBehaviour
                     }
                     else
                     {
-                        //COLLIDING OBJECT IS NOT HAZARDOUS, BUT THIS ONE IS
-                        //                        Rigidbody2DExt.AddExplosionForce(coll.rigidbody, 1000f, this.transform.position, 20f);
-                        //                        coll.gameObject.GetComponent<Explode>().Go();
-                        //if this is a platform, it should not explode
-                        //if this is not a platform, it should explode
                         if (canBeDestroyed)
                         {
                             if (GetComponent<Explode>())
@@ -92,13 +87,6 @@ public class PlaysWithOthers : MonoBehaviour
                 }
             }
 
-            if (coll.gameObject.GetComponent<SpawnsObjects>())
-            {
-                if (canSpawnItems)
-                {
-//                        coll.gameObject.GetComponent<SpawnsObjects>().SpawnObject();
-                } 
-            }
         }
     }
 }

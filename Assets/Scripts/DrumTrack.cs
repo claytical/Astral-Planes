@@ -1,12 +1,25 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
+using Random = UnityEngine.Random;
 
 public enum DrumLoopPattern
 {
     Full,      // Full build-up from 0 to n
     Breakbeat,    // A section that jumps into the later part of the full loop (e.g., n - 3 to n)
     SlowDown   // A special short pattern for slowing down (e.g., perhaps n - 2 to n)
+}
+public enum ObstacleType
+{
+    Standard,        // Default obstacle type
+    HeavyBlock,      // Large, slow-moving obstacles (Bass behavior)
+    FastProjectile,  // Small, fast-moving obstacles (Lead behavior)
+    WaveField,       // Pulsating barriers (Harmony behavior)
+    RhythmWall,      // Spawns in rhythm (Percussion behavior)
+    FloatingHazard,  // Slow, hovering obstacles (Drone behavior)
+    Hazard           // Dangerous, irregular obstacles (Breakbeat pattern)
 }
 
 public enum DrumLoopState
@@ -19,81 +32,37 @@ public class DrumTrack : MonoBehaviour
 {
     // Assuming these are declared and initialized elsewhere:
     public float loopLengthInSeconds;       // Duration of the loop.
-    public float beatMultiplier = 8;
-    public GameObject drumLoopCollectablePrefab;
     public SpawnGrid spawnGrid;
     public int gridWidth = 8;
-    public int gridHeight = 4;
+    public int gridHeight = 8;
     public AudioClip[] fullLoopClips;
     public AudioClip[] breakbeatClips;
     public AudioClip[] slowDownClips;
     // Prefabs for different spawned objects:
     public GameObject obstaclePrefab;
-    public GameObject energyVoidPrefab;
-    public GameObject hazardPrefab;
     public int totalSteps = 64;
-    // Difficulty values (0 = never, 1 = spawn on every candidate step)
-    [Range(0f, 1f)]
-    public float obstacleDifficulty = 0.5f;
-    [Range(0f, 1f)]
-    public float energyVoidDifficulty = 0.3f;
-    [Range(0f, 1f)]
-    public float hazardDifficulty = 0.2f;
-    public float xOffset = 1;
-    public float obstacleMoveDelay = 1f; // ✅ Time between each obstacle move (0 = all move at once)
-
     // Define candidate spawn steps: if you want to spawn onlly on every 8th note, set:
-    private float obstacleInitialY = 0f;  // Starting Y position (e.g., bottom of the screen)
-    public float obstacleTargetY = -8f;   // Target Y position on spawn (between bottom and mid-screen)
-    public float easingSpeed = 1f; // Units per second
+    public AudioSource drumAudioSource;
+    public InstrumentTrackController trackController;
+    public List<GameObject> activeObstacles = new List<GameObject>(); // Track spawned obstacles
+    public List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
     public float drumLoopBPM = 120f;
+    private float obstacleInitialY = 0f;  // Starting Y position (e.g., bottom of the screen)
     public float startDspTime;
-    public float beatMoveSpeed = 5f; // ✅ Speed at which beats move down
-    
-
+    public bool isInitialized = false;    
+     
+    private int progressionIndex = 0;
+    private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
     // Tracking which candidate steps are already used in the current loop:
 
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private float stepWidth; // Dynamic width per step
     private float nextSpawnTime = 0f;  // ✅ Tracks when the next obstacles should spawn
-    public float spawnCooldown = 3f;  // ✅ Delay before spawning again (increase for slower spawns)
-
-
-    public AudioSource drumAudioSource;
     private AudioClip pendingDrumLoop = null;
-    public InstrumentTrackController trackController;
-    public int numVisibleObstacles = 2; // Number of obstacles that should be visible at a time
-    private int lastLoopCount = -1;
-    public List<GameObject> activeObstacles = new List<GameObject>(); // Track spawned obstacles
-    private int progressionIndex = 0;
-    private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
-    public bool isInitialized = false;
-    public float spawnDelay = 5f;
-    IEnumerator FollowMovementPattern(Transform obj, List<Vector3> pattern, float segmentDuration)
-    {
-        if (obj == null) yield break;
-
-        // Loop through each movement step in the pattern.
-        foreach (Vector3 offset in pattern)
-        {
-            Vector3 start = obj.position;
-            Vector3 target = start + offset;
-            float elapsed = 0f;
-
-            while (elapsed < segmentDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, elapsed / segmentDuration);
-                obj.position = Vector3.Lerp(start, target, t);
-                yield return null;
-            }
-
-            // Ensure the object exactly reaches the target.
-            obj.position = target;
-        }
-    }
-    
+    private int lastLoopCount = 0;
+    private int currentStep = 0;
+    public int loopsRequiredBeforeEvolve = 2; 
     private void Update()
     {
         if (drumAudioSource == null || drumAudioSource.clip == null)
@@ -113,7 +82,7 @@ public class DrumTrack : MonoBehaviour
         }
 
         int absoluteStep = Mathf.FloorToInt(currentTime / stepDuration);
-        int currentStep = absoluteStep % totalSteps;
+        currentStep = absoluteStep % totalSteps;
 
         // ✅ Use DSP time to track loops properly
         float elapsedTime = (float)(AudioSettings.dspTime - startDspTime);
@@ -123,69 +92,136 @@ public class DrumTrack : MonoBehaviour
         if (currentLoop > lastLoopCount)
         {
             Debug.Log($"New Loop Started! Current Loop: {currentLoop}");
-
             lastLoopCount = currentLoop;
-
-            // ✅ Alternate logic for obstacles and collectables
-            if (currentLoop % 2 == 0)
-            {
-                Debug.Log("Spawning an obstacle.");
-                SpawnObstacle();
-            }
-            else
-            {
-                Debug.Log("Spawning a drum loop collectable.");
-                SpawnDrumLoopCollectable(DrumLoopPattern.Full);
-            }
+            LoopRoutines();
         }
     }
 
-    private bool DrumLoopRestarted()
+    public int GetCurrentStep()
     {
-        float elapsedTime = (float)(AudioSettings.dspTime - startDspTime);
-        int currentLoop = Mathf.FloorToInt(elapsedTime / loopLengthInSeconds);
-
-        if (currentLoop > lastLoopCount)
-        {
-            lastLoopCount = currentLoop;
-            return true;
-        }
-        return false;
+        return currentStep;
     }
 
+    private void LoopRoutines()
+    {
+        activeObstacles.RemoveAll(obstacle => obstacle == null);
+        SpawnObstacle();
+        Debug.Log($"Last Loop Count {lastLoopCount} modulo {loopsRequiredBeforeEvolve}");
+        if (lastLoopCount%loopsRequiredBeforeEvolve == 0)
+        {
+            for (int i = 0; i < activeObstacles.Count; i++)
+            {
+                EvolvingObstacle obstacleToEvolve = activeObstacles[i].GetComponent<EvolvingObstacle>();
+                if (obstacleToEvolve != null)
+                {
+                    obstacleToEvolve.Evolve();
+                    Debug.Log($"Evolving {obstacleToEvolve.name}");
+                }
+            }
+        }
+
+        if (drumLoopCollectables.Count > 0)
+        {
+            Debug.Log($"{drumLoopCollectables.Count} Drum Loop Collectables Found");
+            if (drumLoopCollectables.Count == 1)
+            {
+                ScheduleDrumLoopChange(slowDownClips[Random.Range(0, slowDownClips.Length)]);                
+            }
+            else if (drumLoopCollectables.Count == 2)
+            {
+                ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Full));
+            }
+            else if (drumLoopCollectables.Count == 3)
+            {
+                ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Breakbeat));
+            }
+
+            for (int i = drumLoopCollectables.Count - 1; i > 0; i--)
+            {
+                DrumLoopCollectable dlc = drumLoopCollectables[i];
+                dlc.Remove();
+            }
+            drumLoopCollectables.Clear();
+        }
+
+    }
+    public void RemoveObstacleAt(Vector2Int gridPos)
+    {
+        GameObject obstacleToRemove = null;
+
+        foreach (GameObject obstacle in activeObstacles)
+        {
+            if (WorldToGridPosition(obstacle.transform.position) == gridPos)
+            {
+                obstacleToRemove = obstacle;
+                break; // ✅ Stop after finding the first matching obstacle
+            }
+        }
+
+        if (obstacleToRemove != null)
+        {
+            Debug.Log($"Removing obstacle at grid {gridPos}");
+            activeObstacles.Remove(obstacleToRemove);
+            Destroy(obstacleToRemove);
+
+            // ✅ Ensure the grid cell is freed after removal
+            spawnGrid.FreeCell(gridPos.x, gridPos.y);
+            Debug.Log($"Cell {gridPos} is now free.");
+        }
+        else
+        {
+            Debug.LogWarning($"No obstacle found at {gridPos} to remove.");
+        }
+    }
 
     private void SpawnObstacle()
     {
-        Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
+        // ✅ Determine NoteBehavior from the current NoteSet (if active)
+        NoteSet activeNoteSet = trackController?.GetCurrentNoteSet();
+        NoteBehavior behavior = activeNoteSet != null ? activeNoteSet.noteBehavior : NoteBehavior.Percussion; // Default to Percussion if no active NoteSet
 
-        if (spawnCell.x == -1) return; // No available space
+        // ✅ Request an available cell using the determined behavior
+        Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell(behavior);
+
+        if (spawnCell.x == -1) 
+        {
+            Debug.LogWarning("No available spawn cell for obstacle!");
+            return;
+        }
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
-        GameObject newObstacle = GetObstacle(ObstacleType.Standard);
-        spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
 
-    }
+        // ✅ Determine obstacle type based on `NoteBehavior` or `DrumLoopPattern`
+        //ObstacleType obstacleType = GetObstacleType();
 
-
-    GameObject GetObstacle(ObstacleType _obstacleType)
-    {
-        switch (_obstacleType)
+        // ✅ Instantiate the correct obstacle
+        GameObject newObstacle = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
+        EvolvingObstacle obstacle = newObstacle.GetComponent<EvolvingObstacle>();
+        if (obstacle != null)
         {
-            case ObstacleType.Hazard:
-                GameObject obj = Instantiate(hazardPrefab, transform.position, Quaternion.identity);
-                return obj;
-
-            case ObstacleType.Standard:
-                GameObject objB = Instantiate(obstaclePrefab, transform.position, Quaternion.identity);
-                return objB;
-            case ObstacleType.Void:
-                GameObject objC = Instantiate(energyVoidPrefab, transform.position, Quaternion.identity);
-                return objC;
-            default:
-                return null;
+            obstacle.SetDrumTrack(this);
         }
+        if (newObstacle == null)
+        {
+            Debug.LogError("Failed to spawn obstacle! Check GetObstacle method.");
+            return;
+        }
+
+        // ✅ Store obstacle so it can be removed later
+        activeObstacles.Add(newObstacle);
+
+        spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
+        Debug.Log($"Spawned Standard Obstacle at {spawnPosition}");
     }
 
+    public Vector2Int WorldToGridPosition(Vector3 worldPos)
+    {
+        // ✅ Convert world position (-8 to 8) back to grid position (0 - gridWidth)
+        int gridX = Mathf.Clamp(Mathf.RoundToInt((worldPos.x + 8f) / 16f * (gridWidth - 1)), 0, gridWidth - 1);
+        int gridY = Mathf.Clamp(Mathf.RoundToInt((worldPos.y + 4f) / 8f * (gridHeight - 1)), 0, gridHeight - 1);
+
+        return new Vector2Int(gridX, gridY);
+    }
 
     public void ScheduleDrumLoopChange(AudioClip newLoop)
     {
@@ -194,90 +230,41 @@ public class DrumTrack : MonoBehaviour
         // Start waiting for the current loop to finish.
         StartCoroutine(WaitAndChangeDrumLoop());
     }
-public void SpawnDrumLoopCollectable(DrumLoopPattern patternToUse)
-{
-    Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
 
-    if (spawnCell.x == -1) return; // No available space
-
-    Vector3 spawnPosition = GridToWorldPosition(spawnCell);
-    GameObject newCollectable = Instantiate(drumLoopCollectablePrefab, spawnPosition, Quaternion.identity);
-    spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.DrumCollectable);
-    DrumLoopCollectable dlc = newCollectable.GetComponent<DrumLoopCollectable>();
-
-    if (dlc != null)
+    public AudioClip SelectDrumClip(DrumLoopPattern pattern)
     {
-        AudioClip selectedClip = null;
-
-        if (patternToUse == DrumLoopPattern.Full)
+        switch (pattern)
         {
-            Debug.Log(("CURRENT DRUM LOOP STATE: " + currentDrumLoopState));
-            if (currentDrumLoopState == DrumLoopState.Progression)
-            {
-                if (fullLoopClips.Length > 0)
+            case DrumLoopPattern.Full:
+                Debug.Log(("Choose a full pattern drum clip"));
+                progressionIndex++;
+                if (progressionIndex > fullLoopClips.Length - 1)
                 {
-                    Debug.Log(("FULL LENGTH CLIPS AVAILABLE"));
-                    // ✅ Ensure progressionIndex does not exceed array bounds
-                    if (progressionIndex < fullLoopClips.Length - 1)
-                    {
-                        Debug.Log("Progression Index: " + progressionIndex);
-                        progressionIndex++;
-                    }
-                    else
-                    {
-                        progressionIndex = fullLoopClips.Length - 1; // ✅ Stay within bounds
-                        Debug.Log("Breakbeat Progression Index: " + progressionIndex);
-                        currentDrumLoopState = DrumLoopState.Breakbeat;
-                        
-                    }
-
-                    selectedClip = fullLoopClips[progressionIndex];
+                    progressionIndex = 0;
                 }
-            }
+                return fullLoopClips[progressionIndex];
+            case DrumLoopPattern.Breakbeat:
+                Debug.Log(("Choose a breakbeat pattern drum clip"));
+                return breakbeatClips.Length > 0 ? breakbeatClips[Random.Range(0, breakbeatClips.Length)] : null;
+            case DrumLoopPattern.SlowDown:
+                Debug.Log(("Choose a slow pattern drum clip"));
+                return slowDownClips.Length > 0 ? slowDownClips[Random.Range(0, slowDownClips.Length)] : null;
+            default:
+                Debug.LogWarning("SelectDrumClip: No valid drum loop found for pattern " + pattern);
+                return null;
         }
-        else if (patternToUse == DrumLoopPattern.Breakbeat)
-        {
-            if (breakbeatClips.Length > 0)
-            {
-                selectedClip = breakbeatClips[Random.Range(0, breakbeatClips.Length)];
-
-                // ✅ Prevent invalid range selection
-                if (fullLoopClips.Length >= 4)
-                {
-                    progressionIndex = Random.Range(fullLoopClips.Length - 4, fullLoopClips.Length);
-                }
-                else
-                {
-                    progressionIndex = Random.Range(0, fullLoopClips.Length); // ✅ Adjust for smaller arrays
-                }
-
-                currentDrumLoopState = DrumLoopState.Progression;
-            }
-        }
-        else if (patternToUse == DrumLoopPattern.SlowDown)
-        {
-            if (slowDownClips.Length > 0)
-                selectedClip = slowDownClips[Random.Range(0, slowDownClips.Length)];
-        }
-
-        if (selectedClip == null)
-        {
-            Debug.LogWarning("SpawnLoopDrumCollectable no valid clip found for pattern " + patternToUse);
-            if (fullLoopClips.Length > 0)
-            {
-                selectedClip = fullLoopClips[0];
-            }
-        }
-        dlc.newDrumLoopClip = selectedClip;
-        dlc.SetTrack(this);
     }
-}
-private Vector3 GridToWorldPosition(Vector2Int gridPos)
-{
-    float worldX = gridPos.x * 2 - (gridWidth / 2);
-    float worldY = gridPos.y * 2 - (gridHeight / 2);
-    return new Vector3(worldX, worldY, 0);
-}
+
+    public Vector3 GridToWorldPosition(Vector2Int gridPos)
+    {
+        // ✅ Convert grid position (0 - gridWidth) to world position (-8 to 8)
+        float worldX = Mathf.Lerp(-8f, 8f, (float)gridPos.x / (gridWidth - 1));
+        float worldY = Mathf.Lerp(-4f, 4f, (float)gridPos.y / (gridHeight - 1));
+
+        Vector3 position = new Vector3(worldX, worldY, 0);
+        return position;
+    }
+
 
     private IEnumerator WaitAndChangeDrumLoop()
     {
@@ -328,15 +315,6 @@ private Vector3 GridToWorldPosition(Vector2Int gridPos)
         isInitialized = true;
         }
 
-    void Awake() // ✅ Initialize early
-    {
-        if (spawnGrid == null)
-        {
-            spawnGrid = new SpawnGrid(gridWidth, gridHeight);
-            Debug.Log($"{gameObject.name} - SpawnGrid initialized in Awake().");
-        }
-    }
-
     void Start()
     {
         if (!GamepadManager.Instance.ReadyToPlay())
@@ -357,7 +335,36 @@ private Vector3 GridToWorldPosition(Vector2Int gridPos)
 
         }
     }
+    public void ApplyPercussionLayer()
+    {
+        Debug.Log("Adding percussion layer...");
+        // Apply subtle rhythm changes (e.g., add hi-hats, soft snares)
+    }
 
+    public void ModifySyncopation()
+    {
+        Debug.Log("Modifying syncopation...");
+        // Adjust drum pattern for more groove
+    }
+
+    public void TriggerBreakbeat()
+    {
+        Debug.Log("Activating breakbeat transition!");
+        ScheduleDrumLoopChange(breakbeatClips[Random.Range(0, breakbeatClips.Length)]);
+    }
+
+    public void CauseRhythmGlitch()
+    {
+        Debug.Log("Triggering rhythm glitch!");
+        drumAudioSource.pitch = 1.5f;
+        Invoke(nameof(ResetDrumPitch), 1.5f);
+    }
+
+    private void ResetDrumPitch()
+    {
+        drumAudioSource.pitch = 1.0f;
+    }
+/*
     IEnumerator EaseToPosition(Transform obj, Vector3 target, float moveSpeed)
     {
         if (obj == null)
@@ -385,5 +392,5 @@ private Vector3 GridToWorldPosition(Vector2Int gridPos)
             obj.position = target;
         }
     }
-
+*/
 }

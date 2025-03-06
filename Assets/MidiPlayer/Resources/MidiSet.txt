@@ -31,6 +31,7 @@
     <string>JX - Bass - 20</string>
     <string>JX - Bass - 21</string>
     <string>JX - Bass - 22</string>
+    <string>JX - Bass 07</string>
     <string>JX - Harmony - 02</string>
     <string>JX - Harmony - 06</string>
     <string>JX - Harmony - 08</string>

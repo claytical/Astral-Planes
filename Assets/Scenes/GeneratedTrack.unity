@@ -120,57 +120,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &31563533
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 31563535}
-  - component: {fileID: 31563534}
-  m_Layer: 0
-  m_Name: Duet 1
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &31563534
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 31563533}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  assignedInstrumentTrack: {fileID: 0}
-  allowedSteps: 
-  notes: 
-  speed: 0.1
-  allowedDuration: -1
-  maxExpansionAllowed: 3
-  dropBackIndex: 0
---- !u!4 &31563535
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 31563533}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &48689784
 GameObject:
   m_ObjectHideFlags: 0
@@ -418,7 +367,7 @@ RectTransform:
   m_AnchoredPosition: {x: -100, y: 0}
   m_SizeDelta: {x: 1000, y: 100}
   m_Pivot: {x: 0, y: 1}
---- !u!1 &184089746
+--- !u!1 &124522097
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -426,50 +375,99 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 184089748}
-  - component: {fileID: 184089747}
+  - component: {fileID: 124522099}
+  - component: {fileID: 124522098}
   m_Layer: 0
-  m_Name: RoutineTimingController
+  m_Name: Bass - 07
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &184089747
+--- !u!114 &124522098
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 184089746}
+  m_GameObject: {fileID: 124522097}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 754970a73e201694787a76901341dc92, type: 3}
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  TimeBetweenSlowUpdateCalls: 0.14285715
-  ProfilerDebugAmount: 0
-  AutoTriggerManualTimeframe: 1
-  UpdateCoroutines: 0
-  FixedUpdateCoroutines: 0
-  LateUpdateCoroutines: 0
-  SlowUpdateCoroutines: 0
-  RealtimeUpdateCoroutines: 0
-  EditorUpdateCoroutines: 0
-  EditorSlowUpdateCoroutines: 0
-  EndOfFrameCoroutines: 0
-  ManualTimeframeCoroutines: 0
-  _instanceID: 1
---- !u!4 &184089748
+  noteBehavior: 0
+  assignedInstrumentTrack: {fileID: 342701841}
+  allowedSteps: 0000000004000000080000000c0000001000000014000000
+  notes: 230000002400000028000000290000002b000000
+  dominantNote: 36
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &124522099
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 184089746}
+  m_GameObject: {fileID: 124522097}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &237020898
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 237020900}
+  - component: {fileID: 237020899}
+  m_Layer: 0
+  m_Name: Harmony - 08
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &237020899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 237020898}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 0c00000012000000
+  notes: 4300000040000000
+  dominantNote: 64
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &237020900
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 237020898}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -486,7 +484,7 @@ GameObject:
   - component: {fileID: 261861059}
   - component: {fileID: 261861058}
   m_Layer: 0
-  m_Name: All Together
+  m_Name: Harmony - 02
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -504,12 +502,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noteBehavior: 2
   assignedInstrumentTrack: {fileID: 627412777}
-  allowedSteps: 02000000060000000a0000000e00000012000000160000001a0000001e000000
-  notes: 430000003c000000400000003e000000
-  speed: 0.1
-  allowedDuration: -1
+  allowedSteps: 00000000020000000400000006000000080000000a0000000c0000000e00000010000000120000001400000016000000180000001a0000001c0000001e00000020000000220000002400000026000000280000002a0000002c0000002e00000030000000320000003400000036000000380000003a0000003c0000003e000000
+  notes: 3c0000003e000000400000004300000041000000
+  dominantNote: 60
+  dominantNoteFrequency: 0.7
   maxExpansionAllowed: 0
+  allowedDuration: -1
   dropBackIndex: 0
 --- !u!4 &261861059
 Transform:
@@ -518,6 +518,59 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 261861057}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &268384299
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 268384301}
+  - component: {fileID: 268384300}
+  m_Layer: 0
+  m_Name: Bass - 05
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &268384300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 268384299}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 0
+  assignedInstrumentTrack: {fileID: 342701841}
+  allowedSteps: 00000000080000001000000014000000180000001c0000002000000030000000
+  notes: 18000000220000001b0000001d000000
+  dominantNote: 34
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &268384301
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 268384299}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
@@ -645,6 +698,59 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 269415555}
   m_Enabled: 1
+--- !u!1 &287963353
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 287963355}
+  - component: {fileID: 287963354}
+  m_Layer: 0
+  m_Name: Harmony - 14
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &287963354
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 287963353}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 00000000020000000400000006000000080000000a0000000c0000000e00000010000000120000001400000016000000180000001a0000001c0000001e00000020000000220000002400000026000000280000002a0000002c0000002e00000030000000320000003400000036000000380000003a0000003c0000003e000000
+  notes: 430000004500000047000000480000004a0000004c0000004d000000
+  dominantNote: 71
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &287963355
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 287963353}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &312963204
 GameObject:
   m_ObjectHideFlags: 0
@@ -696,6 +802,59 @@ MonoBehaviour:
   hazard: {r: 1, g: 0, b: 0, a: 1}
   collectable: {r: 0.92941177, g: 0.8156863, b: 0.16078432, a: 1}
   breakable: {r: 0.62352943, g: 0.8941177, b: 0.882353, a: 1}
+--- !u!1 &329811066
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 329811068}
+  - component: {fileID: 329811067}
+  m_Layer: 0
+  m_Name: Harmony - 15
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &329811067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329811066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 0000000004000000080000000c0000001000000014000000
+  notes: 430000004500000041000000
+  dominantNote: 69
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &329811068
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329811066}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &342701838
 GameObject:
   m_ObjectHideFlags: 0
@@ -745,7 +904,7 @@ MonoBehaviour:
   currentNoteSet: {fileID: 0}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 33
+  preset: 38
   bank: 0
   collectablePrefab: {fileID: 1316711709889716, guid: c5b87dda1b2a50346ac04acbd4a0478a,
     type: 3}
@@ -753,8 +912,7 @@ MonoBehaviour:
   allowedDuration: -1
   minCollectableScale: 1
   maxCollectableScale: 4
-  minDurationTicks: 4
-  maxDurationTicks: 64
+  spawnedCollectables: []
 --- !u!1 &414327004
 GameObject:
   m_ObjectHideFlags: 0
@@ -871,6 +1029,112 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   unit: {fileID: 630680705681546974, guid: b2f64fbd132faa647afa72081cd85641, type: 3}
+--- !u!1 &528540143
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 528540145}
+  - component: {fileID: 528540144}
+  m_Layer: 0
+  m_Name: Harmony - 16
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &528540144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528540143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 04000000
+  notes: 2f000000
+  dominantNote: 47
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &528540145
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528540143}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &584676847
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 584676849}
+  - component: {fileID: 584676848}
+  m_Layer: 0
+  m_Name: Harmony - 06
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &584676848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 584676847}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 000000000100000002000000030000000400000005000000060000000700000008000000090000000a0000000b0000000c0000000d0000000e0000000f00000010000000180000002000000030000000
+  notes: 3c0000003e0000004000000043000000410000003b00000039000000
+  dominantNote: 60
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &584676849
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 584676847}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &608598248
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -931,6 +1195,11 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showDefault
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: volumeGlobal
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
@@ -1000,7 +1269,7 @@ MonoBehaviour:
   currentNoteSet: {fileID: 0}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 68
+  preset: 16
   bank: 0
   collectablePrefab: {fileID: 1316711709889716, guid: 08afbd3a25e32d24880279a992b60e37,
     type: 3}
@@ -1008,8 +1277,7 @@ MonoBehaviour:
   allowedDuration: -1
   minCollectableScale: 1
   maxCollectableScale: 4
-  minDurationTicks: 4
-  maxDurationTicks: 64
+  spawnedCollectables: []
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -1024,6 +1292,59 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 312963205}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &757675153
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 757675155}
+  - component: {fileID: 757675154}
+  m_Layer: 0
+  m_Name: Bass - 04
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &757675154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 757675153}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 0
+  assignedInstrumentTrack: {fileID: 342701841}
+  allowedSteps: 00000000100000001200000014000000
+  notes: 180000002400000030000000
+  dominantNote: 36
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &757675155
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 757675153}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &766525964
 GameObject:
@@ -1161,94 +1482,59 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 766525964}
   m_CullTransparentMesh: 1
---- !u!1001 &810585929
-PrefabInstance:
+--- !u!1 &877964277
+GameObject:
   m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1161690141}
-    m_Modifications:
-    - target: {fileID: 1367716147436054, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_Name
-      value: Drums
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
-        type: 3}
-      propertyPath: playNoteOff
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
-        type: 3}
-      propertyPath: showDefault
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
-        type: 3}
-      propertyPath: MPTK_EffectUnity
-      value: 
-      objectReference: {fileID: 1248500726}
-    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
-        type: 3}
-      propertyPath: showSoundFontEffect
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
-        type: 3}
-      propertyPath: MPTK_EffectSoundFont
-      value: 
-      objectReference: {fileID: 67942256}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: f1aa4788763f8854c9826e449686c328, type: 3}
---- !u!4 &810585930 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328,
-    type: 3}
-  m_PrefabInstance: {fileID: 810585929}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 877964279}
+  - component: {fileID: 877964278}
+  m_Layer: 0
+  m_Name: Harmony - 11
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &877964278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 877964277}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 0000000004000000080000000c00000010000000180000001c0000002000000024000000280000002c00000030000000
+  notes: 3e0000004000000041000000
+  dominantNote: 62
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &877964279
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 877964277}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &977606194
 GameObject:
   m_ObjectHideFlags: 0
@@ -1578,61 +1864,9 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 810585930}
   - {fileID: 1654847335}
   - {fileID: 608598249}
   - {fileID: 1798320909}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1236497520
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1236497522}
-  - component: {fileID: 1236497521}
-  m_Layer: 0
-  m_Name: Duet 2
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1236497521
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1236497520}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  assignedInstrumentTrack: {fileID: 0}
-  allowedSteps: 
-  notes: 
-  speed: 0.1
-  allowedDuration: -1
-  maxExpansionAllowed: 3
-  dropBackIndex: 0
---- !u!4 &1236497522
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1236497520}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1248500726
@@ -1731,6 +1965,7 @@ GameObject:
   - component: {fileID: 1354683684}
   - component: {fileID: 1354683685}
   - component: {fileID: 1354683686}
+  - component: {fileID: 1354683687}
   m_Layer: 0
   m_Name: Drums
   m_TagString: Untagged
@@ -1751,9 +1986,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loopLengthInSeconds: 0
-  beatMultiplier: 8
-  drumLoopCollectablePrefab: {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6,
-    type: 3}
+  spawnGrid: {fileID: 1354683687}
   gridWidth: 8
   gridHeight: 5
   fullLoopClips:
@@ -1779,28 +2012,18 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 7ce39fbe2c1494df48606fac61965d34, type: 3}
   obstaclePrefab: {fileID: 1781116594832268, guid: 930b3edf619309f4b9e970a0703f3968,
     type: 3}
-  energyVoidPrefab: {fileID: 1781116594832268, guid: 276ccae8e80a37649be755e160c4fe8f,
-    type: 3}
-  hazardPrefab: {fileID: 1781116594832268, guid: 6ee1a749deedb7648a8431e8cb87e093,
-    type: 3}
   totalSteps: 64
-  obstacleDifficulty: 0.5
-  energyVoidDifficulty: 0.3
-  hazardDifficulty: 0.2
-  xOffset: 2
-  obstacleMoveDelay: 3.2
-  obstacleTargetY: 4
-  easingSpeed: 8
-  drumLoopBPM: 150
-  startDspTime: 0
-  beatMoveSpeed: 1
-  spawnCooldown: 12.8
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
-  numVisibleObstacles: 4
-  activeObstacles: []
+  activeObstacles:
+  - {fileID: 1781116594832268, guid: 931a1e0e10bff4056bd61c5f54aaf7c2, type: 3}
+  - {fileID: 1781116594832268, guid: 6ee1a749deedb7648a8431e8cb87e093, type: 3}
+  - {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6, type: 3}
+  drumLoopCollectables: []
+  drumLoopBPM: 150
+  startDspTime: 0
   isInitialized: 0
-  spawnDelay: 5
+  loopsRequiredBeforeEvolve: 2
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -1830,9 +2053,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   assignedNoteSets:
   - {fileID: 1834431006}
-  - {fileID: 1592356861}
+  - {fileID: 1461687144}
   - {fileID: 261861058}
+  - {fileID: 1592356861}
+  - {fileID: 757675154}
+  - {fileID: 268384300}
   - {fileID: 2110566099}
+  - {fileID: 584676848}
+  - {fileID: 124522098}
+  - {fileID: 237020899}
+  - {fileID: 1475166684}
+  - {fileID: 877964278}
+  - {fileID: 287963354}
+  - {fileID: 329811067}
+  - {fileID: 528540144}
   boundaries: {fileID: 1461708765}
 --- !u!82 &1354683685
 AudioSource:
@@ -1847,7 +2081,7 @@ AudioSource:
   m_audioClip: {fileID: 8300000, guid: 926eb6a5926c6493d8ec22231d95959e, type: 3}
   m_Resource: {fileID: 8300000, guid: 926eb6a5926c6493d8ec22231d95959e, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 1
+  m_Volume: 0.706
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -1945,6 +2179,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   waveMaterial: {fileID: 0}
   waveDuration: 1.5
+--- !u!114 &1354683687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17f0094acf2944184b8a01cb25a3e90a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gridWidth: 8
+  gridHeight: 5
+  cellSize: 2
 --- !u!1 &1379178344
 GameObject:
   m_ObjectHideFlags: 0
@@ -2245,6 +2494,59 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!1 &1461687143
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1461687145}
+  - component: {fileID: 1461687144}
+  m_Layer: 0
+  m_Name: Lead - 01
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1461687144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1461687143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 0
+  assignedInstrumentTrack: {fileID: 1690824280}
+  allowedSteps: 1000000012000000
+  notes: 4c000000
+  dominantNote: 76
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &1461687145
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1461687143}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1461708763
 GameObject:
   m_ObjectHideFlags: 0
@@ -2294,6 +2596,59 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   damage: 0
+--- !u!1 &1475166683
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1475166685}
+  - component: {fileID: 1475166684}
+  m_Layer: 0
+  m_Name: Harmony - 09
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1475166684
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1475166683}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 2
+  assignedInstrumentTrack: {fileID: 627412777}
+  allowedSteps: 0200000000000000020000000400000006000000080000000a0000000c0000000e00000010000000120000001400000016000000180000001a0000001c0000001e00000020000000220000002400000026000000280000002a0000002c00000030000000320000003400000036000000380000003a0000003c00000012000000
+  notes: 4100000043000000450000004700000048000000
+  dominantNote: 65
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &1475166685
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1475166683}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1499108344
 GameObject:
   m_ObjectHideFlags: 0
@@ -7306,7 +7661,7 @@ GameObject:
   - component: {fileID: 1592356862}
   - component: {fileID: 1592356861}
   m_Layer: 0
-  m_Name: Here Comes the Bass
+  m_Name: Bass - 03
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7324,12 +7679,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noteBehavior: 0
   assignedInstrumentTrack: {fileID: 342701841}
-  allowedSteps: 0000000004000000080000000c0000001000000014000000180000001c00000020000000260000002c00000030000000340000003a000000
-  notes: 240000001d0000002900000024000000230000001f000000
-  speed: 0.1
-  allowedDuration: -1
+  allowedSteps: 0000000020000000
+  notes: 18000000
+  dominantNote: 24
+  dominantNoteFrequency: 0.7
   maxExpansionAllowed: 0
+  allowedDuration: -1
   dropBackIndex: 0
 --- !u!4 &1592356862
 Transform:
@@ -7573,6 +7930,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: volumeGlobal
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: MPTK_EffectUnity
       value: 
       objectReference: {fileID: 1248500726}
@@ -7676,7 +8038,7 @@ MonoBehaviour:
   currentNoteSet: {fileID: 0}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 54
+  preset: 27
   bank: 0
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
@@ -7684,8 +8046,7 @@ MonoBehaviour:
   allowedDuration: -1
   minCollectableScale: 1
   maxCollectableScale: 4
-  minDurationTicks: 4
-  maxDurationTicks: 64
+  spawnedCollectables: []
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0
@@ -7797,7 +8158,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1758545867}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -7944,7 +8305,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.745
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -7990,7 +8351,7 @@ GameObject:
   - component: {fileID: 1834431007}
   - component: {fileID: 1834431006}
   m_Layer: 0
-  m_Name: A Discovery of Energy
+  m_Name: Lead - 00
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8008,12 +8369,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noteBehavior: 0
   assignedInstrumentTrack: {fileID: 1690824280}
-  allowedSteps: 0000000004000000080000001000000018000000200000002800000030000000
-  notes: 4c000000
-  speed: 0.1
-  allowedDuration: -1
+  allowedSteps: 2000000022000000
+  notes: 3c000000
+  dominantNote: 60
+  dominantNoteFrequency: 0.7
   maxExpansionAllowed: 0
+  allowedDuration: -1
   dropBackIndex: 0
 --- !u!4 &1834431007
 Transform:
@@ -8022,6 +8385,59 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1834431005}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1950266785
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1950266787}
+  - component: {fileID: 1950266786}
+  m_Layer: 0
+  m_Name: Bass - 06
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1950266786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1950266785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 0
+  assignedInstrumentTrack: {fileID: 342701841}
+  allowedSteps: 0000000004000000080000000c000000
+  notes: 1800000021000000
+  dominantNote: 33
+  dominantNoteFrequency: 0.7
+  maxExpansionAllowed: 0
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &1950266787
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1950266785}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
@@ -8041,7 +8457,7 @@ GameObject:
   - component: {fileID: 2110566100}
   - component: {fileID: 2110566099}
   m_Layer: 0
-  m_Name: Lead Change
+  m_Name: Lead - 06
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8059,12 +8475,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noteBehavior: 1
   assignedInstrumentTrack: {fileID: 1690824280}
-  allowedSteps: 000000000c0000002000000034000000
-  notes: 4a000000
-  speed: 0.1
-  allowedDuration: -1
+  allowedSteps: 00000000020000000400000006000000080000000a0000000c0000000e00000010000000120000001400000016000000180000001a0000001c0000001e00000020000000220000002400000026000000280000002a0000002c0000002e00000030000000320000003400000036000000380000003a0000003c0000003e000000
+  notes: 4c0000004a000000
+  dominantNote: 76
+  dominantNoteFrequency: 0.7
   maxExpansionAllowed: 0
+  allowedDuration: -1
   dropBackIndex: 0
 --- !u!4 &2110566100
 Transform:
@@ -8139,11 +8557,20 @@ SceneRoots:
   - {fileID: 1161690141}
   - {fileID: 1354683683}
   - {fileID: 312963205}
-  - {fileID: 31563535}
-  - {fileID: 1236497522}
   - {fileID: 1834431007}
-  - {fileID: 1592356862}
+  - {fileID: 1461687145}
   - {fileID: 261861059}
+  - {fileID: 1592356862}
+  - {fileID: 757675155}
+  - {fileID: 268384301}
   - {fileID: 2110566100}
+  - {fileID: 584676849}
+  - {fileID: 1950266787}
+  - {fileID: 124522099}
+  - {fileID: 237020900}
+  - {fileID: 1475166685}
+  - {fileID: 877964279}
+  - {fileID: 287963355}
+  - {fileID: 329811068}
+  - {fileID: 528540145}
   - {fileID: 2130912947}
-  - {fileID: 184089748}

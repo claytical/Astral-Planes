@@ -19,6 +19,7 @@ public class InstrumentTrackController : MonoBehaviour
 
     void Start()
     {
+        Debug.Log($"InstrumentTrackController initialized. Assigned NoteSets: {assignedNoteSets.Count}");
             if (!GamepadManager.Instance.ReadyToPlay())
             {
                 return;
@@ -56,8 +57,17 @@ public class InstrumentTrackController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"Instrument {completedTrack.name} finished. Moving to next NoteSet.");
+        Debug.Log($"Instrument {completedTrack.name} finished. Checking for next NoteSet.");
 
+        // ✅ Ensure all collectables have been collected before moving on
+        if (completedTrack.spawnedCollectables.Count > 0)
+        {
+            Debug.Log($"Waiting for all collectables to be collected before transitioning.");
+            return;
+        }
+
+        completedTrack.ResetTrackGridBehavior();
+        
         currentNoteSetIndex++;
 
         if (currentNoteSetIndex >= assignedNoteSets.Count)
@@ -66,20 +76,21 @@ public class InstrumentTrackController : MonoBehaviour
             return;
         }
 
-        InstrumentTrack nextTrack = assignedNoteSets[currentNoteSetIndex].assignedInstrumentTrack;
+        NoteSet nextNoteSet = assignedNoteSets[currentNoteSetIndex];
     
-        // Prevent duplicate spawns by ensuring only one transition occurs
-        if (nextTrack == activeTrack)
+        if (nextNoteSet == null || nextNoteSet.assignedInstrumentTrack == null)
         {
-            Debug.LogWarning($"Next track {nextTrack.name} is already active. Aborting transition.");
-            return;
+            Debug.LogWarning($"Next NoteSet {currentNoteSetIndex} has no assigned InstrumentTrack. Waiting.");
+            return; // ✅ Prevents transition if no valid instrument is assigned
         }
 
+        InstrumentTrack nextTrack = nextNoteSet.assignedInstrumentTrack;
+
+        Debug.Log($"Transitioning to new track: {nextTrack.name}");
+
         activeTrack = nextTrack;
-        activeTrack.ApplyNoteSet(assignedNoteSets[currentNoteSetIndex]);
+        activeTrack.ApplyNoteSet(nextNoteSet);
         activeTrack.SpawnCollectables();
-    
-        Debug.Log($"Transitioned to {activeTrack.name}.");
     }
 
     public NoteSet GetCurrentNoteSet()
