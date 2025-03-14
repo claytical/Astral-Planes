@@ -134,7 +134,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.75, y: 0.75, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4470546073009318}
@@ -168,6 +168,11 @@ MonoBehaviour:
   gridPosition: {x: 0, y: 0}
   gridOrigin: {x: 0, y: 0}
   cellSize: {x: 0, y: 0}
+  looseTime: 0
+  looseEvolutionThreshold: 10
+  isLoose: 0
+  blackHolePrefab: {fileID: 1781116594832268, guid: 6ee1a749deedb7648a8431e8cb87e093,
+    type: 3}
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5

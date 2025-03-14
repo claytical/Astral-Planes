@@ -20,11 +20,6 @@ public class ParkingLot : MonoBehaviour
         vehicleInUse = new bool[vehicles.Length];
     }
 
-    private void Update()
-    {
-
-    }
-
     public void OnJoin(PlayerInput playerInput)
     {
         players++;

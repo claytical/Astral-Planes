@@ -1,12 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
 
 public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
-    public int gridHeight = 5;
+    public int gridHeight = 12;
     private GridCell[,] gridCells;
-    public float cellSize = 2f; // Adjust to match the world space size
+    public float cellSize = 1f; // Adjust to match the world space size
 
     
     private void Awake()
@@ -16,6 +17,8 @@ public class SpawnGrid : MonoBehaviour
             InitializeGrid();
         }
     }
+    
+
 
     private void InitializeGrid()
     {
@@ -85,77 +88,78 @@ public class SpawnGrid : MonoBehaviour
         Debug.Log("---- End of Grid Debug ----");
     }
 
-    public bool IsCellAvailable(int x, int y, NoteBehavior behavior)
+    public bool IsCellAvailable(int x, int y, NoteBehavior noteBehavior)
     {
-        // ✅ Ensure `gridCells` is initialized
-        if (gridCells == null)
-        {
-            Debug.LogError("IsCellAvailable: gridCells is NULL!");
-            return false;
-        }
-
-        // ✅ Ensure x and y are within valid bounds
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
         {
-            Debug.LogError($"IsCellAvailable: Index out of bounds! (x:{x}, y:{y}) Grid Size: {gridWidth}x{gridHeight}");
+            Debug.Log($"Cell check out of bounds: {x}, {y}");
             return false;
         }
 
-        // ✅ Ensure cell is not null before accessing properties
         if (gridCells[x, y] == null)
         {
-            Debug.LogError($"IsCellAvailable: gridCells[{x}, {y}] is NULL!");
+            Debug.Log($"Cell {x}, {y} is null.");
             return false;
         }
 
-        // ✅ Check if the cell is occupied
-        if (gridCells[x, y].isOccupied)
-        {
-            return false;
-        }
-
-        // ✅ Ensure NoteBehavior is respected
-        switch (behavior)
-        {
-            case NoteBehavior.Bass:
-                return y <= gridHeight / 3; // Bass notes stay low
-            case NoteBehavior.Lead:
-                return y >= gridHeight / 2; // Lead notes stay high
-            case NoteBehavior.Harmony:
-                return y > gridHeight / 3 && y < (gridHeight * 2) / 3; // Harmony in the middle
-            case NoteBehavior.Percussion:
-                return y % 2 == 0; // Percussion is spaced evenly
-            case NoteBehavior.Drone:
-                return y == gridHeight / 2; // Drone notes stay in the center
-            default:
-                return true;
-        }
+        return !gridCells[x, y].isOccupied; // ✅ Correctly check occupancy
     }
+
+
     public void OccupyCell(int x, int y, GridObjectType type, ObstacleType obstacleType = ObstacleType.Standard)
     {
+        // ✅ Ensure indices are within grid boundaries
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+            Debug.LogError($"OccupyCell: Attempted to occupy cell out of bounds! (x:{x}, y:{y}), Grid Size: {gridWidth}x{gridHeight}");
+            return;
+        }
+
+        if (gridCells[x, y] == null)
+        {
+            Debug.LogError($"OccupyCell: gridCells[{x}, {y}] is NULL!");
+            return;
+        }
+
         gridCells[x, y].isOccupied = true;
         gridCells[x, y].objectType = type;
-        gridCells[x, y].obstacleType = obstacleType; // ✅ Store obstacle type
+        gridCells[x, y].obstacleType = obstacleType;
     }
 
     public void FreeCell(int x, int y)
     {
+        // Ensure the coordinates are within valid bounds
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
         {
-            Debug.LogError($"FreeCell: Index out of bounds! (x:{x}, y:{y}) Grid Size: {gridWidth}x{gridHeight}");
+            Debug.LogWarning($"Trying to free a cell out of bounds: {x}, {y}");
             return;
         }
 
-        if (gridCells[x, y].isOccupied)
+        if (gridCells[x, y] == null)
         {
-            gridCells[x, y].isOccupied = false;
-            Debug.Log($"Cell ({x}, {y}) successfully freed.");
+            Debug.LogWarning($"Trying to free a null cell at: {x}, {y}");
+            return;
         }
-        else
-        {
-            Debug.LogWarning($"Cell ({x}, {y}) was already free.");
-        }
+
+        // Mark the cell as available
+        gridCells[x, y].isOccupied = false;
+        gridCells[x, y].objectType = GridObjectType.Empty;
+        gridCells[x, y].obstacleType = null;
+
+        Debug.Log($"Cell {x}, {y} successfully freed.");
     }
+
+    public void ResetCellBehavior(int x, int y)
+    {
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+            Debug.LogError($"ResetCellBehavior: Out of bounds ({x}, {y})");
+            return;
+        }
+        gridCells[x, y].objectType = GridObjectType.Empty;
+        gridCells[x, y].isOccupied = false;
+    }
+
     private bool IsCellValidForNoteBehavior(int x, int y, NoteBehavior behavior)
     {
         switch (behavior)
@@ -187,24 +191,30 @@ public class SpawnGrid : MonoBehaviour
         }
         return true;
     }
-
-    public void ResetCellBehavior(int x, int y)
+    
+    public Vector2Int GetRandomAvailableCell()
     {
-        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        List<Vector2Int> availableCells = new List<Vector2Int>();
+
+        for (int x = 0; x < gridWidth; x++)
         {
-            Debug.LogError($"ResetCellBehavior: Index out of bounds! (x:{x}, y:{y}) Grid Size: {gridWidth}x{gridHeight}");
-            return;
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (!gridCells[x, y].isOccupied)
+                {
+                    availableCells.Add(new Vector2Int(x, y));
+                }
+            }
         }
 
-        // ✅ Reset the behavior of this cell
-        if (gridCells[x, y] != null)
+        if (availableCells.Count == 0)
         {
-            gridCells[x, y].isOccupied = false;
-            gridCells[x, y].objectType = GridObjectType.Obstacle; // ✅ Clears any previous restrictions
-            Debug.Log($"Reset cell behavior at ({x},{y}) - now available for any NoteBehavior.");
+            return new Vector2Int(-1, -1);
         }
+
+        return availableCells[Random.Range(0, availableCells.Count)];
     }
-
+    
     public Vector2Int GetRandomAvailableCell(NoteBehavior noteBehavior)
     {
         List<Vector2Int> availableCells = new List<Vector2Int>();
@@ -246,5 +256,6 @@ public enum GridObjectType
 {
     Note,
     Obstacle,
+    Empty,
     DrumCollectable
 }

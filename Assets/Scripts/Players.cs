@@ -11,9 +11,6 @@ public class Players : MonoBehaviour
     public Boundaries boundaries;
     // Start is called before the first frame update
 
-    void Start() {}
-    private void Update() {}
-
     public void PlayerJoined(int playerId)
     {
         Debug.Log("PLAYER " + playerId + " JOINED!");

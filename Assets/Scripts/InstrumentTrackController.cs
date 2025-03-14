@@ -12,7 +12,6 @@ public class InstrumentTrackController : MonoBehaviour
     private InstrumentTrack activeTrack;
     private int currentNoteSetIndex = 0; // 👈 Tracks which set is active
     private HashSet<InstrumentTrack> usedInstrumentTracks = new HashSet<InstrumentTrack>();
-    public Boundaries boundaries;
 
     // This list parallels instrumentTracks; each element is true when that track has completed its expansion.
     
@@ -50,33 +49,20 @@ public class InstrumentTrackController : MonoBehaviour
     
     public void TrackExpansionCompleted(InstrumentTrack completedTrack)
     {
-        // Ensure we only process the active track
-        if (completedTrack != activeTrack)
-        {
-            Debug.Log($"Ignoring completion of {completedTrack.name} because active track is {activeTrack.name}");
-            return;
-        }
-
-        Debug.Log($"Instrument {completedTrack.name} finished. Checking for next NoteSet.");
-
-        // ✅ Ensure all collectables have been collected before moving on
-        if (completedTrack.spawnedCollectables.Count > 0)
-        {
-            Debug.Log($"Waiting for all collectables to be collected before transitioning.");
-            return;
-        }
-
+        Debug.Log("Current Note Set: " + currentNoteSetIndex);
+        Debug.Log($"Completed instrument track: {completedTrack.name} with NoteSetIndex {currentNoteSetIndex} {GetCurrentNoteSet().name}" );
         completedTrack.ResetTrackGridBehavior();
         
         currentNoteSetIndex++;
 
         if (currentNoteSetIndex >= assignedNoteSets.Count)
         {
-            Debug.Log("All note sets completed.");
-            return;
+            Debug.Log("All note sets completed. Starting over at random spot");
+            currentNoteSetIndex = Random.Range(0, assignedNoteSets.Count);
         }
 
         NoteSet nextNoteSet = assignedNoteSets[currentNoteSetIndex];
+        Debug.Log("Next Note Set: " + nextNoteSet.name);
     
         if (nextNoteSet == null || nextNoteSet.assignedInstrumentTrack == null)
         {
@@ -90,10 +76,11 @@ public class InstrumentTrackController : MonoBehaviour
 
         activeTrack = nextTrack;
         activeTrack.ApplyNoteSet(nextNoteSet);
+        Debug.Log(("Calling Spawn Collectables on " + activeTrack.name + " with " + nextNoteSet.name));
         activeTrack.SpawnCollectables();
     }
 
-    public NoteSet GetCurrentNoteSet()
+    private NoteSet GetCurrentNoteSet()
     {
         if (currentNoteSetIndex >= assignedNoteSets.Count)
         {

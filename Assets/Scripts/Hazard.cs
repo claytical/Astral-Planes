@@ -1,60 +1,35 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
+﻿using UnityEngine;
+using System;
 
 public class Hazard : MonoBehaviour
 {
-    
-    public int damage;
-    public GameObject spawnedFrom;
+    public float energyAbsorbed = 0f;
+    public float maxEnergy = 100f;
+    public float maxGravitySize = 5f; // ✅ Now defined in Hazard
+    public GameObject starPrefab;
+    private DrumTrack drumTrack;
 
-    // Use this for initialization
-
-
-
-    void OnCollisionEnter2D(Collision2D coll)
+    public void AbsorbEnergy(float amount)
     {
-        Vehicle v = coll.gameObject.GetComponent<Vehicle>();
-        if (v != null)
+        energyAbsorbed += amount;
+        if (energyAbsorbed >= maxEnergy)
         {
-            v.energyLevel -= damage;
-            Debug.Log($"VEHICLE ENERGY LEVEL: {v.energyLevel}");
-            LocalPlayer player = v.GetComponentInParent<LocalPlayer>();
-            if (v.energyLevel <= 0)
-            {
-                if (player != null)
-                {
-                    Explode explode = v.GetComponent<Explode>();
-                    if (explode != null)
-                    {
-                        explode.Permanent();
-                    }
-
-                    player.Restart();
-                }
-            }
-            else
-            {
-                Debug.Log(("Taking on negative energy"));
-                player.EnergyCollected(damage);
-            }
-
-            if (spawnedFrom != null)
-            {
-                Destroy(spawnedFrom);
-            }
-
-            Explode hazardExplosion = GetComponent<Explode>();
-            if (hazardExplosion != null)
-            {
-                hazardExplosion.Permanent();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            TransformIntoStar();
         }
     }
-}
 
+    public void SetDrumTrack(DrumTrack track)
+    {
+        drumTrack = track;
+    }    private void TransformIntoStar()
+    {
+        Debug.Log("Black Hole transformed into a Star!");
+        GameObject go = Instantiate(starPrefab, transform.position, Quaternion.identity);
+        DrumLoopCollectable star = go.GetComponent<DrumLoopCollectable>();
+        if (star != null)
+        {
+            star.SetDrumTrack(drumTrack);
+        }
+        Destroy(gameObject);
+    }
+}

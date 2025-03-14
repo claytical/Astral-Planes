@@ -17,9 +17,5 @@ public class PrototypeVehicle : MonoBehaviour
         brakesInStorage = PlayerPrefs.GetInt("brakes in storage", 0);
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+
 }

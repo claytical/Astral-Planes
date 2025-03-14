@@ -7,11 +7,6 @@ public class Remix : MonoBehaviour
     private RemixManager remixManager;
     public SpriteRenderer spriteRenderer;
 
-    // Start is called before the first frame update
-    void Start()
-    {
-    }
-
     public void SetRemixManager(RemixManager rm)
     {
         remixManager = rm;

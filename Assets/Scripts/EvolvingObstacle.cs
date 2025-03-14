@@ -1,72 +1,57 @@
 using UnityEngine;
 using System;
+public enum ObstacleState
+{
+    Block,
+    Hazard,
+    Explosion,
+    DrumCollectable
+}
+
 public class EvolvingObstacle : MonoBehaviour
 {
-    public enum ObstacleState
-    {
-        Block,
-        Hazard,
-        Explosion,
-        DrumCollectable
-    }
-
-    public ObstacleState currentState = ObstacleState.Block;
-    public GameObject[] evolutionPrefab;
     public GameObject explosionPrefab;
     public GameObject debrisPrefab;
     public ParticleSystem particles;
     
-    private int evolutionCounter = 0;
-    private bool isEvolving = false;
+    public GameObject obstaclePrefab; // ✅ Assign Block Obstacle Prefab in Inspector
+    private GameObject spawnedObstacle;
+    private Vector2Int gridPosition;
     private DrumTrack drumTrack;
-    private GameObject evolvingObstacle;
+
     public static event Action<GameObject> OnObstacleDestroyed;
 
     public void SetDrumTrack(DrumTrack drums)
     {
         drumTrack = drums;
     }
-    public void Evolve()
+
+    public void SpawnObstacle(Vector2Int position)
     {
-        if (isEvolving) return; // Prevent multiple evolutions at once
-        isEvolving = true;
-        particles.Stop();
-        TriggerExplosion();
-        if (evolvingObstacle != null)
-        {
-            Explode explode = evolvingObstacle.GetComponent<Explode>();
-            if (explode != null)
-            {
-                explode.Permanent();
-            }
-            else
-            {
-                Destroy(evolvingObstacle);
-            }
+        gridPosition = position;
+        Vector3 worldPos = drumTrack.GridToWorldPosition(gridPosition);
+        spawnedObstacle = Instantiate(obstaclePrefab, worldPos, Quaternion.identity);
 
-        }
-        if (evolutionCounter >= evolutionPrefab.Length)
+        // Assign position tracking to the spawned obstacle
+        Obstacle obsScript = spawnedObstacle.GetComponent<Obstacle>();
+        if (obsScript != null)
         {
-            Destroy(this);
-        }
-        else
-        {
-            evolvingObstacle = Instantiate(evolutionPrefab[evolutionCounter], transform.position, Quaternion.identity);
-            DrumLoopCollectable dlc = evolvingObstacle.GetComponent<DrumLoopCollectable>();
-            if (dlc != null)
-            {
-                Debug.Log("Setting Track and New Pattern");
-                dlc.SetTrack(drumTrack);
-            }
+            obsScript.SetParentEvolvingObstacle(this); // ✅ Link to this EvolvingObstacle
+            obsScript.SetDrumTrack(drumTrack);
         }
 
-        evolutionCounter++;
-        isEvolving = false;
+        drumTrack.spawnGrid.OccupyCell(gridPosition.x, gridPosition.y, GridObjectType.Obstacle);
     }
 
+    public void OnObstacleKnockedLoose()
+    {
+        Debug.Log($"Obstacle at {gridPosition} knocked loose, removing EvolvingObstacle.");
+        drumTrack.spawnGrid.FreeCell(gridPosition.x, gridPosition.y);
+        drumTrack.activeObstacles.Remove(gameObject);
+        Destroy(gameObject); // ✅ Remove this EvolvingObstacle from the game
+    }
     private void TriggerExplosion()
     {
-        currentState = ObstacleState.Explosion;
         Instantiate(explosionPrefab, transform.position, Quaternion.identity);
         
         // Release physics objects (debris)
@@ -77,4 +62,5 @@ public class EvolvingObstacle : MonoBehaviour
             if (rb) rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
         }
     }
+
 }

@@ -76,6 +76,6 @@ public class Collectable : MonoBehaviour
             }
         }
         Debug.Log("Checking Section Complete...");
-        assignedInstrumentTrack?.CheckSectionComplete();
+//        assignedInstrumentTrack?.CheckSectionComplete();
     }
 }

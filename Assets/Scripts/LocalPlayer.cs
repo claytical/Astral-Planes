@@ -32,17 +32,6 @@ public class LocalPlayer : MonoBehaviour
         CreatePlayerSelect();
     }
 
-    private void Update()
-    {
-        //TODO: Let Go - If no input from player in X seconds, self destruct - resets based on energy collection
-        /*
-        if (!isSelfDestructing)
-        {
-            CheckForSelfDestructInput();
-        }
-        */
-    }
-
     public void Hide()
     {
         plane.gameObject.SetActive(false);

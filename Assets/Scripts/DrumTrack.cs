@@ -33,11 +33,9 @@ public class DrumTrack : MonoBehaviour
     // Assuming these are declared and initialized elsewhere:
     public float loopLengthInSeconds;       // Duration of the loop.
     public SpawnGrid spawnGrid;
-    public int gridWidth = 8;
-    public int gridHeight = 8;
+    public float gridPadding = 1f;
     public AudioClip[] fullLoopClips;
-    public AudioClip[] breakbeatClips;
-    public AudioClip[] slowDownClips;
+    public AudioClip[] drumFillClips;
     // Prefabs for different spawned objects:
     public GameObject obstaclePrefab;
     public int totalSteps = 64;
@@ -50,11 +48,9 @@ public class DrumTrack : MonoBehaviour
     private float obstacleInitialY = 0f;  // Starting Y position (e.g., bottom of the screen)
     public float startDspTime;
     public bool isInitialized = false;    
-     
+    public EnergyWaveEffect wave;
     private int progressionIndex = 0;
     private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
-    // Tracking which candidate steps are already used in the current loop:
-
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
     private float stepWidth; // Dynamic width per step
@@ -62,11 +58,19 @@ public class DrumTrack : MonoBehaviour
     private AudioClip pendingDrumLoop = null;
     private int lastLoopCount = 0;
     private int currentStep = 0;
-    public int loopsRequiredBeforeEvolve = 2; 
+    private int loopsRequiredBeforeEvolve = 2;
+    private int drumLoopCollectablesCollected = 0;
+    private bool isTransitioning = false;
+    public Vector3[] cornerPositions = new Vector3[] {
+        new Vector3(-7f, 3f, 0f),  // Top-left
+        new Vector3( 7f, 3f, 0f),  // Top-right
+        new Vector3(-7f,-3f, 0f),  // Bottom-left
+        new Vector3( 7f,-3f, 0f),  // Bottom-right
+    };
+
+
     private void Update()
     {
-        if (drumAudioSource == null || drumAudioSource.clip == null)
-            return;
         if (!GamepadManager.Instance.ReadyToPlay())
         {
             return;
@@ -77,7 +81,6 @@ public class DrumTrack : MonoBehaviour
 
         if (stepDuration <= 0)
         {
-            Debug.LogError("DrumTrack: Step duration is invalid!");
             return;
         }
 
@@ -93,58 +96,280 @@ public class DrumTrack : MonoBehaviour
         {
             Debug.Log($"New Loop Started! Current Loop: {currentLoop}");
             lastLoopCount = currentLoop;
+            CleanupExplodedObstacles();
             LoopRoutines();
+        }
+
+        if (drumLoopCollectablesCollected >= 4)
+        {
+            //DO DRUMS
+
+        }
+    }
+    
+    public Vector3 GetNextCornerPosition()
+    {
+        int index = drumLoopCollectablesCollected - 1; // ✅ Assign to next available corner
+        if (index >= cornerPositions.Length) 
+        {
+            index = (index % cornerPositions.Length); // ✅ Wrap around if more than 4 Stars
+        }
+        return cornerPositions[index];
+    }
+
+    public IEnumerator MergeAllCollectablesIntoCenter()
+    {
+        Debug.Log("[DrumTrack] Merging collectables...");
+
+        List<DrumLoopCollectable> collectablesToDestroy = new List<DrumLoopCollectable>();
+
+        foreach (DrumLoopCollectable collectable in drumLoopCollectables)
+        {
+            if (collectable != null)
+            {
+                Debug.Log($"[DrumTrack] Triggering final burst for: {collectable.name}");
+                collectable.TriggerFinalBurst();
+                collectablesToDestroy.Add(collectable); // ✅ Track objects for destruction
+            }
+        }
+
+        // ✅ Wait for all collectables to finish their particle effects
+        yield return new WaitForSeconds(2f);
+
+        foreach (DrumLoopCollectable collectable in collectablesToDestroy)
+        {
+            if (collectable != null)
+            {
+                Debug.Log($"[DrumTrack] Destroying collectable: {collectable.name}");
+                Destroy(collectable.gameObject);
+            }
+        }
+
+        drumLoopCollectables.Clear();
+        drumLoopCollectablesCollected = 0;
+        Debug.Log("[DrumTrack] Drum Loop Collectables reset and cleared.");
+    }
+
+    public void RemoveDrumLoopCollectable(DrumLoopCollectable collectable)
+    {
+        if (drumLoopCollectables.Contains(collectable))
+        {
+            Debug.Log($"[DrumTrack] Removing collectable from list: {collectable.name}");
+            drumLoopCollectables.Remove(collectable);
+        }
+        else
+        {
+            Debug.LogWarning($"[DrumTrack] Tried to remove a collectable not in list: {collectable.name}");
         }
     }
 
+
+    public float GetStarCollectionRatio()
+    {
+        return Mathf.Clamp01(drumLoopCollectablesCollected / 4f);
+    }
+
+    public int GetCollectedStarCount()
+    {
+        return drumLoopCollectablesCollected;
+    }
+
+    public float GetRemainingLoopTime()
+    {
+        float dspNow = (float)AudioSettings.dspTime;
+        float loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
+        return Mathf.Max(0, loopEndDsp - dspNow);
+    }
+    private void ExplodeAllObstacles()
+    {
+        // Handle Hazards
+        Hazard[] hazards = FindObjectsByType<Hazard>(FindObjectsSortMode.None);
+        for (int i = hazards.Length - 1; i >= 0; i--)
+        {
+            Hazard hazard = hazards[i];
+            if (hazard != null)
+            {
+                Explode explode = hazard.GetComponent<Explode>();
+                if (explode != null)
+                {
+                    explode.Permanent();
+                }
+                else
+                {
+                    Destroy(hazard.gameObject);
+                }
+            }
+        }
+
+        // Handle Obstacles
+        var obstaclesCopy = activeObstacles.ToList();
+        foreach (GameObject obstacle in obstaclesCopy)
+        {
+            if (obstacle != null)
+            {
+                Vector2Int gridPos = WorldToGridPosition(obstacle.transform.position);
+            
+                // Check if spawnGrid is not null before using it
+                if (spawnGrid != null)
+                {
+                    spawnGrid.FreeCell(gridPos.x, gridPos.y);
+                }
+                else
+                {
+                    Debug.LogError("spawnGrid is null!");
+                }
+
+                Explode explodeComponent = obstacle.GetComponent<Explode>();
+                if (explodeComponent != null)
+                {
+                    explodeComponent.Permanent();
+                }
+                else
+                {
+                    Destroy(obstacle);
+                }
+            }
+        }
+        activeObstacles.Clear();
+    }
+
+    private void PushToNextPlane()
+    {
+        float dspNow = (float)AudioSettings.dspTime;
+        float loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
+        float timeRemaining = loopEndDsp - dspNow;
+        wave.TriggerWave(Vector3.zero, timeRemaining);
+        ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Full));
+    }
+
+    private void ResetDrumLoopCollectables()
+    {
+        drumLoopCollectablesCollected = 0;
+        for (int i = drumLoopCollectables.Count - 1; i >= 0; i--)
+        {
+            DrumLoopCollectable dlc = drumLoopCollectables[i];
+            dlc.Remove();
+        }
+        drumLoopCollectables.Clear();
+    }
     public int GetCurrentStep()
     {
         return currentStep;
     }
 
-    private void LoopRoutines()
+    public void LoopRoutines()
     {
-        activeObstacles.RemoveAll(obstacle => obstacle == null);
+        CleanupInvalidObstacles(); // ✅ Remove invalid references
+        HandleFloatingObstacles(); // ✅ Separately process loose obstacles
+        HandleEvolvingObstacles(); // ✅ Process grid-based obstacles
         SpawnObstacle();
-        Debug.Log($"Last Loop Count {lastLoopCount} modulo {loopsRequiredBeforeEvolve}");
-        if (lastLoopCount%loopsRequiredBeforeEvolve == 0)
-        {
-            for (int i = 0; i < activeObstacles.Count; i++)
-            {
-                EvolvingObstacle obstacleToEvolve = activeObstacles[i].GetComponent<EvolvingObstacle>();
-                if (obstacleToEvolve != null)
-                {
-                    obstacleToEvolve.Evolve();
-                    Debug.Log($"Evolving {obstacleToEvolve.name}");
-                }
-            }
-        }
-
-        if (drumLoopCollectables.Count > 0)
-        {
-            Debug.Log($"{drumLoopCollectables.Count} Drum Loop Collectables Found");
-            if (drumLoopCollectables.Count == 1)
-            {
-                ScheduleDrumLoopChange(slowDownClips[Random.Range(0, slowDownClips.Length)]);                
-            }
-            else if (drumLoopCollectables.Count == 2)
-            {
-                ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Full));
-            }
-            else if (drumLoopCollectables.Count == 3)
-            {
-                ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Breakbeat));
-            }
-
-            for (int i = drumLoopCollectables.Count - 1; i > 0; i--)
-            {
-                DrumLoopCollectable dlc = drumLoopCollectables[i];
-                dlc.Remove();
-            }
-            drumLoopCollectables.Clear();
-        }
-
     }
+
+
+    private void HandleEvolvingObstacles()
+    {
+        foreach (var obstacle in activeObstacles.ToList()) // ✅ Safe iteration
+        {
+            Obstacle gridObstacle = obstacle.GetComponent<Obstacle>();
+
+            if (gridObstacle != null && !gridObstacle.isLoose) // ✅ Ensure it's still in the grid
+            {
+                gridObstacle.Age(); // ✅ Trigger standard obstacle behavior
+            }
+        }
+    }
+
+
+    public void CollectedDrumLoop(DrumLoopCollectable collectable)
+    {
+        drumLoopCollectablesCollected++;
+        drumLoopCollectables.Add(collectable);
+        Debug.Log($"Collected {collectable.name} at {drumLoopCollectablesCollected} total collected");
+        collectable.MoveToCorner(GetNextCornerPosition());
+        // Send it to one of the 4 corners (0..3)
+        // ✅ Update Star visuals dynamically
+        foreach (var star in drumLoopCollectables)
+        {
+            star.UpdateStarAppearance();
+        }
+
+        if (drumLoopCollectablesCollected >= 4)
+        {
+            PushToNextPlane();
+            StartCoroutine(MergeAllCollectablesIntoCenter());
+        }
+    }
+    
+    public void ScheduleDrumFillBeforeBeatChange()
+    {
+        float remainingTime = GetRemainingLoopTime();
+    
+        if (remainingTime > 0f)
+        {
+            Invoke(nameof(PlayDrumFill), Mathf.Max(remainingTime - SelectFillClipLength(), 0.01f));
+        }
+    }
+    public AudioClip SelectDrumFillClip()
+    {
+        float remainingTime = GetRemainingLoopTime();
+        AudioClip bestFitClip = null;
+        float closestFit = float.MaxValue;
+
+        foreach (AudioClip clip in drumFillClips) // ✅ Iterate over available fills
+        {
+            float difference = remainingTime - clip.length;
+
+            if (difference >= 0 && difference < closestFit) // ✅ Best fit that doesn't exceed time
+            {
+                bestFitClip = clip;
+                closestFit = difference;
+            }
+        }
+
+        if (bestFitClip == null && drumFillClips.Length > 0)
+        {
+            // ✅ No perfect fit, pick the shortest available fill
+            bestFitClip = drumFillClips.OrderBy(clip => clip.length).First();
+        }
+
+        return bestFitClip;
+    }
+    public float SelectFillClipLength()
+    {
+        AudioClip selectedClip = SelectDrumFillClip();
+        return selectedClip != null ? selectedClip.length : 0f;
+    }
+
+    private void PlayDrumFill()
+    {
+        Debug.Log("Playing drum fill before beat change.");
+
+        AudioClip fillClip = SelectDrumFillClip();
+        float remainingTime = GetRemainingLoopTime();
+
+        if (fillClip.length > remainingTime)
+        {
+            Debug.LogWarning("Drum fill is too long for remaining loop time! Adjusting...");
+            fillClip = TrimAudioClip(fillClip, remainingTime); // ✅ Dynamically adjust the fill length
+        }
+
+        drumAudioSource.PlayOneShot(fillClip);
+        Invoke(nameof(PushToNextPlane), fillClip.length);
+    }
+    private AudioClip TrimAudioClip(AudioClip originalClip, float maxLength)
+    {
+        if (originalClip.length <= maxLength) return originalClip; // ✅ No need to trim if it's already short enough
+
+        int sampleCount = Mathf.FloorToInt(maxLength * originalClip.frequency);
+        float[] samples = new float[sampleCount * originalClip.channels];
+
+        originalClip.GetData(samples, 0);
+        AudioClip trimmedClip = AudioClip.Create(originalClip.name + "_trimmed", sampleCount, originalClip.channels, originalClip.frequency, false);
+        trimmedClip.SetData(samples, 0);
+
+        return trimmedClip;
+    }
+
     public void RemoveObstacleAt(Vector2Int gridPos)
     {
         GameObject obstacleToRemove = null;
@@ -176,57 +401,53 @@ public class DrumTrack : MonoBehaviour
 
     private void SpawnObstacle()
     {
-        // ✅ Determine NoteBehavior from the current NoteSet (if active)
-        NoteSet activeNoteSet = trackController?.GetCurrentNoteSet();
-        NoteBehavior behavior = activeNoteSet != null ? activeNoteSet.noteBehavior : NoteBehavior.Percussion; // Default to Percussion if no active NoteSet
-
-        // ✅ Request an available cell using the determined behavior
-        Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell(behavior);
-
-        if (spawnCell.x == -1) 
+        Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
+        if (spawnCell.x == -1)
         {
             Debug.LogWarning("No available spawn cell for obstacle!");
             return;
         }
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
+        GameObject newObstacleParent = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
+        EvolvingObstacle evolvingObstacle = newObstacleParent.GetComponent<EvolvingObstacle>();
 
-        // ✅ Determine obstacle type based on `NoteBehavior` or `DrumLoopPattern`
-        //ObstacleType obstacleType = GetObstacleType();
-
-        // ✅ Instantiate the correct obstacle
-        GameObject newObstacle = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
-        EvolvingObstacle obstacle = newObstacle.GetComponent<EvolvingObstacle>();
-        if (obstacle != null)
+        if (evolvingObstacle != null)
         {
-            obstacle.SetDrumTrack(this);
+            evolvingObstacle.SetDrumTrack(this);
+            evolvingObstacle.SpawnObstacle(spawnCell); // ✅ Create the initial Block Obstacle
+            activeObstacles.Add(newObstacleParent);
+            spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
         }
-        if (newObstacle == null)
-        {
-            Debug.LogError("Failed to spawn obstacle! Check GetObstacle method.");
-            return;
-        }
-
-        // ✅ Store obstacle so it can be removed later
-        activeObstacles.Add(newObstacle);
-
-        spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
-        Debug.Log($"Spawned Standard Obstacle at {spawnPosition}");
     }
 
-    public Vector2Int WorldToGridPosition(Vector3 worldPos)
+    private void HandleObstacleKnockedLoose(EvolvingObstacle obstacle)
     {
-        // ✅ Convert world position (-8 to 8) back to grid position (0 - gridWidth)
-        int gridX = Mathf.Clamp(Mathf.RoundToInt((worldPos.x + 8f) / 16f * (gridWidth - 1)), 0, gridWidth - 1);
-        int gridY = Mathf.Clamp(Mathf.RoundToInt((worldPos.y + 4f) / 8f * (gridHeight - 1)), 0, gridHeight - 1);
+        Vector2Int gridPos = WorldToGridPosition(obstacle.transform.position);
+        spawnGrid.FreeCell(gridPos.x, gridPos.y);
+        activeObstacles.Remove(obstacle.gameObject);
 
-        return new Vector2Int(gridX, gridY);
+        Debug.Log($"Obstacle {obstacle.name} is now floating and removed from grid.");
+    }
+    private void HandleFloatingObstacles()
+    {
+        foreach (var obstacle in activeObstacles.ToList()) // ✅ Iterate safely
+        {
+            Obstacle floatingObstacle = obstacle.GetComponent<Obstacle>();
+
+            if (floatingObstacle != null && floatingObstacle.isLoose)
+            {
+                floatingObstacle.Age(); // ✅ Ensure loose obstacles evolve on their own
+            }
+        }
     }
 
+    
     public void ScheduleDrumLoopChange(AudioClip newLoop)
     {
         // Store the new loop clip.
         pendingDrumLoop = newLoop;
+       
         // Start waiting for the current loop to finish.
         StartCoroutine(WaitAndChangeDrumLoop());
     }
@@ -243,26 +464,43 @@ public class DrumTrack : MonoBehaviour
                     progressionIndex = 0;
                 }
                 return fullLoopClips[progressionIndex];
-            case DrumLoopPattern.Breakbeat:
-                Debug.Log(("Choose a breakbeat pattern drum clip"));
-                return breakbeatClips.Length > 0 ? breakbeatClips[Random.Range(0, breakbeatClips.Length)] : null;
-            case DrumLoopPattern.SlowDown:
-                Debug.Log(("Choose a slow pattern drum clip"));
-                return slowDownClips.Length > 0 ? slowDownClips[Random.Range(0, slowDownClips.Length)] : null;
             default:
                 Debug.LogWarning("SelectDrumClip: No valid drum loop found for pattern " + pattern);
                 return null;
         }
     }
-
     public Vector3 GridToWorldPosition(Vector2Int gridPos)
     {
-        // ✅ Convert grid position (0 - gridWidth) to world position (-8 to 8)
-        float worldX = Mathf.Lerp(-8f, 8f, (float)gridPos.x / (gridWidth - 1));
-        float worldY = Mathf.Lerp(-4f, 4f, (float)gridPos.y / (gridHeight - 1));
+        float cameraDistance = -Camera.main.transform.position.z;
 
-        Vector3 position = new Vector3(worldX, worldY, 0);
-        return position;
+        // Camera viewport bounds (bottom-left, top-right)
+        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+
+        // Properly defined normalized positions
+        float normalizedX = gridPos.x / (float)(spawnGrid.gridWidth - 1);
+        float normalizedY = gridPos.y / (float)(spawnGrid.gridHeight - 1);
+
+        // Clearly defined worldX and worldY using full viewport mapping
+        float worldX = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
+        float worldY = Mathf.Lerp(bottomLeft.y + gridPadding, topRight.y - gridPadding, normalizedY);
+
+        return new Vector3(worldX, worldY, 0f);
+    }
+    public Vector2Int WorldToGridPosition(Vector3 worldPos)
+    {
+        float cameraDistance = -Camera.main.transform.position.z;
+
+        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+
+        float normalizedX = Mathf.InverseLerp(bottomLeft.x, topRight.x, worldPos.x);
+        float normalizedY = Mathf.InverseLerp(bottomLeft.y, topRight.y, worldPos.y);
+
+        int gridX = Mathf.Clamp(Mathf.RoundToInt(normalizedX * (spawnGrid.gridWidth - 1)), 0, spawnGrid.gridWidth - 1);
+        int gridY = Mathf.Clamp(Mathf.RoundToInt(normalizedY * (spawnGrid.gridHeight - 1)), 0, spawnGrid.gridHeight - 1);
+
+        return new Vector2Int(gridX, gridY);
     }
 
 
@@ -289,7 +527,6 @@ public class DrumTrack : MonoBehaviour
         drumAudioSource.clip = pendingDrumLoop;
         drumAudioSource.Play();
         pendingDrumLoop = null;
-        
     }
 
     private IEnumerator InitializeDrumLoop()
@@ -331,66 +568,86 @@ public class DrumTrack : MonoBehaviour
                 Debug.LogError("DrumTrack: No AudioSource assigned!");
                 return;
             }
+
+//            Hazard.OnHazardHit += HandleHazardHit;
             StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
 
         }
     }
-    public void ApplyPercussionLayer()
-    {
-        Debug.Log("Adding percussion layer...");
-        // Apply subtle rhythm changes (e.g., add hi-hats, soft snares)
-    }
 
-    public void ModifySyncopation()
+    private void HandleHazardHit(Hazard hazard)
     {
-        Debug.Log("Modifying syncopation...");
-        // Adjust drum pattern for more groove
     }
-
-    public void TriggerBreakbeat()
-    {
-        Debug.Log("Activating breakbeat transition!");
-        ScheduleDrumLoopChange(breakbeatClips[Random.Range(0, breakbeatClips.Length)]);
-    }
-
+    
     public void CauseRhythmGlitch()
     {
         Debug.Log("Triggering rhythm glitch!");
         drumAudioSource.pitch = 1.5f;
         Invoke(nameof(ResetDrumPitch), 1.5f);
     }
+    private void CleanupExplodedObstacles()
+    {
+        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        {
+            GameObject obstacle = activeObstacles[i];
+
+            if (obstacle == null) continue;
+
+            Explode explode = obstacle.GetComponent<Explode>();
+            if (explode != null)
+            {
+                Debug.Log($"Forcing removal of exploded obstacle at {obstacle.transform.position}");
+                activeObstacles.RemoveAt(i);
+                Destroy(obstacle);
+            }
+        }
+    }
+    private void CleanupFloatingObstacles()
+    {
+        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        {
+            GameObject obstacle = activeObstacles[i];
+            Obstacle floatingObstacle = obstacle.GetComponent<Obstacle>();
+
+            if (floatingObstacle != null && floatingObstacle.looseTime >= floatingObstacle.looseEvolutionThreshold)
+            {
+                Debug.Log($"Removing floating obstacle at {floatingObstacle.transform.position}");
+                activeObstacles.RemoveAt(i);
+                Destroy(obstacle);
+            }
+        }
+    }
+
+    public void CleanupInvalidObstacles()
+    {
+        Debug.Log("Checking for invalid obstacles...");
+
+        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        {
+            GameObject obstacle = activeObstacles[i];
+
+            if (obstacle == null)
+            {
+                Debug.Log($"Removing null obstacle reference at index {i}");
+                activeObstacles.RemoveAt(i);
+                continue;
+            }
+
+            if (obstacle.GetComponent<EvolvingObstacle>() == null)
+            {
+                Vector2Int gridPos = WorldToGridPosition(obstacle.transform.position);
+                Debug.Log($"Removing non-evolving obstacle at {gridPos}");
+
+                activeObstacles.RemoveAt(i);
+                spawnGrid.FreeCell(gridPos.x, gridPos.y);
+                Destroy(obstacle);
+            }
+        }
+    }
 
     private void ResetDrumPitch()
     {
         drumAudioSource.pitch = 1.0f;
     }
-/*
-    IEnumerator EaseToPosition(Transform obj, Vector3 target, float moveSpeed)
-    {
-        if (obj == null)
-        {
-            yield break;
-        }
-        Vector3 start = obj.position;
-        float distance = Vector3.Distance(start, target);
-        // Duration is distance divided by speed (seconds = units / (units/second))
-        float duration = distance / moveSpeed;
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            if (obj == null)
-            {
-                yield break;
-            }
-            elapsed += Time.deltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-            obj.position = Vector3.Lerp(start, target, t);
-            yield return null;
-        }
-        if (obj != null)
-        {
-            obj.position = target;
-        }
-    }
-*/
+
 }
