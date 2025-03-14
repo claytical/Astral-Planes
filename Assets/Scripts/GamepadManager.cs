@@ -43,8 +43,6 @@ public class GamepadManager : MonoBehaviour
         }
     }
 
-    private void Update() { }
-
     public void RegisterPlayer(LocalPlayer player)
     {
         localPlayers.Add(player);

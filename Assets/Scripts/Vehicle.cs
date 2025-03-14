@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
-
-
+using System.Collections;
 
 public class Vehicle : MonoBehaviour
 {
@@ -16,7 +15,7 @@ public class Vehicle : MonoBehaviour
     public float baseBurnRate = 1f; // Base burn rate per vehicle
     public float burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
 
-    private bool boosting = false;
+    private bool boosting;
 
     public GameObject trail; // Trail prefab
 
@@ -29,9 +28,8 @@ public class Vehicle : MonoBehaviour
     public AudioClip collectedClip;
     public AudioClip thrustClip;
 
-    private float initialForce;
-    private float initialTerminalVelocity;
     
+    private bool isControlDistorted;
     public float capacity = 10f;
     //public float energyCollected;
     public float energyLevel;
@@ -65,11 +63,7 @@ public class Vehicle : MonoBehaviour
             enabled = false;
             return;
         }
-
-        initialForce = force;
-        initialTerminalVelocity = terminalVelocity;
         energyLevel = capacity;
-
         // Ensure playerStatsUI is assigned
         if (playerStatsUI == null)
         {
@@ -96,13 +90,17 @@ public class Vehicle : MonoBehaviour
     {
         if (boosting && energyLevel > 0)
         {
-            float appliedForce = force * burnRateMultiplier * boostMultiplier;
-            Vector2 forceDirection = transform.up * appliedForce;
-            rb.AddForce(forceDirection, ForceMode2D.Force);
-
-            if (rb.linearVelocity.magnitude > terminalVelocity)
+            if (!isControlDistorted)
             {
-                rb.linearVelocity = rb.linearVelocity.normalized * terminalVelocity;
+                float appliedForce = force * burnRateMultiplier * boostMultiplier;
+                Vector2 forceDirection = transform.up * appliedForce;
+                rb.AddForce(forceDirection, ForceMode2D.Force);
+
+                if (rb.linearVelocity.magnitude > terminalVelocity)
+                {
+                    rb.linearVelocity = rb.linearVelocity.normalized * terminalVelocity;
+                }
+                
             }
 
             // Consume fuel based on the pressure applied to the trigger
@@ -262,6 +260,23 @@ public class Vehicle : MonoBehaviour
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
         }
     }
+    public void ApplyControlDistortion()
+    {
+        float distortionChance = 0.3f; // ✅ 30% chance per frame for control interference
+        float inputDelay = Random.Range(0.05f, 0.2f); // ✅ Small input lag
+
+        if (Random.value < distortionChance)
+        {
+            StartCoroutine(DelayedInput(inputDelay));
+        }
+    }
+
+    private IEnumerator DelayedInput(float delay)
+    {
+        isControlDistorted = true;
+        yield return new WaitForSeconds(delay);
+        isControlDistorted = false;
+    }
 
     void OnCollisionEnter2D(Collision2D coll)
     {
@@ -281,6 +296,12 @@ public class Vehicle : MonoBehaviour
             if (obstacle != null)
             {
                 audioManager.PlaySound(collisionClip);
+                Rigidbody2D rb2 = obstacle.GetComponent<Rigidbody2D>();
+                if (rb2 != null)
+                {
+                    rb2.bodyType = RigidbodyType2D.Dynamic;
+                    rb2.gravityScale = Random.Range(-.01f, .01f);
+                }
             }            
             DrumLoopCollectable dlc = coll.gameObject.GetComponent<DrumLoopCollectable>();
             if (dlc != null)

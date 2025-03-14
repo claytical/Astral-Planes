@@ -101,7 +101,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   accelerate: {x: 0.01, y: -0.01, z: 0}
-  randomizeRotation: 0
+  randomizeRotation: 1
 --- !u!1 &1316711709889716
 GameObject:
   m_ObjectHideFlags: 0
@@ -133,7 +133,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 2}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4204267129982818}
@@ -169,6 +169,7 @@ MonoBehaviour:
   noteDurationTicks: 4
   assignedNote: 0
   assignedInstrumentTrack: {fileID: 0}
+  noteBehavior: 0
   floatAmplitude: 0.2
   floatSpeed: 2
   easingComplete: 0
@@ -188,6 +189,7 @@ MonoBehaviour:
     type: 3}
   respawnTimer: 0
   lifetime: 0
+  randomizeLifetimer: 0
 --- !u!50 &263018928427361343
 Rigidbody2D:
   serializedVersion: 5

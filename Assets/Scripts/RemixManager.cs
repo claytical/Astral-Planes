@@ -22,11 +22,6 @@ public class RemixManager : MonoBehaviour
 
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        // This could be used to cycle through themes or apply changes in real-time if needed
-    }
 
     public void ApplyTheme(int themeIndex)
     {

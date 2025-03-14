@@ -60,16 +60,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c91b92ee16e2d43b3aae4363f66afded, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentState: 0
-  evolutionPrefab:
-  - {fileID: 1781116594832268, guid: 931a1e0e10bff4056bd61c5f54aaf7c2, type: 3}
-  - {fileID: 1781116594832268, guid: 6ee1a749deedb7648a8431e8cb87e093, type: 3}
-  - {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6, type: 3}
   explosionPrefab: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
     type: 3}
   debrisPrefab: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d,
     type: 3}
   particles: {fileID: 5653120376534834615}
+  obstaclePrefab: {fileID: 1781116594832268, guid: 931a1e0e10bff4056bd61c5f54aaf7c2,
+    type: 3}
 --- !u!1 &4604847092173952858
 GameObject:
   m_ObjectHideFlags: 0

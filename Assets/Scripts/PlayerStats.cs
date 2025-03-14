@@ -15,10 +15,7 @@ public class PlayerStats : MonoBehaviour
     private int vehicleID;  // Store the vehicle ID to recreate the vehicle later
     private Vehicle currentVehicle;
 
-    void Start()
-    {
-        // Initialization logic can go here if needed
-    }
+
 
     public void SetStats(Vehicle vehicle)
     {

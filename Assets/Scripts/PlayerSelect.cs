@@ -35,9 +35,7 @@ public class PlayerSelect : MonoBehaviour
         transform.localScale = new Vector3(1, 1, 1);
 
     }
-    private void Update()
-    {
-    }
+
     private void SetVehicleStats()
     {
         if (chosenPlane && chosenPlane.GetComponent<Vehicle>())
