@@ -72,7 +72,7 @@ public class Vehicle : MonoBehaviour
             return;
         }
 
-        UpdateFuelUI();
+        UpdateEnergyUI();
 
         if (playerStats == null)
         {
@@ -213,7 +213,7 @@ public class Vehicle : MonoBehaviour
     {
         energyLevel -= amount;
         if (energyLevel < 0) energyLevel = 0;
-        UpdateFuelUI();
+        UpdateEnergyUI();
     }
     public void CollectEnergy(int amount)
     {
@@ -224,7 +224,7 @@ public class Vehicle : MonoBehaviour
             energyLevel = capacity;
         }
 
-        UpdateFuelUI();
+        UpdateEnergyUI();
         playerStats.RecordItemCollected();
 
 
@@ -236,7 +236,7 @@ public class Vehicle : MonoBehaviour
         }
     }
     
-    private void UpdateFuelUI()
+    public void UpdateEnergyUI()
     {
         // Map energy level to alpha (clamped between 0 and 1)
         if (soulSprite != null)
@@ -280,16 +280,7 @@ public class Vehicle : MonoBehaviour
 
     void OnCollisionEnter2D(Collision2D coll)
     {
-        var platform = coll.gameObject.GetComponentInParent<Platform>();
-        if (platform != null && !platform.indestructable)
-        {
 
-            var explode = coll.gameObject.GetComponent<Explode>();
-            if (explode != null)
-            {
-                explode.UntilNextSet();
-            }
-        }
         if (audioManager != null)
         {
             Obstacle obstacle = coll.gameObject.GetComponent<Obstacle>();
@@ -300,20 +291,22 @@ public class Vehicle : MonoBehaviour
                 if (rb2 != null)
                 {
                     rb2.bodyType = RigidbodyType2D.Dynamic;
-                    rb2.gravityScale = Random.Range(-.01f, .01f);
+                    rb2.gravityScale = Random.Range(-.02f, .02f);
                 }
             }            
+            /*
             DrumLoopCollectable dlc = coll.gameObject.GetComponent<DrumLoopCollectable>();
             if (dlc != null)
             {
                 audioManager.PlaySound(collectedClip);
             }
+            /*
             Hazard hazard = coll.gameObject.GetComponent<Hazard>();
             if (hazard != null)
             {
                 audioManager.PlaySound(destroyClip);
             }
-
+*/
         }
 
     }

@@ -1,5 +1,5 @@
 {
-    "name": "Moonlight",
+    "name": "AstralPlanes",
     "maps": [
         {
             "name": "Play",
@@ -45,7 +45,16 @@
                     "name": "LeftShoulder",
                     "type": "Button",
                     "id": "cb3c4eaf-17f7-4565-8c2c-fe83fa667a73",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Quit",
+                    "type": "Button",
+                    "id": "878ebd0c-b324-4c2f-b54c-96aa052bec23",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -117,6 +126,17 @@
                     "action": "LeftShoulder",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "05c50c0e-3747-40d2-8540-1d7a784b701c",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Quit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -128,7 +148,7 @@
                     "name": "Start",
                     "type": "Button",
                     "id": "dbc1f852-1c7a-4878-a28e-570a2977f1f6",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -173,7 +193,7 @@
                     "name": "Choose",
                     "type": "Value",
                     "id": "af068420-8c48-4d1b-8c37-b21840a10adc",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
@@ -182,7 +202,7 @@
                     "name": "Leave",
                     "type": "Value",
                     "id": "1a63e169-d2d1-48f0-84c4-fa3199363f68",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true

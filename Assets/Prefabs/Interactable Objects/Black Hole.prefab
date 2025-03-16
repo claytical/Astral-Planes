@@ -125,7 +125,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.6
+  m_Radius: 1
 --- !u!114 &1851173165947900881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -138,9 +138,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a7e27653ffdf4b63aebb4fa699a8f7b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pullForce: 1
-  maxGravitySize: 5
-  pullSmoothness: 0.05
+  pullForce: 2
+  damage: 5
+  centerPoint: {fileID: 4213040972611002}
+  parentHazard: {fileID: 9143884529070685008}
 --- !u!1 &1781116594832268
 GameObject:
   m_ObjectHideFlags: 0
@@ -219,7 +220,7 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 0
   m_SleepingMode: 1
-  m_CollisionDetection: 1
+  m_CollisionDetection: 0
   m_Constraints: 0
 --- !u!114 &9143884529070685008
 MonoBehaviour:
@@ -234,8 +235,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   energyAbsorbed: 0
-  maxEnergy: 5
-  maxGravitySize: 5
+  maxEnergy: 3
   starPrefab: {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6,
     type: 3}
 --- !u!1 &2854373335092117485

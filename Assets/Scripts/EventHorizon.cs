@@ -13,10 +13,12 @@ public class EventHorizon : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D coll)
     {
+        Debug.Log("Event Horizon hit");
         Vehicle v = coll.GetComponent<Vehicle>();
         if (v != null)
         {
             v.energyLevel -= damage;
+            v.UpdateEnergyUI();
             if (v.energyLevel <= 0)
             {
                 v.Explode();

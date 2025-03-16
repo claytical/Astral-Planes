@@ -2,34 +2,50 @@ using UnityEngine;
 
 public class GravityZone : MonoBehaviour
 {
-    public float pullForce = 5f;
-    public float maxGravitySize = 5f;
-    public float pullSmoothness = 0.05f; // ✅ Controls how smoothly vehicles are pulled
     private Vehicle vehicle;
-    private Hazard parentHazard;
+    public float pullForce = 500f; // Adjust force strength
+    public int damage = 1; // Adjust damage amount
+    public Transform centerPoint; // Assign in inspector or find in Start()
+    public Hazard parentHazard; // Ensure this reference is correctly assigned
 
-    void Start()
+    private void Start()
     {
-        if (transform.parent != null)
-            parentHazard = transform.parent.GetComponent<Hazard>();
-    }
-
-    void OnTriggerStay2D(Collider2D coll)
-    {
-        if (vehicle == null)
+        if (centerPoint == null)
         {
-            vehicle = coll.GetComponent<Vehicle>();
-        }
-        else 
-        {
-            // ✅ Introduce random input distortion
-            vehicle.ApplyControlDistortion();
-        
-            // ✅ Drain energy gradually
-            float energyDrained = Time.deltaTime * 3;
-            vehicle.energyLevel = Mathf.Max(0, vehicle.energyLevel - energyDrained);
-            parentHazard.AbsorbEnergy(energyDrained);
+            centerPoint = transform; // Defaults to its own position if not assigned
         }
     }
 
+    void OnTriggerEnter2D(Collider2D collision)
+    {
+        Debug.Log($"{collision.gameObject.name} collided with {gameObject.name}");
+
+        vehicle = collision.gameObject.GetComponent<Vehicle>();
+
+        if (vehicle != null)
+        {
+            ApplyGravityPull(vehicle);
+            ApplyEffects(vehicle);
+            transform.Rotate(0, 0, 45); // Rotate the zone 180 degrees ( counter-clockwise)
+        }
+    }
+
+    private void ApplyGravityPull(Vehicle vehicle)
+    {
+        Rigidbody2D rb = vehicle.GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            Vector2 forceDirection = (centerPoint.position - vehicle.transform.position).normalized;
+            rb.AddForce(forceDirection * pullForce, ForceMode2D.Impulse);
+            Debug.Log($"{vehicle.name} pulled toward {centerPoint.position} with force {pullForce}");
+        }
+    }
+
+    private void ApplyEffects(Vehicle vehicle)
+    {
+        vehicle.energyLevel = Mathf.Max(0, vehicle.energyLevel - damage);
+        vehicle.UpdateEnergyUI();
+        parentHazard.AbsorbEnergy(damage);
+        Debug.Log($"{vehicle.name} lost {damage} energy due to collision with {gameObject.name}");
+    }
 }

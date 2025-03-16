@@ -34,7 +34,7 @@ public class InstrumentTrack : MonoBehaviour
     private float screenMaxX = 8f;  // Right boundary
     public List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private Dictionary<Collectable, (int note, int duration)> collectableNotes = new Dictionary<Collectable, (int, int)>();
-    private int totalSteps = 64;
+    private int totalSteps = 16;
     private int lastStep = -1;
     private int currentExpansionCount = 0;
     // Define constants for the musical grid resolution:
@@ -86,6 +86,7 @@ public class InstrumentTrack : MonoBehaviour
     }
     public void ApplyNoteSet(NoteSet newNoteSet)
     {
+        totalSteps = drumTrack.totalSteps;
         if (newNoteSet == null)
         {
             Debug.LogError("Assigned NoteSet is null!");
@@ -250,6 +251,7 @@ public class InstrumentTrack : MonoBehaviour
             Debug.Log($"Spawning at {spawnPosition}");
 
             GameObject spawned = Instantiate(collectablePrefab, spawnPosition, Quaternion.identity, collectableParent);
+            Debug.Log($"Step {stepIndex} → Column {spawnPosition.x}");
             Collectable collectable = spawned.GetComponent<Collectable>();
 
             if (collectable == null)
@@ -294,7 +296,18 @@ public class InstrumentTrack : MonoBehaviour
 
         // Clearly separate the step horizontally
         float normalizedX = (float)stepIndex / totalSteps;
-        int x = Mathf.Clamp(Mathf.FloorToInt(normalizedX * gridWidth), 0, gridWidth - 1);
+        int uniqueIndex = allowedSteps.IndexOf(stepIndex);
+        if (uniqueIndex == -1) uniqueIndex = 0; // Safety check
+
+         int x = Mathf.FloorToInt((uniqueIndex / (float)allowedSteps.Count) * gridWidth);
+//        x = Mathf.Clamp(x, 0, gridWidth - 1);
+
+        
+        
+//        int x = Mathf.Clamp(Mathf.FloorToInt(normalizedX * gridWidth), 0, gridWidth - 1);
+//        int x = stepIndex % gridWidth;
+//        int uniqueIndex = allowedSteps.IndexOf(stepIndex); // Get the step's order in the sequence
+//        int x = uniqueIndex % gridWidth;  // ✅ Assigns each note to a unique column
 
         // Map note pitch clearly vertically
         int y = DetermineRowForNote(assignedNote, noteSet.lowestNote, noteSet.highestNote, gridHeight);

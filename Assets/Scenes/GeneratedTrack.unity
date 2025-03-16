@@ -508,11 +508,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   noteBehavior: 2
   assignedInstrumentTrack: {fileID: 627412777}
-  rhythmStyle: 3
-  rootMidi: 36
+  rhythmStyle: 1
+  rootMidi: 60
   scale: 0
-  lowestNote: 36
-  highestNote: 43
+  lowestNote: 60
+  highestNote: 74
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -563,11 +563,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   noteBehavior: 0
   assignedInstrumentTrack: {fileID: 342701841}
-  rhythmStyle: 2
-  rootMidi: 24
+  rhythmStyle: 0
+  rootMidi: 43
   scale: 0
-  lowestNote: 24
-  highestNote: 36
+  lowestNote: 36
+  highestNote: 43
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -955,13 +955,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteBehavior: 1
+  noteBehavior: 4
   assignedInstrumentTrack: {fileID: 652946508}
-  rhythmStyle: 3
-  rootMidi: 60
+  rhythmStyle: 1
+  rootMidi: 36
   scale: 0
-  lowestNote: 60
-  highestNote: 71
+  lowestNote: 36
+  highestNote: 41
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -1414,7 +1414,7 @@ MonoBehaviour:
   currentNoteSet: {fileID: 0}
   drumTrack: {fileID: 1354683682}
   channel: 4
-  preset: 52
+  preset: 54
   bank: 0
   collectablePrefab: {fileID: 1316711709889716, guid: c6fa020d51d4b4dc188cea4882615cf5,
     type: 3}
@@ -1455,10 +1455,10 @@ MonoBehaviour:
   noteBehavior: 0
   assignedInstrumentTrack: {fileID: 342701841}
   rhythmStyle: 0
-  rootMidi: 24
+  rootMidi: 41
   scale: 0
-  lowestNote: 24
-  highestNote: 36
+  lowestNote: 36
+  highestNote: 43
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -2053,9 +2053,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteBehavior: 0
+  noteBehavior: 4
   assignedInstrumentTrack: {fileID: 652946508}
-  rhythmStyle: 3
+  rhythmStyle: 0
   rootMidi: 64
   scale: 0
   lowestNote: 60
@@ -2112,6 +2112,61 @@ Transform:
   - {fileID: 1849649913}
   - {fileID: 608598249}
   - {fileID: 1798320909}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1177741755
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1177741757}
+  - component: {fileID: 1177741756}
+  m_Layer: 0
+  m_Name: Texture - 03
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1177741756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177741755}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3f87fe433f56c4b914c8ce081fcefd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  noteBehavior: 4
+  assignedInstrumentTrack: {fileID: 652946508}
+  rhythmStyle: 3
+  rootMidi: 40
+  scale: 0
+  lowestNote: 40
+  highestNote: 55
+  dominantWeight: 2
+  dominantNoteFrequency: 0.7
+  allowedDuration: -1
+  dropBackIndex: 0
+--- !u!4 &1177741757
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177741755}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.921994, y: -0.23460713, z: -0.05551158}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1235160289
@@ -2360,7 +2415,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 74d7167fa81b64740b9c1d4544a36d95, type: 3}
   obstaclePrefab: {fileID: 1781116594832268, guid: 930b3edf619309f4b9e970a0703f3968,
     type: 3}
-  totalSteps: 64
+  totalSteps: 16
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   activeObstacles: []
@@ -2404,19 +2459,20 @@ MonoBehaviour:
   assignedNoteSets:
   - {fileID: 1834431006}
   - {fileID: 1461687144}
+  - {fileID: 1592356861}
   - {fileID: 403746636}
   - {fileID: 261861058}
-  - {fileID: 1592356861}
   - {fileID: 757675154}
-  - {fileID: 1123900229}
-  - {fileID: 268384300}
+  - {fileID: 1177741756}
   - {fileID: 2110566099}
   - {fileID: 584676848}
-  - {fileID: 1950266786}
-  - {fileID: 124522098}
+  - {fileID: 1123900229}
+  - {fileID: 268384300}
   - {fileID: 835978570}
   - {fileID: 1475166684}
+  - {fileID: 1950266786}
   - {fileID: 1363838284}
+  - {fileID: 124522098}
   - {fileID: 1256422563}
   - {fileID: 287963354}
   - {fileID: 1235160290}
@@ -2991,10 +3047,10 @@ MonoBehaviour:
   noteBehavior: 1
   assignedInstrumentTrack: {fileID: 1690824280}
   rhythmStyle: 3
-  rootMidi: 60
+  rootMidi: 47
   scale: 0
-  lowestNote: 65
-  highestNote: 74
+  lowestNote: 47
+  highestNote: 53
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -8155,10 +8211,10 @@ MonoBehaviour:
   noteBehavior: 0
   assignedInstrumentTrack: {fileID: 342701841}
   rhythmStyle: 0
-  rootMidi: 24
+  rootMidi: 36
   scale: 0
-  lowestNote: 24
-  highestNote: 24
+  lowestNote: 36
+  highestNote: 41
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -8902,10 +8958,10 @@ MonoBehaviour:
   noteBehavior: 4
   assignedInstrumentTrack: {fileID: 1690824280}
   rhythmStyle: 3
-  rootMidi: 60
+  rootMidi: 48
   scale: 0
-  lowestNote: 60
-  highestNote: 69
+  lowestNote: 48
+  highestNote: 55
   dominantWeight: 2
   dominantNoteFrequency: 0.7
   allowedDuration: -1
@@ -9301,6 +9357,7 @@ SceneRoots:
   - {fileID: 1834431007}
   - {fileID: 1461687145}
   - {fileID: 403746637}
+  - {fileID: 1177741757}
   - {fileID: 261861059}
   - {fileID: 1592356862}
   - {fileID: 757675155}
