@@ -134,8 +134,8 @@ public class NoteSet : MonoBehaviour
         // Adjust totalSteps if you want to double (or otherwise scale) the loop length.
         int effectiveTotalSteps = totalSteps * pattern.LoopMultiplier;
 
+        int stepsPerBar = 16; // e.g., 16, 32, 64, 128, etc.
         // Suppose we treat the effective loop as bars of 16 steps (you can parameterize this too)
-        int stepsPerBar = 16;
         int bars = effectiveTotalSteps / stepsPerBar; // e.g., 64 becomes 64 or 128 if doubled
 
         for (int barIndex = 0; barIndex < bars; barIndex++)

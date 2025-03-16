@@ -38,7 +38,7 @@ public class DrumTrack : MonoBehaviour
     public AudioClip[] drumFillClips;
     // Prefabs for different spawned objects:
     public GameObject obstaclePrefab;
-    public int totalSteps = 64;
+    public int totalSteps = 16;
     // Define candidate spawn steps: if you want to spawn onlly on every 8th note, set:
     public AudioSource drumAudioSource;
     public InstrumentTrackController trackController;

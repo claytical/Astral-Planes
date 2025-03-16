@@ -109,6 +109,12 @@ public class GamepadManager : MonoBehaviour
         }
         return count;
     }
+
+    public void QuitGame()
+    {
+        SceneManager.LoadScene("TrackSelection");
+        Destroy(this.gameObject);
+    }
     public void CheckAllPlayersGone()
     {
         foreach (LocalPlayer player in localPlayers)

@@ -4,8 +4,7 @@ using System;
 public class Hazard : MonoBehaviour
 {
     public float energyAbsorbed = 0f;
-    public float maxEnergy = 100f;
-    public float maxGravitySize = 5f; // ✅ Now defined in Hazard
+    public float maxEnergy = 3f;
     public GameObject starPrefab;
     private DrumTrack drumTrack;
 

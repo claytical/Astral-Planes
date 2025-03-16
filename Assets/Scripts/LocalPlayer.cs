@@ -20,11 +20,6 @@ public class LocalPlayer : MonoBehaviour
     private Color color;
     private bool isReady = false;
     public bool IsReady => isReady; // Public read-only property
-    public float selfDestructDelay = 1f;  // Delay before self-destruct
-    private bool isSelfDestructing = false;
-    private bool leftShoulderPulled;
-    private bool rightShoulderPulled;
-    private bool eastButtonPressed;
     void Start()
     {
         DontDestroyOnLoad(this);
@@ -41,50 +36,7 @@ public class LocalPlayer : MonoBehaviour
     {
         plane.gameObject.SetActive(true);
     }
-    void CheckForSelfDestructInput()
-    {
-        Debug.Log("Checking for Self Destruct");
-        // Access the current gamepad
-        Gamepad gamepad = Gamepad.current;
-        if (gamepad == null)
-        {
-            Debug.Log("No Gamepad");
 
-            return;  // No gamepad connected
-        }
-
-        // Check if both triggers are pulled and the east button is pressed
-        bool leftTriggerPulled = gamepad.leftTrigger.isPressed;
-        bool rightTriggerPulled = gamepad.rightTrigger.isPressed;
-        bool eastButtonPressed = gamepad.buttonEast.wasPressedThisFrame;
-        Debug.Log("LEFT: " + leftTriggerPulled + " RIGHT: " + rightTriggerPulled + " EAST: " + eastButtonPressed);
-        if (leftTriggerPulled && rightTriggerPulled && eastButtonPressed)
-        {
-            StartSelfDestructSequence();
-        }
-    }
-
-    void StartSelfDestructSequence()
-    {
-        Debug.Log("Self-destruct sequence initiated!");
-
-         isSelfDestructing = true;
-        StartCoroutine(SelfDestruct());
-    }
-
-    private IEnumerator SelfDestruct()
-    {
-        // Optionally, add a countdown or warning effect here
-        yield return new WaitForSeconds(selfDestructDelay);
-        
-                // Destroy the vehicle or trigger the explosion
-                if (plane != null)
-                {
-                    Restart();
-//                    plane.Explode();  // Assuming you have an Explode() method in your Vehicle script
-                }
-        
-    }
 public void CreatePlayerSelect()
     {
         GameObject ps = Instantiate(playerSelect);
@@ -133,21 +85,14 @@ public void CreatePlayerSelect()
             GetComponent<PlayerInput>().SwitchCurrentActionMap("Play");
         }
     }
-
-    public void NextPlane()
-    {
-        astralPlaneIndex++;
-//        GamepadManager.Instance.CheckAllPlayersGone
-    }
-
-
+    
     public void Restart()
     {
-        GetComponent<PlayerStatsTracking>().CalculateEfficiencyScore();
         isReady = false;
         ui.Deactivate();
         GetComponent<PlayerInput>().SwitchCurrentActionMap("Start");
-        GamepadManager.Instance.CheckAllPlayersGone();
+        GamepadManager.Instance.QuitGame();
+        
     }
     
     public void EnergyCollected(int newAmount)
@@ -169,29 +114,10 @@ public void CreatePlayerSelect()
         plane.Move(value.Get<Vector2>().normalized);
     }
 
-    public void OnEast(InputValue value)
+    public void OnQuit(InputValue value)
     {
-        eastButtonPressed = value.isPressed;
-        CheckSelfDestructCondition();
-    }
-    public void OnRightShoulder(InputValue value)
-    {
-        rightShoulderPulled = value.isPressed;
-        CheckSelfDestructCondition();
-    }
-
-    public void OnLeftShoulder(InputValue value)
-    {
-        leftShoulderPulled = value.isPressed;
-        CheckSelfDestructCondition();
-    }
-
-    private void CheckSelfDestructCondition()
-    {
-        if (leftShoulderPulled && rightShoulderPulled && eastButtonPressed)
-        {
-            StartSelfDestructSequence();
-        }
+        GamepadManager.Instance.QuitGame();
+        Destroy(this.gameObject);
     }
 
     public void OnThrust(InputValue value)

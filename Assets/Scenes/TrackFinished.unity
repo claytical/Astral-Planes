@@ -733,7 +733,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: a quote goes here.
+  m_text: fin.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 57e075902a5754444b2369bfe799ef9b, type: 2}
   m_sharedMaterial: {fileID: -6710680176177670383, guid: 57e075902a5754444b2369bfe799ef9b,
