@@ -11,7 +11,6 @@ public class Explosion : MonoBehaviour {
         {
             if(!GetComponent<ParticleSystem>().isPlaying)
             {
- //               ResetGlitch();
                 Destroy(this.gameObject);
             }
         }    

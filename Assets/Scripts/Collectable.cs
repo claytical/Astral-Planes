@@ -10,7 +10,7 @@ public class Collectable : MonoBehaviour
     public int assignedNote; // 🎵 The MIDI note value
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
     public NoteBehavior noteBehavior; // 🎵 NEW: Stores the note’s behavior
-
+    public SpriteRenderer energySprite;
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;
     public event System.Action OnDestroyed;
@@ -20,6 +20,7 @@ public class Collectable : MonoBehaviour
     public bool easingComplete = false; // ✅ Allows floating after easing-in
     private Vector3 startPosition;
     private float floatTimer = 0f; 
+    private ParticleSystem particleSystem;
 
     // 🔹 Initializes the collectable with its note data
     public void Initialize(int note, int duration, InstrumentTrack track, NoteBehavior behavior)
@@ -28,6 +29,12 @@ public class Collectable : MonoBehaviour
         noteDurationTicks = duration;
         assignedInstrumentTrack = track;
         noteBehavior = behavior;
+        if (GetComponent<ParticleSystem>())
+        {
+            ParticleSystem.MainModule particleSystem = GetComponent<ParticleSystem>().main;
+            particleSystem.startColor = track.trackColor;
+        }
+        energySprite.color = track.trackColor;
 
         if (assignedInstrumentTrack == null)
         {
@@ -56,7 +63,7 @@ public class Collectable : MonoBehaviour
             vehicle.CollectEnergy(amount);
             Debug.Log($"{gameObject.name} collected energy");
             // 🔹 Play the note immediately
-            OnCollected?.Invoke(noteDurationTicks, vehicle.GetForce());
+            OnCollected?.Invoke(noteDurationTicks, vehicle.GetForceAsMidiVelocity());
             if (assignedInstrumentTrack == null)
             {
                 Debug.LogError($"{gameObject.name} - assignedInstrumentTrack is NULL on collection!");

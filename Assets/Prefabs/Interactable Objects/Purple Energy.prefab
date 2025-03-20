@@ -188,6 +188,7 @@ MonoBehaviour:
   assignedNote: 0
   assignedInstrumentTrack: {fileID: 0}
   noteBehavior: 0
+  energySprite: {fileID: 212503362928707232}
   floatAmplitude: 0.2
   floatSpeed: 2
   easingComplete: 0

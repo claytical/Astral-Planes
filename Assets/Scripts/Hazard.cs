@@ -6,29 +6,22 @@ public class Hazard : MonoBehaviour
     public float energyAbsorbed = 0f;
     public float maxEnergy = 3f;
     public GameObject starPrefab;
+    public NoteSet noteSet;
+    public enum MinedObjectType { ChordChange, RootShift, NoteBehavior, RhythmStyle }
     private DrumTrack drumTrack;
-
+    private InstrumentTrack track;
     public void AbsorbEnergy(float amount)
     {
         energyAbsorbed += amount;
         if (energyAbsorbed >= maxEnergy)
         {
-            TransformIntoStar();
         }
     }
 
-    public void SetDrumTrack(DrumTrack track)
+    public void SetDrumTrack(DrumTrack drums)
     {
-        drumTrack = track;
-    }    private void TransformIntoStar()
-    {
-        Debug.Log("Black Hole transformed into a Star!");
-        GameObject go = Instantiate(starPrefab, transform.position, Quaternion.identity);
-        DrumLoopCollectable star = go.GetComponent<DrumLoopCollectable>();
-        if (star != null)
-        {
-            star.SetDrumTrack(drumTrack);
-        }
-        Destroy(gameObject);
-    }
+        drumTrack = drums;
+        track = drumTrack.trackController.GetRandomTrack();
+    }   
+
 }

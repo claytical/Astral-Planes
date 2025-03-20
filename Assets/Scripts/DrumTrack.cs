@@ -37,8 +37,9 @@ public class DrumTrack : MonoBehaviour
     public AudioClip[] fullLoopClips;
     public AudioClip[] drumFillClips;
     // Prefabs for different spawned objects:
-    public GameObject obstaclePrefab;
-    public int totalSteps = 16;
+    public GameObject[] obstaclePrefab;
+    private int obstacleSpawnTypeIndex = 0;
+    public int totalSteps = 32;
     // Define candidate spawn steps: if you want to spawn onlly on every 8th note, set:
     public AudioSource drumAudioSource;
     public InstrumentTrackController trackController;
@@ -263,6 +264,11 @@ public class DrumTrack : MonoBehaviour
         HandleFloatingObstacles(); // ✅ Separately process loose obstacles
         HandleEvolvingObstacles(); // ✅ Process grid-based obstacles
         SpawnObstacle();
+        obstacleSpawnTypeIndex++;
+        if (obstacleSpawnTypeIndex >= obstaclePrefab.Length)
+        {
+            obstacleSpawnTypeIndex = 0;
+        }
     }
 
 
@@ -409,7 +415,7 @@ public class DrumTrack : MonoBehaviour
         }
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
-        GameObject newObstacleParent = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
+        GameObject newObstacleParent = Instantiate(obstaclePrefab[obstacleSpawnTypeIndex], spawnPosition, Quaternion.identity);
         EvolvingObstacle evolvingObstacle = newObstacleParent.GetComponent<EvolvingObstacle>();
 
         if (evolvingObstacle != null)
@@ -420,15 +426,7 @@ public class DrumTrack : MonoBehaviour
             spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
         }
     }
-
-    private void HandleObstacleKnockedLoose(EvolvingObstacle obstacle)
-    {
-        Vector2Int gridPos = WorldToGridPosition(obstacle.transform.position);
-        spawnGrid.FreeCell(gridPos.x, gridPos.y);
-        activeObstacles.Remove(obstacle.gameObject);
-
-        Debug.Log($"Obstacle {obstacle.name} is now floating and removed from grid.");
-    }
+    
     private void HandleFloatingObstacles()
     {
         foreach (var obstacle in activeObstacles.ToList()) // ✅ Iterate safely
@@ -443,7 +441,7 @@ public class DrumTrack : MonoBehaviour
     }
 
     
-    public void ScheduleDrumLoopChange(AudioClip newLoop)
+    private void ScheduleDrumLoopChange(AudioClip newLoop)
     {
         // Store the new loop clip.
         pendingDrumLoop = newLoop;
@@ -452,7 +450,7 @@ public class DrumTrack : MonoBehaviour
         StartCoroutine(WaitAndChangeDrumLoop());
     }
 
-    public AudioClip SelectDrumClip(DrumLoopPattern pattern)
+    private AudioClip SelectDrumClip(DrumLoopPattern pattern)
     {
         switch (pattern)
         {
@@ -568,17 +566,11 @@ public class DrumTrack : MonoBehaviour
                 Debug.LogError("DrumTrack: No AudioSource assigned!");
                 return;
             }
-
-//            Hazard.OnHazardHit += HandleHazardHit;
             StartCoroutine(InitializeDrumLoop()); // ✅ Ensure it loads properly
 
         }
     }
 
-    private void HandleHazardHit(Hazard hazard)
-    {
-    }
-    
     public void CauseRhythmGlitch()
     {
         Debug.Log("Triggering rhythm glitch!");
@@ -597,21 +589,6 @@ public class DrumTrack : MonoBehaviour
             if (explode != null)
             {
                 Debug.Log($"Forcing removal of exploded obstacle at {obstacle.transform.position}");
-                activeObstacles.RemoveAt(i);
-                Destroy(obstacle);
-            }
-        }
-    }
-    private void CleanupFloatingObstacles()
-    {
-        for (int i = activeObstacles.Count - 1; i >= 0; i--)
-        {
-            GameObject obstacle = activeObstacles[i];
-            Obstacle floatingObstacle = obstacle.GetComponent<Obstacle>();
-
-            if (floatingObstacle != null && floatingObstacle.looseTime >= floatingObstacle.looseEvolutionThreshold)
-            {
-                Debug.Log($"Removing floating obstacle at {floatingObstacle.transform.position}");
                 activeObstacles.RemoveAt(i);
                 Destroy(obstacle);
             }

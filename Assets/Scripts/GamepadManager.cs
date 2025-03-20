@@ -255,7 +255,6 @@ public class GamepadManager : MonoBehaviour
         InstrumentTrackController instrumentTrackController = FindFirstObjectByType<InstrumentTrackController>();
         DrumTrack drumTrack = FindFirstObjectByType<DrumTrack>();
         drumTrack.ManualStart();
-        instrumentTrackController.ManualStart();
         for (int i = 0; i < localPlayers.Count; i++)
         {
             localPlayers[i].Launch(drumTrack);

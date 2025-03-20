@@ -10,7 +10,7 @@ public class DrumLoopCollectable : MonoBehaviour
     public DrumTrack drumTrack;
     public AudioClip newDrumLoopClip;
     private bool collected = false;
-    
+    private InstrumentTrack track;
     
     [Header("Pulse Settings")]
     public int pulseEveryNSteps = 4;  // Pulse on every 4th step, for example
@@ -63,9 +63,10 @@ public class DrumLoopCollectable : MonoBehaviour
         transform.localScale = originalScale;
         isAnimating = false;
     }
-    public void SetDrumTrack(DrumTrack track)
+    public void SetTracks(DrumTrack drums)
     {
-        drumTrack = track;
+        drumTrack = drums;
+      //  track = selectedTrack;
         UpdateStarAppearance();
     }
     public void UpdateStarAppearance()
@@ -96,6 +97,8 @@ public class DrumLoopCollectable : MonoBehaviour
             yield return null;
         }
     }
+    
+    
     public void TriggerFinalBurst()
     {
         if (starBurstEffect != null)
