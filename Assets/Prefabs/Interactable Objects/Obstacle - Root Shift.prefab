@@ -118,7 +118,7 @@ GameObject:
   - component: {fileID: 2866961932351380823}
   - component: {fileID: 8668376557347016044}
   m_Layer: 0
-  m_Name: Obstacle
+  m_Name: Obstacle - Root Shift
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -165,14 +165,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00868c843009442dca5e83993027f2b5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridPosition: {x: 0, y: 0}
-  gridOrigin: {x: 0, y: 0}
-  cellSize: {x: 0, y: 0}
+  minedPrefabs:
+  - {fileID: 1781116594832268, guid: a426b36e8942047a997c45ffd0837e5d, type: 3}
+  debris: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d, type: 3}
+  strength: 100
+  maxStrength: 400
   looseTime: 0
   looseEvolutionThreshold: 10
   isLoose: 0
-  blackHolePrefab: {fileID: 1781116594832268, guid: 6ee1a749deedb7648a8431e8cb87e093,
-    type: 3}
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5

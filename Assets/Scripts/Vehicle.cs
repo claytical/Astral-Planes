@@ -117,7 +117,15 @@ public class Vehicle : MonoBehaviour
         audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
     }
 
-    public float GetForce()
+    public int GetForceAsDamage()
+    {
+        
+        float speed = rb.linearVelocity.sqrMagnitude;
+        float normalizedSpeed = Mathf.InverseLerp(0, terminalVelocity, speed);
+        return (int)Mathf.Lerp(0f, 100f, normalizedSpeed);
+    }
+
+    public float GetForceAsMidiVelocity()
     {
         
         float speed = rb.linearVelocity.sqrMagnitude;

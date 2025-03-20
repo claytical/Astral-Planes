@@ -7,24 +7,44 @@ using UnityEngine.SceneManagement;
 
 public class InstrumentTrackController : MonoBehaviour
 {
-    public List<NoteSet> assignedNoteSets; // 👈 Array of NoteSets
-
-    private InstrumentTrack activeTrack;
-    private int currentNoteSetIndex = 0; // 👈 Tracks which set is active
-    private HashSet<InstrumentTrack> usedInstrumentTracks = new HashSet<InstrumentTrack>();
-
-    // This list parallels instrumentTracks; each element is true when that track has completed its expansion.
-    
+    public InstrumentTrack[] tracks;
+    public InstrumentTrack activeTrack;
 
     void Start()
     {
-        Debug.Log($"InstrumentTrackController initialized. Assigned NoteSets: {assignedNoteSets.Count}");
             if (!GamepadManager.Instance.ReadyToPlay())
             {
                 return;
             }
     }
+    public void SetActiveTrack(InstrumentTrack newActiveTrack)
+    {
+        if (activeTrack == newActiveTrack)
+            return; // ✅ If it's already active, do nothing
 
+        // ✅ Remove old collectables before switching tracks
+        if (activeTrack != null)
+        {
+            activeTrack.RemoveAllCollectables();
+        }
+
+        activeTrack = newActiveTrack;
+        if (activeTrack.currentNoteSet != null)
+        {
+            activeTrack.SpawnCollectables(); // ✅ Spawn notes for the new active track
+        }
+    }
+    public InstrumentTrack GetRandomTrack()
+    {
+        return tracks[Random.Range(0, tracks.Length)];
+    }
+
+    public InstrumentTrack GetActiveTrack()
+    {
+        return activeTrack;
+    }
+
+/*
     public void ManualStart()
     {
         if (assignedNoteSets.Count == 0)
@@ -46,7 +66,8 @@ public class InstrumentTrackController : MonoBehaviour
         Debug.Log($"Starting first instrument track: {activeTrack.name}");
         activeTrack.SpawnCollectables();
     }
-    
+  
+
     public void TrackExpansionCompleted(InstrumentTrack completedTrack)
     {
         Debug.Log("Current Note Set: " + currentNoteSetIndex);
@@ -89,6 +110,8 @@ public class InstrumentTrackController : MonoBehaviour
         }
         return assignedNoteSets[currentNoteSetIndex];
     }
-    
+*/
+
+
 
 }

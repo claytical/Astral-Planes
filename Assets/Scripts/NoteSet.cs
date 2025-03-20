@@ -1,6 +1,8 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using Random = UnityEngine.Random;
 
 public enum NoteBehavior
 {
@@ -9,6 +11,14 @@ public enum NoteBehavior
     Harmony,    // Chord-based behavior
     Percussion, // Rhythm-based placement
     Drone       // Continuous background texture
+}
+public enum ChordPattern
+{
+    RootTriad,     // (C, E, G) - Basic triad
+    SeventhChord,  // (C, E, G, Bb) - Adds color
+    Fifths,        // (C, G) - Open sound
+    Sus4,          // (C, F, G) - Suspended, unresolved
+    Arpeggiated,   // (C, E, G, E) - Repeating movement
 }
 
 public enum ScaleType
@@ -77,53 +87,184 @@ public class WeightedDuration
 }
 public class NoteSet : MonoBehaviour
 {
+    public int rootMidi;             // e.g. 24 for C1
+    public int finalRootMidi;
+    public int? dominantNote;
+    public ScaleType scale;          // e.g. Major or Minor
+    public ChordPattern chordPattern = ChordPattern.RootTriad;
     public NoteBehavior noteBehavior;
+    public RhythmStyle rhythmStyle = RhythmStyle.FourOnTheFloor;
     public InstrumentTrack assignedInstrumentTrack; // ✅ Each NoteSet is now tied to an InstrumentTrack
+    
+    
     private List<int> allowedSteps = new List<int>(); // ✅ The valid spawn steps for notes
     private List<int> notes = new List<int>(); // ✅ List of possible note values
-    public RhythmStyle rhythmStyle = RhythmStyle.FourOnTheFloor;
-    public int rootMidi;             // e.g. 24 for C1
-    public ScaleType scale;          // e.g. Major or Minor
-    public int lowestNote;           // e.g. 12
-    public int highestNote;          // e.g. 60
-    public int? dominantNote;
-    public float dominantWeight = 2f;
-    public float dominantNoteFrequency = .7f;
-    public int allowedDuration = -1;
-    public int dropBackIndex = 0;
+    private int lowestNote;           // e.g. 12
+    private int highestNote;          // e.g. 60
+    private float dominantWeight = 2f;
 
     public void BuildNotesFromKey()
     {
-        notes.Clear(); // Clear out any old notes
+        notes.Clear();
         int[] pattern = ScalePatterns.Patterns[scale];
 
+        // Adjust the root note octave **and determine playable range**
+        int adjustedRootMidi = AdjustRootOctave(rootMidi);
+        int lowestNote = assignedInstrumentTrack.lowestAllowedNote; // Min range: 1 octave below root
+        int highestNote = assignedInstrumentTrack.highestAllowedNote; // Max range: 1 octave above root
+
+        // Ensure dominant note is within the range
+        if (dominantNote.HasValue)
+        {
+            dominantNote = Mathf.Clamp(dominantNote.Value, lowestNote, highestNote);
+        }
+        
         for (int pitch = lowestNote; pitch <= highestNote; pitch++)
         {
-            // Check if this pitch is in the scale
-            // e.g. if scalePattern contains ((pitch - rootMidi) mod 12)
-            int semitoneAboveRoot = (pitch - rootMidi) % 12;
+            int semitoneAboveRoot = (pitch - adjustedRootMidi) % 12;
             if (semitoneAboveRoot < 0) semitoneAboveRoot += 12;
 
             if (System.Array.IndexOf(pattern, semitoneAboveRoot) >= 0)
             {
-                // It's part of the scale, so add it
                 notes.Add(pitch);
-
-                // If it's the dominant note, add extra copies
-                if (dominantNote.HasValue && pitch == dominantNote.Value)
-                {
-                    int extraCopies = Mathf.RoundToInt(dominantWeight) - 1;
-                    for (int i = 0; i < extraCopies; i++)
-                    {
-                        notes.Add(pitch);
-                    }
-                }
+                Debug.Log($"✅ Added note: {pitch} (Adjusted Root: {adjustedRootMidi})");
             }
         }
 
-        // At this point, `notes` holds a “weighted” list of pitches that respect the key & range.
-        Debug.Log($"BuildNotesFromKey created {notes.Count} entries in the NoteSet.");
+        Debug.Log($"Generated {notes.Count} notes from adjusted root {adjustedRootMidi}.");
     }
+
+    private int AdjustRootOctave(int baseRoot)
+    {
+        int adjustedRoot = baseRoot;
+
+        // ✅ Ensure that currentNoteSet has an assigned track
+        if (assignedInstrumentTrack == null)
+        {
+            Debug.LogError($"AdjustRootOctave: No assigned InstrumentTrack for {name}");
+            return adjustedRoot; // Return original root if no track is assigned
+        }
+
+        int lowestAllowed = assignedInstrumentTrack.lowestAllowedNote;
+        int highestAllowed = assignedInstrumentTrack.highestAllowedNote;
+
+        // ✅ Apply octave shifts based on NoteBehavior
+        switch (noteBehavior)
+        {
+            case NoteBehavior.Bass:
+                adjustedRoot -= 12; // Shift down 1 octave
+                break;
+            case NoteBehavior.Lead:
+                adjustedRoot += 12; // Shift up 1 octave
+                break;
+            case NoteBehavior.Drone:
+                adjustedRoot -= 24; // Shift down 2 octaves
+                break;
+            default:
+                break; // Keep unchanged for Harmony & Percussion
+        }
+
+        // ✅ Clamp the adjusted root note within the instrument’s playable range
+        adjustedRoot = Mathf.Clamp(adjustedRoot, lowestAllowed, highestAllowed);
+
+        Debug.Log($"🎵 Adjusted root note: {adjustedRoot} (Range: {lowestAllowed} - {highestAllowed})");
+
+        return adjustedRoot;
+    }
+
+    public void RandomizeDominantNote()
+    {
+        dominantWeight = Random.Range(1.5f, 3.0f);
+    }
+    public List<int> GetChordNotes()
+    {
+        int root = rootMidi;
+        switch (chordPattern)
+        {
+            case ChordPattern.RootTriad:
+                return new List<int> { root, root + 4, root + 7 }; // Major triad (C, E, G)
+            case ChordPattern.SeventhChord:
+                return new List<int> { root, root + 4, root + 7, root + 10 }; // C7 (C, E, G, Bb)
+            case ChordPattern.Fifths:
+                return new List<int> { root, root + 7 }; // Open power chord (C, G)
+            case ChordPattern.Sus4:
+                return new List<int> { root, root + 5, root + 7 }; // Suspended chord (C, F, G)
+            case ChordPattern.Arpeggiated:
+                return new List<int> { root, root + 4, root + 7, root + 4 }; // Up and down
+            default:
+                return new List<int> { root, root + 4, root + 7 }; // Default to major triad
+        }
+    }
+    public int GetClosestVoiceLeadingNote(int currentNote, List<int> nextChordNotes)
+    {
+        return nextChordNotes.OrderBy(n => Mathf.Abs(n - currentNote)).First();
+    }
+    
+    public int GetNoteGridRow(int pitch, int totalRows)
+    {
+        if (assignedInstrumentTrack == null)
+        {
+            Debug.LogError("❌ GetNoteGridRow: No assigned InstrumentTrack!");
+            return 0;
+        }
+
+        int lowestNote = assignedInstrumentTrack.lowestAllowedNote;
+        int highestNote = assignedInstrumentTrack.highestAllowedNote;
+
+        if (lowestNote >= highestNote)
+        {
+            Debug.LogError($"❌ Invalid note range for {assignedInstrumentTrack.name}: {lowestNote} - {highestNote}");
+            return 0;
+        }
+
+        int totalNotes = highestNote - lowestNote + 1;
+        int pitchIndex = Mathf.Clamp(pitch - lowestNote, 0, totalNotes - 1);
+
+        // ✅ Scale pitch into the available rows correctly
+        float rowStep = (float)(totalRows - 1) / (totalNotes - 1);
+        int row = Mathf.RoundToInt(pitchIndex * rowStep); 
+
+        // ✅ Clamp to ensure valid row assignment
+        int finalRow = Mathf.Clamp(row, 0, totalRows - 1);
+    
+        Debug.Log($"🎵 GetNoteGridRow: Pitch {pitch} → Row {finalRow} (Range: {lowestNote}-{highestNote}, Grid Rows: {totalRows})");
+    
+        return finalRow;
+    }
+
+    public void AdvanceChord()
+    {
+        List<ChordPattern> allPatterns = Enum.GetValues(typeof(ChordPattern)).Cast<ChordPattern>().ToList();
+        int currentIndex = allPatterns.IndexOf(chordPattern);
+        chordPattern = allPatterns[(currentIndex + 1) % allPatterns.Count]; // Cycle through all chords
+
+        Debug.Log($"Chord progression updated: {chordPattern}");
+    }
+
+
+    public int GetNextArpeggiatedNote(int stepIndex)
+    {
+        if (notes.Count == 0)
+        {
+            Debug.LogError("❌ No notes available in NoteSet!");
+            return rootMidi; // Default to root note if empty
+        }
+
+        int note = notes[stepIndex % notes.Count];
+
+        // ✅ Ensure the note is within the instrument’s range
+        int lowestNote = assignedInstrumentTrack.lowestAllowedNote;
+        int highestNote = assignedInstrumentTrack.highestAllowedNote;
+        if (note < lowestNote || note > highestNote)
+        {
+            Debug.LogWarning($"❌ Selected note {note} out of range ({lowestNote} - {highestNote}). Clamping.");
+            note = Mathf.Clamp(note, lowestNote, highestNote);
+        }
+
+        Debug.Log($"🎹 Returning arpeggiated note {note} for step {stepIndex}");
+        return note;
+    }
+
     public void BuildAllowedStepsFromStyle(int totalSteps)
     {
         allowedSteps.Clear();

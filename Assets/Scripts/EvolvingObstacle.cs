@@ -10,8 +10,6 @@ public enum ObstacleState
 
 public class EvolvingObstacle : MonoBehaviour
 {
-    public GameObject explosionPrefab;
-    public GameObject debrisPrefab;
     public ParticleSystem particles;
     
     public GameObject obstaclePrefab; // ✅ Assign Block Obstacle Prefab in Inspector
@@ -23,6 +21,7 @@ public class EvolvingObstacle : MonoBehaviour
 
     public void SetDrumTrack(DrumTrack drums)
     {
+        Debug.Log($"Setting DrumTrack for EvolvingObstacle {gameObject.name}");
         drumTrack = drums;
     }
 
@@ -38,9 +37,20 @@ public class EvolvingObstacle : MonoBehaviour
         {
             obsScript.SetParentEvolvingObstacle(this); // ✅ Link to this EvolvingObstacle
             obsScript.SetDrumTrack(drumTrack);
+            drumTrack.spawnGrid.OccupyCell(gridPosition.x, gridPosition.y, GridObjectType.Obstacle);
+        }
+        DrumLoopCollectable collectable = spawnedObstacle.GetComponent<DrumLoopCollectable>();
+        if (collectable != null)
+        {
+            collectable.SetTracks(drumTrack);
+            Explode explode = spawnedObstacle.GetComponent<Explode>();
+            if (explode != null)
+            {
+                explode.Permanent();
+            }
         }
 
-        drumTrack.spawnGrid.OccupyCell(gridPosition.x, gridPosition.y, GridObjectType.Obstacle);
+
     }
 
     public void OnObstacleKnockedLoose()
@@ -49,18 +59,6 @@ public class EvolvingObstacle : MonoBehaviour
         drumTrack.spawnGrid.FreeCell(gridPosition.x, gridPosition.y);
         drumTrack.activeObstacles.Remove(gameObject);
         Destroy(gameObject); // ✅ Remove this EvolvingObstacle from the game
-    }
-    private void TriggerExplosion()
-    {
-        Instantiate(explosionPrefab, transform.position, Quaternion.identity);
-        
-        // Release physics objects (debris)
-        for (int i = 0; i < 5; i++)
-        {
-            GameObject debris = Instantiate(debrisPrefab, transform.position + (Vector3)UnityEngine.Random.insideUnitCircle * 0.5f, Quaternion.identity);
-            Rigidbody2D rb = debris.GetComponent<Rigidbody2D>();
-            if (rb) rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
-        }
     }
 
 }

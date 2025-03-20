@@ -90,6 +90,11 @@ public class SpawnGrid : MonoBehaviour
 
     public bool IsCellAvailable(int x, int y, NoteBehavior noteBehavior)
     {
+        if (gridCells == null)
+        {
+            Debug.LogError("SpawnGrid: GridCell is Null!");
+            return false;
+        }
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
         {
             Debug.Log($"Cell check out of bounds: {x}, {y}");
