@@ -919,7 +919,7 @@ PlayerSettings:
   webWasm2023: 0
   scriptingDefineSymbols:
     Android: CROSS_PLATFORM_INPUT;MOBILE_INPUT;IGNORE_ANDROID_SCREENSHOT;UseGooglePlayGamesPlugin
-    Standalone: CROSS_PLATFORM_INPUT
+    Standalone: CROSS_PLATFORM_INPUT;STEAMWORKS_NET
     Windows Store Apps: MOBILE_INPUT
     iPhone: CROSS_PLATFORM_INPUT;MOBILE_INPUT;IGNORE_IOS_SCREENSHOT;UseGameCenterPlugin
   additionalCompilerArguments: {}
