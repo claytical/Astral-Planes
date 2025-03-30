@@ -36,14 +36,13 @@ public class DrumTrack : MonoBehaviour
     public InstrumentTrackController trackController;
     public float startDspTime;
 
-    // Prefabs for different spawned objects:
-    public MineNodeSpawnerSet[] mineNodeSpawnerSets;
-    private int mineNodeSetIndex = 0;
-    private int mineSpawnTypeIndex = 0;
     private float loopLengthInSeconds;       // Duration of the loop.
     private SpawnGrid spawnGrid;
     private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
     private List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
+    private List<MineNode> mineNodes = new List<MineNode>();
+    private List<MinedObject> activeMinedObjects = new List<MinedObject>();
+
     private bool isInitialized = false;    
     private int progressionIndex = 0;
     private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
@@ -98,14 +97,84 @@ public class DrumTrack : MonoBehaviour
 
         if (drumLoopCollectablesCollected >= 4)
         {
-            //DO DRUMS
+            progressionManager.EvaluateProgression();
 
         }
+    }
+    public void RegisterMineNode(MineNode node)
+    {
+        if (!mineNodes.Contains(node))
+        {
+            mineNodes.Add(node);
+        }
+    }
+    public void RegisterMinedObject(MinedObject obj)
+    {
+        if (!activeMinedObjects.Contains(obj))
+        {
+            activeMinedObjects.Add(obj);
+        }
+    }
+
+    public void UnregisterMinedObject(MinedObject obj)
+    {
+        activeMinedObjects.Remove(obj);
+    }
+
+    public void UnregisterMineNode(MineNode node)
+    {
+        mineNodes.Remove(node);
     }
 
     public int GetSpawnGridHeight()
     {
         return spawnGrid.gridHeight;
+    }
+    public void ClearAllActiveMineNodes()
+    {
+        // Clear MineNodeSpawners
+        foreach (GameObject node in activeNodes.ToList())
+        {
+            if (node == null) continue;
+            Explode explode = node.GetComponent<Explode>();
+            if (explode != null) explode.DelayedExplosion(Random.Range(.2f,.5f));
+            else Destroy(node);
+        }
+        activeNodes.Clear();
+
+        // Clear MineNodes
+        foreach (MineNode node in mineNodes.ToList())
+        {
+            if (node == null) continue;
+            Explode explode = node.GetComponent<Explode>();
+            if (explode != null) explode.DelayedExplosion(Random.Range(.2f,.5f));
+            else Destroy(node.gameObject);
+        }
+        mineNodes.Clear();
+
+        // Clear MinedObjects (notes, modifiers, etc.)
+        foreach (MinedObject obj in activeMinedObjects.ToList())
+        {
+            if (obj == null) continue;
+            Destroy(obj.gameObject);
+        }
+        activeMinedObjects.Clear();
+
+        // Clear drum collectables
+        foreach (DrumLoopCollectable collectable in drumLoopCollectables.ToList())
+        {
+
+            if (collectable == null) continue;
+            Explode explode = collectable.GetComponent<Explode>();
+            if (explode != null) explode.DelayedExplosion(Random.Range(.2f,.5f));
+
+            Destroy(collectable.gameObject);
+        }
+        drumLoopCollectables.Clear();
+        drumLoopCollectablesCollected = 0;
+
+        // Reset grid
+        spawnGrid?.ClearAll();
     }
 
     public int GetSpawnGridWidth()
@@ -346,12 +415,13 @@ public class DrumTrack : MonoBehaviour
 
         if (drumLoopCollectablesCollected >= 4)
         {
+/*
             mineNodeSetIndex++;
             if (mineNodeSetIndex >= mineNodeSpawnerSets.Length)
             {
                 mineNodeSetIndex = 0;
             }
-
+*/
             PushToNextPlane();
             StartCoroutine(MergeAllCollectablesIntoCenter());
         }
@@ -467,8 +537,15 @@ public class DrumTrack : MonoBehaviour
         }
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
-        GameObject newNodeParent = Instantiate(mineNodeSpawnerSets[progressionManager.GetCurrentSetIndex()]
-            .GetMineNode(), spawnPosition, Quaternion.identity);
+        MineNodeSpawnerSet currentSet = progressionManager.GetCurrentSpawnerSet();
+
+        if (currentSet == null)
+        {
+            Debug.LogWarning("No current MineNodeSpawnerSet assigned.");
+            return;
+        }
+
+        GameObject newNodeParent = Instantiate(currentSet.GetMineNode(), spawnPosition, Quaternion.identity);
 
         MineNodeSpawner evolvingNode = newNodeParent.GetComponent<MineNodeSpawner>();
 
@@ -642,6 +719,10 @@ public class DrumTrack : MonoBehaviour
 
         progressionManager.OnMinedObjectCollected();
         progressionManager.TryAdvanceSet();
+    }
+    public void SetMineNodeSpawnerSet(MineNodeSpawnerSet set)
+    {
+        progressionManager.OverrideSpawnerSet(set);
     }
 
     private void CleanupExplodedMineNodes()

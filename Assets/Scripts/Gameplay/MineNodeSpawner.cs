@@ -24,11 +24,12 @@ public class MineNodeSpawner : MonoBehaviour
         Vector3 worldPos = drumTrack.GridToWorldPosition(gridPosition);
         spawnedNode = Instantiate(nodePrefab, worldPos, Quaternion.identity);
 
-        MineNode obsScript = spawnedNode.GetComponent<MineNode>();
-        if (obsScript != null)
+        MineNode nodeScript = spawnedNode.GetComponent<MineNode>();
+        drumTrack.RegisterMineNode(nodeScript);
+        if (nodeScript != null)
         {
-            obsScript.SetParentEvolvingObstacle(this);
-            obsScript.SetDrumTrack(drumTrack);
+            nodeScript.SetParentEvolvingObstacle(this);
+            nodeScript.SetDrumTrack(drumTrack);
             drumTrack.OccupySpawnGridCell(gridPosition.x, gridPosition.y, GridObjectType.Node);
         }
 

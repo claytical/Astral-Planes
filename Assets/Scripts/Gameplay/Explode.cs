@@ -49,18 +49,10 @@ public class Explode : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    public void Temporary(int spawnDelay)
+    public void DelayedExplosion(float delay = 0.1f)
     {
-        Debug.Log("Temporary Spawn Called!");
-        Instantiate(explosion, transform.position, Quaternion.identity);
-
-        // Hide the object
-        gameObject.SetActive(false);
-
-        // Schedule reactivation
-        Invoke("Reactivate", spawnDelay);
+        Invoke(nameof(Permanent), delay);
     }
-
     public void Permanent()
     {
         if (GetComponent<Vehicle>())
