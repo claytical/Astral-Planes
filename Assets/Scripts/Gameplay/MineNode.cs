@@ -16,7 +16,8 @@ public class MineNode : MonoBehaviour
     private bool spawnedObject = false;
     private Vector3 originalScale;
     private float maxScaleMultiplier = 4f; // ✅ Maximum growth scale
-    private float scaleGrowthDuration = 10f; // ✅ Time period for max scale up
+    private float minScaleFactor = 0.5f; //Minimum size of node
+    private float scaleGrowthDuration = 100f; // ✅ Time period for max scale up
     private float currentGrowthMultiplier = 1f; // ✅ Tracks how big it got before mined
 
     private void Start()
@@ -76,34 +77,46 @@ public class MineNode : MonoBehaviour
             Debug.Log($"Hit with {damageToNode}, strength now at {strength}");
 
             // ✅ Calculate scale relative to remaining strength
-            float scaleFactor = Mathf.Max(0.2f, ((float)strength / maxStrength) * maxScaleMultiplier);
+            float scaleFactor = Mathf.Max(minScaleFactor, ((float)strength / maxStrength) * maxScaleMultiplier);
             StartCoroutine(ScaleSmoothly(originalScale * scaleFactor, 0.1f));
 
-            if (strength <= 0 || transform.localScale.magnitude <= 0.05f)
+            if (strength <= 0 || transform.localScale.magnitude <= minScaleFactor * originalScale.magnitude)
             {
                 TriggerExplosion();
 
             }
         }
     }
-
+    void OnDestroy()
+    {
+        if (drumTrack != null)
+        {
+            drumTrack.UnregisterMineNode(this);
+        }
+    }
     private void TriggerExplosion()
     {
-        // ✅ Ensure explosion debris does not inherit obstacle's scale
-        GameObject explosion = Instantiate(debris, transform.position, Quaternion.identity);
+        Vector3 currentScale = transform.localScale;
 
-        // ✅ Release physics objects (debris) to knock the vehicle away
+        // Spawn debris chunks with reduced scale
         for (int i = 0; i < 5; i++)
         {
-            GameObject debrisChunk = Instantiate(debris, transform.position + (Vector3)UnityEngine.Random.insideUnitCircle * 0.5f, Quaternion.identity);
-            debrisChunk.transform.localScale = Vector3.one;
+            Vector3 spawnOffset = (Vector3)UnityEngine.Random.insideUnitCircle * 0.5f;
+            GameObject debrisChunk = Instantiate(debris, transform.position + spawnOffset, Quaternion.identity);
+
+            float debrisScaleFactor = 1f; // Adjust this to taste (30% of node size)
+            debrisChunk.transform.localScale = currentScale * debrisScaleFactor;
+
             Rigidbody2D rb = debrisChunk.GetComponent<Rigidbody2D>();
-            if (rb) rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
+            if (rb)
+            {
+                rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
+            }
         }
 
-        // ✅ Delay MinedObject activation to make sure it's visible after the explosion
         StartCoroutine(DelayedSpawnMinedObject(0.2f));
     }
+
 
     private IEnumerator DelayedSpawnMinedObject(float delay)
     {

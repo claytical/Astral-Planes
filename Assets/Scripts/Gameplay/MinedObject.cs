@@ -32,7 +32,6 @@ public class MinedObject : MonoBehaviour
   
     public InstrumentTrack assignedTrack;
     private NoteSet targetNoteSet;
-//    private DrumTrack drumTrack;
     private Collider2D minedCollider;
     private Vector3 originalScale;
     private float animationTime = 0.5f; // Used for animations like pulsing
@@ -46,9 +45,19 @@ public class MinedObject : MonoBehaviour
         }
         originalScale = transform.localScale;
         AssignVisuals();
-        
+        if (assignedTrack.drumTrack != null)
+        {
+            assignedTrack.drumTrack.RegisterMinedObject(this);        
+        }
     }
-    
+    void OnDestroy()
+    {
+        if (assignedTrack.drumTrack != null)
+        {
+            assignedTrack.drumTrack.UnregisterMinedObject(this);
+        }
+    }
+
     public static MinedObjectCategory GetCategory(MinedObjectType type) {
         switch(type) {
             case MinedObjectType.NoteSpawner: return MinedObjectCategory.NoteSpawner;

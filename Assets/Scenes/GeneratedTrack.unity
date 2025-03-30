@@ -330,6 +330,51 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &51606785
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 51606787}
+  - component: {fileID: 51606786}
+  m_Layer: 0
+  m_Name: Phase Debug Display
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &51606786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 51606785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d966e93db66a49938f11f061d1d1d85, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  progressionManager: {fileID: 1354683688}
+--- !u!4 &51606787
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 51606785}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &67942256
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1727,9 +1772,6 @@ MonoBehaviour:
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   startDspTime: 0
-  mineNodeSpawnerSets:
-  - {fileID: 1481789636809791906, guid: 44b1b98144ecc4c3aa8d23ddaf0284ea, type: 3}
-  - {fileID: 1481789636809791906, guid: 2b07118651f4041b0bc6b765d9c27cb2, type: 3}
   cornerPositions:
   - {x: -8, y: 4, z: 0}
   - {x: 8, y: 4, z: 0}
@@ -1918,6 +1960,7 @@ MonoBehaviour:
   requireLoopCount: 0
   totalMinedObjectsCollected: 0
   loopsCompleted: 0
+  phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -3394,3 +3437,4 @@ SceneRoots:
   - {fileID: 1354683683}
   - {fileID: 318370297}
   - {fileID: 2130912947}
+  - {fileID: 51606787}

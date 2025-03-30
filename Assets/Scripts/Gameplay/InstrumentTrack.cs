@@ -84,7 +84,6 @@ public class InstrumentTrack : MonoBehaviour
 
         if (globalStep != lastStep)
         {
-            Debug.Log($"[{gameObject.name}] Step changed: {lastStep} → {globalStep}");
             PlayLoopedNotes(globalStep);
             lastStep = globalStep;
         }
@@ -238,6 +237,10 @@ public class InstrumentTrack : MonoBehaviour
     {
         Debug.Log($"SpawnAntiNote called on {gameObject.name}");
         // TODO: Implement anti-note logic
+    }
+    public int GetNoteDensity()
+    {
+        return persistentLoopNotes.Count;
     }
 
     public NoteSet GetCurrentNoteSet()

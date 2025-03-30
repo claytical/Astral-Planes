@@ -1,4 +1,14 @@
 using UnityEngine;
+public enum SpawnerPhase
+{
+    Intro,
+    GrooveStart,
+    BeatDrop,
+    InstrumentChoice,
+    Reharmonize,
+    Spaceout,
+    Finale
+}
 
 public class MineNodeSpawnerSet : MonoBehaviour
 {

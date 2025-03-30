@@ -113,8 +113,8 @@ GameObject:
   m_Component:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 3706479320875781435}
-  - component: {fileID: 5564659581213000600}
   - component: {fileID: 8747843313378906591}
+  - component: {fileID: 4993008824631711877}
   m_Layer: 0
   m_Name: Debris
   m_TagString: Untagged
@@ -132,7 +132,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.1, y: 0.1, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3732494607500995976}
@@ -167,8 +167,25 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 4
---- !u!61 &5564659581213000600
-BoxCollider2D:
+--- !u!114 &8747843313378906591
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  explosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
+    type: 3}
+  respawnTimer: 0
+  lifetime: 5
+  randomizeLifetimer: 1
+--- !u!60 &4993008824631711877
+PolygonCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -177,7 +194,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 1914cc8b2c1cd4b9faf047b184179035, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -211,25 +228,15 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.7, y: 0.6}
-  m_EdgeRadius: 0
---- !u!114 &8747843313378906591
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  explosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
-    type: 3}
-  respawnTimer: 0
-  lifetime: 5
-  randomizeLifetimer: 1
+  m_Points:
+    m_Paths:
+    - - {x: -0.2, y: 0.4}
+      - {x: -0.45, y: 0}
+      - {x: -0.25, y: -0.4}
+      - {x: 0.25, y: -0.4}
+      - {x: 0.45, y: 0}
+      - {x: 0.2, y: 0.4}
+  m_UseDelaunayMesh: 0
 --- !u!1 &3878609629032989139
 GameObject:
   m_ObjectHideFlags: 0

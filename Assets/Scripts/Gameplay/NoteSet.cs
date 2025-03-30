@@ -127,7 +127,6 @@ public class NoteSet : MonoBehaviour
             if (System.Array.IndexOf(pattern, semitoneAboveRoot) >= 0)
             {
                 notes.Add(pitch);
-                Debug.Log($"✅ Added note: {pitch} (Adjusted Root: {adjustedRootMidi})");
             }
         }
 

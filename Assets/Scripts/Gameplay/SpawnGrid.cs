@@ -153,6 +153,22 @@ public class SpawnGrid : MonoBehaviour
 
         Debug.Log($"Cell {x}, {y} successfully freed.");
     }
+    public void ClearAll()
+    {
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                gridCells[x, y].isOccupied = false;
+                gridCells[x, y].objectType = GridObjectType.Empty;
+
+                // Optionally reset other cell state like visual effects, colors, or behavior
+                ResetCellBehavior(x, y); // Call this if you already use it elsewhere
+            }
+        }
+
+        Debug.Log("[SpawnGrid] Grid cleared.");
+    }
 
     public void ResetCellBehavior(int x, int y)
     {
