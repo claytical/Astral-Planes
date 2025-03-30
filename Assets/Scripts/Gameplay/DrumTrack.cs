@@ -11,15 +11,9 @@ public enum DrumLoopPattern
     Breakbeat,    // A section that jumps into the later part of the full loop (e.g., n - 3 to n)
     SlowDown   // A special short pattern for slowing down (e.g., perhaps n - 2 to n)
 }
-public enum ObstacleType
+public enum NodeType
 {
-    Standard,        // Default obstacle type
-    HeavyBlock,      // Large, slow-moving obstacles (Bass behavior)
-    FastProjectile,  // Small, fast-moving obstacles (Lead behavior)
-    WaveField,       // Pulsating barriers (Harmony behavior)
-    RhythmWall,      // Spawns in rhythm (Percussion behavior)
-    FloatingHazard,  // Slow, hovering obstacles (Drone behavior)
-    Hazard           // Dangerous, irregular obstacles (Breakbeat pattern)
+    Standard
 }
 
 public enum DrumLoopState
@@ -43,13 +37,12 @@ public class DrumTrack : MonoBehaviour
     public float startDspTime;
 
     // Prefabs for different spawned objects:
-    public EvolvingObstacleSet[] evolvingObstaclesSets;
-    private int evolvingObstaclesSetIndex = 0;
-    public GameObject[] obstaclePrefab;
-    private int obstacleSpawnTypeIndex = 0;
+    public MineNodeSpawnerSet[] mineNodeSpawnerSets;
+    private int mineNodeSetIndex = 0;
+    private int mineSpawnTypeIndex = 0;
     private float loopLengthInSeconds;       // Duration of the loop.
     private SpawnGrid spawnGrid;
-    private List<GameObject> activeObstacles = new List<GameObject>(); // Track spawned obstacles
+    private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
     private List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
     private bool isInitialized = false;    
     private int progressionIndex = 0;
@@ -64,6 +57,7 @@ public class DrumTrack : MonoBehaviour
     private int loopsRequiredBeforeEvolve = 2;
     private int drumLoopCollectablesCollected = 0;
     private bool isTransitioning = false;
+    private MineNodeProgressionManager progressionManager;
     public Vector3[] cornerPositions = new Vector3[] {
         new Vector3(-7f, 3f, 0f),  // Top-left
         new Vector3( 7f, 3f, 0f),  // Top-right
@@ -98,7 +92,7 @@ public class DrumTrack : MonoBehaviour
         {
             Debug.Log($"New Loop Started! Current Loop: {currentLoop}");
             lastLoopCount = currentLoop;
-            CleanupExplodedObstacles();
+            CleanupExplodedMineNodes();
             LoopRoutines();
         }
 
@@ -167,7 +161,7 @@ public class DrumTrack : MonoBehaviour
         }
     }
 
-    public Vector3 GetNextCornerPosition()
+    private Vector3 GetNextCornerPosition()
     {
         int index = drumLoopCollectablesCollected - 1; // ✅ Assign to next available corner
         if (index >= cornerPositions.Length) 
@@ -177,7 +171,7 @@ public class DrumTrack : MonoBehaviour
         return cornerPositions[index];
     }
 
-    public IEnumerator MergeAllCollectablesIntoCenter()
+    private IEnumerator MergeAllCollectablesIntoCenter()
     {
         Debug.Log("[DrumTrack] Merging collectables...");
 
@@ -210,9 +204,9 @@ public class DrumTrack : MonoBehaviour
         Debug.Log("[DrumTrack] Drum Loop Collectables reset and cleared.");
     }
 
-    public void RemoveActiveObstacle(GameObject obstacle)
+    public void RemoveActiveMineNode(GameObject node)
     {
-        activeObstacles.Remove(obstacle);
+        activeNodes.Remove(node);
 
     }
     public void RemoveDrumLoopCollectable(DrumLoopCollectable collectable)
@@ -245,7 +239,7 @@ public class DrumTrack : MonoBehaviour
         float loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
         return Mathf.Max(0, loopEndDsp - dspNow);
     }
-    private void ExplodeAllObstacles()
+    private void ExplodeAllMineNodes()
     {
         // Handle Hazards
         Hazard[] hazards = FindObjectsByType<Hazard>(FindObjectsSortMode.None);
@@ -267,8 +261,8 @@ public class DrumTrack : MonoBehaviour
         }
 
         // Handle Obstacles
-        var obstaclesCopy = activeObstacles.ToList();
-        foreach (GameObject obstacle in obstaclesCopy)
+        var nodeCopy = activeNodes.ToList();
+        foreach (GameObject obstacle in nodeCopy)
         {
             if (obstacle != null)
             {
@@ -295,7 +289,7 @@ public class DrumTrack : MonoBehaviour
                 }
             }
         }
-        activeObstacles.Clear();
+        activeNodes.Clear();
     }
 
     private void PushToNextPlane()
@@ -306,49 +300,32 @@ public class DrumTrack : MonoBehaviour
         wave.TriggerWave(Vector3.zero, timeRemaining);
         ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Full));
     }
-
-    private void ResetDrumLoopCollectables()
-    {
-        drumLoopCollectablesCollected = 0;
-        for (int i = drumLoopCollectables.Count - 1; i >= 0; i--)
-        {
-            DrumLoopCollectable dlc = drumLoopCollectables[i];
-            dlc.Remove();
-        }
-        drumLoopCollectables.Clear();
-    }
+    
     public int GetCurrentStep()
     {
         return currentStep;
     }
 
-    public void LoopRoutines()
+    private void LoopRoutines()
     {
-        CleanupInvalidObstacles(); // ✅ Remove invalid references
-        HandleFloatingObstacles(); // ✅ Separately process loose obstacles
-        HandleEvolvingObstacles(); // ✅ Process grid-based obstacles
-        Debug.Log("Spawning Obstacles...");
-        SpawnObstacle();
-        
-/*
-        obstacleSpawnTypeIndex++;
-        if (obstacleSpawnTypeIndex >= obstaclePrefab.Length)
-        {
-            obstacleSpawnTypeIndex = 0;
-        }
-  */
+        CleanupInvalidMineNodes(); // ✅ Remove invalid references
+        HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
+        HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
+        progressionManager.OnLoopCompleted();
+        Debug.Log("Spawning Nodes...");
+        SpawnMineNode();
     }
 
 
-    private void HandleEvolvingObstacles()
+    private void HandleEvolvingMineNodes()
     {
-        foreach (var obstacle in activeObstacles.ToList()) // ✅ Safe iteration
+        foreach (var node in activeNodes.ToList()) // ✅ Safe iteration
         {
-            Obstacle gridObstacle = obstacle.GetComponent<Obstacle>();
+            MineNode gridNode = node.GetComponent<MineNode>();
 
-            if (gridObstacle != null && !gridObstacle.isLoose) // ✅ Ensure it's still in the grid
+            if (gridNode != null && !gridNode.isLoose) // ✅ Ensure it's still in the grid
             {
-                gridObstacle.Age(); // ✅ Trigger standard obstacle behavior
+                gridNode.Age(); // ✅ Trigger standard obstacle behavior
             }
         }
     }
@@ -369,18 +346,13 @@ public class DrumTrack : MonoBehaviour
 
         if (drumLoopCollectablesCollected >= 4)
         {
-            Debug.Log($"Start Index: {evolvingObstaclesSetIndex}");
-            evolvingObstaclesSetIndex++;
-            Debug.Log($"Advance Index: {evolvingObstaclesSetIndex}");
-
-            if (evolvingObstaclesSetIndex >= evolvingObstaclesSets.Length)
+            mineNodeSetIndex++;
+            if (mineNodeSetIndex >= mineNodeSpawnerSets.Length)
             {
-                evolvingObstaclesSetIndex = 0;
+                mineNodeSetIndex = 0;
             }
 
             PushToNextPlane();
-            Debug.Log($"Current: {evolvingObstaclesSetIndex}");
-
             StartCoroutine(MergeAllCollectablesIntoCenter());
         }
     }
@@ -455,24 +427,24 @@ public class DrumTrack : MonoBehaviour
         return trimmedClip;
     }
 
-    public void RemoveObstacleAt(Vector2Int gridPos)
+    public void RemoveMineNodeAt(Vector2Int gridPos)
     {
-        GameObject obstacleToRemove = null;
+        GameObject nodeToRemove = null;
 
-        foreach (GameObject obstacle in activeObstacles)
+        foreach (GameObject node in activeNodes)
         {
-            if (WorldToGridPosition(obstacle.transform.position) == gridPos)
+            if (WorldToGridPosition(node.transform.position) == gridPos)
             {
-                obstacleToRemove = obstacle;
+                nodeToRemove = node;
                 break; // ✅ Stop after finding the first matching obstacle
             }
         }
 
-        if (obstacleToRemove != null)
+        if (nodeToRemove != null)
         {
             Debug.Log($"Removing obstacle at grid {gridPos}");
-            activeObstacles.Remove(obstacleToRemove);
-            Destroy(obstacleToRemove);
+            activeNodes.Remove(nodeToRemove);
+            Destroy(nodeToRemove);
 
             // ✅ Ensure the grid cell is freed after removal
             spawnGrid.FreeCell(gridPos.x, gridPos.y);
@@ -484,39 +456,40 @@ public class DrumTrack : MonoBehaviour
         }
     }
 
-    private void SpawnObstacle()
+    private void SpawnMineNode()
     {
-        Debug.Log($"Spawning obstacle at {WorldToGridPosition(transform.position)}");
+        Debug.Log($"Spawning mine node at {WorldToGridPosition(transform.position)}");
         Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
         if (spawnCell.x == -1)
         {
-            Debug.LogWarning("No available spawn cell for obstacle!");
+            Debug.LogWarning("No available spawn cell for mine node!");
             return;
         }
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
-        GameObject newObstacleParent = Instantiate(evolvingObstaclesSets[evolvingObstaclesSetIndex].GetEvolvingObstacle(), spawnPosition, Quaternion.identity);
+        GameObject newNodeParent = Instantiate(mineNodeSpawnerSets[progressionManager.GetCurrentSetIndex()]
+            .GetMineNode(), spawnPosition, Quaternion.identity);
 
-        EvolvingObstacle evolvingObstacle = newObstacleParent.GetComponent<EvolvingObstacle>();
+        MineNodeSpawner evolvingNode = newNodeParent.GetComponent<MineNodeSpawner>();
 
-        if (evolvingObstacle != null)
+        if (evolvingNode != null)
         {
-            evolvingObstacle.SetDrumTrack(this);
-            evolvingObstacle.SpawnObstacle(spawnCell); // ✅ Create the initial Block Obstacle
-            activeObstacles.Add(newObstacleParent);
-            spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Obstacle);
+            evolvingNode.SetDrumTrack(this);
+            evolvingNode.SpawnNode(spawnCell); // ✅ Create the initial Block Obstacle
+            activeNodes.Add(newNodeParent);
+            spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Node);
         }
     }
     
-    private void HandleFloatingObstacles()
+    private void HandleFloatingMineNodes()
     {
-        foreach (var obstacle in activeObstacles.ToList()) // ✅ Iterate safely
+        foreach (var node in activeNodes.ToList()) // ✅ Iterate safely
         {
-            Obstacle floatingObstacle = obstacle.GetComponent<Obstacle>();
+            MineNode floatingNode = node.GetComponent<MineNode>();
 
-            if (floatingObstacle != null && floatingObstacle.isLoose)
+            if (floatingNode != null && floatingNode.isLoose)
             {
-                floatingObstacle.Age(); // ✅ Ensure loose obstacles evolve on their own
+                floatingNode.Age(); // ✅ Ensure loose obstacles evolve on their own
             }
         }
     }
@@ -634,6 +607,8 @@ public class DrumTrack : MonoBehaviour
     void Start()
     {
         spawnGrid = GetComponent<SpawnGrid>();
+        progressionManager = GetComponent<MineNodeProgressionManager>();
+
         if (!GamepadManager.Instance.ReadyToPlay())
         {
             return;
@@ -653,53 +628,63 @@ public class DrumTrack : MonoBehaviour
         }
     }
 
-    public void CauseRhythmGlitch()
+    public void NotifyNoteCollected()
     {
-        Debug.Log("Triggering rhythm glitch!");
-        drumAudioSource.pitch = 1.5f;
-        Invoke(nameof(ResetDrumPitch), 1.5f);
-    }
-    private void CleanupExplodedObstacles()
-    {
-        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        if (progressionManager == null)
         {
-            GameObject obstacle = activeObstacles[i];
+            progressionManager = GetComponent<MineNodeProgressionManager>();
+            if (progressionManager == null)
+            {
+                Debug.LogError("❌ MineNodeProgressionManager is missing on DrumTrack GameObject.");
+                return;
+            }
+        }
 
-            if (obstacle == null) continue;
+        progressionManager.OnMinedObjectCollected();
+        progressionManager.TryAdvanceSet();
+    }
 
-            Explode explode = obstacle.GetComponent<Explode>();
+    private void CleanupExplodedMineNodes()
+    {
+        for (int i = activeNodes.Count - 1; i >= 0; i--)
+        {
+            GameObject node = activeNodes[i];
+
+            if (node == null) continue;
+
+            Explode explode = node.GetComponent<Explode>();
             if (explode != null)
             {
-                Debug.Log($"Forcing removal of exploded obstacle at {obstacle.transform.position}");
-                activeObstacles.RemoveAt(i);
-                Destroy(obstacle);
+                Debug.Log($"Forcing removal of exploded obstacle at {node.transform.position}");
+                activeNodes.RemoveAt(i);
+                Destroy(node);
             }
         }
     }
 
-    public void CleanupInvalidObstacles()
+    public void CleanupInvalidMineNodes()
     {
         Debug.Log("Checking for invalid obstacles...");
 
-        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        for (int i = activeNodes.Count - 1; i >= 0; i--)
         {
-            GameObject obstacle = activeObstacles[i];
+            GameObject node = activeNodes[i];
 
-            if (obstacle == null)
+            if (node == null)
             {
                 Debug.Log($"Removing null obstacle reference at index {i}");
-                activeObstacles.RemoveAt(i);
+                activeNodes.RemoveAt(i);
                 continue;
             }
 
-            if (obstacle.GetComponent<EvolvingObstacle>() == null)
+            if (node.GetComponent<MineNodeSpawner>() == null)
             {
-                Vector2Int gridPos = WorldToGridPosition(obstacle.transform.position);
-                Debug.Log($"Removing non-evolving obstacle at {gridPos}");
+                Vector2Int gridPos = WorldToGridPosition(node.transform.position);
+                Debug.Log($"Removing mine node spawner at {gridPos}");
 
-                activeObstacles.RemoveAt(i);
+                activeNodes.RemoveAt(i);
                 spawnGrid.FreeCell(gridPos.x, gridPos.y);
-                Destroy(obstacle);
+                Destroy(node);
             }
         }
     }

@@ -179,11 +179,6 @@ public class Vehicle : MonoBehaviour
         }
     }
 
-    public bool IsFlying()
-    {
-        return activeTrail != null && activeTrail.GetComponent<TrailRenderer>().emitting; // Returns true if the trail is emitting
-    }
-
     public void TurnOnBoost(float triggerValue)
     {
         if (energyLevel > 0 && !boosting)
@@ -234,9 +229,7 @@ public class Vehicle : MonoBehaviour
 
         UpdateEnergyUI();
         playerStats.RecordItemCollected();
-
-
-
+        
         var localPlayer = GetComponentInParent<LocalPlayer>();
         if (localPlayer != null)
         {
@@ -268,17 +261,6 @@ public class Vehicle : MonoBehaviour
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
         }
     }
-    public void ApplyControlDistortion()
-    {
-        float distortionChance = 0.3f; // ✅ 30% chance per frame for control interference
-        float inputDelay = Random.Range(0.05f, 0.2f); // ✅ Small input lag
-
-        if (Random.value < distortionChance)
-        {
-            StartCoroutine(DelayedInput(inputDelay));
-        }
-    }
-
     private IEnumerator DelayedInput(float delay)
     {
         isControlDistorted = true;
@@ -291,36 +273,22 @@ public class Vehicle : MonoBehaviour
 
         if (audioManager != null)
         {
-            Obstacle obstacle = coll.gameObject.GetComponent<Obstacle>();
-            if (obstacle != null)
+            MineNode node = coll.gameObject.GetComponent<MineNode>();
+            if (node != null)
             {
                 audioManager.PlaySound(collisionClip);
-                Rigidbody2D rb2 = obstacle.GetComponent<Rigidbody2D>();
+                Rigidbody2D rb2 = node.GetComponent<Rigidbody2D>();
                 if (rb2 != null)
                 {
                     rb2.bodyType = RigidbodyType2D.Dynamic;
                     rb2.gravityScale = Random.Range(-.02f, .02f);
                 }
             }            
-            /*
-            DrumLoopCollectable dlc = coll.gameObject.GetComponent<DrumLoopCollectable>();
-            if (dlc != null)
-            {
-                audioManager.PlaySound(collectedClip);
-            }
-            /*
-            Hazard hazard = coll.gameObject.GetComponent<Hazard>();
-            if (hazard != null)
-            {
-                audioManager.PlaySound(destroyClip);
-            }
-*/
         }
 
     }
     public void Explode()
     {
-
         if(GetComponent<Explode>())
         {
             GetComponent<Explode>().Permanent();

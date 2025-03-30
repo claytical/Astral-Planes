@@ -111,7 +111,7 @@ public class SpawnGrid : MonoBehaviour
     }
 
 
-    public void OccupyCell(int x, int y, GridObjectType type, ObstacleType obstacleType = ObstacleType.Standard)
+    public void OccupyCell(int x, int y, GridObjectType type, NodeType nodeType = NodeType.Standard)
     {
         // ✅ Ensure indices are within grid boundaries
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
@@ -128,7 +128,7 @@ public class SpawnGrid : MonoBehaviour
 
         gridCells[x, y].isOccupied = true;
         gridCells[x, y].objectType = type;
-        gridCells[x, y].obstacleType = obstacleType;
+        gridCells[x, y].nodeType = nodeType;
     }
 
     public void FreeCell(int x, int y)
@@ -149,7 +149,7 @@ public class SpawnGrid : MonoBehaviour
         // Mark the cell as available
         gridCells[x, y].isOccupied = false;
         gridCells[x, y].objectType = GridObjectType.Empty;
-        gridCells[x, y].obstacleType = null;
+        gridCells[x, y].nodeType = null;
 
         Debug.Log($"Cell {x}, {y} successfully freed.");
     }
@@ -254,13 +254,13 @@ public class GridCell
 {
     public bool isOccupied = false;
     public GridObjectType objectType;
-    public ObstacleType? obstacleType = null;
+    public NodeType? nodeType = null;
 }
 
 public enum GridObjectType
 {
     Note,
-    Obstacle,
+    Node,
     Empty,
     DrumCollectable
 }

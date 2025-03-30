@@ -1,17 +1,36 @@
 using UnityEngine;
 using System.Collections;
+public enum MinedObjectCategory {
+    NoteSpawner,
+    TrackUtility,
+    NoteModifier
+}
 
-public enum MinedObjectType { ChordChange, RootShift, NoteBehavior, RhythmStyle }
+public enum MinedObjectType
+{
+    // 🎼 Adds new content
+    NoteSpawner,
+
+    // 🛠 Structural utilities
+    TrackClear,
+    LoopExpansion,
+    AntiNoteSpawner,
+
+    // 🎨 NoteSet modifiers
+    ChordChange,
+    RootShift,
+    NoteBehaviorChange,
+    RhythmStyleChange
+}
 
 public class MinedObject : MonoBehaviour
 {
     public MinedObjectType minedObjectType;
-    public GameObject[] noteSetPrefab;
     public ParticleSystem visualEffect;
     public Material baseMaterial;
     public SpriteRenderer sprite;
   
-    private InstrumentTrack assignedTrack;
+    public InstrumentTrack assignedTrack;
     private NoteSet targetNoteSet;
 //    private DrumTrack drumTrack;
     private Collider2D minedCollider;
@@ -29,6 +48,19 @@ public class MinedObject : MonoBehaviour
         AssignVisuals();
         
     }
+    
+    public static MinedObjectCategory GetCategory(MinedObjectType type) {
+        switch(type) {
+            case MinedObjectType.NoteSpawner: return MinedObjectCategory.NoteSpawner;
+            case MinedObjectType.TrackClear:
+            case MinedObjectType.LoopExpansion:
+            case MinedObjectType.AntiNoteSpawner:
+                return MinedObjectCategory.TrackUtility;
+            default:
+                return MinedObjectCategory.NoteModifier;
+        }
+    }
+    
     public void EnableColliderAfterDelay(float delay)
     {
         StartCoroutine(EnableColliderCoroutine(delay));
@@ -44,23 +76,30 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-    public Color SetTracks(DrumTrack drums)
-    {
-        if (assignedTrack == null)
-        {
-            assignedTrack = drums.trackController.GetRandomTrack();
-            drums.trackController.SetActiveTrack(assignedTrack);
-// ✅ Create & Assign a new NoteSet
-            GameObject spawnedNoteSet = Instantiate(noteSetPrefab[0], transform.position, Quaternion.identity);
-            targetNoteSet = spawnedNoteSet.GetComponent<NoteSet>();
-            targetNoteSet.assignedInstrumentTrack = assignedTrack;
-            assignedTrack.SetCurrentNoteSet(targetNoteSet);
-            return assignedTrack.trackColor;
-        }
-        return Color.white;
-    }
-
     private void AssignVisuals()
+    {
+        MinedObjectCategory category = GetCategory(minedObjectType);
+
+        switch (category)
+        {
+            case MinedObjectCategory.NoteModifier:
+                AssignModifierVisuals();
+                break;
+
+            case MinedObjectCategory.TrackUtility:
+                AssignUtilityVisuals();
+                break;
+
+            case MinedObjectCategory.NoteSpawner:
+                AssignSpawnerVisuals();
+                break;
+
+            default:
+                Debug.LogWarning($"No visuals assigned for category {category}");
+                break;
+        }
+    }
+    private void AssignModifierVisuals()
     {
         switch (minedObjectType)
         {
@@ -70,13 +109,32 @@ public class MinedObject : MonoBehaviour
             case MinedObjectType.RootShift:
                 StartCoroutine(BounceEffect());
                 break;
-            case MinedObjectType.NoteBehavior:
+            case MinedObjectType.NoteBehaviorChange:
                 StartCoroutine(PulseEffect());
                 break;
-            case MinedObjectType.RhythmStyle:
+            case MinedObjectType.RhythmStyleChange:
                 StartCoroutine(PulseGlow());
                 break;
         }
+    }
+    private void AssignUtilityVisuals()
+    {
+        switch (minedObjectType)
+        {
+            case MinedObjectType.TrackClear:
+                StartCoroutine(FadeOutGlow());
+                break;
+            case MinedObjectType.LoopExpansion:
+                StartCoroutine(PulseExpand());
+                break;
+            case MinedObjectType.AntiNoteSpawner:
+                StartCoroutine(JitterEffect());
+                break;
+        }
+    }
+    private void AssignSpawnerVisuals()
+    {
+        StartCoroutine(GlowPulseLoop()); // universal for all NoteSpawner types
     }
 
     private IEnumerator RotateEffect()
@@ -119,37 +177,152 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-    public void ApplyEffect()
+public void ApplyEffect()
+{
+    if (assignedTrack == null)
     {
-        if (assignedTrack == null)
-        {
-            Debug.LogError($"{gameObject.name} has no assigned instrument track.");
-            return;
-        }
-        assignedTrack.RemoveAllCollectables();
-        assignedTrack.ResetTrackGridBehavior();
-       
-        
-        // ✅ Apply effect based on type
-        switch (minedObjectType)
-        {
-            case MinedObjectType.ChordChange:
-                targetNoteSet.AdvanceChord();
-                break;
-            case MinedObjectType.RootShift:
-                targetNoteSet.rootMidi += Random.Range(0, 2) == 0 ? -12 : 12;
-                break;
-            case MinedObjectType.NoteBehavior:
-                targetNoteSet.noteBehavior = (NoteBehavior)Random.Range(0, System.Enum.GetValues(typeof(NoteBehavior)).Length);
-                break;
-            case MinedObjectType.RhythmStyle:
-                targetNoteSet.rhythmStyle = (RhythmStyle)Random.Range(0, System.Enum.GetValues(typeof(RhythmStyle)).Length);
-                break;
-        }
-        assignedTrack.BuildNoteSet();
-        sprite.color = assignedTrack.trackColor;
-        assignedTrack.SpawnCollectables();
+        Debug.LogWarning($"{gameObject.name} - No track assigned.");
+        return;
     }
+
+    MinedObjectCategory category = GetCategory(minedObjectType);
+
+    switch (category)
+    {
+        case MinedObjectCategory.NoteSpawner:
+            NoteSpawnerMinedObject spawner = GetComponent<NoteSpawnerMinedObject>();
+            if (spawner != null)
+            {
+                spawner.OnCollected();
+            }
+            else
+            {
+                Debug.LogWarning("NoteSpawnerMinedObject missing from NoteSpawner.");
+            }
+            break;
+
+        case MinedObjectCategory.TrackUtility:
+            TrackUtilityMinedObject utility = GetComponent<TrackUtilityMinedObject>();
+            if (utility != null)
+            {
+                utility.OnCollected();
+            }
+            else
+            {
+                Debug.LogWarning("TrackUtilityMinedObject missing from TrackUtility item.");
+            }
+            break;
+
+        case MinedObjectCategory.NoteModifier:
+            NoteSet activeNoteSet = assignedTrack.GetCurrentNoteSet();
+            if (activeNoteSet == null)
+            {
+                Debug.LogWarning("No active NoteSet to modify.");
+                return;
+            }
+
+            switch (minedObjectType)
+            {
+                case MinedObjectType.ChordChange:
+                    activeNoteSet.AdvanceChord();
+                    break;
+
+                case MinedObjectType.RootShift:
+                    activeNoteSet.rootMidi += (Random.Range(0, 2) == 0) ? -12 : 12;
+                    break;
+
+                case MinedObjectType.NoteBehaviorChange:
+                    activeNoteSet.noteBehavior = GetRandomNoteBehavior();
+                    break;
+
+                case MinedObjectType.RhythmStyleChange:
+                    activeNoteSet.rhythmStyle = GetRandomRhythmStyle();
+                    break;
+
+                default:
+                    Debug.LogWarning("Unhandled NoteModifier type: " + minedObjectType);
+                    break;
+            }
+            break;
+
+        default:
+            Debug.LogWarning("Unknown MinedObjectCategory: " + category);
+            break;
+    }
+}
+
+private IEnumerator FadeOutGlow()
+{
+    SpriteRenderer sr = sprite;
+    Color original = sr.color;
+    float duration = 0.75f;
+
+    for (float t = 0f; t < duration; t += Time.deltaTime)
+    {
+        float alpha = Mathf.Lerp(original.a, 0f, t / duration);
+        sr.color = new Color(original.r, original.g, original.b, alpha);
+        yield return null;
+    }
+
+    sr.color = new Color(original.r, original.g, original.b, 0f);
+}
+private IEnumerator PulseExpand()
+{
+    float duration = 0.4f;
+    Vector3 start = transform.localScale;
+    Vector3 expanded = start * 1.4f;
+
+    for (float t = 0f; t < duration; t += Time.deltaTime)
+    {
+        float scale = Mathf.SmoothStep(1f, 1.4f, Mathf.Sin(t / duration * Mathf.PI));
+        transform.localScale = start * scale;
+        yield return null;
+    }
+
+    transform.localScale = start;
+}
+private IEnumerator JitterEffect()
+{
+    Vector3 originalPos = transform.localPosition;
+    float duration = 0.3f;
+    float magnitude = 0.05f;
+
+    for (float t = 0f; t < duration; t += Time.deltaTime)
+    {
+        float offsetX = Random.Range(-magnitude, magnitude);
+        float offsetY = Random.Range(-magnitude, magnitude);
+        transform.localPosition = originalPos + new Vector3(offsetX, offsetY, 0);
+        yield return null;
+    }
+
+    transform.localPosition = originalPos;
+}
+private IEnumerator GlowPulseLoop()
+{
+    SpriteRenderer sr = sprite;
+    float duration = 1f;
+    float pulseSpeed = 2f;
+
+    while (true)
+    {
+        float pulse = (Mathf.Sin(Time.time * pulseSpeed) + 1f) / 2f; // 0–1
+        float alpha = Mathf.Lerp(0.5f, 1f, pulse);
+        sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, alpha);
+        yield return null;
+    }
+}
+
+private NoteBehavior GetRandomNoteBehavior()
+{
+    var values = System.Enum.GetValues(typeof(NoteBehavior));
+    return (NoteBehavior)values.GetValue(Random.Range(0, values.Length));
+}
+
+private RhythmStyle GetRandomRhythmStyle()
+{
+    var values = System.Enum.GetValues(typeof(RhythmStyle));
+    return (RhythmStyle)values.GetValue(Random.Range(0, values.Length));
+}
 
 
     private void OnTriggerEnter2D(Collider2D coll)

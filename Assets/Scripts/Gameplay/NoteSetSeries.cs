@@ -30,6 +30,7 @@ public class NoteSetSeries : ScriptableObject
         }
 
         int index = Random.Range(0, curatedNoteSets.Count);
+        Debug.Log($"Choosing note set at index {index}");
         return curatedNoteSets[index];
     }
 }
