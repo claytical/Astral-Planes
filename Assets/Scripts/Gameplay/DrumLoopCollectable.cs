@@ -63,10 +63,9 @@ public class DrumLoopCollectable : MonoBehaviour
         transform.localScale = originalScale;
         isAnimating = false;
     }
-    public void SetTracks(DrumTrack drums)
+    public void SetDrums(DrumTrack drums)
     {
         drumTrack = drums;
-      //  track = selectedTrack;
         UpdateStarAppearance();
     }
     public void UpdateStarAppearance()
@@ -78,7 +77,7 @@ public class DrumLoopCollectable : MonoBehaviour
         }
     }
 
-    public void Collect()
+    private void Collect()
     {
         if (!collected)
         {
@@ -124,25 +123,7 @@ public class DrumLoopCollectable : MonoBehaviour
         }
         Destroy(gameObject);
     }
-
-
-    public void Remove()
-    {
-        if (drumTrack != null)
-        {
-            Vector2Int gridPos = drumTrack.WorldToGridPosition(transform.position);
-            drumTrack.RemoveObstacleAt(gridPos);
-        }
-        Explode explode = GetComponent<Explode>();
-        if (explode != null)
-        {
-            explode.Permanent();
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+    
 
     private void OnTriggerEnter2D(Collider2D coll)
     {

@@ -64,7 +64,7 @@ public static class RhythmPatterns
     public static readonly Dictionary<RhythmStyle, RhythmPattern> Patterns =
         new Dictionary<RhythmStyle, RhythmPattern>
         {
-            { RhythmStyle.FourOnTheFloor, new RhythmPattern { Offsets = new [] {0, 4, 8, 12}, DurationMultiplier = 1f, LoopMultiplier = 2 } },
+            { RhythmStyle.FourOnTheFloor, new RhythmPattern { Offsets = new [] {0, 4, 8, 12}, DurationMultiplier = 1f, LoopMultiplier = 1 } },
             { RhythmStyle.Syncopated,     new RhythmPattern { Offsets = new [] {2, 3, 6, 7, 10, 11, 14, 15}, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
             { RhythmStyle.Swing,          new RhythmPattern { Offsets = new [] {0, 3, 4, 7, 8, 11, 12, 15}, DurationMultiplier = 1f, LoopMultiplier = 1 } },
             { RhythmStyle.Sparse,         new RhythmPattern { Offsets = new [] {0, 8}, DurationMultiplier = 2f, LoopMultiplier = 2 } },
@@ -171,6 +171,19 @@ public class NoteSet : MonoBehaviour
 
         return adjustedRoot;
     }
+    public void Initialize(int totalSteps)
+    {
+        if (assignedInstrumentTrack == null)
+        {
+            Debug.LogError($"❌ NoteSet '{name}' is missing an assignedInstrumentTrack during Initialize.");
+            return;
+        }
+
+        BuildNotesFromKey();
+        BuildAllowedStepsFromStyle(totalSteps);
+
+        Debug.Log($"✅ Initialized NoteSet '{name}' for track '{assignedInstrumentTrack.name}' with {notes.Count} notes and {allowedSteps.Count} steps.");
+    }
 
     public void RandomizeDominantNote()
     {
@@ -267,10 +280,23 @@ public class NoteSet : MonoBehaviour
 
     public void BuildAllowedStepsFromStyle(int totalSteps)
     {
+        Debug.Log($"NoteSet '{name}' building allowed steps for style {rhythmStyle} over {totalSteps} steps.");
+
         allowedSteps.Clear();
 
         // Retrieve the extended pattern for the chosen style.
         RhythmPattern pattern = RhythmPatterns.Patterns[rhythmStyle];
+        if (pattern == null)
+        {
+            Debug.LogError($"❌ RhythmPattern not found for style {rhythmStyle}");
+            return;
+        }
+
+        if (pattern.Offsets == null || pattern.Offsets.Count() == 0)
+        {
+            Debug.LogError($"❌ RhythmPattern '{rhythmStyle}' has no offsets defined.");
+            return;
+        }
 
         // Adjust totalSteps if you want to double (or otherwise scale) the loop length.
         int effectiveTotalSteps = totalSteps * pattern.LoopMultiplier;

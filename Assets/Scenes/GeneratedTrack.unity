@@ -655,13 +655,14 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  assignedRole: 0
   lowestAllowedNote: 24
-  highestAllowedNote: 48
+  highestAllowedNote: 40
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 34
+  preset: 32
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -900,6 +901,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  assignedRole: 1
   lowestAllowedNote: 54
   highestAllowedNote: 78
   controller: {fileID: 1354683684}
@@ -936,7 +938,7 @@ GameObject:
   - component: {fileID: 652946507}
   - component: {fileID: 652946508}
   m_Layer: 0
-  m_Name: Texture
+  m_Name: Groove
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -973,13 +975,14 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  assignedRole: 6
   lowestAllowedNote: 24
   highestAllowedNote: 54
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 4
-  preset: 54
+  preset: 88
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -1684,6 +1687,7 @@ GameObject:
   - component: {fileID: 1354683684}
   - component: {fileID: 1354683686}
   - component: {fileID: 1354683685}
+  - component: {fileID: 1354683688}
   m_Layer: 0
   m_Name: Tracks
   m_TagString: Untagged
@@ -1723,14 +1727,9 @@ MonoBehaviour:
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   startDspTime: 0
-  evolvingObstaclesSets:
+  mineNodeSpawnerSets:
   - {fileID: 1481789636809791906, guid: 44b1b98144ecc4c3aa8d23ddaf0284ea, type: 3}
-  - {fileID: 1481789636809791906, guid: 9439ba279089346cb8205df6c5218e88, type: 3}
-  obstaclePrefab:
-  - {fileID: 1781116594832268, guid: 930b3edf619309f4b9e970a0703f3968, type: 3}
-  - {fileID: 1781116594832268, guid: 14191be373ab6410d8fb5d91a3bf0617, type: 3}
-  - {fileID: 1781116594832268, guid: c4f84dc77cd234674b7865434d7a4874, type: 3}
-  - {fileID: 1781116594832268, guid: 739269a2d584b4d32a8384d55cea85fb, type: 3}
+  - {fileID: 1481789636809791906, guid: 2b07118651f4041b0bc6b765d9c27cb2, type: 3}
   cornerPositions:
   - {x: -8, y: 4, z: 0}
   - {x: 8, y: 4, z: 0}
@@ -1901,6 +1900,24 @@ MonoBehaviour:
   gridWidth: 16
   gridHeight: 12
   cellSize: 1
+--- !u!114 &1354683688
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36dd79ade9e1040efa29d9ec25d71669, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  currentSetIndex: 0
+  requiredNotesPerTrack: 6
+  minimumLoopCount: 0
+  requireLoopCount: 0
+  totalMinedObjectsCollected: 0
+  loopsCompleted: 0
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -2853,6 +2870,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  assignedRole: 5
   lowestAllowedNote: 60
   highestAllowedNote: 84
   controller: {fileID: 1354683684}

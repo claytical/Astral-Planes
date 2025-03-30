@@ -10,6 +10,8 @@ public class InstrumentTrackController : MonoBehaviour
     public InstrumentTrack[] tracks;
     public InstrumentTrack activeTrack;
     public NoteVisualizer noteVisualizer;
+    
+
     void Start()
     {
             if (!GamepadManager.Instance.ReadyToPlay())
@@ -26,23 +28,20 @@ public class InstrumentTrackController : MonoBehaviour
     {
         noteVisualizer.DisplayNotes(tracks.ToList());
     }
-    public void SetActiveTrack(InstrumentTrack newActiveTrack)
+
+    public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
-        if (activeTrack == newActiveTrack)
-            return; // ✅ If it's already active, do nothing
-
-        // ✅ Remove old collectables before switching tracks
-        if (activeTrack != null)
-        {
-            activeTrack.RemoveAllCollectables();
-        }
-
-        activeTrack = newActiveTrack;
-        if (activeTrack.HasNoteSet())
-        {
-            activeTrack.SpawnCollectables(); // ✅ Spawn notes for the new active track
-        }
+        return tracks.FirstOrDefault(t => t.assignedRole == role);
     }
+
+    public InstrumentTrack FindRandomTrackByRole(MusicalRole role)
+    {
+        var matching = tracks.Where(t => t.assignedRole == role).ToList();
+        Debug.Log($"Found {matching.Count} matching tracks");
+        if (matching.Count == 0) return null;
+        return matching[Random.Range(0, matching.Count)];
+    }
+
     public InstrumentTrack GetRandomTrack()
     {
         return tracks[Random.Range(0, tracks.Length)];

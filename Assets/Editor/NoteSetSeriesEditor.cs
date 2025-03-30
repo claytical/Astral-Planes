@@ -13,7 +13,7 @@ public class NoteSetSeriesEditor : Editor
         EditorGUILayout.Space();
 
         series.label = EditorGUILayout.TextField("Label", series.label);
-        series.noteBehavior = (NoteBehavior)EditorGUILayout.EnumPopup("Note Behavior", series.noteBehavior);
+        series.role = (MusicalRole)EditorGUILayout.EnumPopup("Musical Role", series.role);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Curated Note Sets", EditorStyles.boldLabel);
