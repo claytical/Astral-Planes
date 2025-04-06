@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Bass - Evolve
+  m_EditorClassIdentifier: 
+  label: Establish
+  role: 0
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: e9f5315f219fd4376a48a91ca7dff5ee, type: 3}
+  - {fileID: 8509760657121421808, guid: bf4fadf6e124e4121a5efd25ab1fb1d8, type: 3}
+  - {fileID: 8509760657121421808, guid: 0f7b7caa365ba4b259790d5417fcc414, type: 3}
+  - {fileID: 8509760657121421808, guid: 0cdf6bc77cfd644a1943bc09e9d705e0, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

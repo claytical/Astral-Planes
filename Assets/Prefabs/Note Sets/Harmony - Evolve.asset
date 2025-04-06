@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Harmony - Evolve
+  m_EditorClassIdentifier: 
+  label: Evolve
+  role: 1
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: cd5b096cc19614db8ae6cad161e95737, type: 3}
+  - {fileID: 8509760657121421808, guid: 53c50d47f652447a29ce5f62c025566b, type: 3}
+  - {fileID: 8509760657121421808, guid: 7783513c74ae44e14b92e25f7c370d9d, type: 3}
+  - {fileID: 8509760657121421808, guid: 623ae2267964e4acc9ab517113992a4a, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

@@ -29,14 +29,12 @@ public class Damage : MonoBehaviour
 
     public void SetHP(Vehicle vehicle)
     {
-        Debug.Log("Setting HP for " + vehicle.name);
-        maxHP = vehicle.maxHP;
-        for (int i = 0; i < vehicle.maxHP; i++)
+        for (int i = 0; i < vehicle.capacity; i++)
         {
             GameObject container = Instantiate(unitForGauge, gauge);
         }
 
-        for (int i = 0; i < vehicle.currentHP; i++)
+        for (int i = 0; i < vehicle.energyLevel; i++)
         {
             GameObject hpUnit = Instantiate(hp, hpLeft);
         }

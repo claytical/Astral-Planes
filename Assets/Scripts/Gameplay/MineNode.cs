@@ -112,6 +112,7 @@ public class MineNode : MonoBehaviour
             {
                 rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
             }
+            Destroy(debrisChunk, 3f); // 💥 Auto-destroy debris after 3 seconds
         }
 
         StartCoroutine(DelayedSpawnMinedObject(0.2f));
@@ -168,11 +169,15 @@ public class MineNode : MonoBehaviour
         if (spawnedObject) return;
 
         int rewardIndex = Mathf.FloorToInt((currentGrowthMultiplier / maxScaleMultiplier) * (minedPrefabs.Length - 1));
-        GameObject chosenPrefab = minedPrefabs[rewardIndex];
-
+//        GameObject chosenPrefab = minedPrefabs[rewardIndex];
+        GameObject chosenPrefab = minedPrefabs[Random.Range(0, minedPrefabs.Length)];
         GameObject go = Instantiate(chosenPrefab, transform.position, Quaternion.identity);
         MinedObject minedObject = go.GetComponent<MinedObject>();
-
+        Debug.Log($"Spawned mined prefab: {go.name}");
+        foreach (var comp in go.GetComponents<MonoBehaviour>())
+        {
+            Debug.Log($"  → Component: {comp.GetType().Name}");
+        }
         if (minedObject != null)
         {
             // ✅ Handle NoteSpawnerMinedObject logic
@@ -196,8 +201,13 @@ public class MineNode : MonoBehaviour
                 InstrumentTrack track = drumTrack.trackController.FindTrackByRole(utilityItem.targetRole);
                 if (track != null)
                 {
+                    Debug.Log($"Assigning track {track.assignedRole} to utility item {go.name}");
                     utilityItem.Initialize(track);
                     minedObject.sprite.color = track.trackColor;
+                }
+                else
+                {
+                    Debug.LogWarning($"❌ No track found for role: {utilityItem.targetRole}");
                 }
             }
 

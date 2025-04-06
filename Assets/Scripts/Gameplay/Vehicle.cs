@@ -4,8 +4,11 @@ using System.Collections;
 public class Vehicle : MonoBehaviour
 {
 
-    public int currentHP;
-    public int maxHP;
+//    public int currentHP;
+//    public int maxHP;
+    public float capacity = 10f;
+    //public float energyCollected;
+    public float energyLevel;
 
     public float force = 10f;
     public float terminalVelocity = 20f;
@@ -30,9 +33,6 @@ public class Vehicle : MonoBehaviour
 
     
     private bool isControlDistorted;
-    public float capacity = 10f;
-    //public float energyCollected;
-    public float energyLevel;
     private Vector2 driftDirection;
 
     public PlayerStats playerStatsUI; // Reference to the PlayerStats UI element

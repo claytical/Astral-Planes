@@ -32,15 +32,6 @@ public class MineNodeSpawner : MonoBehaviour
             nodeScript.SetDrumTrack(drumTrack);
             drumTrack.OccupySpawnGridCell(gridPosition.x, gridPosition.y, GridObjectType.Node);
         }
-
-        // Handle drum loop collectables
-        DrumLoopCollectable collectable = spawnedNode.GetComponent<DrumLoopCollectable>();
-        if (collectable != null)
-        {
-            collectable.SetDrums(drumTrack);
-            Explode explode = spawnedNode.GetComponent<Explode>();
-            if (explode != null) explode.Permanent();
-        }
         
     }
 

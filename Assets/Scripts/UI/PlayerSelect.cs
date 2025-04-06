@@ -7,7 +7,6 @@ using TMPro;
 public class PlayerSelect : MonoBehaviour
 {
     public Image planeIcon;
-    public HP hp;
     public Fuel fuel;
     public Color[] planeColors;
     public GameObject controlsAndStats;
@@ -46,11 +45,6 @@ public class PlayerSelect : MonoBehaviour
 
     public void SetStats(Vehicle vehicle)
     {
-        foreach (Transform child in hp.hpLeft.transform)
-        {
-            Destroy(child.gameObject);
-        }
-
         foreach (Transform child in fuel.tank)
         {
             Destroy(child.gameObject);
@@ -59,7 +53,6 @@ public class PlayerSelect : MonoBehaviour
         // Set fuel capacity based on vehicle's capabilities, if available
         int fuelCapacity = vehicle.capacity > 0 ? (int)vehicle.capacity : 50;
         fuel.FillTank(fuelCapacity);
-        hp.SetHPUI(vehicle.currentHP);
     }
 
     public void SetVehicleIconColor(Color color)

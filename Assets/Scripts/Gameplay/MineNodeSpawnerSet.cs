@@ -1,13 +1,12 @@
 using UnityEngine;
 public enum SpawnerPhase
 {
-    Intro,
-    GrooveStart,
-    BeatDrop,
-    InstrumentChoice,
-    Reharmonize,
-    Spaceout,
-    Finale
+    Establish,     // replaces Intro, GrooveStart
+    Evolve,        // replaces InstrumentChoice, Reharmonize
+    Intensify,     // replaces Buildup
+    Release,       // replaces GrooveDrop, Finale
+    WildCard,       // replaces Experimental
+    Pop
 }
 
 public class MineNodeSpawnerSet : MonoBehaviour
@@ -17,14 +16,8 @@ public class MineNodeSpawnerSet : MonoBehaviour
 
     public GameObject GetMineNode()
     {
-        GameObject go = mineNodes[mineNodeIndex];
-        Debug.Log($"Mining node {mineNodeIndex} at {transform.position}  {go.name}");
-        mineNodeIndex++;
-        if (mineNodeIndex >= mineNodes.Length)
-        {
-            mineNodeIndex = 0;
-        }
-        return go;
+        int index = Random.Range(0, mineNodes.Length);
+        return mineNodes[index];
     }
     
 }

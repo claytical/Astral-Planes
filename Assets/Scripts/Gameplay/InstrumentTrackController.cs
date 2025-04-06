@@ -1,9 +1,11 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using Unity.Loading;
 using UnityEngine.SceneManagement;
+using Random = UnityEngine.Random;
 
 public class InstrumentTrackController : MonoBehaviour
 {
@@ -26,13 +28,63 @@ public class InstrumentTrackController : MonoBehaviour
 
     public void UpdateVisualizer()
     {
-        noteVisualizer.DisplayNotes(tracks.ToList());
+       // noteVisualizer.DisplayNotes(tracks.ToList());
     }
 
     public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         return tracks.FirstOrDefault(t => t.assignedRole == role);
     }
+    public void PruneSparseTracks(int threshold = 1)
+    {
+        foreach (var track in tracks.Where(t => t.CollectedNotesCount <= threshold))
+        {
+            track.ClearLoopedNotes();
+        }
+    }
+    public void ReassignNoteBehaviorsForPhase(SpawnerPhase phase)
+    {
+        foreach (var track in tracks)
+        {
+            var noteSet = track.GetCurrentNoteSet();
+            if (noteSet == null) continue;
+
+            switch (phase)
+            {
+                case SpawnerPhase.Establish:
+                    noteSet.noteBehavior = ChooseFrom(NoteBehavior.Bass, NoteBehavior.Drone, NoteBehavior.Harmony);
+                    break;
+                case SpawnerPhase.Evolve:
+                    noteSet.noteBehavior = ChooseFrom(NoteBehavior.Harmony, NoteBehavior.Lead);
+                    break;
+                case SpawnerPhase.Intensify:
+                    noteSet.noteBehavior = ChooseFrom(NoteBehavior.Percussion, NoteBehavior.Lead);
+                    break;
+                case SpawnerPhase.Release:
+                    noteSet.noteBehavior = ChooseFrom(NoteBehavior.Drone, NoteBehavior.Harmony);
+                    break;
+                case SpawnerPhase.WildCard:
+                    noteSet.noteBehavior = ChooseRandomBehavior();
+                    break;
+                case SpawnerPhase.Pop:
+                    noteSet.noteBehavior = ChooseFrom(NoteBehavior.Bass, NoteBehavior.Harmony, NoteBehavior.Lead);
+                    break;
+            }
+        }
+    }
+
+    private NoteBehavior ChooseFrom(params NoteBehavior[] options)
+    {
+        return options[UnityEngine.Random.Range(0, options.Length)];
+    }
+
+    private NoteBehavior ChooseRandomBehavior()
+    {
+        var values = Enum.GetValues(typeof(NoteBehavior));
+        return (NoteBehavior)values.GetValue(UnityEngine.Random.Range(0, values.Length));
+    }
+
+
 
     public InstrumentTrack FindRandomTrackByRole(MusicalRole role)
     {

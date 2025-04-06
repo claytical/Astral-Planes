@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Harmony - Intensify
+  m_EditorClassIdentifier: 
+  label: Intensify
+  role: 1
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: 6986554cc39b24c04a8ddcfdb1f45239, type: 3}
+  - {fileID: 8509760657121421808, guid: 8a06bba5c3bfc4ae78379934babefee8, type: 3}
+  - {fileID: 8509760657121421808, guid: 1de749e8b589543b593e4f3fea3725f4, type: 3}
+  - {fileID: 8509760657121421808, guid: bb6d9e41653204b3a85565fbde200e81, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

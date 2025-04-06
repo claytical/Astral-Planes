@@ -4,38 +4,66 @@ using UnityEngine;
 
 public class DrumLoopCollectable : MonoBehaviour
 {
-    public enum EvolutionStage { Sparse, Basic, Flourish, Breakbeat }
-    public EvolutionStage currentStage = EvolutionStage.Sparse;
+    public DrumLoopPattern pattern;
+    public float timeToLive = 6f;
     private int loopAge = 0; // Tracks number of drum loops since spawn
-    public DrumTrack drumTrack;
-    public AudioClip newDrumLoopClip;
+    private DrumTrack drumTrack;
+    private AudioClip newDrumLoopClip;
     private bool collected = false;
     private InstrumentTrack track;
+    private float spawnTime;
+    private bool expired = false;
     
     [Header("Pulse Settings")]
     public int pulseEveryNSteps = 4;  // Pulse on every 4th step, for example
     public float baseScaleMultiplier = 1.3f;  // How big the pulse gets
     public float pulseDuration = 0.15f;   // How quickly it scales in/out
+    public float pulseSpeed = 1.5f;
+    public float maxPulseScale = 1.2f;
+
+    [Header("Star Layers")]
+    public SpriteRenderer baseRenderer;    // Outer diamond
+    public SpriteRenderer overlayRenderer; // Inner highlight
     [Header("Visual Effects")]
     public ParticleSystem starBurstEffect; // ✅ Assign in Inspector
-    public Color[] starColors; // ✅ Assign a gradient for progression (Star 1 → Star 4)
-    private SpriteRenderer spriteRenderer;
     private int lastStep = -1;
     private bool isAnimating = false;
     private Vector3 originalScale;
-    
-    void Update()
+    private float pulseTimer = 0f;
+    void Start()
     {
-        if (collected && drumTrack != null)
+        spawnTime = Time.time;
+    }
+    
+    void HandleExpiration()
+    {
+        if (Time.time - spawnTime > timeToLive && !collected)
         {
-            int currentStep = drumTrack.GetCurrentStep();
-
-            if (currentStep != lastStep && currentStep % pulseEveryNSteps == 0)
+            Debug.Log($"[DrumLoopCollectable] Expired: {gameObject.name}");
+            collected = true; // So it doesn't trigger twice
+            if (drumTrack != null)
             {
-                if (!isAnimating) StartCoroutine(DoPulse());
-                lastStep = currentStep;
+                drumTrack.NotifyStarExpired(this);
+                drumTrack.RemoveDrumLoopCollectable(this);                
+            }
+            Explode explode = GetComponent<Explode>();
+            if (explode != null)
+            {
+                explode.Permanent();
+            }
+            else
+            {
+                Destroy(gameObject);
             }
         }
+    }
+    void Update()
+    {
+        pulseTimer += Time.deltaTime * pulseSpeed;
+        float scale = 1f + Mathf.Sin(pulseTimer) * 0.1f * maxPulseScale;
+        transform.localScale = new Vector3(scale, scale, 1f);
+
+        HandleExpiration();
     }
     
     IEnumerator DoPulse()
@@ -66,16 +94,46 @@ public class DrumLoopCollectable : MonoBehaviour
     public void SetDrums(DrumTrack drums)
     {
         drumTrack = drums;
-        UpdateStarAppearance();
+        var visual = drumTrack.GetVisualForPattern(pattern);
+        ApplyVisual(visual);
     }
-    public void UpdateStarAppearance()
+
+    void OnDestroy()
     {
-        int index = drumTrack.GetCollectedStarCount();
-        if (spriteRenderer != null && starColors.Length > index)
+        if (drumTrack != null)
         {
-            spriteRenderer.color = starColors[index]; // ✅ Change color based on collected count
+            if (drumTrack.GetCollectedStarCount() > 0 || drumTrack.GetActiveStarCount() > 0)
+            {
+                drumTrack.RemoveDrumLoopCollectable(this);
+            }
         }
+
     }
+
+    public void ApplyVisual(DrumLoopPatternVisual visual)
+    {
+        if (visual == null)
+        {
+            Debug.LogWarning($"⚠️ No visual provided for pattern {pattern}");
+            return;
+        }
+
+        if (baseRenderer != null)
+            baseRenderer.color = visual.color;
+
+        if (overlayRenderer != null)
+            overlayRenderer.color = visual.color;
+
+        if (visual.particleEffectPrefab != null)
+        {
+            Instantiate(visual.particleEffectPrefab, transform.position, Quaternion.identity, transform);
+        }
+
+        pulseSpeed = visual.pulseSpeed;
+        maxPulseScale = visual.pulseScale;
+    }
+
+
 
     private void Collect()
     {
@@ -84,7 +142,6 @@ public class DrumLoopCollectable : MonoBehaviour
             collected = true;
             drumTrack.CollectedDrumLoop(this);
             StartCoroutine(PulseWithBeat());
-            UpdateStarAppearance();
         }
     }
     private IEnumerator PulseWithBeat()
@@ -114,16 +171,25 @@ public class DrumLoopCollectable : MonoBehaviour
     private IEnumerator DestroyAfterParticles()
     {
         Debug.Log($"[DrumLoopCollectable] Waiting for particles to finish: {gameObject.name}");
-        yield return new WaitUntil(() => !starBurstEffect.isPlaying); // ✅ Wait for ParticleSystem to finish
-        Debug.Log($"[DrumLoopCollectable] Destroying after particles: {gameObject.name}");
+
+        float timeout = 2f;
+        float elapsed = 0f;
+
+        while (starBurstEffect != null && starBurstEffect.isPlaying && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
 
         if (drumTrack != null)
         {
-            drumTrack.RemoveDrumLoopCollectable(this); // ✅ Ensure cleanup from DrumTrack
+            drumTrack.RemoveDrumLoopCollectable(this);
         }
+
+        Debug.Log($"[DrumLoopCollectable] Destroying after particles: {gameObject.name}");
         Destroy(gameObject);
     }
-    
+
 
     private void OnTriggerEnter2D(Collider2D coll)
     {
