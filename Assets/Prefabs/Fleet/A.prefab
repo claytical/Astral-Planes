@@ -237,11 +237,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentHP: 10
-  maxHP: 10
+  capacity: 85
+  energyLevel: 85
   force: 5
   terminalVelocity: 30
-  boostMultiplier: 2.5
+  boostMultiplier: 2.2
   minimalThrustForce: 0.5
   baseBurnRate: 1.5
   burnRateMultiplier: 1.5
@@ -250,8 +250,6 @@ MonoBehaviour:
   destroyClip: {fileID: 8300000, guid: cdec88e5cf531a34fa7ffb2147d99e85, type: 3}
   collectedClip: {fileID: 8300000, guid: c1fd969aa4df59b4ca3b6c7a4a5aaff1, type: 3}
   thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
-  capacity: 80
-  energyLevel: 0
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   soulSprite: {fileID: 8114757156314455466}

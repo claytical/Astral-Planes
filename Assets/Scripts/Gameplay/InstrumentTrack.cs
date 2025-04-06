@@ -141,7 +141,6 @@ public class InstrumentTrack : MonoBehaviour
         {
             if (storedStep % drumTrack.totalSteps == globalStep) // ✅ Ensure step alignment
             {
-                Debug.Log($"[{gameObject.name}] Triggering Note {note} at step {globalStep}");
                 PlayNote(note, duration, velocity);
             }
         }
@@ -168,7 +167,6 @@ public class InstrumentTrack : MonoBehaviour
             Duration = durationMs, // ✅ Fixed duration scaling
             Velocity = (int)velocity,
         };
-        Debug.Log($"Playing MIDI Note {note} for {durationTicks} ticks @ velocity {velocity}");
 
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
     }
@@ -177,7 +175,6 @@ public class InstrumentTrack : MonoBehaviour
     {
         if (persistentLoopNotes.Count == 0) return;
         persistentLoopNotes.Clear();
-        Debug.Log($"{gameObject.name} - Cleared all looping notes for new track pattern.");
     }
     public void SpawnCollectables(NoteSet noteSet)
     {
@@ -193,7 +190,6 @@ public class InstrumentTrack : MonoBehaviour
             return;
         }
 
-        Debug.Log($"{gameObject.name} - Spawning notes ({noteSet.GetStepList().Count} steps).");
         int halfPoint = totalSteps / 2;
 
         List<int> eligibleSteps = noteSet.GetStepList()
@@ -203,13 +199,14 @@ public class InstrumentTrack : MonoBehaviour
         foreach (int stepIndex in eligibleSteps)
         {
             int assignedNote = noteSet.GetNextArpeggiatedNote(stepIndex);
-            int chosenDurationTicks = CalculateNoteDuration(stepIndex, noteSet);
 
-            Vector2Int gridPos = GetGridPositionForStep(stepIndex, assignedNote, noteSet);
+            // 🔀 Randomize X/Y grid positions instead of deriving from stepIndex
+            Vector2Int gridPos = GetRandomAvailableGridCell(noteSet);
+            int chosenDurationTicks = CalculateDurationFromGridPosition(gridPos);
 
-            if (!drumTrack.IsSpawnCellAvailable(gridPos.x, gridPos.y))
+            if (gridPos.y == -1)
             {
-                Debug.Log($"Cell {gridPos} occupied, skipping.");
+                Debug.Log("No available grid cell found for note spawn.");
                 continue;
             }
 
@@ -225,7 +222,7 @@ public class InstrumentTrack : MonoBehaviour
                 continue;
             }
 
-            collectable.Initialize(assignedNote, chosenDurationTicks,this);
+            collectable.Initialize(assignedNote, chosenDurationTicks, this);
             collectable.OnCollected += (int duration, float force) => OnCollectableCollected(collectable, stepIndex, duration, force);
             collectable.OnDestroyed += () => OnCollectableDestroyed(collectable);
 
@@ -233,11 +230,47 @@ public class InstrumentTrack : MonoBehaviour
             spawnedCollectables.Add(collectable.gameObject);
         }
     }
+    private Vector2Int GetRandomAvailableGridCell(NoteSet noteSet)
+    {
+        int gridWidth = drumTrack.GetSpawnGridWidth();
+        int gridHeight = drumTrack.GetSpawnGridHeight();
+
+        List<Vector2Int> availableCells = new List<Vector2Int>();
+
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (drumTrack.IsSpawnCellAvailable(x, y))
+                {
+                    availableCells.Add(new Vector2Int(x, y));
+                }
+            }
+        }
+
+        if (availableCells.Count == 0)
+            return new Vector2Int(-1, -1); // No space
+
+        return availableCells[UnityEngine.Random.Range(0, availableCells.Count)];
+    }
+
     public void SpawnAntiNote()
     {
         Debug.Log($"SpawnAntiNote called on {gameObject.name}");
         // TODO: Implement anti-note logic
     }
+    
+    private int CalculateDurationFromGridPosition(Vector2Int gridPos)
+    {
+        int ticksMin = 60;  // Shortest duration
+        int ticksMax = 960; // Longest duration
+
+        float t = gridPos.y / (float)(drumTrack.GetSpawnGridHeight() - 1); // 0 (left) → 1 (right)
+        float inverseT = 1f - t; // So bottom = long, top = short
+
+        return Mathf.RoundToInt(Mathf.Lerp(ticksMin, ticksMax, inverseT));
+    }
+
     public int GetNoteDensity()
     {
         return persistentLoopNotes.Count;
@@ -289,7 +322,6 @@ public class InstrumentTrack : MonoBehaviour
         x = Mathf.Clamp(x, 0, gridWidth - 1);
         y = Mathf.Clamp(y, 0, gridHeight - 1);
 
-        Debug.Log($"[InstrumentTrack] Calculated Grid Position: ({x}, {y}) for stepIndex {stepIndex}, assignedNote {assignedNote}");
 
         return new Vector2Int(x, y);
     }
@@ -322,32 +354,56 @@ public class InstrumentTrack : MonoBehaviour
         // Enforce a minimum duration for audibility.
         chosenDurationTicks = Mathf.Max(chosenDurationTicks, ticksPerStep / 2);
 
-        Debug.Log($"CalculateNoteDuration: step {stepIndex}, nextStep {nextStep}, stepsUntilNext {stepsUntilNext}, baseDurationTicks {baseDurationTicks}, finalDuration {chosenDurationTicks}");
 
         return chosenDurationTicks;
     }
 
-    void OnCollectableDestroyed(Collectable collectable)
+    public void OnCollectableDestroyed(Collectable collectable)
     {
-        Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
-    
-        if (drumTrack.HasSpawnGrid())
+        if (spawnedCollectables.Contains(collectable.gameObject))
         {
-            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y); // ✅ Ensure the cell is freed
-            Debug.Log($"✅ Freed cell at {gridPos.x}, {gridPos.y}");
-        }
-        else
-        {
-            Debug.LogError("❌ SpawnGrid is NULL! Cannot free cell.");
+            spawnedCollectables.Remove(collectable.gameObject);
         }
 
-        spawnedCollectables.Remove(collectable.gameObject);
+        if (drumTrack != null && drumTrack.HasSpawnGrid())
+        {
+            Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
+            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+        }
+    }
+    public void ForceClearTrack()
+    {
+        foreach (GameObject obj in spawnedCollectables.ToList())
+        {
+            if (obj == null) continue;
+
+            Collectable collectable = obj.GetComponent<Collectable>();
+            if (collectable != null)
+            {
+                OnCollectableDestroyed(collectable); // centralized cleanup
+            }
+            else
+            {
+                Destroy(obj); // fallback in case it's not a Collectable
+            }
+        }
+
+        spawnedCollectables.Clear();
     }
 
+    public float GetVelocityAtStep(int step)
+    {
+        float max = 0f;
+        foreach (var (noteStep, note, duration, velocity) in GetPersistentLoopNotes())
+        {
+            if (noteStep == step)
+                max = Mathf.Max(max, velocity);
+        }
+        return max;
+    }
 
     void OnCollectableCollected(Collectable collectable, int stepIndex, int durationTicks, float force)
     {
-        Debug.Log($"Collected Note {collectable.name}");
         if (collectable.assignedInstrumentTrack != this)
         {
             return;

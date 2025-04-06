@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7574745666028819120
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7485248454376615692}
+  - component: {fileID: 1481789636809791906}
+  m_Layer: 0
+  m_Name: Mine Node Set - Evolve
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7485248454376615692
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7574745666028819120}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1481789636809791906
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7574745666028819120}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3557ee623930847d3b548720c880d54a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mineNodes:
+  - {fileID: 1781116594832268, guid: 69e965859a8d6490aa27db4159fb1ab6, type: 3}
+  - {fileID: 1781116594832268, guid: 70fa81d3fa5ae4d48a0c5e7fcfa7d0d4, type: 3}
+  - {fileID: 1781116594832268, guid: 0f9d1124cd4144b8fbfa41c03361cc68, type: 3}
+  - {fileID: 1781116594832268, guid: 191726514e7c94549885009b52b60b51, type: 3}
+  - {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107, type: 3}
+  - {fileID: 1781116594832268, guid: 47e0fbb0d988c460e8979cee762fe1f0, type: 3}
+  - {fileID: 1781116594832268, guid: ccff3e92c00d94062a62d6bec9ae784e, type: 3}

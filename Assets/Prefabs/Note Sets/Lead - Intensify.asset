@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Lead - Intensify
+  m_EditorClassIdentifier: 
+  label: Intensify
+  role: 5
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: e0c1c458451284b5f9698f8056a2f310, type: 3}
+  - {fileID: 8509760657121421808, guid: 9cb7397e8fc9747b5bd2999ea3f4fa21, type: 3}
+  - {fileID: 8509760657121421808, guid: 1fd71e9cf6c5e4ef2992f3ef32531f73, type: 3}
+  - {fileID: 8509760657121421808, guid: 2010ee1e1cc1b468d95b1820c01f2da1, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

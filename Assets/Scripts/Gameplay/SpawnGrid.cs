@@ -199,20 +199,6 @@ public class SpawnGrid : MonoBehaviour
         return true;
     }
     
-    private bool IsCellValidForDrumPattern(int x, int y, DrumLoopPattern pattern)
-    {
-        switch (pattern)
-        {
-            case DrumLoopPattern.Full:
-                return y % 4 == 0; // Obstacles every 4th row
-            case DrumLoopPattern.Breakbeat:
-                return y % 2 != 0; // Offset placement for syncopation
-            case DrumLoopPattern.SlowDown:
-                return y < gridHeight / 2; // Lower-positioned obstacles
-        }
-        return true;
-    }
-    
     public Vector2Int GetRandomAvailableCell()
     {
         List<Vector2Int> availableCells = new List<Vector2Int>();

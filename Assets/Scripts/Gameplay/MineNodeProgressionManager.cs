@@ -1,4 +1,5 @@
 using System.Linq;
+using System;
 using UnityEngine;
 
 public class MineNodeProgressionManager : MonoBehaviour
@@ -26,62 +27,193 @@ public class MineNodeProgressionManager : MonoBehaviour
         if (!drumTrack || !trackController)
             Debug.LogError("MineNodeProgressionManager is missing required components on the same GameObject.");
     }
-    
-    public void MoveToNextPhase()
+    public void MoveToNextPhase(
+        SpawnerPhase? specificPhase = null,
+        Func<SpawnerPhaseGroup, bool> filter = null
+    )
     {
         drumTrack.ClearAllActiveMineNodes();
-        currentPhaseIndex++;
+        SpawnerPhaseGroup selectedGroup = null;
 
-        if (currentPhaseIndex >= phaseQueue.phaseGroups.Count)
+        // Option 1: Go to a specific phase
+        if (specificPhase.HasValue)
         {
-            Debug.Log("🎵 All phases completed — looping or staying final.");
+            selectedGroup = phaseQueue.phaseGroups
+                .FirstOrDefault(g => g.phase == specificPhase.Value);
+
+            if (selectedGroup == null)
+            {
+                Debug.LogWarning($"🚫 No phase group found for phase '{specificPhase.Value}'");
+                return;
+            }
+        }
+        // Option 2: Use a filter to choose from valid groups
+        else if (filter != null)
+        {
+            var candidates = phaseQueue.phaseGroups.Where(filter).ToList();
+            if (candidates.Count == 0)
+            {
+                Debug.LogWarning("🚫 No phase groups matched the provided filter.");
+                return;
+            }
+
+            selectedGroup = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ MoveToNextPhase called with no specificPhase or filter.");
             return;
         }
 
-        var phaseGroup = phaseQueue.phaseGroups[currentPhaseIndex];
+        currentPhaseIndex = phaseQueue.phaseGroups.IndexOf(selectedGroup);
 
-        if (phaseGroup.allowRandomSelection && phaseGroup.spawnerOptions.Count > 0)
+        if (selectedGroup.spawnerOptions.Count == 0)
         {
-            currentSpawnerSet = phaseGroup.spawnerOptions[Random.Range(0, phaseGroup.spawnerOptions.Count)];
-        }
-        else if (phaseGroup.spawnerOptions.Count > 0)
-        {
-            currentSpawnerSet = phaseGroup.spawnerOptions[0];
+            Debug.LogWarning($"⚠️ Phase '{selectedGroup.phase}' has no spawner options.");
+            return;
         }
 
-        Debug.Log($"➡️ Phase advanced to {phaseGroup.phase}, using spawner set: {currentSpawnerSet.name}");
+        if (selectedGroup.allowRandomSelection)
+        {
+            currentSpawnerSet = selectedGroup.spawnerOptions[
+                UnityEngine.Random.Range(0, selectedGroup.spawnerOptions.Count)
+            ];
+        }
+        else
+        {
+            currentSpawnerSet = selectedGroup.spawnerOptions[0];
+        }
+
+        drumTrack.SetMineNodeSpawnerSet(currentSpawnerSet);
+        drumTrack.SetPatternFromPhase(selectedGroup.phase);
+
+        Debug.Log($"🎶 Phase advanced to: {selectedGroup.phase} → Set: {currentSpawnerSet.name}");
+    }
+    
+    public void NotifyStarsCollected()
+    {
+        // Force progression evaluation when stars are merged
+        EvaluateProgression();
+        
+        // This ensures that we immediately perform the transition rather than 
+        // waiting for the next loop check
+        var currentPhase = GetCurrentPhase();
+        
+        // Define the next phase based on the current one
+        SpawnerPhase nextPhase;
+        switch (currentPhase)
+        {
+            case SpawnerPhase.Establish:
+                nextPhase = SpawnerPhase.Evolve;
+                break;
+            case SpawnerPhase.Evolve:
+                nextPhase = SpawnerPhase.Intensify;
+                break;
+            case SpawnerPhase.Intensify:
+                nextPhase = SpawnerPhase.Release;
+                break;
+            case SpawnerPhase.Release:
+                // Here you can decide if you want to go to Evolve or WildCard
+                nextPhase = UnityEngine.Random.Range(0, 2) == 0 ? SpawnerPhase.Evolve : SpawnerPhase.WildCard;
+                break;
+            case SpawnerPhase.WildCard:
+                nextPhase = SpawnerPhase.Pop;
+                break;
+            case SpawnerPhase.Pop:
+                nextPhase = SpawnerPhase.Evolve;
+                break;
+            default:
+                nextPhase = SpawnerPhase.Establish;
+                break;
+        }
+        
+        // Force the move to the next phase
+        MoveToNextPhase(specificPhase: nextPhase);
+        
+        Debug.Log($"[MineNodeProgressionManager] Stars collected. Transitioning from {currentPhase} to {nextPhase}");
+    }
+    private void SetSpawnerSetFromGroup(SpawnerPhaseGroup group)
+    {
+        if (group.allowRandomSelection && group.spawnerOptions.Count > 0)
+        {
+            currentSpawnerSet = group.spawnerOptions[
+                UnityEngine.Random.Range(0, group.spawnerOptions.Count)
+            ];
+        }
+        else if (group.spawnerOptions.Count > 0)
+        {
+            currentSpawnerSet = group.spawnerOptions[0];
+        }
+        else
+        {
+            Debug.LogWarning($"⚠️ Phase group {group.phase} has no spawner options.");
+            return;
+        }
+
         drumTrack.SetMineNodeSpawnerSet(currentSpawnerSet);
     }
+
     public void EvaluateProgression()
     {
         var current = phaseQueue.phaseGroups[currentPhaseIndex].phase;
+
         int totalNotes = GetTotalNoteCount();
         int denseTracks = drumTrack.trackController.tracks.Count(t => t.GetNoteDensity() >= 6);
         int sparseTracks = drumTrack.trackController.tracks.Count(t => t.GetNoteDensity() <= 2);
-
-
+        int starsCollected = drumTrack.GetCollectedStarCount();
+Debug.Log($"StarsCollected: {starsCollected}, Total Notes :{totalNotes} Dense Tracks :{denseTracks}, sparse Tracks :{sparseTracks}");
         switch (current)
         {
-            case SpawnerPhase.Intro:
-                if (totalNotes >= 6)
-                    MoveToNextPhase();
-                break;
-            case SpawnerPhase.Reharmonize:
-                if (denseTracks >= 2 && sparseTracks >= 1)
+            case SpawnerPhase.Establish:
+                if (starsCollected >= 4)
                 {
-                    MoveToNextPhase();
+                    // Move to variation or instrument expression
+                    MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
                 }
                 break;
-            case SpawnerPhase.GrooveStart:
-                if (drumTrack.GetCollectedStarCount() >= 4)
-                    MoveToNextPhase();
+
+            case SpawnerPhase.Evolve:
+                if (starsCollected >= 4)
+                {
+                    // Tension building phase
+                    MoveToNextPhase(specificPhase: SpawnerPhase.Intensify);
+                }
                 break;
-            case SpawnerPhase.InstrumentChoice:
-                if (totalNotes >= 20)
-                    MoveToNextPhase();
+
+            case SpawnerPhase.Intensify:
+                if (starsCollected >= 4)
+                {
+                    // Trigger loop switch / groove drop
+                    MoveToNextPhase(specificPhase: SpawnerPhase.Release);
+                }
+                break;
+
+            case SpawnerPhase.Release:
+                if (starsCollected >= 4)
+                {
+                    // Return to evolve or introduce some weird variation
+                    MoveToNextPhase(filter: g =>
+                        g.phase == SpawnerPhase.Evolve || g.phase == SpawnerPhase.WildCard
+                    );
+                }
+                break;
+
+            case SpawnerPhase.WildCard:
+                if (starsCollected >= 4)
+                {
+                    // Bring it back into control
+                    MoveToNextPhase(specificPhase: SpawnerPhase.Pop);
+                }
+                break;
+            case SpawnerPhase.Pop:
+                if (starsCollected == 4)
+                {
+                    MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
+                }
                 break;
         }
     }
+
 
     public MineNodeSpawnerSet GetCurrentSpawnerSet()
     {
@@ -107,7 +239,7 @@ public class MineNodeProgressionManager : MonoBehaviour
         if (selectedGroup.allowRandomSelection)
         {
             currentSpawnerSet = selectedGroup.spawnerOptions[
-                Random.Range(0, selectedGroup.spawnerOptions.Count)
+                UnityEngine.Random.Range(0, selectedGroup.spawnerOptions.Count)
             ];
         }
         else if (selectedGroup.spawnerOptions.Count > 0)
@@ -146,6 +278,22 @@ public class MineNodeProgressionManager : MonoBehaviour
             }
         }
         return densest;
+    }
+    public SpawnerPhase GetCurrentPhase()
+    {
+        if (phaseQueue == null || phaseQueue.phaseGroups.Count == 0)
+        {
+            Debug.LogWarning("[MineNodeProgressionManager] No phase queue defined.");
+            return SpawnerPhase.Establish; // Fallback
+        }
+
+        if (currentPhaseIndex < 0 || currentPhaseIndex >= phaseQueue.phaseGroups.Count)
+        {
+            Debug.LogWarning("[MineNodeProgressionManager] Invalid currentPhaseIndex.");
+            return SpawnerPhase.Establish;
+        }
+
+        return phaseQueue.phaseGroups[currentPhaseIndex].phase;
     }
 
     public void OnMinedObjectCollected()

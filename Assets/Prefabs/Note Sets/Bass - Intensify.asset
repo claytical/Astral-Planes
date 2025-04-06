@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Bass - Intensify
+  m_EditorClassIdentifier: 
+  label: Establish
+  role: 0
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: 46286854cf7874c07a227b62fe0a88b5, type: 3}
+  - {fileID: 8509760657121421808, guid: ad02748e635c84a63aaafef34b418c01, type: 3}
+  - {fileID: 8509760657121421808, guid: dd8686316e4be4060a71eded39188b17, type: 3}
+  - {fileID: 8509760657121421808, guid: 51da597df2949449986275c4ae10a5b3, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

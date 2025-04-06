@@ -5,20 +5,16 @@ public class TrackUtilityMinedObject : MonoBehaviour
     public enum UtilityType { LoopExpansion, AntiNote, TrackClear }
     public UtilityType type;
     public MusicalRole targetRole;
-
-    private InstrumentTrack assignedTrack;
-
+    
     public void Initialize(InstrumentTrack track)
     {
-        assignedTrack = track;
-        if (assignedTrack == null)
-        {
-            Debug.LogWarning($"UtilityItem failed to assign track for role {targetRole}");
-        }
+        GetComponent<MinedObject>().assignedTrack = track;
     }
 
     public void OnCollected()
     {
+        InstrumentTrack assignedTrack = GetComponent<MinedObject>().assignedTrack;
+
         if (assignedTrack == null)
         {
             Debug.LogWarning("No track assigned to utility item.");
@@ -31,10 +27,10 @@ public class TrackUtilityMinedObject : MonoBehaviour
                 assignedTrack.ExpandLoop();
                 break;
             case UtilityType.AntiNote:
-                assignedTrack.SpawnAntiNote(); // This should be implemented in InstrumentTrack
+                assignedTrack.SpawnAntiNote();
                 break;
             case UtilityType.TrackClear:
-                assignedTrack.ClearLoopedNotes();
+                assignedTrack.ForceClearTrack();
                 break;
         }
 

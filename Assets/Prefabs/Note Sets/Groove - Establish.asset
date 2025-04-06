@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755025ae3b9ab428dba95a79943280c6, type: 3}
+  m_Name: Groove - Establish
+  m_EditorClassIdentifier: 
+  label: Establish
+  role: 6
+  curatedNoteSets:
+  - {fileID: 8509760657121421808, guid: 9e03b0106466f459c880c8766c1ee320, type: 3}
+  - {fileID: 8509760657121421808, guid: fc50a178d482740619cb51b1670713e4, type: 3}
+  - {fileID: 8509760657121421808, guid: bf0d416be15ed4a6bb40571e9aafc9d0, type: 3}
+  - {fileID: 8509760657121421808, guid: 8371246a662f640ceacf6bfa27ab5ead, type: 3}
+  allowRandomRootNote: 0
+  allowRandomRhythmStyle: 0
+  selectionWeight: 1

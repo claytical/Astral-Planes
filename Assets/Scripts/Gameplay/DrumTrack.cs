@@ -7,19 +7,16 @@ using Random = UnityEngine.Random;
 
 public enum DrumLoopPattern
 {
-    Full,      // Full build-up from 0 to n
-    Breakbeat,    // A section that jumps into the later part of the full loop (e.g., n - 3 to n)
-    SlowDown   // A special short pattern for slowing down (e.g., perhaps n - 2 to n)
+    Establish,
+    Evolve,
+    Intensify,
+    Release,
+    Wildcard,
+    Pop
 }
 public enum NodeType
 {
     Standard
-}
-
-public enum DrumLoopState
-{
-    Progression,
-    Breakbeat
 }
 
 public class DrumTrack : MonoBehaviour
@@ -28,33 +25,44 @@ public class DrumTrack : MonoBehaviour
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
     public EnergyWaveEffect wave;
-    public AudioClip[] fullLoopClips;
-    public AudioClip[] drumFillClips;
+    [Header("Drum Pattern Visuals")]
+    public List<DrumLoopPatternVisual> patternVisuals;
+    public AudioClip[] establishDrumClips;
+    public AudioClip[] evolveDrumClips;
+    public AudioClip[] intensifyDrumClips;
+    public AudioClip[] releaseDrumClips;
+    public AudioClip[] wildcardClips;
+    public AudioClip[] popDrumClips;
     public int totalSteps = 32;
     // Define candidate spawn steps: if you want to spawn onlly on every 8th note, set:
     public AudioSource drumAudioSource;
     public InstrumentTrackController trackController;
-    public float startDspTime;
+    public double startDspTime;
+    private DrumLoopPattern? currentPattern = null;
+    private bool patternLocked = false;
+    private float gridCheckTimer = 0f;
+    private float gridCheckInterval = 10f;
 
     private float loopLengthInSeconds;       // Duration of the loop.
     private SpawnGrid spawnGrid;
     private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
-    private List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
+//    private List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
+    private List<DrumLoopCollectable> activeStars = new List<DrumLoopCollectable>();
+    private List<DrumLoopCollectable> collectedStars = new List<DrumLoopCollectable>();
+
     private List<MineNode> mineNodes = new List<MineNode>();
     private List<MinedObject> activeMinedObjects = new List<MinedObject>();
 
     private bool isInitialized = false;    
     private int progressionIndex = 0;
-    private DrumLoopState currentDrumLoopState = DrumLoopState.Progression;
     private float screenMinX = -8f; // Left boundary
     private float screenMaxX = 8f;  // Right boundary
-    private float stepWidth; // Dynamic width per step
-    private float nextSpawnTime = 0f;  // ✅ Tracks when the next obstacles should spawn
+    //private float stepWidth; // Dynamic width per step
+    //private float nextSpawnTime = 0f;  // ✅ Tracks when the next obstacles should spawn
     private AudioClip pendingDrumLoop = null;
     private int lastLoopCount = 0;
     private int currentStep = 0;
     private int loopsRequiredBeforeEvolve = 2;
-    private int drumLoopCollectablesCollected = 0;
     private bool isTransitioning = false;
     private MineNodeProgressionManager progressionManager;
     public Vector3[] cornerPositions = new Vector3[] {
@@ -71,7 +79,11 @@ public class DrumTrack : MonoBehaviour
         {
             return;
         }
-
+        if (gridCheckTimer >= gridCheckInterval)
+        {
+            ValidateSpawnGrid();
+            gridCheckTimer = 0f;
+        }
         float currentTime = drumAudioSource.time;
         float stepDuration = loopLengthInSeconds / totalSteps;
         if (stepDuration <= 0)
@@ -89,18 +101,31 @@ public class DrumTrack : MonoBehaviour
         // ✅ Ensure this only runs once per loop restart
         if (currentLoop > lastLoopCount)
         {
-            Debug.Log($"New Loop Started! Current Loop: {currentLoop}");
             lastLoopCount = currentLoop;
             CleanupExplodedMineNodes();
             LoopRoutines();
         }
+    }
+    public int GetActiveStarCount()
+    {
+        return activeStars.Count;
+    }
 
-        if (drumLoopCollectablesCollected >= 4)
+
+    public void NotifyStarExpired(DrumLoopCollectable expiredStar)
+    {
+        if (isTransitioning) return;
+
+        RemoveDrumLoopCollectable(expiredStar); // 🔄 move this to the top
+
+        if (GetCollectedStarCount() == 0 && GetActiveStarCount() == 0)
         {
-            progressionManager.EvaluateProgression();
-
+            Debug.Log("All stars expired, rerolling pattern...");
+            currentPattern = null;
+            patternLocked = false;
         }
     }
+
     public void RegisterMineNode(MineNode node)
     {
         if (!mineNodes.Contains(node))
@@ -113,6 +138,36 @@ public class DrumTrack : MonoBehaviour
         if (!activeMinedObjects.Contains(obj))
         {
             activeMinedObjects.Add(obj);
+        }
+    }
+    public void ValidateSpawnGrid()
+    {
+        for (int x = 0; x < spawnGrid.gridWidth; x++)
+        {
+            for (int y = 0; y < spawnGrid.gridHeight; y++)
+            {
+                if (!spawnGrid.IsCellAvailable(x, y))
+                {
+                    Vector3 worldPos = GridToWorldPosition(new Vector2Int(x, y));
+                    Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, 0.25f);
+
+                    bool objectPresent = false;
+                    foreach (var hit in hits)
+                    {
+                        if (hit.GetComponent<Collectable>() || hit.GetComponent<MineNode>())
+                        {
+                            objectPresent = true;
+                            break;
+                        }
+                    }
+
+                    if (!objectPresent)
+                    {
+                        Debug.LogWarning($"Watchdog freed orphaned cell at {x},{y}");
+                        spawnGrid.FreeCell(x, y);
+                    }
+                }
+            }
         }
     }
 
@@ -161,7 +216,7 @@ public class DrumTrack : MonoBehaviour
         activeMinedObjects.Clear();
 
         // Clear drum collectables
-        foreach (DrumLoopCollectable collectable in drumLoopCollectables.ToList())
+        foreach (DrumLoopCollectable collectable in activeStars.ToList())
         {
 
             if (collectable == null) continue;
@@ -170,11 +225,12 @@ public class DrumTrack : MonoBehaviour
 
             Destroy(collectable.gameObject);
         }
-        drumLoopCollectables.Clear();
-        drumLoopCollectablesCollected = 0;
+        activeStars.Clear();
+//        collectedStars.Clear();
 
         // Reset grid
         spawnGrid?.ClearAll();
+        ValidateSpawnGrid();
     }
 
     public int GetSpawnGridWidth()
@@ -232,44 +288,43 @@ public class DrumTrack : MonoBehaviour
 
     private Vector3 GetNextCornerPosition()
     {
-        int index = drumLoopCollectablesCollected - 1; // ✅ Assign to next available corner
+        int index = GetCollectedStarCount() - 1; // ✅ Assign to next available corner
         if (index >= cornerPositions.Length) 
         {
             index = (index % cornerPositions.Length); // ✅ Wrap around if more than 4 Stars
         }
+        Debug.Log(($"Corner Index: {index}"));
         return cornerPositions[index];
     }
-
+    
+    
     private IEnumerator MergeAllCollectablesIntoCenter()
     {
+        // Don't reset the pattern here! This was causing the phase to get stuck.
+        // currentPattern = null;
+        // patternLocked = false;
         Debug.Log("[DrumTrack] Merging collectables...");
 
-        List<DrumLoopCollectable> collectablesToDestroy = new List<DrumLoopCollectable>();
-
-        foreach (DrumLoopCollectable collectable in drumLoopCollectables)
-        {
-            if (collectable != null)
-            {
-                Debug.Log($"[DrumTrack] Triggering final burst for: {collectable.name}");
-                collectable.TriggerFinalBurst();
-                collectablesToDestroy.Add(collectable); // ✅ Track objects for destruction
-            }
-        }
-
-        // ✅ Wait for all collectables to finish their particle effects
-        yield return new WaitForSeconds(2f);
+        List<DrumLoopCollectable> collectablesToDestroy = new List<DrumLoopCollectable>(collectedStars);
 
         foreach (DrumLoopCollectable collectable in collectablesToDestroy)
         {
             if (collectable != null)
             {
-                Debug.Log($"[DrumTrack] Destroying collectable: {collectable.name}");
-                Destroy(collectable.gameObject);
+                Debug.Log($"[DrumTrack] Triggering final burst for: {collectable.name}");
+                collectable.TriggerFinalBurst(); // ❗ Only call once
             }
         }
 
-        drumLoopCollectables.Clear();
-        drumLoopCollectablesCollected = 0;
+        // ✅ Let each collectable clean itself up (RemoveDrumLoopCollectable, destroy, etc.)
+        yield return new WaitForSeconds(2f); // enough time for particles to play
+
+        collectedStars.Clear(); // ✅ Clear the list now
+        isTransitioning = false;
+
+        // Instead of just clearing the pattern, notify the progression manager that we completed a collection
+        progressionManager.NotifyStarsCollected();
+
         Debug.Log("[DrumTrack] Drum Loop Collectables reset and cleared.");
     }
 
@@ -280,55 +335,34 @@ public class DrumTrack : MonoBehaviour
     }
     public void RemoveDrumLoopCollectable(DrumLoopCollectable collectable)
     {
-        if (drumLoopCollectables.Contains(collectable))
+        if (collectable == null) return;
+
+        if (activeStars.Contains(collectable))
         {
-            Debug.Log($"[DrumTrack] Removing collectable from list: {collectable.name}");
-            drumLoopCollectables.Remove(collectable);
-        }
-        else
-        {
-            Debug.LogWarning($"[DrumTrack] Tried to remove a collectable not in list: {collectable.name}");
+            activeStars.Remove(collectable);
+            Debug.Log($"[DrumTrack] Removed collectable: {collectable.name}");
         }
     }
 
-
+    
     public float GetStarCollectionRatio()
     {
-        return Mathf.Clamp01(drumLoopCollectablesCollected / 4f);
+        return Mathf.Clamp01(GetCollectedStarCount() / 4f);
     }
 
     public int GetCollectedStarCount()
     {
-        return drumLoopCollectablesCollected;
+        return collectedStars.Count;
     }
 
-    public float GetRemainingLoopTime()
+    public double GetRemainingLoopTime()
     {
-        float dspNow = (float)AudioSettings.dspTime;
-        float loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
-        return Mathf.Max(0, loopEndDsp - dspNow);
+        double dspNow = AudioSettings.dspTime; 
+        double loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
+        return Math.Max(0, loopEndDsp - dspNow);
     }
     private void ExplodeAllMineNodes()
     {
-        // Handle Hazards
-        Hazard[] hazards = FindObjectsByType<Hazard>(FindObjectsSortMode.None);
-        for (int i = hazards.Length - 1; i >= 0; i--)
-        {
-            Hazard hazard = hazards[i];
-            if (hazard != null)
-            {
-                Explode explode = hazard.GetComponent<Explode>();
-                if (explode != null)
-                {
-                    explode.Permanent();
-                }
-                else
-                {
-                    Destroy(hazard.gameObject);
-                }
-            }
-        }
-
         // Handle Obstacles
         var nodeCopy = activeNodes.ToList();
         foreach (GameObject obstacle in nodeCopy)
@@ -363,13 +397,75 @@ public class DrumTrack : MonoBehaviour
 
     private void PushToNextPlane()
     {
-        float dspNow = (float)AudioSettings.dspTime;
-        float loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
-        float timeRemaining = loopEndDsp - dspNow;
-        wave.TriggerWave(Vector3.zero, timeRemaining);
-        ScheduleDrumLoopChange(SelectDrumClip(DrumLoopPattern.Full));
-    }
+        if (isTransitioning) return;
+        isTransitioning = true;
     
+        double dspNow = AudioSettings.dspTime;
+        double loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
+        double timeRemaining = loopEndDsp - dspNow;
+
+        wave.TriggerWave(Vector3.zero, (float)timeRemaining);
+
+        // Resolve the pattern - don't reset it yet as progression depends on it
+        DrumLoopPattern patternToUse = GetOrSetCurrentPattern(); // Safely assign if null
+        ScheduleDrumLoopChange(SelectDrumClip(patternToUse));
+        ExplodeAllMineNodes();
+    
+        // Don't reset pattern here - let the progression manager handle it
+        // The pattern will be reset after the transition is complete
+    }
+    public DrumLoopPattern? CurrentPattern
+    {
+        get => currentPattern;
+        set => currentPattern = value;
+    }
+    private DrumLoopPattern ChooseRandomPattern()
+    {
+        Array values = Enum.GetValues(typeof(DrumLoopPattern));
+        return (DrumLoopPattern)values.GetValue(UnityEngine.Random.Range(0, values.Length));
+    }
+    public void SetPatternFromPhase(SpawnerPhase phase)
+    {
+        switch (phase)
+        {
+            case SpawnerPhase.Establish:
+                currentPattern = DrumLoopPattern.Establish;
+                break;
+            case SpawnerPhase.Evolve:
+                currentPattern = DrumLoopPattern.Evolve;
+                break;
+            case SpawnerPhase.Intensify:
+                currentPattern = DrumLoopPattern.Intensify;
+                break;
+            case SpawnerPhase.Release:
+                currentPattern = DrumLoopPattern.Release;
+                break;
+            case SpawnerPhase.WildCard:
+                currentPattern = DrumLoopPattern.Wildcard;
+                break;
+            case SpawnerPhase.Pop:
+                currentPattern = DrumLoopPattern.Pop;
+                break;
+            default:
+                Debug.LogWarning($"No mapped pattern for phase {phase}");
+                break;
+        }
+
+        Debug.Log($"[DrumTrack] Pattern set from phase: {phase} → {currentPattern}");
+    }
+
+    public DrumLoopPattern GetOrSetCurrentPattern()
+    {
+        if (currentPattern == null)
+        {
+            Debug.LogWarning("No current pattern set from phase. Falling back to default");
+            // ✅ Pull next from the defined progression queue
+            currentPattern = DrumLoopPattern.Establish;
+        }
+        return currentPattern.Value;
+    }
+
+
     public int GetCurrentStep()
     {
         return currentStep;
@@ -381,7 +477,7 @@ public class DrumTrack : MonoBehaviour
         HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
         HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
         progressionManager.OnLoopCompleted();
-        Debug.Log("Spawning Nodes...");
+        progressionManager.EvaluateProgression();
         SpawnMineNode();
     }
 
@@ -398,103 +494,47 @@ public class DrumTrack : MonoBehaviour
             }
         }
     }
-
-
+    public void RegisterDrumLoopCollectable(DrumLoopCollectable collectable)
+    {
+        if (!activeStars.Contains(collectable))
+        {
+            activeStars.Add(collectable);
+            Debug.Log($"[DrumTrack] Registered collectable: {collectable.name}");
+        }
+    }
     public void CollectedDrumLoop(DrumLoopCollectable collectable)
     {
-        drumLoopCollectablesCollected++;
-        drumLoopCollectables.Add(collectable);
-        Debug.Log($"Collected {collectable.name} at {drumLoopCollectablesCollected} total collected");
+        Debug.Log($"[DrumTrack] CollectedDrumLoop() called for {collectable.name}");
+        if (!patternLocked)
+        {
+            patternLocked = true;
+            currentPattern = collectable.pattern;
+        }
+
+        if (!collectedStars.Contains(collectable))
+        {
+            collectedStars.Add(collectable);
+        }
+
+        RemoveDrumLoopCollectable(collectable);
+
         collectable.MoveToCorner(GetNextCornerPosition());
         // Send it to one of the 4 corners (0..3)
         // ✅ Update Star visuals dynamically
-        foreach (var star in drumLoopCollectables)
+        foreach (var star in collectedStars)
         {
-            star.UpdateStarAppearance();
+            var visual = GetVisualForPattern(currentPattern.Value);
+            star.ApplyVisual(visual);        
         }
-
-        if (drumLoopCollectablesCollected >= 4)
+        if (GetCollectedStarCount() >= 4)
         {
-/*
-            mineNodeSetIndex++;
-            if (mineNodeSetIndex >= mineNodeSpawnerSets.Length)
-            {
-                mineNodeSetIndex = 0;
-            }
-*/
             PushToNextPlane();
             StartCoroutine(MergeAllCollectablesIntoCenter());
         }
     }
-    
-    public void ScheduleDrumFillBeforeBeatChange()
+    public DrumLoopPatternVisual GetVisualForPattern(DrumLoopPattern pattern)
     {
-        float remainingTime = GetRemainingLoopTime();
-    
-        if (remainingTime > 0f)
-        {
-            Invoke(nameof(PlayDrumFill), Mathf.Max(remainingTime - SelectFillClipLength(), 0.01f));
-        }
-    }
-    public AudioClip SelectDrumFillClip()
-    {
-        float remainingTime = GetRemainingLoopTime();
-        AudioClip bestFitClip = null;
-        float closestFit = float.MaxValue;
-
-        foreach (AudioClip clip in drumFillClips) // ✅ Iterate over available fills
-        {
-            float difference = remainingTime - clip.length;
-
-            if (difference >= 0 && difference < closestFit) // ✅ Best fit that doesn't exceed time
-            {
-                bestFitClip = clip;
-                closestFit = difference;
-            }
-        }
-
-        if (bestFitClip == null && drumFillClips.Length > 0)
-        {
-            // ✅ No perfect fit, pick the shortest available fill
-            bestFitClip = drumFillClips.OrderBy(clip => clip.length).First();
-        }
-
-        return bestFitClip;
-    }
-    public float SelectFillClipLength()
-    {
-        AudioClip selectedClip = SelectDrumFillClip();
-        return selectedClip != null ? selectedClip.length : 0f;
-    }
-
-    private void PlayDrumFill()
-    {
-        Debug.Log("Playing drum fill before beat change.");
-
-        AudioClip fillClip = SelectDrumFillClip();
-        float remainingTime = GetRemainingLoopTime();
-
-        if (fillClip.length > remainingTime)
-        {
-            Debug.LogWarning("Drum fill is too long for remaining loop time! Adjusting...");
-            fillClip = TrimAudioClip(fillClip, remainingTime); // ✅ Dynamically adjust the fill length
-        }
-
-        drumAudioSource.PlayOneShot(fillClip);
-        Invoke(nameof(PushToNextPlane), fillClip.length);
-    }
-    private AudioClip TrimAudioClip(AudioClip originalClip, float maxLength)
-    {
-        if (originalClip.length <= maxLength) return originalClip; // ✅ No need to trim if it's already short enough
-
-        int sampleCount = Mathf.FloorToInt(maxLength * originalClip.frequency);
-        float[] samples = new float[sampleCount * originalClip.channels];
-
-        originalClip.GetData(samples, 0);
-        AudioClip trimmedClip = AudioClip.Create(originalClip.name + "_trimmed", sampleCount, originalClip.channels, originalClip.frequency, false);
-        trimmedClip.SetData(samples, 0);
-
-        return trimmedClip;
+        return patternVisuals.FirstOrDefault(v => v.patternType == pattern);
     }
 
     public void RemoveMineNodeAt(Vector2Int gridPos)
@@ -512,23 +552,32 @@ public class DrumTrack : MonoBehaviour
 
         if (nodeToRemove != null)
         {
-            Debug.Log($"Removing obstacle at grid {gridPos}");
             activeNodes.Remove(nodeToRemove);
             Destroy(nodeToRemove);
 
             // ✅ Ensure the grid cell is freed after removal
             spawnGrid.FreeCell(gridPos.x, gridPos.y);
-            Debug.Log($"Cell {gridPos} is now free.");
-        }
-        else
-        {
-            Debug.LogWarning($"No obstacle found at {gridPos} to remove.");
         }
     }
+    public int GetNoteDensityAcrossAllTracks()
+    {
+        if (trackController == null || trackController.tracks == null)
+            return 0;
 
+        int total = 0;
+        foreach (var track in trackController.tracks)
+        {
+            total += track.CollectedNotesCount;
+        }
+        return total;
+    }
+
+    public Vector2Int GetRandomAvailableCell()
+    {
+        return spawnGrid.GetRandomAvailableCell();
+    }
     private void SpawnMineNode()
     {
-        Debug.Log($"Spawning mine node at {WorldToGridPosition(transform.position)}");
         Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
         if (spawnCell.x == -1)
         {
@@ -538,7 +587,7 @@ public class DrumTrack : MonoBehaviour
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
         MineNodeSpawnerSet currentSet = progressionManager.GetCurrentSpawnerSet();
-
+Debug.Log($"CURRENT SET: {currentSet.gameObject.name}");
         if (currentSet == null)
         {
             Debug.LogWarning("No current MineNodeSpawnerSet assigned.");
@@ -586,18 +635,26 @@ public class DrumTrack : MonoBehaviour
     {
         switch (pattern)
         {
-            case DrumLoopPattern.Full:
-                Debug.Log(("Choose a full pattern drum clip"));
-                progressionIndex++;
-                if (progressionIndex > fullLoopClips.Length - 1)
-                {
-                    progressionIndex = 0;
-                }
-                return fullLoopClips[progressionIndex];
+            case DrumLoopPattern.Establish:
+                return GetRandomClip(establishDrumClips);
+            case DrumLoopPattern.Evolve:
+                return GetRandomClip(evolveDrumClips);
+            case DrumLoopPattern.Intensify:
+                return GetRandomClip(intensifyDrumClips);
+            case DrumLoopPattern.Release:
+                return GetRandomClip(releaseDrumClips);
+            case DrumLoopPattern.Wildcard:
+                return GetRandomClip(wildcardClips);
+            case DrumLoopPattern.Pop:
+                return GetRandomClip(popDrumClips);
             default:
-                Debug.LogWarning("SelectDrumClip: No valid drum loop found for pattern " + pattern);
-                return null;
+                return GetRandomClip(establishDrumClips);
         }
+    }
+    private AudioClip GetRandomClip(AudioClip[] clips)
+    {
+        if (clips == null || clips.Length == 0) return null;
+        return clips[Random.Range(0, clips.Length)];
     }
     public Vector3 GridToWorldPosition(Vector2Int gridPos)
     {
@@ -636,27 +693,44 @@ public class DrumTrack : MonoBehaviour
 
     private IEnumerator WaitAndChangeDrumLoop()
     {
-        // ✅ First, check if `drumAudioSource` is valid
         if (drumAudioSource == null || drumAudioSource.clip == null)
         {
             Debug.LogError("WaitAndChangeDrumLoop: drumAudioSource or its clip is null!");
             yield break;
         }
 
-        // Wait until the current loop is about to finish.
-        while (drumAudioSource.time < drumAudioSource.clip.length - 0.1f)
+        while (drumAudioSource.time < loopLengthInSeconds - 0.05f)
         {
             yield return null;
         }
+
         if (pendingDrumLoop == null)
         {
             Debug.LogWarning("WaitAndChangeDrumLoop: No new drum loop was assigned!");
             yield break;
         }
-        // ✅ Change the drum loop to the pending one.
+
         drumAudioSource.clip = pendingDrumLoop;
-        drumAudioSource.Play();
+        loopLengthInSeconds = drumAudioSource.clip.length;
+
+        double dspNow = AudioSettings.dspTime;
+        double nextStart = Mathf.CeilToInt((float)(dspNow / loopLengthInSeconds)) * loopLengthInSeconds;
+
+        drumAudioSource.PlayScheduled(nextStart);
+        startDspTime = nextStart;
+
+        Debug.Log($"✅ Drum loop changed to: {pendingDrumLoop.name}");
+
+        // Now safe to reset these as the transition is complete
+        currentPattern = null;
+        patternLocked = false;
         pendingDrumLoop = null;
+    
+        // Force check progression to handle any pending transitions
+        if (progressionManager != null)
+        {
+            progressionManager.EvaluateProgression();
+        }
     }
 
     private IEnumerator InitializeDrumLoop()
@@ -674,7 +748,7 @@ public class DrumTrack : MonoBehaviour
                 Debug.LogError(("DrumTrack: Loop length in seconds is invalid."));
             }
             drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
-            startDspTime = (float)AudioSettings.dspTime;
+            startDspTime = AudioSettings.dspTime;
             drumAudioSource.Play();
 
         Debug.Log($"Drum loop initialized with length {loopLengthInSeconds} seconds.");
@@ -736,7 +810,6 @@ public class DrumTrack : MonoBehaviour
             Explode explode = node.GetComponent<Explode>();
             if (explode != null)
             {
-                Debug.Log($"Forcing removal of exploded obstacle at {node.transform.position}");
                 activeNodes.RemoveAt(i);
                 Destroy(node);
             }
@@ -745,7 +818,6 @@ public class DrumTrack : MonoBehaviour
 
     public void CleanupInvalidMineNodes()
     {
-        Debug.Log("Checking for invalid obstacles...");
 
         for (int i = activeNodes.Count - 1; i >= 0; i--)
         {
@@ -753,7 +825,6 @@ public class DrumTrack : MonoBehaviour
 
             if (node == null)
             {
-                Debug.Log($"Removing null obstacle reference at index {i}");
                 activeNodes.RemoveAt(i);
                 continue;
             }
@@ -761,7 +832,6 @@ public class DrumTrack : MonoBehaviour
             if (node.GetComponent<MineNodeSpawner>() == null)
             {
                 Vector2Int gridPos = WorldToGridPosition(node.transform.position);
-                Debug.Log($"Removing mine node spawner at {gridPos}");
 
                 activeNodes.RemoveAt(i);
                 spawnGrid.FreeCell(gridPos.x, gridPos.y);
