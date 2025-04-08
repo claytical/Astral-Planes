@@ -51,9 +51,9 @@ public class PhaseDebugDisplay : MonoBehaviour
             {
                 if (nodePrefab == null) continue;
 
-                label.AppendLine($"• <i>{nodePrefab.name}</i>");
+                label.AppendLine($"• <i>{nodePrefab.prefab.name}</i>");
 
-                var mineNode = nodePrefab.GetComponent<MineNode>();
+                var mineNode = nodePrefab.prefab.GetComponent<MineNode>();
                 if (mineNode != null && mineNode.minedPrefabs != null)
                 {
                     foreach (var mined in mineNode.minedPrefabs)

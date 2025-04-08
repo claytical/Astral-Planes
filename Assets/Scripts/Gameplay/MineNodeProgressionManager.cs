@@ -1,5 +1,6 @@
 using System.Linq;
 using System;
+using UnityEditorInternal.VersionControl;
 using UnityEngine;
 
 public class MineNodeProgressionManager : MonoBehaviour
@@ -19,6 +20,7 @@ public class MineNodeProgressionManager : MonoBehaviour
     private int currentPhaseIndex = 0;
     private MineNodeSpawnerSet currentSpawnerSet;
     private MineNodeSpawnerSet overrideSet;
+    private bool phaseLocked = false;
     private void Awake()
     {
         drumTrack = GetComponent<DrumTrack>();
@@ -88,50 +90,33 @@ public class MineNodeProgressionManager : MonoBehaviour
         drumTrack.SetPatternFromPhase(selectedGroup.phase);
 
         Debug.Log($"🎶 Phase advanced to: {selectedGroup.phase} → Set: {currentSpawnerSet.name}");
+        phaseLocked = false;
     }
-    
+    public SpawnerPhase? PeekNextPhase()
+    {
+        var current = phaseQueue.phaseGroups[currentPhaseIndex].phase;
+
+        switch (current)
+        {
+            case SpawnerPhase.Establish: return SpawnerPhase.Evolve;
+            case SpawnerPhase.Evolve: return SpawnerPhase.Intensify;
+            case SpawnerPhase.Intensify: return SpawnerPhase.Release;
+            case SpawnerPhase.Release: return SpawnerPhase.Wildcard;
+            case SpawnerPhase.Wildcard: return SpawnerPhase.Pop;
+            case SpawnerPhase.Pop: return SpawnerPhase.Evolve;
+            default: return null;
+        }
+    }
+
     public void NotifyStarsCollected()
     {
-        // Force progression evaluation when stars are merged
+        if (phaseLocked) return;
+        phaseLocked = true;
+
         EvaluateProgression();
-        
-        // This ensures that we immediately perform the transition rather than 
-        // waiting for the next loop check
-        var currentPhase = GetCurrentPhase();
-        
-        // Define the next phase based on the current one
-        SpawnerPhase nextPhase;
-        switch (currentPhase)
-        {
-            case SpawnerPhase.Establish:
-                nextPhase = SpawnerPhase.Evolve;
-                break;
-            case SpawnerPhase.Evolve:
-                nextPhase = SpawnerPhase.Intensify;
-                break;
-            case SpawnerPhase.Intensify:
-                nextPhase = SpawnerPhase.Release;
-                break;
-            case SpawnerPhase.Release:
-                // Here you can decide if you want to go to Evolve or WildCard
-                nextPhase = UnityEngine.Random.Range(0, 2) == 0 ? SpawnerPhase.Evolve : SpawnerPhase.WildCard;
-                break;
-            case SpawnerPhase.WildCard:
-                nextPhase = SpawnerPhase.Pop;
-                break;
-            case SpawnerPhase.Pop:
-                nextPhase = SpawnerPhase.Evolve;
-                break;
-            default:
-                nextPhase = SpawnerPhase.Establish;
-                break;
-        }
-        
-        // Force the move to the next phase
-        MoveToNextPhase(specificPhase: nextPhase);
-        
-        Debug.Log($"[MineNodeProgressionManager] Stars collected. Transitioning from {currentPhase} to {nextPhase}");
+        Debug.Log("[MineNodeProgressionManager] Stars collected. Evaluation triggered.");
     }
+
     private void SetSpawnerSetFromGroup(SpawnerPhaseGroup group)
     {
         if (group.allowRandomSelection && group.spawnerOptions.Count > 0)
@@ -165,51 +150,36 @@ Debug.Log($"StarsCollected: {starsCollected}, Total Notes :{totalNotes} Dense Tr
         switch (current)
         {
             case SpawnerPhase.Establish:
-                if (starsCollected >= 4)
+                MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
+                if (denseTracks > 0)
                 {
-                    // Move to variation or instrument expression
-                    MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
+//                    ExpandLoopOnDensestTrack();
                 }
                 break;
-
             case SpawnerPhase.Evolve:
-                if (starsCollected >= 4)
-                {
-                    // Tension building phase
-                    MoveToNextPhase(specificPhase: SpawnerPhase.Intensify);
-                }
+                // Tension building phase
+                MoveToNextPhase(specificPhase: SpawnerPhase.Intensify);
                 break;
-
             case SpawnerPhase.Intensify:
-                if (starsCollected >= 4)
-                {
-                    // Trigger loop switch / groove drop
-                    MoveToNextPhase(specificPhase: SpawnerPhase.Release);
-                }
+                 // Trigger loop switch / groove drop
+                MoveToNextPhase(specificPhase: SpawnerPhase.Release);
                 break;
-
             case SpawnerPhase.Release:
-                if (starsCollected >= 4)
-                {
                     // Return to evolve or introduce some weird variation
+//                    ClearDensestTrack();
+//                    MaybeShrinkLoopIfExpanded();
                     MoveToNextPhase(filter: g =>
-                        g.phase == SpawnerPhase.Evolve || g.phase == SpawnerPhase.WildCard
-                    );
-                }
+                        g.phase == SpawnerPhase.Evolve || g.phase == SpawnerPhase.Wildcard);
                 break;
-
-            case SpawnerPhase.WildCard:
-                if (starsCollected >= 4)
-                {
-                    // Bring it back into control
-                    MoveToNextPhase(specificPhase: SpawnerPhase.Pop);
-                }
+            case SpawnerPhase.Wildcard:
+                // Bring it back into control
+//                ClearRandomTrack();
+//                ShiftNoteSetRootForAllTracks();
+                MoveToNextPhase(specificPhase: SpawnerPhase.Pop);
                 break;
             case SpawnerPhase.Pop:
-                if (starsCollected == 4)
-                {
-                    MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
-                }
+//                AdvanceChordsInNoteSets();
+                MoveToNextPhase(specificPhase: SpawnerPhase.Evolve);
                 break;
         }
     }
@@ -299,7 +269,7 @@ Debug.Log($"StarsCollected: {starsCollected}, Total Notes :{totalNotes} Dense Tr
     public void OnMinedObjectCollected()
     {
         totalMinedObjectsCollected++;
-        EvaluateProgression();
+        //EvaluateProgression();
     }
     public int GetCurrentPhaseIndex()
     {

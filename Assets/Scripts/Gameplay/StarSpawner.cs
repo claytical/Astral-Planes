@@ -35,8 +35,8 @@ public class StarSpawner : MonoBehaviour
             }
         }
 
-        drumTrack.GetOrSetCurrentPattern();
-        
+        drumTrack.CurrentPattern = DrumLoopPattern.Establish;
+
     }
 
     void Update()
@@ -49,10 +49,8 @@ public class StarSpawner : MonoBehaviour
             return;
         }
 
-        if (drumTrack.CurrentPattern == null)
-            drumTrack.GetOrSetCurrentPattern(); // ✅ Force a pattern reroll
-        
-        SpawnerPhase phase = (SpawnerPhase)drumTrack.CurrentPattern.Value;
+
+        SpawnerPhase phase = (SpawnerPhase)drumTrack.CurrentPattern;
         if (!profileLookup.TryGetValue(phase, out var profile))
             return;
 
@@ -93,7 +91,7 @@ public class StarSpawner : MonoBehaviour
         if (starScript != null)
         {
             starScript.SetDrums(drumTrack);
-            starScript.pattern = drumTrack.CurrentPattern ?? DrumLoopPattern.Establish;
+            starScript.pattern = DrumLoopPattern.Establish;
             starScript.timeToLive = ttl;
             drumTrack.RegisterDrumLoopCollectable(starScript);
         }

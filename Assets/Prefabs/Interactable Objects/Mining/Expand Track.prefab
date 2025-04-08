@@ -167,15 +167,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38ce369826c744e38a940108da49774e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  minedObjectType: 2
-  noteSetPrefab:
-  - {fileID: 719439756319140960, guid: 5c0fda7d33aa54cef825820d8de64494, type: 3}
-  - {fileID: 8371329850666408441, guid: 43501c40e66084e959c7d85483a8c136, type: 3}
-  - {fileID: 6732900627177215496, guid: efbf469c8f73c47fbb746884e3523168, type: 3}
-  - {fileID: 6732900627177215496, guid: 36cb04e55397f45c4b13acd536224765, type: 3}
+  minedObjectType: 3
   visualEffect: {fileID: 8976316380256152190}
   baseMaterial: {fileID: 2100000, guid: 825ec59c2dc5741ddaf5c6f6d44a2982, type: 2}
   sprite: {fileID: 212053718670736404}
+  assignedTrack: {fileID: 0}
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5
@@ -270,7 +266,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!114 &7460538929032877813

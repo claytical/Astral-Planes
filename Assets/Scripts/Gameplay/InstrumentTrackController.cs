@@ -30,6 +30,19 @@ public class InstrumentTrackController : MonoBehaviour
     {
        // noteVisualizer.DisplayNotes(tracks.ToList());
     }
+    public void BeginGameOverFade()
+    {
+        foreach (var track in tracks)
+        {
+            var loopNotes = track.GetPersistentLoopNotes();
+            for (int i = 0; i < loopNotes.Count; i++)
+            {
+                var (step, note, _, velocity) = loopNotes[i];
+                int longDuration = 1920; // 4 beats (1 bar)
+                track.GetPersistentLoopNotes()[i] = (step, note, longDuration, velocity);
+            }
+        }
+    }
 
     public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
@@ -63,7 +76,7 @@ public class InstrumentTrackController : MonoBehaviour
                 case SpawnerPhase.Release:
                     noteSet.noteBehavior = ChooseFrom(NoteBehavior.Drone, NoteBehavior.Harmony);
                     break;
-                case SpawnerPhase.WildCard:
+                case SpawnerPhase.Wildcard:
                     noteSet.noteBehavior = ChooseRandomBehavior();
                     break;
                 case SpawnerPhase.Pop:

@@ -23,6 +23,12 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         selectedNoteSet.assignedInstrumentTrack = track;
         selectedNoteSet.Initialize(track.drumTrack.totalSteps);
         ApplyTrackVisuals(track.trackColor);
+        Explode explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.NoteSpawner));
+        }
+
     }
 
 

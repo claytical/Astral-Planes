@@ -45,7 +45,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mineNodes:
-  - {fileID: 1781116594832268, guid: 8f39d959283ef4cdd88c73dd0d082cac, type: 3}
-  - {fileID: 1781116594832268, guid: f6066937a0b904388868ea3c73aa6d48, type: 3}
-  - {fileID: 1781116594832268, guid: 346a13eba1a9047328ccd1db2d5d70a8, type: 3}
-  - {fileID: 1781116594832268, guid: baeae635fd8154bf290598aeb4ebf425, type: 3}
+  - prefab: {fileID: 1781116594832268, guid: 346a13eba1a9047328ccd1db2d5d70a8, type: 3}
+    weight: 4
+  - prefab: {fileID: 1781116594832268, guid: baeae635fd8154bf290598aeb4ebf425, type: 3}
+    weight: 4
+  - prefab: {fileID: 1781116594832268, guid: f6066937a0b904388868ea3c73aa6d48, type: 3}
+    weight: 4
+  - prefab: {fileID: 1781116594832268, guid: 8f39d959283ef4cdd88c73dd0d082cac, type: 3}
+    weight: 4
+  selectionMode: 1

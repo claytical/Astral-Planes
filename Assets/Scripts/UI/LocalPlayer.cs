@@ -94,7 +94,11 @@ public void CreatePlayerSelect()
         GamepadManager.Instance.QuitGame();
         
     }
-    
+    public float GetVehicleEnergy()
+    {
+        return plane?.energyLevel ?? 0f;
+    }
+
     public void EnergyCollected(int newAmount)
     {
         ui.EnergyCollected(newAmount);

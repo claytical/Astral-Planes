@@ -22,15 +22,24 @@ public class MineNodeSpawner : MonoBehaviour
     {
         gridPosition = position;
         Vector3 worldPos = drumTrack.GridToWorldPosition(gridPosition);
+        if (nodePrefab == null)
+        {
+            Debug.LogError("No node prefab assigned on " + gameObject.name);
+        }
         spawnedNode = Instantiate(nodePrefab, worldPos, Quaternion.identity);
 
         MineNode nodeScript = spawnedNode.GetComponent<MineNode>();
-        drumTrack.RegisterMineNode(nodeScript);
+            
         if (nodeScript != null)
         {
+            drumTrack.RegisterMineNode(nodeScript);
             nodeScript.SetParentEvolvingObstacle(this);
             nodeScript.SetDrumTrack(drumTrack);
             drumTrack.OccupySpawnGridCell(gridPosition.x, gridPosition.y, GridObjectType.Node);
+        }
+        else
+        {
+            Debug.LogError("No MineNode script assigned on " + gameObject.name);
         }
         
     }

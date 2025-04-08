@@ -7,7 +7,6 @@ using Random = UnityEngine.Random;
 public class Explode : MonoBehaviour
 {
     public GameObject explosion;
-    public float respawnTimer = 10f;
     public float lifetime;
     public bool randomizeLifetimer = false;
     private float explosionTimer;
@@ -42,11 +41,21 @@ public class Explode : MonoBehaviour
         }
     }
 
-
-    public void UntilNextSet()
+    public void ApplyLifetimeProfile(LifetimeProfile profile)
     {
-        Instantiate(explosion, transform.position, Quaternion.identity);
-        gameObject.SetActive(false);
+        if (profile == null) return;
+
+        lifetime = profile.lifetime;
+        randomizeLifetimer = profile.randomizeLifetime;
+
+        if (randomizeLifetimer)
+        {
+            explosionTimer = Time.time + Random.Range(0f, lifetime);
+        }
+        else
+        {
+            explosionTimer = Time.time + lifetime;
+        }
     }
 
     public void DelayedExplosion(float delay = 0.1f)

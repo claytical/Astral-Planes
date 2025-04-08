@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class TrackItemVisual : MonoBehaviour
 {
-    public enum ItemType { Expansion, AntiNote, Clear }
+    public enum ItemType { Expansion, AntiNote, Clear, Shoft }
 
     [Header("Function & Color")]
     public ItemType itemType = ItemType.Expansion;
@@ -57,6 +57,12 @@ public class TrackItemVisual : MonoBehaviour
         {
             transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
         }
+        if (itemType == ItemType.Shoft)
+        {
+            float hue = Mathf.PingPong(Time.time * 0.2f, 1f);
+            circleRenderer.color = Color.HSVToRGB(hue, 0.6f, 1f);
+        }
+
     }
 
     private void CreateCircle()
@@ -105,6 +111,15 @@ public class TrackItemVisual : MonoBehaviour
                 shouldPulse = false;
                 circleRenderer.color = Color.Lerp(trackColor, Color.gray, 0.5f);
                 break;
+
+            case ItemType.Shoft:
+                iconText.text = "?";
+                iconText.color = new Color(1f, 0.9f, 0.6f); // soft glowing off-white
+                circleRenderer.color = Color.Lerp(trackColor, Color.magenta, 0.5f); // blend track color with pink
+                shouldPulse = true;
+                shouldRotate = true;
+                break;
+            
         }
     }
 

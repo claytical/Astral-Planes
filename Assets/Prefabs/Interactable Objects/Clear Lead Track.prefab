@@ -168,7 +168,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38ce369826c744e38a940108da49774e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  minedObjectType: 1
+  minedObjectType: 2
   visualEffect: {fileID: 8976316380256152190}
   baseMaterial: {fileID: 2100000, guid: 825ec59c2dc5741ddaf5c6f6d44a2982, type: 2}
   sprite: {fileID: 212053718670736404}
@@ -267,7 +267,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!114 &3208189728250256471

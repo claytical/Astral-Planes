@@ -18,22 +18,28 @@ public class Collectable : MonoBehaviour
     public event Action OnDestroyed;
 
     // 🔹 Initializes the collectable with its note data
-    public void Initialize(int note, int duration, InstrumentTrack track)
+    public void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet)
     {
         assignedNote = note;
         noteDurationTicks = duration;
         assignedInstrumentTrack = track;
-        if (GetComponent<ParticleSystem>())
+        CollectableParticles particleScript = GetComponent<CollectableParticles>();
+        if (particleScript != null && noteSet != null)
         {
-            ParticleSystem.MainModule particleSystem = GetComponent<ParticleSystem>().main;
-            particleSystem.startColor = track.trackColor;
+            particleScript.Configure(noteSet);
         }
+
         energySprite.color = track.trackColor;
 
         if (assignedInstrumentTrack == null)
         {
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
         }
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.Note));
+        }        
     }
 
     public int GetNote()

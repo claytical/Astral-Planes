@@ -4,6 +4,12 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using Random = UnityEngine.Random;
+public class PhaseSnapshot {
+    public DrumLoopPattern pattern;
+    public Color color;
+    public List<(int step, int note, float velocity)> collectedNotes = new();
+    public float timestamp; // optional
+}
 
 public enum DrumLoopPattern
 {
@@ -27,6 +33,7 @@ public class DrumTrack : MonoBehaviour
     public EnergyWaveEffect wave;
     [Header("Drum Pattern Visuals")]
     public List<DrumLoopPatternVisual> patternVisuals;
+    public ConstellationVisualizer constellationVisualizer;
     public AudioClip[] establishDrumClips;
     public AudioClip[] evolveDrumClips;
     public AudioClip[] intensifyDrumClips;
@@ -38,17 +45,20 @@ public class DrumTrack : MonoBehaviour
     public AudioSource drumAudioSource;
     public InstrumentTrackController trackController;
     public double startDspTime;
-    private DrumLoopPattern? currentPattern = null;
+    public DrumLoopPattern currentPattern = DrumLoopPattern.Establish;
     private bool patternLocked = false;
     private float gridCheckTimer = 0f;
     private float gridCheckInterval = 10f;
-
-    private float loopLengthInSeconds;       // Duration of the loop.
+    private DrumLoopPattern queuedPattern;
+    private SpawnerPhase? queuedPhase = null;
+    private float loopLengthInSeconds;
+    [SerializeField] private float loopDurationInSeconds = 8f;       // Duration of the loop.
     private SpawnGrid spawnGrid;
     private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
 //    private List<DrumLoopCollectable> drumLoopCollectables = new List<DrumLoopCollectable>();
     private List<DrumLoopCollectable> activeStars = new List<DrumLoopCollectable>();
     private List<DrumLoopCollectable> collectedStars = new List<DrumLoopCollectable>();
+    private List<PhaseSnapshot> sessionPhases = new();
 
     private List<MineNode> mineNodes = new List<MineNode>();
     private List<MinedObject> activeMinedObjects = new List<MinedObject>();
@@ -101,6 +111,7 @@ public class DrumTrack : MonoBehaviour
         // ✅ Ensure this only runs once per loop restart
         if (currentLoop > lastLoopCount)
         {
+            Debug.Log($"Loop {currentLoop} started — calling LoopRoutines()");
             lastLoopCount = currentLoop;
             CleanupExplodedMineNodes();
             LoopRoutines();
@@ -120,9 +131,9 @@ public class DrumTrack : MonoBehaviour
 
         if (GetCollectedStarCount() == 0 && GetActiveStarCount() == 0)
         {
-            Debug.Log("All stars expired, rerolling pattern...");
-            currentPattern = null;
-            patternLocked = false;
+         //   Debug.Log("All stars expired, rerolling pattern...");
+         //   currentPattern = null;
+         //   patternLocked = false;
         }
     }
 
@@ -185,6 +196,25 @@ public class DrumTrack : MonoBehaviour
     {
         return spawnGrid.gridHeight;
     }
+    void FinalizeCurrentPhaseSnapshot()
+    {
+        var snapshot = new PhaseSnapshot {
+            pattern = currentPattern,
+            color = GetVisualForPattern(currentPattern)?.color ?? Color.white,
+            timestamp = Time.time
+        };
+
+        foreach (var track in trackController.tracks)
+        {
+            foreach (var (step, note, duration, velocity) in track.GetPersistentLoopNotes())
+            {
+                snapshot.collectedNotes.Add((step, note, velocity));
+            }
+        }
+
+        sessionPhases.Add(snapshot);
+    }
+
     public void ClearAllActiveMineNodes()
     {
         // Clear MineNodeSpawners
@@ -262,7 +292,7 @@ public class DrumTrack : MonoBehaviour
 
     public float GetLoopLengthInSeconds()
     {
-        return loopLengthInSeconds;
+        return loopDurationInSeconds;
     }
     
     public void SetTempo(float newBPM)
@@ -300,9 +330,6 @@ public class DrumTrack : MonoBehaviour
     
     private IEnumerator MergeAllCollectablesIntoCenter()
     {
-        // Don't reset the pattern here! This was causing the phase to get stuck.
-        // currentPattern = null;
-        // patternLocked = false;
         Debug.Log("[DrumTrack] Merging collectables...");
 
         List<DrumLoopCollectable> collectablesToDestroy = new List<DrumLoopCollectable>(collectedStars);
@@ -311,21 +338,43 @@ public class DrumTrack : MonoBehaviour
         {
             if (collectable != null)
             {
-                Debug.Log($"[DrumTrack] Triggering final burst for: {collectable.name}");
-                collectable.TriggerFinalBurst(); // ❗ Only call once
+                collectable.TriggerFinalBurst();
             }
         }
 
-        // ✅ Let each collectable clean itself up (RemoveDrumLoopCollectable, destroy, etc.)
-        yield return new WaitForSeconds(2f); // enough time for particles to play
+        yield return new WaitForSeconds(2f); // allow particles to play
 
-        collectedStars.Clear(); // ✅ Clear the list now
+        collectedStars.Clear(); // ✅ clear collected stars now
         isTransitioning = false;
 
-        // Instead of just clearing the pattern, notify the progression manager that we completed a collection
-        progressionManager.NotifyStarsCollected();
-
+        // ✅ Only notify progression manager once, here.
+        progressionManager.NotifyStarsCollected(); // → triggers EvaluateProgression
+        if (constellationVisualizer != null)
+        {
+            var snapshot = BuildCurrentPhaseSnapshot();
+            constellationVisualizer.AddSnapshot(snapshot);
+        }
         Debug.Log("[DrumTrack] Drum Loop Collectables reset and cleared.");
+    }
+    private PhaseSnapshot BuildCurrentPhaseSnapshot()
+    {
+        var snapshot = new PhaseSnapshot
+        {
+            pattern = currentPattern,
+            color = GetVisualForPattern(currentPattern)?.color ?? Color.white,
+            timestamp = Time.time,
+            collectedNotes = new List<(int step, int note, float velocity)>()
+        };
+
+        foreach (var track in trackController.tracks)
+        {
+            foreach (var (step, note, _, velocity) in track.GetPersistentLoopNotes())
+            {
+                snapshot.collectedNotes.Add((step, note, velocity));
+            }
+        }
+
+        return snapshot;
     }
 
     public void RemoveActiveMineNode(GameObject node)
@@ -399,26 +448,44 @@ public class DrumTrack : MonoBehaviour
     {
         if (isTransitioning) return;
         isTransitioning = true;
-    
+
         double dspNow = AudioSettings.dspTime;
         double loopEndDsp = startDspTime + (lastLoopCount + 1) * loopLengthInSeconds;
         double timeRemaining = loopEndDsp - dspNow;
 
         wave.TriggerWave(Vector3.zero, (float)timeRemaining);
 
-        // Resolve the pattern - don't reset it yet as progression depends on it
-        DrumLoopPattern patternToUse = GetOrSetCurrentPattern(); // Safely assign if null
-        ScheduleDrumLoopChange(SelectDrumClip(patternToUse));
+        // 🔁 Peek at next phase and get its corresponding pattern
+        SpawnerPhase? nextPhase = progressionManager.PeekNextPhase();
+        DrumLoopPattern nextPattern = currentPattern; // fallback
+
+        if (nextPhase.HasValue)
+        {
+            queuedPhase = nextPhase.Value;
+            queuedPattern = (DrumLoopPattern)nextPhase.Value;
+            nextPattern = queuedPattern;
+        }
+
+        // ✅ Now schedule the next drum loop using the correct pattern
+        ScheduleDrumLoopChange(SelectDrumClip(nextPattern));
+
+        // ✅ Update all collected star visuals before progressing
+        var visual = GetVisualForPattern(nextPattern);
+        foreach (var star in collectedStars)
+        {
+            star.pattern = nextPattern;
+            star.ApplyVisual(visual);
+        }
+
         ExplodeAllMineNodes();
-    
-        // Don't reset pattern here - let the progression manager handle it
-        // The pattern will be reset after the transition is complete
     }
-    public DrumLoopPattern? CurrentPattern
+
+    public DrumLoopPattern CurrentPattern
     {
         get => currentPattern;
         set => currentPattern = value;
     }
+
     private DrumLoopPattern ChooseRandomPattern()
     {
         Array values = Enum.GetValues(typeof(DrumLoopPattern));
@@ -426,45 +493,18 @@ public class DrumTrack : MonoBehaviour
     }
     public void SetPatternFromPhase(SpawnerPhase phase)
     {
-        switch (phase)
+        if (Enum.IsDefined(typeof(DrumLoopPattern), (int)phase))
         {
-            case SpawnerPhase.Establish:
-                currentPattern = DrumLoopPattern.Establish;
-                break;
-            case SpawnerPhase.Evolve:
-                currentPattern = DrumLoopPattern.Evolve;
-                break;
-            case SpawnerPhase.Intensify:
-                currentPattern = DrumLoopPattern.Intensify;
-                break;
-            case SpawnerPhase.Release:
-                currentPattern = DrumLoopPattern.Release;
-                break;
-            case SpawnerPhase.WildCard:
-                currentPattern = DrumLoopPattern.Wildcard;
-                break;
-            case SpawnerPhase.Pop:
-                currentPattern = DrumLoopPattern.Pop;
-                break;
-            default:
-                Debug.LogWarning($"No mapped pattern for phase {phase}");
-                break;
+            currentPattern = (DrumLoopPattern)phase;
+            Debug.Log($"[DrumTrack] Pattern set from phase: {phase} → {currentPattern}");
         }
-
-        Debug.Log($"[DrumTrack] Pattern set from phase: {phase} → {currentPattern}");
+        else
+        {
+            Debug.LogWarning($"[DrumTrack] No mapped pattern for phase {phase}");
+        }
     }
 
-    public DrumLoopPattern GetOrSetCurrentPattern()
-    {
-        if (currentPattern == null)
-        {
-            Debug.LogWarning("No current pattern set from phase. Falling back to default");
-            // ✅ Pull next from the defined progression queue
-            currentPattern = DrumLoopPattern.Establish;
-        }
-        return currentPattern.Value;
-    }
-
+    
 
     public int GetCurrentStep()
     {
@@ -477,7 +517,6 @@ public class DrumTrack : MonoBehaviour
         HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
         HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
         progressionManager.OnLoopCompleted();
-        progressionManager.EvaluateProgression();
         SpawnMineNode();
     }
 
@@ -523,11 +562,12 @@ public class DrumTrack : MonoBehaviour
         // ✅ Update Star visuals dynamically
         foreach (var star in collectedStars)
         {
-            var visual = GetVisualForPattern(currentPattern.Value);
+            var visual = GetVisualForPattern(currentPattern);
             star.ApplyVisual(visual);        
         }
         if (GetCollectedStarCount() >= 4)
         {
+            FinalizeCurrentPhaseSnapshot();
             PushToNextPlane();
             StartCoroutine(MergeAllCollectablesIntoCenter());
         }
@@ -578,6 +618,8 @@ public class DrumTrack : MonoBehaviour
     }
     private void SpawnMineNode()
     {
+        Debug.Log($"Attempting to spawn a mine node at loop {lastLoopCount}");
+
         Vector2Int spawnCell = spawnGrid.GetRandomAvailableCell();
         if (spawnCell.x == -1)
         {
@@ -587,7 +629,6 @@ public class DrumTrack : MonoBehaviour
 
         Vector3 spawnPosition = GridToWorldPosition(spawnCell);
         MineNodeSpawnerSet currentSet = progressionManager.GetCurrentSpawnerSet();
-Debug.Log($"CURRENT SET: {currentSet.gameObject.name}");
         if (currentSet == null)
         {
             Debug.LogWarning("No current MineNodeSpawnerSet assigned.");
@@ -603,7 +644,11 @@ Debug.Log($"CURRENT SET: {currentSet.gameObject.name}");
             evolvingNode.SetDrumTrack(this);
             evolvingNode.SpawnNode(spawnCell); // ✅ Create the initial Block Obstacle
             activeNodes.Add(newNodeParent);
-            spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Node);
+//            spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Node);
+        }
+        else
+        {
+            Debug.LogError($"[DrumTrack No MineNodeSpawner assigned on {newNodeParent.name}.");
         }
     }
     
@@ -717,20 +762,24 @@ Debug.Log($"CURRENT SET: {currentSet.gameObject.name}");
         double nextStart = Mathf.CeilToInt((float)(dspNow / loopLengthInSeconds)) * loopLengthInSeconds;
 
         drumAudioSource.PlayScheduled(nextStart);
-        startDspTime = nextStart;
+        if (startDspTime == 0)
+        {
+            startDspTime = nextStart;
+        }
 
         Debug.Log($"✅ Drum loop changed to: {pendingDrumLoop.name}");
 
         // Now safe to reset these as the transition is complete
-        currentPattern = null;
         patternLocked = false;
         pendingDrumLoop = null;
-    
-        // Force check progression to handle any pending transitions
-        if (progressionManager != null)
+// Finalize queued pattern + phase after drum loop starts
+        if (queuedPhase.HasValue)
         {
-            progressionManager.EvaluateProgression();
+            SetPatternFromPhase(queuedPhase.Value); // updates currentPattern
+            progressionManager.MoveToNextPhase(specificPhase: queuedPhase.Value);
+            queuedPhase = null;
         }
+        lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / loopLengthInSeconds);
     }
 
     private IEnumerator InitializeDrumLoop()
