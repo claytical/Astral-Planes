@@ -115,6 +115,47 @@ public class GamepadManager : MonoBehaviour
         SceneManager.LoadScene("TrackSelection");
         Destroy(this.gameObject);
     }
+    public void CheckAllPlayersOutOfEnergy()
+    {
+        bool allOut = true;
+        foreach (var player in localPlayers)
+        {
+            if (player.IsReady && player.GetVehicleEnergy() > 0f)
+            {
+                allOut = false;
+                break;
+            }
+        }
+
+        if (allOut)
+        {
+            StartCoroutine(HandleGameOverSequence());
+        }
+    }
+    private IEnumerator HandleGameOverSequence()
+    {
+        InstrumentTrackController itc = FindObjectOfType<InstrumentTrackController>();
+        itc.BeginGameOverFade();
+
+        yield return new WaitForSeconds(2f); // Let notes ring
+
+        // Add a UI overlay (e.g., a full-screen black image) and fade it in
+        GameObject fadeOverlay = GameObject.Find("FadeOverlay"); // Make sure this exists
+        if (fadeOverlay)
+        {
+            CanvasGroup canvasGroup = fadeOverlay.GetComponent<CanvasGroup>();
+            for (float t = 0; t < 1f; t += Time.deltaTime)
+            {
+                canvasGroup.alpha = t;
+                yield return null;
+            }
+        }
+
+        yield return new WaitForSeconds(1f); // Hold before reset
+
+        LoadNewScene("TrackFinished"); // Or "TrackSelection" if you want restart
+    }
+
     public void CheckAllPlayersGone()
     {
         foreach (LocalPlayer player in localPlayers)

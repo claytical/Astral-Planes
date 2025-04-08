@@ -20,6 +20,35 @@ public enum ChordPattern
     Sus4,          // (C, F, G) - Suspended, unresolved
     Arpeggiated,   // (C, E, G, E) - Repeating movement
 }
+public static class ChordLibrary
+{
+    public static readonly Dictionary<string, int[]> Formulas = new()
+    {
+        { "Major",     new[] { 0, 4, 7 } },
+        { "Minor",     new[] { 0, 3, 7 } },
+        { "Minor7",    new[] { 0, 3, 7, 10 } },
+        { "Major7",    new[] { 0, 4, 7, 11 } },
+        { "Sus4",      new[] { 0, 5, 7 } },
+        { "Fifths",    new[] { 0, 7 } },
+        { "Diminished",new[] { 0, 3, 6 } },
+    };
+
+    public static int[] GetRandomChord()
+    {
+        var keys = Formulas.Keys.ToList();
+        string key = keys[Random.Range(0, keys.Count)];
+        Debug.Log($"🎵 Random chord selected: {key}");
+        return Formulas[key];
+    }
+
+    public static int[] GetChord(string name)
+    {
+        if (Formulas.TryGetValue(name, out var chord))
+            return chord;
+
+        return Formulas["Major"]; // fallback
+    }
+}
 
 public enum ScaleType
 {
@@ -131,6 +160,28 @@ public class NoteSet : MonoBehaviour
         }
 
         Debug.Log($"Generated {notes.Count} notes from adjusted root {adjustedRootMidi}.");
+    }
+    public int[] GetChordOffsets()
+    {
+        return ChordLibrary.GetChord(chordPattern.ToString());
+    }
+
+    public int[] GetRandomChordOffsets()
+    {
+        return ChordLibrary.GetRandomChord();
+    }
+
+    public void ShiftRoot(int semitoneDelta)
+    {
+        rootMidi += semitoneDelta;
+        rootMidi = Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
+        BuildNotesFromKey(); // rebuild scale
+    }
+
+    public void ChangeNoteBehavior(NoteBehavior newBehavior)
+    {
+        noteBehavior = newBehavior;
+        BuildNotesFromKey(); // may change octave/root
     }
 
     private int AdjustRootOctave(int baseRoot)

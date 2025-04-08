@@ -6,23 +6,6 @@ public enum MinedObjectCategory {
     NoteModifier
 }
 
-public enum MinedObjectType
-{
-    // 🎼 Adds new content
-    NoteSpawner,
-
-    // 🛠 Structural utilities
-    TrackClear,
-    LoopExpansion,
-    AntiNoteSpawner,
-
-    // 🎨 NoteSet modifiers
-    ChordChange,
-    RootShift,
-    NoteBehaviorChange,
-    RhythmStyleChange
-}
-
 public class MinedObject : MonoBehaviour
 {
     public MinedObjectType minedObjectType;
@@ -44,12 +27,26 @@ public class MinedObject : MonoBehaviour
             minedCollider.enabled = false; // ✅ Start with disabled collider
         }
         originalScale = transform.localScale;
-        AssignVisuals();
+        // ⏱️ Apply lifetime from profile if Explode is present
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            LifetimeProfile profile = LifetimeProfile.GetProfile(minedObjectType);
+            explode.ApplyLifetimeProfile(profile);
+        }        
+
+    }
+    public void AssignTrack(InstrumentTrack track)
+    {
+        assignedTrack = track;
         if (assignedTrack.drumTrack != null)
         {
-            assignedTrack.drumTrack.RegisterMinedObject(this);        
+            assignedTrack.drumTrack.RegisterMinedObject(this);
         }
+        AssignVisuals();
+
     }
+
     void OnDestroy()
     {
         if (assignedTrack.drumTrack != null)
@@ -58,17 +55,31 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-    public static MinedObjectCategory GetCategory(MinedObjectType type) {
-        switch(type) {
-            case MinedObjectType.NoteSpawner: return MinedObjectCategory.NoteSpawner;
+    public static MinedObjectCategory GetCategory(MinedObjectType type)
+    {
+        switch (type)
+        {
+            case MinedObjectType.NoteSpawner:
+                return MinedObjectCategory.NoteSpawner;
+
             case MinedObjectType.TrackClear:
             case MinedObjectType.LoopExpansion:
             case MinedObjectType.AntiNoteSpawner:
                 return MinedObjectCategory.TrackUtility;
+
+            case MinedObjectType.ChordChange:
+            case MinedObjectType.NoteBehaviorChange:
+            case MinedObjectType.RootShift:
+            case MinedObjectType.RhythmStyleChange:
+            case MinedObjectType.Shoft:
+                return MinedObjectCategory.NoteModifier;
+
             default:
+                Debug.LogWarning($"⚠️ Unhandled MinedObjectType: {type}. Defaulting to NoteModifier.");
                 return MinedObjectCategory.NoteModifier;
         }
     }
+
     
     public void EnableColliderAfterDelay(float delay)
     {
@@ -88,7 +99,7 @@ public class MinedObject : MonoBehaviour
     private void AssignVisuals()
     {
         MinedObjectCategory category = GetCategory(minedObjectType);
-
+        sprite.color = assignedTrack.trackColor;
         switch (category)
         {
             case MinedObjectCategory.NoteModifier:

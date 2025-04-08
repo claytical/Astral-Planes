@@ -211,13 +211,18 @@ public class Vehicle : MonoBehaviour
             activeTrail.GetComponent<TrailRenderer>().emitting = false;
         }
     }
-
     private void ConsumeEnergy(float amount)
     {
         energyLevel -= amount;
         if (energyLevel < 0) energyLevel = 0;
         UpdateEnergyUI();
+
+        if (energyLevel == 0)
+        {
+            GamepadManager.Instance.CheckAllPlayersOutOfEnergy();
+        }
     }
+    
     public void CollectEnergy(int amount)
     {
         

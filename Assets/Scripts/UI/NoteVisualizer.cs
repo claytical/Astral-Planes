@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine.UI;
 
 public class NoteVisualizer : MonoBehaviour
@@ -57,18 +58,15 @@ public class NoteVisualizer : MonoBehaviour
         if (playheadLine == null || drums == null || tracks == null)
             return;
 
+        float globalElapsed = (float)(AudioSettings.dspTime - drums.startDspTime);
         float baseLoopLength = drums.GetLoopLengthInSeconds();
-        int longestMultiplier = tracks.GetMaxLoopMultiplier();
-        float fullVisualLoopDuration = baseLoopLength * longestMultiplier;
+        int globalLoopMultiplier = tracks.GetMaxLoopMultiplier();
+        float fullVisualLoopDuration = baseLoopLength * globalLoopMultiplier;
 
-        float elapsedTime = (float)(AudioSettings.dspTime - drums.startDspTime);
-        float normalized = (elapsedTime % fullVisualLoopDuration) / fullVisualLoopDuration;
-        float xPos = normalized * screenWidth;
-
-        Vector2 anchored = playheadLine.anchoredPosition;
-        anchored.x = xPos;
-        playheadLine.anchoredPosition = anchored;
-
+        float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
+        float xPos = globalNormalized * screenWidth;
+        playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
+        int longestLoopSteps = tracks.tracks.Max(track => track.GetTotalSteps());
         for (int i = 0; i < ribbons.Count; i++)
         {
             LineRenderer lr = ribbons[i];
@@ -78,25 +76,39 @@ public class NoteVisualizer : MonoBehaviour
             Vector3[] positions = new Vector3[ribbonResolution];
             float width = row.rect.width;
 
+            int trackSteps = track.GetTotalSteps();
+            int repeats = Mathf.Max(1, longestLoopSteps / trackSteps);
+
+            var loopNotes = track.GetPersistentLoopNotes();
+
             for (int j = 0; j < ribbonResolution; j++)
             {
-                float t = j / (float)(ribbonResolution - 1);
+                float t = j / (float)(ribbonResolution - 1); // 0 to 1
                 float x = t * width;
+                float y = 0f;
 
-                int step = Mathf.RoundToInt(t * drums.totalSteps);
+                int visualStep = Mathf.FloorToInt(t * longestLoopSteps);
                 float activeNoteVelocity = 0f;
 
-                foreach (var (noteStep, _, _, velocity) in track.GetPersistentLoopNotes())
+                for (int r = 0; r < repeats; r++)
                 {
-                    if (noteStep % drums.totalSteps == step)
+                    int localStep = visualStep - r * trackSteps;
+                    if (localStep < 0) continue;
+
+                    foreach (var (noteStep, _, _, velocity) in loopNotes)
                     {
-                        activeNoteVelocity = velocity / 127f;
-                        break;
+                        if (noteStep == localStep)
+                        {
+                            activeNoteVelocity = velocity / 127f;
+                            break;
+                        }
                     }
+
+                    if (activeNoteVelocity > 0f) break;
                 }
 
                 float baseWave = Mathf.Sin(Time.time * waveSpeed + t * waveFrequency) * waveAmplitude;
-                float y = baseWave + activeNoteVelocity * velocityMultiplier;
+                y = baseWave + activeNoteVelocity * velocityMultiplier;
 
                 positions[j] = new Vector3(x, y, 0);
             }
@@ -107,6 +119,9 @@ public class NoteVisualizer : MonoBehaviour
             faded.a = 0.6f;
             lr.startColor = lr.endColor = faded;
         }
+        
+        
+
     }
 
     private float GetScreenWidth()

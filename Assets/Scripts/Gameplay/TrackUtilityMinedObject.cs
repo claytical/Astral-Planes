@@ -2,13 +2,20 @@ using UnityEngine;
 
 public class TrackUtilityMinedObject : MonoBehaviour
 {
-    public enum UtilityType { LoopExpansion, AntiNote, TrackClear }
+    public enum UtilityType { LoopExpansion, AntiNote, TrackClear, Shift }
     public UtilityType type;
     public MusicalRole targetRole;
     
     public void Initialize(InstrumentTrack track)
     {
-        GetComponent<MinedObject>().assignedTrack = track;
+        GetComponent<MinedObject>().AssignTrack(track);
+
+        // Setup lifetime
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.TrackUtility));
+        }
     }
 
     public void OnCollected()
@@ -30,7 +37,10 @@ public class TrackUtilityMinedObject : MonoBehaviour
                 assignedTrack.SpawnAntiNote();
                 break;
             case UtilityType.TrackClear:
-                assignedTrack.ForceClearTrack();
+                assignedTrack.ClearLoopedNotes();
+                break;
+            case UtilityType.Shift:
+                assignedTrack.PerformSmartNoteModification();
                 break;
         }
 
