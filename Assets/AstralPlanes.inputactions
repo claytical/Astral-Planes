@@ -15,6 +15,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Choose",
+                    "type": "Value",
+                    "id": "b795f0a9-4433-499b-b3d9-c5b278c2df2f",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "Thrust",
                     "type": "Value",
                     "id": "f7e61601-7744-4c7c-aa2d-6e067b92a039",
@@ -69,6 +78,17 @@
                     "processors": "",
                     "groups": "Game",
                     "action": "Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "Hold",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

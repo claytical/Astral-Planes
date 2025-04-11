@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -135,25 +136,48 @@ public class GamepadManager : MonoBehaviour
     private IEnumerator HandleGameOverSequence()
     {
         InstrumentTrackController itc = FindObjectOfType<InstrumentTrackController>();
+        DrumTrack drumTrack = FindObjectOfType<DrumTrack>();
+
+        // 1. Sustain notes longer
         itc.BeginGameOverFade();
 
-        yield return new WaitForSeconds(2f); // Let notes ring
+        // 2. Fade to black
+        GameObject fadeOverlay = GameObject.Find("FadeOverlay");
+        CanvasGroup canvasGroup = fadeOverlay?.GetComponent<CanvasGroup>();
 
-        // Add a UI overlay (e.g., a full-screen black image) and fade it in
-        GameObject fadeOverlay = GameObject.Find("FadeOverlay"); // Make sure this exists
-        if (fadeOverlay)
+        if (canvasGroup != null)
         {
-            CanvasGroup canvasGroup = fadeOverlay.GetComponent<CanvasGroup>();
             for (float t = 0; t < 1f; t += Time.deltaTime)
             {
-                canvasGroup.alpha = t;
+                canvasGroup.alpha = Mathf.Lerp(0f, 1f, t);
                 yield return null;
             }
+            canvasGroup.alpha = 1f;
         }
 
-        yield return new WaitForSeconds(1f); // Hold before reset
+        // 3. Wait for the rest of the current loop
+        if (drumTrack != null)
+        {
+            double remaining = drumTrack.GetRemainingLoopTime();
+            yield return new WaitForSeconds((float)remaining);
+        }
 
-        LoadNewScene("TrackFinished"); // Or "TrackSelection" if you want restart
+        // 4. Fade out drum loop volume
+        if (drumTrack?.drumAudioSource != null)
+        {
+            AudioSource music = drumTrack.drumAudioSource;
+            float startVolume = music.volume;
+            for (float t = 0; t < 1f; t += Time.deltaTime)
+            {
+                music.volume = Mathf.Lerp(startVolume, 0f, t);
+                yield return null;
+            }
+            music.Stop();
+            music.volume = startVolume; // reset for next round
+        }
+
+        // 5. Transition to final scene with quote
+        LoadNewScene("TrackFinished");
     }
 
     public void CheckAllPlayersGone()
@@ -294,13 +318,23 @@ public class GamepadManager : MonoBehaviour
     private void StartSelectedTrack()
     {
         InstrumentTrackController instrumentTrackController = FindFirstObjectByType<InstrumentTrackController>();
+
         DrumTrack drumTrack = FindFirstObjectByType<DrumTrack>();
         drumTrack.ManualStart();
         for (int i = 0; i < localPlayers.Count; i++)
         {
             localPlayers[i].Launch(drumTrack);
         }
-        
+
+        List<ShipMusicalProfile> shipProfiles = localPlayers
+            .Select(lp => lp.GetSelectedShipName())
+            .Where(name => ShipMusicalProfiles.PresetsByShip.ContainsKey(name))
+            .Select(name => ShipMusicalProfiles.PresetsByShip[name])
+            .ToList();
+
+        instrumentTrackController.ConfigureTracksFromShips(shipProfiles);
+        Debug.Log(instrumentTrackController.GenerateCrypticIntroPhrase());
+
     }
     private void HandleTrackSceneSetup()
     {
@@ -338,30 +372,6 @@ public class GamepadManager : MonoBehaviour
             allPlayerStats[i] = localPlayers[i].GetComponent<PlayerStatsTracking>();
         }
 
-        // Instantiate and populate stats for each player
-        foreach (var player in localPlayers)
-        {
-            PlayerStatsTracking stats = player.GetComponent<PlayerStatsTracking>();
-            if (stats != null)
-            {
-                GameObject statsInstance = Instantiate(finalStatsScreen, playersUIParent.transform);
-                PlayerStatsDisplay statsDisplay = statsInstance.GetComponentInChildren<PlayerStatsDisplay>();
-                if (statsDisplay != null)
-                {
-                    statsDisplay.PopulateStats(stats, allPlayerStats);
-                }
-                else
-                {
-                    Debug.LogWarning("PlayerStatsDisplay component not found on instantiated prefab.");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"Player {player.name} does not have a PlayerStatsTracking component.");
-            }
-        }
-
-        finalStatsScreen.SetActive(true);
     }
     private void HandleTrackSelectionSceneSetup()
     {

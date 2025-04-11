@@ -5,7 +5,37 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
+public static class RolePresetLibrary
+{
+    public static readonly Dictionary<MusicalRole, List<int>> RoleToPresets = new()
+    {
+        // Bass
+        { MusicalRole.Bass, new List<int> { 32, 33, 34, 35, 36, 37, 38, 39 } },
 
+        // Lead
+        { MusicalRole.Lead, new List<int> {
+            24, 25, 26, // Guitars
+            80, 81, 82, 83, 84, 85, 86, 87, // Lead Synths
+            73, 74, 75 // Flute, Recorder, Pan Flute
+        }},
+
+        // Harmony
+        { MusicalRole.Harmony, new List<int> {
+            0, 1, 2, 3, // Pianos
+            48, 49, 50, 51, 52, 53, // Strings
+            88, 89, 90, 91, 92, 93, // Pads
+            16, 17, 18 // Organs
+        }},
+
+        // Groove
+        { MusicalRole.Groove, new List<int> {
+            115, 116, 117, 118, 119, // Percussion FX
+            12, 13, 14, // Mallets
+            24, 27, 28, // Guitars
+            56, 57, 58 // Ensemble/Synth Hits
+        }}
+    };
+}
 public class InstrumentTrack : MonoBehaviour
 {
     [Header("Track Settings")]
@@ -90,7 +120,6 @@ public class InstrumentTrack : MonoBehaviour
             PlayLoopedNotes(localStep);
             lastStep = localStep;
         }
-        Debug.Log($"[{name}] totalSteps={totalSteps}, stepDuration={stepDuration:F2}, elapsed={elapsedTime:F2}, localStep={localStep}");
 
     }
 
@@ -231,8 +260,6 @@ private void ApplyRootShift(NoteSet noteSet)
     {
         int stepIndex = GetCurrentStep();
 
-        // ✅ Add the note to the persistent loop
-        Debug.Log($"Adding {note} with {force} for {durationTicks} to step {stepIndex} ");
         persistentLoopNotes.Add((stepIndex, note, durationTicks, force));
         controller.UpdateVisualizer();
         PlayNote(note, durationTicks, force);
@@ -258,12 +285,10 @@ private void ApplyRootShift(NoteSet noteSet)
   
     void PlayLoopedNotes(int localStep)
     {
-        Debug.Log($"🎵 [{gameObject.name}] Playing step {localStep} of {totalSteps}");
         foreach (var (storedStep, note, duration, velocity) in persistentLoopNotes)
         {
             if (storedStep == localStep)
             {
-                Debug.Log($"    Stored step: {storedStep}, match? {storedStep == localStep}");
                 PlayNote(note, duration, velocity);
             }
         }

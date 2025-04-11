@@ -44,7 +44,6 @@ public class GravityZone : MonoBehaviour
     private void ApplyEffects(Vehicle vehicle)
     {
         vehicle.energyLevel = Mathf.Max(0, vehicle.energyLevel - damage);
-        vehicle.UpdateEnergyUI();
         parentHazard.AbsorbEnergy(damage);
         Debug.Log($"{vehicle.name} lost {damage} energy due to collision with {gameObject.name}");
     }

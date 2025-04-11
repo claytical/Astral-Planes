@@ -79,7 +79,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: -712631045867808456, guid: b670ab75dde984907b8570040daa08c5,
     type: 3}
-  m_Color: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 0.7176471}
+  m_Color: {r: 0.18039216, g: 0.22745098, b: 0.2509804, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -167,6 +167,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   minedPrefabs:
   - {fileID: 1781116594832268, guid: f5c52265b05de4434ba274fecd7cd96f, type: 3}
+  coreSprite: {fileID: 212053718670736404}
+  minedObjectType: 2
   debris: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d, type: 3}
   strength: 100
   maxStrength: 400
@@ -267,6 +269,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0

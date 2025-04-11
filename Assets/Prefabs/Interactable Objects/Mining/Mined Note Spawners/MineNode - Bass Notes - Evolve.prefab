@@ -170,6 +170,8 @@ MonoBehaviour:
   - {fileID: 1781116594832268, guid: 67a1cb2e5c93b4f309086d1a28f822ad, type: 3}
   - {fileID: 1781116594832268, guid: 67a1cb2e5c93b4f309086d1a28f822ad, type: 3}
   - {fileID: 1781116594832268, guid: 67a1cb2e5c93b4f309086d1a28f822ad, type: 3}
+  coreSprite: {fileID: 212053718670736404}
+  minedObjectType: 0
   debris: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d, type: 3}
   strength: 100
   maxStrength: 400
@@ -270,6 +272,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0

@@ -1,6 +1,77 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
+public static class ShipMusicalProfiles
+{
+    public static readonly Dictionary<string, ShipMusicalProfile> PresetsByShip = new()
+    {
+        {
+            "Drifter",
+            new ShipMusicalProfile {
+                shipName = "Drifter",
+                allowedMidiPresets = new List<int> { 32, 33, 34, 48, 49, 50 },
+                description = "Ambient and steady. Prefers low-end and smooth textures."
+            }
+        },
+        {
+            "Flo-Tilla",
+            new ShipMusicalProfile {
+                shipName = "Flo-Tilla",
+                allowedMidiPresets = new List<int> { 0, 1, 3, 88, 89, 90, 115, 116 },
+                description = "Swirling and collaborative. Prefers pads, ambient keys, and light rhythmic FX."
+            }
+        },
+        {
+            "HeartDrive",
+            new ShipMusicalProfile {
+                shipName = "HeartDrive",
+                allowedMidiPresets = new List<int> { 73, 74, 75, 80, 81, 82, 0, 2 },
+                description = "Expressive and melodic. Leans into solos and emotional tones."
+            }
+        },
+        {
+            "Howler",
+            new ShipMusicalProfile {
+                shipName = "Howler",
+                allowedMidiPresets = new List<int> { 24, 26, 84, 85, 115, 117 },
+                description = "Aggressive and bold. Favors wild leads and gritty percussion."
+            }
+        },
+        {
+            "Sandwave",
+            new ShipMusicalProfile {
+                shipName = "Sandwave",
+                allowedMidiPresets = new List<int> { 12, 13, 24, 32, 35 },
+                description = "Earthy and grounded. Driven by groove and plucked rhythm."
+            }
+        },
+        {
+            "Scout",
+            new ShipMusicalProfile {
+                shipName = "Scout",
+                allowedMidiPresets = new List<int> { 73, 80, 81, 82 },
+                description = "Nimble and quick. Loves flutes and light synth melodies."
+            }
+        },
+        {
+            "Scuttle",
+            new ShipMusicalProfile {
+                shipName = "Scuttle",
+                allowedMidiPresets = new List<int> { 13, 14, 83, 84, 115, 116 },
+                description = "Chaotic fun. Drops scattershot rhythms and sharp accents."
+            }
+        },
+        {
+            "X-agong",
+            new ShipMusicalProfile {
+                shipName = "X-agong",
+                allowedMidiPresets = new List<int> { 33, 34, 115, 117, 118 },
+                description = "Alien and forceful. Pulses with deep bass and strange percussive tones."
+            }
+        }
+    };
+}
 public class Vehicle : MonoBehaviour
 {
 
@@ -45,45 +116,57 @@ public class Vehicle : MonoBehaviour
 
 
     void Start()
-    {   // Ensure each moodObject has a MidiListPlayer attached
-        // Get the child SpriteRenderer (make sure the child has the component)
-
+    {
         rb = GetComponent<Rigidbody2D>();
+        audioManager = GetComponent<AudioManager>();
+
         if (rb == null)
         {
-            Debug.LogError("Rigidbody2D component is missing from the GameObject.");
+            Debug.LogError("❌ Rigidbody2D component is missing.");
             enabled = false;
             return;
         }
 
-        audioManager = GetComponent<AudioManager>();
         if (audioManager == null)
         {
-            Debug.LogError("AudioManager component is missing from the GameObject.");
-            enabled = false;
-            return;
-        }
-        energyLevel = capacity;
-        // Ensure playerStatsUI is assigned
-        if (playerStatsUI == null)
-        {
-            Debug.LogError("PlayerStats UI is not assigned. Please assign it in the Inspector.");
+            Debug.LogError("❌ AudioManager component is missing.");
             enabled = false;
             return;
         }
 
-        UpdateEnergyUI();
+        if (playerStatsUI == null)
+        {
+            Debug.LogError("❌ PlayerStats UI reference not assigned.");
+            enabled = false;
+            return;
+        }
 
         if (playerStats == null)
         {
-            Debug.LogError("PlayerStatsTracking component is missing.");
+            Debug.LogError("❌ PlayerStatsTracking component is missing.");
             enabled = false;
             return;
         }
 
-        lastPosition = transform.position; // Initialize last position for distance tracking
-
+        energyLevel = capacity; // Start at full energy
+        lastPosition = transform.position;
+        SyncEnergyUI();
+    }
+    public void SyncEnergyUI()
+    {
+        if (playerStatsUI != null)
+        {
+            playerStatsUI.UpdateFuel(energyLevel, capacity);
         }
+
+        if (soulSprite != null)
+        {
+            float alpha = Mathf.Clamp01(energyLevel / capacity);
+            Color currentColor = soulSprite.color;
+            currentColor.a = alpha;
+            soulSprite.color = currentColor;
+        }
+    }
 
 
     void FixedUpdate()
@@ -214,14 +297,29 @@ public class Vehicle : MonoBehaviour
     private void ConsumeEnergy(float amount)
     {
         energyLevel -= amount;
-        if (energyLevel < 0) energyLevel = 0;
-        UpdateEnergyUI();
+        energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
+
+        // Update soul visual transparency
+        if (soulSprite != null)
+        {
+            float alpha = Mathf.Clamp01(energyLevel / capacity);
+            Color currentColor = soulSprite.color;
+            currentColor.a = alpha;
+            soulSprite.color = currentColor;
+        }
+
+        // Update UI
+        if (playerStatsUI != null)
+        {
+            playerStatsUI.UpdateFuel(energyLevel, capacity);
+        }
 
         if (energyLevel == 0)
         {
             GamepadManager.Instance.CheckAllPlayersOutOfEnergy();
         }
     }
+
     
     public void CollectEnergy(int amount)
     {
@@ -232,30 +330,13 @@ public class Vehicle : MonoBehaviour
             energyLevel = capacity;
         }
 
-        UpdateEnergyUI();
-        playerStats.RecordItemCollected();
-        
-        var localPlayer = GetComponentInParent<LocalPlayer>();
-        if (localPlayer != null)
-        {
-            localPlayer.EnergyCollected((int)energyLevel);
-        }
-    }
-    
-    public void UpdateEnergyUI()
-    {
-        // Map energy level to alpha (clamped between 0 and 1)
-        if (soulSprite != null)
-        {
-            float alpha = Mathf.Clamp01(energyLevel / capacity);
-            Color currentColor = soulSprite.color;
-            currentColor.a = alpha;
-            soulSprite.color = currentColor;
-        }
         if (playerStatsUI != null)
         {
-            playerStatsUI.UpdateFuel((int)energyLevel); // Use playerStatsUI to update fuel
+            playerStatsUI.UpdateFuel(energyLevel, capacity);
         }
+
+        playerStats.RecordItemCollected();
+        
     }
 
     private void ClampAngularVelocity()
@@ -290,6 +371,7 @@ public class Vehicle : MonoBehaviour
                 }
             }            
         }
+        GlitchController.Instance.TriggerHitGlitch();
 
     }
     public void Explode()

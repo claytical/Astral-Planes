@@ -90,9 +90,10 @@ public class TrackItemVisual : MonoBehaviour
         iconText.rectTransform.sizeDelta = new Vector2(1, 1);
         iconText.sortingOrder = 1;
     }
-
     private void ApplyItemStyle()
     {
+        circleRenderer.color = GetModifiedTrackColor(itemType, trackColor);
+
         switch (itemType)
         {
             case ItemType.Expansion:
@@ -103,23 +104,19 @@ public class TrackItemVisual : MonoBehaviour
             case ItemType.AntiNote:
                 iconText.text = "×";
                 shouldPulse = false;
-                circleRenderer.color = Color.Lerp(trackColor, Color.black, 0.3f);
                 break;
 
             case ItemType.Clear:
                 iconText.text = "−";
                 shouldPulse = false;
-                circleRenderer.color = Color.Lerp(trackColor, Color.gray, 0.5f);
                 break;
 
             case ItemType.Shoft:
                 iconText.text = "?";
                 iconText.color = new Color(1f, 0.9f, 0.6f); // soft glowing off-white
-                circleRenderer.color = Color.Lerp(trackColor, Color.magenta, 0.5f); // blend track color with pink
                 shouldPulse = true;
                 shouldRotate = true;
                 break;
-            
         }
     }
 
@@ -128,19 +125,30 @@ public class TrackItemVisual : MonoBehaviour
         if (glowEffect == null)
             glowEffect = GetComponentInChildren<ParticleSystem>();
 
-        if (glowEffect != null && tintParticlesToTrackColor)
+        if (glowEffect != null)
         {
             var main = glowEffect.main;
-            main.startColor = trackColor;
+
+            switch (itemType)
+            {
+                case ItemType.Shoft:
+                    main.startColor = Color.Lerp(trackColor, Color.magenta, 0.8f);
+                    break;
+                case ItemType.AntiNote:
+                    main.startColor = Color.black;
+                    break;
+                default:
+                    if (tintParticlesToTrackColor)
+                        main.startColor = trackColor;
+                    break;
+            }
+
+            glowEffect.Play();
         }
 
         if (burstOnStart && burstEffect != null)
         {
             burstEffect.Emit(15);
-        }
-        else if (glowEffect != null)
-        {
-            glowEffect.Play();
         }
     }
 
@@ -151,4 +159,21 @@ public class TrackItemVisual : MonoBehaviour
 
         Destroy(gameObject, 0.5f);
     }
+    private Color GetModifiedTrackColor(ItemType type, Color baseColor)
+    {
+        switch (type)
+        {
+            case ItemType.Expansion:
+                return baseColor; // Use track color directly
+            case ItemType.AntiNote:
+                return Color.Lerp(baseColor, Color.black, 0.3f);
+            case ItemType.Clear:
+                return Color.Lerp(baseColor, Color.gray, 0.5f);
+            case ItemType.Shoft:
+                return Color.Lerp(baseColor, Color.magenta, 0.5f);
+            default:
+                return baseColor;
+        }
+    }
+
 }

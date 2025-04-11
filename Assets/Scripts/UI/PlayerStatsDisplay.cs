@@ -5,22 +5,10 @@ public class PlayerStatsDisplay : MonoBehaviour
 {
     public TextMeshProUGUI distanceText;
     public TextMeshProUGUI itemsCollectedText;
-    public TextMeshProUGUI scoreText;
+//    public TextMeshProUGUI scoreText;
     public TextMeshProUGUI fuelUsedText;
     public TextMeshProUGUI comparisonLabel;
-
-    public void PopulateStats(PlayerStatsTracking stats, PlayerStatsTracking[] allPlayers)
-    {
-        // Populate the individual stats
-        distanceText.text = $"Distance Traveled: {stats.distanceCovered:F2}m";
-        itemsCollectedText.text = $"Items Collected: {stats.itemsCollected}";
-        scoreText.text = $"Assists: {stats.effiencyScore}";
-        fuelUsedText.text = $"Fuel Used: {stats.fuelUsed}";
-
-        // Generate a funny comparison label
-        comparisonLabel.text = GenerateFunnyLabel(stats, allPlayers);
-    }
-
+    
     private string GenerateFunnyLabel(PlayerStatsTracking stats, PlayerStatsTracking[] allPlayers)
     {
         // Comparison logic to determine who is best at what

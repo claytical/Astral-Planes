@@ -5051,6 +5051,7 @@ GameObject:
   - component: {fileID: 6503020388382346663}
   - component: {fileID: 8722902735766658340}
   - component: {fileID: 1468113586516188759}
+  - component: {fileID: -8412937141475341010}
   m_Layer: 0
   m_Name: Beat Change
   m_TagString: Collect
@@ -5185,9 +5186,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0
+--- !u!114 &-8412937141475341010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4669415747821478303}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f03dc13067c834631bd870ff51a36f1a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectType: 4
+  musicalRole: 1
 --- !u!1 &6344135633260687343
 GameObject:
   m_ObjectHideFlags: 0

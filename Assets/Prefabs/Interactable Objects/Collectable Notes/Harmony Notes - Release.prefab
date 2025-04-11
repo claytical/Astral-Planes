@@ -118,6 +118,7 @@ GameObject:
   - component: {fileID: 2866961932351380823}
   - component: {fileID: 8668376557347016044}
   - component: {fileID: 5196823741573283697}
+  - component: {fileID: -960653021509281639}
   m_Layer: 0
   m_Name: Harmony Notes - Release
   m_TagString: Untagged
@@ -266,7 +267,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!114 &5196823741573283697
@@ -283,6 +283,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   musicalRole: 1
   noteSetSeries: {fileID: 11400000, guid: 5961754dd2002402cb57596271bfea0d, type: 2}
+--- !u!114 &-960653021509281639
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f03dc13067c834631bd870ff51a36f1a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectType: 1
+  musicalRole: 1
 --- !u!1 &7277334762070908827
 GameObject:
   m_ObjectHideFlags: 0

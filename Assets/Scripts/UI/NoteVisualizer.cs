@@ -12,6 +12,8 @@ public class NoteVisualizer : MonoBehaviour
 
     private float screenWidth = 1920f;
 
+    public ParticleSystem playheadParticles;
+
     [Header("Note Ribbon Settings")]
     public Material ribbonMaterial;
     public float ribbonWidth = 0.05f;
@@ -53,76 +55,114 @@ public class NoteVisualizer : MonoBehaviour
         }
     }
 
-    void Update()
+  void Update()
+{
+    if (playheadLine == null || drums == null || tracks == null)
+        return;
+
+    float globalElapsed = (float)(AudioSettings.dspTime - drums.startDspTime);
+    float baseLoopLength = drums.GetLoopLengthInSeconds();
+    int globalLoopMultiplier = tracks.GetMaxLoopMultiplier();
+    float fullVisualLoopDuration = baseLoopLength * globalLoopMultiplier;
+
+    float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
+    float xPos = globalNormalized * screenWidth;
+    playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
+
+    int longestLoopSteps = tracks.tracks.Max(track => track.GetTotalSteps());
+
+    // 🔹 Determine current step index
+    float stepDuration = fullVisualLoopDuration / longestLoopSteps;
+    int currentStep = Mathf.FloorToInt((globalElapsed % fullVisualLoopDuration) / stepDuration);
+
+    // 🔹 Find max velocity at this step across all tracks
+    float maxVelocity = 0f;
+    foreach (var track in tracks.tracks)
     {
-        if (playheadLine == null || drums == null || tracks == null)
-            return;
+        float v = track.GetVelocityAtStep(currentStep);
+        maxVelocity = Mathf.Max(maxVelocity, v / 127f);
+    }
 
-        float globalElapsed = (float)(AudioSettings.dspTime - drums.startDspTime);
-        float baseLoopLength = drums.GetLoopLengthInSeconds();
-        int globalLoopMultiplier = tracks.GetMaxLoopMultiplier();
-        float fullVisualLoopDuration = baseLoopLength * globalLoopMultiplier;
+    // 🔹 Apply visual response to the particle system
+    if (playheadParticles != null)
+    {
+        var main = playheadParticles.main;
+        main.startSize = Mathf.Lerp(0.2f, 1.2f, maxVelocity);
 
-        float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
-        float xPos = globalNormalized * screenWidth;
-        playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
-        int longestLoopSteps = tracks.tracks.Max(track => track.GetTotalSteps());
-        for (int i = 0; i < ribbons.Count; i++)
+        var emission = playheadParticles.emission;
+        emission.rateOverTime = Mathf.Lerp(5f, 50f, maxVelocity);
+
+        var colorOverLifetime = playheadParticles.colorOverLifetime;
+        if (colorOverLifetime.enabled)
         {
-            LineRenderer lr = ribbons[i];
-            RectTransform row = trackRows[i];
-            InstrumentTrack track = tracks.tracks[i];
+            Gradient grad = new Gradient();
+            grad.SetKeys(
+                new[] {
+                    new GradientColorKey(Color.white, 0.0f),
+                    new GradientColorKey(Color.cyan, 1.0f)
+                },
+                new[] {
+                    new GradientAlphaKey(0.4f + maxVelocity * 0.5f, 0.0f),
+                    new GradientAlphaKey(0.1f, 1.0f)
+                }
+            );
+            colorOverLifetime.color = grad;
+        }
+    }
 
-            Vector3[] positions = new Vector3[ribbonResolution];
-            float width = row.rect.width;
+    // 🔹 Animate the ribbons
+    for (int i = 0; i < ribbons.Count; i++)
+    {
+        LineRenderer lr = ribbons[i];
+        RectTransform row = trackRows[i];
+        InstrumentTrack track = tracks.tracks[i];
 
-            int trackSteps = track.GetTotalSteps();
-            int repeats = Mathf.Max(1, longestLoopSteps / trackSteps);
+        Vector3[] positions = new Vector3[ribbonResolution];
+        float width = row.rect.width;
 
-            var loopNotes = track.GetPersistentLoopNotes();
+        int trackSteps = track.GetTotalSteps();
+        int repeats = Mathf.Max(1, longestLoopSteps / trackSteps);
+        var loopNotes = track.GetPersistentLoopNotes();
 
-            for (int j = 0; j < ribbonResolution; j++)
+        for (int j = 0; j < ribbonResolution; j++)
+        {
+            float t = j / (float)(ribbonResolution - 1); // 0 to 1
+            float x = t * width;
+            float y = 0f;
+
+            int visualStep = Mathf.FloorToInt(t * longestLoopSteps);
+            float activeNoteVelocity = 0f;
+
+            for (int r = 0; r < repeats; r++)
             {
-                float t = j / (float)(ribbonResolution - 1); // 0 to 1
-                float x = t * width;
-                float y = 0f;
+                int localStep = visualStep - r * trackSteps;
+                if (localStep < 0) continue;
 
-                int visualStep = Mathf.FloorToInt(t * longestLoopSteps);
-                float activeNoteVelocity = 0f;
-
-                for (int r = 0; r < repeats; r++)
+                foreach (var (noteStep, _, _, velocity) in loopNotes)
                 {
-                    int localStep = visualStep - r * trackSteps;
-                    if (localStep < 0) continue;
-
-                    foreach (var (noteStep, _, _, velocity) in loopNotes)
+                    if (noteStep == localStep)
                     {
-                        if (noteStep == localStep)
-                        {
-                            activeNoteVelocity = velocity / 127f;
-                            break;
-                        }
+                        activeNoteVelocity = velocity / 127f;
+                        break;
                     }
-
-                    if (activeNoteVelocity > 0f) break;
                 }
 
-                float baseWave = Mathf.Sin(Time.time * waveSpeed + t * waveFrequency) * waveAmplitude;
-                y = baseWave + activeNoteVelocity * velocityMultiplier;
-
-                positions[j] = new Vector3(x, y, 0);
+                if (activeNoteVelocity > 0f) break;
             }
 
-            lr.SetPositions(positions);
+            float baseWave = Mathf.Sin(Time.time * waveSpeed + t * waveFrequency) * waveAmplitude;
+            y = baseWave + activeNoteVelocity * velocityMultiplier;
 
-            Color faded = track.trackColor;
-            faded.a = 0.6f;
-            lr.startColor = lr.endColor = faded;
+            positions[j] = new Vector3(x, y, 0);
         }
-        
-        
 
+        lr.SetPositions(positions);
+
+        Color faded = track.trackColor;
+        faded.a = 0.6f;
+        lr.startColor = lr.endColor = faded;
     }
+}
 
     private float GetScreenWidth()
     {
