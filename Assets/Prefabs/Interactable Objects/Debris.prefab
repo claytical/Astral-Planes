@@ -79,7 +79,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: -712631045867808456, guid: b670ab75dde984907b8570040daa08c5,
     type: 3}
-  m_Color: {r: 0.3018868, g: 0.3018868, b: 0.3018868, a: 0.4392157}
+  m_Color: {r: 0.30980393, g: 0.35686275, b: 0.38431373, a: 0.30588236}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -181,7 +181,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
     type: 3}
-  respawnTimer: 0
   lifetime: 5
   randomizeLifetimer: 1
 --- !u!60 &4993008824631711877
@@ -5149,7 +5148,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: -712631045867808456, guid: b670ab75dde984907b8570040daa08c5,
     type: 3}
-  m_Color: {r: 0.5754717, g: 0.5754717, b: 0.5754717, a: 0.78039217}
+  m_Color: {r: 0.18039216, g: 0.22745098, b: 0.2509804, a: 0.46666667}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

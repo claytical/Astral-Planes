@@ -1,61 +1,89 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 public class Hangar : MonoBehaviour
 {
-
+    [Header("Plane Setup")]
     public GameObject[] planes;
     public GameObject setupScreen;
-    private bool[] planeInUse;
- 
 
+    private Dictionary<GameObject, bool> planeInUseMap = new();
 
-    // Start is called before the first frame update
     void Start()
     {
-        planeInUse = new bool[planes.Length];
+        foreach (GameObject plane in planes)
+        {
+            planeInUseMap[plane] = false;
+        }
     }
 
     public void OnJoin(PlayerInput playerInput)
     {
-        //players++;
+        // Reserved for player join logic if needed
     }
 
-    public int FirstAvailablePlane()
+    public GameObject FirstAvailablePlane()
     {
-        for (int i = 0; i < planes.Length; i++)
+        foreach (var kvp in planeInUseMap)
         {
-            if (!planeInUse[i])
+            if (!kvp.Value)
             {
-                planeInUse[i] = true;
-                return i;
+                planeInUseMap[kvp.Key] = true;
+                return kvp.Key;
             }
         }
-        return -1;
+        return null;
     }
 
-    public int NextAvailablePlane(int vehicleId)
+    public int NextAvailablePlane(int currentIndex)
     {
-        vehicleId++;
-        if (vehicleId >= planes.Length)
+        // Skip in-use planes while cycling forward
+        for (int i = 1; i < planes.Length; i++)
         {
-            vehicleId = 0;
+            int index = (currentIndex + i) % planes.Length;
+            if (!planeInUseMap[planes[index]])
+                return index;
         }
-        return vehicleId;
+        return currentIndex;
     }
 
-    public int PreviousAvailableVehicle(int vehicleId)
+    public int PreviousAvailableVehicle(int currentIndex)
     {
-        vehicleId--;
-        if (vehicleId < 0)
+        // Skip in-use planes while cycling backward
+        for (int i = 1; i < planes.Length; i++)
         {
-            vehicleId = planes.Length - 1;
+            int index = (currentIndex - i + planes.Length) % planes.Length;
+            if (!planeInUseMap[planes[index]])
+                return index;
         }
-        return vehicleId;
+        return currentIndex;
     }
 
+    public float GetMaxCapacity()
+    {
+        float max = 0f;
+        foreach (GameObject plane in planes)
+        {
+            Vehicle vehicle = plane.GetComponent<Vehicle>();
+            if (vehicle != null && vehicle.capacity > max)
+            {
+                max = vehicle.capacity;
+            }
+        }
+        return max;
+    }
 
+    public void MarkPlaneInUse(GameObject plane, bool inUse)
+    {
+        if (planeInUseMap.ContainsKey(plane))
+        {
+            planeInUseMap[plane] = inUse;
+        }
+    }
+
+    public bool IsPlaneInUse(GameObject plane)
+    {
+        return planeInUseMap.ContainsKey(plane) && planeInUseMap[plane];
+    }
 }

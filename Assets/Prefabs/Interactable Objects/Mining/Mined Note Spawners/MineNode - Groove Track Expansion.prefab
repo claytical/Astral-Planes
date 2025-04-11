@@ -167,6 +167,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   minedPrefabs:
   - {fileID: 1781116594832268, guid: f7affae277b4646538b32f93d6f84a28, type: 3}
+  coreSprite: {fileID: 212053718670736404}
+  minedObjectType: 3
   debris: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d, type: 3}
   strength: 100
   maxStrength: 400
@@ -267,6 +269,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
     type: 3}
-  respawnTimer: 10
   lifetime: 0
   randomizeLifetimer: 0

@@ -4,6 +4,8 @@ using UnityEngine.Serialization;
 public class MineNode : MonoBehaviour
 {
     public GameObject[] minedPrefabs; // ✅ Array of possible rewards
+    public SpriteRenderer coreSprite;
+    public MinedObjectType minedObjectType; // Assigned on spawn
     public GameObject debris;
     public int strength = 100;
     public int maxStrength = 400; // ✅ Maximum strength when fully grown
@@ -21,11 +23,107 @@ public class MineNode : MonoBehaviour
     private float currentGrowthMultiplier = 1f; // ✅ Tracks how big it got before mined
 
     private void Start()
-    {
+    {        
+        if (coreSprite == null)
+        {
+            coreSprite = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        ApplyVisualStyle(minedObjectType);
         originalScale = transform.localScale;
         StartCoroutine(ScaleUpOverTime()); // ✅ Start the scale-up process
     }
+    public void ApplyVisualStyle(MinedObjectType type)
+    {
+        switch (MinedObject.GetCategory(type))
+        {
+            case MinedObjectCategory.NoteSpawner:
+                ApplyNoteSpawnerStyle();
+                break;
 
+            case MinedObjectCategory.TrackUtility:
+                ApplyUtilityStyle(type);
+                break;
+
+            case MinedObjectCategory.NoteModifier:
+                ApplyModifierStyle(type);
+                break;
+
+            default:
+                ApplyDefaultStyle();
+                break;
+        }
+    }
+
+    private void ApplyNoteSpawnerStyle()
+    {
+        coreSprite.color = new Color(0.18f, 0.22f, 0.25f); // #2E3A40
+        AddGlowEffect("#00FFC8", 0.3f); // teal glow
+        //AddIcon("♪", new Color(0.9f, 1f, 1f)); // optional overlay
+    }
+
+    private void ApplyUtilityStyle(MinedObjectType type)
+    {
+        coreSprite.color = new Color(0.216f, 0.278f, 0.310f); // #2E3A40
+        
+        // Tint based on utility type (AntiNote, Shoft, etc.)
+        switch (type)
+        {
+            case MinedObjectType.AntiNoteSpawner:
+                coreSprite.color = Color.Lerp(coreSprite.color, Color.black, 0.3f);
+                break;
+
+            case MinedObjectType.TrackClear:
+                coreSprite.color = Color.Lerp(coreSprite.color, Color.gray, 0.5f);
+                break;
+
+            case MinedObjectType.LoopExpansion:
+                break;
+
+            case MinedObjectType.Shoft:
+                coreSprite.color = Color.Lerp(coreSprite.color, Color.magenta, 0.5f);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    private void ApplyModifierStyle(MinedObjectType type)
+    {
+        // Similar logic if you decide to distinguish modifiers
+        coreSprite.color = new Color(0.3f, 0.3f, 0.3f); // muted modifier style
+    }
+
+    private void ApplyDefaultStyle()
+    {
+        coreSprite.color = new Color(0.2f, 0.2f, 0.2f); // fallback
+    }
+
+    private void AddGlowEffect(string hexColor, float alpha = 0.3f)
+    {
+        if (coreSprite == null) return;
+        Color glow = ColorUtility.TryParseHtmlString(hexColor, out var c) ? c : Color.cyan;
+        glow.a = alpha;
+
+        // Apply via material, outline, or visual script
+        // Placeholder:
+        coreSprite.material.SetColor("_GlowColor", glow);
+    }
+
+    private void AddIcon(string symbol, Color color)
+    {
+        // You could spawn a child TextMeshPro icon here
+        GameObject iconObj = new GameObject("Icon");
+        iconObj.transform.SetParent(coreSprite.transform);
+        iconObj.transform.localPosition = Vector3.zero;
+
+        var tmp = iconObj.AddComponent<TMPro.TextMeshPro>();
+        tmp.text = symbol;
+        tmp.fontSize = 4;
+        tmp.color = color;
+        tmp.alignment = TMPro.TextAlignmentOptions.Center;
+    }
     public void SetParentEvolvingObstacle(MineNodeSpawner parent)
     {
         parentNodeSpawner = parent;
@@ -191,6 +289,10 @@ public class MineNode : MonoBehaviour
                 {
                     noteSpawner.Initialize(track, selected); // internally assigns track + noteset
                     minedObject.sprite.color = track.trackColor;
+                }
+                else
+                {
+                    Debug.LogWarning($"Track does not exist.");
                 }
             }
 

@@ -39,11 +39,6 @@ public class Player : MonoBehaviour
         SwitchActionMap("Start");
     }
     
-    public void EnergyCollected()
-    {
-        playerStats.EnergyCollected(1);
-    }
-
     public void SetVehicleIconColor(Color color)
     {
         playerStats.vehicleIcon.color = color;

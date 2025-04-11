@@ -119,6 +119,7 @@ GameObject:
   - component: {fileID: 8668376557347016044}
   - component: {fileID: 3208189728250256471}
   - component: {fileID: 7460538929032877813}
+  - component: {fileID: -7044597367778920299}
   m_Layer: 0
   m_Name: Expand Lead Track
   m_TagString: Untagged
@@ -307,6 +308,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 0
   targetRole: 5
+--- !u!114 &-7044597367778920299
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f03dc13067c834631bd870ff51a36f1a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectType: 2
+  musicalRole: 1
 --- !u!1 &7277334762070908827
 GameObject:
   m_ObjectHideFlags: 0

@@ -120,7 +120,7 @@ GameObject:
   - component: {fileID: 1318993829032619801}
   - component: {fileID: 2363428854774520333}
   m_Layer: 0
-  m_Name: NN
+  m_Name: Scout
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

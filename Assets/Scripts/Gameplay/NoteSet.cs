@@ -232,7 +232,6 @@ public class NoteSet : MonoBehaviour
         BuildNotesFromKey();
         BuildAllowedStepsFromStyle(totalSteps);
 
-        Debug.Log($"✅ Initialized NoteSet '{name}' for track '{assignedInstrumentTrack.name}' with {notes.Count} notes and {allowedSteps.Count} steps.");
     }
 
     public void RandomizeDominantNote()
@@ -330,7 +329,7 @@ public class NoteSet : MonoBehaviour
 
     public void BuildAllowedStepsFromStyle(int totalSteps)
     {
-        Debug.Log($"NoteSet '{name}' building allowed steps for style {rhythmStyle} over {totalSteps} steps.");
+        //        Debug.Log($"NoteSet '{name}' building allowed steps for style {rhythmStyle} over {totalSteps} steps.");
 
         allowedSteps.Clear();
 

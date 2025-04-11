@@ -75,6 +75,7 @@ public void CreatePlayerSelect()
             // PlayerStatsTracking component is attached to the plane
             plane.playerStats = playerStats;// = plane.GetComponent<PlayerStatsTracking>();
             plane.playerStatsUI = ui;
+            plane.SyncEnergyUI();
             if (plane.GetComponent<SpriteRenderer>())
             {
                 plane.GetComponent<SpriteRenderer>().color = color;
@@ -85,7 +86,11 @@ public void CreatePlayerSelect()
             GetComponent<PlayerInput>().SwitchCurrentActionMap("Play");
         }
     }
-    
+    public string GetSelectedShipName()
+    {
+        return selection?.GetCurrentShipName(); // assumes your PlayerSelect class has this method
+    }
+
     public void Restart()
     {
         isReady = false;
@@ -98,12 +103,7 @@ public void CreatePlayerSelect()
     {
         return plane?.energyLevel ?? 0f;
     }
-
-    public void EnergyCollected(int newAmount)
-    {
-        ui.EnergyCollected(newAmount);
-    }
-
+    
     public void StartRumble(float lowFrequency, float highFrequency, float duration)
     {
         var gamepad = GetComponent<PlayerInput>().devices[0] as Gamepad;
@@ -192,7 +192,7 @@ public void CreatePlayerSelect()
                 break;
             case "TrackFinished":
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                GamepadManager.Instance.LoadNewScene("TrackSelection");
+                Restart();
                 break;
         }
     }

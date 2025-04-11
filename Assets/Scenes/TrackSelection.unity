@@ -5004,7 +5004,7 @@ MonoBehaviour:
   hangar: {fileID: 2032546266}
   quoteText: {fileID: 1657299817}
   quoteDisplayDuration: 5
-  fadeDuration: 1
+  fadeDuration: 3
 --- !u!4 &2113009022
 Transform:
   m_ObjectHideFlags: 0

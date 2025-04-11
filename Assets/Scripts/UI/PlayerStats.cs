@@ -22,9 +22,8 @@ public class PlayerStats : MonoBehaviour
         // Store the vehicle ID and reference to the vehicle instance
         vehicleID = vehicle.GetInstanceID();
         currentVehicle = vehicle;
-
         vehicleIcon.sprite = vehicle.GetComponent<SpriteRenderer>().sprite;
-        UpdateEnergyDisplay(vehicle.energyLevel);
+        UpdateFuel(currentVehicle.capacity, currentVehicle.capacity);
         Debug.Log("Energy collected should be displayed.");
     }
 
@@ -37,21 +36,11 @@ public class PlayerStats : MonoBehaviour
     {
         inactivePanel.SetActive(true);
     }
-
-
-    public void EnergyCollected(int amount)
+    
+    public void UpdateFuel(float currentEnergy, float maxEnergy)
     {
-        collected.text = amount.ToString("0");
-    }
-
-    private void UpdateEnergyDisplay(float energy)
-    {
-        collected.text = Mathf.CeilToInt(energy).ToString();
-    }
-
-    public void UpdateFuel(int fuelAmount)
-    {
-        fuel.UpdateFuelUI(fuelAmount);
+        float ratio = currentEnergy / maxEnergy;
+        fuel.UpdateFuelUI(ratio);
     }
 
     // Optional: Method to recreate or reset the vehicle using the stored ID

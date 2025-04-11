@@ -18,7 +18,6 @@ public class EventHorizon : MonoBehaviour
         if (v != null)
         {
             v.energyLevel -= damage;
-            v.UpdateEnergyUI();
             if (v.energyLevel <= 0)
             {
                 v.Explode();

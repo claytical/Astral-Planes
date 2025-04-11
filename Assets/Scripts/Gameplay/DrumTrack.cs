@@ -4,12 +4,30 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using Random = UnityEngine.Random;
-public class PhaseSnapshot {
+public class PhaseSnapshot
+{
     public DrumLoopPattern pattern;
     public Color color;
-    public List<(int step, int note, float velocity)> collectedNotes = new();
-    public float timestamp; // optional
+    public List<NoteEntry> collectedNotes = new();
+    public float timestamp;
+
+    public class NoteEntry
+    {
+        public int step;
+        public int note;
+        public float velocity;
+        public Color trackColor;
+
+        public NoteEntry(int step, int note, float velocity, Color trackColor)
+        {
+            this.step = step;
+            this.note = note;
+            this.velocity = velocity;
+            this.trackColor = trackColor;
+        }
+    }
 }
+
 
 public enum DrumLoopPattern
 {
@@ -31,9 +49,9 @@ public class DrumTrack : MonoBehaviour
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
     public EnergyWaveEffect wave;
+    public GalaxyVisualizer galaxyVisualizer;
     [Header("Drum Pattern Visuals")]
     public List<DrumLoopPatternVisual> patternVisuals;
-    public ConstellationVisualizer constellationVisualizer;
     public AudioClip[] establishDrumClips;
     public AudioClip[] evolveDrumClips;
     public AudioClip[] intensifyDrumClips;
@@ -196,19 +214,24 @@ public class DrumTrack : MonoBehaviour
     {
         return spawnGrid.gridHeight;
     }
+
     void FinalizeCurrentPhaseSnapshot()
     {
-        var snapshot = new PhaseSnapshot {
+        var snapshot = new PhaseSnapshot
+        {
             pattern = currentPattern,
             color = GetVisualForPattern(currentPattern)?.color ?? Color.white,
-            timestamp = Time.time
+            timestamp = Time.time,
+            collectedNotes = new List<PhaseSnapshot.NoteEntry>()
         };
 
         foreach (var track in trackController.tracks)
         {
+            Color trackColor = track.trackColor;
+
             foreach (var (step, note, duration, velocity) in track.GetPersistentLoopNotes())
             {
-                snapshot.collectedNotes.Add((step, note, velocity));
+                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
             }
         }
 
@@ -349,10 +372,10 @@ public class DrumTrack : MonoBehaviour
 
         // ✅ Only notify progression manager once, here.
         progressionManager.NotifyStarsCollected(); // → triggers EvaluateProgression
-        if (constellationVisualizer != null)
+        if (galaxyVisualizer != null)
         {
             var snapshot = BuildCurrentPhaseSnapshot();
-            constellationVisualizer.AddSnapshot(snapshot);
+            galaxyVisualizer.AddSnapshot(snapshot);
         }
         Debug.Log("[DrumTrack] Drum Loop Collectables reset and cleared.");
     }
@@ -363,19 +386,23 @@ public class DrumTrack : MonoBehaviour
             pattern = currentPattern,
             color = GetVisualForPattern(currentPattern)?.color ?? Color.white,
             timestamp = Time.time,
-            collectedNotes = new List<(int step, int note, float velocity)>()
+            collectedNotes = new()
         };
 
         foreach (var track in trackController.tracks)
         {
+            Color trackColor = track.trackColor;
+
             foreach (var (step, note, _, velocity) in track.GetPersistentLoopNotes())
             {
-                snapshot.collectedNotes.Add((step, note, velocity));
+                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
             }
         }
 
+
         return snapshot;
     }
+
 
     public void RemoveActiveMineNode(GameObject node)
     {
@@ -465,7 +492,6 @@ public class DrumTrack : MonoBehaviour
             queuedPattern = (DrumLoopPattern)nextPhase.Value;
             nextPattern = queuedPattern;
         }
-
         // ✅ Now schedule the next drum loop using the correct pattern
         ScheduleDrumLoopChange(SelectDrumClip(nextPattern));
 
@@ -705,20 +731,21 @@ public class DrumTrack : MonoBehaviour
     {
         float cameraDistance = -Camera.main.transform.position.z;
 
-        // Camera viewport bounds (bottom-left, top-right)
         Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
         Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
 
-        // Properly defined normalized positions
         float normalizedX = gridPos.x / (float)(spawnGrid.gridWidth - 1);
         float normalizedY = gridPos.y / (float)(spawnGrid.gridHeight - 1);
 
-        // Clearly defined worldX and worldY using full viewport mapping
+        // 👇 Define how much vertical space (in world units) to reserve for the UI at the bottom
+        float uiHeightOffset = 2f; // Adjust this to match your UI overlay height in world space
+
         float worldX = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
-        float worldY = Mathf.Lerp(bottomLeft.y + gridPadding, topRight.y - gridPadding, normalizedY);
+        float worldY = Mathf.Lerp(bottomLeft.y + gridPadding + uiHeightOffset, topRight.y - gridPadding, normalizedY);
 
         return new Vector3(worldX, worldY, 0f);
     }
+
     public Vector2Int WorldToGridPosition(Vector3 worldPos)
     {
         float cameraDistance = -Camera.main.transform.position.z;

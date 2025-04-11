@@ -14,13 +14,13 @@ public class PlayerSelect : MonoBehaviour
 
     private int selectedColor = 0;
     private Hangar hangar;
-    private int vehicleId;
     private GameObject chosenPlane;
 
     void Start()
     {
         hangar = FindAnyObjectByType<Hangar>();
         transform.SetParent(hangar.setupScreen.transform);
+        transform.localScale = Vector3.one;
 
         if (hangar)
         {
@@ -29,30 +29,61 @@ public class PlayerSelect : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Hangar not found.");
+            Debug.LogError("❌ Hangar not found.");
         }
-        transform.localScale = new Vector3(1, 1, 1);
+    }
 
+    private void AssignFirstAvailablePlane()
+    {
+        chosenPlane = hangar.FirstAvailablePlane();
+        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
+
+        if (chosenPlane == null)
+        {
+            Debug.LogWarning("No available planes to assign.");
+            return;
+        }
+
+        ApplyVisuals();
+        hangar.MarkPlaneInUse(chosenPlane, true);
+    }
+
+    private void ApplyVisuals()
+    {
+        SpriteRenderer sr = chosenPlane.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            planeIcon.sprite = sr.sprite;
+            planeIcon.color = planeColors[selectedColor];
+        }
+        else
+        {
+            Debug.LogWarning("Selected plane has no SpriteRenderer.");
+        }
     }
 
     private void SetVehicleStats()
     {
-        if (chosenPlane && chosenPlane.GetComponent<Vehicle>())
+        if (chosenPlane && chosenPlane.TryGetComponent(out Vehicle vehicle))
         {
-            SetStats(chosenPlane.GetComponent<Vehicle>());
+            SetStats(vehicle);
         }
     }
 
     public void SetStats(Vehicle vehicle)
     {
-        foreach (Transform child in fuel.tank)
-        {
-            Destroy(child.gameObject);
-        }
+        float capacity = vehicle.capacity;
+        float maxCapacity = hangar.GetMaxCapacity();
 
-        // Set fuel capacity based on vehicle's capabilities, if available
-        int fuelCapacity = vehicle.capacity > 0 ? (int)vehicle.capacity : 50;
-        fuel.FillTank(fuelCapacity);
+        if (fuel != null && maxCapacity > 0)
+        {
+            float ratio = Mathf.Clamp01(capacity / maxCapacity);
+            fuel.UpdateFuelUI(ratio);
+        }
+        else
+        {
+            fuel?.UpdateFuelUI(1f); // fallback
+        }
     }
 
     public void SetVehicleIconColor(Color color)
@@ -62,71 +93,61 @@ public class PlayerSelect : MonoBehaviour
 
     public void NextColor()
     {
-        selectedColor++;
-        if (selectedColor >= planeColors.Length)
-        {
-            selectedColor = 0;
-        }
+        selectedColor = (selectedColor + 1) % planeColors.Length;
         SetVehicleIconColor(planeColors[selectedColor]);
     }
 
     public void PreviousColor()
     {
-        selectedColor--;
-        if (selectedColor < 0)
-        {
-            selectedColor = planeColors.Length - 1;
-        }
+        selectedColor = (selectedColor - 1 + planeColors.Length) % planeColors.Length;
         SetVehicleIconColor(planeColors[selectedColor]);
-    }
-
-    private void AssignFirstAvailablePlane()
-    {
-        if (hangar != null)
-        {
-            vehicleId = hangar.FirstAvailablePlane();
-            chosenPlane = hangar.planes[vehicleId];
-
-            if (chosenPlane && chosenPlane.GetComponent<SpriteRenderer>())
-            {
-                planeIcon.sprite = chosenPlane.GetComponent<SpriteRenderer>().sprite;
-                planeIcon.color = planeColors[selectedColor];
-            }
-            else
-            {
-                Debug.LogError("Chosen plane or SpriteRenderer not found.");
-            }
-        }
     }
 
     public void NextVehicle()
     {
         Debug.Log("Next Vehicle");
-        vehicleId = hangar.NextAvailablePlane(vehicleId);
-        chosenPlane = hangar.planes[vehicleId];
+        if (chosenPlane != null)
+            hangar.MarkPlaneInUse(chosenPlane, false);
 
-        if (chosenPlane && chosenPlane.GetComponent<SpriteRenderer>())
-        {
-            planeIcon.sprite = chosenPlane.GetComponent<SpriteRenderer>().sprite;
-            SetVehicleStats();
-        }
+        int currentIndex = System.Array.IndexOf(hangar.planes, chosenPlane);
+        int nextIndex = hangar.NextAvailablePlane(currentIndex);
+        chosenPlane = hangar.planes[nextIndex];
+        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
+        ApplyVisuals();
+        SetVehicleStats();
+        hangar.MarkPlaneInUse(chosenPlane, true);
     }
 
     public void PreviousVehicle()
     {
-        vehicleId = hangar.PreviousAvailableVehicle(vehicleId);
-        chosenPlane = hangar.planes[vehicleId];
+        if (chosenPlane != null)
+            hangar.MarkPlaneInUse(chosenPlane, false);
 
-        if (chosenPlane && chosenPlane.GetComponent<SpriteRenderer>())
-        {
-            planeIcon.sprite = chosenPlane.GetComponent<SpriteRenderer>().sprite;
-            SetVehicleStats();
-        }
+        int currentIndex = System.Array.IndexOf(hangar.planes, chosenPlane);
+        int prevIndex = hangar.PreviousAvailableVehicle(currentIndex);
+        chosenPlane = hangar.planes[prevIndex];
+        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
+
+        ApplyVisuals();
+        SetVehicleStats();
+        hangar.MarkPlaneInUse(chosenPlane, true);
     }
 
     public GameObject GetChosenPlane()
     {
         return chosenPlane;
+    }
+    
+    public string GetCurrentShipName()
+    {
+        return currentShipName; // or however you're storing it internally
+    }
+
+    private string currentShipName;
+
+    public void SetCurrentShipName(string name)
+    {
+        currentShipName = name;
     }
 
     public void Confirm()
