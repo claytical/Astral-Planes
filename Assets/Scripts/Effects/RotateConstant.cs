@@ -1,26 +1,49 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
-public class RotateConstant : MonoBehaviour { 
-    public Vector3 accelerate;
-    public bool randomizeRotation;
-	// Use this for initialization
-	void Start () {
-		if(randomizeRotation)
-        {
-            accelerate = new Vector3(Random.value, Random.value, Random.value);
-        }
-        else
-        {
-            accelerate = new Vector3(accelerate.x, accelerate.y, accelerate.z);
-        }
-	}
+public enum RotationMode
+{
+    Uniform,
+    Swirl,
+    SpiralOutward,
+    Randomized
+}
 
-    // Update is called once per frame
+public class RotateConstant : MonoBehaviour
+{
+
+    public RotationMode rotationMode = RotationMode.Uniform;
+    public float baseSpeed = 1f;
+    public int shardIndex = 0;
+    public int totalShards = 1;
+
+    private Vector3 accelerate;
+
+    void Start()
+    {
+        switch (rotationMode)
+        {
+            case RotationMode.Uniform:
+                accelerate = new Vector3(0, 0, baseSpeed);
+                break;
+
+            case RotationMode.Swirl:
+                accelerate = new Vector3(0, 0, (shardIndex % 2 == 0 ? baseSpeed : -baseSpeed));
+                break;
+
+            case RotationMode.SpiralOutward:
+                float offset = Mathf.Lerp(-baseSpeed, baseSpeed, shardIndex / (float)Mathf.Max(1, totalShards - 1));
+                accelerate = new Vector3(0, 0, offset);
+                break;
+
+            case RotationMode.Randomized:
+            default:
+                accelerate = new Vector3(0, 0, Random.Range(-baseSpeed, baseSpeed));
+                break;
+        }
+    }
+
     void Update()
     {
-
-        transform.Rotate(accelerate);
+        transform.Rotate(accelerate * Time.deltaTime);
     }
 }

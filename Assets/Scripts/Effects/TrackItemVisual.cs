@@ -3,10 +3,9 @@ using UnityEngine;
 
 public class TrackItemVisual : MonoBehaviour
 {
-    public enum ItemType { Expansion, AntiNote, Clear, Shoft }
 
     [Header("Function & Color")]
-    public ItemType itemType = ItemType.Expansion;
+    public TrackModifierType itemType = TrackModifierType.Expansion;
     public Color trackColor = Color.cyan;
 
     [Header("Base Animation")]
@@ -57,7 +56,7 @@ public class TrackItemVisual : MonoBehaviour
         {
             transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
         }
-        if (itemType == ItemType.Shoft)
+        if (itemType == TrackModifierType.Drift)
         {
             float hue = Mathf.PingPong(Time.time * 0.2f, 1f);
             circleRenderer.color = Color.HSVToRGB(hue, 0.6f, 1f);
@@ -82,11 +81,11 @@ public class TrackItemVisual : MonoBehaviour
         iconObj.transform.SetParent(transform, false);
 
         iconText = iconObj.AddComponent<TextMeshPro>();
-        iconText.fontSize = 4;
         iconText.color = Color.white;
         iconText.alignment = TextAlignmentOptions.Center;
-        iconText.text = "?";
         iconText.enableAutoSizing = true;
+        iconText.fontSizeMin = 12;
+        iconText.fontSizeMax = 32;
         iconText.rectTransform.sizeDelta = new Vector2(1, 1);
         iconText.sortingOrder = 1;
     }
@@ -96,29 +95,55 @@ public class TrackItemVisual : MonoBehaviour
 
         switch (itemType)
         {
-            case ItemType.Expansion:
-                iconText.text = "+";
+            case TrackModifierType.Contract:
+                iconText.text = "⇣";
+                iconText.color = Color.yellow;
                 shouldPulse = true;
                 break;
 
-            case ItemType.AntiNote:
-                iconText.text = "×";
-                shouldPulse = false;
+            case  TrackModifierType.Solo:
+                iconText.text = "◎";
+                iconText.color = Color.green;
+                shouldPulse = true;
                 break;
 
-            case ItemType.Clear:
-                iconText.text = "−";
-                shouldPulse = false;
+            case  TrackModifierType.Remix:
+                iconText.text = "⟳";
+                iconText.color = Color.cyan;
+                shouldPulse = true;
+                shouldRotate = true;
                 break;
 
-            case ItemType.Shoft:
-                iconText.text = "?";
-                iconText.color = new Color(1f, 0.9f, 0.6f); // soft glowing off-white
+            case  TrackModifierType.Drift:
+                iconText.text = "~";
+                iconText.color = new Color(0.8f, 0.9f, 1f); // pale blue
+                shouldPulse = true;
+                shouldRotate = true;
+                break;
+
+            case  TrackModifierType.Magic:
+                iconText.text = "✨";
+                iconText.color = new Color(1f, 0.8f, 1f); // pink shimmer
+                shouldPulse = true;
+                shouldRotate = true;
+                break;
+
+            case  TrackModifierType.StructureShift:
+                iconText.text = "#";
+                iconText.fontSize = 2;
+                iconText.color = Color.white;
+                shouldPulse = true;
+                break;
+            
+            case TrackModifierType.MoodShift:
+                iconText.text = "~"; // visual wave
+                iconText.color = new Color(1f, 0.7f, 0.9f); // pastel rose
                 shouldPulse = true;
                 shouldRotate = true;
                 break;
         }
     }
+
 
     private void SetupParticles()
     {
@@ -131,11 +156,20 @@ public class TrackItemVisual : MonoBehaviour
 
             switch (itemType)
             {
-                case ItemType.Shoft:
-                    main.startColor = Color.Lerp(trackColor, Color.magenta, 0.8f);
-                    break;
-                case ItemType.AntiNote:
+                case  TrackModifierType.AntiNote:
                     main.startColor = Color.black;
+                    break;
+                case  TrackModifierType.Drift:
+                    main.startColor = new Color(0.8f, 0.9f, 1f);
+                    break;
+                case  TrackModifierType.Magic:
+                    main.startColor = new Color(1f, 0.7f, 1f);
+                    break;
+                case  TrackModifierType.MoodShift:
+                    main.startColor = new Color(1f, 0.8f, 0.9f);
+                    break;
+                case TrackModifierType.StructureShift:
+                    main.startColor = Color.cyan;
                     break;
                 default:
                     if (tintParticlesToTrackColor)
@@ -159,21 +193,30 @@ public class TrackItemVisual : MonoBehaviour
 
         Destroy(gameObject, 0.5f);
     }
-    private Color GetModifiedTrackColor(ItemType type, Color baseColor)
+    private Color GetModifiedTrackColor(TrackModifierType type, Color baseColor)
     {
         switch (type)
         {
-            case ItemType.Expansion:
-                return baseColor; // Use track color directly
-            case ItemType.AntiNote:
+            case  TrackModifierType.AntiNote:
                 return Color.Lerp(baseColor, Color.black, 0.3f);
-            case ItemType.Clear:
-                return Color.Lerp(baseColor, Color.gray, 0.5f);
-            case ItemType.Shoft:
-                return Color.Lerp(baseColor, Color.magenta, 0.5f);
+            case  TrackModifierType.Remix:
+                return Color.Lerp(baseColor, Color.cyan, 0.4f);
+            case  TrackModifierType.Contract:
+                return Color.Lerp(baseColor, Color.yellow, 0.3f);
+            case  TrackModifierType.Solo:
+                return Color.Lerp(baseColor, Color.green, 0.3f);
+            case  TrackModifierType.Drift:
+                return new Color(0.6f, 0.7f, 1f); // indigo blend
+            case  TrackModifierType.Magic:
+                return new Color(0.9f, 0.6f, 1f); // soft pink shimmer
+            case  TrackModifierType.StructureShift:
+                return Color.Lerp(baseColor, Color.cyan, 0.3f);
+            case  TrackModifierType.MoodShift:
+                return Color.Lerp(baseColor, Color.magenta, 0.3f);
             default:
                 return baseColor;
         }
     }
+
 
 }

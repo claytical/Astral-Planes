@@ -33,15 +33,6 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "East",
-                    "type": "Button",
-                    "id": "5cb2e281-da56-4061-a52c-3eb068b8b7d0",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "RightShoulder",
                     "type": "Button",
                     "id": "6bc629a8-25b4-4def-867b-76ecec9100a8",
@@ -67,6 +58,42 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "East",
+                    "type": "Button",
+                    "id": "5cb2e281-da56-4061-a52c-3eb068b8b7d0",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "West",
+                    "type": "Button",
+                    "id": "57517f6e-0d8b-40fb-a67f-7082933bab5e",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "North",
+                    "type": "Button",
+                    "id": "dd665717-3661-4856-a2db-86fce17396e9",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "South",
+                    "type": "Button",
+                    "id": "e0a28126-5053-402f-bf38-1b093b360724",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -86,6 +113,17 @@
                     "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "Hold",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a6c70858-1bae-4962-9edb-cc9793f48fbd",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "Choose",
@@ -157,6 +195,39 @@
                     "action": "Quit",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "659e56cf-5b89-4d4e-aa5f-0ccbaa103653",
+                    "path": "<Gamepad>/buttonWest",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "West",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1d50aa73-c1a0-4019-9816-094162d721d4",
+                    "path": "<Gamepad>/buttonNorth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "North",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "066021d3-f3b1-49b0-9108-530fa86c325e",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "South",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -164,15 +235,6 @@
             "name": "Start",
             "id": "c3baa163-c269-44e2-8d7b-94beef48a8da",
             "actions": [
-                {
-                    "name": "Start",
-                    "type": "Button",
-                    "id": "dbc1f852-1c7a-4878-a28e-570a2977f1f6",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
                 {
                     "name": "NextVehicle",
                     "type": "Value",
@@ -264,12 +326,12 @@
                 },
                 {
                     "name": "",
-                    "id": "496e7aea-d163-4a30-ad47-9f8179849db8",
-                    "path": "<Gamepad>/start",
+                    "id": "53599d04-3f23-498c-8e93-5c188970e5be",
+                    "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Start",
+                    "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

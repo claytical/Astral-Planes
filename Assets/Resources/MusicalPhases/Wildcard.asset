@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ba76b6dcc9c347049a8229f754dbb70, type: 3}
+  m_Name: Wildcard
+  m_EditorClassIdentifier: 
+  phase: 4
+  drumClips:
+  - {fileID: 8300000, guid: 06089b18da2224ff3ae386396989eaf4, type: 3}
+  - {fileID: 8300000, guid: 3626b6f7f2472488385b73d37c38d519, type: 3}
+  - {fileID: 8300000, guid: 152508bcad7a74cf1af6369eb66714f6, type: 3}
+  - {fileID: 8300000, guid: 591255722f5af4aafa686b127956275f, type: 3}
+  - {fileID: 8300000, guid: 230700dc27be845cabcb93fee0b2d39a, type: 3}
+  - {fileID: 8300000, guid: 34ea272159c524399b73002d5e493e72, type: 3}
+  - {fileID: 8300000, guid: 8f66772f8bb2740faac5444f2a5df860, type: 3}
+  - {fileID: 8300000, guid: 3808031418f074988ab9fdeb549e805b, type: 3}
+  visualColor: {r: 0.75114155, g: 0, b: 1, a: 1}
+  rotationMode: 3
+  rotationSpeed: 40
+  hitsRequired: 15
+  energyPerCollectable: 1
+  shortLabel: Wildcard
+  moodDescription: 

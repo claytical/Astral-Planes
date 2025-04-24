@@ -3,7 +3,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "DrumLoopPatternVisual", menuName = "Drums/Drum Loop Pattern Visual", order = 1)]
 public class DrumLoopPatternVisual : ScriptableObject
 {
-    public DrumLoopPattern patternType;
+    public MusicalPhase patternType;
 
     public Color color = Color.white;
     public ParticleSystem particleEffectPrefab;

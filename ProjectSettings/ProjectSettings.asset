@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: Clay Ewing
-  productName: Astral Planes
+  companyName: NERDLab
+  productName: AstralPlanes
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -144,7 +144,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 9
+  bundleVersion: 1.0.0-playtest1
   preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -168,7 +168,7 @@ PlayerSettings:
   androidMinAspectRatio: 1
   applicationIdentifier:
     Android: com.NERDLab.AstralPlanes
-    Standalone: com.Clay-Ewing.Astral-Planes
+    Standalone: com.NERDLab.AstralPlanes
     Tizen: edu.nerdlab.astralplanes
     iPhone: edu.nerdlab.astralplanes
     tvOS: edu.nerdlab.astralplanes
@@ -1114,7 +1114,7 @@ PlayerSettings:
   qnxGraphicConfPath: 
   apiCompatibilityLevel: 6
   captureStartupLogs: {}
-  activeInputHandler: 2
+  activeInputHandler: 1
   windowsGamepadBackendHint: 0
   cloudProjectId: 026bab3d-3490-4a7f-beba-60c6947e88f2
   framebufferDepthMemorylessMode: 0

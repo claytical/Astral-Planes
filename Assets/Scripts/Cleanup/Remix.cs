@@ -24,11 +24,7 @@ public class Remix : MonoBehaviour
         {
             spriteRenderer.color = remixManager.collectable;
         }
-        else if (GetComponentInChildren<Hazard>())
-        {
-            spriteRenderer.color = remixManager.hazard;
 
-        }
         
         else
         {

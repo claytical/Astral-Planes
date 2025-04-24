@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ba76b6dcc9c347049a8229f754dbb70, type: 3}
+  m_Name: Pop
+  m_EditorClassIdentifier: 
+  phase: 5
+  drumClips:
+  - {fileID: 8300000, guid: bb8707cccaf6a4969b4a3bd447662281, type: 3}
+  - {fileID: 8300000, guid: f8701d750a9ba4e34aaff004ac259c7a, type: 3}
+  - {fileID: 8300000, guid: a96dc167db05e4ed8ab49a981cdea485, type: 3}
+  - {fileID: 8300000, guid: 3e7b60218f8974817ba03e518ebae449, type: 3}
+  - {fileID: 8300000, guid: 5bd03cd26925f449cb064c5daf31e0e6, type: 3}
+  - {fileID: 8300000, guid: b89d328f0986841c799d6cc20a8a864a, type: 3}
+  - {fileID: 8300000, guid: 3e0a2e331c00548b5bd369f95be21739, type: 3}
+  - {fileID: 8300000, guid: de1d8d10c39244fb887c5243b51a60c8, type: 3}
+  visualColor: {r: 1, g: 0.24056602, b: 0.49621707, a: 1}
+  rotationMode: 1
+  rotationSpeed: 30
+  hitsRequired: 14
+  energyPerCollectable: 1
+  shortLabel: Pop
+  moodDescription: 

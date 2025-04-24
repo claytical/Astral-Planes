@@ -193,8 +193,8 @@ MonoBehaviour:
     type: 3}
   clickFx: {fileID: 8300000, guid: 53ecfd42442a5de49ab20834c2e97578, type: 3}
   confirmFx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
+  plane: {fileID: 0}
   astralPlaneIndex: 0
-  selfDestructDelay: 1
 --- !u!82 &827239962078650827
 AudioSource:
   m_ObjectHideFlags: 0
@@ -204,12 +204,12 @@ AudioSource:
   m_GameObject: {fileID: 8086964223068625411}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -854998193656957392, guid: 07985bf4f6d469340930e958ef313c14,
+  OutputAudioMixerGroup: {fileID: 5833623550140716882, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 1
-  m_Volume: 1
+  m_Volume: 0.223
   m_Pitch: 1
   Loop: 0
   Mute: 0

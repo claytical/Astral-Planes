@@ -76,7 +76,7 @@ public class PlayerStatsTracking : MonoBehaviour
 
     public float CalculateEfficiencyScore()
     {
-        maxEnergy = GamepadManager.Instance.MaxItemsCollected();
+        maxEnergy = 0;//GameFlowManager.Instance;
         if (timeTaken == 0) return 0;  // Avoid division by zero
         effiencyScore = (itemsCollected / (float)maxEnergy) * (maxTime / timeTaken);
         return effiencyScore;

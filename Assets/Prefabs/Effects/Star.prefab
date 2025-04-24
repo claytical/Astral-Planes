@@ -98,6 +98,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6865588601910019052}
   - component: {fileID: 6144800729594378874}
+  - component: {fileID: 256992733824560200}
   m_Layer: 0
   m_Name: Star
   m_TagString: Untagged
@@ -136,6 +137,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   twinkleSpeed: 2
   twinkleAmount: 0.5
+--- !u!114 &256992733824560200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4669415747821478303}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cad4f98b6b9d39b4baa92b0dfd6598b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationMode: 3
+  baseSpeed: 10
+  shardIndex: 0
+  totalShards: 2
 --- !u!1 &6344135633260687343
 GameObject:
   m_ObjectHideFlags: 0
