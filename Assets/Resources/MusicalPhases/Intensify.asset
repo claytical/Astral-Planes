@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ba76b6dcc9c347049a8229f754dbb70, type: 3}
+  m_Name: Intensify
+  m_EditorClassIdentifier: 
+  phase: 2
+  drumClips:
+  - {fileID: 8300000, guid: 51ce72dfd6b524f5181742617861be8a, type: 3}
+  - {fileID: 8300000, guid: a2c3f53b22d584720b62bdf604676290, type: 3}
+  - {fileID: 8300000, guid: dc732d7091e624cd8876c46e7f7e7417, type: 3}
+  - {fileID: 8300000, guid: 9c352263733bf45db9a35a7da84e06f8, type: 3}
+  - {fileID: 8300000, guid: 964a54d5e0b7b4f039c66a2e776d4ef7, type: 3}
+  - {fileID: 8300000, guid: 0b10a549e61e74fdf83b8d0872c55735, type: 3}
+  - {fileID: 8300000, guid: 8e6bad9b1c2424a689fa4fd658d6b180, type: 3}
+  - {fileID: 8300000, guid: dde941e03554c4773b6204fc8c2a052c, type: 3}
+  - {fileID: 8300000, guid: 27c29c3e1ddad4a61b27776ac6fe70ba, type: 3}
+  visualColor: {r: 0.9555027, g: 1, b: 0.019607842, a: 1}
+  rotationMode: 3
+  rotationSpeed: 30
+  hitsRequired: 15
+  energyPerCollectable: 1
+  shortLabel: Intensify
+  moodDescription: 

@@ -35,7 +35,7 @@ public class GlitchController : MonoBehaviour
         if (analogGlitch == null || drumTrack == null)
             return;
 
-        bool inWildcard = drumTrack.CurrentPattern == DrumLoopPattern.Wildcard;
+        bool inWildcard = drumTrack.currentPhase == MusicalPhase.Wildcard;
 
         if (inWildcard && !isWildcardActive)
         {
@@ -63,7 +63,7 @@ public class GlitchController : MonoBehaviour
 
     public void TriggerHitGlitch()
     {
-        if (drumTrack != null && drumTrack.CurrentPattern == DrumLoopPattern.Wildcard)
+        if (drumTrack != null && drumTrack.currentPhase == MusicalPhase.Wildcard)
         {
             TriggerBurst();
         }

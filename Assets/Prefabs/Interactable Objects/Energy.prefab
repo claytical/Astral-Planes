@@ -101,8 +101,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cad4f98b6b9d39b4baa92b0dfd6598b9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  accelerate: {x: 0.048509248, y: 0.24454537, z: 0.9462867}
-  randomizeRotation: 0
+  rotationMode: 0
+  baseSpeed: 1
+  shardIndex: 0
+  totalShards: 1
 --- !u!1 &1316711709889716
 GameObject:
   m_ObjectHideFlags: 0
@@ -112,13 +114,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4522237307073234}
-  - component: {fileID: 6829879192205348174}
   - component: {fileID: 8711798789080338920}
-  - component: {fileID: 4210209640870371169}
+  - component: {fileID: 8925877091113225264}
   - component: {fileID: 263018928427361343}
   - component: {fileID: 2413030258118961647}
+  - component: {fileID: 4210209640870371169}
   - component: {fileID: 336917936034479529}
-  - component: {fileID: 8925877091113225264}
   m_Layer: 0
   m_Name: Energy
   m_TagString: Untagged
@@ -144,19 +145,6 @@ Transform:
   - {fileID: 981561846700415872}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6829879192205348174
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1316711709889716}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 12e097fd62730ca469772eff2435b326, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spriteRenderer: {fileID: 212503362928707232}
 --- !u!114 &8711798789080338920
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -171,7 +159,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   assignedInstrumentTrack: {fileID: 0}
   energySprite: {fileID: 212503362928707232}
---- !u!114 &4210209640870371169
+--- !u!114 &8925877091113225264
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -180,14 +168,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 1316711709889716}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Script: {fileID: 11500000, guid: dc69482a820294e28b327da2f14c5a5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  explosion: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
-    type: 3}
-  respawnTimer: 0
-  lifetime: 0
-  randomizeLifetimer: 0
+  particleSystem: {fileID: 8037149987760044590}
 --- !u!50 &263018928427361343
 Rigidbody2D:
   serializedVersion: 5
@@ -251,6 +235,22 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.15
+--- !u!114 &4210209640870371169
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1316711709889716}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  explosion: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
+    type: 3}
+  lifetime: 0
+  randomizeLifetimer: 0
 --- !u!114 &336917936034479529
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -263,19 +263,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b050d86334e5c7742a4f32eda4ecc065, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &8925877091113225264
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1316711709889716}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc69482a820294e28b327da2f14c5a5d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  particleSystem: {fileID: 8037149987760044590}
 --- !u!1 &4064160350664904132
 GameObject:
   m_ObjectHideFlags: 0

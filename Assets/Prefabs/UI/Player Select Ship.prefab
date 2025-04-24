@@ -107,7 +107,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   planeIcon: {fileID: 2960802091766057107}
-  fuel: {fileID: 7561279167695045727}
+  fuel: {fileID: 8716908644972952696}
   planeColors:
   - {r: 0.9372549, g: 0.3254902, b: 0.3137255, a: 1}
   - {r: 1, g: 0.654902, b: 0.14901961, a: 1}
@@ -531,9 +531,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 11a1461d443ba47498d20324eb962de2, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 1
@@ -606,7 +606,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 8371bfd026431c543bc97f5c9e32cacb, type: 3}
+  m_Sprite: {fileID: 7482667652216324306, guid: fc753fe49bdb4491baf3fd6451f9bd7c,
+    type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -626,7 +627,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5716849901993614263}
   m_Layer: 5
-  m_Name: Controls and Stas
+  m_Name: Controls and Stats
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -858,7 +859,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 8371bfd026431c543bc97f5c9e32cacb, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -877,8 +878,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3912680163344683720}
-  - component: {fileID: 7561279167695045727}
   - component: {fileID: 2708537899329198198}
+  - component: {fileID: 8716908644972952696}
   m_Layer: 5
   m_Name: Energy
   m_TagString: Untagged
@@ -907,19 +908,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -150}
   m_SizeDelta: {x: 100, y: 16}
   m_Pivot: {x: 0.5, y: 1}
---- !u!114 &7561279167695045727
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7713143702255473060}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 112602ded2be9e7449d477cbc4092b36, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  fuelFill: {fileID: 4854563068160529103}
 --- !u!114 &2708537899329198198
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -940,6 +928,19 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &8716908644972952696
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7713143702255473060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 014f56e73eec348bbbb67cac6b92b027, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fuelFill: {fileID: 4854563068160529103}
 --- !u!1 &8752818021686632448
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
+  m_Name: Groove
+  m_EditorClassIdentifier: 
+  role: 6
+  defaultColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 1}
+  description: Percussive rhythms that give structure and drive.
+  defaultBehavior: 3
+  allowedMidiPresets: 73000000740000007500000076000000770000000c0000000d0000000e000000180000001b0000001c00000038000000390000003a000000
+  textureDescriptor: bone clack
+  samplePreview: {fileID: 0}

@@ -42,7 +42,7 @@ ParticleSystem:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2567590292593330884}
   serializedVersion: 8
-  lengthInSec: 1
+  lengthInSec: 0.5
   simulationSpeed: 1
   stopAction: 0
   cullingMode: 0
@@ -170,7 +170,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
+      scalar: 1.1
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -227,25 +227,25 @@ ParticleSystem:
       maxColor: {r: 1, g: 0.8218751, b: 0, a: 0.34117648}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0, g: 0.29371595, b: 0.60784316, a: 1}
-        key1: {r: 1, g: 1, b: 1, a: 1}
-        key2: {r: 0.95132476, g: 1, b: 0.41568625, a: 1}
-        key3: {r: 1, g: 0.16600259, b: 0, a: 0}
-        key4: {r: 0, g: 0, b: 0, a: 0}
-        key5: {r: 0, g: 0, b: 0, a: 0}
-        key6: {r: 0, g: 0, b: 0, a: 0}
+        key0: {r: 0.07357097, g: 1, b: 0, a: 0}
+        key1: {r: 0.36320752, g: 0.5148248, b: 1, a: 1}
+        key2: {r: 1, g: 0.36320752, b: 0.8351832, a: 0}
+        key3: {r: 0.57535505, g: 0, b: 0.9811321, a: 0}
+        key4: {r: 1, g: 0.2688679, b: 0.3290789, a: 0}
+        key5: {r: 1, g: 0.67352945, b: 0.25, a: 0}
+        key6: {r: 1, g: 0.9349057, b: 0.2783019, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
-        ctime0: 1928
-        ctime1: 7517
-        ctime2: 14649
-        ctime3: 36430
-        ctime4: 65535
-        ctime5: 0
-        ctime6: 0
+        ctime0: 6361
+        ctime1: 12722
+        ctime2: 20817
+        ctime3: 27371
+        ctime4: 44525
+        ctime5: 48959
+        ctime6: 57825
         ctime7: 0
         atime0: 0
-        atime1: 27371
-        atime2: 65535
+        atime1: 32575
+        atime2: 64957
         atime3: 0
         atime4: 0
         atime5: 0
@@ -253,7 +253,7 @@ ParticleSystem:
         atime7: 0
         m_Mode: 0
         m_ColorSpace: 0
-        m_NumColorKeys: 5
+        m_NumColorKeys: 7
         m_NumAlphaKeys: 3
       minGradient:
         serializedVersion: 2
@@ -665,11 +665,11 @@ ParticleSystem:
   ShapeModule:
     serializedVersion: 6
     enabled: 1
-    type: 8
+    type: 10
     angle: 25
     length: 0.18
     boxThickness: {x: 0, y: 0, z: 0}
-    radiusThickness: 1
+    radiusThickness: 0.63
     donutRadius: 0.4
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
@@ -752,7 +752,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.38
+      value: 2.6
       mode: 0
       spread: 0
       speed:
@@ -810,7 +810,7 @@ ParticleSystem:
           m_RotationOrder: 4
     arc:
       value: 360
-      mode: 0
+      mode: 3
       spread: 0
       speed:
         serializedVersion: 2

@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e03bd7d4d4f1b4a41a62831d24c5f8bf, type: 3}
+  m_Name: Howler
+  m_EditorClassIdentifier: 
+  shipName: Howler
+  allowedMidiPresets: 180000001a00000054000000550000007300000075000000
+  description: Aggressive and bold. Favors wild leads and gritty percussion.

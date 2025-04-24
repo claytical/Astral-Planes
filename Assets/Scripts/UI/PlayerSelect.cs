@@ -19,7 +19,7 @@ public class PlayerSelect : MonoBehaviour
     void Start()
     {
         hangar = FindAnyObjectByType<Hangar>();
-        transform.SetParent(hangar.setupScreen.transform);
+        transform.SetParent(hangar.planeSelection.transform);
         transform.localScale = Vector3.one;
 
         if (hangar)
@@ -74,7 +74,6 @@ public class PlayerSelect : MonoBehaviour
     {
         float capacity = vehicle.capacity;
         float maxCapacity = hangar.GetMaxCapacity();
-
         if (fuel != null && maxCapacity > 0)
         {
             float ratio = Mathf.Clamp01(capacity / maxCapacity);
@@ -105,7 +104,6 @@ public class PlayerSelect : MonoBehaviour
 
     public void NextVehicle()
     {
-        Debug.Log("Next Vehicle");
         if (chosenPlane != null)
             hangar.MarkPlaneInUse(chosenPlane, false);
 

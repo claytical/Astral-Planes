@@ -5290,6 +5290,7 @@ GameObject:
   - component: {fileID: 269415557}
   - component: {fileID: 269415558}
   - component: {fileID: 269415561}
+  - component: {fileID: 269415563}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -5396,6 +5397,20 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 269415555}
   m_Enabled: 1
+--- !u!114 &269415563
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 269415555}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a3a070408aa941ab83ae10be1708848, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _intensity: 0
+  _shader: {fileID: 4800000, guid: ba40dc630e1d9417cb9ea22586ece1e1, type: 3}
 --- !u!1 &318370296
 GameObject:
   m_ObjectHideFlags: 0
@@ -5480,6 +5495,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  lockBurstEffect: {fileID: 0}
   assignedRole: 0
   lowestAllowedNote: 24
   highestAllowedNote: 40
@@ -5491,6 +5507,9 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  isDriftoneActive: 0
+  isDriftoneLocked: 0
+  wasLockedByPlayer: 0
 --- !u!1 &371718999
 GameObject:
   m_ObjectHideFlags: 0
@@ -5621,7 +5640,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -5716,7 +5735,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1367716147436054, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_Name
-      value: Oboe
+      value: Groove
       objectReference: {fileID: 0}
     - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5789,6 +5808,11 @@ PrefabInstance:
       propertyPath: MPTK_EffectSoundFont
       value: 
       objectReference: {fileID: 67942256}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showUnitySynthEffect
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5845,6 +5869,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  lockBurstEffect: {fileID: 0}
   assignedRole: 1
   lowestAllowedNote: 54
   highestAllowedNote: 78
@@ -5856,6 +5881,9 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  isDriftoneActive: 0
+  isDriftoneLocked: 0
+  wasLockedByPlayer: 0
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -5919,6 +5947,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  lockBurstEffect: {fileID: 0}
   assignedRole: 6
   lowestAllowedNote: 24
   highestAllowedNote: 54
@@ -5930,6 +5959,9 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  isDriftoneActive: 0
+  isDriftoneLocked: 0
+  wasLockedByPlayer: 0
 --- !u!1 &657963290
 GameObject:
   m_ObjectHideFlags: 0
@@ -6558,13 +6590,14 @@ GameObject:
   m_Component:
   - component: {fileID: 1354683683}
   - component: {fileID: 1354683682}
-  - component: {fileID: 1354683687}
   - component: {fileID: 1354683684}
-  - component: {fileID: 1354683686}
+  - component: {fileID: 1354683693}
   - component: {fileID: 1354683685}
+  - component: {fileID: 1354683692}
   - component: {fileID: 1354683688}
-  - component: {fileID: 1354683689}
+  - component: {fileID: 1354683687}
   - component: {fileID: 1354683690}
+  - component: {fileID: 1354683691}
   m_Layer: 0
   m_Name: Tracks
   m_TagString: Untagged
@@ -6584,10 +6617,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e136d82a23df714ea810b28e4170c3e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  phaseStarPrefab: {fileID: 2312498068821558259, guid: b780336bac3ca4cd69850ea7a221d987,
+    type: 3}
   drumLoopBPM: 120
   gridPadding: 1
-  wave: {fileID: 1354683686}
+  wave: {fileID: 0}
   galaxyVisualizer: {fileID: 1041262113}
+  driftoneManager: {fileID: 1354683691}
   patternVisuals:
   - {fileID: 11400000, guid: 386206b565e804180ad46cae7498e8a9, type: 2}
   - {fileID: 11400000, guid: 1758281faaf56489c9501e5ddd20dc93, type: 2}
@@ -6595,39 +6631,15 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 30c3680fb57584ccaabd5962405eef7e, type: 2}
   - {fileID: 11400000, guid: 9e9cdea4f7b364dc1893d720a9e9fe10, type: 2}
   - {fileID: 11400000, guid: 52bbbbd6ed52640fcb3ab3ea4fa5fd33, type: 2}
-  establishDrumClips:
-  - {fileID: 8300000, guid: e62078f284ab946c8acc4f8c54db4162, type: 3}
-  - {fileID: 8300000, guid: 80ad7e03c492445968529577cd4322da, type: 3}
-  - {fileID: 8300000, guid: 4f3824ef77dfe49a1a91a51e9c00d8e6, type: 3}
-  - {fileID: 8300000, guid: b0c1efa42354e436483d3bbac2a90837, type: 3}
-  evolveDrumClips:
-  - {fileID: 8300000, guid: 3f061525a21cd471bac89515efe4be1b, type: 3}
-  - {fileID: 8300000, guid: 9684fde2e46e8447c91dae3e9c294313, type: 3}
-  - {fileID: 8300000, guid: abb8052ba3eee4b919d9cdb657183e67, type: 3}
-  - {fileID: 8300000, guid: 7c6447ce4acae47e7a38658f94870c46, type: 3}
-  - {fileID: 8300000, guid: 95800894f9c8048d0ac640f75c22f1b3, type: 3}
-  intensifyDrumClips:
-  - {fileID: 8300000, guid: 8de5110f14b7045cda1781b9445b4c32, type: 3}
-  - {fileID: 8300000, guid: ee2c97e4140814869b6f7e837627b75d, type: 3}
-  releaseDrumClips:
-  - {fileID: 8300000, guid: 88fd087bb86c44fee9a683cc3485a513, type: 3}
-  - {fileID: 8300000, guid: 651fbfa59daa0429da5f1c04b0fa68bf, type: 3}
-  wildcardClips:
-  - {fileID: 8300000, guid: c0818846069a9440d8c860dec379d2b3, type: 3}
-  - {fileID: 8300000, guid: 780cb6970ff734c82841653ab97d9772, type: 3}
-  popDrumClips:
-  - {fileID: 8300000, guid: eaec46fde75d64d72934109a2ce5c025, type: 3}
   totalSteps: 16
+  phaseHitVolume: 1
+  boostVolume: 1
+  fadeDuration: 8
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   startDspTime: 0
-  currentPattern: 0
+  currentPhase: 0
   loopDurationInSeconds: 8
-  cornerPositions:
-  - {x: -8, y: 4, z: 0}
-  - {x: 8, y: 4, z: 0}
-  - {x: -8, y: -4, z: 0}
-  - {x: 8, y: -4, z: 0}
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -6666,6 +6678,8 @@ MonoBehaviour:
   - {fileID: 652946508}
   activeTrack: {fileID: 652946508}
   noteVisualizer: {fileID: 45202786}
+  noteSetPrefab: {fileID: 5821295020177947933, guid: b2b7f0ea1bccb49aeb72c00af25a23bb,
+    type: 3}
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -6680,7 +6694,7 @@ AudioSource:
   m_audioClip: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
   m_Resource: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.706
+  m_Volume: 0.5
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -6764,20 +6778,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &1354683686
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1354683681}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee8e0a5d562014965ad22cb7abf3a9d4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  energyPrefab: {fileID: 2567590292593330884, guid: ac7ca5ccdd7494bbe9493a7e2327bb65,
-    type: 3}
 --- !u!114 &1354683687
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6809,55 +6809,20 @@ MonoBehaviour:
   requiredNotesPerTrack: 6
   minimumLoopCount: 0
   requireLoopCount: 0
+  phaseProfiles:
+  - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
+  - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
+  - {fileID: 11400000, guid: a756d4e83a53b43ed990e4579dde83e8, type: 2}
+  - {fileID: 11400000, guid: 4d38e6e924afc450a8b4dc5f1c8b4ca8, type: 2}
+  - {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
+  - {fileID: 11400000, guid: c36ca097ec10c4fd2b51488a8fef5cb9, type: 2}
   totalMinedObjectsCollected: 0
   loopsCompleted: 0
   phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
---- !u!114 &1354683689
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1354683681}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a1d722e5a249f4788a9872d4db854233, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  drumTrack: {fileID: 1354683682}
-  starPrefab: {fileID: 4669415747821478303, guid: 414cfc2267cca49408e05a7bc13520f6,
-    type: 3}
-  profiles:
-  - phase: 0
-    spawnInterval: 1
-    timeToLive: 8
-    maxStarsOnScreen: 4
-    useDynamicInterval: 0
-  - phase: 1
-    spawnInterval: 3
-    timeToLive: 7
-    maxStarsOnScreen: 4
-    useDynamicInterval: 0
-  - phase: 2
-    spawnInterval: 2
-    timeToLive: 6
-    maxStarsOnScreen: 4
-    useDynamicInterval: 0
-  - phase: 3
-    spawnInterval: 4
-    timeToLive: 8
-    maxStarsOnScreen: 4
-    useDynamicInterval: 0
-  - phase: 4
-    spawnInterval: 5
-    timeToLive: 5
-    maxStarsOnScreen: 4
-    useDynamicInterval: 1
-  - phase: 5
-    spawnInterval: 3
-    timeToLive: 6.5
-    maxStarsOnScreen: 3
-    useDynamicInterval: 0
+  phaseLocked: 0
+  isPhaseInProgress: 0
+  isPhaseTransitioning: 0
+  pendingNextPhase: 0
 --- !u!114 &1354683690
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6867,20 +6832,70 @@ MonoBehaviour:
   m_GameObject: {fileID: 1354683681}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9f746c11720c24b4395155f9ccf77737, type: 3}
+  m_Script: {fileID: 11500000, guid: cc6321d5af3c442789e065bc66372fef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  analogGlitch: {fileID: 269415558}
+  analog: {fileID: 269415558}
+  digital: {fileID: 269415563}
+--- !u!114 &1354683691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ab35f73921c649bcadd089bcf9b0aca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isDriftoneActive: 0
+  maxDriftDuration: 20
+--- !u!164 &1354683692
+AudioReverbFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_DryLevel: 0
+  m_Room: -1000
+  m_RoomHF: -454
+  m_DecayTime: 0.4
+  m_DecayHFRatio: 0.83
+  m_ReflectionsLevel: -1646
+  m_ReverbLevel: 53
+  m_ReverbDelay: 0.003
+  m_Diffusion: 100
+  m_Density: 100
+  m_HFReference: 5000
+  m_RoomLF: 0
+  m_LFReference: 250
+  m_ReflectionsDelay: 0
+  m_ReverbPreset: 3
+--- !u!114 &1354683693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ef797a8c829e42449c31e3a0ead935b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   drumTrack: {fileID: 1354683682}
-  wildcardScanLine: 0
-  wildcardVerticalJump: 0
-  wildcardHorizontalShake: 0
-  wildcardColorDrift: 1
-  burstScanLine: 0.8
-  burstVerticalJump: 0.6
-  burstHorizontalShake: 0.6
-  burstColorDrift: 0.9
-  burstDuration: 1
+  influenceToggles:
+  - influence: {fileID: 11400000, guid: c3c4120f5dd06436990eef9352c54345, type: 2}
+    enabled: 1
+  - influence: {fileID: 11400000, guid: 2f73fd5e5e5054aa5b6f63ebddae8445, type: 2}
+    enabled: 1
+  - influence: {fileID: 11400000, guid: da2d7ee4985f34c758502495a42c9dc9, type: 2}
+    enabled: 1
+  currentVolume: 0
+  smoothingSpeed: 1.5
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -6982,7 +6997,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: press start
+  m_text: shall we fly?
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 57e075902a5754444b2369bfe799ef9b, type: 2}
   m_sharedMaterial: {fileID: -6710680176177670383, guid: 57e075902a5754444b2369bfe799ef9b,
@@ -7702,7 +7717,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1367716147436054, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_Name
-      value: Vox
+      value: Lead
       objectReference: {fileID: 0}
     - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_LocalPosition.x
@@ -7783,7 +7798,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showUnitySynthEffect
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -7869,6 +7884,7 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  lockBurstEffect: {fileID: 0}
   assignedRole: 5
   lowestAllowedNote: 60
   highestAllowedNote: 84
@@ -7880,6 +7896,9 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  isDriftoneActive: 0
+  isDriftoneLocked: 0
+  wasLockedByPlayer: 0
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0
@@ -7956,10 +7975,8 @@ GameObject:
   - component: {fileID: 1758545870}
   - component: {fileID: 1758545869}
   - component: {fileID: 1758545871}
-  - component: {fileID: 1758545873}
-  - component: {fileID: 1758545874}
   m_Layer: 5
-  m_Name: Game Stats UI
+  m_Name: GameStats
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8046,33 +8063,6 @@ MonoBehaviour:
   m_Spacing: {x: 20, y: 0}
   m_Constraint: 1
   m_ConstraintCount: 4
---- !u!114 &1758545873
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1758545867}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 72c2227c09a13184482d09ab49d98349, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  intro: {fileID: 1736554591}
-  spawnLocations: {fileID: 0}
-  boundaries: {fileID: 1461708765}
---- !u!114 &1758545874
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1758545867}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 78b055ed62e550a4b8f5fbd11201e078, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1001 &1798320908
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8189,7 +8179,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1367716147436054, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_Name
-      value: Synth
+      value: Harmony
       objectReference: {fileID: 0}
     - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
       propertyPath: m_LocalPosition.x
@@ -8279,38 +8269,43 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: m_RoomHF
+      value: -100
+      objectReference: {fileID: 0}
+    - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_DecayTime
-      value: 8.39
+      value: 1.49
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbDelay
-      value: 0.03
+      value: 0.011
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbLevel
-      value: 985
+      value: 200
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_DecayHFRatio
-      value: 1.39
+      value: 0.83
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbPreset
-      value: 24
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReflectionsLevel
-      value: -115
+      value: -2602
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

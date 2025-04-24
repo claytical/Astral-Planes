@@ -1,5 +1,4 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -8,192 +7,196 @@ public class LocalPlayer : MonoBehaviour
 {
     public GameObject playerSelect;
     public GameObject playerVehicle;
-    public GameObject playerStatsUI; // Renamed to clarify that this is the UI
+    public GameObject playerStatsUI;
     public AudioClip clickFx;
     public AudioClip confirmFx;
 
-    private Vehicle plane;
+    public Vehicle plane;
     public int astralPlaneIndex = 0;
     private PlayerSelect selection;
-    private PlayerStatsTracking playerStats; // Responsible for tracking metrics
-    private PlayerStats ui; // Responsible for managing the player's UI
+    private PlayerStatsTracking playerStats;
+    private PlayerStats ui;
     private Color color;
     private bool isReady = false;
-    public bool IsReady => isReady; // Public read-only property
+    private Vector2 moveInput;
+    public bool IsReady => isReady;
+    
     void Start()
     {
         DontDestroyOnLoad(this);
-        GamepadManager.Instance.RegisterPlayer(this);
+        GameFlowManager.Instance.RegisterPlayer(this);
         CreatePlayerSelect();
     }
 
-    public void Hide()
-    {
-        plane.gameObject.SetActive(false);
-    }
-
-    public void Show()
-    {
-        plane.gameObject.SetActive(true);
-    }
-
-public void CreatePlayerSelect()
+    public void CreatePlayerSelect()
     {
         GameObject ps = Instantiate(playerSelect);
-        if (ps.GetComponent<PlayerSelect>())
-        {
-            selection = ps.GetComponent<PlayerSelect>();
-        }
+        selection = ps.GetComponent<PlayerSelect>();
     }
 
     public void SetStats()
     {
-        ui.SetStats(plane);
+        ui?.SetStats(plane);
     }
 
-    public void SetColor()
+    private void SetColor()
     {
         color = selection.planeIcon.color;
     }
 
     public void Launch(DrumTrack drums)
     {
-        // ADD UI
-        GameStatsUI gameStats = FindAnyObjectByType<GameStatsUI>();
-
-        GameObject statsUI = Instantiate(playerStatsUI, gameStats.transform);
-        ui = statsUI.GetComponent<PlayerStats>(); // Assign PlayerStats (UI)
-
-        // ADD PLANE
-        Debug.Log("ADDING PLANE AT " + transform.position);
-        //TODO: APPEAR IN SAFE SPACE
+        GameObject statsUI = Instantiate(playerStatsUI, GameFlowManager.Instance.GetUIParent());
+        ui = statsUI.GetComponent<PlayerStats>();
         GameObject vehicle = Instantiate(playerVehicle, transform);
+        plane = vehicle.GetComponent<Vehicle>();
         playerStats = GetComponent<PlayerStatsTracking>();
-        if (vehicle.GetComponent<Vehicle>())
+
+        if (plane != null)
         {
-            plane = vehicle.GetComponent<Vehicle>();
-            // PlayerStatsTracking component is attached to the plane
-            plane.playerStats = playerStats;// = plane.GetComponent<PlayerStatsTracking>();
+            plane.playerStats = playerStats;
             plane.playerStatsUI = ui;
             plane.SyncEnergyUI();
-            if (plane.GetComponent<SpriteRenderer>())
-            {
-                plane.GetComponent<SpriteRenderer>().color = color;
-            }
+            plane.GetComponent<SpriteRenderer>().color = color;
             SetStats();
             ui.SetColor(color);
-            plane.Fly();
+            
+//            plane.Fly();
             GetComponent<PlayerInput>().SwitchCurrentActionMap("Play");
         }
     }
-    public string GetSelectedShipName()
-    {
-        return selection?.GetCurrentShipName(); // assumes your PlayerSelect class has this method
-    }
 
-    public void Restart()
-    {
-        isReady = false;
-        ui.Deactivate();
-        GetComponent<PlayerInput>().SwitchCurrentActionMap("Start");
-        GamepadManager.Instance.QuitGame();
-        
-    }
     public float GetVehicleEnergy()
     {
         return plane?.energyLevel ?? 0f;
     }
-    
-    public void StartRumble(float lowFrequency, float highFrequency, float duration)
+
+    public string GetSelectedShipName()
     {
-        var gamepad = GetComponent<PlayerInput>().devices[0] as Gamepad;
-        if (gamepad != null)
-        {
-            GamepadManager.Instance.StartRumble(gamepad, lowFrequency, highFrequency, duration);
-        }
+        return selection?.GetCurrentShipName();
     }
 
+    private void Restart()
+    {
+        isReady = false;
+
+        if (selection != null)
+        {
+            Destroy(selection.gameObject);
+        }
+
+        GetComponent<PlayerInput>().SwitchCurrentActionMap("Start");
+        Destroy(gameObject);
+        GameFlowManager.Instance.QuitToSelection();
+    }
+
+    // Input System Actions
+
+    void FixedUpdate()
+    {
+        if (plane != null && moveInput.sqrMagnitude > 0.01f)
+        {
+            plane.Move(moveInput);
+        }
+    }
     public void OnMove(InputValue value)
     {
-        plane.Move(value.Get<Vector2>().normalized);
+        moveInput = value.Get<Vector2>().normalized;
     }
 
     public void OnQuit(InputValue value)
     {
-        GamepadManager.Instance.QuitGame();
-        Destroy(this.gameObject);
+        Destroy(gameObject);
+        GameFlowManager.Instance.QuitToSelection();
     }
 
     public void OnThrust(InputValue value)
     {
-        float triggerValue = value.Get<float>(); // Get the right trigger value (0 to 1)
-
-        if (triggerValue > 0)
-        {
-            plane.TurnOnBoost(triggerValue); // Pass trigger value to control thrust
-        }
-        else
-        {
-            plane.TurnOffBoost(); // Stop boosting when trigger is released
-        }
-    }
-
-    public void OnNextColor(InputValue value)
-    {
-        if (value.isPressed)
-        {
-            GetComponent<AudioSource>().PlayOneShot(clickFx);
-            selection.NextColor();
-        }
-    }
-
-    public void OnPreviousColor(InputValue value)
-    {
-        if (value.isPressed)
-        {
-            GetComponent<AudioSource>().PlayOneShot(clickFx);
-            selection.PreviousColor();
-        }
-    }
-
-    public void OnNextVehicle(InputValue value)
-    {
-        if (value.isPressed)
-        {
-            GetComponent<AudioSource>().PlayOneShot(clickFx);
-            selection.NextVehicle();
-        }
-    }
-
-    public void OnPreviousVehicle(InputValue value)
-    {
-        if (value.isPressed)
-        {
-            GetComponent<AudioSource>().PlayOneShot(clickFx);
-            selection.PreviousVehicle();
-        }
+        float v = value.Get<float>();
+        if (v > 0) plane?.TurnOnBoost(v);
+        else plane?.TurnOffBoost();
     }
 
     public void OnChoose(InputValue value)
     {
-        Debug.Log("Confirmed Selection");
-        switch (SceneManager.GetActiveScene().name)
+        if (!value.isPressed) return;
+
+        switch (GameFlowManager.Instance.CurrentState)
         {
-            case "Track":
+            case GameState.Begin:
+                GameFlowManager.Instance.JoinGame();
+                GameFlowManager.Instance.CurrentState = GameState.Selection;
                 break;
-            case "TrackSelection":
+            case GameState.Selection:
+                if (isReady) return; // 🛑 already confirmed
+
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 playerVehicle = selection.GetChosenPlane();
                 selection.Confirm();
                 SetColor();
-                isReady = !isReady; // Toggle ready state
-                Debug.Log($"Player {gameObject.name} is {(isReady ? "ready" : "not ready")}");
-                GamepadManager.Instance.CheckAllPlayersReady();
+                isReady = true;
+                Debug.Log($"Player {name} is ready");
+                GameFlowManager.Instance.CheckAllPlayersReady();
                 break;
-            case "TrackFinished":
+
+            case GameState.GameOver:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 Restart();
                 break;
         }
     }
+
+    public void OnNextVehicle(InputValue value)
+    {
+        if (!value.isPressed) return;
+        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        selection.NextVehicle();
+    }
+
+    public void OnPreviousVehicle(InputValue value)
+    {
+        if (!value.isPressed) return;
+        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        selection.PreviousVehicle();
+    }
+
+    public void OnNextColor(InputValue value)
+    {
+        if (!value.isPressed) return;
+        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        selection.NextColor();
+    }
+
+    public void OnPreviousColor(InputValue value)
+    {
+        if (!value.isPressed) return;
+        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        selection.PreviousColor();
+    }
+
+    public void StartRumble(float lowFreq, float highFreq, float duration)
+    {
+        Gamepad pad = GetComponent<PlayerInput>().devices[0] as Gamepad;
+        if (pad != null)
+            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
+    }
+
+    // Wildcard Glitch Toggles
+    public void OnNorth(InputValue value) => ToggleGlitch(0);
+    public void OnEast(InputValue value) => ToggleGlitch(1);
+    public void OnWest(InputValue value) => ToggleGlitch(2);
+    public void OnSouth(InputValue value) => ToggleGlitch(3);
+
+    private void ToggleGlitch(int index)
+    {
+        if (GameFlowManager.Instance.ReadyToPlay() && GameFlowManager.Instance.CurrentState == GameState.Playing)
+        {
+            var drumTrack = FindAnyObjectByType<DrumTrack>();
+            if (drumTrack != null && drumTrack.currentPhase == MusicalPhase.Wildcard)
+            {
+                GameFlowManager.Instance.glitch.ToggleEffect(index);
+            }
+        }
+    }
+    
 }

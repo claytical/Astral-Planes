@@ -22,8 +22,13 @@ public class PlayerStats : MonoBehaviour
         // Store the vehicle ID and reference to the vehicle instance
         vehicleID = vehicle.GetInstanceID();
         currentVehicle = vehicle;
-        vehicleIcon.sprite = vehicle.GetComponent<SpriteRenderer>().sprite;
-        UpdateFuel(currentVehicle.capacity, currentVehicle.capacity);
+        if (vehicle != null)
+        {
+            vehicleIcon.sprite = vehicle.GetComponent<SpriteRenderer>().sprite;
+            UpdateFuel(currentVehicle.capacity, currentVehicle.capacity);
+        }
+        else {Debug.LogWarning("There is no vehicle attached to this object.");}
+        
         Debug.Log("Energy collected should be displayed.");
     }
 
@@ -31,26 +36,13 @@ public class PlayerStats : MonoBehaviour
     {
         vehicleIcon.color = color;
     }
-
-    public void Deactivate()
-    {
-        inactivePanel.SetActive(true);
-    }
     
     public void UpdateFuel(float currentEnergy, float maxEnergy)
     {
+        Debug.Log($"current energy: {currentEnergy}, max energy: {maxEnergy}");
         float ratio = currentEnergy / maxEnergy;
         fuel.UpdateFuelUI(ratio);
     }
 
-    // Optional: Method to recreate or reset the vehicle using the stored ID
-    public Vehicle RecreateVehicle()
-    {
-        // Logic to recreate the vehicle based on the stored vehicle ID
-        // This will depend on your game's architecture and vehicle management system
-        // Example (assuming you have a vehicle manager):
-        // return VehicleManager.Instance.GetVehicleByID(vehicleID);
 
-        return null; // Placeholder return, replace with actual logic
-    }
 }

@@ -9,6 +9,7 @@ public class NoteVisualizer : MonoBehaviour
     public RectTransform playheadLine;
     public DrumTrack drums;
     public InstrumentTrackController tracks;
+    private Dictionary<InstrumentTrack, float> waveAmplitudes = new();
 
     private float screenWidth = 1920f;
 
@@ -28,9 +29,10 @@ public class NoteVisualizer : MonoBehaviour
 
     public List<RectTransform> trackRows;
     private Canvas worldSpaceCanvas;
-
+    private Transform uiParent;
     private void Start()
     {
+        uiParent = transform.parent;
         worldSpaceCanvas = GetComponentInParent<Canvas>();
         screenWidth = GetScreenWidth();
 
@@ -53,6 +55,16 @@ public class NoteVisualizer : MonoBehaviour
 
             ribbons.Add(lr);
         }
+        foreach (InstrumentTrack track in tracks.tracks)
+        {
+            waveAmplitudes[track] = 0.05f; // Initial wavy state
+        }
+
+    }
+
+    public Transform GetUIParent()
+    {
+        return uiParent;
     }
 
   void Update()
@@ -121,37 +133,28 @@ public class NoteVisualizer : MonoBehaviour
         float width = row.rect.width;
 
         int trackSteps = track.GetTotalSteps();
-        int repeats = Mathf.Max(1, longestLoopSteps / trackSteps);
-        var loopNotes = track.GetPersistentLoopNotes();
-
+        
         for (int j = 0; j < ribbonResolution; j++)
         {
-            float t = j / (float)(ribbonResolution - 1); // 0 to 1
+            float t = j / (float)(ribbonResolution);
+            int step = Mathf.FloorToInt(t * trackSteps);
             float x = t * width;
-            float y = 0f;
-
-            int visualStep = Mathf.FloorToInt(t * longestLoopSteps);
             float activeNoteVelocity = 0f;
 
-            for (int r = 0; r < repeats; r++)
+            foreach (var (noteStep, _, _, velocity) in track.GetPersistentLoopNotes())
             {
-                int localStep = visualStep - r * trackSteps;
-                if (localStep < 0) continue;
-
-                foreach (var (noteStep, _, _, velocity) in loopNotes)
+                if (noteStep == step)
                 {
-                    if (noteStep == localStep)
-                    {
-                        activeNoteVelocity = velocity / 127f;
-                        break;
-                    }
+                    activeNoteVelocity = velocity / 127f;
+                    break;
                 }
-
-                if (activeNoteVelocity > 0f) break;
             }
 
-            float baseWave = Mathf.Sin(Time.time * waveSpeed + t * waveFrequency) * waveAmplitude;
-            y = baseWave + activeNoteVelocity * velocityMultiplier;
+            // NEW: Determine wave amplitude based on Driftone state
+            float driftoneWaveAmplitude = GetDriftoneWaveAmplitude(track);
+
+            float baseWave = Mathf.Sin(Time.time * waveSpeed + t * waveFrequency) * driftoneWaveAmplitude;
+            float y = baseWave + activeNoteVelocity * velocityMultiplier;
 
             positions[j] = new Vector3(x, y, 0);
         }
@@ -163,6 +166,37 @@ public class NoteVisualizer : MonoBehaviour
         lr.startColor = lr.endColor = faded;
     }
 }
+private float GetDriftoneWaveAmplitude(InstrumentTrack track)
+{
+    // Default low wave for settled state
+    float baseAmp = 0.015f;
+
+    if (track.isDriftoneActive && !track.isDriftoneLocked)
+    {
+        // Wavy during Driftone
+        return 0.05f;
+    }
+
+    if (track.isDriftoneLocked)
+    {
+        if (track.wasLockedByPlayer)
+        {
+            // Pop to flat
+            return 0f;
+        }
+        else
+        {
+            // Fade down gradually
+            float current = Mathf.Clamp(waveAmplitudes[track], 0f, 0.05f);
+            float newVal = Mathf.Lerp(current, baseAmp, Time.deltaTime * 1.5f);
+            waveAmplitudes[track] = newVal;
+            return newVal;
+        }
+    }
+
+    return baseAmp;
+}
+
 
     private float GetScreenWidth()
     {
