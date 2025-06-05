@@ -49,20 +49,9 @@ MonoBehaviour:
     weight: 5
   - prefab: {fileID: 1781116594832268, guid: 820f664d7d45f4fd1a19585d9bf6f4ce, type: 3}
     weight: 1
-  - prefab: {fileID: 1781116594832268, guid: 47e0fbb0d988c460e8979cee762fe1f0, type: 3}
-    weight: 2
-  - prefab: {fileID: 1781116594832268, guid: ccff3e92c00d94062a62d6bec9ae784e, type: 3}
-    weight: 2
-  - prefab: {fileID: 1781116594832268, guid: 1d6f1105b74f94485b1ff8495f16c367, type: 3}
-    weight: 3
-  - prefab: {fileID: 1781116594832268, guid: 9c1e1e320c19642d295136d6aa763f0f, type: 3}
-    weight: 3
-  - prefab: {fileID: 1781116594832268, guid: 76c2d87455f0243bcbfea6bd0df051eb, type: 3}
-    weight: 5
   - prefab: {fileID: 1781116594832268, guid: f5b92ab0688714cc39936281208a4a61, type: 3}
     weight: 5
   - prefab: {fileID: 1781116594832268, guid: 6be276d19d30344579cb8deacaaacb53, type: 3}
     weight: 5
-  - prefab: {fileID: 1781116594832268, guid: 6be276d19d30344579cb8deacaaacb53, type: 3}
-    weight: 5
   selectionMode: 0
+  trackController: {fileID: 0}

@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Visual_Groove
   m_EditorClassIdentifier: 
   role: 6
-  glowColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 1}
+  utilityType: 0
+  glowColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 0.19215687}
   rotationSpeed: 2
   pulseSpeed: 1.5
   pulseScaleAmount: 1.5

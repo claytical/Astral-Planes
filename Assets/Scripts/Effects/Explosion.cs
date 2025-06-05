@@ -15,12 +15,4 @@ public class Explosion : MonoBehaviour {
             }
         }    
     }
-
-    void ResetGlitch()
-    {
-        Camera.main.gameObject.GetComponent<Kino.AnalogGlitch>().scanLineJitter = 0f;
-        Camera.main.gameObject.GetComponent<Kino.AnalogGlitch>().colorDrift = 0f;
-        Camera.main.gameObject.GetComponent<Kino.AnalogGlitch>().verticalJump = 0f;
-    }
-
 }

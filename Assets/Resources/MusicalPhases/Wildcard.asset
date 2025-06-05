@@ -25,7 +25,7 @@ MonoBehaviour:
   visualColor: {r: 0.75114155, g: 0, b: 1, a: 1}
   rotationMode: 3
   rotationSpeed: 40
-  hitsRequired: 15
+  hitsRequired: 1
   energyPerCollectable: 1
   shortLabel: Wildcard
   moodDescription: 

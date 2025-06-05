@@ -70,7 +70,10 @@ public class Explode : MonoBehaviour
             GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
         }
 
-        Instantiate(explosion, transform.position, Quaternion.identity);
+        if (explosion != null)
+        {
+            Instantiate(explosion, transform.position, Quaternion.identity);
+        }
         Destroy(this.gameObject);
     }
 

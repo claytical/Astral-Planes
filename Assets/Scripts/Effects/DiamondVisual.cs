@@ -1,77 +1,82 @@
+// DiamondVisual.cs — Updated for Ghost mode isolation
+
 using UnityEngine;
 using System.Collections;
 
 public class DiamondVisual : MonoBehaviour
 {
     public SpriteRenderer sprite;
+    public Transform visualTarget; // Assign visualOnly from DiamondGhost
     public float spinSpeed = 90f;
     public float baseScale = 1f;
     public float pulseAmplitude = 0.1f;
     public float pulseSpeed = 2f;
-
     private float hueOffset;
     private bool shouldRotate = true;
     private float storedHue;
     public Color assignedColor;
+    public DiamondVisualMode mode = DiamondVisualMode.Normal;
 
-
-    void Start()
+    public enum DiamondVisualMode
     {
-//        hueOffset = Random.Range(0f, 1f);
+        Normal,
+        Ghost
     }
+
+    void Awake()
+    {
+        if (visualTarget == null) visualTarget = transform;
+        hueOffset = Random.Range(0f, 2f * Mathf.PI);
+    }
+
     void Update()
+    {
+        switch (mode)
+        {
+            case DiamondVisualMode.Normal:
+                RunNormalBehavior(); break;
+            case DiamondVisualMode.Ghost:
+                RunGhostBehavior(); break;
+        }
+    }
+
+    private void RunNormalBehavior()
     {
         if (shouldRotate)
         {
-            transform.Rotate(Vector3.forward, spinSpeed * Time.deltaTime);
+            visualTarget.Rotate(Vector3.forward, spinSpeed * Time.deltaTime);
         }
 
         float scale = baseScale + Mathf.Sin(Time.time * pulseSpeed) * pulseAmplitude;
-        transform.localScale = Vector3.one * scale;
+        visualTarget.localScale = Vector3.one * scale;
 
-        // 🌟 Breathing alpha pulse (twinkling star)
-        assignedColor.a = 0.3f + 0.2f * Mathf.Sin(Time.time * 2f); // base + subtle pulse
+        Color c = assignedColor;
+        c.a = 0.3f + 0.2f * Mathf.Sin(Time.time * 2f);
+        sprite.color = c;
+    }
 
-        sprite.color = assignedColor;
+    private void RunGhostBehavior()
+    {
+        Color colorA = new Color(2f, 0.3f, 0.3f, 1f);
+        Color colorB = new Color(1f, 1f, 0.4f, 1f);
+        float flicker = Mathf.PingPong(Time.time * 24f + hueOffset, 1f);
+        sprite.color = Color.Lerp(colorA, colorB, flicker);
+
+        float twitch = baseScale * (1f + Mathf.Sign(Mathf.Sin(Time.time * 25f)) * 0.1f);
+        visualTarget.localScale = Vector3.one * twitch;
+
+        if (shouldRotate)
+        {
+            float spin = Mathf.Sin(Time.time * 15f + hueOffset) * spinSpeed;
+            visualTarget.Rotate(Vector3.forward, spin * Time.deltaTime);
+        }
     }
 
     public void SetAssignedColor(Color color)
     {
         assignedColor = color;
         sprite.color = color;
-        storedHue = 0f; // optional: neutralize hue logic
-    }
-
-    public void SetHue(float hue)
-    {
-        storedHue = hue;
-        Color color = Color.HSVToRGB(hue, 0.8f, 1f);
-        sprite.color = color;
-        assignedColor = color;
-    }
-
-    public Color GetColor()
-    {
-        return Color.HSVToRGB(storedHue, 0.8f, 1f);
-    }
-
-    public IEnumerator FlyTo(Vector3 target)
-    {
-        shouldRotate = false;
-
-        Vector3 start = transform.position;
-        float duration = 0.6f;
-        float t = 0f;
-
-        while (t < 1f)
-        {
-            t += Time.deltaTime / duration;
-            transform.position = Vector3.Lerp(start, target, t);
-            transform.localScale = Vector3.Lerp(Vector3.one, Vector3.one * 0.4f, t);
-            yield return null;
-        }
-
-        Destroy(gameObject);
+        storedHue = 0f;
     }
 
     public void RotateToCross(float delay = 0.2f)
@@ -83,7 +88,7 @@ public class DiamondVisual : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
 
-        Quaternion startRot = transform.rotation;
+        Quaternion startRot = visualTarget.rotation;
         Quaternion targetRot = Quaternion.Euler(0, 0, 90f);
         float t = 0f;
         float duration = 0.4f;
@@ -91,10 +96,10 @@ public class DiamondVisual : MonoBehaviour
         while (t < 1f)
         {
             t += Time.deltaTime / duration;
-            transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
+            visualTarget.rotation = Quaternion.Slerp(startRot, targetRot, t);
             yield return null;
         }
 
-        transform.rotation = targetRot;
+        visualTarget.rotation = targetRot;
     }
 }

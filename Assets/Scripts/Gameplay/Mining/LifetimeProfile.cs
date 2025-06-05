@@ -19,7 +19,7 @@ public class LifetimeProfile
         randomizeLifetime = randomize;
     }
 
-    public static readonly Dictionary<MinedObjectType, LifetimeProfile> Profiles = new()
+    private static readonly Dictionary<MinedObjectType, LifetimeProfile> Profiles = new()
     {
         { MinedObjectType.NoteSpawner, new LifetimeProfile(16f) },
         { MinedObjectType.TrackUtility, new LifetimeProfile(8f) }

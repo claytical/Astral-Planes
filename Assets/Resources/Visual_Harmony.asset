@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Visual_Harmony
   m_EditorClassIdentifier: 
   role: 1
-  glowColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
+  utilityType: 0
+  glowColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 0.22745098}
   rotationSpeed: 3
   pulseSpeed: 2
   pulseScaleAmount: 1.25

@@ -14,26 +14,32 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phaseGroups:
   - phase: 0
+    hollowRadius: 5
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: 65cda9cafefde49faaf660fc8b7abefa, type: 3}
     allowRandomSelection: 1
   - phase: 1
+    hollowRadius: 4.5
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: a44e1d1d39a4e411b9c850efc4279697, type: 3}
     allowRandomSelection: 1
   - phase: 2
+    hollowRadius: 3
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: 3167adfe8191048b9bbff177a8577fb2, type: 3}
     allowRandomSelection: 1
   - phase: 3
+    hollowRadius: 3.5
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: 94e5dd86624334e2587eccb2f0146021, type: 3}
     allowRandomSelection: 1
   - phase: 4
+    hollowRadius: 5
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: be1a9d722cde548e48325a1698d67365, type: 3}
     allowRandomSelection: 1
   - phase: 5
+    hollowRadius: 4
     spawnerOptions:
     - {fileID: 1481789636809791906, guid: 2ba02956f38374819a55f3af5f3f5afd, type: 3}
     allowRandomSelection: 1

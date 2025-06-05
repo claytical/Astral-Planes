@@ -5,6 +5,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Users;
 using UnityEngine.SceneManagement;
 
 public enum GameState { Begin, Selection, Playing, GameOver }
@@ -22,6 +23,9 @@ public class GameFlowManager : MonoBehaviour
     public GlitchManager glitch; // Assign dynamically if needed
 
     private Dictionary<string, Action> sceneHandlers;
+    private List<Vehicle> vehicles;
+    public List<Vehicle> GetAllVehicles() => vehicles;
+    private bool hasGameOverStarted = false;
 
     private void Awake()
     {
@@ -29,6 +33,7 @@ public class GameFlowManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            vehicles = new List<Vehicle>();
             sceneHandlers = new()
             {
                 { "GeneratedTrack", HandleTrackSceneSetup },
@@ -41,7 +46,6 @@ public class GameFlowManager : MonoBehaviour
             Destroy(gameObject);
         }
     }
-    
     public GameState CurrentState
     {
         get => currentState;
@@ -89,8 +93,12 @@ public class GameFlowManager : MonoBehaviour
 
     public void CheckAllPlayersOutOfEnergy()
     {
-        if (localPlayers.All(p => !p.IsReady || p.GetVehicleEnergy() <= 0f))
+        if (hasGameOverStarted) return;
+
+        if (localPlayers.Where(p => p != null).All(p => !p.IsReady || p.GetVehicleEnergy() <= 0f))
+
         {
+            hasGameOverStarted = true;
             StartCoroutine(HandleGameOverSequence());
         }
     }
@@ -128,9 +136,9 @@ public class GameFlowManager : MonoBehaviour
         {
             string quote = sceneName switch
             {
-                "TrackFinished" => "The loop fades. But harmony lingers.",
+                "TrackFinished" => "Whether you burned out or broke through—\nthe system remembers the motion.",
                 "TrackSelection" => "Choose your path wisely.",
-                "GeneratedTrack" => "You move. The loop listens.",
+                "GeneratedTrack" => "The first note is yours.",
                 _ => string.Empty
             };
 
@@ -228,6 +236,7 @@ public class GameFlowManager : MonoBehaviour
 
     private void HandleTrackSceneSetup()
     {
+        vehicles.Clear();
         currentState = GameState.Playing;
         FindAnyObjectByType<DrumTrack>()?.ManualStart();
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>();
@@ -240,9 +249,11 @@ public class GameFlowManager : MonoBehaviour
             );
         }
 
+
         foreach (var player in localPlayers)
         {
             player.Launch(FindAnyObjectByType<DrumTrack>());
+            vehicles.Add(player.plane);
         }
     }
 
@@ -251,16 +262,30 @@ public class GameFlowManager : MonoBehaviour
         currentState = GameState.GameOver;
         // TODO: Final stats screen setup
     }
+    public void StartShipSelectionPhase()
+    {
+        CurrentState = GameState.Selection;
+        // No need to call PlayerInput.Instantiate — joining is handled by PlayerInputManager
+        Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
+    }
+
+    public string SelectedMode { get; private set; }
+
+    public void SetSelectedMode(string mode)
+    {
+        SelectedMode = mode;
+    }
 
     private void HandleTrackSelectionSceneSetup()
     {
         currentState = GameState.Selection;
-
+        hasGameOverStarted = false;
         // Remove null/destroyed references first
         localPlayers = localPlayers.Where(p => p != null).ToList();
 
         foreach (var player in localPlayers)
         {
+            player.IsReady = false;
             player.CreatePlayerSelect();
             player.SetStats();
         }

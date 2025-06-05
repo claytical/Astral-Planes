@@ -1,5 +1,7 @@
 
+using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
@@ -16,22 +18,76 @@ public class LocalPlayer : MonoBehaviour
     private PlayerSelect selection;
     private PlayerStatsTracking playerStats;
     private PlayerStats ui;
+    private PlayerInput playerInput;
     private Color color;
     private bool isReady = false;
     private Vector2 moveInput;
-    public bool IsReady => isReady;
-    
-    void Start()
+    private bool suppressChoose = true;
+    private bool confirmEnabled = false;
+    private InputAction confirmAction;
+    public float friction = 0.5f;
+    public bool IsReady
     {
+        get => isReady;
+        set => isReady = value;
+    }
+
+    IEnumerator Start()
+    {
+        yield return null; // wait one frame so input system "settles"
+        suppressChoose = false;
         DontDestroyOnLoad(this);
         GameFlowManager.Instance.RegisterPlayer(this);
+        playerInput = GetComponent<PlayerInput>();
         CreatePlayerSelect();
+        playerInput.SwitchCurrentActionMap("Selection");
+        confirmAction = playerInput.actions["Choose"]; // use your actual action name
+        confirmAction.started += ctx =>
+        {
+            if (!confirmEnabled)
+            {
+                // Wait for release before enabling
+                return;
+            }
+
+            HandleConfirm();
+        };
+
+        confirmAction.canceled += ctx =>
+        {
+            // Button released — allow confirm on next press
+            confirmEnabled = true;
+        };
+
+    }
+    private void HandleConfirm()
+    {
+        if (isReady) return;
+
+        switch (GameFlowManager.Instance.CurrentState)
+        {
+            case GameState.Selection:
+                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                playerVehicle = selection.GetChosenPlane();
+                selection.Confirm();
+                SetColor();
+                isReady = true;
+                Debug.Log($"Player {name} is ready");
+                GameFlowManager.Instance.CheckAllPlayersReady();
+                break;
+
+            case GameState.GameOver:
+                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                Restart();
+                break;
+        }
     }
 
     public void CreatePlayerSelect()
     {
         GameObject ps = Instantiate(playerSelect);
         selection = ps.GetComponent<PlayerSelect>();
+        StartRumble(.1f,1, .5f);
     }
 
     public void SetStats()
@@ -50,6 +106,7 @@ public class LocalPlayer : MonoBehaviour
         ui = statsUI.GetComponent<PlayerStats>();
         GameObject vehicle = Instantiate(playerVehicle, transform);
         plane = vehicle.GetComponent<Vehicle>();
+        plane.SetDrumTrack(drums);
         playerStats = GetComponent<PlayerStatsTracking>();
 
         if (plane != null)
@@ -60,9 +117,9 @@ public class LocalPlayer : MonoBehaviour
             plane.GetComponent<SpriteRenderer>().color = color;
             SetStats();
             ui.SetColor(color);
-            
+            Debug.Log($"Switching action map to play.");
 //            plane.Fly();
-            GetComponent<PlayerInput>().SwitchCurrentActionMap("Play");
+            playerInput.SwitchCurrentActionMap("Play");
         }
     }
 
@@ -85,15 +142,19 @@ public class LocalPlayer : MonoBehaviour
             Destroy(selection.gameObject);
         }
 
-        GetComponent<PlayerInput>().SwitchCurrentActionMap("Start");
+        GetComponent<PlayerInput>().SwitchCurrentActionMap("Selection");
         Destroy(gameObject);
         GameFlowManager.Instance.QuitToSelection();
     }
 
     // Input System Actions
+    void Update()
+    {
+    }
 
     void FixedUpdate()
     {
+        
         if (plane != null && moveInput.sqrMagnitude > 0.01f)
         {
             plane.Move(moveInput);
@@ -101,7 +162,7 @@ public class LocalPlayer : MonoBehaviour
     }
     public void OnMove(InputValue value)
     {
-        moveInput = value.Get<Vector2>().normalized;
+        moveInput = value.Get<Vector2>().normalized * friction;
     }
 
     public void OnQuit(InputValue value)
@@ -117,19 +178,31 @@ public class LocalPlayer : MonoBehaviour
         else plane?.TurnOffBoost();
     }
 
+    
+/*
     public void OnChoose(InputValue value)
     {
-        if (!value.isPressed) return;
+        if (!value.isPressed)
+        {
+            // Button was released — now allow input
+            confirmReady = true;
+            return;
+        }
 
+        if (!confirmReady)
+        {
+            // First press still held — block this input
+            return;
+        }
+
+        // ✅ At this point, confirmReady is true and button is freshly pressed
+        confirmReady = false;
+
+        // Your actual confirmation logic here
         switch (GameFlowManager.Instance.CurrentState)
         {
-            case GameState.Begin:
-                GameFlowManager.Instance.JoinGame();
-                GameFlowManager.Instance.CurrentState = GameState.Selection;
-                break;
             case GameState.Selection:
-                if (isReady) return; // 🛑 already confirmed
-
+                if (isReady) return;
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 playerVehicle = selection.GetChosenPlane();
                 selection.Confirm();
@@ -146,38 +219,52 @@ public class LocalPlayer : MonoBehaviour
         }
     }
 
+*/
     public void OnNextVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        selection.NextVehicle();
+        if (selection != null)
+        {
+            selection.NextVehicle();
+            
+        }
     }
 
     public void OnPreviousVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        selection.PreviousVehicle();
+        if (selection != null)
+        {
+            selection.PreviousVehicle();
+        }
     }
 
     public void OnNextColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        selection.NextColor();
+        if (selection != null)
+        {
+
+            selection.NextColor();
+        }
     }
 
     public void OnPreviousColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        selection.PreviousColor();
+        if (selection != null)
+        {
+            selection.PreviousColor();
+        }
     }
 
     public void StartRumble(float lowFreq, float highFreq, float duration)
     {
-        Gamepad pad = GetComponent<PlayerInput>().devices[0] as Gamepad;
-        if (pad != null)
+        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
             GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
     }
 

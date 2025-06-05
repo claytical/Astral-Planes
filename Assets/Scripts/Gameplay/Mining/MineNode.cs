@@ -24,6 +24,7 @@ public class MineNode : MonoBehaviour
     private float scaleGrowthDuration = 100f; // ✅ Time period for max scale up
     private float currentGrowthMultiplier = 1f; // ✅ Tracks how big it got before mined
     private bool colorIsLocked = false;
+    private Color originalColor;
     private Rigidbody2D _rigidbody2D;
     private void Start()
     {        
@@ -36,9 +37,9 @@ public class MineNode : MonoBehaviour
         originalScale = transform.localScale;
         StartCoroutine(ScaleUpOverTime()); // ✅ Start the scale-up process
     }
-
     public void LockColor(Color c)
     {
+        originalColor = c;
         if (coreSprite == null)
             coreSprite = GetComponentInChildren<SpriteRenderer>();
 
@@ -55,7 +56,6 @@ public class MineNode : MonoBehaviour
                 mat.SetColor("_GlowColor", glow);
             }
         }
-
         colorIsLocked = true;
     }
 
@@ -78,8 +78,7 @@ public class MineNode : MonoBehaviour
         if (strength <= 0)
             TriggerExplosion(); // existing logic
     }
-
-    public void ApplyVisualStyle(MinedObjectType type)
+    private void ApplyVisualStyle(MinedObjectType type)
     {
         
 
@@ -104,12 +103,9 @@ public class MineNode : MonoBehaviour
                 break;
         }
     }
-
     private void ApplyNoteSpawnerStyle()
     {
-        //coreSprite.color = Color.cyan * 0.8f;
-        AddGlowEffect("#00FFC8", 0.3f); // teal glow
-        //AddIcon("♪", new Color(0.9f, 1f, 1f)); // optional overlay
+
     }
 
     private void ApplyUtilityStyle(MinedObjectType type)
@@ -122,41 +118,14 @@ public class MineNode : MonoBehaviour
         // Similar logic if you decide to distinguish modifiers
         coreSprite.color = new Color(0.3f, 0.3f, 0.3f); // muted modifier style
     }
-
     private void ApplyDefaultStyle()
     {
         coreSprite.color = new Color(0.2f, 0.2f, 0.2f); // fallback
-    }
-
-    private void AddGlowEffect(string hexColor, float alpha = 0.3f)
-    {
-        if (coreSprite == null) return;
-        Color glow = ColorUtility.TryParseHtmlString(hexColor, out var c) ? c : Color.cyan;
-        glow.a = alpha;
-
-        // Apply via material, outline, or visual script
-        // Placeholder:
-        coreSprite.material.SetColor("_GlowColor", glow);
-    }
-
-    private void AddIcon(string symbol, Color color)
-    {
-        // You could spawn a child TextMeshPro icon here
-        GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(coreSprite.transform);
-        iconObj.transform.localPosition = Vector3.zero;
-
-        var tmp = iconObj.AddComponent<TMPro.TextMeshPro>();
-        tmp.text = symbol;
-        tmp.fontSize = 4;
-        tmp.color = color;
-        tmp.alignment = TMPro.TextAlignmentOptions.Center;
     }
     public void SetParentEvolvingObstacle(MineNodeSpawner parent)
     {
         parentNodeSpawner = parent;
     }
-
     public void SetDrumTrack(DrumTrack track)
     {
         drumTrack = track;
@@ -188,12 +157,13 @@ public class MineNode : MonoBehaviour
         Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
         if (vehicle != null)
         {
+            if (coreSprite != null)
+            {
+                StartCoroutine(VisualFeedbackUtility.SpectrumFlickerWithPulse(coreSprite, transform, .3f, .5f));
+            }
             int damageToNode = vehicle.GetForceAsDamage();
-
-                strength -= damageToNode;
-
-            
-
+            strength -= damageToNode;
+         
             // ✅ Calculate scale relative to remaining strength
             float scaleFactor = Mathf.Max(minScaleFactor, ((float)strength / maxStrength) * maxScaleMultiplier);
             StartCoroutine(ScaleSmoothly(originalScale * scaleFactor, 0.1f));
@@ -201,7 +171,6 @@ public class MineNode : MonoBehaviour
             if (strength <= 0 || transform.localScale.magnitude <= minScaleFactor * originalScale.magnitude)
             {
                 TriggerExplosion();
-
             }
         }
     }
@@ -235,8 +204,7 @@ public class MineNode : MonoBehaviour
 
         StartCoroutine(DelayedSpawnMinedObject(0.2f));
     }
-
-
+    
     private IEnumerator DelayedSpawnMinedObject(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -312,22 +280,23 @@ public class MineNode : MonoBehaviour
                 }
             }
 
-            // ✅ Handle TrackUtilityMinedObject logic
             TrackUtilityMinedObject utilityItem = go.GetComponent<TrackUtilityMinedObject>();
             if (utilityItem != null)
             {
                 InstrumentTrack track = drumTrack.trackController.FindTrackByRole(utilityItem.targetRole);
                 if (track != null)
                 {
-                    
                     utilityItem.Initialize(track);
                     minedObject.sprite.color = track.trackColor;
                 }
                 else
                 {
-                    Debug.LogWarning($"❌ No track found for role: {utilityItem.targetRole}");
+                    Debug.Log($"⚠️ Skipped spawning {utilityItem.type} - not useful now.");
+                    Destroy(go); // prevent clutter
+                    return;
                 }
             }
+
 
 
             // ✅ Delay collider so player doesn't accidentally collect immediately
@@ -342,4 +311,5 @@ public class MineNode : MonoBehaviour
     {
         Destroy(gameObject);
     }
+    
 }

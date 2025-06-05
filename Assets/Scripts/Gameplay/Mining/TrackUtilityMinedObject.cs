@@ -4,19 +4,25 @@ public enum TrackModifierType
 {
     Expansion, AntiNote, Clear, Drift, Remix,
     Contract, Solo, Magic,
-    StructureShift, MoodShift
+    StructureShift, MoodShift,
+    ChordProgression
+}
+public enum TrackClearType
+{
+    EnergyRestore,
+    Remix
 }
 
 public class TrackUtilityMinedObject : MonoBehaviour
 {
     public TrackModifierType type;
     public MusicalRole targetRole;
-    
+    private InstrumentTrack assignedTrack;
+    public ChordProgressionProfile chordProfile;
     public void Initialize(InstrumentTrack track)
     {
         GetComponent<MinedObject>().AssignTrack(track);
 
-        // Setup lifetime
         var explode = GetComponent<Explode>();
         if (explode != null)
         {
@@ -26,8 +32,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
 
     public void OnCollected()
     {
-        InstrumentTrack assignedTrack = GetComponent<MinedObject>().assignedTrack;
-
+        assignedTrack = GetComponent<MinedObject>().assignedTrack;
         if (assignedTrack == null)
         {
             Debug.LogWarning("No track assigned to utility item.");
@@ -36,194 +41,86 @@ public class TrackUtilityMinedObject : MonoBehaviour
 
         switch (type)
         {
+            case TrackModifierType.ChordProgression:
+                ApplyChordProgressionToTrack(); break;
             case TrackModifierType.Expansion:
-                assignedTrack.ExpandLoop();
-                break;
+                assignedTrack.ExpandLoop(); break;
             case TrackModifierType.Contract:
-                assignedTrack.ContractLoop();
-                break;
+                assignedTrack.ContractLoop(); break;
             case TrackModifierType.Clear:
-                assignedTrack.ClearLoopedNotes();
-                break;
+                assignedTrack.ClearLoopedNotes(); break;
             case TrackModifierType.Drift:
-                if (assignedTrack.drumTrack != null)
-                {
-                    var driftoneManager = assignedTrack.drumTrack.driftoneManager;
-                    if (driftoneManager != null && !driftoneManager.isDriftoneActive)
-                    {
-                        driftoneManager.BeginDriftone(assignedTrack.drumTrack.trackController.tracks.ToList());
-                    }
-                }
-                break;
+                ApplyDrift(assignedTrack); break;
             case TrackModifierType.Remix:
-                RemixTrack(assignedTrack);
-                break;
-            case  TrackModifierType.Solo:
-                SoloTrack(assignedTrack);
-                break;
-            case  TrackModifierType.Magic:
-                ExecuteSmartUtility(assignedTrack);
-                break;
-            case  TrackModifierType.StructureShift:
-                ApplySmartStructureShift(assignedTrack);
-                break;
-            case  TrackModifierType.MoodShift:
-                ApplySmartMoodShift(assignedTrack);
-                break;
-
+                RemixTrack(assignedTrack); break;
+            case TrackModifierType.Solo:
+                SoloTrackWithBassSupport(assignedTrack); break;
+            case TrackModifierType.Magic:
+                ExecuteSmartUtility(assignedTrack); break;
+            case TrackModifierType.StructureShift:
+                ApplySmartStructureShift(assignedTrack); break;
+            case TrackModifierType.MoodShift:
+                ApplySmartMoodShift(assignedTrack); break;
         }
 
         Debug.Log($"Executed {type} on track: {assignedTrack.name}");
-        Explode explode = GetComponent<Explode>();
-        if (explode != null)
-        {
-            explode.Permanent();            
-        }
-        else
-        {
-            Destroy(gameObject);
-            
-        }
-        
-    }
-    private void ApplySmartStructureShift(InstrumentTrack track)
-    {
-        if (track.loopMultiplier < track.maxLoopMultiplier && track.GetNoteDensity() >= 4)
-        {
-            track.ExpandLoop();
-            Debug.Log("Smart Structure: Expand");
-        }
-        else if (track.loopMultiplier > 1 && track.GetNoteDensity() < 4)
-        {
-            track.ContractLoop();
-            Debug.Log("Smart Structure: Contract");
-        }
-        else
-        {
-            track.ClearLoopedNotes();
-            Debug.Log("Smart Structure: Clear Track");
-        }
-    }
-    private void ApplySmartMoodShift(InstrumentTrack track)
-    {
-        
-        var controller = track.controller;
-        var drumTrack = track.drumTrack;
-        var tracks = controller.tracks;
-    if (track == null)
-    {
-        Debug.LogError("❌ ApplySmartMoodShift called with null track!");
-        return;
+        GetComponent<Explode>()?.Permanent();
     }
 
-    var noteSet = track.GetCurrentNoteSet();
-    if (noteSet == null)
-    {
-        Debug.LogError($"❌ Track '{track.name}' has no current NoteSet assigned.");
-        return;
-    }
-        int activeTracks = tracks.Count(t => t.GetNoteDensity() > 0);
-
-        if (activeTracks == 1)
-        {
-            foreach (var t in tracks)
-            {
-                drumTrack.driftoneManager.ApplyDriftToTrack(t); // ← Your drift logic
-            }
-            Debug.Log("Smart Mood: Drift applied to all tracks");
-        }
-        else if (track.GetNoteDensity() <= 2)
-        {
-            RemixTrack(track);
-            Debug.Log("Smart Mood: Remix");
-        }
-        else
-        {
-            foreach (var t in tracks)
-            {
-                if (t != track) t.ClearLoopedNotes();
-            }
-            Debug.Log("Smart Mood: Solo");
-        }
-
-        controller.UpdateVisualizer();
-    }
-
-    private void ExecuteSmartUtility(InstrumentTrack assignedTrack)
-    {
-        var controller = assignedTrack.controller;
-        var tracks = controller.tracks;
-        //var phase = assignedTrack.drumTrack.currentPhase;
-
-        // Analyze current state
-        int sparseCount = tracks.Count(t => t.GetNoteDensity() <= 1);
-        int denseCount = tracks.Count(t => t.GetNoteDensity() >= 6);
-
-        if (sparseCount > 0)
-        {
-            RemixTrack(assignedTrack); return;
-        }
-
-        if (denseCount > 0 && assignedTrack.GetNoteDensity() >= 6)
-        {
-            ContractLoop(assignedTrack); return;
-        }
-
-        if (Random.value < 0.7f)
-        {
-            SoloTrack(assignedTrack); return;
-        }
-
-        // Default fallback
-        DriftTrack(assignedTrack);
-    }
-    private void ContractLoop(InstrumentTrack track)
-    {
-        track.ContractLoop();
-    }
-
-    private void SoloTrack(InstrumentTrack keepTrack)
-    {
-        foreach (var track in keepTrack.controller.tracks)
-        {
-            if (track != keepTrack)
-                track.ClearLoopedNotes();
-        }
-    }
-
-    private void DriftTrack(InstrumentTrack track)
+    private void ApplyDrift(InstrumentTrack track)
     {
         track.PerformSmartNoteModification();
     }
+
+    private void SoloTrackWithBassSupport(InstrumentTrack keepTrack)
+    {
+        foreach (var track in keepTrack.controller.tracks)
+        {
+            if (track != keepTrack && track.assignedRole != MusicalRole.Bass)
+                track.ClearLoopedNotes();
+        }
+
+        var bassTrack = keepTrack.controller.FindTrackByRole(MusicalRole.Bass);
+        if (bassTrack != null && bassTrack.GetNoteDensity() < 3)
+        {
+            RemixTrack(bassTrack);
+        }
+    }
+    private void ApplyChordProgressionToTrack()
+    {
+        if (chordProfile == null || assignedTrack == null) return;
+
+        assignedTrack.ClearLoopedNotes();
+        assignedTrack.ApplyChordProgression(chordProfile);
+
+        Debug.Log($"🎵 Overwrote {assignedTrack.assignedRole} with progression {chordProfile.name}");
+    }
+
     private void RemixTrack(InstrumentTrack track)
     {
         track.ClearLoopedNotes();
-
         var noteSet = track.GetCurrentNoteSet();
         if (noteSet == null) return;
 
-        var phase = track.drumTrack.currentPhase;
         var profile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        var phase = track.drumTrack.currentPhase;
+
         noteSet.noteBehavior = profile.defaultBehavior;
 
-        // Assign role+phase-specific behaviors
         switch (profile.role)
         {
             case MusicalRole.Bass:
                 noteSet.noteBehavior = NoteBehavior.Bass;
                 noteSet.rhythmStyle = (phase == MusicalPhase.Pop) ? RhythmStyle.FourOnTheFloor : RhythmStyle.Sparse;
                 break;
-
             case MusicalRole.Lead:
                 noteSet.noteBehavior = NoteBehavior.Lead;
                 noteSet.rhythmStyle = RhythmStyle.Syncopated;
                 break;
-
             case MusicalRole.Harmony:
                 noteSet.noteBehavior = NoteBehavior.Harmony;
                 noteSet.chordPattern = (phase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad;
                 break;
-
             case MusicalRole.Groove:
                 noteSet.noteBehavior = NoteBehavior.Percussion;
                 noteSet.rhythmStyle = RhythmStyle.Dense;
@@ -231,12 +128,19 @@ public class TrackUtilityMinedObject : MonoBehaviour
         }
 
         noteSet.Initialize(track.GetTotalSteps());
+        AddRandomNotes(track, noteSet, 6); // Main remix pass
+        if (track.GetNoteDensity() < 4)
+            AddRandomNotes(track, noteSet, 4 - track.GetNoteDensity()); // Fill in to avoid sparseness
 
-        var steps = noteSet.GetStepList();
-        var pitches = noteSet.GetNoteList();
-        if (steps.Count == 0 || pitches.Count == 0) return;
+        track.controller.UpdateVisualizer();
+    }
 
-        for (int i = 0; i < Mathf.Min(steps.Count, 6); i++)
+    private void AddRandomNotes(InstrumentTrack track, NoteSet noteSet, int count)
+    {
+        var steps = noteSet.GetStepList().OrderBy(_ => Random.value).ToList();
+        var notes = noteSet.GetNoteList();
+
+        for (int i = 0; i < Mathf.Min(count, steps.Count); i++)
         {
             int step = steps[i];
             int note = noteSet.GetNextArpeggiatedNote(step);
@@ -244,10 +148,82 @@ public class TrackUtilityMinedObject : MonoBehaviour
             float velocity = Random.Range(60f, 100f);
             track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
         }
-
-        track.controller.UpdateVisualizer();
-
-        Debug.Log($"🎛 Remix applied to {track.name} ({track.assignedRole}, Phase: {phase})");
     }
-    
+
+    private void RemixTrackLite(InstrumentTrack track)
+    {
+        var noteSet = track.GetCurrentNoteSet();
+        if (noteSet == null) return;
+
+        noteSet.Initialize(track.GetTotalSteps());
+        AddRandomNotes(track, noteSet, 3);
+    }
+
+    private void ExecuteSmartUtility(InstrumentTrack track)
+    {
+        var tracks = track.controller.tracks;
+
+        int sparseCount = tracks.Count(t => t.GetNoteDensity() <= 1);
+        int denseCount = tracks.Count(t => t.GetNoteDensity() >= 6);
+
+        if (sparseCount > 0)
+        {
+            RemixTrackLite(track); return;
+        }
+
+        if (denseCount > 0 && track.GetNoteDensity() >= 6)
+        {
+            track.ContractLoop(); return;
+        }
+
+        if (Random.value < 0.7f)
+        {
+            SoloTrackWithBassSupport(track); return;
+        }
+
+        ApplyDrift(track);
+    }
+
+    private void ApplySmartStructureShift(InstrumentTrack track)
+    {
+        if (track.loopMultiplier < track.maxLoopMultiplier && track.GetNoteDensity() >= 4)
+        {
+            track.ExpandLoop();
+        }
+        else if (track.loopMultiplier > 1 && track.GetNoteDensity() < 4)
+        {
+            track.ContractLoop();
+        }
+        else
+        {
+            track.ClearLoopedNotes();
+        }
+    }
+
+    private void ApplySmartMoodShift(InstrumentTrack track)
+    {
+        var controller = track.controller;
+        var drumTrack = track.drumTrack;
+        var tracks = controller.tracks;
+        var noteSet = track.GetCurrentNoteSet();
+
+        int activeTracks = tracks.Count(t => t.GetNoteDensity() > 0);
+
+        if (activeTracks == 1)
+        {
+//            foreach (var t in tracks)
+//                drumTrack.driftoneManager.ApplyDriftToTrack(t);
+        }
+        else if (track.GetNoteDensity() <= 2)
+        {
+            RemixTrack(track);
+        }
+        else
+        {
+            foreach (var t in tracks)
+                if (t != track) t.ClearLoopedNotes();
+        }
+
+        controller.UpdateVisualizer();
+    }
 }

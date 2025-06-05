@@ -47,10 +47,10 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 0.1
+  m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 0.001
+  m_GravityScale: 0.1
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -61,7 +61,7 @@ Rigidbody2D:
   m_Interpolate: 0
   m_SleepingMode: 1
   m_CollisionDetection: 1
-  m_Constraints: 4
+  m_Constraints: 0
 --- !u!60 &4993008824631711877
 PolygonCollider2D:
   m_ObjectHideFlags: 0
@@ -69,7 +69,7 @@ PolygonCollider2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 0}
@@ -126,7 +126,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
     type: 3}
-  lifetime: 5
+  lifetime: 2
   randomizeLifetimer: 1
 --- !u!1 &4604847092173952858
 GameObject:
@@ -139,6 +139,7 @@ GameObject:
   - component: {fileID: 3732494607500995976}
   - component: {fileID: 7236654244480378721}
   - component: {fileID: 4213050659045031135}
+  - component: {fileID: 5764885054334535137}
   m_Layer: 0
   m_Name: Triangle
   m_TagString: Untagged
@@ -156,7 +157,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.9, y: 0.9, z: 1}
+  m_LocalScale: {x: 0.2, y: 0.2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4213040972611002}
@@ -207,7 +208,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 49f940834b72543bd8fceacb201eba1a,
     type: 3}
-  m_Color: {r: 0.8627451, g: 0.90588236, b: 0.45882353, a: 0.05490196}
+  m_Color: {r: 0.8627451, g: 0.90588236, b: 0.45882353, a: 0.54509807}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -233,3 +234,16 @@ MonoBehaviour:
   baseSpeed: 1
   shardIndex: 0
   totalShards: 1
+--- !u!114 &5764885054334535137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4604847092173952858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ca3538242e4f46e7a2b42655c7929fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colorCycleSpeed: 1

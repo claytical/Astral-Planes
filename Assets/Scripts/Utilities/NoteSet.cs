@@ -160,10 +160,6 @@ public class NoteSet : MonoBehaviour
         }
 
     }
-    public int[] GetChordOffsets()
-    {
-        return ChordLibrary.GetChord(chordPattern.ToString());
-    }
 
     public int[] GetRandomChordOffsets()
     {
@@ -354,11 +350,7 @@ public class NoteSet : MonoBehaviour
             }
         }
     }
-
-    public int GetRandomNote()
-    {
-        return notes[Random.Range(0, notes.Count)];
-    }
+    
     public List<int> GetNoteList()
     {
         return notes;
@@ -369,12 +361,4 @@ public class NoteSet : MonoBehaviour
         return allowedSteps;
     }
 
-    public int GetNoteCount()
-    {
-        return notes.Count;
-    }
-    public int GetStepCount()
-    {
-        return allowedSteps.Count;
-    }
 }

@@ -169,9 +169,9 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: 43297345-e770-4d26-bd90-2bc2dd9c6a75
     m_ActionName: 'Start/Previous Vehicle Color[/SwitchProControllerHID/dpad/up]'
-  m_NeverAutoSwitchControlSchemes: 0
+  m_NeverAutoSwitchControlSchemes: 1
   m_DefaultControlScheme: 
-  m_DefaultActionMap: Start
+  m_DefaultActionMap: Selection
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
 --- !u!114 &1889986493287473852
@@ -195,6 +195,7 @@ MonoBehaviour:
   confirmFx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
   plane: {fileID: 0}
   astralPlaneIndex: 0
+  friction: 0.5
 --- !u!82 &827239962078650827
 AudioSource:
   m_ObjectHideFlags: 0

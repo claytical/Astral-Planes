@@ -240,6 +240,5 @@ public enum GridObjectType
 {
     Note,
     Node,
-    Empty,
-    DrumCollectable
+    Empty
 }

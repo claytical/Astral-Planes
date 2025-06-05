@@ -12,7 +12,6 @@ public class PlayerStats : MonoBehaviour
     public TextMeshProUGUI collected;
     public GameObject inactivePanel;
 
-    private int vehicleID;  // Store the vehicle ID to recreate the vehicle later
     private Vehicle currentVehicle;
 
 
@@ -20,7 +19,6 @@ public class PlayerStats : MonoBehaviour
     public void SetStats(Vehicle vehicle)
     {
         // Store the vehicle ID and reference to the vehicle instance
-        vehicleID = vehicle.GetInstanceID();
         currentVehicle = vehicle;
         if (vehicle != null)
         {
@@ -39,7 +37,6 @@ public class PlayerStats : MonoBehaviour
     
     public void UpdateFuel(float currentEnergy, float maxEnergy)
     {
-        Debug.Log($"current energy: {currentEnergy}, max energy: {maxEnergy}");
         float ratio = currentEnergy / maxEnergy;
         fuel.UpdateFuelUI(ratio);
     }

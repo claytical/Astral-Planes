@@ -121,7 +121,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.75, y: 0.75, z: 1}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4470546073009318}
@@ -173,6 +173,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 282adc52e033c40bebc3f2d561afbaa0, type: 2}
   - {fileID: 11400000, guid: c1b04b838e56449f4b8256d7fb2b8500, type: 2}
   - {fileID: 11400000, guid: a98a60101b1e94ba6b42aab3f92889ab, type: 2}
+  utilityProfiles: []
 --- !u!114 &2307382923742697024
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -279,7 +280,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  explosion: {fileID: 8455937364993888704, guid: a7bca7ddf5071004ab12b90503aebe5b,
+  explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
     type: 3}
   lifetime: 0
   randomizeLifetimer: 0

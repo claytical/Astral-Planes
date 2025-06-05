@@ -17,8 +17,38 @@ public class RotateConstant : MonoBehaviour
     public int totalShards = 1;
 
     private Vector3 accelerate;
-
+    private float pulseAngle = 30f;
+    private float pulseDuration = 0.2f;
+    private float pulseTimer = 0f;
+    private bool pulsing = false;
+    private int pulseDirection = 1;
+    
     void Start()
+    {
+        ApplyRotationSettings();
+    }
+
+    void Update()
+    {
+        if (pulsing)
+        {
+            pulseTimer += Time.deltaTime;
+            float t = pulseTimer / pulseDuration;
+            float eased = Mathf.Sin(t * Mathf.PI); // smooth in-out
+            float angle = pulseDirection * pulseAngle * eased;
+            transform.localRotation = Quaternion.Euler(0, 0, angle);
+
+            if (pulseTimer >= pulseDuration)
+            {
+                pulsing = false;
+            }
+        }
+        else
+        {
+            transform.Rotate(accelerate * Time.deltaTime);
+        }
+    }
+    public void ApplyRotationSettings()
     {
         switch (rotationMode)
         {
@@ -37,13 +67,9 @@ public class RotateConstant : MonoBehaviour
 
             case RotationMode.Randomized:
             default:
-                accelerate = new Vector3(0, 0, Random.Range(-baseSpeed, baseSpeed));
+                accelerate = new Vector3(Random.Range(-baseSpeed, baseSpeed), Random.Range(-baseSpeed, baseSpeed), Random.Range(-baseSpeed, baseSpeed));
                 break;
         }
     }
 
-    void Update()
-    {
-        transform.Rotate(accelerate * Time.deltaTime);
-    }
 }

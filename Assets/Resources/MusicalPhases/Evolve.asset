@@ -28,7 +28,7 @@ MonoBehaviour:
   visualColor: {r: 0.34603062, g: 0.9056604, b: 0.578277, a: 1}
   rotationMode: 0
   rotationSpeed: 10
-  hitsRequired: 8
+  hitsRequired: 3
   energyPerCollectable: 1
   shortLabel: Evolve
   moodDescription: 

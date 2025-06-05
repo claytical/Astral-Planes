@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: HeartDrive
   m_EditorClassIdentifier: 
   shipName: HeartDrive
-  allowedMidiPresets: 490000004a0000004b0000005000000051000000520000000000000002000000
+  allowedMidiPresets: 23000000
   description: Expressive and melodic. Leans into solos and emotional tones.

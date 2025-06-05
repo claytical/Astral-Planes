@@ -51,11 +51,14 @@ public class Collectable : MonoBehaviour
         if (vehicle)
         {
             float force = vehicle.GetForceAsMidiVelocity(); // 60–127
-            int energyReward = Mathf.RoundToInt(Mathf.Lerp(2f, 12f, (force - 60f) / (127f - 60f)));
+          //  float normalizedMIDI = (force - 40f) / (127f - 40f);
+            int energyReward = Mathf.RoundToInt(Mathf.Lerp(6f, 20f, (force - 40f) / 87f));
+
+            vehicle.TriggerFlickerAndPulse(1.1f, energySprite.color, false);
             vehicle.CollectEnergy(energyReward);
             
             // 🔹 Play the note immediately
-            OnCollected?.Invoke(noteDurationTicks, vehicle.GetForceAsMidiVelocity());
+            OnCollected?.Invoke(noteDurationTicks, force);
             if (assignedInstrumentTrack == null)
             {
                 Debug.LogError($"{gameObject.name} - assignedInstrumentTrack is NULL on collection!");
@@ -75,4 +78,21 @@ public class Collectable : MonoBehaviour
             }
         }
     }
+    private IEnumerator FadeOutAndDestroy()
+    {
+        SpriteRenderer sr = energySprite;
+        Color original = sr.color;
+        float duration = 0.6f;
+
+        for (float t = 0f; t < duration; t += Time.deltaTime)
+        {
+            float alpha = Mathf.Lerp(original.a, 0f, t / duration);
+            sr.color = new Color(original.r, original.g, original.b, alpha);
+            yield return null;
+        }
+
+        OnDestroyed?.Invoke();
+        Destroy(gameObject);
+    }
+
 }
