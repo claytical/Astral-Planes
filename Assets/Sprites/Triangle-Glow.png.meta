@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 8cc46e0729f094c24be957443b1eea63
+guid: c408169c086a64f25ab95a5f2ffb9e94
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -2701515555367279175
-    second: Sandwave 1_0
+      213: 3652648977885266336
+    second: Triangle-Glow_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -165,13 +165,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Sandwave 1_0
+      name: Triangle-Glow_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 62
-        height: 116
+        x: 42
+        y: 13
+        width: 183
+        height: 209
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -180,8 +180,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9b524276ae9428ad0800000000000000
-      internalID: -2701515555367279175
+      spriteID: 0a18b0094e0d0b230800000000000000
+      internalID: 3652648977885266336
       vertices: []
       indices: 
       edges: []
@@ -199,8 +199,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      Sandwave 1_0: -2701515555367279175
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -48,7 +48,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   particles: {fileID: 5653120376534834615}
-  nodePrefab: {fileID: 1781116594832268, guid: 84abe8702aa8345bd887a236598fecd7, type: 3}
+  nodePrefab: {fileID: 1781116594832268, guid: 7bf7ef8ac78504295b7a1c87ce094d19, type: 3}
   resolvedColor: {r: 0, g: 0, b: 0, a: 0}
 --- !u!114 &8297345605356625462
 MonoBehaviour:

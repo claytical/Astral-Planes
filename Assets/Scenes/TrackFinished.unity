@@ -390,7 +390,7 @@ Camera:
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 60
-  orthographic: 0
+  orthographic: 1
   orthographic size: 5
   m_Depth: -1
   m_CullingMask:
@@ -536,7 +536,7 @@ RectTransform:
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &820579481
 GameObject:
   m_ObjectHideFlags: 0
@@ -618,11 +618,11 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 655149691}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0}
-  m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 20}
-  m_SizeDelta: {x: 1920, y: 600}
-  m_Pivot: {x: 0.5, y: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 1920, y: 200}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1014060965
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -643,7 +643,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: The loop fades. But harmony lingers.
+  m_text: The last note belongs to the loop.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
@@ -671,7 +671,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 132
+  m_fontSize: 124
   m_fontSizeBase: 51.18
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -748,10 +748,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1378940200}
-  - component: {fileID: 1378940199}
   - component: {fileID: 1378940198}
+  - component: {fileID: 1378940201}
   m_Layer: 0
-  m_Name: Constellation Visualizer
+  m_Name: Coral Visualizer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -769,26 +769,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8765b5e5b6e1442a9bd0315225d69ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  constellationVisualizer: {fileID: 1378940199}
---- !u!114 &1378940199
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1378940197}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba713655a80344be68c449ae29ca654f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  starPrefab: {fileID: 4669415747821478303, guid: f8c3d7b5ce61f4b159dad5814cfcbd2d,
-    type: 3}
-  baseRadius: 25
-  ringSpacing: 5
-  rotationSpeed: 5
-  pulseSpeed: 2
-  maxScale: 1
+  coralVisualizer: {fileID: 1378940201}
 --- !u!4 &1378940200
 Transform:
   m_ObjectHideFlags: 0
@@ -798,12 +779,35 @@ Transform:
   m_GameObject: {fileID: 1378940197}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 95, z: 0}
-  m_LocalScale: {x: 32, y: 32, z: 32}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1378940201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378940197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9719a5ef47f54f508bee99167dc603b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  branchPrefab: {fileID: 1489691682797356712, guid: 464038b6578f540738168f487b8bd898,
+    type: 3}
+  tendrilPrefab: {fileID: 2567590292593330884, guid: 33a2b2f200d00462d98bf2d2315a21a3,
+    type: 3}
+  branchLength: 2
+  branchSpreadAngle: 45
+  tendrilSpacing: 0.2
+  rotationSpeed: 15
+  coralRoot: {fileID: 1899443904}
+  coralOrigin: {x: -7, y: -5, z: 0}
+  branchScale: 1.5
 --- !u!1 &1811426716
 GameObject:
   m_ObjectHideFlags: 0
@@ -875,6 +879,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1811426716}
   m_CullTransparentMesh: 1
+--- !u!1 &1899443902
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1899443904}
+  m_Layer: 0
+  m_Name: Cooral
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1899443904
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1899443902}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -883,3 +918,4 @@ SceneRoots:
   - {fileID: 48689788}
   - {fileID: 820579484}
   - {fileID: 1378940200}
+  - {fileID: 1899443904}

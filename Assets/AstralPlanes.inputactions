@@ -2,6 +2,167 @@
     "name": "AstralPlanes",
     "maps": [
         {
+            "name": "Selection",
+            "id": "c3baa163-c269-44e2-8d7b-94beef48a8da",
+            "actions": [
+                {
+                    "name": "NextVehicle",
+                    "type": "Button",
+                    "id": "1abf4dc0-2f1c-4957-b433-053155dcb2f9",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "NextColor",
+                    "type": "Button",
+                    "id": "7e5987d9-6667-4b82-8c9a-ff55697ed190",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "PreviousVehicle",
+                    "type": "Button",
+                    "id": "5b946c89-f459-4d27-acfb-76f2cd8e5c2c",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "PreviousColor",
+                    "type": "Button",
+                    "id": "43297345-e770-4d26-bd90-2bc2dd9c6a75",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Choose",
+                    "type": "Button",
+                    "id": "af068420-8c48-4d1b-8c37-b21840a10adc",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Leave",
+                    "type": "Button",
+                    "id": "1a63e169-d2d1-48f0-84c4-fa3199363f68",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "e03850fd-876f-4d3f-83b8-679a46984a1d",
+                    "path": "<Gamepad>/dpad/right",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "NextVehicle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0e5c404d-cb5e-4457-80a8-ee6f43620c07",
+                    "path": "<Gamepad>/dpad/left",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PreviousVehicle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7d273e39-804a-473b-8b09-75298a288889",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "Hold",
+                    "processors": "",
+                    "groups": ";Generic Gamepad",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "57676fc6-1eee-4a74-9b80-6ad3a07a214f",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2f78123b-35e7-4b5d-b92d-b4c88cc0f3a4",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Xbox",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b4d25a7d-3a5b-4845-b66b-bcc9d9e6d82b",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Playstation",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ba47cf2c-4c5d-4404-a4f8-97b7a0878a5f",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Generic Gamepad",
+                    "action": "Leave",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4b40a9b2-8579-4c3f-83ed-4b72d69497e7",
+                    "path": "<Gamepad>/dpad/down",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Generic Gamepad",
+                    "action": "NextColor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "231baeb4-2fbb-49cd-8c58-bbe835f74ff1",
+                    "path": "<Gamepad>/dpad/up",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Generic Gamepad",
+                    "action": "PreviousColor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
             "name": "Play",
             "id": "82152746-d9ff-473f-95b8-cd6d4b3eac98",
             "actions": [
@@ -36,7 +197,7 @@
                     "name": "RightShoulder",
                     "type": "Button",
                     "id": "6bc629a8-25b4-4def-867b-76ecec9100a8",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -103,7 +264,7 @@
                     "path": "<Gamepad>/leftStick",
                     "interactions": "",
                     "processors": "",
-                    "groups": "Game",
+                    "groups": "Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -114,7 +275,7 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "Hold",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Switch",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -125,7 +286,7 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -136,7 +297,7 @@
                     "path": "<Gamepad>/rightTrigger",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Thrust",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -147,7 +308,7 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "East",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -158,7 +319,7 @@
                     "path": "<Gamepad>/rightShoulder",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "RightShoulder",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -169,7 +330,7 @@
                     "path": "<Gamepad>/leftShoulder",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "LeftShoulder",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -191,7 +352,7 @@
                     "path": "<Gamepad>/select",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Quit",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -202,7 +363,7 @@
                     "path": "<Gamepad>/buttonWest",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Playstation;Xbox;Switch;Generic Gamepad",
                     "action": "West",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -213,7 +374,7 @@
                     "path": "<Gamepad>/buttonNorth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "North",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -224,147 +385,8 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Playstation;Xbox;Switch;Generic Gamepad",
                     "action": "South",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                }
-            ]
-        },
-        {
-            "name": "Start",
-            "id": "c3baa163-c269-44e2-8d7b-94beef48a8da",
-            "actions": [
-                {
-                    "name": "NextVehicle",
-                    "type": "Value",
-                    "id": "1abf4dc0-2f1c-4957-b433-053155dcb2f9",
-                    "expectedControlType": "Dpad",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "NextColor",
-                    "type": "Value",
-                    "id": "7e5987d9-6667-4b82-8c9a-ff55697ed190",
-                    "expectedControlType": "Dpad",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "PreviousVehicle",
-                    "type": "Value",
-                    "id": "5b946c89-f459-4d27-acfb-76f2cd8e5c2c",
-                    "expectedControlType": "Dpad",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "PreviousColor",
-                    "type": "Value",
-                    "id": "43297345-e770-4d26-bd90-2bc2dd9c6a75",
-                    "expectedControlType": "Dpad",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "Choose",
-                    "type": "Value",
-                    "id": "af068420-8c48-4d1b-8c37-b21840a10adc",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "Leave",
-                    "type": "Value",
-                    "id": "1a63e169-d2d1-48f0-84c4-fa3199363f68",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                }
-            ],
-            "bindings": [
-                {
-                    "name": "",
-                    "id": "e03850fd-876f-4d3f-83b8-679a46984a1d",
-                    "path": "<Gamepad>/dpad/right",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "NextVehicle",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "0e5c404d-cb5e-4457-80a8-ee6f43620c07",
-                    "path": "<Gamepad>/dpad/left",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "PreviousVehicle",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "7d273e39-804a-473b-8b09-75298a288889",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "Hold",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "53599d04-3f23-498c-8e93-5c188970e5be",
-                    "path": "<Gamepad>/buttonSouth",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "ba47cf2c-4c5d-4404-a4f8-97b7a0878a5f",
-                    "path": "<Gamepad>/buttonSouth",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Game",
-                    "action": "Leave",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "4b40a9b2-8579-4c3f-83ed-4b72d69497e7",
-                    "path": "<Gamepad>/dpad/down",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Game",
-                    "action": "NextColor",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "231baeb4-2fbb-49cd-8c58-bbe835f74ff1",
-                    "path": "<Gamepad>/dpad/up",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Game",
-                    "action": "PreviousColor",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -373,11 +395,44 @@
     ],
     "controlSchemes": [
         {
-            "name": "Game",
-            "bindingGroup": "Game",
+            "name": "Generic Gamepad",
+            "bindingGroup": "Generic Gamepad",
             "devices": [
                 {
                     "devicePath": "<Gamepad>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        },
+        {
+            "name": "Switch",
+            "bindingGroup": "Switch",
+            "devices": [
+                {
+                    "devicePath": "<SwitchProControllerHID>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        },
+        {
+            "name": "Xbox",
+            "bindingGroup": "Xbox",
+            "devices": [
+                {
+                    "devicePath": "<XInputController>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        },
+        {
+            "name": "Playstation",
+            "bindingGroup": "Playstation",
+            "devices": [
+                {
+                    "devicePath": "<DualShockGamepad>",
                     "isOptional": false,
                     "isOR": false
                 }

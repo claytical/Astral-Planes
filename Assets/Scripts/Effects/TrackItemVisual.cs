@@ -33,7 +33,6 @@ public class TrackItemVisual : MonoBehaviour
     {
         originalPosition = transform.position;
         CreateCircle();
-        CreateIcon();
         ApplyItemStyle();
         SetupParticles();
     }
@@ -75,20 +74,7 @@ public class TrackItemVisual : MonoBehaviour
         circleRenderer.sortingOrder = 0;
     }
 
-    private void CreateIcon()
-    {
-        GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(transform, false);
 
-        iconText = iconObj.AddComponent<TextMeshPro>();
-        iconText.color = Color.white;
-        iconText.alignment = TextAlignmentOptions.Center;
-        iconText.enableAutoSizing = true;
-        iconText.fontSizeMin = 12;
-        iconText.fontSizeMax = 32;
-        iconText.rectTransform.sizeDelta = new Vector2(1, 1);
-        iconText.sortingOrder = 1;
-    }
     private void ApplyItemStyle()
     {
         circleRenderer.color = GetModifiedTrackColor(itemType, trackColor);
@@ -143,8 +129,7 @@ public class TrackItemVisual : MonoBehaviour
                 break;
         }
     }
-
-
+    
     private void SetupParticles()
     {
         if (glowEffect == null)
@@ -185,14 +170,7 @@ public class TrackItemVisual : MonoBehaviour
             burstEffect.Emit(15);
         }
     }
-
-    public void PlayBurstAndDestroy()
-    {
-        if (glowEffect != null) glowEffect.Stop();
-        if (burstEffect != null) burstEffect.Emit(25);
-
-        Destroy(gameObject, 0.5f);
-    }
+    
     private Color GetModifiedTrackColor(TrackModifierType type, Color baseColor)
     {
         switch (type)
@@ -217,6 +195,4 @@ public class TrackItemVisual : MonoBehaviour
                 return baseColor;
         }
     }
-
-
 }

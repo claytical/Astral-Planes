@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Visual_Lead
   m_EditorClassIdentifier: 
   role: 5
-  glowColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
+  utilityType: 0
+  glowColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 0.15686275}
   rotationSpeed: 10
   pulseSpeed: 4
   pulseScaleAmount: 1.05

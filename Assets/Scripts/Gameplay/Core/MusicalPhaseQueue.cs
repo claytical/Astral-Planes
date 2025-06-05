@@ -11,6 +11,7 @@ public class MusicalPhaseQueue : ScriptableObject
 public class MusicalPhaseGroup
 {
     public MusicalPhase phase;
+    public float hollowRadius = 2.5f;
     public List<MineNodeSpawnerSet> spawnerOptions;
     public bool allowRandomSelection = true;
 }

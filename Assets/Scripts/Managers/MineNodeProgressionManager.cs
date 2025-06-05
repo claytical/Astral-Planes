@@ -10,11 +10,13 @@ public class MineNodeProgressionManager : MonoBehaviour
 
     [Header("Progression Settings")]
     public int currentSetIndex ;
-    public int requiredNotesPerTrack = 6;
+    public int requiredNotesPerTrack = 1;
     public int minimumLoopCount;
     public bool requireLoopCount;
     public List<MusicalPhaseProfile> phaseProfiles;
-
+    public GameObject darkStarPrefab;
+    private int darkStarSpawnCount = 0;
+    
     [Header("Tracking")]
     public int totalMinedObjectsCollected;
     public int loopsCompleted;
@@ -26,7 +28,15 @@ public class MineNodeProgressionManager : MonoBehaviour
     public bool isPhaseInProgress;
     public bool isPhaseTransitioning;
     [HideInInspector] public bool pendingNextPhase = false;
+    private bool awaitingDarkStar = false;
     private bool hasStartedFirstPhase = false;
+    private DarkStar currentDarkStar;
+    private MusicalPhase currentPhase;
+    private Vector3 darkStarSpawnPoint = Vector3.zero;
+    public bool phaseStarActive = false; // 🛡️ Blocks progression until PhaseStar completes
+
+    public void SetDarkStarSpawnPoint(Vector3 pos) => darkStarSpawnPoint = pos;
+    public Vector3 GetDarkStarSpawnPoint() => darkStarSpawnPoint;
 
     private void Awake()
     {
@@ -41,55 +51,48 @@ public class MineNodeProgressionManager : MonoBehaviour
         Func<MusicalPhaseGroup, bool> filter = null
     )
     {
-        if (isPhaseInProgress || isPhaseTransitioning || pendingNextPhase)
+        Debug.Log($"🌀 MoveToNextPhase called. awaitingDarkStar: {awaitingDarkStar}, darkStarModeEnabled: {drumTrack.darkStarModeEnabled}");
+        overrideSet = null;
+        if (awaitingDarkStar)
         {
+            awaitingDarkStar = false;
+            PatchLoopIfNeeded();
+            SpawnDarkStar(drumTrack.GetStarPosition());
             return;
         }
 
-        pendingNextPhase = true;
+        if (isPhaseInProgress || isPhaseTransitioning || pendingNextPhase)
+            return;
 
+        pendingNextPhase = true;
         isPhaseInProgress = true;
         isPhaseTransitioning = false;
+
         drumTrack.ClearAllActiveMineNodes();
         MusicalPhaseGroup selectedGroup = null;
 
-        // Option 1: Go to a specific phase
         if (specificPhase.HasValue)
         {
             selectedGroup = phaseQueue.phaseGroups
                 .FirstOrDefault(g => g.phase == specificPhase.Value);
-
-            if (selectedGroup == null)
-            {
-                Debug.LogWarning($"🚫 No phase group found for phase '{specificPhase.Value}'");
-                return;
-            }
         }
-        // Option 2: Use a filter to choose from valid groups
         else if (filter != null)
         {
             var candidates = phaseQueue.phaseGroups.Where(filter).ToList();
-            if (candidates.Count == 0)
-            {
-                Debug.LogWarning("🚫 No phase groups matched the provided filter.");
-                return;
-            }
-
-            selectedGroup = candidates[(int)UnityEngine.Random.Range((float)0, candidates.Count)];
+            selectedGroup = candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
-        else
+
+        if (selectedGroup == null)
         {
-            Debug.LogWarning("⚠️ MoveToNextPhase called with no specificPhase or filter.");
+            Debug.LogWarning("⚠️ No phase group found.");
             return;
         }
 
         currentPhaseIndex = phaseQueue.phaseGroups.IndexOf(selectedGroup);
-
-        if (selectedGroup.spawnerOptions.Count == 0)
-        {
-            Debug.LogWarning($"⚠️ Phase '{selectedGroup.phase}' has no spawner options.");
-            return;
-        }
+        currentPhase = selectedGroup.phase;
+        drumTrack.currentPhase = currentPhase;
+        Debug.Log($"Moving to phase: {currentPhase}");
+        awaitingDarkStar = drumTrack.darkStarModeEnabled;
 
         if (selectedGroup.allowRandomSelection)
         {
@@ -101,36 +104,20 @@ public class MineNodeProgressionManager : MonoBehaviour
         {
             currentSpawnerSet = selectedGroup.spawnerOptions[0];
         }
-
-
-        drumTrack.BeginPhase(selectedGroup.phase, currentSpawnerSet);
-        
-        phaseLocked = false;
-        isPhaseInProgress = true;
-        isPhaseTransitioning = false;
-        pendingNextPhase = false;
-
+        drumTrack.SpawnPhaseStar(currentPhase, currentSpawnerSet);
+        drumTrack.ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
     }
-    
 
-    public void BeginFirstPhase()
+    public float GetHollowRadiusForCurrentPhase()
     {
-        if (hasStartedFirstPhase) return;
-
-        if (phaseQueue == null || phaseQueue.phaseGroups.Count == 0)
-        {
-            Debug.LogError("No phases defined in phaseQueue!");
-            return;
-        }
-
-        var firstGroup = phaseQueue.phaseGroups[0];
-        var spawnerSet = firstGroup.spawnerOptions[0];
-
-        drumTrack.BeginPhase(firstGroup.phase, spawnerSet);
-        hasStartedFirstPhase = true;
-        isPhaseInProgress = true;
+        var group = phaseQueue.phaseGroups[currentPhaseIndex];
+        return group.hollowRadius;
     }
-    public MusicalPhaseProfile GetProfileForPhase(MusicalPhase phase)
+
+    public bool IsAwaitingDarkStar() => awaitingDarkStar;
+
+
+    public MusicalPhaseProfile GetProfileForPhase(MusicalPhase? phase)
     {
         foreach (var profile in phaseProfiles)
         {
@@ -157,31 +144,48 @@ public class MineNodeProgressionManager : MonoBehaviour
             default: return null;
         }
     }
-
-    public void NotifyStarsCollected()
+    private void PatchLoopIfNeeded()
     {
-        if (phaseLocked || isPhaseTransitioning) return;
-        phaseLocked = true;
+        foreach (var track in drumTrack.trackController.tracks)
+        {
+            if (track.CollectedNotesCount < 2)
+            {
+                var noteSet = track.GetCurrentNoteSet();
+                if (noteSet == null) continue;
 
-        EvaluateProgression();
-        
+                var steps = noteSet.GetStepList();
+                var notes = noteSet.GetNoteList();
+                if (steps.Count == 0 || notes.Count == 0) continue;
+
+                for (int i = track.CollectedNotesCount; i < 2; i++)
+                {
+                    int step = steps[UnityEngine.Random.Range(0, steps.Count)];
+                    int note = noteSet.GetNextArpeggiatedNote(step);
+                    int duration = track.CalculateNoteDuration(step, noteSet);
+                    float velocity = UnityEngine.Random.Range(60f, 100f);
+
+                    track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+                }
+
+                Debug.Log($"Patched {track.assignedRole} with filler notes.");
+            }
+        }
+
+        drumTrack.trackController.UpdateVisualizer();
     }
 
-    private void EvaluateProgression()
+    public void EvaluateProgression()
     {
+        if (phaseStarActive)
+        {
+            return;
+        }
         var current = phaseQueue.phaseGroups[currentPhaseIndex].phase;
-
-//        int totalNotes = GetTotalNoteCount();
-        int denseTracks = drumTrack.trackController.tracks.Count(t => t.GetNoteDensity() >= 6);
-//        int sparseTracks = drumTrack.trackController.tracks.Count(t => t.GetNoteDensity() <= 2);
         switch (current)
         {
             case MusicalPhase.Establish:
                 MoveToNextPhase(specificPhase: MusicalPhase.Evolve);
-                if (denseTracks > 0)
-                {
-//                    ExpandLoopOnDensestTrack();
-                }
+
                 break;
             case MusicalPhase.Evolve:
                 // Tension building phase
@@ -193,23 +197,66 @@ public class MineNodeProgressionManager : MonoBehaviour
                 break;
             case MusicalPhase.Release:
                     // Return to evolve or introduce some weird variation
-//                    ClearDensestTrack();
-//                    MaybeShrinkLoopIfExpanded();
                     MoveToNextPhase(filter: g =>
                         g.phase == MusicalPhase.Evolve || g.phase == MusicalPhase.Wildcard);
                 break;
             case MusicalPhase.Wildcard:
                 // Bring it back into control
-//                ClearRandomTrack();
-//                ShiftNoteSetRootForAllTracks();
                 MoveToNextPhase(specificPhase: MusicalPhase.Pop);
                 break;
             case MusicalPhase.Pop:
-//                AdvanceChordsInNoteSets();
                 MoveToNextPhase(specificPhase: MusicalPhase.Evolve);
                 break;
         }
     }
+
+    public void SpawnDarkStar(Vector3 worldPosition)
+    {
+        Debug.Log($"Spawning Dark Star at position: {worldPosition}");
+        if (currentDarkStar != null) {
+            Debug.Log("Attempted to spawn dark star but one is already active");
+            return;
+        }
+        GameObject instance = Instantiate(darkStarPrefab, worldPosition, Quaternion.identity);
+        DarkStar darkStar = instance.GetComponent<DarkStar>();
+        if (darkStar != null)
+        {
+            darkStar.currentPhase = currentPhase;
+            darkStar.Initialize(this);
+            currentDarkStar = darkStar;
+            darkStar.Begin();
+        }
+    }
+    public void OnDarkStarComplete()
+    {
+        Debug.Log("✅ OnDarkStarComplete() called");
+        awaitingDarkStar = false;
+        isPhaseInProgress = false;
+        drumTrack.isPhaseStarActive = false;
+
+        StartCoroutine(drumTrack.WaitForPhaseStarToDieThenAdvance()); // ✅ always runs
+
+        if (!drumTrack.darkStarModeEnabled)
+        {
+            Debug.Log("🌊 The River mode: deferring phase advancement to WaitForPhaseStarToDieThenAdvance()");
+            return;
+        }
+
+        var nextPhase = PeekNextPhase();
+        if (nextPhase.HasValue)
+        {
+            drumTrack.queuedPhase = nextPhase;
+            drumTrack.RestructureTracksWithRemixLogic();
+            drumTrack.ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(nextPhase.Value));
+            Debug.Log($"🎯 Scheduled drum loop change to {nextPhase.Value}");
+        }
+        else
+        {
+            Debug.LogWarning("🎵 No next phase available after DarkStar.");
+        }
+    }
+
+
 
 
     public MineNodeSpawnerSet GetCurrentSpawnerSet()
@@ -221,77 +268,6 @@ public class MineNodeProgressionManager : MonoBehaviour
     {
         overrideSet = set;
     }
-    public void SetPhase(MusicalPhase targetPhase)
-    {
-        var group = phaseQueue.phaseGroups.FirstOrDefault(g => g.phase == targetPhase);
-        if (group == null)
-        {
-            Debug.LogWarning($"Phase {targetPhase} not found in queue.");
-            return;
-        }
-
-        currentPhaseIndex = phaseQueue.phaseGroups.IndexOf(group);
-        MusicalPhaseGroup selectedGroup = phaseQueue.phaseGroups[currentPhaseIndex];
-
-        if (selectedGroup.allowRandomSelection)
-        {
-            currentSpawnerSet = selectedGroup.spawnerOptions[
-                UnityEngine.Random.Range(0, selectedGroup.spawnerOptions.Count)
-            ];
-        }
-        else if (selectedGroup.spawnerOptions.Count > 0)
-        {
-            currentSpawnerSet = selectedGroup.spawnerOptions[0];
-        }
-
-        
-        drumTrack.SetMineNodeSpawnerSet(currentSpawnerSet);
-    }
-
-    public int GetTotalNoteCount()
-    {
-        if (drumTrack.trackController == null) return 0;
-
-        int total = 0;
-        foreach (var track in drumTrack.trackController.tracks)
-        {
-            total += track.GetNoteDensity();
-        }
-        return total;
-    }
-
-    public InstrumentTrack GetDensestTrack()
-    {
-        InstrumentTrack densest = null;
-        int maxNotes = 0;
-
-        foreach (var track in drumTrack.trackController.tracks)
-        {
-            int count = track.GetNoteDensity();
-            if (count > maxNotes)
-            {
-                maxNotes = count;
-                densest = track;
-            }
-        }
-        return densest;
-    }
-    public MusicalPhase GetCurrentPhase()
-    {
-        if (phaseQueue == null || phaseQueue.phaseGroups.Count == 0)
-        {
-            Debug.LogWarning("[MineNodeProgressionManager] No phase queue defined.");
-            return MusicalPhase.Establish; // Fallback
-        }
-
-        if (currentPhaseIndex < 0 || currentPhaseIndex >= phaseQueue.phaseGroups.Count)
-        {
-            Debug.LogWarning("[MineNodeProgressionManager] Invalid currentPhaseIndex.");
-            return MusicalPhase.Establish;
-        }
-
-        return phaseQueue.phaseGroups[currentPhaseIndex].phase;
-    }
 
     public void OnMinedObjectCollected()
     {
@@ -302,17 +278,17 @@ public class MineNodeProgressionManager : MonoBehaviour
         return currentPhaseIndex;
     }
 
-
     public void OnLoopCompleted()
     {
         loopsCompleted++;
+        /*
+        if (!drumTrack.darkStarModeEnabled)
+        {
+            TryAdvanceSet();
+            EvaluateProgression();
+        }*/
     }
-
-    public int GetCurrentSetIndex()
-    {
-        return currentSetIndex;
-    }
-
+    
     private bool ShouldAdvanceMineNodeSet()
     {
         bool allTracksHaveEnoughNotes = trackController.tracks.All(t => t.CollectedNotesCount >= requiredNotesPerTrack);

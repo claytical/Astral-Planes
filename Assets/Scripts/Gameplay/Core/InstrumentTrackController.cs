@@ -82,13 +82,33 @@ public class InstrumentTrackController : MonoBehaviour
     {
         return tracks.Max(track => track.loopMultiplier);
     }
+    public InstrumentTrack ClearAndReturnTrack(Vehicle vehicle)
+    {
+        var nonEmptyTracks = tracks.Where(t => t.GetNoteDensity() > 0).ToList();
+        if (nonEmptyTracks.Count == 0) return null;
+
+        var track = nonEmptyTracks[Random.Range(0, nonEmptyTracks.Count)];
+        track.ClearLoopedNotes(TrackClearType.EnergyRestore, vehicle);
+        return track;
+    }
+
+    public InstrumentTrack ClearAndReturnTrack()
+    {
+        var nonEmptyTracks = tracks.Where(t => t.GetNoteDensity() > 0).ToList();
+        if (nonEmptyTracks.Count == 0) return null;
+
+        var track = nonEmptyTracks[Random.Range(0, nonEmptyTracks.Count)];
+        track.ClearLoopedNotes(TrackClearType.EnergyRestore); // or .Remix
+        return track;
+    }
+    
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips, GameObject notesetPrefab)
     {
         
         ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList(), notesetPrefab);
         UpdateVisualizer();
     }
-
+//TODO: NEEDED?
     public void UpdateVisualizer()
     {
        // noteVisualizer.DisplayNotes(tracks.ToList());
@@ -129,19 +149,10 @@ public class InstrumentTrackController : MonoBehaviour
 
         player.MPTK_Volume = 0f;
     }
-
     public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         return tracks.FirstOrDefault(t => t.assignedRole == role);
     }
-    public void PruneSparseTracks(int threshold = 1)
-    {
-        foreach (var track in tracks.Where(t => t.CollectedNotesCount <= threshold))
-        {
-            track.ClearLoopedNotes();
-        }
-    }
-    
     public InstrumentTrack FindRandomTrackByRole(MusicalRole role)
     {
         var matching = tracks.Where(t => t.assignedRole == role).ToList();
@@ -149,66 +160,5 @@ public class InstrumentTrackController : MonoBehaviour
         if (matching.Count == 0) return null;
         return matching[Random.Range(0, matching.Count)];
     }
-
-    public string GenerateCrypticIntroPhrase()
-    {
-        Dictionary<int, string> presetDescriptors = new()
-        {
-            // Bass
-            { 32, "subterranean warmth" }, { 33, "low-frequency prayer" }, { 34, "slow thunder" }, { 35, "molten anchors" },
-            { 36, "pulsating love" }, { 37, "heartquake" }, { 38, "magnetic tide" }, { 39, "deep machine breath" },
-
-            // Lead
-            { 24, "glittering teeth" }, { 25, "slicing wind" }, { 26, "blazing fingers" },
-            { 80, "synthetic longing" }, { 81, "electric fire" }, { 82, "sapphire spirals" }, { 83, "neon needles" },
-            { 84, "sky-cutting melody" }, { 85, "liquid blaze" }, { 86, "signal pulse" }, { 87, "hyperlight beams" },
-            { 73, "hollow flute" }, { 74, "ghost pipe" }, { 75, "bamboo wind" },
-
-            // Harmony
-            { 0, "gentle collisions" }, { 1, "stained glass echoes" }, { 2, "room-sized memory" }, { 3, "twilight bloom" },
-            { 48, "wooden bloom" }, { 49, "threaded harmonies" }, { 50, "woven dusk" }, { 51, "velvet architecture" },
-            { 52, "drifting arcs" }, { 53, "bowed ether" },
-            { 88, "cloud breath" }, { 89, "fog lace" }, { 90, "woolen shimmer" }, { 91, "electric wool" },
-            { 92, "celestial fog" }, { 93, "horizon wash" },
-            { 16, "pipe pulse" }, { 17, "chord cathedral" }, { 18, "light organ" },
-
-            // Groove
-            { 115, "mechanical twitch" }, { 116, "bone clack" }, { 117, "granular clockwork" }, { 118, "ritual static" }, { 119, "rattling chrome" },
-            { 12, "hammered tone" }, { 13, "sparked crystal" }, { 14, "glass pulse" },
-            { 27, "twang shimmer" }, { 28, "metallic jangle" },
-            { 56, "spark-driven limbs" }, { 57, "piston swing" }, { 58, "sync in steel" }
-        };
-
-        List<string> fragments = new();
-        foreach (var track in tracks)
-        {
-            if (presetDescriptors.TryGetValue(track.preset, out var phrase))
-            {
-                fragments.Add(phrase);
-            }
-            else
-            {
-                fragments.Add("an unnamed current");
-            }
-        }
-
-        // Shuffle for variation
-        fragments = fragments.OrderBy(_ => UnityEngine.Random.value).ToList();
-
-        // Template library
-        string[] templates = new[]
-        {
-            $"Where {fragments[0]} meets {fragments[1]}, and {fragments[2]} drifts through {fragments[3]}, a signal awakens.",
-            $"In the space between {fragments[0]}, {fragments[1]}, {fragments[2]}, and {fragments[3]}, the groove begins.",
-            $"You’ll hear {fragments[0]}. Then {fragments[1]}. Then {fragments[2]} and {fragments[3]}. And still not understand what’s coming.",
-            $"{fragments[0]}, {fragments[1]}, {fragments[2]}, and {fragments[3]}—their harmony foretells the unknown.",
-            $"Threads of {fragments[0]} wrap around {fragments[1]}, while {fragments[2]} and {fragments[3]} echo through time.",
-            $"All four converge: {fragments[0]}, {fragments[1]}, {fragments[2]}, and {fragments[3]}. Hold on."
-        };
-
-        int index = UnityEngine.Random.Range(0, templates.Length);
-        return templates[index];
-    }
-
 
 }

@@ -28,7 +28,7 @@ MonoBehaviour:
   visualColor: {r: 0.5330188, g: 0.82528865, b: 1, a: 1}
   rotationMode: 0
   rotationSpeed: 5
-  hitsRequired: 5
+  hitsRequired: 4
   energyPerCollectable: 1
   shortLabel: Establish
   moodDescription: 

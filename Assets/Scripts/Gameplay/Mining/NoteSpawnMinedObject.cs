@@ -36,17 +36,19 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     {
         if (assignedTrack != null && selectedNoteSet != null)
         {
-            assignedTrack.SpawnCollectables(selectedNoteSet);
+            assignedTrack.AdaptiveSpawnCollectables(selectedNoteSet);
             
         }
 
         Explode explode = GetComponent<Explode>();
         if (explode != null)
         {
+            Debug.Log($"Explosion called from {gameObject.name}");
             explode.Permanent();
         }
         else
         {
+            Debug.Log($"Explosion null on {gameObject.name}");
             Destroy(gameObject);
         }
     }

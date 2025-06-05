@@ -18,6 +18,7 @@ public class MinedObject : MonoBehaviour
 
     private void Start()
     {
+        sprite.enabled = false;
         minedCollider = GetComponent<Collider2D>();
         if (minedCollider != null)
         {
@@ -66,7 +67,6 @@ public class MinedObject : MonoBehaviour
                 return MinedObjectCategory.NoteModifier;
         }
     }
-
     
     public void EnableColliderAfterDelay(float delay)
     {
@@ -161,59 +161,64 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-private IEnumerator FadeOutGlow()
-{
-    SpriteRenderer sr = sprite;
-    Color original = sr.color;
-    float duration = 0.75f;
-
-    for (float t = 0f; t < duration; t += Time.deltaTime)
+    private IEnumerator FadeOutGlow()
     {
-        float alpha = Mathf.Lerp(original.a, 0f, t / duration);
-        sr.color = new Color(original.r, original.g, original.b, alpha);
-        yield return null;
+        SpriteRenderer sr = sprite;
+        Color original = sr.color;
+        float duration = 0.75f;
+
+        for (float t = 0f; t < duration; t += Time.deltaTime)
+        {
+            float alpha = Mathf.Lerp(original.a, 0f, t / duration);
+            sr.color = new Color(original.r, original.g, original.b, alpha);
+            yield return null;
+        }
+
+        sr.color = new Color(original.r, original.g, original.b, 0f);
     }
-
-    sr.color = new Color(original.r, original.g, original.b, 0f);
-}
-private IEnumerator PulseExpand()
-{
-    float duration = 0.4f;
-    Vector3 start = transform.localScale;
-//    Vector3 expanded = start * 1.4f;
-
-    for (float t = 0f; t < duration; t += Time.deltaTime)
+    private IEnumerator PulseExpand()
     {
-        float scale = Mathf.SmoothStep(1f, 1.4f, Mathf.Sin(t / duration * Mathf.PI));
-        transform.localScale = start * scale;
-        yield return null;
+        float duration = 0.4f;
+        Vector3 start = transform.localScale;
+    //    Vector3 expanded = start * 1.4f;
+
+        for (float t = 0f; t < duration; t += Time.deltaTime)
+        {
+            float scale = Mathf.SmoothStep(1f, 1.4f, Mathf.Sin(t / duration * Mathf.PI));
+            transform.localScale = start * scale;
+            yield return null;
+        }
+
+        transform.localScale = start;
     }
-
-    transform.localScale = start;
-}
-private IEnumerator JitterEffect()
-{
-    Vector3 originalPos = transform.localPosition;
-    float duration = 0.3f;
-    float magnitude = 0.05f;
-
-    for (float t = 0f; t < duration; t += Time.deltaTime)
+    private IEnumerator JitterEffect()
     {
-        float offsetX = Random.Range(-magnitude, magnitude);
-        float offsetY = Random.Range(-magnitude, magnitude);
-        transform.localPosition = originalPos + new Vector3(offsetX, offsetY, 0);
-        yield return null;
-    }
+        Vector3 originalPos = transform.localPosition;
+        float duration = 0.3f;
+        float magnitude = 0.05f;
 
-    transform.localPosition = originalPos;
-}
+        for (float t = 0f; t < duration; t += Time.deltaTime)
+        {
+            float offsetX = Random.Range(-magnitude, magnitude);
+            float offsetY = Random.Range(-magnitude, magnitude);
+            transform.localPosition = originalPos + new Vector3(offsetX, offsetY, 0);
+            yield return null;
+        }
+
+        transform.localPosition = originalPos;
+    }
 
     private void OnTriggerEnter2D(Collider2D coll)
     {
-        if (coll.gameObject.GetComponent<Vehicle>())
+        Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
+        if (vehicle != null)
         {
             ApplyEffect();
-            Destroy(gameObject);
+            vehicle.TeleportToRandomCell();
+      
         }
     }
+    
+
+
 }

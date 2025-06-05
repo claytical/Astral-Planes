@@ -9,17 +9,20 @@ public class RainbowLerp : MonoBehaviour
     private Image image;
     private float hue;
     private bool isSprite = false;
+    private float alpha = 1f;
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
             isSprite = true;
+            alpha = spriteRenderer.color.a;
         }
         Image img = GetComponent<Image>();
         if (img != null)
         {
             image = img;
+            alpha = img.color.a;
             isSprite = false;
         }
         // Optional: start at a random hue if you like
@@ -36,6 +39,7 @@ public class RainbowLerp : MonoBehaviour
         // Convert HSV to RGB. 
         // Full saturation (1f) & full value (1f) to get bright rainbow colors.
         Color rainbowColor = Color.HSVToRGB(hue, 1f, 1f);
+        rainbowColor.a = alpha;
         if (isSprite)
         {
             spriteRenderer.color = rainbowColor;

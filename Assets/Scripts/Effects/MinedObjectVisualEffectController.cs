@@ -142,14 +142,6 @@ public class MinedObjectVisualEffectController : MonoBehaviour
             float pulse = (Mathf.Sin(Time.time * activeProfile.pulseSpeed) + 1f) / 2f;
             float scale = Mathf.Lerp(1f, activeProfile.pulseScaleAmount, pulse);
             transform.localScale = Vector3.one * scale;
-
-            if (sprite != null && sprite.material.HasProperty("_GlowColor"))
-            {
-                Color glow = activeProfile.glowColor;
-                glow.a = Mathf.Lerp(0.2f, 0.4f, pulse);
-                sprite.material.SetColor("_GlowColor", glow);
-            }
-
             yield return null;
         }
     }
@@ -176,11 +168,4 @@ public class MinedObjectVisualEffectController : MonoBehaviour
         return null;
     }
 
-    public void PlayCollectEffect()
-    {
-        if (particles != null)
-        {
-            particles.Play();
-        }
-    }
 }

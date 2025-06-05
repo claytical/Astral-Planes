@@ -16,6 +16,6 @@ MonoBehaviour:
   defaultColor: {r: 0.6156863, g: 0.30588236, b: 0.8666667, a: 1}
   description: Deep and grounding. Adds weight to the groove with low-end power.
   defaultBehavior: 0
-  allowedMidiPresets: 2000000021000000220000002300000024000000250000002600000027000000
+  allowedMidiPresets: 2000000023000000
   textureDescriptor: subterranean warmth
   samplePreview: {fileID: 0}
