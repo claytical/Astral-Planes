@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: X-agong
   m_EditorClassIdentifier: 
   shipName: X-agong
-  allowedMidiPresets: 2400000027000000
+  allowedMidiPresets: 07000000
   description: Alien and forceful. Pulses with deep bass and strange percussive tones.

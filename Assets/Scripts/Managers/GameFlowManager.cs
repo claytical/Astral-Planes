@@ -40,12 +40,15 @@ public class GameFlowManager : MonoBehaviour
                 { "TrackFinished", HandleTrackFinishedSceneSetup },
                 { "TrackSelection", HandleTrackSelectionSceneSetup },
             };
+
+
         }
         else
         {
             Destroy(gameObject);
         }
     }
+
     public GameState CurrentState
     {
         get => currentState;

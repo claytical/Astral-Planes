@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Sandwave
   m_EditorClassIdentifier: 
   shipName: Sandwave
-  allowedMidiPresets: 340000005c00000002000000
+  allowedMidiPresets: 04000000
   description: Earthy and grounded. Driven by groove and plucked rhythm.

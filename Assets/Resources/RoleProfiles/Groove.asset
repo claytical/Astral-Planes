@@ -16,6 +16,6 @@ MonoBehaviour:
   defaultColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 1}
   description: Percussive rhythms that give structure and drive.
   defaultBehavior: 3
-  allowedMidiPresets: 320000000a000000
+  allowedMidiPresets: 0100000004000000
   textureDescriptor: bone clack
   samplePreview: {fileID: 0}

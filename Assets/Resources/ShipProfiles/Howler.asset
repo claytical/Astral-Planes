@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Howler
   m_EditorClassIdentifier: 
   shipName: Howler
-  allowedMidiPresets: 50000000
+  allowedMidiPresets: 03000000
   description: Aggressive and bold. Favors wild leads and gritty percussion.

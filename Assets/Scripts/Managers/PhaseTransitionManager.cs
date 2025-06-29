@@ -54,7 +54,7 @@ public class PhaseTransitionManager : MonoBehaviour
             var noteSet = track.GetCurrentNoteSet();
             if (noteSet == null) continue;
 
-            track.ClearLoopedNotes();
+            track.ClearLoopedNotes(TrackClearType.Remix);
             noteSet.Initialize(track.GetTotalSteps());
 
             var steps = noteSet.GetStepList();

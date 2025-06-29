@@ -310,7 +310,7 @@ public class PhaseStar : MonoBehaviour
             set.noteBehavior = NoteBehavior.Lead;
 
             set.Initialize(track.GetTotalSteps());
-            track.ClearLoopedNotes();
+            track.ClearLoopedNotes(TrackClearType.Remix);
 
             var steps = set.GetStepList();
             var notes = set.GetNoteList();
@@ -323,6 +323,7 @@ public class PhaseStar : MonoBehaviour
                 float vel = Random.Range(60f, 100f);
                 track.GetPersistentLoopNotes().Add((step, note, dur, vel));
             }
+            
         }
     }
 
@@ -475,7 +476,7 @@ public class PhaseStar : MonoBehaviour
             }
 
             set.Initialize(track.GetTotalSteps());
-            track.ClearLoopedNotes();
+            track.ClearLoopedNotes(TrackClearType.Remix);
 
             var steps = set.GetStepList();
             var notes = set.GetNoteList();
@@ -541,7 +542,7 @@ public class PhaseStar : MonoBehaviour
             set.chordPattern = ChordPattern.RootTriad;
             set.Initialize(track.GetTotalSteps());
 
-            track.ClearLoopedNotes();
+            track.ClearLoopedNotes(TrackClearType.Remix);
 
             var steps = set.GetStepList();
             var notes = set.GetNoteList();

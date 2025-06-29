@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Drifter
   m_EditorClassIdentifier: 
   shipName: Drifter
-  allowedMidiPresets: 32000000
+  allowedMidiPresets: 00000000
   description: Ambient and steady. Prefers low-end and smooth textures.

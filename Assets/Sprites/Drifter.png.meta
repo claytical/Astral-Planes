@@ -199,7 +199,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      Drifter_0: -2531368812042023698
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

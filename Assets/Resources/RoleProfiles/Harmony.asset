@@ -16,6 +16,6 @@ MonoBehaviour:
   defaultColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
   description: "\tLush chords and layered textures that fill in the soundscape."
   defaultBehavior: 2
-  allowedMidiPresets: 02000000320000005c000000
+  allowedMidiPresets: 030000000500000007000000
   textureDescriptor: cloud breath
   samplePreview: {fileID: 0}

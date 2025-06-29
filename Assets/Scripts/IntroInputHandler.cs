@@ -23,6 +23,7 @@ public class IntroInputHandler : MonoBehaviour
     public void ShowMenuClean()
     {
         gameModeSelect.SetActive(true);
+        quoteText.SetActive(false);
         StartCoroutine(ResetUISelection());
     }
 

@@ -3,8 +3,6 @@ using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using MidiPlayerTK;
-using UnityEngine.UI;
 
 public class NoteVisualizer : MonoBehaviour
 {

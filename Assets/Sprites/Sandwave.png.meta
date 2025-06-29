@@ -199,7 +199,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      Sandwave_0: 7223363152320260212
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
