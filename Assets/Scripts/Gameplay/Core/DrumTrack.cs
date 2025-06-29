@@ -410,7 +410,7 @@ public class DrumTrack : MonoBehaviour
             }
             else
             {
-                trackController.tracks[i].ClearLoopedNotes();   
+                trackController.tracks[i].ClearLoopedNotes(TrackClearType.Remix);   
             }
         }
 
@@ -418,7 +418,7 @@ public class DrumTrack : MonoBehaviour
     }
     private void RemixTrack(InstrumentTrack track)
     {
-        track.ClearLoopedNotes();
+        track.ClearLoopedNotes(TrackClearType.Remix);
         var noteSet = track.GetCurrentNoteSet();
         if (noteSet == null) return;
 

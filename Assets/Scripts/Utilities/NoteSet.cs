@@ -4,22 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
 
-public enum NoteBehavior
-{
-    Bass,       // Sustained, lower-frequency notes
-    Lead,       // Fast-moving, melodic notes
-    Harmony,    // Chord-based behavior
-    Percussion, // Rhythm-based placement
-    Drone       // Continuous background texture
-}
-public enum ChordPattern
-{
-    RootTriad,     // (C, E, G) - Basic triad
-    SeventhChord,  // (C, E, G, Bb) - Adds color
-    Fifths,        // (C, G) - Open sound
-    Sus4,          // (C, F, G) - Suspended, unresolved
-    Arpeggiated,   // (C, E, G, E) - Repeating movement
-}
+
+
 public static class ChordLibrary
 {
     public static readonly Dictionary<string, int[]> Formulas = new()
@@ -74,14 +60,7 @@ public static class ScalePatterns
         { ScaleType.Locrian,    new [] {0, 1, 3, 5, 6, 8, 10} },
     };
 }
-public enum RhythmStyle
-{
-    FourOnTheFloor,
-    Syncopated,
-    Swing,
-    Sparse,
-    Dense
-}
+
 public class RhythmPattern {
     public int[] Offsets;           // The allowed onset offsets (within a measure)
     public float DurationMultiplier; // Multiplier to extend (or shorten) the note duration

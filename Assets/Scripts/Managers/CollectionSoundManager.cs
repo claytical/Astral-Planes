@@ -21,7 +21,7 @@ public class CollectionSoundManager : MonoBehaviour
     public int defaultFxPreset = 89; // Warm Pad (safe fallback)
 
     // All presets assumed to be in Bank 0
-    private const int fxBank = 128;
+    private const int fxBank = 0;
 
     public static CollectionSoundManager Instance;
 
@@ -38,45 +38,35 @@ public class CollectionSoundManager : MonoBehaviour
 
     public void PlayEffect(CollectionEffectType type, MusicalRole role = MusicalRole.Harmony)
     {
-        int note = 72; // Default MIDI note
-        int preset = defaultFxPreset; // You can customize per type
+        int root = 60; // Middle C
+        int note = root; // Default
 
         switch (type)
         {
             case CollectionEffectType.PhaseStar:
-                note = 96; // High shimmer
-                preset = 96; // Sweep Pad or FX
+                note = root + 24; // C6 – bright
                 break;
-
             case CollectionEffectType.Aether:
-                note = 84; // C6
-                preset = 88; // Pad 1 (new age)
+                note = root + 12 + Random.Range(-2, 3); // ~C5 + variation
                 break;
-
             case CollectionEffectType.Burst:
-                note = 101; // C4
-                preset = 45; // Synth drum
+                note = root + Random.Range(-6, 6); // center punch
                 break;
-
             case CollectionEffectType.Core:
-                note = 48; // C3
-                preset = 89; // Warm pad
+                note = root - 12; // C3 – low pulse
                 break;
             case CollectionEffectType.MazeFriendly:
-                TinklePopSound pop = FriendlyNoteUtility.GetTinklePopSound(60);
-                note = pop.note;
-                preset = pop.preset; // always 112
-
+                note = FriendlyNoteUtility.GetNote(root);
                 break;
             case CollectionEffectType.MazeToxic:
-                ToxicSound toxic = ToxicNoteUtility.GetToxicSound(60);
-                note = toxic.note;
-                preset = toxic.preset;
+                note = ToxicNoteUtility.GetNote(root);
                 break;
         }
-        
+
+        // Always use custom Preset 8 (percussive)
         midiStreamPlayer.MPTK_Channels[midiChannel].ForcedBank = fxBank;
-        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = preset;
+        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = 8;
+
         midiStreamPlayer.MPTK_PlayEvent(new MPTKEvent()
         {
             Command = MPTKCommand.NoteOn,
@@ -103,9 +93,13 @@ public struct TinklePopSound
 
 public static class FriendlyNoteUtility
 {
-    // C major scale intervals (can be reused across keys)
-    private static readonly int[] MajorScaleOffsets = { 0, 2, 4, 5, 7, 9, 11, 12 };
+    private static readonly int[] MajorScaleOffsets = { 0, 2, 4, 5, 7, 9, 11 };
 
+    public static int GetNote(int root = 60)
+    {
+        int offset = MajorScaleOffsets[UnityEngine.Random.Range(0, MajorScaleOffsets.Length)];
+        return Mathf.Clamp(root + offset, 48, 84);
+    }
     public static TinklePopSound GetTinklePopSound(int rootNote = 60)
     {
         int interval = MajorScaleOffsets[UnityEngine.Random.Range(0, MajorScaleOffsets.Length)];
@@ -128,12 +122,14 @@ public struct ToxicSound
 
 public static class ToxicNoteUtility
 {
-    // Diatonic major scale intervals to avoid
-    private static readonly int[] MajorScaleOffsets = { 0, 2, 4, 5, 7, 9, 11 };
-
-    // Dissonant or chromatic intervals
     private static readonly int[] DissonantOffsets = { 1, 3, 6, 8, 10, 13, 14 };
 
+    public static int GetNote(int root = 60)
+    {
+        int offset = DissonantOffsets[UnityEngine.Random.Range(0, DissonantOffsets.Length)];
+        if (UnityEngine.Random.value < 0.5f) offset = -offset;
+        return Mathf.Clamp(root + offset, 36, 84);
+    }
     // Gritty or eerie-sounding General MIDI preset IDs
     private static readonly int[] DarkPresets = {
         38, // Synth Bass 1

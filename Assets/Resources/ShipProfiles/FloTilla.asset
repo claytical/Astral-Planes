@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: FloTilla
   m_EditorClassIdentifier: 
   shipName: FloTilla
-  allowedMidiPresets: 0d0000007300000076000000
+  allowedMidiPresets: 01000000
   description: Swirling and collaborative. Prefers pads, ambient keys, and light
     rhythmic FX.

@@ -48,7 +48,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
             case TrackModifierType.Contract:
                 assignedTrack.ContractLoop(); break;
             case TrackModifierType.Clear:
-                assignedTrack.ClearLoopedNotes(); break;
+                assignedTrack.ClearLoopedNotes(TrackClearType.EnergyRestore); break;
             case TrackModifierType.Drift:
                 ApplyDrift(assignedTrack); break;
             case TrackModifierType.Remix:
@@ -77,7 +77,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
         foreach (var track in keepTrack.controller.tracks)
         {
             if (track != keepTrack && track.assignedRole != MusicalRole.Bass)
-                track.ClearLoopedNotes();
+                track.ClearLoopedNotes(TrackClearType.Remix);
         }
 
         var bassTrack = keepTrack.controller.FindTrackByRole(MusicalRole.Bass);
@@ -90,7 +90,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
     {
         if (chordProfile == null || assignedTrack == null) return;
 
-        assignedTrack.ClearLoopedNotes();
+        assignedTrack.ClearLoopedNotes(TrackClearType.Remix);
         assignedTrack.ApplyChordProgression(chordProfile);
 
         Debug.Log($"🎵 Overwrote {assignedTrack.assignedRole} with progression {chordProfile.name}");
@@ -98,7 +98,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
 
     private void RemixTrack(InstrumentTrack track)
     {
-        track.ClearLoopedNotes();
+        track.ClearLoopedNotes(TrackClearType.Remix);
         var noteSet = track.GetCurrentNoteSet();
         if (noteSet == null) return;
 
@@ -196,7 +196,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
         }
         else
         {
-            track.ClearLoopedNotes();
+            track.ClearLoopedNotes(TrackClearType.Remix);
         }
     }
 
@@ -221,7 +221,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
         else
         {
             foreach (var t in tracks)
-                if (t != track) t.ClearLoopedNotes();
+                if (t != track) t.ClearLoopedNotes(TrackClearType.Remix);
         }
 
         controller.UpdateVisualizer();

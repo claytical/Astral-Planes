@@ -199,7 +199,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      Xagong_0: -3495420660709828112
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

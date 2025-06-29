@@ -510,7 +510,7 @@ public class DarkStar : MonoBehaviour
             SpawnGhostDiamond(role, step, note, velocity, duration, track);
             yield return new WaitForSeconds(interval);
         }
-        track.ClearLoopedNotes();
+        track.ClearLoopedNotes(TrackClearType.Remix);
 
         // Vulnerability window
         SetDangerState(false);

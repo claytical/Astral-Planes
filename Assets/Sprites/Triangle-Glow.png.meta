@@ -199,7 +199,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      Triangle-Glow_0: 3652648977885266336
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -386,7 +386,6 @@ public class InstrumentTrack : MonoBehaviour
                     controller?.noteVisualizer?.TriggerNoteRushToVehicle(this, vehicle.transform.position);
                 }
                 break;
-
             case TrackClearType.Remix:
                 controller?.noteVisualizer?.TriggerNoteBlastOff(this);
                 break;
@@ -396,17 +395,6 @@ public class InstrumentTrack : MonoBehaviour
         persistentLoopNotes.Clear();
     }
 
-    public void ClearLoopedNotes()
-    {
-        if (persistentLoopNotes.Count == 0) return;
-        
-        foreach (GameObject note in spawnedNotes.ToList())
-        {
-            if (note != null) Destroy(note);
-        }
-        spawnedNotes.Clear();
-        persistentLoopNotes.Clear();
-    }
 
     private void SpawnCollectables(NoteSet noteSet)
     {
@@ -582,7 +570,7 @@ public class InstrumentTrack : MonoBehaviour
     {
         if (loopMultiplier <= 1)
         {
-            ClearLoopedNotes(); // Final shrink is a clear
+            ClearLoopedNotes(TrackClearType.Remix); // Final shrink is a clear
             return;
         }
 

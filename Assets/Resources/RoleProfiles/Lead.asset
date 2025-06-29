@@ -16,6 +16,6 @@ MonoBehaviour:
   defaultColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   description: Bright, aggressive lines that cut through the mix.
   defaultBehavior: 1
-  allowedMidiPresets: 0d000000730000006d000000
+  allowedMidiPresets: 02000000060000000700000003000000
   textureDescriptor: sky-cutting melody
   samplePreview: {fileID: 0}
