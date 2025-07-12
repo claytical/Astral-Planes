@@ -11,7 +11,7 @@ public class Vehicle : MonoBehaviour
     public float energyLevel;
     public GameObject teleportationParticles;
     public GameObject trailParticlePrefab;
-
+    public GameObject ghostVehiclePrefab;
     public float force = 10f;
     public float terminalVelocity = 20f;
     public float boostMultiplier = 2f;
@@ -30,15 +30,17 @@ public class Vehicle : MonoBehaviour
     public PlayerStats playerStatsUI; // Reference to the PlayerStats UI element
     public PlayerStatsTracking playerStats;
     public SpriteRenderer soulSprite;
-
     private GameObject activeTrail; // Reference to the currently active trail instance 
     private Rigidbody2D rb;
     private AudioManager audioManager;
+    private bool isInConstellation = false;
+    private Vector2 storedVelocity;
 
     [SerializeField] private float minAlpha = 0.2f;
     [SerializeField] private float maxAlpha = 1f;
     [SerializeField] private float maxSpeed = 10f;
     private SpriteRenderer baseSprite;
+    [SerializeField] private bool isLocked = false;
 
     private Vector3 lastPosition;
     private Vector3 originalScale;
@@ -104,6 +106,11 @@ public class Vehicle : MonoBehaviour
             currentColor.a = alpha;
             baseSprite.color = currentColor;
         }
+        public bool IsLockedOrHiding()
+        {
+            return isLocked || (baseSprite != null && !baseSprite.enabled);
+        }
+
         public void SyncEnergyUI()
         {
             if (playerStatsUI != null)
@@ -125,88 +132,215 @@ public class Vehicle : MonoBehaviour
             drumTrack = drums;
         }
         
-        public void TeleportToRandomCell()
+
+        public void LockControl()
         {
-            StartCoroutine(TeleportRoutine());
+            isLocked = true;
+            storedVelocity = rb.linearVelocity;        // 💾 Save current drift
+            rb.linearVelocity = Vector2.zero;
+            rb.isKinematic = true;
+            GetComponent<Collider2D>().enabled = false;
         }
 
-        private IEnumerator TeleportRoutine()
+        public void UnlockControl()
         {
-         
-            Vector3 startPos = transform.position;
-            Vector2 entryVelocity = rb.linearVelocity.normalized; // use current direction
-            Vector2Int entryGrid = drumTrack.WorldToGridPosition(startPos);
+            isLocked = false;
+            rb.isKinematic = false;
+            GetComponent<Collider2D>().enabled = true;
+        }
+        public void HideVisuals()
+        {
+            if (baseSprite != null)
+                baseSprite.enabled = false;
 
-            Vector2Int newCell = new Vector2Int(-1, -1); // default to invalid
-            int maxSteps = 8;
+            if (soulSprite != null)
+                soulSprite.enabled = false;
 
-            for (int i = 1; i <= maxSteps; i++)
+            if (trail != null)
+                trail.SetActive(false);
+        }
+        public IEnumerator ReactivateVisuals(float duration = 0.4f)
+        {
+            ShowVisuals();
+
+            float t = 0f;
+            Vector3 originalScale = transform.localScale;
+            transform.localScale = originalScale * 0.3f;
+
+            Color baseColor = baseSprite.color;
+            baseColor.a = 0f;
+            baseSprite.color = baseColor;
+
+            while (t < duration)
             {
-                Vector2 offset = entryVelocity * i * drumTrack.GetGridCellSize();
-                Vector3 probeWorld = startPos + (Vector3)offset;
-                Vector2Int probeGrid = drumTrack.WorldToGridPosition(probeWorld);
-
-                if (drumTrack.IsSpawnCellAvailable(probeGrid.x, probeGrid.y))
-                {
-                    newCell = probeGrid;
-                    break;
-                }
-            }
-
-    // ⛳ Fallback if directional path is blocked
-            if (newCell.x == -1)
-            {
-                newCell = drumTrack.GetRandomAvailableCell();
-                if (newCell.x == -1)
-                {
-                    Debug.LogWarning("❌ No grid cell available for teleport.");
-                    yield break;
-                }
-            }
-
-            float duration = 0.3f;
-
-            // 🌀 Shrink to 0
-            for (float t = 0; t < duration; t += Time.deltaTime)
-            {
-                float scale = Mathf.Lerp(1f, 0f, t / duration);
-                transform.localScale = originalScale * scale;
-                yield return null;
-            }
-            transform.localScale = Vector3.zero;
-            // ⛳ Find new grid cell
-            
-            if (drumTrack == null) yield break;
-
-             newCell = drumTrack.GetRandomAvailableCell();
-            if (newCell.x == -1)
-            {
-                Debug.LogWarning("❌ No grid cell available for teleport.");
-                yield break;
-            }
-
-            Vector3 newPos = drumTrack.GridToWorldPosition(newCell);
-            GameObject preview = Instantiate(teleportationParticles, newPos, Quaternion.identity);
-            StartCoroutine(EmitTrail(startPos, newPos, 0.4f, 16));
-            rb.linearVelocity = Vector3.zero;
-            yield return new WaitForSeconds(0.6f); // ⏳ Let the preview bubble up
-            transform.position = newPos;
-
-            // ✅ Re-occupy the grid cell
-            drumTrack.OccupySpawnGridCell(newCell.x, newCell.y, GridObjectType.Note);
-
-            // 🌱 Grow back to full size
-            for (float t = 0; t < duration; t += Time.deltaTime)
-            {
-                float scale = Mathf.Lerp(0f, 1f, t / duration);
-                transform.localScale = originalScale * scale;
+                float p = t / duration;
+                transform.localScale = originalScale * Mathf.Lerp(0.3f, 1f, p);
+                baseColor.a = Mathf.Lerp(0f, 1f, p);
+                baseSprite.color = baseColor;
+                t += Time.deltaTime;
                 yield return null;
             }
 
             transform.localScale = originalScale;
-            Destroy(preview, 1.5f); // Let it fade out naturally
-
+            baseColor.a = 1f;
+            baseSprite.color = baseColor;
         }
+
+        public void ShowVisuals()
+        {
+            if (baseSprite != null)
+                baseSprite.enabled = true;
+
+            if (soulSprite != null)
+                soulSprite.enabled = true;
+
+            if (trail != null)
+                trail.SetActive(true);
+        }
+
+        public IEnumerator EnterConstellationDrift(List<Vector3> path)
+        {
+            if (isInConstellation) yield break;
+            isInConstellation = true;
+
+            // Optional: disable collisions or switch layer
+            Collider2D col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
+
+            rb.linearVelocity = Vector2.zero;
+            rb.isKinematic = true;
+
+            float segmentDuration = 0.4f;
+            for (int i = 0; i < path.Count - 1; i++)
+            {
+                Vector3 a = path[i];
+                Vector3 b = path[i + 1];
+
+                for (float t = 0; t < segmentDuration; t += Time.deltaTime)
+                {
+                    float lerpT = t / segmentDuration;
+                    transform.position = Vector3.Lerp(a, b, Mathf.SmoothStep(0, 1, lerpT));
+                    yield return null;
+                }
+            }
+
+            rb.isKinematic = false;
+            if (col != null) col.enabled = true;
+            isInConstellation = false;
+        }
+
+private IEnumerator TeleportRoutine()
+{
+    if (drumTrack == null) yield break;
+
+    Vector3 startPos = transform.position;
+    rb.linearVelocity = Vector2.zero;
+    rb.isKinematic = true;
+
+    // 🎬 1. Shrink vehicle down
+    float shrinkDuration = 0.3f;
+    for (float t = 0; t < shrinkDuration; t += Time.deltaTime)
+    {
+        float scale = Mathf.Lerp(1f, 0f, t / shrinkDuration);
+        transform.localScale = originalScale * scale;
+        yield return null;
+    }
+    transform.localScale = Vector3.zero;
+
+    // 🌀 2. Generate spiral path
+    Vector3 corePos = drumTrack.transform.position;
+    float goldenAngle = 137.5f;
+    float radiusStep = drumTrack.GetGridCellSize() * 1.2f;
+    int spiralSteps = 16;
+
+    List<Vector3> spiralPath = new List<Vector3>();
+    for (int i = 0; i < spiralSteps; i++)
+    {
+        float angleDeg = i * goldenAngle;
+        float angleRad = angleDeg * Mathf.Deg2Rad;
+        float radius = i * radiusStep;
+
+        Vector2 offset = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad)) * radius;
+        Vector3 probeWorld = corePos + (Vector3)offset;
+        spiralPath.Add(probeWorld);
+    }
+
+    // 🎯 3. Choose final position (later in the spiral)
+    Vector2Int newCell = new Vector2Int(-1, -1);
+    Vector3 newPos = startPos;
+
+    for (int i = spiralSteps - 1; i >= spiralSteps / 2; i--)
+    {
+        Vector2Int probeGrid = drumTrack.WorldToGridPosition(spiralPath[i]);
+        if (drumTrack.IsSpawnCellAvailable(probeGrid.x, probeGrid.y))
+        {
+            newCell = probeGrid;
+            newPos = drumTrack.GridToWorldPosition(newCell);
+            break;
+        }
+    }
+
+    if (newCell.x == -1)
+    {
+        newCell = drumTrack.GetRandomAvailableCell();
+        if (newCell.x == -1)
+        {
+            Debug.LogWarning("❌ No grid cell available for teleport.");
+            yield break;
+        }
+        newPos = drumTrack.GridToWorldPosition(newCell);
+    }
+
+    // ✨ 4. Animate ghost movement through spiral
+    float moveDuration = 1.2f;
+    int segmentCount = spiralPath.Count - 1;
+    for (int i = 0; i < segmentCount; i++)
+    {
+        Vector3 a = spiralPath[i];
+        Vector3 b = spiralPath[i + 1];
+        float segmentDuration = moveDuration / segmentCount;
+
+        for (float s = 0; s < segmentDuration; s += Time.deltaTime)
+        {
+            float lerpT = s / segmentDuration;
+            transform.position = Vector3.Lerp(a, b, lerpT);
+
+            // Optional: emit trail particles here
+            if (i % 2 == 0)
+            {
+                GameObject p = Instantiate(trailParticlePrefab, transform.position, Quaternion.identity);
+                if (p.TryGetComponent<Rigidbody2D>(out var trailRb))
+                {
+                    Vector2 dir = (b - a).normalized + UnityEngine.Random.insideUnitSphere * 0.2f;
+                    trailRb.linearVelocity = dir * UnityEngine.Random.Range(1f, 3f);
+                }
+            }
+
+            yield return null;
+        }
+    }
+
+    // 🌀 5. Spawn particle effect at destination
+    GameObject preview = Instantiate(teleportationParticles, newPos, Quaternion.identity);
+    transform.position = newPos;
+
+    // ✅ Re-occupy grid
+    drumTrack.OccupySpawnGridCell(newCell.x, newCell.y, GridObjectType.Note);
+    rb.isKinematic = false;
+
+    // 🌱 6. Regrow vehicle from 0 to full size
+    float growDuration = 0.3f;
+    for (float t = 0; t < growDuration; t += Time.deltaTime)
+    {
+        float scale = Mathf.Lerp(0f, 1f, t / growDuration);
+        transform.localScale = originalScale * scale;
+        yield return null;
+    }
+    transform.localScale = originalScale;
+
+    Destroy(preview, 1.5f);
+}
+
 
         void FixedUpdate()
         {
@@ -285,6 +419,7 @@ public class Vehicle : MonoBehaviour
 
         public void Move(Vector2 direction)
         {
+            if (isLocked) return;
             if (rb != null && direction != Vector2.zero)
             {
                 // Reset the existing rotational force (angular velocity)

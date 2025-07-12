@@ -21,7 +21,7 @@ public class MinedObjectVisualEffectController : MonoBehaviour
 
         if (noteSpawner != null)
         {
-            activeProfile = GetProfileForRole(noteSpawner.musicalRole);
+            activeProfile = GetProfileForRole(noteSpawner.musicalRole.role);
         }
         else if (trackUtility != null)
         {

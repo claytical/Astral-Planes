@@ -292,9 +292,11 @@ public void TriggerNoteRushToVehicle(InstrumentTrack track, Vector3 vehiclePos)
 }
 public void TriggerNoteBlastOff(InstrumentTrack track)
 {
+    Debug.Log($"Triggered note blast off");
     foreach (var marker in GetNoteMarkers(track))
     {
         if (marker == null) continue;
+        Debug.Log($"Blasting off {marker.name}");
         StartCoroutine(BlastOffAndDestroy(marker));
     }
 }

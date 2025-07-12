@@ -73,8 +73,8 @@ public class InstrumentTrackController : MonoBehaviour
 
     void Start()
     {
-        MidiPlayerGlobal.OnEventPresetLoaded.AddListener(EndLoadingSF);
-        MidiPlayerGlobal.MPTK_LoadLiveSF("file:///Users/clayewing/Documents/Moonlight.sf2");
+        //MidiPlayerGlobal.OnEventPresetLoaded.AddListener(EndLoadingSF);
+        //MidiPlayerGlobal.MPTK_LoadLiveSF("file:///Users/clayewing/Documents/Moonlight.sf2");
             if (!GameFlowManager.Instance.ReadyToPlay())
             {
                 return;

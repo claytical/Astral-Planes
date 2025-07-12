@@ -121,7 +121,7 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-    private void ApplyEffect()
+    private void ApplyEffect(Vehicle vehicle)
     {
         if (assignedTrack == null) {
             Debug.LogWarning($"{gameObject.name} - No track assigned.");
@@ -136,7 +136,7 @@ public class MinedObject : MonoBehaviour
                 NoteSpawnerMinedObject spawner = GetComponent<NoteSpawnerMinedObject>();
                 if (spawner != null)
                 {
-                    spawner.OnCollected();
+                    spawner.OnCollected(vehicle);
                 }
                 else
                 {
@@ -213,9 +213,7 @@ public class MinedObject : MonoBehaviour
         Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
         if (vehicle != null)
         {
-            ApplyEffect();
-            vehicle.TeleportToRandomCell();
-      
+            ApplyEffect(vehicle);
         }
     }
     

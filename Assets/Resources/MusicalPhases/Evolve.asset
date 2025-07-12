@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Evolve
   m_EditorClassIdentifier: 
   phase: 1
+  rolePatternStrategies: []
+  ghostLoopCount: 4
   drumClips:
   - {fileID: 8300000, guid: 16fb73248cc9d43049223e146619bd61, type: 3}
   - {fileID: 8300000, guid: 16fa22cb8693742dcb23cc4fab6360b9, type: 3}
@@ -28,7 +30,10 @@ MonoBehaviour:
   visualColor: {r: 0.34603062, g: 0.9056604, b: 0.578277, a: 1}
   rotationMode: 0
   rotationSpeed: 10
+  defaultRemixStrategy: {fileID: 0}
+  remixRoleOverrides: []
   hitsRequired: 3
   energyPerCollectable: 1
   shortLabel: Evolve
   moodDescription: 
+  roleGhostStrategies: []

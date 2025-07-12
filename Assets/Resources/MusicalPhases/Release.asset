@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Release
   m_EditorClassIdentifier: 
   phase: 3
+  rolePatternStrategies: []
+  ghostLoopCount: 4
   drumClips:
   - {fileID: 8300000, guid: 9758cfbfeee8b4e3f91670131c6b32d3, type: 3}
   - {fileID: 8300000, guid: 3364a0ba2d7354550a9154de2588b20c, type: 3}
@@ -25,7 +27,10 @@ MonoBehaviour:
   visualColor: {r: 1, g: 0.7071784, b: 0.43867922, a: 1}
   rotationMode: 0
   rotationSpeed: 8
+  defaultRemixStrategy: {fileID: 0}
+  remixRoleOverrides: []
   hitsRequired: 4
   energyPerCollectable: 1
   shortLabel: Release
   moodDescription: 
+  roleGhostStrategies: []

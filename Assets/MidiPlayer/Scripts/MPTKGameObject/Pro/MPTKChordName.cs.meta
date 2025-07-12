@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ac0e93c882e282d47a8127f0f17c9521
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.15.0
+  assetPath: Assets/MidiPlayer/Scripts/MPTKGameObject/Pro/MPTKChordName.cs
+  uploadId: 751843

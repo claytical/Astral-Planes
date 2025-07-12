@@ -35,7 +35,7 @@ public class InstrumentTrack : MonoBehaviour
     private NoteSet currentNoteSet;
     private Coroutine currentSpawnerRoutine;
     private List<(int stepIndex, int note, int duration, float velocity)> persistentLoopNotes = new List<(int, int, int, float)>();
-    private List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
+    public List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private int totalSteps = 16;
     private int lastStep = -1;
     private Boundaries boundaries;
@@ -156,39 +156,7 @@ public class InstrumentTrack : MonoBehaviour
 
         controller.UpdateVisualizer();
     }
-    public void AdaptiveSpawnCollectables(NoteSet noteSet)
-    {
-        if (noteSet == null) return;
 
-        currentNoteSet = noteSet;
-        currentNoteSet.assignedInstrumentTrack = this;
-        currentNoteSet.Initialize(totalSteps);
-
-        if (persistentLoopNotes.Count == 0)
-        {
-            // No notes yet—start fresh
-            SpawnCollectables(noteSet);
-        }
-        else if (loopMultiplier < maxLoopMultiplier)
-        {
-            // Not at max loop length—expand the loop
-            ExpandLoop();
-            SpawnCollectables(noteSet);
-        }
-        else
-        {
-            // Max loop length reached—overwrite first section
-            int sectionLength = totalSteps / 2;
-            persistentLoopNotes = persistentLoopNotes
-                .Where(n => n.stepIndex >= sectionLength)
-                .ToList();
-
-            SpawnCollectables(noteSet);
-        }
-
-        controller.UpdateVisualizer();
-    }
-    
     private void ApplyChordChange(NoteSet noteSet)
 {
     int[] chordOffsets = noteSet.GetRandomChordOffsets();
@@ -244,26 +212,13 @@ public class InstrumentTrack : MonoBehaviour
     }
 }
 
-    private int CollectNote(int note, int durationTicks, float force)
+    public int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
-        int stepIndex = GetCurrentStep();
-
-        persistentLoopNotes.Add((stepIndex, note, durationTicks, force));
-        GameObject noteMarker = controller.noteVisualizer.PlacePersistentNoteMarker(this, stepIndex);
-        if (noteMarker != null)
-        {
-            VisualNoteMarker marker = noteMarker.GetComponent<VisualNoteMarker>();
-            if (marker != null)
-            {
-                marker.Initialize(trackColor);
-            }
-            spawnedNotes.Add(noteMarker);
-        }
-        controller.UpdateVisualizer();
+        AddNoteToLoop(stepIndex, note, durationTicks, force);
         PlayNote(note, durationTicks, force);
-
         return stepIndex;
     }
+
     public void ApplyChordProgression(ChordProgressionProfile profile)
     {
         if (profile == null) return;
@@ -318,8 +273,8 @@ public class InstrumentTrack : MonoBehaviour
             }
         }
     }
-    
-    void PlayNote(int note, int durationTicks, float velocity)
+
+    public void PlayNote(int note, int durationTicks, float velocity)
     {
         if (drumTrack == null || drumTrack.drumLoopBPM <= 0)
         {
@@ -395,21 +350,7 @@ public class InstrumentTrack : MonoBehaviour
         persistentLoopNotes.Clear();
     }
 
-
-    private void SpawnCollectables(NoteSet noteSet)
-    {
-        if (currentSpawnerRoutine != null)
-            StopCoroutine(currentSpawnerRoutine);
-
-        ForceClearTrack(); // remove current collectables
-
-        currentNoteSet = noteSet;
-        currentNoteSet.assignedInstrumentTrack = this;
-        currentNoteSet.Initialize(totalSteps);
-
-        currentSpawnerRoutine = StartCoroutine(SpawnCollectablesOverTime(noteSet));
-    }
-    private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
+    public int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
     {
         List<int> allowedSteps = noteSet.GetStepList();
         int totalSteps = GetTotalSteps();
@@ -432,75 +373,7 @@ public class InstrumentTrack : MonoBehaviour
         return Mathf.Max(adjusted, ticksPerStep / 2); // ensure audibility
     }
 
-    private IEnumerator SpawnCollectablesOverTime(NoteSet noteSet)
-    {
-        if (noteSet == null || noteSet.GetStepList().Count == 0) yield break;
-        List<int> eligibleSteps = noteSet.GetStepList()
-            .Where(step => step >= totalSteps / 2)
-            .ToList();
-        float loopDuration = drumTrack.GetLoopLengthInSeconds();
-        float spacing = loopDuration / Mathf.Max(1, eligibleSteps.Count);
-        foreach (int stepIndex in eligibleSteps)
-        {
-
-            int assignedNote = noteSet.GetNextArpeggiatedNote(stepIndex);
-            int gridY = GetGridYFromNote(assignedNote);
-            int gridX = Random.Range(0, drumTrack.GetSpawnGridWidth());
-
-            Vector2Int gridPos = new Vector2Int(gridX, gridY);
-
-// Find available column if that cell is taken
-            if (!drumTrack.IsSpawnCellAvailable(gridX, gridY))
-            {
-                bool found = false;
-                for (int attempt = 0; attempt < drumTrack.GetSpawnGridWidth(); attempt++)
-                {
-                    int tryX = (gridX + attempt) % drumTrack.GetSpawnGridWidth();
-                    if (drumTrack.IsSpawnCellAvailable(tryX, gridY))
-                    {
-                        gridPos = new Vector2Int(tryX, gridY);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    continue; // skip spawn if no space on this row
-                }
-            }
-
-                Vector3 spawnPosition = drumTrack.GridToWorldPosition(gridPos);
-                GameObject spawned = Instantiate(collectablePrefab, spawnPosition, Quaternion.identity, collectableParent);
-                Collectable collectable = spawned.GetComponent<Collectable>();
-                collectable.energySprite.color = trackColor;
-
-                if (collectable == null)
-                {
-                    Debug.LogError("Spawned object missing Collectable component.");
-                    Destroy(spawned);
-                    continue;
-                }
-                if (!drumTrack.IsSpawnCellAvailable(gridPos.x, gridPos.y))
-                {
-                    // Destroy collectable if the spawn is invalid (overlap with node)
-                    yield return null; // optional: gives visual sync spacing
-                    continue;
-                }
-                int chosenDurationTicks = CalculateNoteDurationFromSteps(stepIndex, noteSet);
-
-                collectable.Initialize(assignedNote, chosenDurationTicks, this, noteSet);
-                collectable.OnCollected += (int duration, float force) => OnCollectableCollected(collectable, stepIndex, duration, force);
-                collectable.OnDestroyed += () => OnCollectableDestroyed(collectable);
-
-                drumTrack.OccupySpawnGridCell(gridPos.x, gridPos.y, GridObjectType.Note);
-                spawnedCollectables.Add(collectable.gameObject);
-            // Spawn logic (same as now) ...
-            // Instantiate collectable, assign note/duration/gridPos, etc.
-            yield return new WaitForSeconds(spacing); // Delay between spawns
-        }
-    }
-    private int GetGridYFromNote(int note)
+    public int GetGridYFromNote(int note)
     {
         int gridHeight = drumTrack.GetSpawnGridHeight();
         note = Mathf.Clamp(note, lowestAllowedNote, highestAllowedNote);
@@ -508,42 +381,85 @@ public class InstrumentTrack : MonoBehaviour
         int y = Mathf.RoundToInt(normalized * (gridHeight - 1));
         return Mathf.Clamp(y, 0, gridHeight - 1);
     }
-
-    private Vector2Int GetRandomAvailableGridCell(NoteSet noteSet)
+public IEnumerator SpawnCollectablesWithPath(NoteSet noteSet, Action<List<Vector3>> onComplete)
+{
+    if (noteSet == null || noteSet.GetStepList().Count == 0)
     {
-        int gridWidth = drumTrack.GetSpawnGridWidth();
-        int gridHeight = drumTrack.GetSpawnGridHeight();
-        int maxSafeY = drumTrack.GetSpawnGridHeight() - 2; // prevent lowest row
+        onComplete?.Invoke(new List<Vector3>());
+        yield break;
+    }
 
-        List<Vector2Int> availableCells = new List<Vector2Int>();
+    List<Vector3> pathPoints = new List<Vector3>();
+    List<int> eligibleSteps = noteSet.GetStepList();
 
-        for (int x = 0; x < gridWidth; x++)
+    // Guarantee minimum number of constellation points
+    int minimumCount = Mathf.Min(4, eligibleSteps.Count);
+    int spawnCount = Mathf.Clamp(minimumCount, 3, eligibleSteps.Count);
+    float loopDuration = drumTrack.GetLoopLengthInSeconds();
+    float spacing = loopDuration / Mathf.Max(1, spawnCount);
+
+    int stepIndex = 0;
+    int attempts = 0;
+    while (pathPoints.Count < spawnCount && attempts < eligibleSteps.Count)
+    {
+        int step = eligibleSteps[stepIndex % eligibleSteps.Count];
+        int assignedNote = noteSet.GetNextArpeggiatedNote(step);
+        int gridY = GetGridYFromNote(assignedNote);
+        int gridX = Random.Range(0, drumTrack.GetSpawnGridWidth());
+
+        Vector2Int gridPos = new Vector2Int(gridX, gridY);
+        bool found = false;
+
+        // Search for available X in row
+        for (int x = 0; x < drumTrack.GetSpawnGridWidth(); x++)
         {
-            for (int y = 0; y < maxSafeY; y++)
+            int tryX = (gridX + x) % drumTrack.GetSpawnGridWidth();
+            if (drumTrack.IsSpawnCellAvailable(tryX, gridY))
             {
-                if (drumTrack.IsSpawnCellAvailable(x, y))
-                {
-                    availableCells.Add(new Vector2Int(x, y));
-                }
+                gridPos = new Vector2Int(tryX, gridY);
+                found = true;
+                break;
             }
         }
 
-        if (availableCells.Count == 0)
-            return new Vector2Int(-1, -1); // No space
+        if (!found)
+        {
+            stepIndex++;
+            attempts++;
+            continue;
+        }
 
-        return availableCells[UnityEngine.Random.Range(0, availableCells.Count)];
+        Vector3 spawnPosition = drumTrack.GridToWorldPosition(gridPos);
+        pathPoints.Add(spawnPosition); // 🌟 Add to path
+
+        GameObject spawned = Instantiate(collectablePrefab, spawnPosition, Quaternion.identity, collectableParent);
+        Collectable collectable = spawned.GetComponent<Collectable>();
+        if (collectable == null)
+        {
+            Destroy(spawned);
+            stepIndex++;
+            attempts++;
+            continue;
+        }
+
+        int chosenDurationTicks = CalculateNoteDurationFromSteps(step, noteSet);
+
+        collectable.energySprite.color = trackColor;
+        collectable.Initialize(assignedNote, chosenDurationTicks, this, noteSet);
+        collectable.OnCollected += (int duration, float force) => OnCollectableCollected(collectable, step, duration, force);
+        collectable.OnDestroyed += () => OnCollectableDestroyed(collectable);
+
+        drumTrack.OccupySpawnGridCell(gridPos.x, gridPos.y, GridObjectType.Note);
+        spawnedCollectables.Add(collectable.gameObject);
+
+        yield return new WaitForSeconds(spacing);
+        stepIndex++;
+        attempts++;
     }
-    
-    private int CalculateDurationFromGridPosition(Vector2Int gridPos)
-    {
-        int ticksMin = 60;  // Shortest duration
-        int ticksMax = 960; // Longest duration
 
-        float t = gridPos.y / (float)(drumTrack.GetSpawnGridHeight() - 1); // 0 (left) → 1 (right)
-        float inverseT = 1f - t; // So bottom = long, top = short
-
-        return Mathf.RoundToInt(Mathf.Lerp(ticksMin, ticksMax, inverseT));
-    }
+    Debug.Log($"✅ Constellation path has {pathPoints.Count} points.");
+    onComplete?.Invoke(pathPoints);
+}
 
     public int GetNoteDensity()
     {
@@ -616,6 +532,24 @@ public class InstrumentTrack : MonoBehaviour
 
         return chosenDurationTicks;
     }
+    public int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force)
+    {
+        persistentLoopNotes.Add((stepIndex, note, durationTicks, force));
+
+        GameObject noteMarker = controller.noteVisualizer.PlacePersistentNoteMarker(this, stepIndex);
+        if (noteMarker != null)
+        {
+            VisualNoteMarker marker = noteMarker.GetComponent<VisualNoteMarker>();
+            if (marker != null)
+            {
+                marker.Initialize(trackColor);
+            }
+            spawnedNotes.Add(noteMarker);
+        }
+
+        controller.UpdateVisualizer();
+        return stepIndex;
+    }
 
     private void OnCollectableDestroyed(Collectable collectable)
     {
@@ -630,24 +564,6 @@ public class InstrumentTrack : MonoBehaviour
             drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
         }
     }
-    private void ForceClearTrack()
-    {
-        foreach (GameObject obj in spawnedCollectables.ToList())
-        {
-            if (obj == null) continue;
-
-            Collectable collectable = obj.GetComponent<Collectable>();
-            if (collectable != null)
-            {
-                OnCollectableDestroyed(collectable); // centralized cleanup
-            }
-            else
-            {
-                Destroy(obj); // fallback in case it's not a Collectable
-            }
-        }
-        spawnedCollectables.Clear();
-    }
 
     public float GetVelocityAtStep(int step)
     {
@@ -660,8 +576,9 @@ public class InstrumentTrack : MonoBehaviour
         return max;
     }
 
-    void OnCollectableCollected(Collectable collectable, int stepIndex, int durationTicks, float force)
+    public void OnCollectableCollected(Collectable collectable, int _, int durationTicks, float force)
     {
+        Debug.Log($"On Collectable Collected Called {collectable.name}");
         if (collectable.assignedInstrumentTrack != this)
         {
             return;
@@ -670,9 +587,12 @@ public class InstrumentTrack : MonoBehaviour
         Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
         drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
         drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
-        // ✅ Store the collected note in the loop
-        
-        stepIndex = CollectNote(collectable.GetNote(), durationTicks, force);
+
+        // ✅ Use current playhead step — NOT visual column
+        int stepIndex = GetCurrentStep();
+
+        stepIndex = CollectNote(stepIndex, collectable.GetNote(), durationTicks, force);
+
         Vector3 visualTargetPos = controller.noteVisualizer.GetNoteMarkerPosition(this, stepIndex);
         GameObject tether = Instantiate(tetherPrefab, collectable.transform.position, Quaternion.identity);
         var tetherScript = tether.GetComponent<VisualTether>();
@@ -681,11 +601,11 @@ public class InstrumentTrack : MonoBehaviour
             tetherScript.SetColor(trackColor);
             tetherScript.SetTargetPosition(visualTargetPos);
         }
-        
+
         drumTrack.NotifyNoteCollected();
-        // ✅ Remove the collected note from the spawned list
+
         spawnedCollectables.Remove(collectable.gameObject);
         Destroy(collectable.gameObject);
-
     }
+
 }

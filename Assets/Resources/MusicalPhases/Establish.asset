@@ -13,6 +13,15 @@ MonoBehaviour:
   m_Name: Establish
   m_EditorClassIdentifier: 
   phase: 0
+  roleStrategyBundles:
+  - role: 0
+    strategies: 01000000
+  - role: 1
+    strategies: 05000000
+  - role: 2
+    strategies: 03000000
+  - role: 3
+    strategies: 04000000
   drumClips:
   - {fileID: 8300000, guid: 676457cb6ed4c4922af1fc9d44e28725, type: 3}
   - {fileID: 8300000, guid: f6f6828474d55485882631dcd9d88663, type: 3}
@@ -28,6 +37,8 @@ MonoBehaviour:
   visualColor: {r: 0.5330188, g: 0.82528865, b: 1, a: 1}
   rotationMode: 0
   rotationSpeed: 5
+  defaultRemixStrategy: {fileID: 0}
+  remixOverrides: []
   hitsRequired: 4
   energyPerCollectable: 1
   shortLabel: Establish

@@ -406,7 +406,7 @@ public class DarkStar : MonoBehaviour
             drumTrack.UnregisterHexagon(collision.gameObject);
             Vector2 dir = (collision.transform.position - transform.position).normalized;
             GetComponent<Rigidbody2D>()?.AddForce(dir * 20f, ForceMode2D.Impulse);
-            hex.BreakHexagon(CollectionEffectType.MazeToxic);
+            hex.BreakHexagon(SoundEffectMood.Toxic);
         }
     }
     private void HandleShardStrike(Vehicle vehicle)

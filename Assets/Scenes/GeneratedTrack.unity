@@ -5682,13 +5682,13 @@ MonoBehaviour:
   tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
   assignedRole: 0
-  lowestAllowedNote: 24
-  highestAllowedNote: 40
+  lowestAllowedNote: 48
+  highestAllowedNote: 72
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 32
+  preset: 0
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -5819,6 +5819,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: showVerbose
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: VerboseSynth
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: showMidiInfo
       value: 0
       objectReference: {fileID: 0}
@@ -5826,6 +5836,21 @@ PrefabInstance:
         type: 3}
       propertyPath: volumeGlobal
       value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: VerboseSample
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: MPTK_LogEvents
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: VerboseChannel
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -5842,6 +5867,11 @@ PrefabInstance:
       propertyPath: MPTK_EffectUnity
       value: 
       objectReference: {fileID: 800858077}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: VerboseSoundfont
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showMidiParameter
@@ -6057,13 +6087,13 @@ MonoBehaviour:
   tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
   assignedRole: 1
-  lowestAllowedNote: 54
-  highestAllowedNote: 78
+  lowestAllowedNote: 36
+  highestAllowedNote: 72
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 26
+  preset: 8
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -6136,13 +6166,13 @@ MonoBehaviour:
   tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
   assignedRole: 6
-  lowestAllowedNote: 24
-  highestAllowedNote: 54
+  lowestAllowedNote: 48
+  highestAllowedNote: 96
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 4
-  preset: 88
+  preset: 6
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -8385,12 +8415,12 @@ MonoBehaviour:
     type: 3}
   assignedRole: 5
   lowestAllowedNote: 60
-  highestAllowedNote: 84
+  highestAllowedNote: 96
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 42
+  preset: 2
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -9172,8 +9202,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   midiStreamPlayer: {fileID: 480221060}
-  midiChannel: 0
-  defaultFxPreset: 112
+  midiChannel: 5
 --- !u!4 &2067870202
 Transform:
   m_ObjectHideFlags: 0

@@ -184,14 +184,14 @@ public class HexMazeGenerator : MonoBehaviour
             yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 1f));
         }
     }
-    public IEnumerator BreakSelfThenNeighbors(HexagonShield origin, CollectionEffectType soundType, Vector2Int center, int radius, float delay)
+    public IEnumerator BreakSelfThenNeighbors(HexagonShield origin, SoundEffectMood mood, Vector2Int center, int radius, float delay)
     {
         Debug.Log($"Breaking Self Then Neigbhors");
 
         if (origin != null)
         {
             Debug.Log($"Breaking hexagon");
-            origin.BreakHexagon(soundType); // Central hex breaks first
+            origin.BreakHexagon(mood); // Central hex breaks first
         }
         else
         {
@@ -201,10 +201,10 @@ public class HexMazeGenerator : MonoBehaviour
         yield return new WaitForSeconds(delay);
         Debug.Log($"Breaking Self Then Neigbhors, Continued");
 
-        yield return BreakNearbyHexesSequentially(soundType, center, radius, delay);
+        yield return BreakNearbyHexesSequentially(mood, center, radius, delay);
     }
 
-    public IEnumerator BreakNearbyHexesSequentially(CollectionEffectType soundType, Vector2Int center, int radius, float delay)
+    public IEnumerator BreakNearbyHexesSequentially(SoundEffectMood mood, Vector2Int center, int radius, float delay)
     {
         Debug.Log($"💥 Starting sequential break at {center} with delay {delay}");
         List<Vector2Int> targets = new();
@@ -228,7 +228,8 @@ public class HexMazeGenerator : MonoBehaviour
             {
                 if (hex.TryGetComponent<Explode>(out var explode))
                 {
-                    CollectionSoundManager.Instance.PlayEffect(soundType);
+                    Debug.Log("Breaking Hex through generator with mood: " + mood);
+                    CollectionSoundManager.Instance.PlayEffect((int)mood);
                     explode.Permanent();
                 }
                 else

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 083a7985097fbf84fad5936a1f2681dd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 115331
+  packageName: Maestro - Midi Player Tool Kit - Pro
+  packageVersion: 2.15.0
+  assetPath: Assets/MidiPlayer/Prefab/Pro/MidiSpatializer.prefab
+  uploadId: 751843
