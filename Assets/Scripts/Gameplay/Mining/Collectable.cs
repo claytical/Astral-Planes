@@ -50,6 +50,7 @@ public class Collectable : MonoBehaviour
         Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
         if (vehicle)
         {
+            Debug.Log($"Collected object {coll.gameObject.name}");
             float force = vehicle.GetForceAsMidiVelocity(); // 60–127
           //  float normalizedMIDI = (force - 40f) / (127f - 40f);
             int energyReward = Mathf.RoundToInt(Mathf.Lerp(6f, 20f, (force - 40f) / 87f));

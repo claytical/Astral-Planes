@@ -154,7 +154,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d18b16b01aa9498294736cd54d3a7f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  musicalRole: 0
+  musicalRole: {fileID: 11400000, guid: b63a78a8afc9544ffaeacdd2306d6ee8, type: 2}
   noteSetSeries: {fileID: 11400000, guid: b86e29b4562cc4bcfa6e54b5722c02ca, type: 2}
 --- !u!114 &3916158017695502062
 MonoBehaviour:
@@ -187,6 +187,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   effectType: 3
+  mood: 10
   musicalRole: 0
 --- !u!50 &4561843143948562615
 Rigidbody2D:

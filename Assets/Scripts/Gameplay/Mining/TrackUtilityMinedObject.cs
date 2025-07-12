@@ -52,7 +52,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
             case TrackModifierType.Drift:
                 ApplyDrift(assignedTrack); break;
             case TrackModifierType.Remix:
-                RemixTrack(assignedTrack); break;
+                ApplyRemixStrategy(assignedTrack); break;
             case TrackModifierType.Solo:
                 SoloTrackWithBassSupport(assignedTrack); break;
             case TrackModifierType.Magic:
@@ -65,6 +65,111 @@ public class TrackUtilityMinedObject : MonoBehaviour
 
         Debug.Log($"Executed {type} on track: {assignedTrack.name}");
         GetComponent<Explode>()?.Permanent();
+    }
+    private void ApplyRemixStrategy(InstrumentTrack track)
+    {
+        if (track == null || track.drumTrack == null) return;
+
+        MusicalPhase phase = track.drumTrack.currentPhase;
+        var profile = MusicalPhaseLibrary.Get(phase);
+
+        if (profile == null)
+        {
+            Debug.LogWarning($"No phase profile found for remix phase: {phase}");
+            return;
+        }
+
+        var strategy = MusicalPhaseLibrary.GetGhostStrategyForRole(phase, track.assignedRole);
+
+        if (strategy == null)
+        {
+            Debug.LogWarning($"No ghost strategy found for role: {track.assignedRole} in phase: {phase}");
+            return;
+        }
+
+        NoteSet noteSet = track.GetCurrentNoteSet();
+        if (noteSet == null) return;
+
+        // Apply behavior and rhythm style aligned with the ghost strategy
+        noteSet.Initialize(track.GetTotalSteps());
+        switch (strategy)
+        {
+            case GhostPatternStrategy.StaticRoot:
+                AddRootNotes(track, noteSet);
+                break;
+            case GhostPatternStrategy.WalkingBass:
+                AddWalkingNotes(track, noteSet);
+                break;
+            case GhostPatternStrategy.MelodicPhrase:
+                AddPhraseNotes(track, noteSet);
+                break;
+            case GhostPatternStrategy.PercussiveLoop:
+                AddGrooveNotes(track, noteSet);
+                break;
+            case GhostPatternStrategy.Drone:
+                AddSustainedNotes(track, noteSet);
+                break;
+            case GhostPatternStrategy.Randomized:
+            default:
+                AddRandomNotes(track, noteSet, 6);
+                break;
+        }
+
+        track.controller.UpdateVisualizer();
+    }
+    private void AddRootNotes(InstrumentTrack track, NoteSet noteSet)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            int step = i * 4;
+            int note = noteSet.GetRootNote();
+            int duration = track.CalculateNoteDuration(step, noteSet);
+            float velocity = Random.Range(60f, 90f);
+            track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+        }
+    }
+
+    private void AddWalkingNotes(InstrumentTrack track, NoteSet noteSet)
+    {
+        for (int step = 0; step < track.GetTotalSteps(); step += 2)
+        {
+            int note = noteSet.GetNextWalkingNote(step);
+            int duration = track.CalculateNoteDuration(step, noteSet);
+            float velocity = Random.Range(50f, 80f);
+            track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+        }
+    }
+
+    private void AddPhraseNotes(InstrumentTrack track, NoteSet noteSet)
+    {
+        for (int step = 0; step < track.GetTotalSteps(); step += 3)
+        {
+            int note = noteSet.GetPhraseNote(step);
+            int duration = track.CalculateNoteDuration(step, noteSet);
+            float velocity = Random.Range(70f, 100f);
+            track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+        }
+    }
+
+    private void AddGrooveNotes(InstrumentTrack track, NoteSet noteSet)
+    {
+        for (int step = 0; step < track.GetTotalSteps(); step++)
+        {
+            if (noteSet.IsAccentStep(step))
+            {
+                int note = noteSet.GetGrooveNote(out _);
+                int duration = track.CalculateNoteDuration(step, noteSet);
+                float velocity = Random.Range(80f, 110f);
+                track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+            }
+        }
+    }
+
+    private void AddSustainedNotes(InstrumentTrack track, NoteSet noteSet)
+    {
+        int totalSteps = track.GetTotalSteps();
+        int note = noteSet.GetSustainedNote();
+        track.GetPersistentLoopNotes().Add((0, note, totalSteps, 80f));
     }
 
     private void ApplyDrift(InstrumentTrack track)

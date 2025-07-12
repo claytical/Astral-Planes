@@ -267,7 +267,7 @@ public class MineNode : MonoBehaviour
             if (noteSpawner != null)
             {
                 // Assign track based on role
-                InstrumentTrack track = drumTrack.trackController.FindRandomTrackByRole(noteSpawner.musicalRole);
+                InstrumentTrack track = drumTrack.trackController.FindRandomTrackByRole(noteSpawner.musicalRole.role);
                 NoteSet selected = noteSpawner.noteSetSeries?.GetRandomOrCuratedNoteSet();
                 if (track != null)
                 {

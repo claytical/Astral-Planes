@@ -95,6 +95,31 @@ public class DrumTrack : MonoBehaviour
             return;
         }
     }
+    public void ManualStart()
+    {
+        if (started) return;
+        started = true;
+
+        if (drumAudioSource == null)
+        {
+            Debug.LogError("DrumTrack: No AudioSource assigned!");
+            return;
+        }
+
+        StartCoroutine(InitializeDrumLoop());
+
+        // ✅ Let the loop handle phase startup
+        queuedPhase = MusicalPhase.Establish;
+        ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(MusicalPhase.Establish));
+        if (hexMazeGenerator != null)
+        {
+            Vector2Int centerCell = WorldToGridPosition(transform.position);
+            float radius = progressionManager.GetHollowRadiusForCurrentPhase();
+            var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, queuedPhase.Value, radius);
+            hexMazeGenerator.BeginStaggeredMazeRegrowth(growthCells);
+        }
+    }
+
     private void Update()
     {
         if (!GameFlowManager.Instance.ReadyToPlay())
@@ -124,16 +149,83 @@ public class DrumTrack : MonoBehaviour
         if (currentLoop > lastLoopCount)
         {
             lastLoopCount = currentLoop;
-            CleanupExplodedMineNodes();
             LoopRoutines();
         }
     }
-    
-    public void UnregisterHexagon(GameObject hex)
+
+    private void LoopRoutines()
     {
-        if (hex != null)
+        CleanupExplodedMineNodes();
+        CleanupInvalidMineNodes(); // ✅ Remove invalid references
+        HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
+        HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
+        progressionManager.OnLoopCompleted();
+        if (isPhaseStarActive)
         {
-            activeHexagons.Remove(hex);
+            //   SpawnMineNode();
+        }
+    }
+    private void HandleFloatingMineNodes()
+    {
+        foreach (var node in activeNodes.ToList()) // ✅ Iterate safely
+        {
+            MineNode floatingNode = node.GetComponent<MineNode>();
+
+            if (floatingNode != null && floatingNode.isLoose)
+            {
+                floatingNode.Age(); // ✅ Ensure loose obstacles evolve on their own
+            }
+        }
+    }
+    private void HandleEvolvingMineNodes()
+    {
+        foreach (var node in activeNodes.ToList()) // ✅ Safe iteration
+        {
+            MineNode gridNode = node.GetComponent<MineNode>();
+
+            if (gridNode != null && !gridNode.isLoose) // ✅ Ensure it's still in the grid
+            {
+                gridNode.Age(); // ✅ Trigger standard obstacle behavior
+            }
+        }
+    }
+    private void CleanupExplodedMineNodes()
+    {
+        for (int i = activeNodes.Count - 1; i >= 0; i--)
+        {
+            GameObject node = activeNodes[i];
+
+            if (node == null) continue;
+
+            Explode explode = node.GetComponent<Explode>();
+            if (explode != null)
+            {
+                activeNodes.RemoveAt(i);
+                Destroy(node);
+            }
+        }
+    }
+    private void CleanupInvalidMineNodes()
+    {
+
+        for (int i = activeNodes.Count - 1; i >= 0; i--)
+        {
+            GameObject node = activeNodes[i];
+
+            if (node == null)
+            {
+                activeNodes.RemoveAt(i);
+                continue;
+            }
+
+            if (node.GetComponent<MineNodeSpawner>() == null)
+            {
+                Vector2Int gridPos = WorldToGridPosition(node.transform.position);
+
+                activeNodes.RemoveAt(i);
+                spawnGrid.FreeCell(gridPos.x, gridPos.y);
+                Destroy(node);
+            }
         }
     }
 
@@ -150,7 +242,6 @@ public class DrumTrack : MonoBehaviour
         startDspTime = AudioSettings.dspTime;
         drumAudioSource.Play();
     }
-
     public void ExitDarkStarDrumLoop()
     {
         if (!queuedPhase.HasValue)
@@ -181,34 +272,11 @@ public class DrumTrack : MonoBehaviour
         starProgressUI.SetShardState(phaseCount, StarProgressUI.ShardState.Fixed);
         phaseCount++;
     }
-
+    
+    
     public int GetRemainingMineNodeCount()
     {
         return mineNodes.Count;
-    }
-    public void ManualStart()
-    {
-        if (started) return;
-        started = true;
-
-        if (drumAudioSource == null)
-        {
-            Debug.LogError("DrumTrack: No AudioSource assigned!");
-            return;
-        }
-
-        StartCoroutine(InitializeDrumLoop());
-
-        // ✅ Let the loop handle phase startup
-        queuedPhase = MusicalPhase.Establish;
-        ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(MusicalPhase.Establish));
-        if (hexMazeGenerator != null)
-        {
-            Vector2Int centerCell = WorldToGridPosition(transform.position);
-            float radius = progressionManager.GetHollowRadiusForCurrentPhase();
-            var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, queuedPhase.Value, radius);
-            hexMazeGenerator.BeginStaggeredMazeRegrowth(growthCells);
-        }
     }
     public void NotifyNoteCollected()
     {
@@ -225,11 +293,13 @@ public class DrumTrack : MonoBehaviour
         progressionManager.OnMinedObjectCollected();
         progressionManager.TryAdvanceSet();
     }
-    public void SetMineNodeSpawnerSet(MineNodeSpawnerSet set)
+
+    private void SetMineNodeSpawnerSet(MineNodeSpawnerSet set)
     {
         progressionManager.OverrideSpawnerSet(set);
     }
-    public void BeginPhase(MusicalPhase phase, MineNodeSpawnerSet spawnerSet)
+
+    private void BeginPhase(MusicalPhase phase, MineNodeSpawnerSet spawnerSet)
     {
         Debug.Log($"📣 BeginPhase called for: {phase}");
         queuedPhase = phase;
@@ -237,55 +307,15 @@ public class DrumTrack : MonoBehaviour
         ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
         StartCoroutine(SpawnPhaseStarDelayed(phase, spawnerSet)); // ⬅ new
     }
-    public Vector3 HexToWorldPosition(Vector2Int gridPos, float cellSize)
+    
+    
+    public void UnregisterHexagon(GameObject hex)
     {
-        float width = cellSize;
-        float height = Mathf.Sqrt(3f) / 2f * cellSize;
-
-        float x = gridPos.x * width * 0.75f;
-        float y = gridPos.y * height + (gridPos.x % 2 == 1 ? height / 2f : 0f);
-
-        return new Vector3(x, y, 0f);
+        if (hex != null)
+        {
+            activeHexagons.Remove(hex);
+        }
     }
-    public float GetNoteVisualizerTopY()
-    {
-        return trackController?.noteVisualizer?.GetTopWorldY() ?? Camera.main.ViewportToWorldPoint(new Vector3(0, 0, -Camera.main.transform.position.z)).y;
-    }
-
-    public Vector3 GridToWorldPosition(Vector2Int gridPos)
-    {
-        float cameraDistance = -Camera.main.transform.position.z;
-
-        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
-
-        float normalizedX = gridPos.x / (float)(spawnGrid.gridWidth - 1);
-        float normalizedY = gridPos.y / (float)(spawnGrid.gridHeight - 1);
-
-        // 👇 Define how much vertical space (in world units) to reserve for the UI at the bottom
-         // Adjust this to match your UI overlay height in world space
-
-        float worldX = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
-        float bottomY = trackController.noteVisualizer.GetTopWorldY();
-        float worldY = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
-
-        return new Vector3(worldX, worldY, 0f);
-    }
-    public Vector2Int WorldToGridPosition(Vector3 worldPos)
-    {
-        float cameraDistance = -Camera.main.transform.position.z;
-
-        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
-
-        float normalizedX = Mathf.InverseLerp(bottomLeft.x, topRight.x, worldPos.x);
-        float normalizedY = Mathf.InverseLerp(bottomLeft.y, topRight.y, worldPos.y);
-
-        int gridX = Mathf.Clamp(Mathf.RoundToInt(normalizedX * (spawnGrid.gridWidth - 1)), 0, spawnGrid.gridWidth - 1);
-        int gridY = Mathf.Clamp(Mathf.RoundToInt(normalizedY * (spawnGrid.gridHeight - 1)), 0, spawnGrid.gridHeight - 1);
-
-        return new Vector2Int(gridX, gridY);
-    }    
     public void RegisterMineNode(MineNode node)
     {
         if (!mineNodes.Contains(node))
@@ -300,7 +330,15 @@ public class DrumTrack : MonoBehaviour
             activeMinedObjects.Add(obj);
         }
     }
-
+    public void UnregisterMinedObject(MinedObject obj)
+    {
+        activeMinedObjects.Remove(obj);
+    }
+    public void UnregisterMineNode(MineNode node)
+    {
+        mineNodes.Remove(node);
+    }
+    
     private void ValidateSpawnGrid()
     {
         for (int x = 0; x < spawnGrid.gridWidth; x++)
@@ -331,17 +369,32 @@ public class DrumTrack : MonoBehaviour
             }
         }
     }
-    public void UnregisterMinedObject(MinedObject obj)
-    {
-        activeMinedObjects.Remove(obj);
-    }
-    public void UnregisterMineNode(MineNode node)
-    {
-        mineNodes.Remove(node);
-    }
     public int GetSpawnGridHeight()
     {
         return spawnGrid.gridHeight;
+    }
+    public PhaseSnapshot BuildCurrentPhaseSnapshot()
+    {
+        var snapshot = new PhaseSnapshot
+        {
+            pattern = currentPhase,
+            color = GetVisualForPattern(currentPhase)?.color ?? Color.white,
+            timestamp = Time.time,
+            collectedNotes = new()
+        };
+
+        foreach (var track in trackController.tracks)
+        {
+            Color trackColor = track.trackColor;
+
+            foreach (var (step, note, _, velocity) in track.GetPersistentLoopNotes())
+            {
+                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
+            }
+        }
+
+
+        return snapshot;
     }
     public void FinalizeCurrentPhaseSnapshot()
     {
@@ -465,7 +518,7 @@ public class DrumTrack : MonoBehaviour
             int note = noteSet.GetNextArpeggiatedNote(step);
             int duration = track.CalculateNoteDuration(step, noteSet);
             float velocity = UnityEngine.Random.Range(60f, 100f);
-            track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+            track.AddNoteToLoop(step, note, duration, velocity);
         }
     }
 
@@ -485,6 +538,10 @@ public class DrumTrack : MonoBehaviour
     {
         spawnGrid.OccupyCell(x, y, gridObjectType);
     }
+    public float GetGridCellSize()
+    {
+        return spawnGrid.cellSize;
+    }
     public void ResetSpawnCellBehavior(int x, int y)
     {
         spawnGrid.ResetCellBehavior(x, y);
@@ -493,32 +550,58 @@ public class DrumTrack : MonoBehaviour
     {
         spawnGrid.FreeCell(x, y);
     }
+    public Vector2Int GetRandomAvailableCell()
+    {
+        return spawnGrid.GetRandomAvailableCell();
+    }
+    public Vector3 HexToWorldPosition(Vector2Int gridPos, float cellSize)
+    {
+        float width = cellSize;
+        float height = Mathf.Sqrt(3f) / 2f * cellSize;
+
+        float x = gridPos.x * width * 0.75f;
+        float y = gridPos.y * height + (gridPos.x % 2 == 1 ? height / 2f : 0f);
+
+        return new Vector3(x, y, 0f);
+    }
+    public Vector3 GridToWorldPosition(Vector2Int gridPos)
+    {
+        float cameraDistance = -Camera.main.transform.position.z;
+
+        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+
+        float normalizedX = gridPos.x / (float)(spawnGrid.gridWidth - 1);
+        float normalizedY = gridPos.y / (float)(spawnGrid.gridHeight - 1);
+
+        // 👇 Define how much vertical space (in world units) to reserve for the UI at the bottom
+         // Adjust this to match your UI overlay height in world space
+
+        float worldX = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
+        float bottomY = trackController.noteVisualizer.GetTopWorldY();
+        float worldY = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
+
+        return new Vector3(worldX, worldY, 0f);
+    }
+    public Vector2Int WorldToGridPosition(Vector3 worldPos)
+    {
+        float cameraDistance = -Camera.main.transform.position.z;
+
+        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+
+        float normalizedX = Mathf.InverseLerp(bottomLeft.x, topRight.x, worldPos.x);
+        float normalizedY = Mathf.InverseLerp(bottomLeft.y, topRight.y, worldPos.y);
+
+        int gridX = Mathf.Clamp(Mathf.RoundToInt(normalizedX * (spawnGrid.gridWidth - 1)), 0, spawnGrid.gridWidth - 1);
+        int gridY = Mathf.Clamp(Mathf.RoundToInt(normalizedY * (spawnGrid.gridHeight - 1)), 0, spawnGrid.gridHeight - 1);
+
+        return new Vector2Int(gridX, gridY);
+    }    
+
     public float GetLoopLengthInSeconds()
     {
         return loopDurationInSeconds;
-    }
-    public PhaseSnapshot BuildCurrentPhaseSnapshot()
-    {
-        var snapshot = new PhaseSnapshot
-        {
-            pattern = currentPhase,
-            color = GetVisualForPattern(currentPhase)?.color ?? Color.white,
-            timestamp = Time.time,
-            collectedNotes = new()
-        };
-
-        foreach (var track in trackController.tracks)
-        {
-            Color trackColor = track.trackColor;
-
-            foreach (var (step, note, _, velocity) in track.GetPersistentLoopNotes())
-            {
-                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
-            }
-        }
-
-
-        return snapshot;
     }
     public void RemoveActiveMineNode(GameObject node)
     {
@@ -559,76 +642,30 @@ public class DrumTrack : MonoBehaviour
     {
         return currentStep;
     }
-    private void LoopRoutines()
-    {
-        CleanupInvalidMineNodes(); // ✅ Remove invalid references
-        HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
-        HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
-        progressionManager.OnLoopCompleted();
-        if (isPhaseStarActive)
-        {
-         //   SpawnMineNode();
-        }
-    }
-    private void HandleEvolvingMineNodes()
-    {
-        foreach (var node in activeNodes.ToList()) // ✅ Safe iteration
-        {
-            MineNode gridNode = node.GetComponent<MineNode>();
-
-            if (gridNode != null && !gridNode.isLoose) // ✅ Ensure it's still in the grid
-            {
-                gridNode.Age(); // ✅ Trigger standard obstacle behavior
-            }
-        }
-    }
     private DrumLoopPatternVisual GetVisualForPattern(MusicalPhase pattern)
     {
         return patternVisuals.FirstOrDefault(v => v.patternType == pattern);
     }
-    public Vector2Int GetRandomAvailableCell()
-    {
-        return spawnGrid.GetRandomAvailableCell();
-    }
 
-    public float GetGridCellSize()
+
+    private IEnumerator InitializeDrumLoop()
     {
-        return spawnGrid.cellSize;
-    }
-    private void HandleFloatingMineNodes()
-    {
-        foreach (var node in activeNodes.ToList()) // ✅ Iterate safely
+        // ✅ Wait until the AudioSource has a valid clip
+        while (drumAudioSource.clip == null)
         {
-            MineNode floatingNode = node.GetComponent<MineNode>();
-
-            if (floatingNode != null && floatingNode.isLoose)
-            {
-                floatingNode.Age(); // ✅ Ensure loose obstacles evolve on their own
-            }
+            yield return null; // Wait until the next frame
         }
+
+        loopLengthInSeconds = drumAudioSource.clip.length;
+        if (loopLengthInSeconds <= 0)
+        {
+            Debug.LogError(("DrumTrack: Loop length in seconds is invalid."));
+        }
+        drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
+        startDspTime = AudioSettings.dspTime;
+        drumAudioSource.Play();
+
     }
-
-    public void ScheduleDrumLoopChange(AudioClip newLoop)
-    {
-        // Store the new loop clip.
-        pendingDrumLoop = newLoop;
-       
-        // Start waiting for the current loop to finish.
-
-        StartCoroutine(WaitAndChangeDrumLoop());
-    }
-    private IEnumerator SpawnPhaseStarDelayed(MusicalPhase phase, MineNodeSpawnerSet set)
-    {
-        Debug.Log($"🕓 Waiting for next step to spawn PhaseStar: {phase}");
-
-        yield return new WaitUntil(() => GetCurrentStep() == 0);
-        Debug.Log("✅ Hit step 0, starting 1.5s delay...");
-
-        yield return new WaitForSeconds(1.5f);
-        Debug.Log("🌟 Calling SpawnPhaseStar now...");
-        SpawnPhaseStar(phase, set);
-    }
-
     private IEnumerator WaitAndChangeDrumLoop()
     {
         if (drumAudioSource == null || drumAudioSource.clip == null)
@@ -690,13 +727,16 @@ public class DrumTrack : MonoBehaviour
 
         lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / loopLengthInSeconds);
     }
-    private IEnumerator DelayedBeginPhase(MusicalPhase phase, MineNodeSpawnerSet set)
+    
+    public void ScheduleDrumLoopChange(AudioClip newLoop)
     {
-        yield return null; // wait one frame
-        BeginPhase(phase, set);
-        queuedPhase = null; // ✅ now cleared AFTER BeginPhase is set up
-    }
+        // Store the new loop clip.
+        pendingDrumLoop = newLoop;
+       
+        // Start waiting for the current loop to finish.
 
+        StartCoroutine(WaitAndChangeDrumLoop());
+    }
     private IEnumerator WaitForMineNodesThenAdvance()
     {
         yield return new WaitUntil(() => GetRemainingMineNodeCount() == 0);
@@ -706,13 +746,12 @@ public class DrumTrack : MonoBehaviour
         }
 
     }
-
     public IEnumerator WaitForPhaseStarToDieThenAdvance()
     {
         // Wait until all mine nodes are gone AND no active phase star
         yield return new WaitUntil(() =>
             GetRemainingMineNodeCount() == 0 && !isPhaseStarActive);
-            starProgressUI.SetShardState(phaseCount, StarProgressUI.ShardState.Debug);
+        starProgressUI.SetShardState(phaseCount, StarProgressUI.ShardState.Debug);
 
         if (queuedPhase.HasValue)
         {
@@ -728,63 +767,24 @@ public class DrumTrack : MonoBehaviour
 
         }
     }
-
-    private IEnumerator InitializeDrumLoop()
-        {
-            // ✅ Wait until the AudioSource has a valid clip
-            while (drumAudioSource.clip == null)
-            {
-                yield return null; // Wait until the next frame
-            }
-
-            loopLengthInSeconds = drumAudioSource.clip.length;
-            if (loopLengthInSeconds <= 0)
-            {
-                Debug.LogError(("DrumTrack: Loop length in seconds is invalid."));
-            }
-            drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
-            startDspTime = AudioSettings.dspTime;
-            drumAudioSource.Play();
-
-        }
-    private void CleanupExplodedMineNodes()
+    private IEnumerator DelayedBeginPhase(MusicalPhase phase, MineNodeSpawnerSet set)
     {
-        for (int i = activeNodes.Count - 1; i >= 0; i--)
-        {
-            GameObject node = activeNodes[i];
-
-            if (node == null) continue;
-
-            Explode explode = node.GetComponent<Explode>();
-            if (explode != null)
-            {
-                activeNodes.RemoveAt(i);
-                Destroy(node);
-            }
-        }
+        yield return null; // wait one frame
+        BeginPhase(phase, set);
+        queuedPhase = null; // ✅ now cleared AFTER BeginPhase is set up
     }
-    private void CleanupInvalidMineNodes()
+    private IEnumerator SpawnPhaseStarDelayed(MusicalPhase phase, MineNodeSpawnerSet set)
     {
+        Debug.Log($"🕓 Waiting for next step to spawn PhaseStar: {phase}");
 
-        for (int i = activeNodes.Count - 1; i >= 0; i--)
-        {
-            GameObject node = activeNodes[i];
+        yield return new WaitUntil(() => GetCurrentStep() == 0);
+        Debug.Log("✅ Hit step 0, starting 1.5s delay...");
 
-            if (node == null)
-            {
-                activeNodes.RemoveAt(i);
-                continue;
-            }
-
-            if (node.GetComponent<MineNodeSpawner>() == null)
-            {
-                Vector2Int gridPos = WorldToGridPosition(node.transform.position);
-
-                activeNodes.RemoveAt(i);
-                spawnGrid.FreeCell(gridPos.x, gridPos.y);
-                Destroy(node);
-            }
-        }
+        yield return new WaitForSeconds(1.5f);
+        Debug.Log("🌟 Calling SpawnPhaseStar now...");
+        SpawnPhaseStar(phase, set);
     }
+
+
 
 }

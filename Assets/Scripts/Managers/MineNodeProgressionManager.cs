@@ -42,7 +42,8 @@ public class MineNodeProgressionManager : MonoBehaviour
     {
         drumTrack = GetComponent<DrumTrack>();
         trackController = GetComponent<InstrumentTrackController>();
-
+        // 🌟 Register globally
+        MusicalPhaseLibrary.InitializeProfiles(phaseProfiles);
         if (!drumTrack || !trackController)
             Debug.LogError("MineNodeProgressionManager is missing required components on the same GameObject.");
     }

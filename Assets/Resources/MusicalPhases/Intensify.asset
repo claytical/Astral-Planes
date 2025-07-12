@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Intensify
   m_EditorClassIdentifier: 
   phase: 2
+  rolePatternStrategies: []
+  ghostLoopCount: 4
   drumClips:
   - {fileID: 8300000, guid: 51ce72dfd6b524f5181742617861be8a, type: 3}
   - {fileID: 8300000, guid: a2c3f53b22d584720b62bdf604676290, type: 3}
@@ -26,7 +28,10 @@ MonoBehaviour:
   visualColor: {r: 0.9555027, g: 1, b: 0.019607842, a: 1}
   rotationMode: 3
   rotationSpeed: 30
+  defaultRemixStrategy: {fileID: 0}
+  remixRoleOverrides: []
   hitsRequired: 5
   energyPerCollectable: 1
   shortLabel: Intensify
   moodDescription: 
+  roleGhostStrategies: []

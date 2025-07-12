@@ -3,9 +3,6 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
-
-
-
 public static class ChordLibrary
 {
     public static readonly Dictionary<string, int[]> Formulas = new()
@@ -104,12 +101,18 @@ public class NoteSet : MonoBehaviour
     public RhythmStyle rhythmStyle = RhythmStyle.FourOnTheFloor;
     public InstrumentTrack assignedInstrumentTrack; // ✅ Each NoteSet is now tied to an InstrumentTrack
     
-    
+    [Header("Remix System")]
+    public RemixUtility remixUtility;
+
+    [HideInInspector] public List<int> ghostNoteSequence = new List<int>();
+
     private List<int> allowedSteps = new List<int>(); // ✅ The valid spawn steps for notes
     private List<int> notes = new List<int>(); // ✅ List of possible note values
     private int lowestNote;           // e.g. 12
     private int highestNote;          // e.g. 60
 //    private float dominantWeight = 2f;
+    private int grooveIndex = 0;
+    private readonly int[] accentPattern = { 1, 0, 0, 1 }; // Accent on 1st and 4th
 
     public void BuildNotesFromKey()
     {
@@ -137,7 +140,113 @@ public class NoteSet : MonoBehaviour
                 notes.Add(pitch);
             }
         }
+    }
+    public int GetRootNote()
+    {
+        return Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
+    }
+    public int GetNextWalkingNote(int stepIndex)
+    {
+        if (notes.Count == 0) return rootMidi;
+        var sortedNotes = GetSortedNoteList();
+        return sortedNotes[stepIndex % sortedNotes.Count];
+    }
+    public int GetPhraseNote(int phraseIndex)
+    {
+        if (ghostNoteSequence != null && ghostNoteSequence.Count > 0)
+        {
+            return ghostNoteSequence[phraseIndex % ghostNoteSequence.Count];
+        }
+        return GetNextArpeggiatedNote(phraseIndex);
+    }
+    public int GetPercussiveHit()
+    {
+        if (notes.Count == 0) return rootMidi;
+        return notes[Random.Range(0, notes.Count)];
+    }
+    public int GetSustainedNote()
+    {
+        List<int> chord = GetChordNotes();
+        return chord[0]; // Root of chord, intended to be held
+    }
 
+    public int GetGrooveNote(out float velocity)
+    {
+        if (notes.Count == 0)
+        {
+            velocity = 0.5f;
+            return rootMidi;
+        }
+
+        int index = grooveIndex % notes.Count;
+        int patternIndex = grooveIndex % accentPattern.Length;
+
+        // Base note selection
+        int note = notes[index];
+
+        // Accent velocity (you can scale this more expressively)
+        velocity = accentPattern[patternIndex] == 1 ? 1.0f : 0.6f;
+
+        grooveIndex++;
+        return note;
+    }
+
+    public int GetRandomNote()
+    {
+        if (notes.Count == 0) return rootMidi;
+        return notes[Random.Range(0, notes.Count)];
+    }
+
+    public void GenerateGhostNoteSequence()
+    {
+        if (remixUtility == null || notes.Count == 0)
+        {
+            ghostNoteSequence.Clear();
+            return;
+        }
+
+        ghostNoteSequence = remixUtility.GeneratePhrase(this);
+    }
+
+    public int GetPitchIndexInSet(int pitch)
+    {
+        var sorted = GetSortedNoteList();
+        return sorted.IndexOf(pitch);
+    }
+
+    public List<int> GetSortedNoteList()
+    {
+        return GetNoteList().OrderBy(n => n).ToList();
+    }
+    public bool IsAccentStep(int step)
+    {
+        // Simple 16-step accent pattern: accents on downbeats
+        // You can swap this for a pattern based on rhythmStyle if available
+        return step % 4 == 0; // accents every 4 steps (0, 4, 8, 12)
+    }
+
+    public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
+    {
+        var currentPhase = track.drumTrack.currentPhase; // assuming this exists on the same track ref
+        var strategy = MusicalPhaseLibrary.GetGhostStrategyForRole(currentPhase, track.assignedRole);
+        switch (strategy)
+        {
+            case GhostPatternStrategy.StaticRoot:
+                return GetRootNote();
+            case GhostPatternStrategy.WalkingBass:
+                return GetNextWalkingNote(step);
+            case GhostPatternStrategy.MelodicPhrase:
+                return GetPhraseNote(step);
+            case GhostPatternStrategy.PercussiveLoop:
+                return GetGrooveNote(out _);
+            case GhostPatternStrategy.Randomized: // treated the same now
+                return GetRandomNote();
+            case GhostPatternStrategy.Drone:
+                return GetSustainedNote();
+            case GhostPatternStrategy.Arpeggiated:
+            default:
+                return GetNextArpeggiatedNote(step);
+        }
     }
 
     public int[] GetRandomChordOffsets()

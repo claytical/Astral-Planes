@@ -28,7 +28,6 @@ public class HexagonShield : MonoBehaviour
     {
         fullScale = transform.localScale; // What the final scale *should be*
         alphaBreathingOffset = Random.Range(0f, 1f);
-        Debug.Log($"{gameObject.name} awake:" + Time.time);
     }
 
     private IEnumerator GrowIn()
@@ -44,15 +43,12 @@ public class HexagonShield : MonoBehaviour
             transform.localScale = fullScale * s;
             yield return null;
         }
-        Debug.Log($"{gameObject.name} fullscale:" + Time.time);
         transform.localScale = fullScale; // Ensure exact final size
     }
 
 
     public void Begin()
     {
-        Debug.Log($"{gameObject.name} begin called" + Time.time);
-
         SetColorVariance();
         // ✅ Start alpha fade-in
         if (baseSprite != null)
@@ -178,10 +174,10 @@ Debug.Log($"{gameObject.name} fade in alpha:" + Time.time);
         }
     }
 
-    public void BreakHexagon(CollectionEffectType effectType)
+    public void BreakHexagon(SoundEffectMood mood)
     {
-        CollectionSoundManager.Instance.PlayEffect(effectType);
-        Debug.Log($"{gameObject.name}: Breaking Hexagon");
+        CollectionSoundManager.Instance.PlayEffect((int)mood);
+        Debug.Log($"{gameObject.name}: Breaking Hexagon, mood: " + mood);
         if (drumTrack != null)
         {
             Vector2Int gridPos = drumTrack.WorldToGridPosition(transform.position);
@@ -247,17 +243,11 @@ Debug.Log($"{gameObject.name} fade in alpha:" + Time.time);
         {
             if (CollectionSoundManager.Instance != null)
             {
-                CollectionEffectType soundType = shieldType == HexagonShieldType.Friendly
-                    ? CollectionEffectType.MazeFriendly
-                    : CollectionEffectType.MazeToxic;
-               
-                Debug.Log($"Breaking Self Hex");
-                
-                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, soundType, center, 2, .2f));
+                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, SoundEffectMood.Friendly, center, 2, .2f));
             }
             else
             {
-                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, CollectionEffectType.Burst, center, 2, .2f));
+                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, SoundEffectMood.Friendly, center, 2, .2f));
             }
         }
         else

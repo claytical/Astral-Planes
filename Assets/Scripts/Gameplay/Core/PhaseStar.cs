@@ -31,7 +31,7 @@ public static class ShardColorUtility
             var noteSpawner = minedPrefab.GetComponent<NoteSpawnerMinedObject>();
             if (noteSpawner != null)
             {
-                var track = controller.FindTrackByRole(noteSpawner.musicalRole);
+                var track = controller.FindTrackByRole(noteSpawner.musicalRole.role);
                 if (track != null) return track.trackColor;
             }
 

@@ -137,7 +137,7 @@ public class DiamondGhost : MonoBehaviour
         PlayDarkNote();
         if (collision.gameObject.TryGetComponent<HexagonShield>(out var shield))
         {
-            shield.BreakHexagon(CollectionEffectType.MazeToxic);            
+            shield.BreakHexagon(SoundEffectMood.Toxic);            
         }
         else if (collision.gameObject.TryGetComponent<Vehicle>(out var vehicle))
         {

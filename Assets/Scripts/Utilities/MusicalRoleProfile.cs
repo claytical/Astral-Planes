@@ -4,12 +4,8 @@ public enum MusicalRole
 {
     Bass,
     Harmony,
-    Melody,
-    Arpeggiator,
-    Ambient,
     Lead,
-    Groove,
-    Texture
+    Groove
 }
 
 [CreateAssetMenu(menuName = "Astral Planes/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
@@ -21,6 +17,8 @@ public class MusicalRoleProfile : ScriptableObject
     public Color defaultColor = Color.white;
     [TextArea]
     public string description;
+    public GameObject envelopeParticlePrefab; // for PlayEnvelopePulse()
+    public GameObject sparkParticlePrefab;    // for ghost path sparks
 
     [Header("Behavior & Presets")]
     public NoteBehavior defaultBehavior;

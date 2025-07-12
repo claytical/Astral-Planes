@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Wildcard
   m_EditorClassIdentifier: 
   phase: 4
+  rolePatternStrategies: []
+  ghostLoopCount: 4
   drumClips:
   - {fileID: 8300000, guid: 06089b18da2224ff3ae386396989eaf4, type: 3}
   - {fileID: 8300000, guid: 3626b6f7f2472488385b73d37c38d519, type: 3}
@@ -25,7 +27,10 @@ MonoBehaviour:
   visualColor: {r: 0.75114155, g: 0, b: 1, a: 1}
   rotationMode: 3
   rotationSpeed: 40
+  defaultRemixStrategy: {fileID: 0}
+  remixRoleOverrides: []
   hitsRequired: 1
   energyPerCollectable: 1
   shortLabel: Wildcard
   moodDescription: 
+  roleGhostStrategies: []
