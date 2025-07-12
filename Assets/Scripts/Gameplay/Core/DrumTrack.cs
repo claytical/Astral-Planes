@@ -36,7 +36,6 @@ public class DrumTrack : MonoBehaviour
     public StarProgressUI starProgressUI;
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
-    public EnergyWaveEffect wave;
     public GalaxyVisualizer galaxyVisualizer;
     [Header("Dark Star Mode")]
     public bool darkStarModeEnabled = false;
