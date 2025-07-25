@@ -1,214 +1,145 @@
-using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Serialization;
-using Random = UnityEngine.Random;
 
 public class MineNode : MonoBehaviour
 {
-    public GameObject[] minedPrefabs; // ✅ Array of possible rewards
+    public GameObject debrisPrefab;
     public SpriteRenderer coreSprite;
-    public MinedObjectType minedObjectType; // Assigned on spawn
-    public GameObject debris;
-    private int strength = 100;
-    private int maxStrength = 120; // cap it — no more 400
-    public float looseTime = 0f;
-    public float looseEvolutionThreshold = 10f;
-    public bool isLoose = false;
-    private MineNodeSpawner parentNodeSpawner;
-    private DrumTrack drumTrack;
-    private bool spawnedObject = false;
+    public int maxStrength = 100;
+    private int strength;
+    private GameObject preloadedObject;
     private Vector3 originalScale;
-    private float maxScaleMultiplier = 4f; // ✅ Maximum growth scale
-    private float minScaleFactor = 0.5f; //Minimum size of node
-    private float scaleGrowthDuration = 100f; // ✅ Time period for max scale up
-    private float currentGrowthMultiplier = 1f; // ✅ Tracks how big it got before mined
-    private bool colorIsLocked = false;
-    private Color originalColor;
-    private Rigidbody2D _rigidbody2D;
+    private bool objectRevealed = false;
+    private Color? lockedColor;
+    private Rigidbody2D rb;
+    private MinedObject minedObject;
     private void Start()
-    {        
-        if (coreSprite == null)
-        {
-            coreSprite = GetComponentInChildren<SpriteRenderer>();
-        }
-        _rigidbody2D = GetComponent<Rigidbody2D>();
-        ApplyVisualStyle(minedObjectType);
+    {
+        rb = GetComponent<Rigidbody2D>();
         originalScale = transform.localScale;
-        StartCoroutine(ScaleUpOverTime()); // ✅ Start the scale-up process
+        strength = maxStrength;
     }
-    public void LockColor(Color c)
+
+    public void Initialize(MinedObjectSpawnDirective directive)
     {
-        originalColor = c;
-        if (coreSprite == null)
-            coreSprite = GetComponentInChildren<SpriteRenderer>();
-
-        
-
-        if (coreSprite != null)
+        Debug.Log("Initializing mine node with directive: " + directive);
+        if (directive.minedObjectPrefab == null)
         {
-            coreSprite.color = c;
-            var mat = coreSprite.material;
-            if (mat != null && mat.HasProperty("_GlowColor"))
+            Debug.LogError("❌ MinedObject prefab not set in directive.");
+            return;
+        }
+
+        GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
+        lockedColor = directive.displayColor;
+        minedObject = obj.GetComponent<MinedObject>();
+        obj.transform.SetParent(transform);
+        Debug.Log($"Setting {obj} to inactive");
+        obj.SetActive(false);
+        Debug.Log($"Mined object {minedObject.name}");
+        minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSetSeries, directive.trackModifierType);
+        minedObject.assignedTrack.drumTrack.RegisterMinedObject(minedObject);
+        minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
+        NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
+        if (spawner != null)
+        {
+            this.preloadedObject = spawner.ghostTrigger;
+        }
+        TrackUtilityMinedObject track = obj.GetComponent<TrackUtilityMinedObject>();
+        if (track != null)
+        {
+            Debug.Log($"Assigning Track Utility Mined Object: {track.name} on {obj.name}");
+            this.preloadedObject = obj;
+            if (directive.remixUtility != null)
             {
-                Color glow = c;
-                glow.a = 0.3f;
-                mat.SetColor("_GlowColor", glow);
+                Debug.Log($"Applying Remix Utility with {directive.remixUtility}");
+                track.ApplyRemixUtility(directive.remixUtility);                
             }
         }
-        colorIsLocked = true;
-    }
-
-
-    public void ReceiveDamage(int baseDamage)
-    {
-        float resistanceFactor = 1f;
-
-        if (TryGetComponent<Rigidbody2D>(out var rb))
+        if (coreSprite != null && lockedColor.HasValue)
         {
-            resistanceFactor = Mathf.Clamp(1f - (rb.mass - 1f) * 0.1f, 0.5f, 1f);
-            // heavier ships do more effective damage
-        }
-
-        int finalDamage = Mathf.RoundToInt(baseDamage * resistanceFactor);
-        strength -= finalDamage;
-
-        
-
-        if (strength <= 0)
-            TriggerExplosion(); // existing logic
-    }
-    private void ApplyVisualStyle(MinedObjectType type)
-    {
-        
-
-        if (colorIsLocked) return; // ⛔ skip overwriting color
-
-        switch (MinedObject.GetCategory(type))
-        {
-            case MinedObjectCategory.NoteSpawner:
-                ApplyNoteSpawnerStyle();
-                break;
-
-            case MinedObjectCategory.TrackUtility:
-                ApplyUtilityStyle(type);
-                break;
-
-            case MinedObjectCategory.NoteModifier:
-                ApplyModifierStyle(type);
-                break;
-
-            default:
-                ApplyDefaultStyle();
-                break;
+            coreSprite.color = lockedColor.Value;
         }
     }
-    private void ApplyNoteSpawnerStyle()
-    {
 
-    }
+    private void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (objectRevealed) return;
 
-    private void ApplyUtilityStyle(MinedObjectType type)
-    {
-        coreSprite.color = new Color(1f, 0.5f, 0f);
-    }
-
-    private void ApplyModifierStyle(MinedObjectType type)
-    {
-        // Similar logic if you decide to distinguish modifiers
-        coreSprite.color = new Color(0.3f, 0.3f, 0.3f); // muted modifier style
-    }
-    private void ApplyDefaultStyle()
-    {
-        coreSprite.color = new Color(0.2f, 0.2f, 0.2f); // fallback
-    }
-    public void SetParentEvolvingObstacle(MineNodeSpawner parent)
-    {
-        parentNodeSpawner = parent;
-    }
-    public void SetDrumTrack(DrumTrack track)
-    {
-        drumTrack = track;
-    }
-
-    public void Age()
-    {
-        if (isLoose)
+        if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
         {
-            looseTime += Time.deltaTime;
+            strength -= vehicle.GetForceAsDamage();
+            strength = Mathf.Max(0, strength); // Ensure it doesn’t go below 0
 
-            if (looseTime >= looseEvolutionThreshold)
-            {
-                FadeAway();
-            }
-        }
-    }
-    void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (!isLoose)
-        {
-            isLoose = true;
-            if (parentNodeSpawner != null)
-            {
-                parentNodeSpawner.OnObstacleKnockedLoose();
-            }
-        }
+            float normalized = (float)strength / maxStrength; // [0, 1]
+            float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
 
-        Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
-        if (vehicle != null)
-        {
-            if (coreSprite != null)
-            {
-                StartCoroutine(VisualFeedbackUtility.SpectrumFlickerWithPulse(coreSprite, transform, .3f, .5f));
-            }
-            int damageToNode = vehicle.GetForceAsDamage();
-            strength -= damageToNode;
-         
-            // ✅ Calculate scale relative to remaining strength
-            float scaleFactor = Mathf.Max(minScaleFactor, ((float)strength / maxStrength) * maxScaleMultiplier);
             StartCoroutine(ScaleSmoothly(originalScale * scaleFactor, 0.1f));
-
-            if (strength <= 0 || transform.localScale.magnitude <= minScaleFactor * originalScale.magnitude)
+            if (strength <= 0)
             {
-                TriggerExplosion();
+                if (preloadedObject != null)
+                {
+                    preloadedObject.transform.SetParent(null, true); // world position stays
+                    preloadedObject.transform.localScale = originalScale;
+                    preloadedObject.SetActive(true);
+                }
+
+                TriggerExplosion(); // destroy self, fade sprite, etc.
             }
+
+            
         }
     }
-    void OnDestroy()
-    {
-        if (drumTrack != null)
-        {
-            drumTrack.UnregisterMineNode(this);
-        }
-    }
+
     private void TriggerExplosion()
     {
-        Vector3 currentScale = transform.localScale;
+        Debug.Log($"Triggering Explosion in Mine Node");
+        //preloadedObject
+        minedObject.assignedTrack.drumTrack.UnregisterMinedObject(minedObject);
 
-        // Spawn debris chunks with reduced scale
-        for (int i = 0; i < 5; i++)
-        {
-            Vector3 spawnOffset = (Vector3)UnityEngine.Random.insideUnitCircle * 0.5f;
-            GameObject debrisChunk = Instantiate(debris, transform.position + spawnOffset, Quaternion.identity);
-
-            float debrisScaleFactor = 1f; // Adjust this to taste (30% of node size)
-            debrisChunk.transform.localScale = currentScale * debrisScaleFactor;
-
-            Rigidbody2D rb = debrisChunk.GetComponent<Rigidbody2D>();
-            if (rb)
-            {
-                rb.AddForce(UnityEngine.Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
-            }
-            Destroy(debrisChunk, 3f); // 💥 Auto-destroy debris after 3 seconds
-        }
-
-        StartCoroutine(DelayedSpawnMinedObject(0.2f));
+        SpawnDebris();
+        StartCoroutine(DelayedReveal(0.2f));
     }
-    
-    private IEnumerator DelayedSpawnMinedObject(float delay)
+
+    private IEnumerator DelayedReveal(float delay)
     {
         yield return new WaitForSeconds(delay);
-        SpawnMinedObject(); // ✅ Wait before spawning to allow explosion effects
+        RevealPreloadedObject();
+    }
+
+    private void RevealPreloadedObject()
+    {
+        if (preloadedObject == null || preloadedObject.gameObject == null || objectRevealed)
+        {
+            Debug.LogWarning("⚠️ Preloaded object was destroyed before reveal.");
+            return;
+        }
+
+        Debug.Log($"Reveal Preloaded Object: {preloadedObject.name}");
+
+        preloadedObject.transform.SetParent(null);
+        preloadedObject.transform.position = transform.position;
+        preloadedObject.SetActive(true);
+
+        if (preloadedObject.TryGetComponent(out MinedObject mined))
+        {
+            mined.EnableColliderAfterDelay(0.5f);
+        }
+        Destroy(gameObject);
+        objectRevealed = true;
+    }
+
+    private void SpawnDebris()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            Vector3 offset = Random.insideUnitCircle * 0.5f;
+            GameObject chunk = Instantiate(debrisPrefab, transform.position + offset, Quaternion.identity);
+            chunk.transform.localScale = originalScale * 0.7f;
+            if (chunk.TryGetComponent(out Rigidbody2D debrisRb))
+                debrisRb.AddForce(Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
+
+            Destroy(chunk, 3f);
+        }
     }
 
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)
@@ -225,91 +156,7 @@ public class MineNode : MonoBehaviour
 
         transform.localScale = targetScale;
 
-        // ✅ If the object gets too small, force destruction
         if (transform.localScale.magnitude <= 0.05f)
-        {
             TriggerExplosion();
-        }
     }
-
-    private IEnumerator ScaleUpOverTime()
-    {
-        float elapsed = 0f;
-        while (elapsed < scaleGrowthDuration)
-        {
-            if (isLoose) yield break; // ✅ Stop scaling if knocked loose
-
-            currentGrowthMultiplier = 1f + (elapsed / scaleGrowthDuration) * (maxScaleMultiplier - 1f);
-            float newScaleFactor = Mathf.Min(currentGrowthMultiplier, maxScaleMultiplier);
-
-            strength = Mathf.RoundToInt(maxStrength * (newScaleFactor / maxScaleMultiplier)); // ✅ Strength increases properly
-            transform.localScale = originalScale * newScaleFactor;
-
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-    }
-
-    private void SpawnMinedObject()
-    {
-        if (spawnedObject) return;
-
-        int rewardIndex = Mathf.FloorToInt((currentGrowthMultiplier / maxScaleMultiplier) * (minedPrefabs.Length - 1));
-//        GameObject chosenPrefab = minedPrefabs[rewardIndex];
-        GameObject chosenPrefab = minedPrefabs[Random.Range(0, minedPrefabs.Length)];
-        GameObject go = Instantiate(chosenPrefab, transform.position, Quaternion.identity);
-        MinedObject minedObject = go.GetComponent<MinedObject>();
-        
-        if (minedObject != null)
-        {
-            // ✅ Handle NoteSpawnerMinedObject logic
-            NoteSpawnerMinedObject noteSpawner = go.GetComponent<NoteSpawnerMinedObject>();
-            if (noteSpawner != null)
-            {
-                // Assign track based on role
-                InstrumentTrack track = drumTrack.trackController.FindRandomTrackByRole(noteSpawner.musicalRole.role);
-                NoteSet selected = noteSpawner.noteSetSeries?.GetRandomOrCuratedNoteSet();
-                if (track != null)
-                {
-                    noteSpawner.Initialize(track, selected); // internally assigns track + noteset
-                    minedObject.sprite.color = track.trackColor;
-                }
-                else
-                {
-                    Debug.LogWarning($"Track does not exist.");
-                }
-            }
-
-            TrackUtilityMinedObject utilityItem = go.GetComponent<TrackUtilityMinedObject>();
-            if (utilityItem != null)
-            {
-                InstrumentTrack track = drumTrack.trackController.FindTrackByRole(utilityItem.targetRole);
-                if (track != null)
-                {
-                    utilityItem.Initialize(track);
-                    minedObject.sprite.color = track.trackColor;
-                }
-                else
-                {
-                    Debug.Log($"⚠️ Skipped spawning {utilityItem.type} - not useful now.");
-                    Destroy(go); // prevent clutter
-                    return;
-                }
-            }
-
-
-
-            // ✅ Delay collider so player doesn't accidentally collect immediately
-            minedObject.EnableColliderAfterDelay(0.5f);
-        }
-
-        Destroy(gameObject); // ✅ Self-destruct obstacle
-        spawnedObject = true;
-    }
-
-    void FadeAway()
-    {
-        Destroy(gameObject);
-    }
-    
 }

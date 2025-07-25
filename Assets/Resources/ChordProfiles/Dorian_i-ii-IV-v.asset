@@ -16,7 +16,7 @@ MonoBehaviour:
   phase: 0
   beatsPerChord: 4
   chordSequence:
-  - label: i
+  - label: Dorian i
     rootNote: 62
     intervals: 000000000300000007000000
   - label: ii

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Scout
   m_EditorClassIdentifier: 
   shipName: Scout
-  allowedMidiPresets: 05000000
+  allowedMidiPresets: 03000000
   description: 

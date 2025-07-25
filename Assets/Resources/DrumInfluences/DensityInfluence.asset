@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: DensityInfluence
   m_EditorClassIdentifier: 
   influenceName: DensityInfluence
-  weight: 1
+  weight: 0.602
   densityThreshold: 4

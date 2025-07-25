@@ -13,33 +13,23 @@ MonoBehaviour:
   m_Name: Establish
   m_EditorClassIdentifier: 
   phase: 0
-  roleStrategyBundles:
-  - role: 0
-    strategies: 01000000
-  - role: 1
-    strategies: 05000000
-  - role: 2
-    strategies: 03000000
-  - role: 3
-    strategies: 04000000
+  ghostLoopCount: 4
+  roleNoteSetSeriesList: []
   drumClips:
-  - {fileID: 8300000, guid: 676457cb6ed4c4922af1fc9d44e28725, type: 3}
-  - {fileID: 8300000, guid: f6f6828474d55485882631dcd9d88663, type: 3}
-  - {fileID: 8300000, guid: 9866e125ad63943ca99898b8c50fb459, type: 3}
-  - {fileID: 8300000, guid: b0278180a58584d3f859a90a6007d236, type: 3}
-  - {fileID: 8300000, guid: b0169f481f85d48a98ecb5ac15d74c13, type: 3}
-  - {fileID: 8300000, guid: 1e6094507d7c64463b9b39e8277f68f1, type: 3}
-  - {fileID: 8300000, guid: cc1f3da5e7f4e445d8db031a2ae9a8f9, type: 3}
-  - {fileID: 8300000, guid: f0a3a055f1f6c479c8caefd09d001fb3, type: 3}
-  - {fileID: 8300000, guid: df329c21fba6a4147a30901bd43bfeea, type: 3}
-  - {fileID: 8300000, guid: 81c4cb6d3f889403facbc6ccbc167888, type: 3}
-  - {fileID: 8300000, guid: 97b806326a28f429a9417b658a2f2a64, type: 3}
+  - {fileID: 8300000, guid: 6e93c379a8421408296593ca0940269e, type: 3}
+  - {fileID: 8300000, guid: 0eae5a698f3e247538b31bf322fb4db9, type: 3}
+  - {fileID: 8300000, guid: 97f3af0e001cb45d98f30f3ec43b14b9, type: 3}
+  - {fileID: 8300000, guid: 8bc6925b6990d4f8eb1a0a24382b29ce, type: 3}
+  - {fileID: 8300000, guid: ae5e89683f6c14ae38322c46da3331ec, type: 3}
+  - {fileID: 8300000, guid: 2ed06d876afa04dba891f4f482e4a250, type: 3}
+  - {fileID: 8300000, guid: 928324c29158d40fe807b9e08e10d949, type: 3}
   visualColor: {r: 0.5330188, g: 0.82528865, b: 1, a: 1}
   rotationMode: 0
   rotationSpeed: 5
   defaultRemixStrategy: {fileID: 0}
-  remixOverrides: []
+  remixRoleOverrides: []
   hitsRequired: 4
   energyPerCollectable: 1
   shortLabel: Establish
   moodDescription: 
+  roleGhostStrategies: []

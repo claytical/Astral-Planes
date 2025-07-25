@@ -31,7 +31,7 @@ public class PhaseSnapshot
 public class DrumTrack : MonoBehaviour
 {
     // Assuming these are declared and initialized elsewhere:
-    public HexMazeGenerator hexMazeGenerator;
+    public CosmicDustGenerator hexMazeGenerator;
     public GameObject phaseStarPrefab;
     public StarProgressUI starProgressUI;
     public float drumLoopBPM = 120f;
@@ -39,6 +39,7 @@ public class DrumTrack : MonoBehaviour
     public GalaxyVisualizer galaxyVisualizer;
     [Header("Dark Star Mode")]
     public bool darkStarModeEnabled = false;
+    public NoteCollectionMode collectionMode = NoteCollectionMode.TimedPuzzle;
     public AudioClip darkStarDrumLoop;
     //public AudioClip normalDrumLoop; // optional fallback
     [Header("Drum Pattern Visuals")]
@@ -60,18 +61,19 @@ public class DrumTrack : MonoBehaviour
     public List<GameObject> activeHexagons = new List<GameObject>();
 
     private PhaseTransitionManager phaseTransitionManager;
-    private List<MineNode> mineNodes = new List<MineNode>();
     private List<MinedObject> activeMinedObjects = new List<MinedObject>();
     public bool isPhaseStarActive = false;
     private AudioClip pendingDrumLoop = null;
     private int lastLoopCount = 0;
-    private int currentStep = 0;
-    private MineNodeProgressionManager progressionManager;
+    public int currentStep = 0;
+    public MineNodeProgressionManager progressionManager;
     private float phaseStartTime;
     private int phaseStartLoop;
     private PhaseStar star;
     private int phaseCount = 0;
     private bool started = false;
+    public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
+
     void Start()
     {
         spawnGrid = GetComponent<SpawnGrid>();
@@ -156,38 +158,14 @@ public class DrumTrack : MonoBehaviour
     {
         CleanupExplodedMineNodes();
         CleanupInvalidMineNodes(); // ✅ Remove invalid references
-        HandleFloatingMineNodes(); // ✅ Separately process loose obstacles
-        HandleEvolvingMineNodes(); // ✅ Process grid-based obstacles
         progressionManager.OnLoopCompleted();
         if (isPhaseStarActive)
         {
             //   SpawnMineNode();
         }
     }
-    private void HandleFloatingMineNodes()
-    {
-        foreach (var node in activeNodes.ToList()) // ✅ Iterate safely
-        {
-            MineNode floatingNode = node.GetComponent<MineNode>();
 
-            if (floatingNode != null && floatingNode.isLoose)
-            {
-                floatingNode.Age(); // ✅ Ensure loose obstacles evolve on their own
-            }
-        }
-    }
-    private void HandleEvolvingMineNodes()
-    {
-        foreach (var node in activeNodes.ToList()) // ✅ Safe iteration
-        {
-            MineNode gridNode = node.GetComponent<MineNode>();
 
-            if (gridNode != null && !gridNode.isLoose) // ✅ Ensure it's still in the grid
-            {
-                gridNode.Age(); // ✅ Trigger standard obstacle behavior
-            }
-        }
-    }
     private void CleanupExplodedMineNodes()
     {
         for (int i = activeNodes.Count - 1; i >= 0; i--)
@@ -275,7 +253,7 @@ public class DrumTrack : MonoBehaviour
     
     public int GetRemainingMineNodeCount()
     {
-        return mineNodes.Count;
+        return activeMinedObjects.Count;
     }
     public void NotifyNoteCollected()
     {
@@ -293,20 +271,13 @@ public class DrumTrack : MonoBehaviour
         progressionManager.TryAdvanceSet();
     }
 
-    private void SetMineNodeSpawnerSet(MineNodeSpawnerSet set)
+    private void BeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
     {
-        progressionManager.OverrideSpawnerSet(set);
-    }
-
-    private void BeginPhase(MusicalPhase phase, MineNodeSpawnerSet spawnerSet)
-    {
-        Debug.Log($"📣 BeginPhase called for: {phase}");
+        Debug.Log($"📣 BeginPhase called for: {phase} with profile: {profile}");
         queuedPhase = phase;
-        SetMineNodeSpawnerSet(spawnerSet);
         ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
-        StartCoroutine(SpawnPhaseStarDelayed(phase, spawnerSet)); // ⬅ new
+        StartCoroutine(SpawnPhaseStarDelayed(phase, profile)); // ⬅ new
     }
-    
     
     public void UnregisterHexagon(GameObject hex)
     {
@@ -315,13 +286,14 @@ public class DrumTrack : MonoBehaviour
             activeHexagons.Remove(hex);
         }
     }
+    /*
     public void RegisterMineNode(MineNode node)
     {
         if (!mineNodes.Contains(node))
         {
             mineNodes.Add(node);
         }
-    }
+    }*/
     public void RegisterMinedObject(MinedObject obj)
     {
         if (!activeMinedObjects.Contains(obj))
@@ -331,13 +303,16 @@ public class DrumTrack : MonoBehaviour
     }
     public void UnregisterMinedObject(MinedObject obj)
     {
+        Debug.Log($"Removing MinedObject {obj}. Total Count: {activeMinedObjects.Count}");
         activeMinedObjects.Remove(obj);
+        Debug.Log($"Mined Object Count Now: {activeMinedObjects.Count}");
     }
+    /*
     public void UnregisterMineNode(MineNode node)
     {
         mineNodes.Remove(node);
     }
-    
+    */
     private void ValidateSpawnGrid()
     {
         for (int x = 0; x < spawnGrid.gridWidth; x++)
@@ -352,7 +327,7 @@ public class DrumTrack : MonoBehaviour
                     bool objectPresent = false;
                     foreach (var hit in hits)
                     {
-                        if (hit.GetComponent<Collectable>() || hit.GetComponent<MineNode>())
+                        if (hit.GetComponent<Collectable>())
                         {
                             objectPresent = true;
                             break;
@@ -417,28 +392,8 @@ public class DrumTrack : MonoBehaviour
 
         sessionPhases.Add(snapshot);
     }
-    public void ClearAllActiveMineNodes()
+    public void ClearAllActiveMinedObjects()
     {
-        // Clear MineNodeSpawners
-        foreach (GameObject node in activeNodes.ToList())
-        {
-            if (node == null) continue;
-            Explode explode = node.GetComponent<Explode>();
-            if (explode != null) explode.DelayedExplosion(Random.Range(.2f,.5f));
-            else Destroy(node);
-        }
-        activeNodes.Clear();
-
-        // Clear MineNodes
-        foreach (MineNode node in mineNodes.ToList())
-        {
-            if (node == null) continue;
-            Explode explode = node.GetComponent<Explode>();
-            if (explode != null) explode.DelayedExplosion(Random.Range(.2f,.5f));
-            else Destroy(node.gameObject);
-        }
-        mineNodes.Clear();
-
         // Clear MinedObjects (notes, modifiers, etc.)
         foreach (MinedObject obj in activeMinedObjects.ToList())
         {
@@ -602,13 +557,9 @@ public class DrumTrack : MonoBehaviour
     {
         return loopDurationInSeconds;
     }
-    public void RemoveActiveMineNode(GameObject node)
-    {
-        activeNodes.Remove(node);
 
-    }
    
-    public void SpawnPhaseStar(MusicalPhase phase, MineNodeSpawnerSet set)
+    public void SpawnPhaseStar(MusicalPhase phase, SpawnStrategyProfile profile)
     {
         Vector2Int cell = GetRandomAvailableCell();
         if (cell.x == -1)
@@ -625,7 +576,7 @@ public class DrumTrack : MonoBehaviour
         star = starObject.GetComponent<PhaseStar>();
         if (star != null)
         {
-            star.Initialize(this, phase, set, progressionManager);
+            star.Initialize(this, profile, phase, progressionManager);
         }
         else
         {
@@ -712,7 +663,7 @@ public class DrumTrack : MonoBehaviour
             {
                 currentPhase = queuedPhase.Value;
                 progressionManager.isPhaseInProgress = false;
-                StartCoroutine(DelayedBeginPhase(queuedPhase.Value, progressionManager.GetCurrentSpawnerSet()));
+                StartCoroutine(DelayedBeginPhase(queuedPhase.Value, progressionManager.GetCurrentSpawnerStrategyProfile()));
             }
             // ✅ Slow maze growth instead of instant
             if (hexMazeGenerator != null)
@@ -763,16 +714,15 @@ public class DrumTrack : MonoBehaviour
         {
             Debug.Log("📡 No queuedPhase set — calling EvaluateProgression()");
             progressionManager.EvaluateProgression();  // ✅ This will call MoveToNextPhase() based on currentPhase
-
         }
     }
-    private IEnumerator DelayedBeginPhase(MusicalPhase phase, MineNodeSpawnerSet set)
+    private IEnumerator DelayedBeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
     {
         yield return null; // wait one frame
-        BeginPhase(phase, set);
+        BeginPhase(phase, profile);
         queuedPhase = null; // ✅ now cleared AFTER BeginPhase is set up
     }
-    private IEnumerator SpawnPhaseStarDelayed(MusicalPhase phase, MineNodeSpawnerSet set)
+    private IEnumerator SpawnPhaseStarDelayed(MusicalPhase phase, SpawnStrategyProfile profile)
     {
         Debug.Log($"🕓 Waiting for next step to spawn PhaseStar: {phase}");
 
@@ -781,7 +731,7 @@ public class DrumTrack : MonoBehaviour
 
         yield return new WaitForSeconds(1.5f);
         Debug.Log("🌟 Calling SpawnPhaseStar now...");
-        SpawnPhaseStar(phase, set);
+        SpawnPhaseStar(phase, profile);
     }
 
 

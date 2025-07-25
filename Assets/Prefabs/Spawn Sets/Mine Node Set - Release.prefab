@@ -53,5 +53,7 @@ MonoBehaviour:
     weight: 3
   - prefab: {fileID: 1781116594832268, guid: 73bfe6d6dca2f4f4f940ec75183d7dc5, type: 3}
     weight: 3
-  selectionMode: 0
+  - prefab: {fileID: 1781116594832268, guid: 76c2d87455f0243bcbfea6bd0df051eb, type: 3}
+    weight: 3
+  selectionMode: 1
   trackController: {fileID: 0}

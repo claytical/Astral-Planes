@@ -349,10 +349,21 @@
                 {
                     "name": "",
                     "id": "05c50c0e-3747-40d2-8540-1d7a784b701c",
-                    "path": "<Gamepad>/select",
+                    "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "Quit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e677724f-7050-46a9-9f05-432183b95d45",
+                    "path": "*/{Submit}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
                     "action": "Quit",
                     "isComposite": false,
                     "isPartOfComposite": false

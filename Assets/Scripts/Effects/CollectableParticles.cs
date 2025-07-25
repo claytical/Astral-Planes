@@ -21,6 +21,40 @@ public class CollectableParticles : MonoBehaviour
             colorOverLifetime = particleSystem.colorOverLifetime;
         }
     }
+    public void EmitZap()
+    {
+        if (particleSystem == null) return;
+
+        var burst = new ParticleSystem.Burst(0f, 8); // 8 sparks immediately
+        emission.SetBursts(new[] { burst });
+        particleSystem.Play();
+    }
+    public void SetEmissionActive(bool isActive)
+    {
+        if (particleSystem == null) return;
+
+        if (isActive)
+        {
+            emission.rateOverTime = 10f; // or whatever suits your looped look
+            if (!particleSystem.isPlaying)
+                particleSystem.Play();
+        }
+        else
+        {
+            emission.rateOverTime = 0f;
+            // This combination forces emission to halt while allowing particles to fade naturally
+            particleSystem.Stop(withChildren: false, ParticleSystemStopBehavior.StopEmitting);
+        }
+    }
+    public void SetGravityForBeat(bool isOnBeat)
+    {
+        if (particleSystem == null) return;
+
+        var main = particleSystem.main;
+        main.gravityModifier = isOnBeat ? 0f : 2.5f; // tweak the gravity value to taste
+    }
+
+
 
     public void Configure(NoteSet noteSet)
 {

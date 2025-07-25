@@ -167,8 +167,11 @@ public class LocalPlayer : MonoBehaviour
 
     public void OnQuit(InputValue value)
     {
-        Destroy(gameObject);
-        GameFlowManager.Instance.QuitToSelection();
+        if (GameFlowManager.Instance.CurrentState == GameState.GameOver)
+        {
+            GameFlowManager.Instance.QuitToSelection();
+            Destroy(gameObject);
+        }
     }
 
     public void OnThrust(InputValue value)
@@ -178,48 +181,7 @@ public class LocalPlayer : MonoBehaviour
         else plane?.TurnOffBoost();
     }
 
-    
-/*
-    public void OnChoose(InputValue value)
-    {
-        if (!value.isPressed)
-        {
-            // Button was released — now allow input
-            confirmReady = true;
-            return;
-        }
 
-        if (!confirmReady)
-        {
-            // First press still held — block this input
-            return;
-        }
-
-        // ✅ At this point, confirmReady is true and button is freshly pressed
-        confirmReady = false;
-
-        // Your actual confirmation logic here
-        switch (GameFlowManager.Instance.CurrentState)
-        {
-            case GameState.Selection:
-                if (isReady) return;
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                playerVehicle = selection.GetChosenPlane();
-                selection.Confirm();
-                SetColor();
-                isReady = true;
-                Debug.Log($"Player {name} is ready");
-                GameFlowManager.Instance.CheckAllPlayersReady();
-                break;
-
-            case GameState.GameOver:
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                Restart();
-                break;
-        }
-    }
-
-*/
     public void OnNextVehicle(InputValue value)
     {
         if (!value.isPressed) return;
@@ -264,8 +226,8 @@ public class LocalPlayer : MonoBehaviour
 
     public void StartRumble(float lowFreq, float highFreq, float duration)
     {
-        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
-            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
+//        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
+//            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
     }
 
     // Wildcard Glitch Toggles

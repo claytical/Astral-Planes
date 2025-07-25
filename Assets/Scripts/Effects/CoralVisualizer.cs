@@ -15,11 +15,16 @@ public class CoralVisualizer : MonoBehaviour
 
     private List<GameObject> spawnedParts = new();
     public List<PhaseSnapshot> snapshots = new();
-    public Transform coralRoot;     // Optional: parent transform for hierarchy
+    private Transform coralRoot;     // Optional: parent transform for hierarchy
 
     public Vector3 coralOrigin = new Vector3(-10f, -3f, 0f); // Move off center if needed
     public float branchScale = 5f; // Amplify size of visuals
     
+    void Awake()
+    {
+        coralRoot = new GameObject("CoralRoot").transform;
+        coralRoot.SetParent(this.transform, false);
+    }
 
 public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
 {
@@ -123,6 +128,6 @@ public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
 
     private void Update()
     {
-        transform.Rotate(Vector3.forward * rotationSpeed * Time.deltaTime);
+        //transform.Rotate(Vector3.forward * rotationSpeed * Time.deltaTime);
     }
 }

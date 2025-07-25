@@ -48,5 +48,50 @@ public static class VisualFeedbackUtility
 
         sr.color = originalColor;
     }
+    public static IEnumerator BoundaryThudFeedback(SpriteRenderer sprite, Transform objTransform, Vector2 normal, float duration = 0.2f)
+    {
+        if (sprite == null || objTransform == null) yield break;
+
+        Vector3 originalScale = objTransform.localScale;
+        Color originalColor = sprite.color;
+
+        // Choose axis to squish based on collision direction
+        Vector3 squishScale = originalScale;
+        if (Mathf.Abs(normal.x) > Mathf.Abs(normal.y))
+        {
+            // Horizontal wall → squish X
+            squishScale.x *= 0.5f;
+            squishScale.y *= 1.2f;
+        }
+        else
+        {
+            // Vertical wall → squish Y
+            squishScale.y *= 0.5f;
+            squishScale.x *= 1.2f;
+        }
+
+        float flickerAlpha = 0.5f;
+        Color flickerColor = Color.red;
+        flickerColor.a = flickerAlpha;
+
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float t = elapsed / duration;
+
+            // Interpolate scale
+            objTransform.localScale = Vector3.Lerp(squishScale, originalScale, t);
+
+            // Interpolate flicker
+            sprite.color = Color.Lerp(flickerColor, originalColor, t);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        objTransform.localScale = originalScale;
+        sprite.color = originalColor;
+    }
 
 }

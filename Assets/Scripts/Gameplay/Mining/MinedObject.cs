@@ -1,24 +1,28 @@
+using System;
 using UnityEngine;
 using System.Collections;
-
-public enum MinedObjectCategory {
-    NoteSpawner,
-    TrackUtility,
-    NoteModifier
-}
+using UnityEngine.Rendering.Universal;
+using Random = UnityEngine.Random;
+[Serializable]
 
 public class MinedObject : MonoBehaviour
 {
-    public MinedObjectType minedObjectType;
     public SpriteRenderer sprite;
-  
     public InstrumentTrack assignedTrack;
-    private NoteSet targetNoteSet;
     private Collider2D minedCollider;
-
+    private int hitsRequired = 3;
+    public MinedObjectType minedObjectType;
+    public TrackModifierType? trackModifierType;
+    [SerializeField] private NoteSetSeries noteSetSeries;
+    private NoteSet currentNoteSet;
+    private bool wasCollected = false;
+    private GameObject ghostTrigger;
     private void Start()
     {
-        sprite.enabled = false;
+        if (minedObjectType == MinedObjectType.NoteSpawner)
+        {
+            sprite.enabled = false;
+        }
         minedCollider = GetComponent<Collider2D>();
         if (minedCollider != null)
         {
@@ -33,13 +37,11 @@ public class MinedObject : MonoBehaviour
         }        
 
     }
+    
+    
     public void AssignTrack(InstrumentTrack track)
     {
         assignedTrack = track;
-        if (assignedTrack.drumTrack != null)
-        {
-            assignedTrack.drumTrack.RegisterMinedObject(this);
-        }
         AssignVisuals();
 
     }
@@ -52,114 +54,61 @@ public class MinedObject : MonoBehaviour
         }
     }
 
-    public static MinedObjectCategory GetCategory(MinedObjectType type)
-    {
-        switch (type)
-        {
-            case MinedObjectType.NoteSpawner:
-                return MinedObjectCategory.NoteSpawner;
-
-            case MinedObjectType.TrackUtility:
-                return MinedObjectCategory.TrackUtility;
-
-            default:
-                Debug.LogWarning($"⚠️ Unhandled MinedObjectType: {type}. Defaulting to NoteModifier.");
-                return MinedObjectCategory.NoteModifier;
-        }
-    }
-    
     public void EnableColliderAfterDelay(float delay)
     {
-        StartCoroutine(EnableColliderCoroutine(delay));
+        Collider2D collider2D = GetComponent<Collider2D>();
+        if(collider2D != null)
+        StartCoroutine(EnableColliderCoroutine(collider2D, delay));
     }
 
-    private IEnumerator EnableColliderCoroutine(float delay)
+    private IEnumerator EnableColliderCoroutine(Collider2D col, float delay)
     {
         yield return new WaitForSeconds(delay);
-        
-        if (minedCollider != null)
-        {
-            minedCollider.enabled = true; // ✅ Collider is enabled after delay
-        }
+        col.enabled = true; // ✅ Collider is enabled after delay
     }
-
-    private void AssignVisuals()
+    public void AssignVisuals()
     {
-        MinedObjectCategory category = GetCategory(minedObjectType);
         sprite.color = assignedTrack.trackColor;
-        switch (category)
+        switch (minedObjectType)
         {
-            case MinedObjectCategory.TrackUtility:
-                AssignUtilityVisuals();
-                break;
-
-            case MinedObjectCategory.NoteSpawner:
-                break;
-
-            default:
-                Debug.LogWarning($"No visuals assigned for category {category}");
+            case MinedObjectType.NoteSpawner:
+                sprite.enabled = false;
                 break;
         }
+
     }
-    private void AssignUtilityVisuals()
+    public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSetSeries noteSetSeries = null, TrackModifierType? modifier = null)
     {
-        var trackUtility = GetComponent<TrackUtilityMinedObject>();
-        if (trackUtility != null)
+        minedObjectType = type;
+        assignedTrack = track;
+        this.noteSetSeries = noteSetSeries;
+        this.trackModifierType = modifier;
+        var explode = GetComponent<Explode>();
+        if (explode != null)
         {
-            switch (trackUtility.type)
+            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.TrackUtility));
+        }
+        TrackUtilityMinedObject trackUtilityMinedObject = GetComponent<TrackUtilityMinedObject>();
+        NoteSpawnerMinedObject noteSpawnerMinedObject = GetComponent<NoteSpawnerMinedObject>();
+        if (trackUtilityMinedObject != null)
+        {
+            trackUtilityMinedObject.Initialize(assignedTrack);
+        }
+
+        if (noteSpawnerMinedObject != null)
+        {
+            NoteSet selectedNoteSet = noteSetSeries.GetRandomOrCuratedNoteSet();
+            noteSpawnerMinedObject.Initialize(assignedTrack, selectedNoteSet, noteSetSeries);
+            MinedObjectVisualEffectController visualEffectController = noteSpawnerMinedObject.GetComponent<MinedObjectVisualEffectController>();
+            if (visualEffectController != null)
             {
-                case TrackModifierType.Clear:
-                    StartCoroutine(FadeOutGlow());
-                    break;
-                case  TrackModifierType.Expansion:
-                    StartCoroutine(PulseExpand());
-                    break;
-                case  TrackModifierType.Contract:
-                    StartCoroutine(JitterEffect());
-                    break;
-            }
+                ghostTrigger = visualEffectController.Initialize(noteSpawnerMinedObject);
+            }            
         }
+        AssignVisuals();
     }
 
-    private void ApplyEffect(Vehicle vehicle)
-    {
-        if (assignedTrack == null) {
-            Debug.LogWarning($"{gameObject.name} - No track assigned.");
-            return;
-        }
 
-        MinedObjectCategory category = GetCategory(minedObjectType);
-
-        switch (category)
-        {
-            case MinedObjectCategory.NoteSpawner:
-                NoteSpawnerMinedObject spawner = GetComponent<NoteSpawnerMinedObject>();
-                if (spawner != null)
-                {
-                    spawner.OnCollected(vehicle);
-                }
-                else
-                {
-                    Debug.LogWarning("NoteSpawnerMinedObject missing from NoteSpawner.");
-                }
-                break;
-
-            case MinedObjectCategory.TrackUtility:
-                TrackUtilityMinedObject utility = GetComponent<TrackUtilityMinedObject>();
-                if (utility != null)
-                {
-                    utility.OnCollected();
-                }
-                else
-                {
-                    Debug.LogWarning("TrackUtilityMinedObject missing from TrackUtility item.");
-                }
-                break;
-            default:
-                Debug.LogWarning("Unknown MinedObjectCategory: " + category);
-                break;
-        }
-    }
 
     private IEnumerator FadeOutGlow()
     {
@@ -208,15 +157,14 @@ public class MinedObject : MonoBehaviour
         transform.localPosition = originalPos;
     }
 
-    private void OnTriggerEnter2D(Collider2D coll)
+
+    protected virtual void OnCollected(Vehicle vehicle)
     {
-        Vehicle vehicle = coll.gameObject.GetComponent<Vehicle>();
-        if (vehicle != null)
-        {
-            ApplyEffect(vehicle);
-        }
+
+
+        // Default behavior
+        Destroy(gameObject);
     }
+
     
-
-
 }

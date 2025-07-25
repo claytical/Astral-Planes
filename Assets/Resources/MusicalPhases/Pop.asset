@@ -16,14 +16,8 @@ MonoBehaviour:
   rolePatternStrategies: []
   ghostLoopCount: 4
   drumClips:
-  - {fileID: 8300000, guid: bb8707cccaf6a4969b4a3bd447662281, type: 3}
-  - {fileID: 8300000, guid: f8701d750a9ba4e34aaff004ac259c7a, type: 3}
-  - {fileID: 8300000, guid: a96dc167db05e4ed8ab49a981cdea485, type: 3}
-  - {fileID: 8300000, guid: 3e7b60218f8974817ba03e518ebae449, type: 3}
-  - {fileID: 8300000, guid: 5bd03cd26925f449cb064c5daf31e0e6, type: 3}
-  - {fileID: 8300000, guid: b89d328f0986841c799d6cc20a8a864a, type: 3}
-  - {fileID: 8300000, guid: 3e0a2e331c00548b5bd369f95be21739, type: 3}
-  - {fileID: 8300000, guid: de1d8d10c39244fb887c5243b51a60c8, type: 3}
+  - {fileID: 8300000, guid: fdd2ef21522af41fbb0c7538e76442a8, type: 3}
+  - {fileID: 8300000, guid: 86bf9bd2784784d78af16c6f103760f6, type: 3}
   visualColor: {r: 1, g: 0.24056602, b: 0.49621707, a: 1}
   rotationMode: 1
   rotationSpeed: 30

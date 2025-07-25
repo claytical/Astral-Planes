@@ -61,7 +61,7 @@ public class DarkStar : MonoBehaviour
         safeColor = color;
         Vector2Int centerCell = drumTrack.WorldToGridPosition(transform.position);
         drumTrack.hexMazeGenerator.ClearMaze();
-        drumTrack.hexMazeGenerator.GenerateMaze(centerCell, drumTrack.currentPhase, progressionManager.GetHollowRadiusForCurrentPhase(), true);
+        drumTrack.hexMazeGenerator.GenerateDust(centerCell, drumTrack.currentPhase, progressionManager.GetHollowRadiusForCurrentPhase(), true);
         //FindObjectOfType<GlitchManager>()?.EnableAllGlitchesSubtle();
         Debug.Log("[DarkStar] Begin()");
         isActive = true;
@@ -401,7 +401,7 @@ public class DarkStar : MonoBehaviour
                 break;
         }
 
-        if (collision.gameObject.TryGetComponent<HexagonShield>(out var hex))
+        if (collision.gameObject.TryGetComponent<CosmicDust>(out var hex))
         {
             drumTrack.UnregisterHexagon(collision.gameObject);
             Vector2 dir = (collision.transform.position - transform.position).normalized;

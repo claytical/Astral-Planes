@@ -1,10 +1,13 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Random = UnityEngine.Random;
+[Serializable]
 public enum TrackModifierType
 {
-    Expansion, AntiNote, Clear, Drift, Remix,
-    Contract, Solo, Magic,
-    StructureShift, MoodShift,
+    Spawner, Clear, Remix,
+    RootShift, RhythmStyle,
     ChordProgression
 }
 public enum TrackClearType
@@ -19,52 +22,15 @@ public class TrackUtilityMinedObject : MonoBehaviour
     public MusicalRole targetRole;
     private InstrumentTrack assignedTrack;
     public ChordProgressionProfile chordProfile;
+    private RemixUtility appliedRemix;
+
     public void Initialize(InstrumentTrack track)
     {
         GetComponent<MinedObject>().AssignTrack(track);
-
-        var explode = GetComponent<Explode>();
-        if (explode != null)
-        {
-            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.TrackUtility));
-        }
     }
 
-    public void OnCollected()
+    public void OnCollected(Vehicle vehicle)
     {
-        assignedTrack = GetComponent<MinedObject>().assignedTrack;
-        if (assignedTrack == null)
-        {
-            Debug.LogWarning("No track assigned to utility item.");
-            return;
-        }
-
-        switch (type)
-        {
-            case TrackModifierType.ChordProgression:
-                ApplyChordProgressionToTrack(); break;
-            case TrackModifierType.Expansion:
-                assignedTrack.ExpandLoop(); break;
-            case TrackModifierType.Contract:
-                assignedTrack.ContractLoop(); break;
-            case TrackModifierType.Clear:
-                assignedTrack.ClearLoopedNotes(TrackClearType.EnergyRestore); break;
-            case TrackModifierType.Drift:
-                ApplyDrift(assignedTrack); break;
-            case TrackModifierType.Remix:
-                ApplyRemixStrategy(assignedTrack); break;
-            case TrackModifierType.Solo:
-                SoloTrackWithBassSupport(assignedTrack); break;
-            case TrackModifierType.Magic:
-                ExecuteSmartUtility(assignedTrack); break;
-            case TrackModifierType.StructureShift:
-                ApplySmartStructureShift(assignedTrack); break;
-            case TrackModifierType.MoodShift:
-                ApplySmartMoodShift(assignedTrack); break;
-        }
-
-        Debug.Log($"Executed {type} on track: {assignedTrack.name}");
-        GetComponent<Explode>()?.Permanent();
     }
     private void ApplyRemixStrategy(InstrumentTrack track)
     {
@@ -128,6 +94,92 @@ public class TrackUtilityMinedObject : MonoBehaviour
             track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
         }
     }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        Vehicle vehicle = other.GetComponent<Vehicle>();
+        if(vehicle == null) return;
+        CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Aether);
+        vehicle.AddRemixRole(targetRole);
+
+        assignedTrack = GetComponent<MinedObject>().assignedTrack;
+        if (assignedTrack == null)
+        {
+            Debug.LogWarning("No track assigned to utility item.");
+            return;
+        }
+        
+        switch (type)
+        {
+            case TrackModifierType.Remix:
+            {
+                break;
+            }
+            case TrackModifierType.ChordProgression:
+                ApplyChordProgressionToTrack(); break;
+            case TrackModifierType.Clear:
+                assignedTrack.ClearLoopedNotes(TrackClearType.EnergyRestore); break;
+            case TrackModifierType.RhythmStyle:
+                ExecuteSmartUtility(assignedTrack); break;
+            case TrackModifierType.RootShift:
+                ApplySmartStructureShift(assignedTrack); break;
+        }
+
+        Debug.Log($"Executed {type} on track: {assignedTrack.name}");
+        GetComponent<Explode>()?.Permanent();
+
+    }
+
+    public void ApplyRemixUtility(RemixUtility utility)
+    {
+        if (assignedTrack == null || utility == null)
+        {
+            Debug.LogWarning("❌ ApplyRemixUtility failed: missing assignedTrack or utility.");
+            return;
+        }
+
+        NoteSet noteSet = assignedTrack.GetCurrentNoteSet();
+        if (noteSet == null)
+        {
+            Debug.LogWarning("❌ ApplyRemixUtility: NoteSet is null.");
+            return;
+        }
+
+        // Override settings only if told to do so
+        if (utility.overrideDefaults)
+        {
+            noteSet.noteBehavior = utility.noteBehaviorOverride;
+            noteSet.rhythmStyle = utility.rhythmStyleOverride;
+        }
+
+        noteSet.Initialize(assignedTrack.GetTotalSteps());
+
+        // Step 1: Collect notes from current NoteSet
+        List<int> collectedNotes = noteSet.GetNoteList();
+        if (collectedNotes == null || collectedNotes.Count == 0)
+        {
+            Debug.LogWarning("⚠️ ApplyRemixUtility: NoteSet returned no collected notes.");
+            return;
+        }
+
+        // Step 2: Clear current loop
+        assignedTrack.ClearLoopedNotes(TrackClearType.Remix);
+
+        // Step 3: Run Remix logic
+        int totalSteps = assignedTrack.GetTotalSteps();
+        var remixData = utility.Remix(collectedNotes, noteSet, totalSteps);
+
+        // Step 4: Apply result
+        var loop = assignedTrack.GetPersistentLoopNotes();
+        foreach (var (step, note, duration, velocity) in remixData)
+        {
+            loop.Add((step, note, duration, velocity));
+        }
+
+        assignedTrack.controller?.UpdateVisualizer();
+        Debug.Log($"🎛 Applied RemixUtility '{utility.name}' to track {assignedTrack.assignedRole} (steps: {remixData.Count})");
+    }
+
 
     private void AddWalkingNotes(InstrumentTrack track, NoteSet noteSet)
     {
@@ -304,7 +356,7 @@ public class TrackUtilityMinedObject : MonoBehaviour
             track.ClearLoopedNotes(TrackClearType.Remix);
         }
     }
-
+/*
     private void ApplySmartMoodShift(InstrumentTrack track)
     {
         var controller = track.controller;
@@ -331,4 +383,5 @@ public class TrackUtilityMinedObject : MonoBehaviour
 
         controller.UpdateVisualizer();
     }
+    */
 }

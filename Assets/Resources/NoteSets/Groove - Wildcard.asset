@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Groove - Wildcard
   m_EditorClassIdentifier: 
   label: Wildcard
-  role: 6
+  role: 3
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: 0d0a134e52a67454c9c341dbedfa4dc9, type: 3}
   - {fileID: 8509760657121421808, guid: df90ecbbe18284f76aa68b584940e5ac, type: 3}

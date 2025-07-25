@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using UnityEditor.UI;
 using UnityEngine;
 
 [RequireComponent(typeof(MinedObject))]
@@ -13,10 +15,10 @@ public class MinedObjectVisualEffectController : MonoBehaviour
     private ParticleSystem particles;
     private VisualEffectProfile activeProfile;
 
-    void Start()
+    public GameObject Initialize(NoteSpawnerMinedObject spawner)
     {
         minedObject = GetComponent<MinedObject>();
-        noteSpawner = GetComponent<NoteSpawnerMinedObject>();
+        noteSpawner = spawner;
         sprite = minedObject?.sprite;
 
         if (noteSpawner != null)
@@ -35,10 +37,16 @@ public class MinedObjectVisualEffectController : MonoBehaviour
             if (activeProfile.particlePrefab != null)
             {
                 // Instantiate the full GameObject prefab
-                GameObject fxObject = Instantiate(activeProfile.particlePrefab, transform.position, Quaternion.identity, transform);
-
+                spawner.ghostTrigger = Instantiate(activeProfile.particlePrefab, transform.position, Quaternion.identity, transform);
+                GhostPatternTrigger trigger = spawner.ghostTrigger.GetComponent<GhostPatternTrigger>();
+                if (trigger != null)
+                {
+                    if (noteSpawner != null)
+                        trigger.Initialize(noteSpawner.selectedNoteSet, noteSpawner.assignedTrack,
+                            noteSpawner.musicalRole);
+                }
                 // Then get the ParticleSystem from the instantiated object
-                particles = fxObject.GetComponent<ParticleSystem>();
+                particles = spawner.ghostTrigger.GetComponent<ParticleSystem>();
                 if (particles != null)
                 {
                     var main = particles.main;
@@ -57,10 +65,12 @@ public class MinedObjectVisualEffectController : MonoBehaviour
                 {
                     Debug.LogWarning($"No ParticleSystem found on particleEffectPrefab '{activeProfile.particlePrefab.name}'");
                 }
-            }
 
-            StartCoroutine(PulseLoop());
+                return spawner.ghostTrigger;
+            }
         }
+
+        return null;
     }
     private void ApplyVisuals()
     {
@@ -91,7 +101,7 @@ public class MinedObjectVisualEffectController : MonoBehaviour
 
         switch (type)
         {
-            case TrackModifierType.StructureShift:
+            case TrackModifierType.RootShift:
                 // ⬢ Sharp, geometric, structured
                 main.startColor = Color.cyan;
                 main.startSize = 0.2f;
@@ -105,7 +115,7 @@ public class MinedObjectVisualEffectController : MonoBehaviour
                 renderer.renderMode = ParticleSystemRenderMode.Billboard;
                 break;
 
-            case TrackModifierType.MoodShift:
+            case TrackModifierType.ChordProgression:
                 // 🌊 Soft, flowing, emotional
                 main.startColor = new Color(1f, 0.7f, 0.9f); // pastel rose
                 main.startSize = 0.15f;
@@ -135,9 +145,14 @@ public class MinedObjectVisualEffectController : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+     //   StartCoroutine(PulseLoop());
+    }
+
     private IEnumerator PulseLoop()
     {
-        while (true)
+        while (gameObject.activeSelf) ;
         {
             float pulse = (Mathf.Sin(Time.time * activeProfile.pulseSpeed) + 1f) / 2f;
             float scale = Mathf.Lerp(1f, activeProfile.pulseScaleAmount, pulse);

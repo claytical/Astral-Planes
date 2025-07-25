@@ -3,9 +3,9 @@
   <SoundFonts>
     <SoundFontInfo>
       <Name>Moonlight</Name>
-      <PatchCount>11</PatchCount>
-      <WaveCount>22</WaveCount>
-      <WaveSize>9513952</WaveSize>
+      <PatchCount>14</PatchCount>
+      <WaveCount>28</WaveCount>
+      <WaveSize>11202612</WaveSize>
       <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Moonlight.sf2</SF2Path>
     </SoundFontInfo>
   </SoundFonts>

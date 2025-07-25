@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lead - Evolve
   m_EditorClassIdentifier: 
   label: Evolve
-  role: 5
+  role: 2
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: 28f1bf24f72e84e6a87cdd1b5a8a3023, type: 3}
   - {fileID: 8509760657121421808, guid: 5ce4fffbf7aa849739788e9d9eea9746, type: 3}

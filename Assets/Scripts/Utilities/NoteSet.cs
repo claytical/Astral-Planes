@@ -69,13 +69,20 @@ public static class RhythmPatterns
     public static readonly Dictionary<RhythmStyle, RhythmPattern> Patterns =
         new Dictionary<RhythmStyle, RhythmPattern>
         {
-            { RhythmStyle.FourOnTheFloor, new RhythmPattern { Offsets = new [] {0, 4, 8, 12}, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Syncopated,     new RhythmPattern { Offsets = new [] {2, 3, 6, 7, 10, 11, 14, 15}, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
-            { RhythmStyle.Swing,          new RhythmPattern { Offsets = new [] {0, 3, 4, 7, 8, 11, 12, 15}, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Sparse,         new RhythmPattern { Offsets = new [] {0, 8}, DurationMultiplier = 2f, LoopMultiplier = 2 } },
-            { RhythmStyle.Dense,          new RhythmPattern { Offsets = Enumerable.Range(0,16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } }
+            { RhythmStyle.FourOnTheFloor, new RhythmPattern { Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Syncopated,     new RhythmPattern { Offsets = new[] { 2, 3, 6, 7, 10, 11, 14, 15 }, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
+            { RhythmStyle.Swing,          new RhythmPattern { Offsets = new[] { 0, 3, 4, 7, 8, 11, 12, 15 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Sparse,         new RhythmPattern { Offsets = new[] { 0, 8 }, DurationMultiplier = 2f, LoopMultiplier = 2 } },
+            { RhythmStyle.Dense,          new RhythmPattern { Offsets = Enumerable.Range(0, 16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } },
+            { RhythmStyle.Steady,         new RhythmPattern { Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Triplet,        new RhythmPattern { Offsets = new[] { 0, 5, 10, 15 }, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
+            { RhythmStyle.PulseBuild,     new RhythmPattern { Offsets = new[] { 0, 8, 4, 12, 2, 10 }, DurationMultiplier = 1.2f, LoopMultiplier = 1 } },
+            { RhythmStyle.Stutter,        new RhythmPattern { Offsets = new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, DurationMultiplier = 0.6f, LoopMultiplier = 1 } },
+            { RhythmStyle.Scatter,        new RhythmPattern { Offsets = new[] { 1, 5, 7, 10, 13, 14 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Breakbeat,      new RhythmPattern { Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
         };
 }
+
 
 [System.Serializable]
 public class WeightedNote
@@ -93,7 +100,6 @@ public class WeightedDuration
 public class NoteSet : MonoBehaviour
 {
     public int rootMidi;             // e.g. 24 for C1
-    public int finalRootMidi;
     public int? dominantNote;
     public ScaleType scale;          // e.g. Major or Minor
     public ChordPattern chordPattern = ChordPattern.RootTriad;
@@ -285,6 +291,7 @@ public class NoteSet : MonoBehaviour
         switch (noteBehavior)
         {
             case NoteBehavior.Bass:
+            case NoteBehavior.Pad:
                 adjustedRoot -= 12; // Shift down 1 octave
                 break;
             case NoteBehavior.Lead:
@@ -292,6 +299,15 @@ public class NoteSet : MonoBehaviour
                 break;
             case NoteBehavior.Drone:
                 adjustedRoot -= 24; // Shift down 2 octaves
+                break;
+            case NoteBehavior.Hook:
+                adjustedRoot += 24;
+                break;
+            case NoteBehavior.Harmony:
+                adjustedRoot = 0;
+                break;
+            case NoteBehavior.Sustain: 
+                adjustedRoot = 0;
                 break;
             default:
                 break; // Keep unchanged for Harmony & Percussion

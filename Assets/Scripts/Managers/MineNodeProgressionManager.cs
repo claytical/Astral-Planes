@@ -22,8 +22,9 @@ public class MineNodeProgressionManager : MonoBehaviour
     public int loopsCompleted;
     public MusicalPhaseQueue phaseQueue;
     private int currentPhaseIndex;
-    private MineNodeSpawnerSet currentSpawnerSet;
-    private MineNodeSpawnerSet overrideSet;
+    SpawnStrategyProfile currentSpawnStrategy;
+    SpawnStrategyProfile overrideSpawnStrategy;
+
     public bool phaseLocked;
     public bool isPhaseInProgress;
     public bool isPhaseTransitioning;
@@ -53,7 +54,7 @@ public class MineNodeProgressionManager : MonoBehaviour
     )
     {
         Debug.Log($"🌀 MoveToNextPhase called. awaitingDarkStar: {awaitingDarkStar}, darkStarModeEnabled: {drumTrack.darkStarModeEnabled}");
-        overrideSet = null;
+        overrideSpawnStrategy = null;
         if (awaitingDarkStar)
         {
             awaitingDarkStar = false;
@@ -69,7 +70,7 @@ public class MineNodeProgressionManager : MonoBehaviour
         isPhaseInProgress = true;
         isPhaseTransitioning = false;
 
-        drumTrack.ClearAllActiveMineNodes();
+        drumTrack.ClearAllActiveMinedObjects();
         MusicalPhaseGroup selectedGroup = null;
 
         if (specificPhase.HasValue)
@@ -97,15 +98,15 @@ public class MineNodeProgressionManager : MonoBehaviour
 
         if (selectedGroup.allowRandomSelection)
         {
-            currentSpawnerSet = selectedGroup.spawnerOptions[
-                UnityEngine.Random.Range(0, selectedGroup.spawnerOptions.Count)
+            currentSpawnStrategy = selectedGroup.spawnStrategies[
+                UnityEngine.Random.Range(0, selectedGroup.spawnStrategies.Count)
             ];
         }
         else
         {
-            currentSpawnerSet = selectedGroup.spawnerOptions[0];
+            currentSpawnStrategy = selectedGroup.spawnStrategies[0];
         }
-        drumTrack.SpawnPhaseStar(currentPhase, currentSpawnerSet);
+        drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
         drumTrack.ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
     }
 
@@ -260,14 +261,15 @@ public class MineNodeProgressionManager : MonoBehaviour
 
 
 
-    public MineNodeSpawnerSet GetCurrentSpawnerSet()
+    public SpawnStrategyProfile GetCurrentSpawnerStrategyProfile()
     {
-        return overrideSet ?? phaseQueue?.phaseGroups[currentPhaseIndex].spawnerOptions.FirstOrDefault();
+        return overrideSpawnStrategy ?? phaseQueue?.phaseGroups[currentPhaseIndex].spawnStrategies.FirstOrDefault();
     }
 
-    public void OverrideSpawnerSet(MineNodeSpawnerSet set)
+    public void OverrideSpawnerStrategy(SpawnStrategyProfile profile)
     {
-        overrideSet = set;
+        currentSpawnStrategy = profile;
+        overrideSpawnStrategy = profile;
     }
 
     public void OnMinedObjectCollected()

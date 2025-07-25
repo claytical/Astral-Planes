@@ -6,15 +6,12 @@ public enum RhythmStyle
     Swing,
     Sparse,
     Dense,
-
-    // New Additions
     Steady,
-    Wildcard,
-    Pulsed,
-    Staggered,
-    Chaotic,
-    Unstable,
-    Choppy
+    Triplet,
+    PulseBuild,
+    Stutter,
+    Scatter,
+    Breakbeat
 }
 
 public enum NoteBehavior
@@ -24,15 +21,11 @@ public enum NoteBehavior
     Harmony,
     Percussion,
     Drone,
-
-    // New Additions
     Sustain,
-    Jump,
-    Random,
-    Disrupt,
-    Waver,
-    Pulse,
-    Legato
+    Glitch,
+    Hook,
+    Pad,
+    Accent
 }
 
 public enum ChordPattern
@@ -41,11 +34,5 @@ public enum ChordPattern
     SeventhChord,
     Fifths,
     Sus4,
-    Arpeggiated,
-
-    // New Additions
-    Diminished,
-    BrokenChord,
-    Clustered,
-    Echoed
+    Arpeggiated
 }
