@@ -135,7 +135,7 @@ public class DiamondGhost : MonoBehaviour
     void OnCollisionEnter2D(Collision2D collision)
     {
         PlayDarkNote();
-        if (collision.gameObject.TryGetComponent<HexagonShield>(out var shield))
+        if (collision.gameObject.TryGetComponent<CosmicDust>(out var shield))
         {
             shield.BreakHexagon(SoundEffectMood.Toxic);            
         }

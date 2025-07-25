@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 162112303559718899}
   - component: {fileID: 3197689220231228328}
   - component: {fileID: 7872104301369236207}
-  - component: {fileID: 1942888033184086632}
   - component: {fileID: 3445841556216710544}
   - component: {fileID: 911336328777086674}
   - component: {fileID: 8305377386291287705}
@@ -121,20 +120,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 7
---- !u!114 &1942888033184086632
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312498068821558259}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f03dc13067c834631bd870ff51a36f1a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  effectType: 0
-  musicalRole: 4
 --- !u!114 &3445841556216710544
 MonoBehaviour:
   m_ObjectHideFlags: 0

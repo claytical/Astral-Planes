@@ -20,6 +20,6 @@ MonoBehaviour:
   sparkParticlePrefab: {fileID: 5137427580465729298, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
     type: 3}
   defaultBehavior: 3
-  allowedMidiPresets: 0100000004000000
+  allowedMidiPresets: 0c00000004000000
   textureDescriptor: bone clack
   samplePreview: {fileID: 0}

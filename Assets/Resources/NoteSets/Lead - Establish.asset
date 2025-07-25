@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lead - Establish
   m_EditorClassIdentifier: 
   label: Establish
-  role: 5
+  role: 2
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: b2b7f0ea1bccb49aeb72c00af25a23bb, type: 3}
   - {fileID: 8509760657121421808, guid: 4952b718235bc4006940e227d171e855, type: 3}

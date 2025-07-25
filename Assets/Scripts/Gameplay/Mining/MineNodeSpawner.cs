@@ -5,9 +5,8 @@ public class MineNodeSpawner : MonoBehaviour
 {
     public ParticleSystem particles;
     
-    public GameObject nodePrefab; // ✅ Assign Block Obstacle Prefab in Inspector
+    public GameObject nodePrefab;
     private GameObject spawnedNode;
-    public GameObject SpawnedNode => spawnedNode;
     private Vector2Int gridPosition;
     private DrumTrack drumTrack;
     public Color resolvedColor;
@@ -20,48 +19,31 @@ public class MineNodeSpawner : MonoBehaviour
             childRenderer.color = resolvedColor;
             
         }
-
     }
    
     public void SetDrumTrack(DrumTrack drums)
     {
         drumTrack = drums;
     }
-
-    public void SpawnNode(Vector2Int position)
+    public MineNode SpawnNode(Vector2Int cell, MinedObjectSpawnDirective directive)
     {
-        gridPosition = position;
-        Vector3 worldPos = drumTrack.GridToWorldPosition(gridPosition);
-        if (nodePrefab == null)
+        gridPosition = cell;
+        Vector3 worldPos = drumTrack.GridToWorldPosition(cell);
+    
+        GameObject obj = Instantiate(nodePrefab, worldPos, Quaternion.identity);
+        spawnedNode = obj;
+        var node = obj.GetComponent<MineNode>();
+        if (node != null)
         {
-            Debug.LogError("No node prefab assigned on " + gameObject.name);
-        }
-        spawnedNode = Instantiate(nodePrefab, worldPos, Quaternion.identity);
-
-        MineNode nodeScript = spawnedNode.GetComponent<MineNode>();
-            
-        if (nodeScript != null)
-        {
-            resolvedColor = ShardColorUtility.ResolveColorFromMineNodePrefab(nodePrefab, drumTrack.trackController);
-            drumTrack.RegisterMineNode(nodeScript);
-            nodeScript.SetParentEvolvingObstacle(this);
-            nodeScript.SetDrumTrack(drumTrack);
-            drumTrack.OccupySpawnGridCell(gridPosition.x, gridPosition.y, GridObjectType.Node);  
-            nodeScript.LockColor(resolvedColor);
+            node.Initialize(directive);
+            drumTrack.OccupySpawnGridCell(cell.x, cell.y, GridObjectType.Node);
         }
         else
         {
-            Debug.LogError("No MineNode script assigned on " + gameObject.name);
+            Debug.LogError("🚨 nodePrefab is missing a MineNode component.");
         }
-        
+        return node;
     }
 
-    public void OnObstacleKnockedLoose()
-    {
-        
-        drumTrack.FreeSpawnCell(gridPosition.x, gridPosition.y);
-        drumTrack.RemoveActiveMineNode(gameObject);
-        Destroy(gameObject); // ✅ Remove this EvolvingObstacle from the game
-    }
 
 }

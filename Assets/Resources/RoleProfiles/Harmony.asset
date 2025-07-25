@@ -20,6 +20,6 @@ MonoBehaviour:
   sparkParticlePrefab: {fileID: 5137427580465729298, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
     type: 3}
   defaultBehavior: 2
-  allowedMidiPresets: 030000000500000007000000
+  allowedMidiPresets: 040000000b0000000700000006000000
   textureDescriptor: cloud breath
   samplePreview: {fileID: 0}

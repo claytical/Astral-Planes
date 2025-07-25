@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Groove - Evolve
   m_EditorClassIdentifier: 
   label: Evolve
-  role: 6
+  role: 3
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: 8c652ed44d2c9499584d09a84d1d1855, type: 3}
   - {fileID: 8509760657121421808, guid: 46ef890b832bb4e47b80a4d727efa1ae, type: 3}

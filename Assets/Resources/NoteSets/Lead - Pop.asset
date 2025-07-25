@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lead - Pop
   m_EditorClassIdentifier: 
   label: Pop
-  role: 5
+  role: 2
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: f77998d2ef6274a84b954cdc5ad5b785, type: 3}
   - {fileID: 8509760657121421808, guid: 50dec3bd3a580447ebdf6396d57d34e9, type: 3}

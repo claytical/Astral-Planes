@@ -5,7 +5,7 @@ public class TrackItemVisual : MonoBehaviour
 {
 
     [Header("Function & Color")]
-    public TrackModifierType itemType = TrackModifierType.Expansion;
+    public TrackModifierType itemType = TrackModifierType.Remix;
     public Color trackColor = Color.cyan;
 
     [Header("Base Animation")]
@@ -55,7 +55,7 @@ public class TrackItemVisual : MonoBehaviour
         {
             transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
         }
-        if (itemType == TrackModifierType.Drift)
+        if (itemType == TrackModifierType.RootShift)
         {
             float hue = Mathf.PingPong(Time.time * 0.2f, 1f);
             circleRenderer.color = Color.HSVToRGB(hue, 0.6f, 1f);
@@ -81,49 +81,20 @@ public class TrackItemVisual : MonoBehaviour
 
         switch (itemType)
         {
-            case TrackModifierType.Contract:
-                iconText.text = "⇣";
-                iconText.color = Color.yellow;
+            case TrackModifierType.RhythmStyle:
                 shouldPulse = true;
+                shouldRotate = false;
                 break;
-
-            case  TrackModifierType.Solo:
-                iconText.text = "◎";
-                iconText.color = Color.green;
-                shouldPulse = true;
-                break;
-
             case  TrackModifierType.Remix:
-                iconText.text = "⟳";
-                iconText.color = Color.cyan;
-                shouldPulse = true;
+                shouldPulse = false;
                 shouldRotate = true;
                 break;
 
-            case  TrackModifierType.Drift:
-                iconText.text = "~";
-                iconText.color = new Color(0.8f, 0.9f, 1f); // pale blue
+            case  TrackModifierType.RootShift:
                 shouldPulse = true;
                 shouldRotate = true;
                 break;
-
-            case  TrackModifierType.Magic:
-                iconText.text = "✨";
-                iconText.color = new Color(1f, 0.8f, 1f); // pink shimmer
-                shouldPulse = true;
-                shouldRotate = true;
-                break;
-
-            case  TrackModifierType.StructureShift:
-                iconText.text = "#";
-                iconText.fontSize = 2;
-                iconText.color = Color.white;
-                shouldPulse = true;
-                break;
-            
-            case TrackModifierType.MoodShift:
-                iconText.text = "~"; // visual wave
-                iconText.color = new Color(1f, 0.7f, 0.9f); // pastel rose
+            case  TrackModifierType.ChordProgression:
                 shouldPulse = true;
                 shouldRotate = true;
                 break;
@@ -141,20 +112,14 @@ public class TrackItemVisual : MonoBehaviour
 
             switch (itemType)
             {
-                case  TrackModifierType.AntiNote:
-                    main.startColor = Color.black;
-                    break;
-                case  TrackModifierType.Drift:
+                case  TrackModifierType.RootShift:
                     main.startColor = new Color(0.8f, 0.9f, 1f);
                     break;
-                case  TrackModifierType.Magic:
+                case  TrackModifierType.RhythmStyle:
                     main.startColor = new Color(1f, 0.7f, 1f);
                     break;
-                case  TrackModifierType.MoodShift:
+                case  TrackModifierType.ChordProgression:
                     main.startColor = new Color(1f, 0.8f, 0.9f);
-                    break;
-                case TrackModifierType.StructureShift:
-                    main.startColor = Color.cyan;
                     break;
                 default:
                     if (tintParticlesToTrackColor)
@@ -175,21 +140,13 @@ public class TrackItemVisual : MonoBehaviour
     {
         switch (type)
         {
-            case  TrackModifierType.AntiNote:
-                return Color.Lerp(baseColor, Color.black, 0.3f);
             case  TrackModifierType.Remix:
                 return Color.Lerp(baseColor, Color.cyan, 0.4f);
-            case  TrackModifierType.Contract:
-                return Color.Lerp(baseColor, Color.yellow, 0.3f);
-            case  TrackModifierType.Solo:
+            case  TrackModifierType.RhythmStyle:
                 return Color.Lerp(baseColor, Color.green, 0.3f);
-            case  TrackModifierType.Drift:
+            case  TrackModifierType.ChordProgression:
                 return new Color(0.6f, 0.7f, 1f); // indigo blend
-            case  TrackModifierType.Magic:
-                return new Color(0.9f, 0.6f, 1f); // soft pink shimmer
-            case  TrackModifierType.StructureShift:
-                return Color.Lerp(baseColor, Color.cyan, 0.3f);
-            case  TrackModifierType.MoodShift:
+            case  TrackModifierType.RootShift:
                 return Color.Lerp(baseColor, Color.magenta, 0.3f);
             default:
                 return baseColor;

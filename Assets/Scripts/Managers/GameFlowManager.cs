@@ -26,6 +26,41 @@ public class GameFlowManager : MonoBehaviour
     private List<Vehicle> vehicles;
     public List<Vehicle> GetAllVehicles() => vehicles;
     private bool hasGameOverStarted = false;
+    private bool ghostCycleInProgress = false;
+    private List<InstrumentTrack> activeTracks = new();
+    public void RegisterInstrumentTrack(InstrumentTrack track)
+    {
+     Debug.Log($"Register Instrument Track: {track.name}");
+        if (!activeTracks.Contains(track))
+            activeTracks.Add(track);
+    }
+    public void SetGhostCycleState(bool inProgress)
+    {
+        ghostCycleInProgress = inProgress;
+
+        if (!inProgress)
+        {
+            // Ghost cycle just ended, re-check game over condition
+            CheckAllTracksExpired();
+        }
+    }
+
+    private void CheckAllTracksExpired()
+    {
+        Debug.Log($"[CheckAllTracksExpired] hasGameOverStarted={hasGameOverStarted}, activeTracks={activeTracks.Count}, ghostCycleInProgress={ghostCycleInProgress}");
+
+        if (!hasGameOverStarted && activeTracks.Count == 0 && !ghostCycleInProgress)
+        {
+            Debug.Log("🛑 All instrument tracks expired. Triggering game over.");
+            StartCoroutine(HandleGameOverSequence());
+        }
+    }
+
+    public void UnregisterInstrumentTrack(InstrumentTrack track)
+    {
+        activeTracks.Remove(track);
+        CheckAllTracksExpired(); // Check after each removal
+    }
 
     private void Awake()
     {
@@ -108,7 +143,8 @@ public class GameFlowManager : MonoBehaviour
 
     public void QuitToSelection()
     {
-        StartCoroutine(TransitionToScene("TrackSelection"));
+        localPlayers.Clear();
+        StartCoroutine(TransitionToScene("Main"));
     }
 
     private IEnumerator TransitionToScene(string sceneName)

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Scuttle
   m_EditorClassIdentifier: 
   shipName: Scuttle
-  allowedMidiPresets: 06000000
+  allowedMidiPresets: 0c000000
   description: Chaotic fun. Drops scattershot rhythms and sharp accents.

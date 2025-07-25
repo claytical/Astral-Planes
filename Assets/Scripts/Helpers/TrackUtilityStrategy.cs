@@ -1,5 +1,5 @@
 using UnityEngine;
-using System.Collections.Generic;
+using System.Linq;
 
 public abstract class TrackUtilityStrategy : ScriptableObject
 {
@@ -11,18 +11,4 @@ public abstract class TrackUtilityStrategy : ScriptableObject
     /// <param name="noteSet">The active NoteSet associated with the track.</param>
     /// <param name="phase">The current musical phase.</param>
     public abstract void Apply(InstrumentTrack track, NoteSet noteSet, MusicalPhaseProfile phase);
-
-    /// <summary>
-    /// Optional helper to remix collected notes if the strategy wants to respond to player input.
-    /// </summary>
-    /// <param name="collectedNotes">The notes collected by the player during the phase.</param>
-    /// <param name="noteSet">The context NoteSet used for harmony/pitch rules.</param>
-    /// <returns>Remixed loop notes.</returns>
-    public virtual List<int> RemixFromCollectedNotes(List<int> collectedNotes, NoteSet noteSet)
-    {
-        if (noteSet?.remixUtility == null || collectedNotes == null || collectedNotes.Count == 0)
-            return new List<int>();
-
-        return noteSet.remixUtility.Remix(collectedNotes, noteSet);
-    }
 }

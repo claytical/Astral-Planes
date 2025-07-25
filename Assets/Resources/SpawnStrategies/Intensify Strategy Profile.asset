@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0181f8dfb572491aa7cfe523caf5ba9b, type: 3}
+  m_Name: Intensify Strategy Profile
+  m_EditorClassIdentifier: 
+  mineNodes:
+  - minedObjectType: 0
+    trackModifierType: 0
+    role: 0
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: b86e29b4562cc4bcfa6e54b5722c02ca, type: 2}
+    quota: 1
+  - minedObjectType: 0
+    trackModifierType: 0
+    role: 1
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: 035287ed3cb0845ed8421ae524042ebd, type: 2}
+    quota: 1
+  - minedObjectType: 0
+    trackModifierType: 0
+    role: 2
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: aa0e6904ce3f64f04b06ae5b7d2e86b4, type: 2}
+    quota: 1
+  - minedObjectType: 0
+    trackModifierType: 0
+    role: 3
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: 9b21a6d6515cc40f8aee019f41f37895, type: 2}
+    quota: 1
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 0
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: b86e29b4562cc4bcfa6e54b5722c02ca, type: 2}
+    quota: 1
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 1
+    weight: 1
+    noteSetSeries: {fileID: 11400000, guid: 9b21a6d6515cc40f8aee019f41f37895, type: 2}
+    quota: 1
+  nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
+  objectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
+    type: 2}
+  selectionMode: 0

@@ -32,7 +32,7 @@ public class PhaseDebugDisplay : MonoBehaviour
             return;
 
         var group = phaseGroups[phaseIndex];
-        var currentSet = progressionManager.GetCurrentSpawnerSet();
+        var currentSet = progressionManager.GetCurrentSpawnerStrategyProfile();
 
         StringBuilder label = new StringBuilder();
         label.AppendLine($"<b>🎼 Current Phase:</b> {group.phase}");
@@ -45,16 +45,8 @@ public class PhaseDebugDisplay : MonoBehaviour
             {
                 if (nodePrefab == null) continue;
 
-                label.AppendLine($"• <i>{nodePrefab.prefab.name}</i>");
-
-                var mineNode = nodePrefab.prefab.GetComponent<MineNode>();
-                if (mineNode != null && mineNode.minedPrefabs != null)
-                {
-                    foreach (var mined in mineNode.minedPrefabs)
-                    {
-                        label.AppendLine($"    → {mined?.name ?? "null"}");
-                    }
-                }
+                label.AppendLine($"• <i>{nodePrefab.ToString()}</i>");
+                
             }
         }
 

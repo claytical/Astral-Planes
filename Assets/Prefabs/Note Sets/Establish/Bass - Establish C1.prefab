@@ -51,3 +51,5 @@ MonoBehaviour:
   noteBehavior: 0
   rhythmStyle: 0
   assignedInstrumentTrack: {fileID: 0}
+  remixUtility: {fileID: 0}
+  ghostNoteSequence: 

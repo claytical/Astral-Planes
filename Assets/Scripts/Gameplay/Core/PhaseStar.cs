@@ -20,29 +20,24 @@ public static class ShardColorUtility
         }
 
         var mineNodeScript = mineNodePrefab.GetComponent<MineNode>();
-        if (mineNodeScript == null || mineNodeScript.minedPrefabs.Length == 0)
+        if (mineNodeScript == null)
         {
             Debug.LogWarning("⚠️ MineNode prefab missing script or minedPrefabs.");
             return Color.gray;
         }
-
-        foreach (GameObject minedPrefab in mineNodeScript.minedPrefabs)
+        var noteSpawner = mineNodeScript.GetComponent<NoteSpawnerMinedObject>();
+        if (noteSpawner != null)
         {
-            var noteSpawner = minedPrefab.GetComponent<NoteSpawnerMinedObject>();
-            if (noteSpawner != null)
-            {
-                var track = controller.FindTrackByRole(noteSpawner.musicalRole.role);
-                if (track != null) return track.trackColor;
-            }
-
-            var utility = minedPrefab.GetComponent<TrackUtilityMinedObject>();
-            if (utility != null)
-            {
-                var track = controller.FindTrackByRole(utility.targetRole);
-                if (track != null) return track.trackColor;
-            }
+           var track = controller.FindTrackByRole(noteSpawner.musicalRole.role);
+           if (track != null) return track.trackColor;
         }
 
+        var utility = mineNodeScript.GetComponent<TrackUtilityMinedObject>();
+        if (utility != null)
+        {
+           var track = controller.FindTrackByRole(utility.targetRole);
+           if (track != null) return track.trackColor;
+        }
         return Color.gray;
     }
     public static Color RoleColor(MusicalRole role)
@@ -60,87 +55,36 @@ public static class ShardColorUtility
 
 public class PhaseStar : MonoBehaviour
 {
-    
     [Header("Star Settings")]
     public int hitsRequired = 8;
     public GameObject diamondVisualPrefab;
     public float hitCooldown = 0.75f;
     public float impactForce = 8f;
     public GameObject impactEffectPrefab;
+    public GameObject collapsePrefab;
     public float gravityRampDuration = 3f;
     public float maxGravityForce = 20f;
     public float blackHoleRange = 12f;
-    public GameObject collapseEffectPrefab;
     public ParticleSystem particleSystem;
     public float pulseSpeed = 1f;
     public float minAlpha = .1f;
     public float maxAlpha = 1f;
 
-    private DrumTrack drumTrack;
-    private MineNodeSpawnerSet spawnerSet;
-    private MineNodeProgressionManager progressionManager;
+    [SerializeField] private SpawnStrategyProfile spawnStrategyProfile;
+    public GameObject mineNodeSpawnerPrefab;
 
+    private DrumTrack drumTrack;
+    private MineNodeProgressionManager progressionManager;
     private List<DiamondVisual> diamonds = new();
     private bool isDestroyed = false;
     private bool canBeHit = true;
     private bool isDepleted = false;
     private bool collapseStarted = false;
-
     private int orbitCount = 0;
     private Collider2D starCollider;
     private ParticleSystem.MainModule starParticlesMain;
     private MusicalPhase assignedPhase;
-    void Awake()
-    {
-        starCollider = GetComponent<Collider2D>();
-        starParticlesMain = particleSystem.main;
-    }
-
-    public void Initialize(DrumTrack track, MusicalPhase phase, MineNodeSpawnerSet set, MineNodeProgressionManager manager)
-    {
-        assignedPhase = phase;
-        this.drumTrack = track;
-        this.spawnerSet = set;
-        this.progressionManager = manager;
-        progressionManager.pendingNextPhase = false;
-        hitsRequired = MusicalPhaseLibrary.Get(phase).hitsRequired;
-    
-        for (int i = 0; i < hitsRequired; i++)
-        {
-            GameObject d = Instantiate(diamondVisualPrefab, transform);
-        // 🔁 Rotation style
-            RotateConstant rotator = d.GetComponent<RotateConstant>();
-            if (rotator != null)
-            {
-                rotator.shardIndex = i;
-                rotator.rotationMode = MusicalPhaseLibrary.Get(phase).rotationMode;
-                rotator.baseSpeed = MusicalPhaseLibrary.Get(phase).rotationSpeed;
-            }
-            float angle = (360f / hitsRequired) * i;
-            d.transform.localPosition = Vector3.zero;
-            d.transform.localRotation = Quaternion.Euler(0, 0, angle);
-
-            // 🎨 Assign color from estimated reward prefab
-            DiamondVisual visual = d.GetComponent<DiamondVisual>();
-            Color logicColor = MusicalPhaseLibrary.Get(phase).visualColor;
-            logicColor.a = 50f;
-        
-        // ✅ Ensure diamond is registered even if visual is null
-        if (visual != null)
-        {
-            visual.SetAssignedColor(logicColor);
-        }
-        else
-        {
-            Debug.LogWarning($"[PhaseStar] DiamondVisual missing on shard {i}");
-        }
-
-        diamonds.Add(visual); // could be null, and that's OK — avoids out-of-range errors later
-    }
-    BeginEntrance(); 
-}
-    
-        private void BeginEntrance()
+    private void BeginEntrance()
     {
         StartCoroutine(EntranceRoutine());
     }
@@ -188,16 +132,21 @@ public class PhaseStar : MonoBehaviour
         if (collider) collider.enabled = true;
     }
 
-        private void OnCollisionEnter2D(Collision2D coll)
+    private void OnCollisionEnter2D(Collision2D coll)
     {
-        if (isDepleted) return;
-
         Vehicle v = coll.gameObject.GetComponent<Vehicle>();
-        if (v != null && canBeHit)
+        if (v != null)
         {
-          //  MusicalPhase? next = progressionManager.PeekNextPhase(); // Or hardcoded if needed
+
+            if (isDepleted || !canBeHit) return;
+        
+            Debug.Log($"Continuing with routine...");
+
+            canBeHit = false;
+
+            CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Aether);
             MusicalPhaseProfile profile = progressionManager.GetProfileForPhase(assignedPhase);
-            foreach (var hex in FindObjectsOfType<HexagonShield>())
+            foreach (var hex in FindObjectsOfType<CosmicDust>())
             {
                 hex.ShiftToPhaseColor(profile,2f);
             }
@@ -205,12 +154,11 @@ public class PhaseStar : MonoBehaviour
             Vector2 contactPoint = coll.GetContact(0).point;
             StartCoroutine(ImpactResponse(v, contactPoint));
         }
+        
     }
 
-        private IEnumerator ImpactResponse(Vehicle vehicle, Vector2 contactPoint)
+    private IEnumerator ImpactResponse(Vehicle vehicle, Vector2 contactPoint)
     {
-        canBeHit = false;
-
         if (impactEffectPrefab != null)
         {
             Instantiate(impactEffectPrefab, contactPoint, Quaternion.identity);
@@ -218,7 +166,6 @@ public class PhaseStar : MonoBehaviour
 
         Vector2 bounceDirection = (vehicle.transform.position - transform.position).normalized;
         vehicle.ApplyImpulse(bounceDirection * impactForce);
-
         Color shardColor = Color.white;
 
         if (orbitCount < diamonds.Count && diamonds[orbitCount] != null)
@@ -227,7 +174,7 @@ public class PhaseStar : MonoBehaviour
             Destroy(diamonds[orbitCount].gameObject);
             diamonds[orbitCount] = null;
         }
-
+        Debug.Log($"Running SpawnColoredMineNode: Orbit Count {orbitCount} Color: {shardColor}" );
         SpawnColoredMineNode(orbitCount, contactPoint, shardColor);
         orbitCount++;
 
@@ -239,17 +186,20 @@ public class PhaseStar : MonoBehaviour
 
         if (orbitCount >= hitsRequired && !collapseStarted)
         {
+            Debug.Log($"Running coroutine to start collapse event");
             isDepleted = true;
             collapseStarted = true;
             StartCoroutine(StartCollapseEvent());
         }
-
+        Debug.Log($"Orbit Count {orbitCount} Hits Required: {hitsRequired} Collapse Started: {collapseStarted}");
         yield return new WaitForSeconds(hitCooldown);
+        Debug.Log($"Phase Star can be hit.");
         canBeHit = true;
     }
 
         private IEnumerator StartCollapseEvent()
     {
+        Debug.Log($"Starting collapse event...");
         if (starCollider != null)
         {
             starCollider.enabled = false;
@@ -259,6 +209,11 @@ public class PhaseStar : MonoBehaviour
         while (drumTrack.GetRemainingMineNodeCount() > 0)
         {
             t += Time.deltaTime / gravityRampDuration;
+            if (t > 1f)
+            {
+                Debug.Log($"⏳ Still waiting on MineNodes: {drumTrack.GetRemainingMineNodeCount()}");
+                t = 0f;
+            }
             float pullStrength = Mathf.Lerp(0f, maxGravityForce, t);
 
             foreach (var vehicle in FindAllVehiclesInRange(blackHoleRange))
@@ -270,11 +225,6 @@ public class PhaseStar : MonoBehaviour
             }
 
             yield return null;
-        }
-
-        if (collapseEffectPrefab != null)
-        {
-            Instantiate(collapseEffectPrefab, transform.position, Quaternion.identity);
         }
 
         if (drumTrack != null)
@@ -295,6 +245,11 @@ public class PhaseStar : MonoBehaviour
         {
             var snapshot = drumTrack.BuildCurrentPhaseSnapshot();
         }
+
+        if (collapsePrefab != null)
+        {
+            Instantiate(collapsePrefab, transform.position, Quaternion.identity);
+        }        
         TriggerPhaseAdvance();
     }
         private void RemixTracksForDarkStar()
@@ -367,42 +322,87 @@ public class PhaseStar : MonoBehaviour
         // If active pull during StartCollapseEvent is sufficient, this can remain empty
     }
 
-        private void OnTriggerEnter2D(Collider2D coll)
+
+
+    void Awake()
     {
-        Vehicle v = coll.GetComponent<Vehicle>();
-        if (v != null)
-        {
-            // Do nothing, handled by OnCollision
-        }
+        starCollider = GetComponent<Collider2D>();
+        starParticlesMain = particleSystem.main;
     }
 
-        private void SpawnColoredMineNode(int index, Vector3 spawnFrom, Color color)
+    public void Initialize(DrumTrack track, SpawnStrategyProfile profile, MusicalPhase phase, MineNodeProgressionManager manager)
     {
-        if (index >= hitsRequired || spawnerSet == null) return;
+        assignedPhase = phase;
+        this.drumTrack = track;
+        this.progressionManager = manager;
+        this.spawnStrategyProfile = profile;
+        progressionManager.pendingNextPhase = false;
+        hitsRequired = MusicalPhaseLibrary.Get(phase).hitsRequired;
 
-        GameObject spawnerPrefab = spawnerSet.GetMineNode();
-        if (spawnerPrefab == null) return;
+        for (int i = 0; i < hitsRequired; i++)
+        {
+            GameObject d = Instantiate(diamondVisualPrefab, transform);
+            RotateConstant rotator = d.GetComponent<RotateConstant>();
+            if (rotator != null)
+            {
+                rotator.shardIndex = i;
+                rotator.rotationMode = MusicalPhaseLibrary.Get(phase).rotationMode;
+                rotator.baseSpeed = MusicalPhaseLibrary.Get(phase).rotationSpeed;
+            }
+            float angle = (360f / hitsRequired) * i;
+            d.transform.localPosition = Vector3.zero;
+            d.transform.localRotation = Quaternion.Euler(0, 0, angle);
+
+            DiamondVisual visual = d.GetComponent<DiamondVisual>();
+            Color logicColor = MusicalPhaseLibrary.Get(phase).visualColor;
+            logicColor.a = 50f;
+            if (visual != null)
+            {
+                visual.SetAssignedColor(logicColor);
+            }
+            else
+            {
+                Debug.LogWarning($"[PhaseStar] DiamondVisual missing on shard {i}");
+            }
+
+            diamonds.Add(visual);
+        }
+        BeginEntrance();
+    }
+
+    private void SpawnColoredMineNode(int index, Vector3 spawnFrom, Color color)
+    {
+        Debug.Log($"Mine Node {index} / {hitsRequired}. Using {spawnStrategyProfile}");
+        if (index >= hitsRequired || spawnStrategyProfile == null) return;
+        Debug.Log($"Getting Mined Object Directive for Mine Node {index} / {hitsRequired}. Using {spawnStrategyProfile}");
+
+        var directive = spawnStrategyProfile.GetMinedObjectDirective(drumTrack.trackController);
+        Debug.Log($"Directive: {directive}");
+        if (directive == null) return;
 
         Vector2Int cell = drumTrack.GetRandomAvailableCell();
         if (cell.x == -1) return;
 
         Vector3 targetPos = drumTrack.GridToWorldPosition(cell);
-        GameObject wrapper = Instantiate(spawnerPrefab, spawnFrom, Quaternion.identity);
+        Debug.Log($"Spawning wrapper...");
+        GameObject wrapper = Instantiate(mineNodeSpawnerPrefab, spawnFrom, Quaternion.identity);
         MineNodeSpawner spawner = wrapper.GetComponent<MineNodeSpawner>();
-
         if (spawner == null) return;
+        Debug.Log($"Configuring Spawner...");
 
         spawner.SetDrumTrack(drumTrack);
-        spawner.SpawnNode(cell);
-
-        if (spawner.SpawnedNode != null)
+        MineNode mineNode = spawner.SpawnNode(cell, directive);
+        mineNode.gameObject.SetActive(false);
+        if (mineNode != null)
         {
-            spawner.SpawnedNode.SetActive(false);
-            StartCoroutine(MoveShardToTarget(spawnFrom, targetPos, wrapper, spawner.SpawnedNode, color));
+            Debug.Log($"Moving shard {wrapper.name} from {spawnFrom} to {targetPos}");
+            StartCoroutine(MoveShardToTarget(spawnFrom, targetPos, wrapper, mineNode.gameObject, color));
         }
     }
 
-        private IEnumerator MoveShardToTarget(Vector3 start, Vector3 end, GameObject shard, GameObject mineNode, Color fallbackColor)
+
+
+    private IEnumerator MoveShardToTarget(Vector3 start, Vector3 end, GameObject shard, GameObject mineNode, Color fallbackColor)
     {
         float t = 0f;
         float duration = 0.6f;
@@ -428,72 +428,29 @@ public class PhaseStar : MonoBehaviour
         // 🪐 Activate and color the MineNode
         if (mineNode != null)
         {
+            Debug.Log($"{mineNode.name} moved to {end}");
             mineNode.transform.position = end;
             mineNode.SetActive(true);
-
-            MineNode mineNodeComp = mineNode.GetComponent<MineNode>();
-            if (mineNodeComp != null && mineNodeComp.coreSprite != null)
-            {
-                // Get spawned prefab
-                var mineNodeSpawner = mineNode.GetComponent<MineNodeSpawner>();
-                if (mineNodeSpawner != null && mineNodeSpawner.SpawnedNode != null)
-                {
-                    Color resolvedColor = ShardColorUtility.ResolveColorFromMineNodePrefab(mineNode, drumTrack.trackController);
-                    mineNodeComp.LockColor(resolvedColor);
-
-                }
-            }
-
         }
 
-        Destroy(shard);
-    }
-
-        private void GlitchRemix()
-    {
-        foreach (var track in drumTrack.trackController.tracks)
+        Explode explode = shard.GetComponent<Explode>();
+        if (explode != null)
         {
-            if (track.GetNoteDensity() == 0) continue;
-
-            NoteSet set = track.GetCurrentNoteSet();
-            if (set == null) continue;
-
-            // Random mutation: force Lead to syncopate, Groove to jitter, Harmony to invert
-            switch (track.assignedRole)
-            {
-                case MusicalRole.Lead:
-                    set.rhythmStyle = RhythmStyle.Syncopated;
-                    break;
-                case MusicalRole.Groove:
-                    set.rhythmStyle = RhythmStyle.FourOnTheFloor;
-                    break;
-                case MusicalRole.Harmony:
-                    set.chordPattern = ChordPattern.Arpeggiated;
-                    break;
-                case MusicalRole.Bass:
-                    set.noteBehavior = NoteBehavior.Drone;
-                    break;
-            }
-
-            set.Initialize(track.GetTotalSteps());
-            track.ClearLoopedNotes(TrackClearType.Remix);
-
-            var steps = set.GetStepList();
-            var notes = set.GetNoteList();
-
-            for (int i = 0; i < Mathf.Min(4, steps.Count); i++)
-            {
-                int step = steps[i];
-                int note = set.GetNextArpeggiatedNote(step);
-                int dur = track.CalculateNoteDuration(step, set);
-                float vel = Random.Range(60f, 90f);
-                track.GetPersistentLoopNotes().Add((step, note, dur, vel));
-            }
+            Debug.Log($"Running Explode on {shard.name}");
+            explode.Permanent();
+        }
+        else
+        {
+            Debug.Log($"No explode on {shard.name}, destroying instead.");
+            Destroy(shard);
         }
 
     }
+
         private IEnumerator WaitForRemainingNodes()
     {
+        Debug.Log($"⛏ Remaining mine nodes: {drumTrack.GetRemainingMineNodeCount()}");
+
         progressionManager.phaseLocked = true;
 
         while (drumTrack != null && drumTrack.GetRemainingMineNodeCount() > 0)
@@ -505,7 +462,7 @@ public class PhaseStar : MonoBehaviour
         if (drumTrack.darkStarModeEnabled)
         {
             Debug.Log("Glitch Remix Queued");
-            GlitchRemix();
+//            GlitchRemix();
             float loopLength = drumTrack.GetLoopLengthInSeconds();
             Debug.Log($"🕒 Waiting {loopLength} seconds before Dark Star spawns...");
             yield return new WaitForSeconds(loopLength); // ⏳ Give breathing room
@@ -562,9 +519,9 @@ public class PhaseStar : MonoBehaviour
 
         private void TriggerPhaseAdvance()
     {
+        Debug.Log("📡 PhaseStar.TriggerPhaseAdvance()");
         if (isDestroyed) return;
         isDestroyed = true;
-        Debug.Log("📡 PhaseStar.TriggerPhaseAdvance()");
 
         if (progressionManager == null)
         {

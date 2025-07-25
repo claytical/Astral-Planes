@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Groove - Establish
   m_EditorClassIdentifier: 
   label: Establish
-  role: 6
+  role: 3
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: 9e03b0106466f459c880c8766c1ee320, type: 3}
   - {fileID: 8509760657121421808, guid: fc50a178d482740619cb51b1670713e4, type: 3}

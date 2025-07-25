@@ -13,7 +13,6 @@ GameObject:
   - component: {fileID: 3197689220231228328}
   - component: {fileID: 7872104301369236207}
   - component: {fileID: 1335835332103871931}
-  - component: {fileID: 1942888033184086632}
   m_Layer: 0
   m_Name: Phase Star
   m_TagString: Untagged
@@ -56,15 +55,18 @@ MonoBehaviour:
   impactForce: 8
   impactEffectPrefab: {fileID: 2567590292593330884, guid: a6e66e36d7009c54b9674939b661be45,
     type: 3}
+  collapsePrefab: {fileID: 2567590292593330884, guid: dcab5faf30b9c49d4b4e85be27a647f2,
+    type: 3}
   gravityRampDuration: 3
   maxGravityForce: 20
   blackHoleRange: 12
-  collapseEffectPrefab: {fileID: 2567590292593330884, guid: 7cfef40c3fd6cc44c87f04196a734800,
-    type: 3}
   particleSystem: {fileID: 382306593780773728}
   pulseSpeed: 2
   minAlpha: 0.1
   maxAlpha: 1
+  spawnStrategyProfile: {fileID: 0}
+  mineNodeSpawnerPrefab: {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107,
+    type: 3}
 --- !u!212 &3197689220231228328
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -184,20 +186,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.5
---- !u!114 &1942888033184086632
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312498068821558259}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f03dc13067c834631bd870ff51a36f1a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  effectType: 0
-  musicalRole: 4
 --- !u!1 &6090321477331913616
 GameObject:
   m_ObjectHideFlags: 0

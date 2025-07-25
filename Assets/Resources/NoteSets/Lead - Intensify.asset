@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lead - Intensify
   m_EditorClassIdentifier: 
   label: Intensify
-  role: 5
+  role: 2
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: e0c1c458451284b5f9698f8056a2f310, type: 3}
   - {fileID: 8509760657121421808, guid: 9cb7397e8fc9747b5bd2999ea3f4fa21, type: 3}

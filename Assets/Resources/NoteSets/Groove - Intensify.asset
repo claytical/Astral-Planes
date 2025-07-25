@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Groove - Intensify
   m_EditorClassIdentifier: 
   label: Intensify
-  role: 6
+  role: 3
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: d2454dcad867047a9b10dcfc139ad207, type: 3}
   - {fileID: 8509760657121421808, guid: 98208f666f94542978c4068996e2af23, type: 3}

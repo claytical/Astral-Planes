@@ -32,7 +32,7 @@ Transform:
   m_GameObject: {fileID: 5120608187766906454}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -2}
+  m_LocalPosition: {x: 0, y: 0, z: -4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -79,8 +79,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: -98977089
+  m_SortingLayer: -1
   m_SortingOrder: 0
   m_Sprite: {fileID: 150086971757272781, guid: 20a54b61128f44908adbffd0336b3d91, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.7490196}
@@ -138,6 +138,8 @@ MonoBehaviour:
     type: 3}
   trailParticlePrefab: {fileID: 1728400142563202279, guid: ac49296c0e25142be8dee26a0a4af429,
     type: 3}
+  ghostVehiclePrefab: {fileID: 5120608187766906454, guid: c6f4f1d5f85ec4fb3ac7b1480fb973ca,
+    type: 3}
   force: 14
   terminalVelocity: 22
   boostMultiplier: 2.2
@@ -152,6 +154,10 @@ MonoBehaviour:
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   soulSprite: {fileID: 0}
+  minAlpha: 0.2
+  maxAlpha: 1
+  maxSpeed: 10
+  isLocked: 0
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0

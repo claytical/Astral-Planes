@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lead - Wildcard
   m_EditorClassIdentifier: 
   label: Wildcard
-  role: 5
+  role: 2
   curatedNoteSets:
   - {fileID: 8509760657121421808, guid: e6b970dd3a1cc4bf29873443d5c34511, type: 3}
   - {fileID: 8509760657121421808, guid: 61c6b7acb49ff43c4b752f28bf655c47, type: 3}
