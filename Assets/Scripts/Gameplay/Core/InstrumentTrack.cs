@@ -4,6 +4,7 @@ using MidiPlayerTK;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Gameplay.Mining;
 using Random = UnityEngine.Random;
 
 public class InstrumentTrack : MonoBehaviour
@@ -106,16 +107,16 @@ public class InstrumentTrack : MonoBehaviour
     {
         return totalSteps;
     }
-    public void PerformSmartNoteModification()
+    public void PerformSmartNoteModification(Vector3 sourcePosition)
     {
-        
+        Debug.Log($"Performing SmartNoteModification on {gameObject.name}");
         if (drumTrack == null || !HasNoteSet())
             return;
 
         MusicalPhase phase = drumTrack.currentPhase;
-        NoteSet noteSet = GetCurrentNoteSet();
 
         string[] options;
+        Debug.Log($"Assessing options for {currentNoteSet}");
 
         switch (phase)
         {
@@ -147,41 +148,89 @@ public class InstrumentTrack : MonoBehaviour
         switch (selected)
         {
             case "ChordChange":
-                ApplyChordChange(noteSet);
+                ApplyChordChange(currentNoteSet, sourcePosition);
                 break;
             case "NoteBehaviorChange":
-                ApplyNoteBehaviorChange(noteSet);
+                ApplyNoteBehaviorChange(currentNoteSet, sourcePosition);
                 break;
             case "RootShift":
-                ApplyRootShift(noteSet);
+                ApplyRootShift(currentNoteSet, sourcePosition);
                 break;
         }
 
         controller.UpdateVisualizer();
     }
-    private void ApplyChordChange(NoteSet noteSet)
+private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modifiedNotes, Vector3 sourcePosition)
+{
+    persistentLoopNotes.Clear();
+
+    foreach (var obj in spawnedNotes)
+    {
+        if (obj != null)
+            Destroy(obj);
+    }
+    spawnedNotes.Clear();
+
+    foreach (var (step, note, duration, velocity) in modifiedNotes)
+    {
+        AddNoteToLoop(step, note, duration, velocity);
+        ShowTetherEffect(sourcePosition, step);
+
+    }
+}
+
+private void ApplyChordChange(NoteSet noteSet, Vector3 sourcePosition)
 {
     int[] chordOffsets = noteSet.GetRandomChordOffsets();
+    var modifiedNotes = new List<(int, int, int, float)>();
 
     for (int i = 0; i < persistentLoopNotes.Count; i++)
     {
         var (step, baseNote, duration, velocity) = persistentLoopNotes[i];
         int offset = chordOffsets[i % chordOffsets.Length];
         int newNote = Mathf.Clamp(baseNote + offset, lowestAllowedNote, highestAllowedNote);
-        persistentLoopNotes[i] = (step, newNote, duration, velocity);
+        modifiedNotes.Add((step, newNote, duration, velocity));
     }
+
+    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
 }
-    private void ApplyNoteBehaviorChange(NoteSet noteSet)
+
+public void PerformSmartNoteModification(NoteSet noteSet, Vector3 sourcePosition)
 {
-    // Pick a random behavior different from current
+    currentNoteSet = noteSet;
+    noteSet.assignedInstrumentTrack = this;
+    noteSet.Initialize(GetTotalSteps());
+    PerformSmartNoteModification(sourcePosition); // use the existing one
+}
+
+private void ApplyRootShift(NoteSet noteSet, Vector3 sourcePosition)
+{
+    int shift = Random.Range(-3, 4); // ±3 semitones
+    noteSet.ShiftRoot(shift);
+
+    var newScaleNotes = noteSet.GetNoteList();
+    var modifiedNotes = new List<(int, int, int, float)>();
+
+    for (int i = 0; i < persistentLoopNotes.Count; i++)
+    {
+        var (step, oldNote, duration, velocity) = persistentLoopNotes[i];
+        int newNote = noteSet.GetClosestVoiceLeadingNote(oldNote, newScaleNotes);
+        modifiedNotes.Add((step, newNote, duration, velocity));
+    }
+
+    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
+}
+
+private void ApplyNoteBehaviorChange(NoteSet noteSet, Vector3 sourcePosition)
+{
     var values = Enum.GetValues(typeof(NoteBehavior)).Cast<NoteBehavior>().ToList();
     values.Remove(noteSet.noteBehavior);
     NoteBehavior newBehavior = values[Random.Range(0, values.Count)];
 
     noteSet.ChangeNoteBehavior(newBehavior);
-    
 
-    // Optionally adjust durations to reflect behavior (e.g., Drone = long, Lead = short)
+    var modifiedNotes = new List<(int, int, int, float)>();
+
     for (int i = 0; i < persistentLoopNotes.Count; i++)
     {
         var (step, note, _, velocity) = persistentLoopNotes[i];
@@ -193,24 +242,12 @@ public class InstrumentTrack : MonoBehaviour
             _ => 360
         };
 
-        persistentLoopNotes[i] = (step, note, newDuration, velocity);
+        modifiedNotes.Add((step, note, newDuration, velocity));
     }
-}
-    private void ApplyRootShift(NoteSet noteSet)
-{
-    int shift = Random.Range(-3, 4); // ±3 semitones
-    noteSet.ShiftRoot(shift);
 
-    // Rebuild note loop by voice-leading into closest new scale tones
-    var newScaleNotes = noteSet.GetNoteList();
-
-    for (int i = 0; i < persistentLoopNotes.Count; i++)
-    {
-        var (step, oldNote, duration, velocity) = persistentLoopNotes[i];
-        int newNote = noteSet.GetClosestVoiceLeadingNote(oldNote, newScaleNotes);
-        persistentLoopNotes[i] = (step, newNote, duration, velocity);
-    }
+    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
 }
+
     private int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
         AddNoteToLoop(stepIndex, note, durationTicks, force);
@@ -445,6 +482,8 @@ public class InstrumentTrack : MonoBehaviour
             if (marker != null)
             {
                 marker.Initialize(trackColor);
+                Debug.Log($"Adding note {note} with color {trackColor}");
+
             }
             spawnedNotes.Add(noteMarker);
         }
@@ -534,6 +573,7 @@ public class InstrumentTrack : MonoBehaviour
     {
         Vector3 target = controller.noteVisualizer.GetNoteMarkerPosition(this, stepIndex);
         GameObject tether = Instantiate(tetherPrefab, source, Quaternion.identity);
+        
         if (tether.TryGetComponent(out VisualTether tetherScript))
         {
             tetherScript.SetColor(trackColor);
@@ -541,4 +581,9 @@ public class InstrumentTrack : MonoBehaviour
         }
     }
 
+    public void SetNoteSet(NoteSet noteSet)
+    {
+        currentNoteSet = noteSet;
+        Debug.Log($"Using note set {noteSet.name}");
+    }
 }

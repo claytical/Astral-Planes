@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Effects;
+using Gameplay.Mining;
 using UnityEngine;
 
 public class NoteSpawnerMinedObject : MonoBehaviour

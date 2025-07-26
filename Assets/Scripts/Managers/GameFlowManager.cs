@@ -28,6 +28,8 @@ public class GameFlowManager : MonoBehaviour
     private bool hasGameOverStarted = false;
     private bool ghostCycleInProgress = false;
     private List<InstrumentTrack> activeTracks = new();
+    public InstrumentTrackController controller;
+    public DrumTrack activeDrumTrack;
     public void RegisterInstrumentTrack(InstrumentTrack track)
     {
      Debug.Log($"Register Instrument Track: {track.name}");
@@ -216,8 +218,7 @@ public class GameFlowManager : MonoBehaviour
 
     private IEnumerator HandleGameOverSequence()
     {
-        InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>();
-        DrumTrack drumTrack = FindAnyObjectByType<DrumTrack>();
+        InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 
         GalaxyVisualizer galaxy = FindAnyObjectByType<GalaxyVisualizer>();
         NoteVisualizer visualizer = FindAnyObjectByType<NoteVisualizer>();
         
@@ -225,8 +226,7 @@ public class GameFlowManager : MonoBehaviour
 
         if (visualizer != null)
         {
-            visualizer.waveAmplitude *= 2.5f;
-            visualizer.velocityMultiplier *= 2f;
+            visualizer.velocityMultiplier *= .2f;
             visualizer.waveSpeed *= 0.7f;
         }
 
@@ -244,14 +244,14 @@ public class GameFlowManager : MonoBehaviour
             visualizer.GetUIParent().gameObject.SetActive(false);
         }
 
-        if (galaxy != null && drumTrack.sessionPhases != null)
+        if (galaxy != null && activeDrumTrack.sessionPhases != null)
         {
-            foreach (var snapshot in drumTrack.sessionPhases)
+            foreach (var snapshot in activeDrumTrack.sessionPhases)
             {
                 galaxy.AddSnapshot(snapshot);
             }
         }
-        ConstellationMemoryStore.StoreSnapshot(drumTrack.sessionPhases);
+        ConstellationMemoryStore.StoreSnapshot(activeDrumTrack.sessionPhases);
 
         yield return new WaitForSeconds(2f);
 
@@ -277,14 +277,13 @@ public class GameFlowManager : MonoBehaviour
     {
         vehicles.Clear();
         currentState = GameState.Playing;
-        FindAnyObjectByType<DrumTrack>()?.ManualStart();
-        InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>();
-
-        var controller = FindAnyObjectByType<InstrumentTrackController>();
+        activeDrumTrack = FindAnyObjectByType<DrumTrack>();
+        activeDrumTrack?.ManualStart();
+        controller = FindAnyObjectByType<InstrumentTrackController>();
         if (controller != null)
         {
             controller.ConfigureTracksFromShips(
-                localPlayers.Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName())).ToList(), itc.noteSetPrefab
+                localPlayers.Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName())).ToList(), controller.noteSetPrefab
             );
         }
 

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 137c372b3a21446619d2c3a4376af82e, type: 3}
   m_Name: Visual_Lead
   m_EditorClassIdentifier: 
-  role: 5
+  role: 2
   utilityType: 0
   glowColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 0.15686275}
   rotationSpeed: 10

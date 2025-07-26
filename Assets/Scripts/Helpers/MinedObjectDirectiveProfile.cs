@@ -1,3 +1,4 @@
+using Gameplay.Mining;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Astral Planes/Mined Object Directive")]

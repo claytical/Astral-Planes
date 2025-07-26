@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using System.Collections;
+using Gameplay.Mining;
 using UnityEngine.Rendering.Universal;
 using Random = UnityEngine.Random;
 [Serializable]
@@ -13,10 +14,11 @@ public class MinedObject : MonoBehaviour
     private int hitsRequired = 3;
     public MinedObjectType minedObjectType;
     public TrackModifierType? trackModifierType;
+    public MusicalRole musicalRole;
     [SerializeField] private NoteSetSeries noteSetSeries;
     private NoteSet currentNoteSet;
     private bool wasCollected = false;
-    private GameObject ghostTrigger;
+    
     private void Start()
     {
         if (minedObjectType == MinedObjectType.NoteSpawner)
@@ -88,23 +90,22 @@ public class MinedObject : MonoBehaviour
         {
             explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.TrackUtility));
         }
+
         TrackUtilityMinedObject trackUtilityMinedObject = GetComponent<TrackUtilityMinedObject>();
         NoteSpawnerMinedObject noteSpawnerMinedObject = GetComponent<NoteSpawnerMinedObject>();
-        if (trackUtilityMinedObject != null)
-        {
-            trackUtilityMinedObject.Initialize(assignedTrack);
-        }
 
         if (noteSpawnerMinedObject != null)
         {
             NoteSet selectedNoteSet = noteSetSeries.GetRandomOrCuratedNoteSet();
             noteSpawnerMinedObject.Initialize(assignedTrack, selectedNoteSet, noteSetSeries);
-            MinedObjectVisualEffectController visualEffectController = noteSpawnerMinedObject.GetComponent<MinedObjectVisualEffectController>();
-            if (visualEffectController != null)
-            {
-                ghostTrigger = visualEffectController.Initialize(noteSpawnerMinedObject);
-            }            
         }
+        
+        MinedObjectVisualEffectController visualEffectController = GetComponent<MinedObjectVisualEffectController>();
+        if (visualEffectController != null)
+        {
+            visualEffectController.Initialize(this);
+        }            
+
         AssignVisuals();
     }
 

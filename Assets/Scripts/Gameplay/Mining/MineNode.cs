@@ -1,4 +1,5 @@
 using System.Collections;
+using Gameplay.Mining;
 using UnityEngine;
 
 public class MineNode : MonoBehaviour
@@ -51,8 +52,8 @@ public class MineNode : MonoBehaviour
             this.preloadedObject = obj;
             if (directive.remixUtility != null)
             {
-                Debug.Log($"Applying Remix Utility with {directive.remixUtility}");
-                track.ApplyRemixUtility(directive.remixUtility);                
+                Debug.Log($"Initializing {minedObject.assignedTrack} with {directive}");
+                track.Initialize(GameFlowManager.Instance.controller, directive);
             }
         }
         if (coreSprite != null && lockedColor.HasValue)
