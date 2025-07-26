@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Gameplay.Mining;
 using Steamworks;
 using UnityEngine;
 public enum GhostPatternStrategy

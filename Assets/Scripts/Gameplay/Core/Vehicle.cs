@@ -34,7 +34,7 @@ public class Vehicle : MonoBehaviour
     private Rigidbody2D rb;
     private AudioManager audioManager;
     private bool isInConstellation = false;
-    private Color profileColor;
+    public Color profileColor;
     [SerializeField] private float minAlpha = 0.2f;
     [SerializeField] private float maxAlpha = 1f;
     [SerializeField] private float maxSpeed = 10f;
@@ -49,55 +49,134 @@ public class Vehicle : MonoBehaviour
     private bool incapacitated = false;
     private double loopStartDSPTime;
     private float boostTimeThisLoop = 0f;
+    [SerializeField] public RemixRingHolder remixRingHolder;
+
     public float boostPadding = 0.3f; // configurable padding in seconds
 
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
-    private HashSet<MusicalRole> collectedRemixRoles = new();
+    public HashSet<MusicalRole> collectedRemixRoles = new();
     private const int maxRemixCapacity = 4;
     private float remixChargeTime = 0f;
     private const float remixBoostDuration = 4f;
     private bool remixCharging = false;
     private Color currentColorBlend = Color.white;
+    private VehicleRemixController remixController;
     
-    public void AddRemixRole(MusicalRole role)
+    void FixedUpdate()
+        {
+            if (incapacitated) return;
+            if (boosting)
+            {
+                boostTimeThisLoop += Time.deltaTime;
+            }
+            // Check loop boundaries
+            float loopLength = drumTrack.GetLoopLengthInSeconds();
+            double dspNow = AudioSettings.dspTime;
+            if (dspNow - loopStartDSPTime >= loopLength)
+            {
+                loopStartDSPTime = dspNow;
+                EvaluateRemixCondition();  // now calls controller.EvaluateRemixCondition()
+            }        
+            
+            float fuelConsumption = 0f;
+            float currentMaxSpeed = terminalVelocity;
+            float appliedForce = 0f;
+
+            // Boosting movement
+            if (boosting && energyLevel > 0)
+            {
+                appliedForce = force * burnRateMultiplier * boostMultiplier;
+                currentMaxSpeed = terminalVelocity * 1.5f;
+
+                fuelConsumption = burnRateMultiplier * baseBurnAmount * Time.fixedDeltaTime;
+
+                if (remixController.HasRemixRoles())
+                {
+                    remixController.FixedUpdateBoosting(Time.fixedDeltaTime, drumTrack.currentStep);
+                    UpdateRemixParticleEmission();
+                } 
+
+            }
+            
+            // Apply fuel drain (if any)
+            if (fuelConsumption > 0f)
+            {
+                fuelConsumption *= difficultyMultiplier;
+                ConsumeEnergy(fuelConsumption);
+                playerStats.RecordFuelUsed(fuelConsumption);
+            }
+
+            // Apply thrust force
+            if (appliedForce > 0f)
+            {
+                rb.AddForce(transform.up * appliedForce * friction, ForceMode2D.Force);
+            }
+
+            // Clamp speed
+            if (rb.linearVelocity.magnitude > currentMaxSpeed)
+            {
+                rb.linearVelocity = rb.linearVelocity.normalized * currentMaxSpeed;
+            }
+
+            // Stat tracking
+            UpdateDistanceCovered();
+            ClampAngularVelocity();
+
+            // Audio feedback
+            audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
+        }
+    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
     {
+        if (collectedRemixRoles.Contains(role)) return;
+
+        // Store role
         collectedRemixRoles.Add(role);
         Debug.Log($"Remix Role {role} collected");
-        if (collectedRemixRoles.Count >= maxRemixCapacity)
-        {
-            // Optionally show a UI warning or block further collection
-        }
+
+        // Get role color from profile
         MusicalRoleProfile profile = MusicalRoleProfileLibrary.GetProfile(role);
-        ApplyTrackColorToShip(profile.defaultColor); // method described below
+        Color roleColor = profile.defaultColor;
+
+        // Let the remix controller handle visuals and logic
+        remixController.AddRemixRole(role, roleColor, directive);
+
+        // Optional: give immediate visual feedback (e.g., pulse, swap sprite color)
+        ApplyTrackColorToShip(roleColor);
         UpdateRemixParticles();
 
+        // Activate corresponding ring
+        if (remixRingHolder != null)
+            remixRingHolder.ActivateRing(role, roleColor);
     }
+
+    public void SetColor(Color newColor)
+    {
+        if (baseSprite != null)
+            baseSprite.color = newColor;
+
+    }
+
     private void UpdateRemixParticleEmission()
     {
         if (remixParticleEffect == null) return;
-
+        Debug.Log($"UpdateRemixParticleEmission");
         var emission = remixParticleEffect.emission;
         emission.rateOverTime = boosting ? 50f : 5f;
 
-        if (!remixParticleEffect.isPlaying && HasRemixRoles())
+        if (!remixParticleEffect.isPlaying && remixController.HasRemixRoles())
         {
+            Debug.Log("Playing Remix Particle Effect");
             remixParticleEffect.Play();
         }
-        else if (!HasRemixRoles())
+        else if (!remixController.HasRemixRoles())
         {
+            Debug.Log("Stopping particles");
             remixParticleEffect.Stop();
+            
         }
     }
 
-    public HashSet<MusicalRole> GetRemixRoles()
-    {
-        return new HashSet<MusicalRole>(collectedRemixRoles);
-    }
-    public void ResetRemixRoles()
-    {
-        collectedRemixRoles.Clear();
-    }
     private void UpdateRemixParticles()
     {
         if (remixParticleEffect == null) return;
@@ -125,7 +204,7 @@ public class Vehicle : MonoBehaviour
     }
 
 
-        void Start()
+    void Start()
         {
             rb = GetComponent<Rigidbody2D>();
             baseSprite = GetComponent<SpriteRenderer>();
@@ -133,6 +212,8 @@ public class Vehicle : MonoBehaviour
             shipRenderer = baseSprite;
             audioManager = GetComponent<AudioManager>();
             originalScale = transform.localScale;
+            remixController = GetComponent<VehicleRemixController>();
+            loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
             if (rb == null)
             {
                 Debug.LogError("❌ Rigidbody2D component is missing.");
@@ -167,51 +248,13 @@ public class Vehicle : MonoBehaviour
         }
 
 
-        public void TriggerRemixBlast()
-        {
-            Debug.Log($"TriggerRemixBlast called");
-            foreach (var role in collectedRemixRoles)
-            {
-                var track = drumTrack.trackController.FindTrackByRole(role);
-                if (track != null)
-                {
-                    track.ClearLoopedNotes(TrackClearType.Remix);
-                    Debug.Log($"Remixing {track.name}");
-
-                    track.PerformSmartNoteModification(); // or call RemixTrack()
-                }
-            }
-
-            if (collectedRemixRoles.Count == 4)
-            {
-                ApplyPaletteShiftToAllTracks();
-            }
-
-            ResetRemixRoles();
-            ResetShipColor();
-        }
-
-        private void ApplyPaletteShiftToAllTracks()
-        {
-            var controller = FindObjectOfType<InstrumentTrackController>();
-            foreach (var track in controller.tracks)
-            {
-                // You can make this more expressive
-                track.trackColor = new Color(Random.value, Random.value, Random.value);
-                track.controller.UpdateVisualizer(); // if needed
-            }
-
-            Debug.Log("🌈 Palette Shift activated!");
-        }
-        
-
-        private void StartRainbowEffect()
+    private void StartRainbowEffect()
         {
             if (rainbowRoutine != null) return;
             rainbowRoutine = StartCoroutine(RainbowPulse());
         }
 
-        private void StopRainbowEffect()
+    private void StopRainbowEffect()
         {
             if (rainbowRoutine != null)
             {
@@ -221,7 +264,7 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        private IEnumerator RainbowPulse()
+    private IEnumerator RainbowPulse()
         {
             float hue = 0f;
             while (true)
@@ -232,22 +275,8 @@ public class Vehicle : MonoBehaviour
                 yield return null;
             }
         }
-        private void TriggerRemixBlastVFX()
-        {
-            // Add screen shake, particles, or a white flash
-            Debug.Log("🔥 Remix Blast Triggered!");
-        }
-        private void ResetShipColor()
-        {
-            shipRenderer.color = profileColor;
-        }
-        
-        public bool IsLockedOrHiding()
-        {
-            return isLocked || (baseSprite != null && !baseSprite.enabled);
-        }
-
-        public void SyncEnergyUI()
+    
+    public void SyncEnergyUI()
         {
             if (playerStatsUI != null)
             {
@@ -263,297 +292,17 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        public void SetDrumTrack(DrumTrack drums)
+    public void SetDrumTrack(DrumTrack drums)
         {
             drumTrack = drums;
         }
-        
-        public void HideVisuals()
+    
+
+    private void EvaluateRemixCondition()
         {
-            if (baseSprite != null)
-                baseSprite.enabled = false;
-
-            if (soulSprite != null)
-                soulSprite.enabled = false;
-
-            if (trail != null)
-                trail.SetActive(false);
+            remixController.EvaluateRemixCondition();
         }
-        public IEnumerator ReactivateVisuals(float duration = 0.4f)
-        {
-            ShowVisuals();
-
-            float t = 0f;
-            Vector3 originalScale = transform.localScale;
-            transform.localScale = originalScale * 0.3f;
-
-            Color baseColor = baseSprite.color;
-            baseColor.a = 0f;
-            baseSprite.color = baseColor;
-
-            while (t < duration)
-            {
-                float p = t / duration;
-                transform.localScale = originalScale * Mathf.Lerp(0.3f, 1f, p);
-                baseColor.a = Mathf.Lerp(0f, 1f, p);
-                baseSprite.color = baseColor;
-                t += Time.deltaTime;
-                yield return null;
-            }
-
-            transform.localScale = originalScale;
-            baseColor.a = 1f;
-            baseSprite.color = baseColor;
-        }
-
-        public void ShowVisuals()
-        {
-            if (baseSprite != null)
-                baseSprite.enabled = true;
-
-            if (soulSprite != null)
-                soulSprite.enabled = true;
-
-            if (trail != null)
-                trail.SetActive(true);
-        }
-
-        public IEnumerator EnterConstellationDrift(List<Vector3> path)
-        {
-            if (isInConstellation) yield break;
-            isInConstellation = true;
-
-            // Optional: disable collisions or switch layer
-            Collider2D col = GetComponent<Collider2D>();
-            if (col != null) col.enabled = false;
-
-            rb.linearVelocity = Vector2.zero;
-            rb.isKinematic = true;
-
-            float segmentDuration = 0.4f;
-            for (int i = 0; i < path.Count - 1; i++)
-            {
-                Vector3 a = path[i];
-                Vector3 b = path[i + 1];
-
-                for (float t = 0; t < segmentDuration; t += Time.deltaTime)
-                {
-                    float lerpT = t / segmentDuration;
-                    transform.position = Vector3.Lerp(a, b, Mathf.SmoothStep(0, 1, lerpT));
-                    yield return null;
-                }
-            }
-
-            rb.isKinematic = false;
-            if (col != null) col.enabled = true;
-            isInConstellation = false;
-        }
-
-private IEnumerator TeleportRoutine()
-{
-    if (drumTrack == null) yield break;
-
-    Vector3 startPos = transform.position;
-    rb.linearVelocity = Vector2.zero;
-    rb.isKinematic = true;
-
-    // 🎬 1. Shrink vehicle down
-    float shrinkDuration = 0.3f;
-    for (float t = 0; t < shrinkDuration; t += Time.deltaTime)
-    {
-        float scale = Mathf.Lerp(1f, 0f, t / shrinkDuration);
-        transform.localScale = originalScale * scale;
-        yield return null;
-    }
-    transform.localScale = Vector3.zero;
-
-    // 🌀 2. Generate spiral path
-    Vector3 corePos = drumTrack.transform.position;
-    float goldenAngle = 137.5f;
-    float radiusStep = drumTrack.GetGridCellSize() * 1.2f;
-    int spiralSteps = 16;
-
-    List<Vector3> spiralPath = new List<Vector3>();
-    for (int i = 0; i < spiralSteps; i++)
-    {
-        float angleDeg = i * goldenAngle;
-        float angleRad = angleDeg * Mathf.Deg2Rad;
-        float radius = i * radiusStep;
-
-        Vector2 offset = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad)) * radius;
-        Vector3 probeWorld = corePos + (Vector3)offset;
-        spiralPath.Add(probeWorld);
-    }
-
-    // 🎯 3. Choose final position (later in the spiral)
-    Vector2Int newCell = new Vector2Int(-1, -1);
-    Vector3 newPos = startPos;
-
-    for (int i = spiralSteps - 1; i >= spiralSteps / 2; i--)
-    {
-        Vector2Int probeGrid = drumTrack.WorldToGridPosition(spiralPath[i]);
-        if (drumTrack.IsSpawnCellAvailable(probeGrid.x, probeGrid.y))
-        {
-            newCell = probeGrid;
-            newPos = drumTrack.GridToWorldPosition(newCell);
-            break;
-        }
-    }
-
-    if (newCell.x == -1)
-    {
-        newCell = drumTrack.GetRandomAvailableCell();
-        if (newCell.x == -1)
-        {
-            Debug.LogWarning("❌ No grid cell available for teleport.");
-            yield break;
-        }
-        newPos = drumTrack.GridToWorldPosition(newCell);
-    }
-
-    // ✨ 4. Animate ghost movement through spiral
-    float moveDuration = 1.2f;
-    int segmentCount = spiralPath.Count - 1;
-    for (int i = 0; i < segmentCount; i++)
-    {
-        Vector3 a = spiralPath[i];
-        Vector3 b = spiralPath[i + 1];
-        float segmentDuration = moveDuration / segmentCount;
-
-        for (float s = 0; s < segmentDuration; s += Time.deltaTime)
-        {
-            float lerpT = s / segmentDuration;
-            transform.position = Vector3.Lerp(a, b, lerpT);
-
-            // Optional: emit trail particles here
-            if (i % 2 == 0)
-            {
-                GameObject p = Instantiate(trailParticlePrefab, transform.position, Quaternion.identity);
-                if (p.TryGetComponent<Rigidbody2D>(out var trailRb))
-                {
-                    Vector2 dir = (b - a).normalized + UnityEngine.Random.insideUnitSphere * 0.2f;
-                    trailRb.linearVelocity = dir * UnityEngine.Random.Range(1f, 3f);
-                }
-            }
-
-            yield return null;
-        }
-    }
-
-    // 🌀 5. Spawn particle effect at destination
-    GameObject preview = Instantiate(teleportationParticles, newPos, Quaternion.identity);
-    transform.position = newPos;
-
-    // ✅ Re-occupy grid
-    drumTrack.OccupySpawnGridCell(newCell.x, newCell.y, GridObjectType.Note);
-    rb.isKinematic = false;
-
-    // 🌱 6. Regrow vehicle from 0 to full size
-    float growDuration = 0.3f;
-    for (float t = 0; t < growDuration; t += Time.deltaTime)
-    {
-        float scale = Mathf.Lerp(0f, 1f, t / growDuration);
-        transform.localScale = originalScale * scale;
-        yield return null;
-    }
-    transform.localScale = originalScale;
-
-    Destroy(preview, 1.5f);
-}
-
-
-        void FixedUpdate()
-        {
-            if (incapacitated) return;
-            if (boosting)
-            {
-                boostTimeThisLoop += Time.deltaTime;
-            }
-            // Check loop boundaries
-            float loopLength = drumTrack.GetLoopLengthInSeconds();
-            double dspNow = AudioSettings.dspTime;
-            if (dspNow - loopStartDSPTime >= loopLength)
-            {
-                loopStartDSPTime = dspNow;
-                EvaluateRemixCondition();
-                boostTimeThisLoop = 0f; // reset after evaluation
-            }            
-            float fuelConsumption = 0f;
-            float currentMaxSpeed = terminalVelocity;
-            float appliedForce = 0f;
-
-            // Boosting movement
-            if (boosting && energyLevel > 0)
-            {
-                appliedForce = force * burnRateMultiplier * boostMultiplier;
-                currentMaxSpeed = terminalVelocity * 1.5f;
-
-                fuelConsumption = burnRateMultiplier * baseBurnAmount * Time.fixedDeltaTime;
-                
-                // ✅ Only trigger if player has collected remix roles
-                if (HasRemixRoles() && CanTriggerRemixThisLoop())
-                {
-                    
-                }
-            }
-            
-            // Apply fuel drain (if any)
-            if (fuelConsumption > 0f)
-            {
-                fuelConsumption *= difficultyMultiplier;
-                ConsumeEnergy(fuelConsumption);
-                playerStats.RecordFuelUsed(fuelConsumption);
-            }
-
-            // Apply thrust force
-            if (appliedForce > 0f)
-            {
-                rb.AddForce(transform.up * appliedForce * friction, ForceMode2D.Force);
-            }
-
-            // Clamp speed
-            if (rb.linearVelocity.magnitude > currentMaxSpeed)
-            {
-                rb.linearVelocity = rb.linearVelocity.normalized * currentMaxSpeed;
-            }
-            UpdateRemixParticleEmission();
-
-            // Stat tracking
-            UpdateDistanceCovered();
-            ClampAngularVelocity();
-
-            // Audio feedback
-            audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
-        }
-        private void EvaluateRemixCondition()
-        {
-            float loopLength = drumTrack.GetLoopLengthInSeconds();
-            if (boostTimeThisLoop >= loopLength - boostPadding && HasRemixRoles())
-            {
-                TriggerRemixBlast();
-            }
-        }
-
-        private bool HasRemixRoles()
-        {
-            return collectedRemixRoles != null && collectedRemixRoles.Count > 0;
-        }
-
-        private bool CanTriggerRemixThisLoop()
-        {
-            int currentStep = drumTrack.currentStep; // implement based on `DrumTrack`
-            if (currentStep == 0 && !remixTriggeredThisLoop)
-            {
-                remixTriggeredThisLoop = true;
-                return true;
-            }
-
-            if (currentStep != 0)
-                remixTriggeredThisLoop = false;
-
-            return false;
-        }
-        public int GetForceAsDamage()
+    public int GetForceAsDamage()
         {
             float speed = rb.linearVelocity.magnitude;
             float impactCapVelocity = 32f;
@@ -574,16 +323,14 @@ private IEnumerator TeleportRoutine()
 
             return Mathf.RoundToInt(Mathf.Clamp(damage, 0f, 120f));
         }
-
-        public float GetForceAsMidiVelocity()
+    public float GetForceAsMidiVelocity()
         {
             
             float speed = rb.linearVelocity.sqrMagnitude;
             float normalizedSpeed = Mathf.InverseLerp(0, terminalVelocity * terminalVelocity, speed);
             return Mathf.Lerp(80f, 127f, normalizedSpeed);
         }
-
-        public void Move(Vector2 direction)
+    public void Move(Vector2 direction)
         {
             if (isLocked) return;
             if (rb != null && direction != Vector2.zero)
@@ -608,27 +355,7 @@ private IEnumerator TeleportRoutine()
 
             }
         }
-
-        IEnumerator EmitTrail(Vector3 from, Vector3 to, float duration, int count = 12)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                float t = i / (float)(count - 1);
-                Vector3 pos = Vector3.Lerp(from, to, t);
-                GameObject p = Instantiate(trailParticlePrefab, pos, Quaternion.identity);
-
-                // Optional: add directional spark motion
-                if (p.TryGetComponent<Rigidbody2D>(out var rb))
-                {
-                    Vector2 dir = (to - from).normalized + UnityEngine.Random.insideUnitSphere * 0.2f;
-                    rb.linearVelocity = dir * Random.Range(1f, 3f);
-                }
-
-                yield return new WaitForSeconds(duration / count);
-            }
-        }
-
-        private void UpdateDistanceCovered()
+    private void UpdateDistanceCovered()
         {
             // Calculate the distance covered since the last frame
             float distance = Vector3.Distance(transform.position, lastPosition);
@@ -638,7 +365,7 @@ private IEnumerator TeleportRoutine()
             lastPosition = transform.position;
         }
 
-        private void Fly()
+    private void Fly()
         {
             if (trail != null && activeTrail == null)
             {
@@ -651,31 +378,15 @@ private IEnumerator TeleportRoutine()
             }
         }
 
-        public void TurnOnBoost(float triggerValue)
-        {
-            if (energyLevel > 0 && !boosting)
-            {
-                boosting = true;
 
-                if (audioManager != null && thrustClip != null)
-                {
-                    audioManager.PlayLoopingSound(thrustClip, .5f);
-                }
-
-                Fly(); // Activate the trail when boosting start
-            }
-
-            burnRateMultiplier = Mathf.Max(0.2f, triggerValue); // Ensure a minimum multiplier for adequate thrust
-        }
-
-        public void ApplyImpulse(Vector2 force)
+    public void ApplyImpulse(Vector2 force)
         {
             if (TryGetComponent<Rigidbody2D>(out var rb))
             {
                 rb.AddForce(force, ForceMode2D.Impulse);
             }
         }
-        public void ApplyGravitationalForce(Vector2 force)
+    public void ApplyGravitationalForce(Vector2 force)
         {
             if (TryGetComponent<Rigidbody2D>(out var rb))
             {
@@ -683,22 +394,39 @@ private IEnumerator TeleportRoutine()
             }
         }
 
-        public void TurnOffBoost()
+    public void TurnOnBoost(float triggerValue)
+    {
+        if (energyLevel > 0 && !boosting)
         {
-            if (audioManager != null)
-            {
-                audioManager.StopSound();
-            }
-            boosting = false;
-            burnRateMultiplier = 0f; // Reset the multiplier when not boosting
+            boosting = true;
 
-            // Disable the trail's emission when boosting stops
-            if (activeTrail != null)
+            if (audioManager != null && thrustClip != null)
             {
-                activeTrail.GetComponent<TrailRenderer>().emitting = false;
+                audioManager.PlayLoopingSound(thrustClip, .5f);
             }
+
+            Fly(); // Activate the trail when boosting start
         }
-        public void ConsumeEnergy(float amount)
+
+        burnRateMultiplier = Mathf.Max(0.2f, triggerValue); // Ensure a minimum multiplier for adequate thrust
+    }
+    public void TurnOffBoost()
+    {
+        if (audioManager != null)
+        {
+            audioManager.StopSound();
+        }
+        boosting = false;
+        remixController.ResetRemixVisuals();
+        burnRateMultiplier = 0f; // Reset the multiplier when not boosting
+
+        // Disable the trail's emission when boosting stops
+        if (activeTrail != null)
+        {
+            activeTrail.GetComponent<TrailRenderer>().emitting = false;
+        }
+    }
+    public void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
@@ -743,8 +471,7 @@ private IEnumerator TeleportRoutine()
 
 
         }
-        
-        public void CollectEnergy(int amount)
+    public void CollectEnergy(int amount)
         {
             energyLevel += amount;
             if (energyLevel > capacity)
@@ -760,8 +487,10 @@ private IEnumerator TeleportRoutine()
             playerStats.RecordItemCollected();
             
         }
+    
 
-        private void ClampAngularVelocity()
+   
+    private void ClampAngularVelocity()
         {
             float maxAngularVelocity = 540f;
             if (rb != null)
@@ -770,7 +499,7 @@ private IEnumerator TeleportRoutine()
             }
         }
 
-        void OnCollisionEnter2D(Collision2D coll)
+    void OnCollisionEnter2D(Collision2D coll)
         {
             var node = coll.gameObject.GetComponent<MineNode>();
 
@@ -795,7 +524,8 @@ private IEnumerator TeleportRoutine()
                 TriggerThud(coll.contacts[0].point);
             }
         }
-        public void TriggerThud(Vector2 collisionPoint)
+
+    public void TriggerThud(Vector2 collisionPoint)
         {
             if (baseSprite == null || isFlickering) return;
 
@@ -805,8 +535,7 @@ private IEnumerator TeleportRoutine()
             }
             flickerPulseRoutine = StartCoroutine(ThudRoutine(collisionPoint));
         }
-
-        public void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
+    public void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
         {
             if (baseSprite == null || isFlickering) return;
 
@@ -817,14 +546,14 @@ private IEnumerator TeleportRoutine()
 
             flickerPulseRoutine = StartCoroutine(FlickerAndPulseRoutine(scaleMultiplier, baseColor, cycleHue));
         }
-        private IEnumerator ThudRoutine(Vector2 coll)
+    private IEnumerator ThudRoutine(Vector2 coll)
         {
             isFlickering = true;
             yield return VisualFeedbackUtility.BoundaryThudFeedback(baseSprite, transform, coll);
             isFlickering = false;
             flickerPulseRoutine = null;
         }
-        private IEnumerator FlickerAndPulseRoutine(float scaleMultiplier, Color? baseColor, bool cycleHue)
+    private IEnumerator FlickerAndPulseRoutine(float scaleMultiplier, Color? baseColor, bool cycleHue)
         {
             isFlickering = true;
 

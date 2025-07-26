@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Gameplay.Mining;
 using UnityEditor.UI;
 using UnityEngine;
 
@@ -7,7 +8,6 @@ using UnityEngine;
 public class MinedObjectVisualEffectController : MonoBehaviour
 {
     public VisualEffectProfile[] roleProfiles;
-    public VisualEffectProfile[] utilityProfiles;
     private MinedObject minedObject;
     private NoteSpawnerMinedObject noteSpawner;
     private TrackUtilityMinedObject trackUtility;
@@ -15,38 +15,34 @@ public class MinedObjectVisualEffectController : MonoBehaviour
     private ParticleSystem particles;
     private VisualEffectProfile activeProfile;
 
-    public GameObject Initialize(NoteSpawnerMinedObject spawner)
+    public void Initialize(MinedObject minedObject)
     {
-        minedObject = GetComponent<MinedObject>();
-        noteSpawner = spawner;
+        trackUtility = minedObject.GetComponent<TrackUtilityMinedObject>();
+        noteSpawner = minedObject.GetComponent<NoteSpawnerMinedObject>();
         sprite = minedObject?.sprite;
-
-        if (noteSpawner != null)
-        {
-            activeProfile = GetProfileForRole(noteSpawner.musicalRole.role);
-        }
-        else if (trackUtility != null)
-        {
-            activeProfile = GetProfileForUtility(trackUtility.type);
-        }
-        
+        activeProfile = GetProfileForRole(minedObject.musicalRole);
         if (activeProfile != null)
         {
             ApplyVisuals();
             // Instantiate particle system and set color
             if (activeProfile.particlePrefab != null)
             {
-                // Instantiate the full GameObject prefab
-                spawner.ghostTrigger = Instantiate(activeProfile.particlePrefab, transform.position, Quaternion.identity, transform);
-                GhostPatternTrigger trigger = spawner.ghostTrigger.GetComponent<GhostPatternTrigger>();
-                if (trigger != null)
+                //note spawner
+                if (noteSpawner != null)
                 {
-                    if (noteSpawner != null)
-                        trigger.Initialize(noteSpawner.selectedNoteSet, noteSpawner.assignedTrack,
-                            noteSpawner.musicalRole);
+                    // Instantiate the full GameObject prefab
+                    noteSpawner.ghostTrigger = Instantiate(activeProfile.particlePrefab, transform.position, Quaternion.identity, transform);
+                    GhostPatternTrigger trigger = noteSpawner.ghostTrigger.GetComponent<GhostPatternTrigger>();
+                    if (trigger != null)
+                    {
+                        if (noteSpawner != null)
+                            trigger.Initialize(noteSpawner.selectedNoteSet, noteSpawner.assignedTrack,
+                                noteSpawner.musicalRole);
+                    }
                 }
+                
                 // Then get the ParticleSystem from the instantiated object
-                particles = spawner.ghostTrigger.GetComponent<ParticleSystem>();
+                particles = minedObject.GetComponent<ParticleSystem>();
                 if (particles != null)
                 {
                     var main = particles.main;
@@ -61,16 +57,8 @@ public class MinedObjectVisualEffectController : MonoBehaviour
                     }
                     particles.Play();
                 }
-                else
-                {
-                    Debug.LogWarning($"No ParticleSystem found on particleEffectPrefab '{activeProfile.particlePrefab.name}'");
-                }
-
-                return spawner.ghostTrigger;
             }
         }
-
-        return null;
     }
     private void ApplyVisuals()
     {
@@ -145,10 +133,6 @@ public class MinedObjectVisualEffectController : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-     //   StartCoroutine(PulseLoop());
-    }
 
     private IEnumerator PulseLoop()
     {
@@ -169,17 +153,6 @@ public class MinedObjectVisualEffectController : MonoBehaviour
                 return profile;
         }
         Debug.LogWarning($"No visual profile found for role: {role}");
-        return null;
-    }
-    private VisualEffectProfile GetProfileForUtility(TrackModifierType type)
-    {
-        foreach (var profile in utilityProfiles)
-        {
-            if (profile != null && profile.utilityType == type)
-                return profile;
-        }
-
-        Debug.LogWarning($"No visual profile found for utility type: {type}");
         return null;
     }
 

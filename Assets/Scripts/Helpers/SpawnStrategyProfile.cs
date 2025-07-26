@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Gameplay.Mining;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "SpawnStrategyProfile", menuName = "Astral Planes/Spawn Strategy Profile")]
@@ -22,7 +23,10 @@ public class SpawnStrategyProfile : ScriptableObject
         if (track == null) return null;
 
         Color color = ShardColorUtility.RoleColor(selected.role);
-        return selected.ToDirective(track, color, nodePrefabRegistry, objectPrefabRegistry); // ✅ dual registries
+        MinedObjectSpawnDirective directive =
+            selected.ToDirective(track, color, nodePrefabRegistry, objectPrefabRegistry);
+            Debug.Log($"Selected Role: {selected.role}, Directive Role: {directive.role}, Track: {track.name}, Directive Track: {directive.assignedTrack}, {directive.prefab}");
+        return directive; // ✅ dual registries
     }
 
 

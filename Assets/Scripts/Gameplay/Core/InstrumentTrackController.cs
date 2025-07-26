@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using Gameplay.Mining;
 using MidiPlayerTK;
 using Random = UnityEngine.Random;
 public static class ShipTrackAssigner

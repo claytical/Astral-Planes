@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Gameplay.Mining;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -11,35 +12,6 @@ public static class ShardColorUtility
     private static readonly Color MoodShiftColor = new Color(1f, 0.7f, 0.9f);      // pastel rose
     private static readonly Color StructureShiftColor = new Color(0.5f, 0.9f, 1f);  // cyan-teal
     private static readonly Color UnknownColor = Color.gray;
-    public static Color ResolveColorFromMineNodePrefab(GameObject mineNodePrefab, InstrumentTrackController controller)
-    {
-        if (mineNodePrefab == null || controller == null)
-        {
-            Debug.LogWarning("⚠️ ResolveColorFromMineNodePrefab: Null input.");
-            return Color.gray;
-        }
-
-        var mineNodeScript = mineNodePrefab.GetComponent<MineNode>();
-        if (mineNodeScript == null)
-        {
-            Debug.LogWarning("⚠️ MineNode prefab missing script or minedPrefabs.");
-            return Color.gray;
-        }
-        var noteSpawner = mineNodeScript.GetComponent<NoteSpawnerMinedObject>();
-        if (noteSpawner != null)
-        {
-           var track = controller.FindTrackByRole(noteSpawner.musicalRole.role);
-           if (track != null) return track.trackColor;
-        }
-
-        var utility = mineNodeScript.GetComponent<TrackUtilityMinedObject>();
-        if (utility != null)
-        {
-           var track = controller.FindTrackByRole(utility.targetRole);
-           if (track != null) return track.trackColor;
-        }
-        return Color.gray;
-    }
     public static Color RoleColor(MusicalRole role)
     {
         return role switch

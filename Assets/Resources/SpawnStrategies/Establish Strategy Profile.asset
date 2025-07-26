@@ -52,4 +52,4 @@ MonoBehaviour:
   nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
   objectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
     type: 2}
-  selectionMode: 2
+  selectionMode: 1

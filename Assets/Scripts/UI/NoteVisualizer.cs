@@ -16,15 +16,13 @@ public class NoteVisualizer : MonoBehaviour
 
     [Header("Note Ribbon Settings")]
     public Material ribbonMaterial;
-    public float ribbonWidth = 0.05f;
+    public float ribbonWidth = 5f;
     public int ribbonResolution = 64;
     private List<LineRenderer> ribbons = new List<LineRenderer>();
     public GameObject notePrefab;
 
     [Header("Ribbon Animation")]
     public float waveSpeed = 2f;
-    public float waveFrequency = 10f;
-    public float waveAmplitude = 0.05f;
     public float velocityMultiplier = 0.2f;
 
     public List<RectTransform> trackRows;
@@ -58,15 +56,8 @@ public class NoteVisualizer : MonoBehaviour
         }
         foreach (InstrumentTrack track in tracks.tracks)
         {
-            waveAmplitudes[track] = 0.05f; // Initial wavy state
+            waveAmplitudes[track] = 0; // Initial wavy state
         }
-    }
-    public void RegisterGhostStep(InstrumentTrack track, int stepIndex)
-    {
-        if (!ghostNoteSteps.ContainsKey(track))
-            ghostNoteSteps[track] = new HashSet<int>();
-
-        ghostNoteSteps[track].Add(stepIndex);
     }
 
 
@@ -176,17 +167,19 @@ public class NoteVisualizer : MonoBehaviour
                 {
                     activeNoteVelocity = 0.3f; // or any fixed ghost visibility value
                 }
-            }
-
-            float y = activeNoteVelocity * velocityMultiplier;
+            } 
+           
+//            float y = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * waveAmplitude;
+            float amplitude = waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
+            float y = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * amplitude;
 
             Vector3 localPos = new Vector3(x, y, 0);
             Vector3 worldPos = lr.transform.TransformPoint(localPos);
+            lr.useWorldSpace = false;
             positions[j] = localPos;
 
             if (!stepMap.ContainsKey(trackStep))
                 stepMap[globalStep] = worldPos; // ✅ now using global step
-            
         }
 
         lr.SetPositions(positions);
@@ -265,12 +258,7 @@ public class NoteVisualizer : MonoBehaviour
 
         Vector3 localPos = new Vector3(x, y, 0f);
         Vector3 worldPos = row.TransformPoint(localPos); // ⬅️ Converts to world space
-
-        Debug.Log(
-            $"Step {stepIndex}: localPos={localPos}, " +
-            $"row.anchoredPosition={row.anchoredPosition}, " +
-            $"worldPos={worldPos}"
-        );
+        
         return worldPos;
     }
 public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
@@ -338,6 +326,32 @@ private void UpdateNoteMarkerPositions()
         noteMarkers.Remove(key);
     }
 }
+public float GetWaveAmplitude(InstrumentTrack track)
+{
+    if (waveAmplitudes.TryGetValue(track, out var amplitude))
+        return amplitude;
+
+    return 0f;
+}
+
+public void SetWaveAmplitudeForTrack(InstrumentTrack track, float amplitude)
+{
+    if (waveAmplitudes.ContainsKey(track))
+    {
+        waveAmplitudes[track] = amplitude;
+    }
+}
+public void SetWaveSpeed(float speed)
+{
+    waveSpeed = Mathf.Clamp(speed, 2f, 32f);
+}
+public void ResetWaves()
+{
+    foreach (var track in tracks.tracks)
+        waveAmplitudes[track] = 0f;
+        waveSpeed = 2f;
+}
+
 public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
 {
     foreach (var marker in GetNoteMarkers(track))

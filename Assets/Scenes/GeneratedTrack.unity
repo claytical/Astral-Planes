@@ -181,10 +181,8 @@ MonoBehaviour:
   ribbonResolution: 64
   notePrefab: {fileID: 4452279037497567512, guid: ece60c6a349a846e085a4f328163340b,
     type: 3}
-  waveSpeed: 0
-  waveFrequency: 20
-  waveAmplitude: 0
-  velocityMultiplier: 10
+  waveSpeed: 4
+  velocityMultiplier: 16
   trackRows:
   - {fileID: 1373048478}
   - {fileID: 197216900}
@@ -5823,7 +5821,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: VerboseSynth
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -5838,17 +5836,17 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: VerboseSample
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: MPTK_LogEvents
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: VerboseChannel
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -5868,7 +5866,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: VerboseSoundfont
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -6008,6 +6006,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: showVerbose
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: volumeGlobal
       value: 0.8
       objectReference: {fileID: 0}
@@ -6024,7 +6027,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showUnitySynthEffect
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7127,6 +7130,7 @@ MonoBehaviour:
   activeHexagons: []
   isPhaseStarActive: 0
   currentStep: 0
+  progressionManager: {fileID: 0}
   timingWindowSteps: 4
 --- !u!4 &1354683683
 Transform:
@@ -7179,7 +7183,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: -6306783060187683301, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  m_audioClip: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
+  m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 0.8
@@ -8286,6 +8290,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: showVerbose
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: volumeGlobal
       value: 0.9
       objectReference: {fileID: 0}
@@ -8641,6 +8650,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: showVerbose
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: volumeGlobal
       value: 0.9
       objectReference: {fileID: 0}
@@ -8744,6 +8758,11 @@ PrefabInstance:
         type: 3}
       propertyPath: showDefault
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showVerbose
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}

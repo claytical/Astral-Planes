@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using Gameplay.Mining;
 using Random = UnityEngine.Random;
 
 public class PhaseSnapshot
@@ -73,6 +74,8 @@ public class DrumTrack : MonoBehaviour
     private int phaseCount = 0;
     private bool started = false;
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
+    private float lastLoopStartTime;
+
 
     void Start()
     {
@@ -96,6 +99,16 @@ public class DrumTrack : MonoBehaviour
             return;
         }
     }
+    public void MarkLoopStartTime()
+    {
+        lastLoopStartTime = Time.time;
+    }
+
+    public float GetLoopStartTime()
+    {
+        return lastLoopStartTime;
+    }
+
     public void ManualStart()
     {
         if (started) return;
@@ -151,6 +164,7 @@ public class DrumTrack : MonoBehaviour
         {
             lastLoopCount = currentLoop;
             LoopRoutines();
+            MarkLoopStartTime();
         }
     }
 
