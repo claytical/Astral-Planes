@@ -160,7 +160,7 @@ namespace Gameplay.Mining
                     break;
             }
 
-            noteSet.Initialize(track.GetTotalSteps());
+            noteSet.Initialize(track, track.GetTotalSteps());
             AddRandomNotes(track, noteSet, 6); // Main remix pass
             if (track.GetNoteDensity() < 4)
                 AddRandomNotes(track, noteSet, 4 - track.GetNoteDensity()); // Fill in to avoid sparseness

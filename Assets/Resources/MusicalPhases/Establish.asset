@@ -14,7 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phase: 0
   ghostLoopCount: 4
-  roleNoteSetSeriesList: []
+  roleNoteSetSeriesList:
+  - role: 0
+    noteSetSeries: {fileID: 11400000, guid: d9f6e717c8c954ddf84973a62769495c, type: 2}
+  - role: 3
+    noteSetSeries: {fileID: 11400000, guid: 86d78bff6c6cd4dbc976591f2c5399ed, type: 2}
+  - role: 1
+    noteSetSeries: {fileID: 11400000, guid: 70fd7f1592a3543a6bd239bfbdc798a9, type: 2}
+  - role: 2
+    noteSetSeries: {fileID: 11400000, guid: 59a6fd4b1603a4d4d9d60735d016e98e, type: 2}
   drumClips:
   - {fileID: 8300000, guid: 6e93c379a8421408296593ca0940269e, type: 3}
   - {fileID: 8300000, guid: 0eae5a698f3e247538b31bf322fb4db9, type: 3}
@@ -32,4 +40,14 @@ MonoBehaviour:
   energyPerCollectable: 1
   shortLabel: Establish
   moodDescription: 
-  roleGhostStrategies: []
+  roleGhostStrategies:
+  - role: 0
+    strategy: 5
+  - role: 0
+    strategy: 1
+  - role: 2
+    strategy: 3
+  - role: 1
+    strategy: 0
+  - role: 3
+    strategy: 4

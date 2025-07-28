@@ -282,6 +282,7 @@ public class GameFlowManager : MonoBehaviour
         controller = FindAnyObjectByType<InstrumentTrackController>();
         if (controller != null)
         {
+            Debug.Log($"Configuring Tracks from Ships...");
             controller.ConfigureTracksFromShips(
                 localPlayers.Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName())).ToList(), controller.noteSetPrefab
             );

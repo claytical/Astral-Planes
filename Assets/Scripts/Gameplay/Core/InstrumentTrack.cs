@@ -31,6 +31,7 @@ public class InstrumentTrack : MonoBehaviour
     private NoteSet currentNoteSet;
     //private Coroutine currentSpawnerRoutine;
     private List<(int stepIndex, int note, int duration, float velocity)> persistentLoopNotes = new List<(int, int, int, float)>();
+    private List<(int stepIndex, int note, int duration, float velocity)> notesSpawnedThisPhase = new List<(int, int, int, float)>();
     public List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private int totalSteps = 16;
     private int lastStep = -1;
@@ -99,6 +100,50 @@ public class InstrumentTrack : MonoBehaviour
     {
         return persistentLoopNotes;
     }
+    
+    public List<(int, int, int, float)> GetSpawnedNotesThisPhase() => notesSpawnedThisPhase;
+    
+    public void RegisterSpawnedNotesThisPhase(List<(int stepIndex, int note, int duration, float velocity)> newNotes)
+    {
+        notesSpawnedThisPhase.AddRange(newNotes);
+    }
+    public bool IsTrackUtilityRelevant(TrackModifierType modifierType)
+    {
+        // 1. Skip if there's no loop data yet
+        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0)
+            return false;
+
+        // 2. Avoid duplicate behavior modifiers — could be expanded
+        switch (modifierType)
+        {
+            case TrackModifierType.RootShift:
+                return !HasAlreadyShiftedNotes();
+            case TrackModifierType.Clear:
+                return persistentLoopNotes.Count > 0;
+            case TrackModifierType.Remix:
+                return !HasRemixActive(); // placeholder for tracking remix status
+            default:
+                return true; // fallback: assume useful
+        }
+    }
+
+    private bool HasAlreadyShiftedNotes()
+    {
+        // Placeholder logic — adapt as needed for actual behavior detection
+        return persistentLoopNotes.Any(n => n.note > 127); // example threshold
+    }
+
+    private bool HasRemixActive()
+    {
+        // You can track this via a bool, tag, or count of modified notes
+        return false; // stub for now
+    }
+
+    public void ClearSpawnedNotesThisPhase()
+    {
+        notesSpawnedThisPhase.Clear();
+    }
+
     public bool HasNoteSet()
     {
         return currentNoteSet != null;
@@ -107,6 +152,66 @@ public class InstrumentTrack : MonoBehaviour
     {
         return totalSteps;
     }
+    public CoralGrade GetCoralGrade()
+{
+    float score = EvaluateCompositeScore();
+    if (score >= 1f) return CoralGrade.Perfect;
+    if (score >= 0.8f) return CoralGrade.Strong;
+    if (score >= 0.4f) return CoralGrade.Fragile;
+    return CoralGrade.Missed;
+}
+
+public float EvaluateCompositeScore()
+{
+    // Count note frequency in spawned notes
+    Dictionary<int, int> spawnedCounts = new();
+    foreach (var note in notesSpawnedThisPhase)
+    {
+        int pitch = note.note;
+        if (!spawnedCounts.ContainsKey(pitch))
+            spawnedCounts[pitch] = 0;
+        spawnedCounts[pitch]++;
+    }
+
+    // Count note frequency and velocity in collected notes
+    Dictionary<int, int> collectedCounts = new();
+    float totalVelocity = 0f;
+    int velocitySamples = 0;
+
+    foreach (var note in persistentLoopNotes)
+    {
+        int pitch = note.note;
+        if (!collectedCounts.ContainsKey(pitch))
+            collectedCounts[pitch] = 0;
+        collectedCounts[pitch]++;
+
+        totalVelocity += note.velocity;
+        velocitySamples++;
+    }
+
+    // 1. Coverage Score
+    int coverageMatches = spawnedCounts.Keys.Intersect(collectedCounts.Keys).Count();
+    float coverageScore = spawnedCounts.Count > 0 ? (float)coverageMatches / spawnedCounts.Count : 0f;
+
+    // 2. Frequency Match Score
+    float frequencySum = 0f;
+    foreach (var pitch in spawnedCounts.Keys)
+    {
+        int spawned = spawnedCounts[pitch];
+        int collected = collectedCounts.ContainsKey(pitch) ? collectedCounts[pitch] : 0;
+        frequencySum += Mathf.Min(collected, spawned) / (float)spawned;
+    }
+    float frequencyScore = spawnedCounts.Count > 0 ? frequencySum / spawnedCounts.Count : 0f;
+
+    // 3. Velocity Bonus
+    float avgVelocity = velocitySamples > 0 ? totalVelocity / velocitySamples : 0f;
+    float velocityBonus = Mathf.Clamp01(avgVelocity);  // in [0, 1]
+
+    // Final Weighted Score
+    float compositeScore = (coverageScore * 0.5f) + (frequencyScore * 0.4f) + (velocityBonus * 0.1f);
+    return Mathf.Clamp01(compositeScore);
+}
+
     public void PerformSmartNoteModification(Vector3 sourcePosition)
     {
         Debug.Log($"Performing SmartNoteModification on {gameObject.name}");
@@ -174,8 +279,26 @@ private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modifiedN
     foreach (var (step, note, duration, velocity) in modifiedNotes)
     {
         AddNoteToLoop(step, note, duration, velocity);
-        ShowTetherEffect(sourcePosition, step);
+        // compute the ribbon position yourself
+        Vector3 worldPos = controller.noteVisualizer.ComputeRibbonWorldPosition(this, step);
+//        var marker = controller.noteVisualizer.PlacePersistentNoteMarker(this, step);
 
+        var marker = Instantiate(controller.noteVisualizer.notePrefab, worldPos,
+            Quaternion.identity, controller.noteVisualizer.transform);
+        VisualNoteMarker noteMarker = marker.GetComponent<VisualNoteMarker>();
+        if (noteMarker != null)
+        {
+            noteMarker.Initialize(trackColor);
+            Debug.Log($"Adding note {note} with color {trackColor}");
+        }
+        else
+        {
+            Debug.Log($"{marker.gameObject} is missing the note marker");
+
+        }
+        spawnedNotes.Add(marker);
+        var key = (this, step);
+        controller.noteVisualizer.noteMarkers[key] = marker.transform;
     }
 }
 
@@ -195,18 +318,11 @@ private void ApplyChordChange(NoteSet noteSet, Vector3 sourcePosition)
     RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
 }
 
-public void PerformSmartNoteModification(NoteSet noteSet, Vector3 sourcePosition)
-{
-    currentNoteSet = noteSet;
-    noteSet.assignedInstrumentTrack = this;
-    noteSet.Initialize(GetTotalSteps());
-    PerformSmartNoteModification(sourcePosition); // use the existing one
-}
 
 private void ApplyRootShift(NoteSet noteSet, Vector3 sourcePosition)
 {
     int shift = Random.Range(-3, 4); // ±3 semitones
-    noteSet.ShiftRoot(shift);
+    noteSet.ShiftRoot(this, shift);
 
     var newScaleNotes = noteSet.GetNoteList();
     var modifiedNotes = new List<(int, int, int, float)>();
@@ -227,7 +343,7 @@ private void ApplyNoteBehaviorChange(NoteSet noteSet, Vector3 sourcePosition)
     values.Remove(noteSet.noteBehavior);
     NoteBehavior newBehavior = values[Random.Range(0, values.Count)];
 
-    noteSet.ChangeNoteBehavior(newBehavior);
+    noteSet.ChangeNoteBehavior(this, newBehavior);
 
     var modifiedNotes = new List<(int, int, int, float)>();
 

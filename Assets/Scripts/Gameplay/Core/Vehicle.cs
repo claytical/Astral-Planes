@@ -300,7 +300,12 @@ public class Vehicle : MonoBehaviour
 
     private void EvaluateRemixCondition()
         {
-            remixController.EvaluateRemixCondition();
+            if(remixController.EvaluateRemixCondition())
+            {
+                TurnOffBoost();
+                boostTimeThisLoop = 0;
+            }
+            
         }
     public int GetForceAsDamage()
         {

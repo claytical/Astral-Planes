@@ -5831,7 +5831,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.74
+      value: 0.397
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -6164,7 +6164,7 @@ MonoBehaviour:
   collectableParent: {fileID: 0}
   tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
-  assignedRole: 6
+  assignedRole: 3
   lowestAllowedNote: 48
   highestAllowedNote: 96
   controller: {fileID: 1354683684}
@@ -7107,6 +7107,9 @@ MonoBehaviour:
   hexMazeGenerator: {fileID: 1354683695}
   phaseStarPrefab: {fileID: 2312498068821558259, guid: b780336bac3ca4cd69850ea7a221d987,
     type: 3}
+  nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
+  minedObjectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
+    type: 2}
   starProgressUI: {fileID: 2057904930}
   drumLoopBPM: 120
   gridPadding: 1
@@ -8404,7 +8407,7 @@ MonoBehaviour:
   collectableParent: {fileID: 0}
   tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
-  assignedRole: 5
+  assignedRole: 2
   lowestAllowedNote: 60
   highestAllowedNote: 96
   controller: {fileID: 1354683684}

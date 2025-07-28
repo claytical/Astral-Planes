@@ -10,6 +10,7 @@ public class PhaseSnapshot
     public MusicalPhase pattern;
     public Color color;
     public List<NoteEntry> collectedNotes = new();
+    public Dictionary<MusicalRole, float> trackScores = new();
     public float timestamp;
 
     public class NoteEntry
@@ -34,6 +35,8 @@ public class DrumTrack : MonoBehaviour
     // Assuming these are declared and initialized elsewhere:
     public CosmicDustGenerator hexMazeGenerator;
     public GameObject phaseStarPrefab;
+    public MineNodePrefabRegistry nodePrefabRegistry;
+    public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
     public StarProgressUI starProgressUI;
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
@@ -391,7 +394,8 @@ public class DrumTrack : MonoBehaviour
             pattern = currentPhase,
             color = GetVisualForPattern(currentPhase)?.color ?? Color.white,
             timestamp = Time.time,
-            collectedNotes = new List<PhaseSnapshot.NoteEntry>()
+            collectedNotes = new List<PhaseSnapshot.NoteEntry>(),
+            trackScores = new Dictionary<MusicalRole, float>() 
         };
 
         foreach (var track in trackController.tracks)
@@ -402,6 +406,9 @@ public class DrumTrack : MonoBehaviour
             {
                 snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
             }
+            // ✅ Run evaluation just before archiving the score
+            float score = track.EvaluateCompositeScore();
+            snapshot.trackScores[track.assignedRole] = score;
         }
 
         sessionPhases.Add(snapshot);
@@ -468,7 +475,7 @@ public class DrumTrack : MonoBehaviour
                 break;
         }
 
-        noteSet.Initialize(track.GetTotalSteps());
+        noteSet.Initialize(track, track.GetTotalSteps());
 
         AddRandomNotes(track, noteSet, 6); // Initial remix
         if (track.GetNoteDensity() < 4)

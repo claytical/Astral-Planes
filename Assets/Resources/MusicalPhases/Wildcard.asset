@@ -13,8 +13,16 @@ MonoBehaviour:
   m_Name: Wildcard
   m_EditorClassIdentifier: 
   phase: 4
-  rolePatternStrategies: []
   ghostLoopCount: 4
+  roleNoteSetSeriesList:
+  - role: 0
+    noteSetSeries: {fileID: 11400000, guid: 6a5c214bff5da4ee188fe4f3e1cd5ad2, type: 2}
+  - role: 1
+    noteSetSeries: {fileID: 11400000, guid: dd9d0917ed40a4715adf19116e43f503, type: 2}
+  - role: 2
+    noteSetSeries: {fileID: 11400000, guid: 7a64f432ec120479dba40ba8bf88af11, type: 2}
+  - role: 3
+    noteSetSeries: {fileID: 11400000, guid: 4bfb9956b51e5429bb59df3b288949f1, type: 2}
   drumClips:
   - {fileID: 8300000, guid: c6bebe096bbed46bf8f87af5b3c342f2, type: 3}
   - {fileID: 8300000, guid: 30ef16a0d37f5469c864ac617a930d82, type: 3}

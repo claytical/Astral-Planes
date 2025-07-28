@@ -13,8 +13,16 @@ MonoBehaviour:
   m_Name: Release
   m_EditorClassIdentifier: 
   phase: 3
-  rolePatternStrategies: []
   ghostLoopCount: 4
+  roleNoteSetSeriesList:
+  - role: 0
+    noteSetSeries: {fileID: 11400000, guid: 870236519ae0e47079bcb47332fd2d89, type: 2}
+  - role: 3
+    noteSetSeries: {fileID: 11400000, guid: 8e8510544802c40ce9e88a8011ffb444, type: 2}
+  - role: 1
+    noteSetSeries: {fileID: 11400000, guid: 5961754dd2002402cb57596271bfea0d, type: 2}
+  - role: 2
+    noteSetSeries: {fileID: 11400000, guid: a2bcfaa0f701a43df8e55028e04ab852, type: 2}
   drumClips:
   - {fileID: 8300000, guid: fdd2ef21522af41fbb0c7538e76442a8, type: 3}
   - {fileID: 8300000, guid: 86bf9bd2784784d78af16c6f103760f6, type: 3}

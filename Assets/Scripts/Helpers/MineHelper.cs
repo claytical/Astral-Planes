@@ -34,18 +34,34 @@ public class WeightedMineNode
     public MinedObjectType minedObjectType;
     public TrackModifierType trackModifierType;
     public MusicalRole role;
-    public int weight;
+
+    [Range(0, 100)]
+    public int weight = 1;
+
     public NoteSetSeries noteSetSeries;
 
-    public int quota;
+    public int quota = 1;
 
-    public MinedObjectSpawnDirective ToDirective(InstrumentTrack track, Color color, MineNodePrefabRegistry nodeRegistry, MinedObjectPrefabRegistry objectRegistry)
+    [Tooltip("Leave empty for all phases")]
+    public List<MusicalPhase> allowedPhases;
+
+    [Tooltip("Higher = rarer")]
+    public int rarityTier = 0;
+
+    [Tooltip("If true, requires player to have collected at least one remix")]
+    public bool requiresRemixToSpawn = false;
+
+    public MinedObjectSpawnDirective ToDirective(
+        InstrumentTrack track,
+        Color color,
+        MineNodePrefabRegistry nodeRegistry,
+        MinedObjectPrefabRegistry objectRegistry)
     {
-        Debug.Log($"Returning directive for {minedObjectType} / {trackModifierType}");
+        Debug.Log($"🧭 Spawning directive for {minedObjectType} / {trackModifierType}");
 
         RemixUtility remixUtil = null;
 
-        var phaseManager = track.drumTrack.progressionManager;
+        var phaseManager = track?.drumTrack?.progressionManager;
         if (phaseManager != null)
         {
             int index = phaseManager.GetCurrentPhaseIndex();
@@ -55,8 +71,6 @@ public class WeightedMineNode
                 remixUtil = group.remixUtilities.FirstOrDefault(r => r.targetRole == track.assignedRole);
             }
         }
-
-
 
         return new MinedObjectSpawnDirective
         {
@@ -68,9 +82,12 @@ public class WeightedMineNode
             displayColor = color,
             minedObjectPrefab = objectRegistry.GetPrefab(minedObjectType, trackModifierType),
             prefab = nodeRegistry.GetPrefab(minedObjectType, trackModifierType),
-            remixUtility = remixUtil // ✅ assign here
+            remixUtility = remixUtil
         };
     }
 
+    public override string ToString()
+    {
+        return $"{role} | {minedObjectType} [{trackModifierType}] | weight: {weight}, quota: {quota}, rarity: {rarityTier}";
+    }
 }
-

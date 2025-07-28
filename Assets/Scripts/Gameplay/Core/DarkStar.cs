@@ -490,7 +490,7 @@ public class DarkStar : MonoBehaviour
             var noteSet = track.GetCurrentNoteSet();
             if (noteSet != null)
             {
-                noteSet.Initialize(track.GetTotalSteps());
+                noteSet.Initialize(track, track.GetTotalSteps());
                 int step = Random.Range(0, track.GetTotalSteps());
                 int note = noteSet.GetNextArpeggiatedNote(step);
                 int duration = track.CalculateNoteDuration(step, noteSet);
