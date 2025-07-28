@@ -45,9 +45,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   rootMidi: 19
-  finalRootMidi: 0
   scale: 1
   chordPattern: 0
   noteBehavior: 0
   rhythmStyle: 3
   assignedInstrumentTrack: {fileID: 0}
+  remixUtility: {fileID: 0}
+  ghostNoteSequence: 

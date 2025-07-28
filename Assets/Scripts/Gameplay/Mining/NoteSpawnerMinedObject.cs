@@ -36,7 +36,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         if (selectedNoteSet != null)
         {
             selectedNoteSet.assignedInstrumentTrack = track;
-            selectedNoteSet.Initialize(track.drumTrack.totalSteps);
+            selectedNoteSet.Initialize(track, track.drumTrack.totalSteps);
         }
 
         ApplyTrackVisuals(track.trackColor);
@@ -74,65 +74,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         Debug.Log($"NoteSpawnerMinedObject.OnCollisionEnter2D: {coll.gameObject.name}");
         CollectionSoundManager.Instance?.PlayNoteSpawnerSound(assignedTrack, selectedNoteSet);
     }
-
-   
     
-// simple coroutine to lerp the spark
-    private IEnumerator MoveSparkTo(Transform spark, Vector3 from, Vector3 to, float duration)
-    {
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            spark.position = Vector3.Lerp(from, to, elapsed / duration);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-        spark.position = to;
-        Destroy(spark.gameObject, 0.2f);
-    }
-    private List<Vector3> GenerateConstellationPath()
-    {
-        if (assignedTrack == null || selectedNoteSet == null)
-            return null;
-
-        List<Vector3> path = new List<Vector3>();
-        List<int> noteList = selectedNoteSet.GetSortedNoteList();
-        List<int> stepList = selectedNoteSet.GetStepList();
-
-        float loopDuration = assignedTrack.drumTrack.GetLoopLengthInSeconds();
-        int gridWidth = assignedTrack.drumTrack.GetSpawnGridWidth();
-        int gridHeight = noteList.Count;
-
-        int column = 0;
-
-        foreach (int step in stepList)
-        {
-            if (column >= gridWidth)
-                break;
-
-            int note = selectedNoteSet.GetNextArpeggiatedNote(step);
-            int pitchIndex = noteList.IndexOf(note);
-            if (pitchIndex == -1 || pitchIndex >= gridHeight)
-            {
-                column++;
-                continue;
-            }
-
-            Vector2Int gridPos = new Vector2Int(column, pitchIndex);
-            if (!assignedTrack.drumTrack.IsSpawnCellAvailable(gridPos.x, gridPos.y))
-            {
-                column++;
-                continue;
-            }
-
-            Vector3 spawnPos = assignedTrack.drumTrack.GridToWorldPosition(gridPos);
-            path.Add(spawnPos);
-            column++;
-        }
-
-        return path;
-    }
-
     private void ApplyTrackVisuals(Color color)
     {
         var visual = GetComponent<TrackItemVisual>();

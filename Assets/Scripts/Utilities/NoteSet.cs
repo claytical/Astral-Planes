@@ -120,15 +120,15 @@ public class NoteSet : MonoBehaviour
     private int grooveIndex = 0;
     private readonly int[] accentPattern = { 1, 0, 0, 1 }; // Accent on 1st and 4th
 
-    public void BuildNotesFromKey()
+    public void BuildNotesFromKey(InstrumentTrack track)
     {
         notes.Clear();
         int[] pattern = ScalePatterns.Patterns[scale];
 
         // Adjust the root note octave **and determine playable range**
-        int adjustedRootMidi = AdjustRootOctave(rootMidi);
-        int lowestNote = assignedInstrumentTrack.lowestAllowedNote; // Min range: 1 octave below root
-        int highestNote = assignedInstrumentTrack.highestAllowedNote; // Max range: 1 octave above root
+        int adjustedRootMidi = AdjustRootOctave(track, rootMidi);
+        int lowestNote = track.lowestAllowedNote; // Min range: 1 octave below root
+        int highestNote = track.highestAllowedNote; // Max range: 1 octave above root
 
         // Ensure dominant note is within the range
         if (dominantNote.HasValue)
@@ -260,32 +260,25 @@ public class NoteSet : MonoBehaviour
         return ChordLibrary.GetRandomChord();
     }
 
-    public void ShiftRoot(int semitoneDelta)
+    public void ShiftRoot(InstrumentTrack track, int semitoneDelta)
     {
         rootMidi += semitoneDelta;
-        rootMidi = Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
-        BuildNotesFromKey(); // rebuild scale
+        rootMidi = Mathf.Clamp(rootMidi, track.lowestAllowedNote, track.highestAllowedNote);
+        BuildNotesFromKey(track); // rebuild scale
     }
 
-    public void ChangeNoteBehavior(NoteBehavior newBehavior)
+    public void ChangeNoteBehavior(InstrumentTrack track, NoteBehavior newBehavior)
     {
         noteBehavior = newBehavior;
-        BuildNotesFromKey(); // may change octave/root
+        BuildNotesFromKey(track); // may change octave/root
     }
 
-    private int AdjustRootOctave(int baseRoot)
+    private int AdjustRootOctave(InstrumentTrack track, int baseRoot)
     {
         int adjustedRoot = baseRoot;
 
-        // ✅ Ensure that currentNoteSet has an assigned track
-        if (assignedInstrumentTrack == null)
-        {
-            Debug.LogError($"AdjustRootOctave: No assigned InstrumentTrack for {name}");
-            return adjustedRoot; // Return original root if no track is assigned
-        }
-
-        int lowestAllowed = assignedInstrumentTrack.lowestAllowedNote;
-        int highestAllowed = assignedInstrumentTrack.highestAllowedNote;
+        int lowestAllowed = track.lowestAllowedNote;
+        int highestAllowed = track.highestAllowedNote;
 
         // ✅ Apply octave shifts based on NoteBehavior
         switch (noteBehavior)
@@ -317,15 +310,9 @@ public class NoteSet : MonoBehaviour
         adjustedRoot = Mathf.Clamp(adjustedRoot, lowestAllowed, highestAllowed);
         return adjustedRoot;
     }
-    public void Initialize(int totalSteps)
+    public void Initialize(InstrumentTrack track, int totalSteps)
     {
-        if (assignedInstrumentTrack == null)
-        {
-            Debug.LogError($"❌ NoteSet '{name}' is missing an assignedInstrumentTrack during Initialize.");
-            return;
-        }
-
-        BuildNotesFromKey();
+        BuildNotesFromKey(track);
         BuildAllowedStepsFromStyle(totalSteps);
 
     }
@@ -354,35 +341,6 @@ public class NoteSet : MonoBehaviour
         return nextChordNotes.OrderBy(n => Mathf.Abs(n - currentNote)).First();
     }
     
-    public int GetNoteGridRow(int pitch, int totalRows)
-    {
-        if (assignedInstrumentTrack == null)
-        {
-            Debug.LogError("❌ GetNoteGridRow: No assigned InstrumentTrack!");
-            return 0;
-        }
-
-        int lowestNote = assignedInstrumentTrack.lowestAllowedNote;
-        int highestNote = assignedInstrumentTrack.highestAllowedNote;
-
-        if (lowestNote >= highestNote)
-        {
-            Debug.LogError($"❌ Invalid note range for {assignedInstrumentTrack.name}: {lowestNote} - {highestNote}");
-            return 0;
-        }
-
-        int totalNotes = highestNote - lowestNote + 1;
-        int pitchIndex = Mathf.Clamp(pitch - lowestNote, 0, totalNotes - 1);
-
-        // ✅ Scale pitch into the available rows correctly
-        float rowStep = (float)(totalRows - 1) / (totalNotes - 1);
-        int row = Mathf.RoundToInt(pitchIndex * rowStep); 
-
-        // ✅ Clamp to ensure valid row assignment
-        int finalRow = Mathf.Clamp(row, 0, totalRows - 1);
-        return finalRow;
-    }
-
     public void AdvanceChord()
     {
         List<ChordPattern> allPatterns = Enum.GetValues(typeof(ChordPattern)).Cast<ChordPattern>().ToList();

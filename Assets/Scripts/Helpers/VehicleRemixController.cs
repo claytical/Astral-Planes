@@ -5,7 +5,6 @@ using UnityEngine;
 
 public class VehicleRemixController : MonoBehaviour
 {
-    public RemixRingHolder remixRingHolder;
     public Vehicle vehicle;
     public InstrumentTrackController trackController;
     public NoteVisualizer visualizer;
@@ -53,7 +52,7 @@ public class VehicleRemixController : MonoBehaviour
         remixDirectives[role] = _directive;
         collectedColors.Add(color);
 
-        remixRingHolder?.ActivateRing(role, color);
+        vehicle.remixRingHolder?.ActivateRing(role, color);
     }
 
     public void FixedUpdateBoosting(float deltaTime, int currentStep)
@@ -71,14 +70,14 @@ public class VehicleRemixController : MonoBehaviour
             Color c1 = collectedColors[colorCycleIndex];
             Color c2 = collectedColors[(colorCycleIndex + 1) % collectedColors.Count];
 
-            remixRingHolder.SetColor(c1);
+            vehicle.remixRingHolder.SetColor(c1);
             vehicle.SetColor(c2);
         }
         boostTimeThisLoop += deltaTime;
     }
     public void ResetRemixVisuals()
     {
-        remixRingHolder?.SetColor(Color.white);
+        vehicle.remixRingHolder?.SetColor(Color.white);
         vehicle.SetColor(vehicle.profileColor); // Restore base color
         colorCycleIndex = 0;
         colorCycleTimer = 0f;
@@ -107,18 +106,22 @@ public class VehicleRemixController : MonoBehaviour
         }
     }
 
-    public void EvaluateRemixCondition()
+    public bool EvaluateRemixCondition()
     {
-        if (!HasRemixRoles()) return;
+        if (!HasRemixRoles()) return false;
 
         if (boostTimeThisLoop >= requiredBoostTime)
         {
             TriggerRemixBlast();
+            vehicle.remixRingHolder.ClearAllRings();
+            ResetRemixVisuals();
+            return true;
         }
 
         remixPrimed = false;
         boostTimeThisLoop = 0f;
         remixWaveSpeed = 0f;
+        return false;
     }
     
     public void TriggerRemixBlast()

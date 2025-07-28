@@ -158,9 +158,11 @@ public class PhaseStar : MonoBehaviour
 
         if (orbitCount >= hitsRequired && !collapseStarted)
         {
+            
             Debug.Log($"Running coroutine to start collapse event");
             isDepleted = true;
             collapseStarted = true;
+            EvaluateAllTracks();
             StartCoroutine(StartCollapseEvent());
         }
         Debug.Log($"Orbit Count {orbitCount} Hits Required: {hitsRequired} Collapse Started: {collapseStarted}");
@@ -169,7 +171,7 @@ public class PhaseStar : MonoBehaviour
         canBeHit = true;
     }
 
-        private IEnumerator StartCollapseEvent()
+    private IEnumerator StartCollapseEvent()
     {
         Debug.Log($"Starting collapse event...");
         if (starCollider != null)
@@ -236,7 +238,7 @@ public class PhaseStar : MonoBehaviour
             set.rhythmStyle = RhythmStyle.Dense;
             set.noteBehavior = NoteBehavior.Lead;
 
-            set.Initialize(track.GetTotalSteps());
+            set.Initialize(track, track.GetTotalSteps());
             track.ClearLoopedNotes(TrackClearType.Remix);
 
             var steps = set.GetStepList();
@@ -346,32 +348,50 @@ public class PhaseStar : MonoBehaviour
     {
         Debug.Log($"Mine Node {index} / {hitsRequired}. Using {spawnStrategyProfile}");
         if (index >= hitsRequired || spawnStrategyProfile == null) return;
-        Debug.Log($"Getting Mined Object Directive for Mine Node {index} / {hitsRequired}. Using {spawnStrategyProfile}");
 
-        var directive = spawnStrategyProfile.GetMinedObjectDirective(drumTrack.trackController);
-        Debug.Log($"Directive: {directive}");
-        if (directive == null) return;
+        MusicalPhaseProfile profile = progressionManager.GetProfileForPhase(assignedPhase);
+        var directive = spawnStrategyProfile.GetMinedObjectDirective(
+            drumTrack.trackController,
+            assignedPhase,
+            profile,
+            drumTrack.minedObjectPrefabRegistry,
+            drumTrack.nodePrefabRegistry
+        );
+
+        if (directive == null)
+        {
+            Debug.LogWarning("⚠️ No valid directive returned — skipping spawn.");
+            return;
+        }
 
         Vector2Int cell = drumTrack.GetRandomAvailableCell();
         if (cell.x == -1) return;
 
         Vector3 targetPos = drumTrack.GridToWorldPosition(cell);
-        Debug.Log($"Spawning wrapper...");
         GameObject wrapper = Instantiate(mineNodeSpawnerPrefab, spawnFrom, Quaternion.identity);
         MineNodeSpawner spawner = wrapper.GetComponent<MineNodeSpawner>();
         if (spawner == null) return;
-        Debug.Log($"Configuring Spawner...");
 
         spawner.SetDrumTrack(drumTrack);
         MineNode mineNode = spawner.SpawnNode(cell, directive);
         mineNode.gameObject.SetActive(false);
         if (mineNode != null)
         {
-            Debug.Log($"Moving shard {wrapper.name} from {spawnFrom} to {targetPos}");
             StartCoroutine(MoveShardToTarget(spawnFrom, targetPos, wrapper, mineNode.gameObject, color));
         }
     }
 
+
+    private void EvaluateAllTracks()
+    {
+        if (drumTrack.trackController == null) return;
+
+        foreach (var track in drumTrack.trackController.tracks)
+        {
+            float score = track.EvaluateCompositeScore();
+            Debug.Log($"🎼 Composite Score for {track.assignedRole}: {score:F2}");
+        }
+    }
 
 
     private IEnumerator MoveShardToTarget(Vector3 start, Vector3 end, GameObject shard, GameObject mineNode, Color fallbackColor)
@@ -469,7 +489,7 @@ public class PhaseStar : MonoBehaviour
             set.noteBehavior = profile.defaultBehavior;
             set.rhythmStyle = RhythmStyle.Sparse;
             set.chordPattern = ChordPattern.RootTriad;
-            set.Initialize(track.GetTotalSteps());
+            set.Initialize(track, track.GetTotalSteps());
 
             track.ClearLoopedNotes(TrackClearType.Remix);
 

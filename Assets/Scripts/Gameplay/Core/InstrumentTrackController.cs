@@ -32,12 +32,12 @@ public static class ShipTrackAssigner
                     track.preset = preset;
                     GameObject noteSetGO = GameObject.Instantiate(noteSetPrefab);
                     NoteSet noteSet = noteSetGO.GetComponent<NoteSet>();
-
                     noteSet.assignedInstrumentTrack = track;
                     noteSet.noteBehavior = roleProfile.defaultBehavior;
-                    noteSet.Initialize(track.GetTotalSteps());
+                    noteSet.Initialize(track, track.GetTotalSteps());
 //                    track.SpawnCollectables(noteSet);
-                    
+                    Debug.Log($"Assigned track {track.name} to preset {preset} with noteset: {noteSet} for profile {roleProfile}");
+
                     unassignedTracks.Remove(track);
                     break;
                 }
@@ -58,8 +58,9 @@ public static class ShipTrackAssigner
 
             noteSet.assignedInstrumentTrack = track;
             noteSet.noteBehavior = fallbackProfile.defaultBehavior;
-            noteSet.Initialize(track.GetTotalSteps());
+            noteSet.Initialize(track, track.GetTotalSteps());
                 //track.SpawnCollectables(noteSet);
+                Debug.Log($"Falback assigned track {track.name} to preset {randomPreset} with noteset: {noteSet} for profile {fallbackProfile}");
 
         }
     }
@@ -159,6 +160,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
+        Debug.Log("Configured roles: " + 
+                  string.Join(", ", tracks.Select(t => t.assignedRole)));
         return tracks.FirstOrDefault(t => t.assignedRole == role);
     }
     public InstrumentTrack FindRandomTrackByRole(MusicalRole role)

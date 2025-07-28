@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+public enum CoralGrade { Missed, Fragile, Strong, Perfect, RemixPerfect }
 
 public class CoralVisualizer : MonoBehaviour
 {

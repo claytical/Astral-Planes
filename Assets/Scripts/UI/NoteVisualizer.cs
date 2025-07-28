@@ -29,7 +29,7 @@ public class NoteVisualizer : MonoBehaviour
     private Canvas worldSpaceCanvas;
     private Transform uiParent;
     private Dictionary<InstrumentTrack, Dictionary<int, Vector3>> trackStepWorldPositions = new();
-    private Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
+    public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
     private Dictionary<InstrumentTrack, float> ribbonWidths = new();
     private Dictionary<InstrumentTrack, float> ribbonIntensities = new();
     private Vehicle energyTransferVehicle;

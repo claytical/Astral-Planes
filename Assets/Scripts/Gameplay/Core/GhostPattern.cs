@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Gameplay.Mining;
 using Steamworks;
 using UnityEngine;
@@ -62,7 +63,7 @@ public void Create()
     List<Vector3> path  = new List<Vector3>();
     bool spawnedAny     = false;
     HashSet<int> usedColumns = new(); // 💡 track globally used columns
-
+    List<(int, int, int, float)> spawnedThisPhase = new();
     for (int i = 0; i < stepList.Count; i++)
     {
         int step       = stepList[i];
@@ -71,6 +72,7 @@ public void Create()
         if (pitchIndex < 0 || pitchIndex >= gridHeight) continue;
 
         bool didSpawn = false;
+        
 
         for (int col = 0; col < gridWidth && !didSpawn; col++)
         {
@@ -93,6 +95,8 @@ public void Create()
             if (spawned.TryGetComponent(out Collectable c))
             {
                 int dur = track.CalculateNoteDurationFromSteps(step, noteSet);
+                spawnedThisPhase.Add((step, note, dur, 1f)); // Velocity could be varied
+
                 c.energySprite.color = track.trackColor;
                 c.Initialize(note, dur, track, noteSet, stepList);
                 c.OnCollected += (d, force) => track.OnCollectableCollected(c, step, d, force);
@@ -113,6 +117,8 @@ public void Create()
             }
         }
     }
+    track.RegisterSpawnedNotesThisPhase(spawnedThisPhase);
+    Debug.Log($"📀 Spawned {spawnedThisPhase.Count} notes this phase for {track.name}");
 
     if (!spawnedAny)
     {

@@ -1,124 +1,86 @@
 using System.Collections.Generic;
 using System.Linq;
-using Gameplay.Mining;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "SpawnStrategyProfile", menuName = "Astral Planes/Spawn Strategy Profile")]
+[CreateAssetMenu(menuName = "Astral Planes/Spawn Strategy Profile")]
 public class SpawnStrategyProfile : ScriptableObject
 {
     public List<WeightedMineNode> mineNodes;
-    public MineNodePrefabRegistry nodePrefabRegistry; // assign in Inspector
-    public MinedObjectPrefabRegistry objectPrefabRegistry;
-    public MineNodeSelectionMode selectionMode = MineNodeSelectionMode.WeightedRandom;
 
-    private HashSet<WeightedMineNode> spawnedThisCycle = new();
-    private Dictionary<WeightedMineNode, int> spawnCounts = new();
-
-    public MinedObjectSpawnDirective GetMinedObjectDirective(InstrumentTrackController trackController)
+    public MinedObjectSpawnDirective GetMinedObjectDirective(
+        InstrumentTrackController trackController,
+        MusicalPhase currentPhase,
+        MusicalPhaseProfile phaseProfile,
+        MinedObjectPrefabRegistry objectRegistry,
+        MineNodePrefabRegistry nodeRegistry)
     {
-        WeightedMineNode selected = GetWeightedMineNode(trackController);
-        if (selected == null) return null;
+        List<WeightedMineNode> validNodes = new();
 
-        InstrumentTrack track = trackController.FindTrackByRole(selected.role);
-        if (track == null) return null;
-
-        Color color = ShardColorUtility.RoleColor(selected.role);
-        MinedObjectSpawnDirective directive =
-            selected.ToDirective(track, color, nodePrefabRegistry, objectPrefabRegistry);
-            Debug.Log($"Selected Role: {selected.role}, Directive Role: {directive.role}, Track: {track.name}, Directive Track: {directive.assignedTrack}, {directive.prefab}");
-        return directive; // ✅ dual registries
-    }
-
-
-    private WeightedMineNode GetWeightedMineNode(InstrumentTrackController trackController)
-    {
-        List<WeightedMineNode> candidates = mineNodes
-            .Where(n => IsDirectiveUseful(n, trackController, trackController.activeTrack.drumTrack.currentPhase.ToString()))
-            .ToList();
-        if (mineNodes == null || mineNodes.Count == 0)
+        foreach (var node in mineNodes)
         {
-            Debug.LogError("❌ No mineNodes defined in SpawnStrategyProfile!");
+            // Check phase compatibility
+            if (node.allowedPhases != null &&
+                node.allowedPhases.Count > 0 &&
+                !node.allowedPhases.Contains(currentPhase))
+                continue;
+
+            InstrumentTrack track = trackController.FindTrackByRole(node.role);
+            if (!IsNodeUsefulForTrack(node, track, currentPhase, phaseProfile))
+                continue;
+
+            validNodes.Add(node);
+        }
+
+        if (validNodes.Count == 0)
+        {
+            Debug.LogWarning($"⚠️ No valid spawn nodes for {currentPhase}. Returning null.");
             return null;
         }
 
-        if (candidates.Count == 0) candidates = mineNodes;
+        WeightedMineNode selected = ChooseRandomWeighted(validNodes);
 
-        switch (selectionMode)
-        {
-            case MineNodeSelectionMode.WeightedRandom:
-                int totalWeight = candidates.Sum(n => n.weight);
-                int choice = Random.Range(0, totalWeight);
-                int current = 0;
-                foreach (var node in candidates)
-                {
-                    current += node.weight;
-                    if (choice < current)
-                        return node;
-                }
-                break;
+        InstrumentTrack selectedTrack = trackController.FindTrackByRole(selected.role);
+        Color color = ShardColorUtility.RoleColor(selected.role);
 
-            case MineNodeSelectionMode.RoundRobinUniqueFirst:
-                var unused = candidates.Where(n => !spawnedThisCycle.Contains(n)).ToList();
-                if (unused.Count == 0)
-                {
-                    spawnedThisCycle.Clear();
-                    unused = candidates;
-                }
-                var rrChoice = unused[Random.Range(0, unused.Count)];
-                spawnedThisCycle.Add(rrChoice);
-                return rrChoice;
-
-            case MineNodeSelectionMode.QuotaBased:
-                var quotas = candidates.OrderBy(n =>
-                {
-                    int used = spawnCounts.GetValueOrDefault(n, 0);
-                    return (float)used / Mathf.Max(n.weight, 1);
-                }).ToList();
-                var quotaChoice = quotas.First();
-                spawnCounts.TryAdd(quotaChoice, 0);
-                spawnCounts[quotaChoice]++;
-                return quotaChoice;
-        }
-
-        return null;
+        return selected.ToDirective(selectedTrack, color, nodeRegistry, objectRegistry);
     }
 
-    private bool IsDirectiveUseful(WeightedMineNode node, InstrumentTrackController trackController, string phaseLabel)
+    private bool IsNodeUsefulForTrack(
+        WeightedMineNode node,
+        InstrumentTrack track,
+        MusicalPhase phase,
+        MusicalPhaseProfile profile)
     {
-        var track = trackController?.tracks?.FirstOrDefault(t => t.assignedRole == node.role);
-        if (track == null) return false;
+        if (track == null)
+            return false;
+
         if (node.minedObjectType == MinedObjectType.NoteSpawner)
         {
-            if (node.noteSetSeries == null || string.IsNullOrEmpty(node.noteSetSeries.label))
-                return false;
-
-            return node.noteSetSeries.label.Equals(phaseLabel, System.StringComparison.OrdinalIgnoreCase);
-
+            var expectedSeries = profile.GetNoteSetSeriesForRole(node.role);
+            return node.noteSetSeries == expectedSeries;
         }
-        
-        
+
         if (node.minedObjectType == MinedObjectType.TrackUtility)
-            return IsUtilityRelevant(node.trackModifierType, track);
+        {
+            return track.IsTrackUtilityRelevant(node.trackModifierType);
+        }
 
         return true;
     }
 
-    private bool IsUtilityRelevant(TrackModifierType type, InstrumentTrack track)
+    private WeightedMineNode ChooseRandomWeighted(List<WeightedMineNode> nodes)
     {
-        return type switch
-        {
-            TrackModifierType.Clear => track.GetNoteDensity() > 0,
-            TrackModifierType.Remix => track.GetNoteDensity() < 4,
-            TrackModifierType.RootShift => true,
-            TrackModifierType.ChordProgression => true,
-            TrackModifierType.RhythmStyle => true,
-            _ => true
-        };
-    }
+        int totalWeight = nodes.Sum(n => n.weight);
+        int pick = Random.Range(0, totalWeight);
+        int cumulative = 0;
 
-    public void ResetSpawnState()
-    {
-        spawnedThisCycle.Clear();
-        spawnCounts.Clear();
+        foreach (var node in nodes)
+        {
+            cumulative += node.weight;
+            if (pick < cumulative)
+                return node;
+        }
+
+        return nodes[Random.Range(0, nodes.Count)]; // fallback
     }
 }
