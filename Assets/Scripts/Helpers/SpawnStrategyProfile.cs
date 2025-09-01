@@ -12,7 +12,8 @@ public class SpawnStrategyProfile : ScriptableObject
         MusicalPhase currentPhase,
         MusicalPhaseProfile phaseProfile,
         MinedObjectPrefabRegistry objectRegistry,
-        MineNodePrefabRegistry nodeRegistry)
+        MineNodePrefabRegistry nodeRegistry, 
+        NoteSetFactory noteSetFactory)
     {
         List<WeightedMineNode> validNodes = new();
 
@@ -38,11 +39,37 @@ public class SpawnStrategyProfile : ScriptableObject
         }
 
         WeightedMineNode selected = ChooseRandomWeighted(validNodes);
-
         InstrumentTrack selectedTrack = trackController.FindTrackByRole(selected.role);
         Color color = ShardColorUtility.RoleColor(selected.role);
+        if (selected == null)
+        {
+            Debug.LogError("SpawnStrategyProfile: No suitable WeightedMineNode was selected.");
+            return null;
+        }
 
-        return selected.ToDirective(selectedTrack, color, nodeRegistry, objectRegistry);
+        if (selectedTrack == null)
+        {
+            Debug.LogError("SpawnStrategyProfile: selectedTrack is null for role " + selected.role);
+            return null;
+        }
+
+        if (noteSetFactory == null)
+        {
+            Debug.LogError("SpawnStrategyProfile: NoteSetFactory is null.");
+            return null;
+        }
+
+        NoteSet generatedNoteSet = noteSetFactory.Generate(selectedTrack, currentPhase);
+        selectedTrack.SetNoteSet(generatedNoteSet);
+        return selected.ToDirective(
+            selectedTrack,
+            generatedNoteSet,
+            color,
+            nodeRegistry,
+            objectRegistry,
+            noteSetFactory,
+            currentPhase
+        );
     }
 
     private bool IsNodeUsefulForTrack(
@@ -56,8 +83,9 @@ public class SpawnStrategyProfile : ScriptableObject
 
         if (node.minedObjectType == MinedObjectType.NoteSpawner)
         {
-            var expectedSeries = profile.GetNoteSetSeriesForRole(node.role);
-            return node.noteSetSeries == expectedSeries;
+            //var expectedSeries = profile.GetNoteSetSeriesForRole(node.role);
+            //return node.noteSetSeries == expectedSeries;
+            return node.role == track.assignedRole;
         }
 
         if (node.minedObjectType == MinedObjectType.TrackUtility)

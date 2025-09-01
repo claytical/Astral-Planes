@@ -48,6 +48,40 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  shardPickupPrefab: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d,
+    type: 3}
+  shardScatterRadius: 1.6
+  shardSpawnStagger: 0.03
+  shardEnergyBase: 0.06
+  dustShrinkRadius: 1
+  dustShrinkUnitsPerSecond: 1.2
+  dustLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  dustFalloff:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: -1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   hitsRequired: 8
   diamondVisualPrefab: {fileID: 3824273451645816754, guid: ba4ab1cb7361d47548f4d66fe1de8726,
     type: 3}
@@ -64,9 +98,11 @@ MonoBehaviour:
   pulseSpeed: 2
   minAlpha: 0.1
   maxAlpha: 1
-  spawnStrategyProfile: {fileID: 0}
+  spawnStrategyProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94,
+    type: 2}
   mineNodeSpawnerPrefab: {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107,
     type: 3}
+  noteSetFactory: {fileID: 0}
 --- !u!212 &3197689220231228328
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -149,7 +185,7 @@ Rigidbody2D:
   m_Interpolate: 0
   m_SleepingMode: 1
   m_CollisionDetection: 0
-  m_Constraints: 2
+  m_Constraints: 0
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -355,7 +391,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 3.87
+      scalar: 3
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -473,7 +509,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 4.34
+      scalar: 3
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -937,7 +973,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.24
+      value: 1.5
       mode: 0
       spread: 0
       speed:
@@ -1000,7 +1036,7 @@ ParticleSystem:
       speed:
         serializedVersion: 2
         minMaxState: 0
-        scalar: 3.26
+        scalar: 3
         minScalar: 1
         maxCurve:
           serializedVersion: 2
@@ -1056,7 +1092,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 49.52
+      scalar: 28
       minScalar: 10
       maxCurve:
         serializedVersion: 2

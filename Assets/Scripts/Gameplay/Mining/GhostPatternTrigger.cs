@@ -55,6 +55,38 @@ public class GhostPatternTrigger : MonoBehaviour
 
         Destroy(pulse, 2f);
     }
+    private void DisableTriggerVisualsAndColliders()
+    {
+        // 1) Stop & clear EVERY particle under this trigger
+        foreach (var ps in GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var emission = ps.emission; emission.enabled = false;
+            ps.Stop(withChildren: true, stopBehavior: ParticleSystemStopBehavior.StopEmittingAndClear);
+            var renderer = ps.GetComponent<Renderer>();
+            if (renderer) renderer.enabled = false;
+        }
+
+        // 2) Disable any Sprite/Mesh renderers just in case
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+            r.enabled = false;
+
+        // 3) Disable colliders so it can’t be triggered again
+        foreach (var col in GetComponentsInChildren<Collider2D>(true))
+            col.enabled = false;
+    }
+
+    private IEnumerator PoofThenDispose(float delayBeforeDispose = 0.05f, bool usePooling = false)
+    {
+        // optional: play your explode effect
+        if (TryGetComponent(out Explode explode))
+            explode.Permanent();
+
+        // give the poof a heartbeat if desired
+        if (delayBeforeDispose > 0f) yield return new WaitForSeconds(delayBeforeDispose);
+
+        if (usePooling) gameObject.SetActive(false);
+        else Destroy(gameObject);
+    }
 
     private IEnumerator HandleAstralTransfer(Vehicle vehicle)
     {
@@ -85,21 +117,18 @@ public class GhostPatternTrigger : MonoBehaviour
             yield break;
         }
 
+
         // ⚡ 4. Grant vehicle energy and start the ghost routine
         vehicle.CollectEnergy(10);
         ghost.Initialize(vehicle, selectedNoteSet, selectedInstrument, selectedMusicalRoleProfile);
         ghost.Create();
 
-        // 🌫 5. Remove or fade out this trigger object
-        if (TryGetComponent(out Explode explode))
-        {
-            explode.Permanent(); // fade/poof
-        }
-        else
-        {
-            Destroy(gameObject); // fallback
-        }
+// 🌫 Immediately hide trigger visuals so nothing lingers
+        DisableTriggerVisualsAndColliders();
 
+// (Optional) play poof, then remove the trigger object
+        StartCoroutine(PoofThenDispose(0.05f /* small beat */, usePooling: false));
+        
         yield return null;
     }
 

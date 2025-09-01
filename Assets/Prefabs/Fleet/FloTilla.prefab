@@ -19,7 +19,7 @@ GameObject:
   - component: {fileID: 3258746400435223215}
   m_Layer: 0
   m_Name: FloTilla
-  m_TagString: Untagged
+  m_TagString: Vehicle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -157,6 +157,7 @@ MonoBehaviour:
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   soulSprite: {fileID: 0}
+  profileColor: {r: 0, g: 0, b: 0, a: 0}
   minAlpha: 0.2
   maxAlpha: 1
   maxSpeed: 10
@@ -403,7 +404,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   vehicle: {fileID: 0}
-  boostPadding: 0.3
+  trackController: {fileID: 0}
+  visualizer: {fileID: 0}
 --- !u!1001 &6024373538657104726
 PrefabInstance:
   m_ObjectHideFlags: 0

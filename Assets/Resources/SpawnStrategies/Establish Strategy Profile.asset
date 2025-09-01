@@ -17,21 +17,63 @@ MonoBehaviour:
     trackModifierType: 0
     role: 2
     weight: 1
-    noteSetSeries: {fileID: 11400000, guid: 59a6fd4b1603a4d4d9d60735d016e98e, type: 2}
     quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
   - minedObjectType: 0
     trackModifierType: 0
-    role: 0
+    role: 2
     weight: 1
-    noteSetSeries: {fileID: 11400000, guid: d9f6e717c8c954ddf84973a62769495c, type: 2}
     quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
   - minedObjectType: 0
     trackModifierType: 0
     role: 1
     weight: 1
-    noteSetSeries: {fileID: 11400000, guid: 70fd7f1592a3543a6bd239bfbdc798a9, type: 2}
     quota: 1
-  nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
-  objectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
-    type: 2}
-  selectionMode: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
+  - minedObjectType: 0
+    trackModifierType: 0
+    role: 3
+    weight: 1
+    quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 1
+    weight: 1
+    quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 0
+    weight: 1
+    quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 2
+    weight: 1
+    quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0
+  - minedObjectType: 1
+    trackModifierType: 2
+    role: 2
+    weight: 1
+    quota: 1
+    allowedPhases: 000000000100000002000000030000000400000005000000
+    rarityTier: 0
+    requiresRemixToSpawn: 0

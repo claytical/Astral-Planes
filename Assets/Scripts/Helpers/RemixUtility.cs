@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "RemixUtility", menuName = "Astral Planes/Remix Utility")]
+[System.Serializable]
 public class RemixUtility : ScriptableObject
 {
     public MusicalRole targetRole;

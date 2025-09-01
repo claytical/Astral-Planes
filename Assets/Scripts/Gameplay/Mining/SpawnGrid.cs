@@ -5,7 +5,7 @@ public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
     public int gridHeight = 12;
-    private GridCell[,] gridCells;
+    public GridCell[,] gridCells;
     public float cellSize = 1f; // Adjust to match the world space size
 
     
@@ -233,7 +233,7 @@ public class SpawnGrid : MonoBehaviour
 public class GridCell
 {
     public bool isOccupied;
-    public GridObjectType objectType;
+    public GridObjectType objectType = GridObjectType.Empty;
 }
 
 public enum GridObjectType

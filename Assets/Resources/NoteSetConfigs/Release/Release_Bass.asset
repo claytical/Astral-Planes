@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53549c2c693944c64a6e92afb7868d8e, type: 3}
+  m_Name: Release_Bass
+  m_EditorClassIdentifier: 
+  role: 0
+  phase: 3
+  possibleScales: 00000000010000000300000002000000
+  possibleChordPatterns: 000000000100000002000000
+  possibleRhythmStyles: 0000000005000000030000000200000007000000
+  noteBehavior: 0

@@ -60,7 +60,7 @@ public class DrumTrack : MonoBehaviour
     public MusicalPhase? queuedPhase = null;
     private float loopLengthInSeconds;
     [SerializeField] private float loopDurationInSeconds = 8f;       // Duration of the loop.
-    private SpawnGrid spawnGrid;
+    public SpawnGrid spawnGrid;
     private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
     public List<GameObject> activeHexagons = new List<GameObject>();
 
@@ -444,7 +444,8 @@ public class DrumTrack : MonoBehaviour
 
         trackController.UpdateVisualizer();
     }
-    private void RemixTrack(InstrumentTrack track)
+
+    public void RemixTrack(InstrumentTrack track)
     {
         track.ClearLoopedNotes(TrackClearType.Remix);
         var noteSet = track.GetCurrentNoteSet();

@@ -109,7 +109,25 @@ public class InstrumentTrackController : MonoBehaviour
         return track;
     }
 
-    
+    public List<MusicalRole> RemixRoles()
+    {
+        var roles = tracks.Select(t => t.assignedRole).ToList();
+        for (int i = 0; i < roles.Count; i++)
+        {
+            int j = Random.Range(i, roles.Count);
+            (roles[i], roles[j]) = (roles[j], roles[i]);
+        }
+        return roles;
+    }
+    public void RemixTrackByRole(MusicalRole role)
+    {
+        var track = FindTrackByRole(role);
+        if (track != null && GameFlowManager.Instance.activeDrumTrack != null)
+        {
+            GameFlowManager.Instance.activeDrumTrack.RemixTrack(track);
+        }
+    }
+
     
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips, GameObject notesetPrefab)
     {
@@ -120,8 +138,15 @@ public class InstrumentTrackController : MonoBehaviour
 //TODO: NEEDED?
     public void UpdateVisualizer()
     {
-       // noteVisualizer.DisplayNotes(tracks.ToList());
+        if (noteVisualizer == null) return;
+
+        foreach (var track in tracks)
+        {
+            foreach (var (step, _, _, _) in track.GetPersistentLoopNotes())
+                noteVisualizer.PlacePersistentNoteMarker(track, step);
+        }
     }
+
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)

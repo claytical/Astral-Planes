@@ -30,6 +30,8 @@ public class GameFlowManager : MonoBehaviour
     private List<InstrumentTrack> activeTracks = new();
     public InstrumentTrackController controller;
     public DrumTrack activeDrumTrack;
+    public NoteSetFactory noteSetFactory;
+
     public void RegisterInstrumentTrack(InstrumentTrack track)
     {
      Debug.Log($"Register Instrument Track: {track.name}");
@@ -77,7 +79,13 @@ public class GameFlowManager : MonoBehaviour
                 { "TrackFinished", HandleTrackFinishedSceneSetup },
                 { "TrackSelection", HandleTrackSelectionSceneSetup },
             };
-
+            // Ensure noteSetFactory is found
+            if (noteSetFactory == null)
+            {
+                noteSetFactory = FindAnyObjectByType<NoteSetFactory>();
+                if (noteSetFactory == null)
+                    Debug.LogError("❌ NoteSetFactory could not be found in scene!");
+            }
 
         }
         else

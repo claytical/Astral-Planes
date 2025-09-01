@@ -62,7 +62,11 @@ public class Vehicle : MonoBehaviour
     private bool remixCharging = false;
     private Color currentColorBlend = Color.white;
     private VehicleRemixController remixController;
-    
+    private float envSpeedScale = 1f;
+    private float envAccelScale = 1f;
+    private float envExtraDamping = 0f;
+    private int   envStacks = 0;
+    private int   envInsideCount = 0;   // support overlapping dust
     void FixedUpdate()
         {
             if (incapacitated) return;
@@ -82,21 +86,23 @@ public class Vehicle : MonoBehaviour
             float fuelConsumption = 0f;
             float currentMaxSpeed = terminalVelocity;
             float appliedForce = 0f;
+// Always respect environment slow (even when not boosting)
+            currentMaxSpeed *= envSpeedScale;
 
             // Boosting movement
             if (boosting && energyLevel > 0)
             {
-                appliedForce = force * burnRateMultiplier * boostMultiplier;
-                currentMaxSpeed = terminalVelocity * 1.5f;
-
+                appliedForce = force * burnRateMultiplier * boostMultiplier; // existing【:contentReference[oaicite:10]{index=10}】
                 fuelConsumption = burnRateMultiplier * baseBurnAmount * Time.fixedDeltaTime;
 
                 if (remixController.HasRemixRoles())
                 {
                     remixController.FixedUpdateBoosting(Time.fixedDeltaTime, drumTrack.currentStep);
                     UpdateRemixParticleEmission();
-                } 
+                }
 
+                currentMaxSpeed *= envSpeedScale;
+                appliedForce    *= envAccelScale;
             }
             
             // Apply fuel drain (if any)
@@ -126,7 +132,21 @@ public class Vehicle : MonoBehaviour
             // Audio feedback
             audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
         }
-    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
+// Called by dust
+
+    public void EnterDustField(float speedScale, float accelScale) {
+        envInsideCount++;
+        envSpeedScale = Mathf.Min(envSpeedScale, speedScale);
+        envAccelScale = Mathf.Min(envAccelScale, accelScale);
+    }
+
+    public void ExitDustField() {
+        envInsideCount = Mathf.Max(0, envInsideCount - 1);
+        if (envInsideCount == 0) {
+            envSpeedScale = 1f;
+            envAccelScale = 1f;
+        }
+    }    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
     {
         if (collectedRemixRoles.Contains(role)) return;
 
@@ -354,8 +374,13 @@ public class Vehicle : MonoBehaviour
                 rb.rotation = angleDeg;
 
                 // Apply force in the direction of movement
-                Vector2 forceDirection = direction.normalized * force;
+                Vector2 forceDirection = direction.normalized * (force * envAccelScale);
                 rb.AddForce(forceDirection, ForceMode2D.Force);
+                if (envInsideCount > 0)
+                {
+                    rb.AddForce(-rb.linearVelocity * (1f - envAccelScale) * 3f, ForceMode2D.Force);
+                }
+
                 ConsumeEnergy(.01f);
 
             }

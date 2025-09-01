@@ -36,6 +36,11 @@ public class MineNodeSpawner : MonoBehaviour
         if (node != null)
         {
             node.Initialize(directive);
+            var gaits = node.GetComponent<MineNodeGaits>();
+            if (gaits != null)
+            {
+                gaits.SetPhaseProvider(() => drumTrack.progressionManager.GetCurrentPhaseName());
+            }
             drumTrack.OccupySpawnGridCell(cell.x, cell.y, GridObjectType.Node);
         }
         else

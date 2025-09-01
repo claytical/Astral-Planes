@@ -131,12 +131,14 @@ public class VehicleRemixController : MonoBehaviour
         {
             if (remixDirectives.TryGetValue(role, out var directive))
             {
+                Debug.Log($"Remix Directive Out: {directive}");
                 var track = trackController.FindTrackByRole(role);
-                if (track != null && directive?.remixUtility != null)
-                {
-                    Debug.Log($"Track: {track.name} Started");
+                Debug.Log($"Track: {track}");
 
-                    track.SetNoteSet(directive.noteSetSeries.GetRandomOrCuratedNoteSet());
+                if (track != null && directive?.remixUtility != null && directive.noteSet != null)
+                {
+                    Debug.Log($"Track: {track.name} Started with Directive Note Set: {directive.noteSet}");
+                    track.SetNoteSet(directive.noteSet);
                     track.PerformSmartNoteModification(vehicle.transform.position);
                 }
             }

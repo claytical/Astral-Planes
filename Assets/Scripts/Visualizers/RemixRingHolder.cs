@@ -57,9 +57,12 @@ public class RemixRingHolder : MonoBehaviour
     {
         for (int i = 0; i < ringSprites.Count; i++)
         {
-            if (ringSprites[i].enabled)
+            if (ringSprites[i] != null)
             {
-                ringSprites[i].color = newColor;
+                if (ringSprites[i].enabled)
+                {
+                    ringSprites[i].color = newColor;
+                }
             }
         }
     }

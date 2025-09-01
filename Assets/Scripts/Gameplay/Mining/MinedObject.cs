@@ -15,7 +15,6 @@ public class MinedObject : MonoBehaviour
     public MinedObjectType minedObjectType;
     public TrackModifierType? trackModifierType;
     public MusicalRole musicalRole;
-    [SerializeField] private NoteSetSeries noteSetSeries;
     private NoteSet currentNoteSet;
     private bool wasCollected = false;
     
@@ -79,12 +78,12 @@ public class MinedObject : MonoBehaviour
         }
 
     }
-    public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSetSeries noteSetSeries = null, TrackModifierType? modifier = null)
+    public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSet noteSet = null, TrackModifierType? modifier = null)
     {
         minedObjectType = type;
         assignedTrack = track;
-        this.noteSetSeries = noteSetSeries;
         this.trackModifierType = modifier;
+        currentNoteSet = noteSet;
         var explode = GetComponent<Explode>();
         if (explode != null)
         {
@@ -96,8 +95,7 @@ public class MinedObject : MonoBehaviour
 
         if (noteSpawnerMinedObject != null)
         {
-            NoteSet selectedNoteSet = noteSetSeries.GetRandomOrCuratedNoteSet();
-            noteSpawnerMinedObject.Initialize(assignedTrack, selectedNoteSet, noteSetSeries);
+            noteSpawnerMinedObject.Initialize(assignedTrack, noteSet);
         }
         
         MinedObjectVisualEffectController visualEffectController = GetComponent<MinedObjectVisualEffectController>();

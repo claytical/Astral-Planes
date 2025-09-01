@@ -19,7 +19,7 @@ GameObject:
   - component: {fileID: -1083081321893026294}
   m_Layer: 0
   m_Name: Drifter
-  m_TagString: Untagged
+  m_TagString: Vehicle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -85,13 +85,13 @@ SpriteRenderer:
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2531368812042023698, guid: 53593e74864dd4094a9409fe78eab4f4,
+  m_Sprite: {fileID: 4691761893896984221, guid: 698b919de63584cb5b93e17f4a498253,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.7490196}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.66, y: 0.66}
+  m_Size: {x: 2.36, y: 2.36}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -158,6 +158,7 @@ MonoBehaviour:
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   soulSprite: {fileID: 0}
+  profileColor: {r: 0, g: 0, b: 0, a: 0}
   minAlpha: 0.2
   maxAlpha: 1
   maxSpeed: 10
@@ -340,7 +341,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   vehicle: {fileID: 0}
-  boostPadding: 0.3
+  trackController: {fileID: 0}
+  visualizer: {fileID: 0}
 --- !u!1 &5958635974756898733
 GameObject:
   m_ObjectHideFlags: 0
