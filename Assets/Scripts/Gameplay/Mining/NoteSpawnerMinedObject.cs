@@ -8,7 +8,6 @@ using UnityEngine;
 public class NoteSpawnerMinedObject : MonoBehaviour
 {
     public MusicalRoleProfile musicalRole;
-    public NoteSetSeries noteSetSeries;
     private bool hasBeenTriggered = false;
 
     public InstrumentTrack assignedTrack;
@@ -21,12 +20,11 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         if (assignedTrack.drumTrack.collectionMode == NoteCollectionMode.TimedPuzzle)
             StartCoroutine(AutoFadeIfUncollected());
     }
-    public void Initialize(InstrumentTrack track, NoteSet noteSet, NoteSetSeries series = null)
+    public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
         assignedTrack = track;
         musicalRole = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         selectedNoteSet = noteSet;
-        noteSetSeries = series;
         if (track == null || noteSet == null)
         {
             Debug.LogWarning("NoteSpawnerMinedObject initialized with missing track or NoteSet.");
@@ -41,11 +39,6 @@ public class NoteSpawnerMinedObject : MonoBehaviour
 
         ApplyTrackVisuals(track.trackColor);
 
-        if (series == null)
-        {
-            // Attempt dynamic fallback
-            noteSetSeries = MusicalPhaseLibrary.GetNoteSetSeries(track.drumTrack.currentPhase, track.assignedRole);
-        }
         Explode explode = GetComponent<Explode>();
         if (explode != null)
         {

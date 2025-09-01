@@ -109,6 +109,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 {
                     hexScript.SwitchType(CosmicDust.CosmicDustType.Friendly);
                 }
+                Debug.Log($"Setting Phase");
+                
                 hexScript.SetPhaseColor(drumTrack.currentPhase);
                 hexScript.SetDrumTrack(drumTrack); 
                 hexScript.Begin();

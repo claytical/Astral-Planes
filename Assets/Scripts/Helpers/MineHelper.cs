@@ -19,7 +19,7 @@ public class MinedObjectSpawnDirective
     public MusicalRole role;
     public InstrumentTrack assignedTrack;
     public RemixUtility remixUtility;
-    public NoteSetSeries noteSetSeries;
+    public NoteSet noteSet;
     public TrackModifierType trackModifierType;
 
     public Color displayColor;
@@ -37,9 +37,7 @@ public class WeightedMineNode
 
     [Range(0, 100)]
     public int weight = 1;
-
-    public NoteSetSeries noteSetSeries;
-
+    
     public int quota = 1;
 
     [Tooltip("Leave empty for all phases")]
@@ -53,9 +51,12 @@ public class WeightedMineNode
 
     public MinedObjectSpawnDirective ToDirective(
         InstrumentTrack track,
+        NoteSet noteSet,
         Color color,
         MineNodePrefabRegistry nodeRegistry,
-        MinedObjectPrefabRegistry objectRegistry)
+        MinedObjectPrefabRegistry objectRegistry,
+        NoteSetFactory noteSetFactory,
+        MusicalPhase currentPhase)
     {
         Debug.Log($"🧭 Spawning directive for {minedObjectType} / {trackModifierType}");
 
@@ -72,19 +73,28 @@ public class WeightedMineNode
             }
         }
 
+        NoteSet generatedNoteSet = null;
+
+        if (minedObjectType == MinedObjectType.NoteSpawner && noteSetFactory != null)
+        {
+            generatedNoteSet = noteSetFactory.Generate(track, currentPhase);
+        }
+
         return new MinedObjectSpawnDirective
         {
             minedObjectType = this.minedObjectType,
             role = this.role,
             assignedTrack = track,
-            noteSetSeries = this.noteSetSeries,
+            //noteSetSeries = null, // 🔥 no longer needed in procedural system
             trackModifierType = this.trackModifierType,
             displayColor = color,
             minedObjectPrefab = objectRegistry.GetPrefab(minedObjectType, trackModifierType),
             prefab = nodeRegistry.GetPrefab(minedObjectType, trackModifierType),
-            remixUtility = remixUtil
+            remixUtility = remixUtil,
+            noteSet = generatedNoteSet // 🎯 Inject the runtime NoteSet
         };
     }
+
 
     public override string ToString()
     {

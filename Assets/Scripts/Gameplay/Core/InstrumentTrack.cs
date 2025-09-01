@@ -40,7 +40,11 @@ public class InstrumentTrack : MonoBehaviour
     public int CollectedNotesCount => persistentLoopNotes.Count;
     private HashSet<int> collectedStepsInCycle = new(); // Step indices collected this cycle
     private float ghostCycleDuration = 8f; // override if needed
-    
+    // Tracks spawned vs. collected ghost pattern notes this phase
+    private readonly Dictionary<int, (int note, int duration, float vel)> _ghostSpawnedByStep =
+        new Dictionary<int, (int, int, float)>();
+    private readonly HashSet<int> _ghostCollectedSteps = new HashSet<int>();
+
     // Define the smallest and largest scales for collectables.
      void Start()
     {
@@ -106,6 +110,12 @@ public class InstrumentTrack : MonoBehaviour
     public void RegisterSpawnedNotesThisPhase(List<(int stepIndex, int note, int duration, float velocity)> newNotes)
     {
         notesSpawnedThisPhase.AddRange(newNotes);
+        _ghostSpawnedByStep.Clear();
+        _ghostCollectedSteps.Clear();
+        foreach (var (s, n, d, v) in newNotes)
+        {
+            _ghostSpawnedByStep[s] = (n, d, v);
+        }
     }
     public bool IsTrackUtilityRelevant(TrackModifierType modifierType)
     {
@@ -664,8 +674,9 @@ private void ApplyNoteBehaviorChange(NoteSet noteSet, Vector3 sourcePosition)
             GameFlowManager.Instance?.UnregisterInstrumentTrack(this);
         }
     }
-    public void OnCollectableCollected(Collectable collectable, int _, int durationTicks, float force)
+    public void OnCollectableCollected(Collectable collectable, int step, int durationTicks, float force)
     {
+        _ghostCollectedSteps.Add(step);
         Debug.Log($"On Collectable Collected Called {collectable.name}");
         if (collectable.assignedInstrumentTrack != this)
         {
@@ -685,6 +696,26 @@ private void ApplyNoteBehaviorChange(NoteSet noteSet, Vector3 sourcePosition)
         spawnedCollectables.Remove(collectable.gameObject);
         Destroy(collectable.gameObject);
     }
+    public List<(int step, int note, int duration, float velocity)> GetMissedGhostPayloads()
+    {
+        var missed = new List<(int, int, int, float)>();
+        foreach (var kv in _ghostSpawnedByStep)
+        {
+            if (!_ghostCollectedSteps.Contains(kv.Key))
+            {
+                var (n, d, v) = kv.Value;
+                missed.Add((kv.Key, n, d, v));
+            }
+        }
+        return missed;
+    }
+
+    public void ResetGhostPhaseTracking()
+    {
+        _ghostSpawnedByStep.Clear();
+        _ghostCollectedSteps.Clear();
+    }
+
     private void ShowTetherEffect(Vector3 source, int stepIndex)
     {
         Vector3 target = controller.noteVisualizer.GetNoteMarkerPosition(this, stepIndex);

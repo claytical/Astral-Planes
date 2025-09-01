@@ -1,10 +1,19 @@
 using System.Collections;
+using System.Linq;
 using Gameplay.Mining;
 using UnityEngine;
 
+// Example interface the child directive could implement
+public interface IMinedObjectDirective
+{
+    string GetObjectType();         // e.g., "NoteSpawner", "LoopExpansion", "TrackClear", ...
+    string GetMusicalRole();        // e.g., "Bass", "Lead", "Harmony", "Groove"
+    int GetAssignedTrackIndex();    // 0..3 (or however many)
+}
+
+
 public class MineNode : MonoBehaviour
 {
-    public GameObject debrisPrefab;
     public SpriteRenderer coreSprite;
     public int maxStrength = 100;
     private int strength;
@@ -14,6 +23,7 @@ public class MineNode : MonoBehaviour
     private Color? lockedColor;
     private Rigidbody2D rb;
     private MinedObject minedObject;
+    
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -37,7 +47,7 @@ public class MineNode : MonoBehaviour
         Debug.Log($"Setting {obj} to inactive");
         obj.SetActive(false);
         Debug.Log($"Mined object {minedObject.name}");
-        minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSetSeries, directive.trackModifierType);
+        minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
         minedObject.assignedTrack.drumTrack.RegisterMinedObject(minedObject);
         minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
         NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
@@ -131,16 +141,6 @@ public class MineNode : MonoBehaviour
 
     private void SpawnDebris()
     {
-        for (int i = 0; i < 5; i++)
-        {
-            Vector3 offset = Random.insideUnitCircle * 0.5f;
-            GameObject chunk = Instantiate(debrisPrefab, transform.position + offset, Quaternion.identity);
-            chunk.transform.localScale = originalScale * 0.7f;
-            if (chunk.TryGetComponent(out Rigidbody2D debrisRb))
-                debrisRb.AddForce(Random.insideUnitCircle * 5f, ForceMode2D.Impulse);
-
-            Destroy(chunk, 3f);
-        }
     }
 
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)

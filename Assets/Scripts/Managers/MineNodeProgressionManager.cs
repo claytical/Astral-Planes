@@ -2,6 +2,7 @@ using System.Linq;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = System.Random;
 
 public class MineNodeProgressionManager : MonoBehaviour
 {
@@ -47,6 +48,12 @@ public class MineNodeProgressionManager : MonoBehaviour
         MusicalPhaseLibrary.InitializeProfiles(phaseProfiles);
         if (!drumTrack || !trackController)
             Debug.LogError("MineNodeProgressionManager is missing required components on the same GameObject.");
+    }
+
+    public RemixUtility GetRemixUtility()
+    {
+        int index =  UnityEngine.Random.Range(0, phaseQueue.phaseGroups[currentPhaseIndex].remixUtilities.Count);
+        return phaseQueue.phaseGroups[currentPhaseIndex].remixUtilities[index];
     }
     public void MoveToNextPhase(
         MusicalPhase? specificPhase = null,
@@ -106,10 +113,15 @@ public class MineNodeProgressionManager : MonoBehaviour
         {
             currentSpawnStrategy = selectedGroup.spawnStrategies[0];
         }
+        
         drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
         drumTrack.ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
     }
-
+    public string GetCurrentPhaseName()
+    {
+        var grp = phaseQueue.phaseGroups[GetCurrentPhaseIndex()];
+        return grp.phase.ToString(); // e.g., "Evolve", "Wildcard"
+    }
     public float GetHollowRadiusForCurrentPhase()
     {
         var group = phaseQueue.phaseGroups[currentPhaseIndex];

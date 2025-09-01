@@ -356,7 +356,7 @@ public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
 {
     foreach (var marker in GetNoteMarkers(track))
     {
-        StartCoroutine(RushToVehicle(marker, v));
+        StartCoroutine(RushToVehicle(marker, marker.transform.position, v));
     }
 }
 public void TriggerNoteBlastOff(InstrumentTrack track)
@@ -372,6 +372,7 @@ public void TriggerNoteBlastOff(InstrumentTrack track)
 
 private IEnumerator BlastOffAndDestroy(GameObject marker)
 {
+    if (marker == null) yield break;
     Vector3 start = marker.transform.position;
     Vector3 offset = UnityEngine.Random.insideUnitSphere * 2f;
     Vector3 end = start + offset;
@@ -382,12 +383,18 @@ private IEnumerator BlastOffAndDestroy(GameObject marker)
     {
         t += Time.deltaTime;
         float eased = Mathf.SmoothStep(0f, 1f, t / duration);
-        marker.transform.position = Vector3.Lerp(start, end, eased);
-        marker.transform.localScale = Vector3.Lerp(Vector3.one, Vector3.zero, eased);
+        if (marker != null)
+        {
+            marker.transform.position = Vector3.Lerp(start, end, eased);
+            marker.transform.localScale = Vector3.Lerp(Vector3.one, Vector3.zero, eased);
+        }
+
         yield return null;
     }
-    Explode explode = marker.GetComponent<Explode>();
-    if (explode != null)
+
+    if (marker == null) yield break;
+
+    if (marker.TryGetComponent<Explode>(out var explode))
     {
         explode.Permanent();
     }
@@ -395,6 +402,7 @@ private IEnumerator BlastOffAndDestroy(GameObject marker)
     {
         Destroy(marker);
     }
+    yield return null;
 }
 
 public List<GameObject> GetNoteMarkers(InstrumentTrack track)
@@ -415,9 +423,8 @@ public List<GameObject> GetNoteMarkers(InstrumentTrack track)
     return result;
 }
 
-private IEnumerator RushToVehicle(GameObject marker, Vehicle target)
+private IEnumerator RushToVehicle(GameObject marker, Vector3 position, Vehicle target)
 {
-    Vector3 start = marker.transform.position;
     float duration = 0.6f;
     float t = 0f;
 
@@ -425,17 +432,22 @@ private IEnumerator RushToVehicle(GameObject marker, Vehicle target)
     {
         t += Time.deltaTime;
         float eased = Mathf.SmoothStep(0f, 1f, t / duration);
-        marker.transform.position = Vector3.Lerp(start, target.transform.position, eased);
+        position = Vector3.Lerp(position, target.transform.position, eased);
         yield return null;
     }
-    Explode explode = marker.GetComponent<Explode>();
-    if (explode != null)
+
+    if (marker != null)
     {
-        explode.Permanent();
-    }
-    else
-    {
-        Destroy(marker);
+        Explode explode = marker.GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.Permanent();
+        }
+        else
+        {
+            Destroy(marker);
+        }
+        
     }
 }
 

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
   m_Name: Groove
   m_EditorClassIdentifier: 
-  role: 6
+  role: 3
   defaultColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 1}
   description: Percussive rhythms that give structure and drive.
   envelopeParticlePrefab: {fileID: 7704860281926021353, guid: 0a8f58ba4b35d41aa830206a1d369348,

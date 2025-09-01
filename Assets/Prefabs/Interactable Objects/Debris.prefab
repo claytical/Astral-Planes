@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4213040972611002}
+  - component: {fileID: 5907910837567832253}
   - component: {fileID: 3706479320875781435}
   - component: {fileID: 4993008824631711877}
   - component: {fileID: 8747843313378906591}
@@ -35,6 +36,25 @@ Transform:
   - {fileID: 3732494607500995976}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5907910837567832253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1be0bc7487a24594a80ec8fcf38e6fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  track: {fileID: 0}
+  step: 0
+  note: 0
+  duration: 0
+  velocity: 80
+  energyCost: 0.08
+  flyToRibbonDuration: 0.25
 --- !u!50 &3706479320875781435
 Rigidbody2D:
   serializedVersion: 5
@@ -43,7 +63,7 @@ Rigidbody2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1781116594832268}
-  m_BodyType: 0
+  m_BodyType: 1
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
@@ -58,7 +78,7 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 0
@@ -69,7 +89,7 @@ PolygonCollider2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 0}
@@ -92,7 +112,7 @@ PolygonCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -108,7 +128,7 @@ PolygonCollider2D:
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0, y: 0.5}
+    - - {x: 0, y: 0.6}
       - {x: 0.5, y: -0.3}
       - {x: -0.5, y: -0.3}
   m_UseDelaunayMesh: 0
@@ -126,8 +146,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
     type: 3}
-  lifetime: 2
-  randomizeLifetimer: 1
+  lifetime: 0
+  randomizeLifetimer: 0
 --- !u!1 &4604847092173952858
 GameObject:
   m_ObjectHideFlags: 0
@@ -140,6 +160,7 @@ GameObject:
   - component: {fileID: 7236654244480378721}
   - component: {fileID: 4213050659045031135}
   - component: {fileID: 5764885054334535137}
+  - component: {fileID: 5274384150108209221}
   m_Layer: 0
   m_Name: Triangle
   m_TagString: Untagged
@@ -157,7 +178,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.2, y: 0.2, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4213040972611002}
@@ -247,3 +268,53 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   colorCycleSpeed: 1
+--- !u!60 &5274384150108209221
+PolygonCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4604847092173952858}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.28866667}
+    oldSize: {x: 1, y: 1}
+    newSize: {x: 1, y: 0.8828125}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Points:
+    m_Paths:
+    - - {x: 0, y: 0.4}
+      - {x: -0.4, y: -0.2}
+      - {x: 0.4, y: -0.2}
+  m_UseDelaunayMesh: 0

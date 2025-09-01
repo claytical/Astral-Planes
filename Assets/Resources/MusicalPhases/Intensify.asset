@@ -16,13 +16,9 @@ MonoBehaviour:
   ghostLoopCount: 4
   roleNoteSetSeriesList:
   - role: 0
-    noteSetSeries: {fileID: 11400000, guid: b86e29b4562cc4bcfa6e54b5722c02ca, type: 2}
   - role: 1
-    noteSetSeries: {fileID: 11400000, guid: 035287ed3cb0845ed8421ae524042ebd, type: 2}
   - role: 2
-    noteSetSeries: {fileID: 11400000, guid: aa0e6904ce3f64f04b06ae5b7d2e86b4, type: 2}
   - role: 3
-    noteSetSeries: {fileID: 11400000, guid: 9b21a6d6515cc40f8aee019f41f37895, type: 2}
   drumClips:
   - {fileID: 8300000, guid: 417d325bbc85f4e349ada757fe5953fe, type: 3}
   - {fileID: 8300000, guid: 8ab1fdfa595ad4f468991bd940e69c5a, type: 3}

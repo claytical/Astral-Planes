@@ -15,6 +15,9 @@ GameObject:
   - component: {fileID: 2442014530722922072}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7493033509501386839}
+  - component: {fileID: 6181109060186163687}
+  - component: {fileID: 2404411601338668691}
+  - component: {fileID: 5945880808699000198}
   m_Layer: 0
   m_Name: Mine Node
   m_TagString: Untagged
@@ -253,3 +256,76 @@ PolygonCollider2D:
       - {x: 0.14999999, y: -0.36499998}
       - {x: 0.32, y: -0.36499998}
   m_UseDelaunayMesh: 0
+--- !u!114 &6181109060186163687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b053dc576c0b439292ad62c00011fd7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseMaxSpeed: 3
+  baseMaxForce: 10
+  wanderRadius: 1.75
+  wanderJitter: 2
+  evadeDistance: 6
+  hideDistanceInsideDust: 0.75
+  cosmicDustMask:
+    serializedVersion: 2
+    m_Bits: 128
+  playerTag: Vehicle
+  establishSpeedMul: 0.8
+  evolveSpeedMul: 1
+  intensifySpeedMul: 1.2
+  releaseSpeedMul: 0.9
+  wildcardSpeedMul: 1.35
+  popSpeedMul: 1.1
+  leadFrolicBias: 0.6
+  bassHideBias: 0.6
+  grooveEvadeBias: 0.6
+  harmonyOrbitBias: 0.6
+  trackWaypoints: []
+--- !u!114 &2404411601338668691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speedCapMul: 0.9
+  extraBrake: 0.25
+  lateralNudgeMul: 1
+  turbulenceMul: 1
+--- !u!114 &5945880808699000198
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7e54704abc8748509377aff03c1c443, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dustMask:
+    serializedVersion: 2
+    m_Bits: 128
+  senseRadius: 7
+  vehicleTag: Vehicle
+  trackWaypoints: []
+  wanderImpulse: 3
+  evadeImpulse: 4
+  dustSeekImpulse: 1.8
+  orbitImpulse: 1.2
+  maxSpeed: 10
+  impulseIntervalRange: {x: 0.25, y: 0.6}

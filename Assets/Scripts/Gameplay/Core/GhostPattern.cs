@@ -23,6 +23,8 @@ public class GhostPattern : MonoBehaviour
     private InstrumentTrack track;
     private NoteSet noteSet;
     private int notesPerLoop;
+    public static event System.Action OnHarvestComplete;
+
     public void Initialize(Vehicle vehicle, NoteSet noteSet, InstrumentTrack track, MusicalRoleProfile role)
     {
         foreach (var t in sprites)
@@ -58,7 +60,7 @@ public void Create()
 
     float loopSeconds   = track.drumTrack.GetLoopLengthInSeconds();
     int   gridWidth     = track.drumTrack.GetSpawnGridWidth();
-    int   gridHeight    = noteList.Count;
+    int   gridHeight    = track.drumTrack.GetSpawnGridHeight();
     float spawnChance   = GetSpawnChanceForPhase();
     List<Vector3> path  = new List<Vector3>();
     bool spawnedAny     = false;
@@ -80,11 +82,15 @@ public void Create()
             if (Random.value > spawnChance && spawnedAny) continue;
 
             Vector2Int gridPos = new Vector2Int(col, pitchIndex);
-            if (!track.drumTrack.IsSpawnCellAvailable(gridPos.x, gridPos.y)) continue;
-
-            Vector3 spawnPos   = track.drumTrack.GridToWorldPosition(gridPos);
+            var cell = track.drumTrack.spawnGrid.gridCells[gridPos.x, gridPos.y];
+            if (cell.isOccupied && cell.objectType == GridObjectType.Note)
+               continue;
             Vector3 driftStart = driftOrigin;
+            Vector3 gridTarget  = track.drumTrack.GridToWorldPosition(gridPos);  // carries the correct lane Y
+            Vector3 ribbonPos   = targetPositions[i];                            // full-width step X, but bad Y (bottom)
 
+// ✅ blend X from ribbon with Y (and Z) from the lane
+            Vector3 spawnPos    = new Vector3(ribbonPos.x, gridTarget.y, gridTarget.z);
             GameObject spawned = Instantiate(
                 track.collectablePrefab,
                 driftStart,
@@ -126,10 +132,27 @@ public void Create()
         ForceFallbackSpawn(noteList, stepList, nv, targetPositions, loopSeconds, path);
     }
 
+    StartCoroutine(WaitForTrackHarvestCompletion());
+}
+private IEnumerator WaitForTrackHarvestCompletion()
+{
+    // Wait until all collectables spawned in this cycle are gone
+    while (track != null && track.spawnedCollectables.Any(go => go != null))
+        yield return null;
+
+    // optional: give a tiny grace beat
+    yield return new WaitForSeconds(0.05f);
+
+    // signal the star that harvesting is done
+    OnHarvestComplete?.Invoke();
+
+    // clear UI state if you set it when spawning
+    GameFlowManager.Instance.SetGhostCycleState(false);
+
+    // end cycle cleanly
     track.OnGhostCycleEnded();
     Destroy(gameObject);
 }
-
 private void ForceFallbackSpawn(List<int> noteList, List<int> stepList, NoteVisualizer nv, List<Vector3> targetPositions, float loopSeconds, List<Vector3> path)
 {
     int gridWidth  = track.drumTrack.GetSpawnGridWidth();

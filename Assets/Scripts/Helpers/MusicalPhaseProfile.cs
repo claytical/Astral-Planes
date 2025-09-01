@@ -11,7 +11,6 @@ public class PhaseRoleStrategy
 public class RoleNoteSetSeries
 {
     public MusicalRole role;
-    public NoteSetSeries noteSetSeries;
 }
 
 [System.Serializable]
@@ -65,16 +64,6 @@ public class MusicalPhaseProfile : ScriptableObject
         return defaultRemixStrategy;
     }
 
-    public NoteSetSeries GetNoteSetSeriesForRole(MusicalRole role)
-    {
-        foreach (var pair in roleNoteSetSeriesList)
-        {
-            if (pair.role == role)
-                return pair.noteSetSeries;
-        }
-
-        return null; // fallback if needed
-    }
 
     public GhostPatternStrategy GetGhostStrategyForRole(MusicalRole role)
     {

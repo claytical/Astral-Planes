@@ -6,7 +6,6 @@ public class MinedObjectDirectiveProfile : ScriptableObject
 {
     public MinedObjectType minedObjectType;
     public MusicalRoleProfile role;
-    public NoteSetSeries noteSetSeries;
     public TrackModifierType trackModifierType;
     }
 [System.Serializable]

@@ -22,11 +22,6 @@ public static class MusicalPhaseLibrary
         _profiles = Resources.LoadAll<MusicalPhaseProfile>("MusicalPhases")
             .ToDictionary(p => p.phase, p => p);
     }
-    public static NoteSetSeries GetNoteSetSeries(MusicalPhase phase, MusicalRole role)
-    {
-        var profile = GetProfile(phase);
-        return profile?.GetNoteSetSeriesForRole(role);
-    }
 
     public static void InitializeProfiles(List<MusicalPhaseProfile> profiles)
     {

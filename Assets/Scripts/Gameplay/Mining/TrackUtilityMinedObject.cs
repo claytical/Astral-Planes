@@ -44,22 +44,23 @@ namespace Gameplay.Mining
             }
             directive = _directive;
         }
-    
-        private void OnTriggerEnter2D(Collider2D other)
+        void OnTriggerEnter2D(Collider2D other)
         {
-            Vehicle vehicle = other.GetComponent<Vehicle>();
-            if(vehicle == null) return;
             CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Aether);
-        
-            if (minedObject.assignedTrack == null)
+            var vehicle = other.GetComponent<Vehicle>();
+            if (vehicle != null)
             {
-                Debug.LogWarning("No track assigned to utility item.");
-                return;
-            }
-            vehicle.AddRemixRole(minedObject.assignedTrack, minedObject.musicalRole, directive);
-            GetComponent<Explode>()?.Permanent();
+                if (directive == null)
+                {
+                    Debug.LogError($"{name} ❌ directive is null in TrackUtilityMinedObject!");
+                    return;
+                }
 
+                vehicle.AddRemixRole(minedObject.assignedTrack, minedObject.musicalRole, directive);
+                GetComponent<Explode>()?.Permanent();
+            }
         }
+
 
 
         private void AddWalkingNotes(InstrumentTrack track, NoteSet noteSet)
@@ -69,7 +70,9 @@ namespace Gameplay.Mining
                 int note = noteSet.GetNextWalkingNote(step);
                 int duration = track.CalculateNoteDuration(step, noteSet);
                 float velocity = Random.Range(50f, 80f);
-                track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+                track.AddNoteToLoop(step, note, duration, velocity);
+                //track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+                
             }
         }
 
@@ -80,7 +83,9 @@ namespace Gameplay.Mining
                 int note = noteSet.GetPhraseNote(step);
                 int duration = track.CalculateNoteDuration(step, noteSet);
                 float velocity = Random.Range(70f, 100f);
-                track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+                track.AddNoteToLoop(step, note, duration, velocity);
+
+//                track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
             }
         }
 
@@ -93,7 +98,8 @@ namespace Gameplay.Mining
                     int note = noteSet.GetGrooveNote(out _);
                     int duration = track.CalculateNoteDuration(step, noteSet);
                     float velocity = Random.Range(80f, 110f);
-                    track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
+                    track.AddNoteToLoop(step, note, duration, velocity);
+//                    track.GetPersistentLoopNotes().Add((step, note, duration, velocity));
                 }
             }
         }
@@ -102,7 +108,9 @@ namespace Gameplay.Mining
         {
             int totalSteps = track.GetTotalSteps();
             int note = noteSet.GetSustainedNote();
-            track.GetPersistentLoopNotes().Add((0, note, totalSteps, 80f));
+            track.AddNoteToLoop(0, note, totalSteps, 80f);
+          
+//            track.GetPersistentLoopNotes().Add((0, note, totalSteps, 80f));
         }
     
         private void SoloTrackWithBassSupport(InstrumentTrack keepTrack)
