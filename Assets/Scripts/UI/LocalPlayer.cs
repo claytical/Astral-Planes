@@ -24,6 +24,7 @@ public class LocalPlayer : MonoBehaviour
     private Vector2 moveInput;
     private bool suppressChoose = true;
     private bool confirmEnabled = false;
+    private bool decelerate = false;
     private InputAction confirmAction;
     public float friction = 0.5f;
     public bool IsReady
@@ -107,6 +108,14 @@ public class LocalPlayer : MonoBehaviour
         GameObject vehicle = Instantiate(playerVehicle, transform);
         plane = vehicle.GetComponent<Vehicle>();
         plane.SetDrumTrack(drums);
+        var hd = FindAnyObjectByType<HarmonyDirector>();
+        if (hd != null)
+        {
+            plane.SetHarmony(hd);                 // new helper on Vehicle
+            hd.Initialize(drums, GameFlowManager.Instance.controller,
+                FindAnyObjectByType<ChordChangeArpeggiator>());
+        }
+
         playerStats = GetComponent<PlayerStatsTracking>();
 
         if (plane != null)
@@ -148,9 +157,6 @@ public class LocalPlayer : MonoBehaviour
     }
 
     // Input System Actions
-    void Update()
-    {
-    }
 
     void FixedUpdate()
     {
@@ -158,6 +164,10 @@ public class LocalPlayer : MonoBehaviour
         if (plane != null && moveInput.sqrMagnitude > 0.01f)
         {
             plane.Move(moveInput);
+            if (decelerate)
+            {
+                moveInput = Vector2.zero;
+            }
         }
     }
     public void OnMove(InputValue value)
@@ -165,6 +175,11 @@ public class LocalPlayer : MonoBehaviour
         moveInput = value.Get<Vector2>().normalized * friction;
     }
 
+    public void OnMouseMove(InputValue value)
+    {
+        Debug.Log($"OnMouseMove: {value}");
+        moveInput = value.Get<Vector2>().normalized * friction;
+    }
     public void OnQuit(InputValue value)
     {
         if (GameFlowManager.Instance.CurrentState == GameState.GameOver)
@@ -231,10 +246,43 @@ public class LocalPlayer : MonoBehaviour
     }
 
     // Wildcard Glitch Toggles
-    public void OnNorth(InputValue value) => ToggleGlitch(0);
-    public void OnEast(InputValue value) => ToggleGlitch(1);
-    public void OnWest(InputValue value) => ToggleGlitch(2);
-    public void OnSouth(InputValue value) => ToggleGlitch(3);
+    public void OnNorth(InputValue value)
+    {
+        moveInput = Vector2.up * friction;
+        if (!value.isPressed)
+        {
+            decelerate = true;
+        }
+    }
+
+    public void OnEast(InputValue value)
+    {
+        moveInput = Vector2.right * friction;
+        if (!value.isPressed)
+        {
+            decelerate = true;
+        }
+
+    }
+
+    public void OnWest(InputValue value)
+    {
+        moveInput = Vector2.left * friction;
+        if (!value.isPressed)
+        {
+            decelerate = true;
+        }
+
+    }
+
+    public void OnSouth(InputValue value)
+    {
+        moveInput = Vector2.down * friction;
+        if (!value.isPressed)
+        {
+            decelerate = true;
+        }
+    }
 
     private void ToggleGlitch(int index)
     {

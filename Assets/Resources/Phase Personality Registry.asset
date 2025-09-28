@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db8607fd370144da8ae212d6a3bb9f5d, type: 3}
+  m_Name: Phase Personality Registry
+  m_EditorClassIdentifier: 
+  entries:
+  - phase: 0
+    profile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
+  - phase: 1
+    profile: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  - phase: 2
+    profile: {fileID: 11400000, guid: fcae745cbd76a45b6b5643bb787cde8c, type: 2}

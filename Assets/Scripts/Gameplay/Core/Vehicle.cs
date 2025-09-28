@@ -9,10 +9,7 @@ public class Vehicle : MonoBehaviour
 {
     public float capacity = 10f;
     public float energyLevel;
-    public GameObject teleportationParticles;
-    public GameObject trailParticlePrefab;
     public ParticleSystem remixParticleEffect;
-    public GameObject ghostVehiclePrefab;
     public float force = 10f;
     public float terminalVelocity = 20f;
     public float boostMultiplier = 2f;
@@ -67,6 +64,7 @@ public class Vehicle : MonoBehaviour
     private float envExtraDamping = 0f;
     private int   envStacks = 0;
     private int   envInsideCount = 0;   // support overlapping dust
+    [SerializeField] HarmonyDirector harmony;
     void FixedUpdate()
         {
             if (incapacitated) return;
@@ -132,7 +130,6 @@ public class Vehicle : MonoBehaviour
             // Audio feedback
             audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
         }
-// Called by dust
 
     public void EnterDustField(float speedScale, float accelScale) {
         envInsideCount++;
@@ -146,7 +143,8 @@ public class Vehicle : MonoBehaviour
             envSpeedScale = 1f;
             envAccelScale = 1f;
         }
-    }    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
+    }    
+    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
     {
         if (collectedRemixRoles.Contains(role)) return;
 
@@ -213,7 +211,7 @@ public class Vehicle : MonoBehaviour
             remixParticleEffect.Play();
     }
 
-    public void ApplyTrackColorToShip(Color newColor)
+    private void ApplyTrackColorToShip(Color newColor)
     {
         if (currentColorBlend == profileColor)
             currentColorBlend = newColor;
@@ -222,7 +220,6 @@ public class Vehicle : MonoBehaviour
 
         shipRenderer.color = currentColorBlend;
     }
-
 
     void Start()
         {
@@ -266,35 +263,6 @@ public class Vehicle : MonoBehaviour
             lastPosition = transform.position;
             SyncEnergyUI();
         }
-
-
-    private void StartRainbowEffect()
-        {
-            if (rainbowRoutine != null) return;
-            rainbowRoutine = StartCoroutine(RainbowPulse());
-        }
-
-    private void StopRainbowEffect()
-        {
-            if (rainbowRoutine != null)
-            {
-                StopCoroutine(rainbowRoutine);
-                rainbowRoutine = null;
-                shipRenderer.color = Color.white; // or reset to base
-            }
-        }
-
-    private IEnumerator RainbowPulse()
-        {
-            float hue = 0f;
-            while (true)
-            {
-                hue += Time.deltaTime * 0.2f;
-                if (hue > 1f) hue -= 1f;
-                shipRenderer.color = Color.HSVToRGB(hue, 0.8f, 1f);
-                yield return null;
-            }
-        }
     
     public void SyncEnergyUI()
         {
@@ -318,15 +286,14 @@ public class Vehicle : MonoBehaviour
         }
     
 
-    private void EvaluateRemixCondition()
-        {
-            if(remixController.EvaluateRemixCondition())
-            {
-                TurnOffBoost();
-                boostTimeThisLoop = 0;
-            }
+    private void EvaluateRemixCondition() {
+       if(remixController.EvaluateRemixCondition()) {
+       }
+    }
             
-        }
+    public void SetHarmony(HarmonyDirector h) { harmony = h; }
+    
+
     public int GetForceAsDamage()
         {
             float speed = rb.linearVelocity.magnitude;
@@ -407,39 +374,26 @@ public class Vehicle : MonoBehaviour
                 activeTrail.GetComponent<TrailRenderer>().emitting = true; // Enable the trail's emission
             }
         }
-
-
-    public void ApplyImpulse(Vector2 force)
-        {
-            if (TryGetComponent<Rigidbody2D>(out var rb))
-            {
-                rb.AddForce(force, ForceMode2D.Impulse);
-            }
-        }
-    public void ApplyGravitationalForce(Vector2 force)
-        {
-            if (TryGetComponent<Rigidbody2D>(out var rb))
-            {
-                rb.AddForce(force, ForceMode2D.Force);
-            }
-        }
-
+    
     public void TurnOnBoost(float triggerValue)
     {
         if (energyLevel > 0 && !boosting)
         {
             boosting = true;
 
-            if (audioManager != null && thrustClip != null)
-            {
-                audioManager.PlayLoopingSound(thrustClip, .5f);
-            }
+            // seconds remaining in the current drum loop (with a small safety pad)
+            float remain = drumTrack.GetTimeToLoopEnd();   // <- use the helper
+            harmony?.BeginBoostArp(Mathf.Max(0.05f, remain)); // start arp toward the loop end
 
-            Fly(); // Activate the trail when boosting start
+            if (audioManager != null && thrustClip != null)
+                audioManager.PlayLoopingSound(thrustClip, .5f);
+
+            Fly();
         }
 
-        burnRateMultiplier = Mathf.Max(0.2f, triggerValue); // Ensure a minimum multiplier for adequate thrust
+        burnRateMultiplier = Mathf.Max(0.2f, triggerValue);
     }
+
     public void TurnOffBoost()
     {
         if (audioManager != null)
@@ -447,6 +401,7 @@ public class Vehicle : MonoBehaviour
             audioManager.StopSound();
         }
         boosting = false;
+        harmony?.CancelBoostArp();
         remixController.ResetRemixVisuals();
         burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
@@ -501,6 +456,7 @@ public class Vehicle : MonoBehaviour
 
 
         }
+   
     public void CollectEnergy(int amount)
         {
             energyLevel += amount;
@@ -518,8 +474,6 @@ public class Vehicle : MonoBehaviour
             
         }
     
-
-   
     private void ClampAngularVelocity()
         {
             float maxAngularVelocity = 540f;

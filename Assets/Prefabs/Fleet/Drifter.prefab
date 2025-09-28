@@ -85,13 +85,13 @@ SpriteRenderer:
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 0
-  m_Sprite: {fileID: 4691761893896984221, guid: 698b919de63584cb5b93e17f4a498253,
+  m_Sprite: {fileID: -7208588322343283277, guid: c762d6baab2ed4782a9e8baa77882665,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.7490196}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 2.36, y: 2.36}
+  m_Size: {x: 0.64, y: 0.64}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -166,6 +166,7 @@ MonoBehaviour:
   shipRenderer: {fileID: 0}
   remixRingHolder: {fileID: 7343128530655426899}
   boostPadding: 0.3
+  harmony: {fileID: 0}
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -191,8 +192,7 @@ AudioSource:
   m_GameObject: {fileID: 5120608187766906454}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -854998193656957392, guid: 07985bf4f6d469340930e958ef313c14,
-    type: 2}
+  OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
@@ -327,7 +327,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.33
+  m_Radius: 0.25
 --- !u!114 &-1083081321893026294
 MonoBehaviour:
   m_ObjectHideFlags: 0

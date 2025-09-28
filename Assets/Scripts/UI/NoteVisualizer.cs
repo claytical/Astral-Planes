@@ -20,6 +20,8 @@ public class NoteVisualizer : MonoBehaviour
     public int ribbonResolution = 64;
     private List<LineRenderer> ribbons = new List<LineRenderer>();
     public GameObject notePrefab;
+    public GameObject noteTetherPrefab;
+
 
     [Header("Ribbon Animation")]
     public float waveSpeed = 2f;
@@ -58,6 +60,13 @@ public class NoteVisualizer : MonoBehaviour
         {
             waveAmplitudes[track] = 0; // Initial wavy state
         }
+        foreach (var row in trackRows)
+        {
+            row.anchorMin = new Vector2(0f, row.anchorMin.y);
+            row.anchorMax = new Vector2(1f, row.anchorMax.y);
+            row.offsetMin = new Vector2(0f, row.offsetMin.y);
+            row.offsetMax = new Vector2(0f, row.offsetMax.y);
+        }
     }
 
 
@@ -74,42 +83,41 @@ public class NoteVisualizer : MonoBehaviour
         return uiParent;
     }
 
-    void Update()
+  void Update()
 {
     if (playheadLine == null || drums == null || tracks == null)
         return;
 
+    // --- Playhead (same logic, just safer clamps) ---
     float globalElapsed = (float)(AudioSettings.dspTime - drums.startDspTime);
     float baseLoopLength = drums.GetLoopLengthInSeconds();
     int globalLoopMultiplier = tracks.GetMaxLoopMultiplier();
-    float fullVisualLoopDuration = baseLoopLength * globalLoopMultiplier;
-
+    float fullVisualLoopDuration = Mathf.Max(0.0001f, baseLoopLength * Mathf.Max(1, globalLoopMultiplier));
     float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
-    float xPos = globalNormalized * GetScreenWidth();
+
+    float canvasWidth = GetScreenWidth();
+    float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
     playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
 
-    int longestLoopSteps = tracks.tracks.Max(track => track.GetTotalSteps());
-    float drumLoopLength   = drums.GetLoopLengthInSeconds();
-    int   drumTotalSteps   = drums.totalSteps;
-    float stepDuration     = drumLoopLength / drumTotalSteps;
-    float windowSeconds    = stepDuration * 2f;
-    float drumElapsed      = (float)((AudioSettings.dspTime - drums.startDspTime) % drumLoopLength);
-    
-    int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % drumTotalSteps; 
-    bool shimmer = false;
-    float maxVelocity = 0;
+    // --- Drum timing / velocity shimmer ---
+    int   drumTotalSteps = drums.totalSteps;
+    float drumLoopLength = drums.GetLoopLengthInSeconds();
+    float stepDuration   = Mathf.Max(0.0001f, drumLoopLength / Mathf.Max(1, drumTotalSteps));
+    float drumElapsed    = (float)((AudioSettings.dspTime - drums.startDspTime) % drumLoopLength);
 
-    foreach (var track in tracks.tracks) {
+    int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % Mathf.Max(1, drumTotalSteps);
+
+    bool shimmer = false; float maxVelocity = 0f;
+    foreach (var track in tracks.tracks)
+    {
         float v = track.GetVelocityAtStep(currentStep);
         maxVelocity = Mathf.Max(maxVelocity, v / 127f);
         if (ghostNoteSteps.TryGetValue(track, out var steps) && steps.Contains(currentStep))
         {
-            shimmer = true;
-            break;
+            shimmer = true; break;
         }
     }
-    
-    // 🔹 Apply visual response to the particle system
+
     if (playheadParticles != null)
     {
         var main = playheadParticles.main;
@@ -118,115 +126,104 @@ public class NoteVisualizer : MonoBehaviour
         emission.rateOverTime = Mathf.Lerp(10f, 50f, maxVelocity);
         emission.enabled = shimmer;
 
-        var colorOverLifetime = playheadParticles.colorOverLifetime;
-        if (colorOverLifetime.enabled)
+        var col = playheadParticles.colorOverLifetime;
+        if (col.enabled)
         {
-            Gradient grad = new Gradient();
-            grad.SetKeys(
-                new[] {
-                    new GradientColorKey(Color.white, 0.0f),
-                    new GradientColorKey(Color.cyan, 1.0f)
-                },
-                new[] {
-                    new GradientAlphaKey(0.4f + maxVelocity * 0.5f, 0.0f),
-                    new GradientAlphaKey(0.1f, 1.0f)
-                }
+            Gradient g = new Gradient();
+            g.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.cyan, 1f) },
+                new[] { new GradientAlphaKey(0.4f + maxVelocity * 0.5f, 0f), new GradientAlphaKey(0.1f, 1f) }
             );
-            colorOverLifetime.color = grad;
+            col.color = g;
         }
     }
 
-    // 🔹 Animate the ribbons with correct time alignment
+    // --- Ribbons: build in ROW-LOCAL space; write world-space into step map ---
+    int longestLoopSteps = tracks.tracks.Max(t => t.GetTotalSteps());
+
     for (int i = 0; i < ribbons.Count; i++)
     {
-        LineRenderer lr = ribbons[i];
-        RectTransform row = trackRows[i];
-        Vector3[] corners = new Vector3[4];
-        row.GetWorldCorners(corners);
+        LineRenderer   lr   = ribbons[i];
+        RectTransform  row  = trackRows[i];
         InstrumentTrack track = tracks.tracks[i];
 
-        Vector3[] positions = new Vector3[ribbonResolution];
-        float width = row.rect.width;
-        int trackSteps = track.GetTotalSteps();
+        Rect rowRect  = row.rect;
+        float xLeft   = rowRect.xMin;
+        float xRight  = rowRect.xMax;
+        float yMid    = (rowRect.yMin + rowRect.yMax) * 0.5f;
 
-        // NEW: Step position cache
+        float amplitude = waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
+
+        // local-space positions for the LR
+        int res = Mathf.Max(2, ribbonResolution);
+        Vector3[] localPositions = new Vector3[res];
+
+        // world-space lookup for markers/tethers (keyed by GLOBAL step)
         Dictionary<int, Vector3> stepMap = new Dictionary<int, Vector3>();
 
-        for (int j = 0; j < ribbonResolution; j++)
+        for (int j = 0; j < res; j++)
         {
-            float tGlobal = j / (float)(ribbonResolution); // normalized 0–1 across longest loop
-            int globalStep = Mathf.FloorToInt(tGlobal * longestLoopSteps);
-            int trackStep = Mathf.FloorToInt((globalStep / (float)longestLoopSteps) * trackSteps);
+            float t01        = j / (float)(res - 1);                    // 0..1 across the row width
+            int   globalStep = Mathf.FloorToInt(t01 * longestLoopSteps);
 
-            float x = tGlobal * width;
-            float activeNoteVelocity = 0f;
+            float xLocal = Mathf.Lerp(xLeft, xRight, t01);
 
-            if (ghostNoteSteps.TryGetValue(track, out var ghostSteps))
-            {
-                if (ghostSteps.Contains(trackStep))
-                {
-                    activeNoteVelocity = 0.3f; // or any fixed ghost visibility value
-                }
-            } 
-           
-//            float y = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * waveAmplitude;
-            float amplitude = waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
-            float y = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * amplitude;
+            // vertical wave in local Y (kept! no overwrite)
+            float yOffset = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * amplitude;
+            float yLocal  = yMid + yOffset;
 
-            Vector3 localPos = new Vector3(x, y, 0);
-            Vector3 worldPos = lr.transform.TransformPoint(localPos);
-            lr.useWorldSpace = false;
-            positions[j] = localPos;
+            Vector3 localPos = new Vector3(xLocal, yLocal, 0f);
+            localPositions[j] = localPos;
 
-            if (!stepMap.ContainsKey(trackStep))
-                stepMap[globalStep] = worldPos; // ✅ now using global step
+            // store a precise WORLD position for this global step
+            if (!stepMap.ContainsKey(globalStep))
+                stepMap[globalStep] = row.TransformPoint(localPos);
         }
 
-        lr.SetPositions(positions);
-// Relative density calc
-        int maxNotes = tracks.tracks.Max(t => t.GetNoteDensity());
-        int trackNotes = track.GetNoteDensity();
-        if (trackNotes == 0)
-        {
-            trackNotes = 1;
-        }
+        lr.positionCount = res;
+        lr.SetPositions(localPositions); // useWorldSpace = false
+
+        // width/color by density
+        int maxNotes   = tracks.tracks.Max(t => t.GetNoteDensity());
+        int trackNotes = Mathf.Max(1, track.GetNoteDensity());
         float densityT = (maxNotes > 0) ? (float)trackNotes / maxNotes : 0f;
-// Width scaling (pop well-worn track)
-        float minWidth = 1f;
-        float maxWidth = 3f;
+
+        float minWidth = 1f, maxWidth = 3f;
         float targetWidth = Mathf.Lerp(minWidth, maxWidth, densityT);
         lr.widthMultiplier = targetWidth;
         ribbonWidths[track] = targetWidth;
 
-// Color vibrancy scaling
         Color baseColor = track.trackColor;
-        float vibrancy = Mathf.Lerp(0.5f, 1f, densityT); // Half-saturated to full
-        Color scaledColor = baseColor * vibrancy;
-        scaledColor.a = Mathf.Lerp(0.1f, 0.65f, densityT);
-        lr.startColor = lr.endColor = scaledColor;
+        float vibrancy  = Mathf.Lerp(0.5f, 1f, densityT);
+        Color scaled    = baseColor * vibrancy; scaled.a = Mathf.Lerp(0.1f, 0.65f, densityT);
+        lr.startColor = lr.endColor = scaled;
         ribbonIntensities[track] = vibrancy;
 
-
+        // publish step map
         trackStepWorldPositions[track] = stepMap;
     }
+
+    // keep marker sync + vine anim
     UpdateNoteMarkerPositions();
 
-    // 2) Compute how far we are into the *drum* loop
-    double dspNow       = AudioSettings.dspTime;
-    double sinceStart   = dspNow - drums.startDspTime;
-    
+    float windowSeconds = stepDuration * 2f;
+    float dElapsed      = drumElapsed;
     foreach (var track in tracks.tracks)
     {
-        foreach (var collectableGO in track.spawnedCollectables)
+        foreach (var go in track.spawnedCollectables)
         {
-            if (collectableGO == null) continue;
-            if (!collectableGO.TryGetComponent(out GhostNoteVine vine)) continue;
-            vine.AnimateToNextStep(drumElapsed, stepDuration, windowSeconds);
+            if (go == null) continue;
+            if (!go.TryGetComponent(out GhostNoteVine vine)) continue;
+            vine.AnimateToNextStep(dElapsed, stepDuration, windowSeconds);
         }
     }
-
 }
-
+public Transform EnsureMarker(InstrumentTrack track, int step)
+{
+    var go = PlacePersistentNoteMarker(track, step);
+    if (go != null) return go.transform;
+    return noteMarkers.TryGetValue((track, step), out var t) ? t : null;
+}
     public List<Vector3> GetRibbonWorldPositionsForSteps(InstrumentTrack track, List<int> steps)
 {
     var result = new List<Vector3>();
@@ -240,27 +237,25 @@ public class NoteVisualizer : MonoBehaviour
     }
     return result;
 }
+// NoteVisualizer.cs
     public Vector3 ComputeRibbonWorldPosition(InstrumentTrack track, int stepIndex)
     {
         int trackIndex = System.Array.IndexOf(tracks.tracks, track);
         if (trackIndex < 0 || trackIndex >= ribbons.Count) return transform.position;
 
         RectTransform row = trackRows[trackIndex];
-        Vector3[] corners = new Vector3[4];
-        row.GetWorldCorners(corners);
-        Debug.Log($"Row WorldCorners: BL={corners[0]}, TL={corners[1]}, TR={corners[2]}, BR={corners[3]}");
+        Rect rowRect = row.rect;
 
         int totalSteps = track.GetTotalSteps();
-        float t = stepIndex / (float)totalSteps;
+        float t = Mathf.Clamp01(stepIndex / (float)totalSteps);
 
-        float x = t * row.rect.width;
-        float y = row.rect.height * 0.5f; // 🧠 Use midpoint of the ribbon row
+        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t);
+        float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
 
-        Vector3 localPos = new Vector3(x, y, 0f);
-        Vector3 worldPos = row.TransformPoint(localPos); // ⬅️ Converts to world space
-        
-        return worldPos;
+        Vector3 localPos = new Vector3(xLocal, yLocal, 0f);
+        return row.TransformPoint(localPos);
     }
+
 public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
 {
     if (noteMarkers.TryGetValue((track, stepIndex), out var markerTransform))
@@ -272,60 +267,69 @@ public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
     return ComputeRibbonWorldPosition(track, stepIndex);
 }
 
-public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex)
-{
-    var key = (track, stepIndex);
-    if (noteMarkers.ContainsKey(key)) return null;
-
-    if (!trackStepWorldPositions.TryGetValue(track, out var map)) return null;
-
-    // Convert local step to global step index
-    int globalSteps = tracks.tracks.Max(t => t.GetTotalSteps());
-    int trackSteps = track.GetTotalSteps();
-    int globalStep = Mathf.FloorToInt((stepIndex / (float)trackSteps) * globalSteps);
-
-    if (!map.TryGetValue(globalStep, out var worldPos)) return null;
-
-    GameObject marker = Instantiate(notePrefab, worldPos, Quaternion.identity, transform);
-    noteMarkers[key] = marker.transform;
-    return marker;
-}
-private void UpdateNoteMarkerPositions()
-{
-    int globalSteps = tracks.tracks.Max(t => t.GetTotalSteps());
-    var deadKeys = new List<(InstrumentTrack, int)>();
-
-    foreach (var kvp in noteMarkers)
+// NoteVisualizer.cs
+    public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex)
     {
-        InstrumentTrack track = kvp.Key.Item1;
-        int localStep = kvp.Key.Item2;
-        Transform marker = kvp.Value;
+        var key = (track, stepIndex);
+        if (noteMarkers.ContainsKey(key)) return null;
 
-        // Null check to avoid the MissingReferenceException
-        if (marker == null)
-        {
-            deadKeys.Add(kvp.Key); // Mark for cleanup
-            continue;
-        }
+        int trackIndex = Array.IndexOf(tracks.tracks, track);
+        if (trackIndex < 0 || trackIndex >= trackRows.Count) return null;
 
-        if (!trackStepWorldPositions.TryGetValue(track, out var map))
-            continue;
+        // Compute local position in the row (not world)
+        RectTransform row = trackRows[trackIndex];
+        Rect rowRect = row.rect;
 
-        int trackSteps = track.GetTotalSteps();
-        int globalStep = Mathf.FloorToInt((localStep / (float)trackSteps) * globalSteps);
+        int totalSteps = track.GetTotalSteps();
+        float t = Mathf.Clamp01(stepIndex / (float)totalSteps);
+        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t);
+        float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
 
-        if (map.TryGetValue(globalStep, out var worldPos))
-        {
-            marker.position = worldPos;
-        }
+        // Parent under the row and place in local space
+        GameObject marker = Instantiate(notePrefab, Vector3.zero, Quaternion.identity, row);
+        marker.transform.localPosition = new Vector3(xLocal, yLocal, 0f);
+
+        noteMarkers[key] = marker.transform;
+        return marker;
     }
 
-    // Cleanup dead entries
-    foreach (var key in deadKeys)
+    private void UpdateNoteMarkerPositions()
     {
-        noteMarkers.Remove(key);
+        int globalSteps = tracks.tracks.Max(t => t.GetTotalSteps());
+        var deadKeys = new List<(InstrumentTrack, int)>();
+
+        foreach (var kvp in noteMarkers)
+        {
+            InstrumentTrack track = kvp.Key.Item1;
+            int localStep = kvp.Key.Item2;
+            Transform marker = kvp.Value;
+
+            if (marker == null) { deadKeys.Add(kvp.Key); continue; }
+
+            if (!trackStepWorldPositions.TryGetValue(track, out var map))
+                continue;
+
+            int trackIndex = Array.IndexOf(tracks.tracks, track);
+            if (trackIndex < 0 || trackIndex >= trackRows.Count) continue;
+
+            RectTransform row = trackRows[trackIndex];
+
+            // Convert the world point map back to the row's local space,
+            // then assign localPosition so it never exceeds the row width.
+            int trackSteps = track.GetTotalSteps();
+            int globalStep = Mathf.FloorToInt((localStep / (float)trackSteps) * globalSteps);
+
+            if (map.TryGetValue(globalStep, out var worldPos))
+            {
+                Vector3 localPos = row.InverseTransformPoint(worldPos);
+                marker.localPosition = localPos;
+            }
+        }
+
+        foreach (var key in deadKeys)
+            noteMarkers.Remove(key);
     }
-}
+
 public float GetWaveAmplitude(InstrumentTrack track)
 {
     if (waveAmplitudes.TryGetValue(track, out var amplitude))

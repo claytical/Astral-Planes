@@ -37,15 +37,13 @@ public class DrumTrack : MonoBehaviour
     public GameObject phaseStarPrefab;
     public MineNodePrefabRegistry nodePrefabRegistry;
     public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
+    public PhasePersonalityRegistry phasePersonalityRegistry; 
     public StarProgressUI starProgressUI;
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
     public GalaxyVisualizer galaxyVisualizer;
-    [Header("Dark Star Mode")]
-    public bool darkStarModeEnabled = false;
+    [Header("Star Mode")]
     public NoteCollectionMode collectionMode = NoteCollectionMode.TimedPuzzle;
-    public AudioClip darkStarDrumLoop;
-    //public AudioClip normalDrumLoop; // optional fallback
     [Header("Drum Pattern Visuals")]
     public List<DrumLoopPatternVisual> patternVisuals;
     public int totalSteps = 32;
@@ -59,13 +57,14 @@ public class DrumTrack : MonoBehaviour
     private float gridCheckInterval = 10f;
     public MusicalPhase? queuedPhase = null;
     private float loopLengthInSeconds;
-    [SerializeField] private float loopDurationInSeconds = 8f;       // Duration of the loop.
+//    [SerializeField] private float loopDurationInSeconds = 8f;       // Duration of the loop.
     public SpawnGrid spawnGrid;
     private List<GameObject> activeNodes = new List<GameObject>(); // Track spawned nodes
     public List<GameObject> activeHexagons = new List<GameObject>();
 
     private PhaseTransitionManager phaseTransitionManager;
-    private List<MinedObject> activeMinedObjects = new List<MinedObject>();
+    public List<MinedObject> activeMinedObjects = new List<MinedObject>();
+    public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive = false;
     private AudioClip pendingDrumLoop = null;
     private int lastLoopCount = 0;
@@ -77,8 +76,7 @@ public class DrumTrack : MonoBehaviour
     private int phaseCount = 0;
     private bool started = false;
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
-    private float lastLoopStartTime;
-
+    public event System.Action OnLoopBoundary; // fire in LoopRoutines()
 
     void Start()
     {
@@ -86,32 +84,13 @@ public class DrumTrack : MonoBehaviour
         progressionManager = GetComponent<MineNodeProgressionManager>();
         phaseTransitionManager = GetComponent<PhaseTransitionManager>();
         GameFlowManager.Instance.glitch = GetComponent<GlitchManager>();
-        if (GameFlowManager.Instance.SelectedMode.Contains("River"))
-        {
-            darkStarModeEnabled = false;
-            Debug.Log($"Playing the River");
-        }
-        else
-        {
-            darkStarModeEnabled = true;
-            Debug.Log($"Playing the Fire");
-        }
+
         starProgressUI.Initialize(7);
         if (!GameFlowManager.Instance.ReadyToPlay())
         {
             return;
         }
     }
-    public void MarkLoopStartTime()
-    {
-        lastLoopStartTime = Time.time;
-    }
-
-    public float GetLoopStartTime()
-    {
-        return lastLoopStartTime;
-    }
-
     public void ManualStart()
     {
         if (started) return;
@@ -123,20 +102,46 @@ public class DrumTrack : MonoBehaviour
             return;
         }
 
+        // --- A) START THE CURRENT PHASE CLIP *NOW* (no queued change) ---
+        // Establish is the first phase; play its loop immediately so timing is correct.
+        currentPhase = MusicalPhase.Establish;
+        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(currentPhase) : null; 
+        if (hexMazeGenerator != null && bootProfile != null) { 
+            hexMazeGenerator.ApplyProfile(bootProfile); 
+            hexMazeGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.ClassicLoopAligned;
+        }
+        var initialClip = MusicalPhaseLibrary.GetRandomClip(currentPhase);
+        if (initialClip == null)
+        {
+            Debug.LogError("DrumTrack.ManualStart: No Establish clip found.");
+            return;
+        }
+
+        // Clear any queued/scheduled transitions; we're booting the clock cleanly.
+        queuedPhase = null;
+        pendingDrumLoop = null;
+
+        drumAudioSource.Stop();
+        drumAudioSource.clip = initialClip;
+        drumAudioSource.loop = true;
+
+        // Align to DSP so the transport is stable from frame 0.
+        double dspStart = AudioSettings.dspTime + 0.05;
+        drumAudioSource.PlayScheduled(dspStart);
+
+        // If InitializeDrumLoop only sets counters/grid, keep it. If it also calls PlayScheduled, remove the call below.
         StartCoroutine(InitializeDrumLoop());
 
-        // ✅ Let the loop handle phase startup
-        queuedPhase = MusicalPhase.Establish;
-        ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(MusicalPhase.Establish));
+        // --- B) BUILD MAZE + SPAWN FIRST STAR (NO CLIP CHANGE SCHEDULED) ---
         if (hexMazeGenerator != null)
         {
-            Vector2Int centerCell = WorldToGridPosition(transform.position);
-            float radius = progressionManager.GetHollowRadiusForCurrentPhase();
-            var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, queuedPhase.Value, radius);
-            hexMazeGenerator.BeginStaggeredMazeRegrowth(growthCells);
+            Debug.Log($"Building Maze for {currentPhase}");
+            StartCoroutine(hexMazeGenerator.GenerateMazeThenPlacePhaseStar(
+                MusicalPhase.Establish,
+                progressionManager.GetCurrentSpawnerStrategyProfile()
+            ));
         }
     }
-
     private void Update()
     {
         if (!GameFlowManager.Instance.ReadyToPlay())
@@ -167,22 +172,171 @@ public class DrumTrack : MonoBehaviour
         {
             lastLoopCount = currentLoop;
             LoopRoutines();
-            MarkLoopStartTime();
         }
     }
-
     private void LoopRoutines()
     {
+        Debug.Log($"[MAZE] Loop start @ {AudioSettings.dspTime:0.000}s, loopLen={GetLoopLengthInSeconds():0.000}s");
+
         CleanupExplodedMineNodes();
         CleanupInvalidMineNodes(); // ✅ Remove invalid references
         progressionManager.OnLoopCompleted();
-        if (isPhaseStarActive)
+// DrumTrack.cs (inside LoopRoutines)
+        // Only breathe the maze between stars (or when you explicitly want a reset)
+        if (hexMazeGenerator != null 
+            && !GameFlowManager.Instance.ghostCycleInProgress 
+            && !isPhaseStarActive)  // 👈 add this guard
         {
-            //   SpawnMineNode();
+            float loopSeconds = GetLoopLengthInSeconds();
+            Vector2Int centerCell = WorldToGridPosition(transform.position);
+             hexMazeGenerator.TryRequestLoopAlignedCycle(currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
         }
+        OnLoopBoundary?.Invoke();
+    }
+    public bool TryFindPath(Vector2Int start, Vector2Int goal, List<Vector2Int> outPath)
+    {
+        outPath.Clear();
+        if (start == goal) { outPath.Add(goal); return true; }
+
+        int W = GetSpawnGridWidth(), H = GetSpawnGridHeight();
+        bool InBounds(Vector2Int c) => (uint)c.x < (uint)W && (uint)c.y < (uint)H;
+
+        static IEnumerable<Vector2Int> HexNeighbors(Vector2Int c)
+        {
+            // even-r offset neighbors; swap if you use odd-r
+            bool even = (c.y & 1) == 0;
+            var dirs = even
+                ? new[]{ new Vector2Int(+1,0), new Vector2Int(-1,0), new Vector2Int(0,+1), new Vector2Int(-1,+1), new Vector2Int(0,-1), new Vector2Int(-1,-1)}
+                : new[]{ new Vector2Int(+1,0), new Vector2Int(-1,0), new Vector2Int(+1,+1), new Vector2Int(0,+1), new Vector2Int(+1,-1), new Vector2Int(0,-1)};
+            foreach (var d in dirs) yield return c + d;
+        }
+
+        var q = new Queue<Vector2Int>();
+        var came = new Dictionary<Vector2Int, Vector2Int>();
+        var seen = new HashSet<Vector2Int> { start };
+        q.Enqueue(start);
+
+        while (q.Count > 0)
+        {
+            var cur = q.Dequeue();
+            foreach (var n in HexNeighbors(cur))
+            {
+                if (!InBounds(n) || seen.Contains(n)) continue;
+                // 🚫 Dust/Node/etc. block; allow goal even if currently reserved (we'll stop at its center)
+                if (!IsSpawnCellAvailable(n.x, n.y) && n != goal) continue;
+
+                came[n] = cur;
+                if (n == goal) {
+                    // reconstruct
+                    var p = n;
+                    outPath.Add(p);
+                    while (came.TryGetValue(p, out var prev)) { p = prev; outPath.Add(p); }
+                    outPath.Reverse();
+                    return true;
+                }
+                seen.Add(n);
+                q.Enqueue(n);
+            }
+        }
+        return false;
+    }
+    public float GetCellWorldSize()
+    {
+        // distance (world units) between adjacent cell centers, matching GridToWorldPosition mapping
+        var a = GridToWorldPosition(new Vector2Int(0, 0));
+        var b = GridToWorldPosition(new Vector2Int(1, 0));
+        return Vector2.Distance(a, b);
+    }
+    public Vector2Int FarthestReachableCellInComponent(Vector2Int start)
+    {
+        int W = GetSpawnGridWidth(), H = GetSpawnGridHeight();
+        bool InBounds(Vector2Int c) => (uint)c.x < (uint)W && (uint)c.y < (uint)H;
+
+        var q = new Queue<Vector2Int>();
+        var dist = new Dictionary<Vector2Int, int>();
+        q.Enqueue(start);
+        dist[start] = 0;
+
+        Vector2Int far = start;
+        int best = 0;
+
+        while (q.Count > 0)
+        {
+            var cur = q.Dequeue();
+            int d = dist[cur];
+            if (d > best) { best = d; far = cur; }
+
+            foreach (var nb in HexNeighbors(cur)) // your existing neighbor func
+            {
+                if (!InBounds(nb) || dist.ContainsKey(nb)) continue;
+                if (!IsSpawnCellAvailable(nb.x, nb.y)) continue; // dust = walls
+                dist[nb] = d + 1;
+                q.Enqueue(nb);
+            }
+        }
+        return far;
     }
 
+    private IEnumerable<Vector2Int> HexNeighbors(Vector2Int c)
+{
+    bool even = (c.y & 1) == 0; // even-r offset layout
+    if (even)
+    {
+        yield return new Vector2Int(c.x + 1, c.y);
+        yield return new Vector2Int(c.x - 1, c.y);
+        yield return new Vector2Int(c.x    , c.y + 1);
+        yield return new Vector2Int(c.x - 1, c.y + 1);
+        yield return new Vector2Int(c.x    , c.y - 1);
+        yield return new Vector2Int(c.x - 1, c.y - 1);
+    }
+    else
+    {
+        yield return new Vector2Int(c.x + 1, c.y);
+        yield return new Vector2Int(c.x - 1, c.y);
+        yield return new Vector2Int(c.x + 1, c.y + 1);
+        yield return new Vector2Int(c.x    , c.y + 1);
+        yield return new Vector2Int(c.x + 1, c.y - 1);
+        yield return new Vector2Int(c.x    , c.y - 1);
+    }
+}
+    
+    public Vector3 CellCenter(Vector2Int c) => GridToWorldPosition(c);
+    public Vector2Int CellOf(Vector3 world) => WorldToGridPosition(world);
 
+    public void SpawnPhaseStarAtCell(MusicalPhase phase, SpawnStrategyProfile profile, Vector2Int cell)
+    {
+        if (cell.x < 0) { Debug.LogWarning("No valid cell for PhaseStar."); return; }
+        if (phaseStarPrefab == null) { Debug.LogError("PhaseStar prefab is null."); return; }
+
+        Vector3 pos = GridToWorldPosition(cell);
+        Debug.Log($"🌟 Spawning PhaseStar at {cell} for phase {phase}");
+        GameObject starObject = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
+
+        // Initialize the star exactly like SpawnPhaseStar(...)
+        star = starObject.GetComponent<PhaseStar>();
+        if (star != null)
+        {
+            var mgr = progressionManager != null ? progressionManager : GetComponent<MineNodeProgressionManager>();
+            var phaseProfile = mgr.GetProfileForPhase(phase);
+            star.SetSpawnStrategyProfile(profile);
+            var targets = (trackController != null ? trackController.tracks : GetComponentsInChildren<InstrumentTrack>())
+                .Where(t => t != null).OrderBy(_ => UnityEngine.Random.value).Take(4);
+
+            star.Initialize(this, mgr, targets, armFirstPokeCommit: false);
+
+            // Cache the musical phase profile for the upcoming “first poke commits” path, if you use it
+            if (phaseProfile != null) mgr.BindPendingPhase(phaseProfile);
+        }
+        else
+        {
+            Debug.LogWarning("PhaseStar prefab missing PhaseStar component.");
+        }
+
+        // Mark grid & gate
+        OccupySpawnGridCell(cell.x, cell.y, GridObjectType.Node);
+        isPhaseStarActive = true;
+    }
+    
     private void CleanupExplodedMineNodes()
     {
         for (int i = activeNodes.Count - 1; i >= 0; i--)
@@ -212,105 +366,34 @@ public class DrumTrack : MonoBehaviour
                 continue;
             }
 
-            if (node.GetComponent<MineNodeSpawner>() == null)
+// was: if (node.GetComponent<MineNodeSpawner>() == null)
+            if (node.GetComponent<MineNodeSpawner>() == null && node.GetComponent<MineNode>() == null)
             {
                 Vector2Int gridPos = WorldToGridPosition(node.transform.position);
-
                 activeNodes.RemoveAt(i);
                 spawnGrid.FreeCell(gridPos.x, gridPos.y);
+// right before you Destroy(node)
+                var comps = string.Join(",", node.GetComponents<Component>().Select(c => c.GetType().Name));
+                Debug.LogWarning($"[CleanupInvalidMineNodes] Destroying '{node.name}' ({node.GetInstanceID()}) comps=[{comps}] at {node.transform.position}");
+
                 Destroy(node);
             }
+
         }
     }
 
-    public void EnterDarkStarDrumLoop()
+    private int GetRemainingMineNodeCount()
     {
-        if (darkStarDrumLoop == null)
-        {
-            Debug.LogWarning("No DarkStar drum loop assigned.");
-            return;
-        }
-
-        drumAudioSource.clip = darkStarDrumLoop;
-        loopLengthInSeconds = darkStarDrumLoop.length;
-        startDspTime = AudioSettings.dspTime;
-        drumAudioSource.Play();
+        // Most robust: count live MinedObject components in the scene
+        var objs = GameObject.FindObjectsOfType<MinedObject>(includeInactive: false);
+        Debug.Log($"Looking up remaining count:{ objs.Length } ");
+        return objs?.Length ?? 0;
     }
-    public void ExitDarkStarDrumLoop()
-    {
-        if (!queuedPhase.HasValue)
-        {
-            Debug.LogWarning("No queued phase to transition to after DarkStar.");
-            return;
-        }
-
-        AudioClip nextLoop = MusicalPhaseLibrary.GetRandomClip(queuedPhase.Value);
-        if (nextLoop == null)
-        {
-            Debug.LogWarning($"No drum loop found for phase {queuedPhase.Value}");
-            return;
-        }
-
-        pendingDrumLoop = nextLoop;
-
-        // Wait until the current loop is about to end, then schedule the switch
-        StartCoroutine(WaitAndChangeDrumLoop());
-    }
-    public void ExitDarkStarMode()
-    {
-        hexMazeGenerator.ClearMaze();
-        foreach (var track in trackController.tracks)
-        {
-            track.midiStreamPlayer.MPTK_Volume = 1f;
-        }
-        starProgressUI.SetShardState(phaseCount, StarProgressUI.ShardState.Fixed);
-        phaseCount++;
-    }
-    
-    
-    public int GetRemainingMineNodeCount()
-    {
-        return activeMinedObjects.Count;
-    }
-    public void NotifyNoteCollected()
-    {
-        if (progressionManager == null)
-        {
-            progressionManager = GetComponent<MineNodeProgressionManager>();
-            if (progressionManager == null)
-            {
-                Debug.LogError("❌ MineNodeProgressionManager is missing on DrumTrack GameObject.");
-                return;
-            }
-        }
-
-        progressionManager.OnMinedObjectCollected();
-        progressionManager.TryAdvanceSet();
-    }
-
     private void BeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
     {
         Debug.Log($"📣 BeginPhase called for: {phase} with profile: {profile}");
-        queuedPhase = phase;
-        ScheduleDrumLoopChange(MusicalPhaseLibrary.GetRandomClip(currentPhase));
         StartCoroutine(SpawnPhaseStarDelayed(phase, profile)); // ⬅ new
     }
-    
-    public void UnregisterHexagon(GameObject hex)
-    {
-        if (hex != null)
-        {
-            activeHexagons.Remove(hex);
-        }
-    }
-    /*
-    public void RegisterMineNode(MineNode node)
-    {
-        if (!mineNodes.Contains(node))
-        {
-            mineNodes.Add(node);
-        }
-    }*/
     public void RegisterMinedObject(MinedObject obj)
     {
         if (!activeMinedObjects.Contains(obj))
@@ -324,12 +407,7 @@ public class DrumTrack : MonoBehaviour
         activeMinedObjects.Remove(obj);
         Debug.Log($"Mined Object Count Now: {activeMinedObjects.Count}");
     }
-    /*
-    public void UnregisterMineNode(MineNode node)
-    {
-        mineNodes.Remove(node);
-    }
-    */
+
     private void ValidateSpawnGrid()
     {
         for (int x = 0; x < spawnGrid.gridWidth; x++)
@@ -364,55 +442,6 @@ public class DrumTrack : MonoBehaviour
     {
         return spawnGrid.gridHeight;
     }
-    public PhaseSnapshot BuildCurrentPhaseSnapshot()
-    {
-        var snapshot = new PhaseSnapshot
-        {
-            pattern = currentPhase,
-            color = GetVisualForPattern(currentPhase)?.color ?? Color.white,
-            timestamp = Time.time,
-            collectedNotes = new()
-        };
-
-        foreach (var track in trackController.tracks)
-        {
-            Color trackColor = track.trackColor;
-
-            foreach (var (step, note, _, velocity) in track.GetPersistentLoopNotes())
-            {
-                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
-            }
-        }
-
-
-        return snapshot;
-    }
-    public void FinalizeCurrentPhaseSnapshot()
-    {
-        var snapshot = new PhaseSnapshot
-        {
-            pattern = currentPhase,
-            color = GetVisualForPattern(currentPhase)?.color ?? Color.white,
-            timestamp = Time.time,
-            collectedNotes = new List<PhaseSnapshot.NoteEntry>(),
-            trackScores = new Dictionary<MusicalRole, float>() 
-        };
-
-        foreach (var track in trackController.tracks)
-        {
-            Color trackColor = track.trackColor;
-
-            foreach (var (step, note, duration, velocity) in track.GetPersistentLoopNotes())
-            {
-                snapshot.collectedNotes.Add(new PhaseSnapshot.NoteEntry(step, note, velocity, trackColor));
-            }
-            // ✅ Run evaluation just before archiving the score
-            float score = track.EvaluateCompositeScore();
-            snapshot.trackScores[track.assignedRole] = score;
-        }
-
-        sessionPhases.Add(snapshot);
-    }
     public void ClearAllActiveMinedObjects()
     {
         // Clear MinedObjects (notes, modifiers, etc.)
@@ -426,25 +455,18 @@ public class DrumTrack : MonoBehaviour
         // Reset grid
         spawnGrid?.ClearAll();
         ValidateSpawnGrid();
+        
     }
+    
     public void RestructureTracksWithRemixLogic()
     {
-        int chosenTrack = Random.Range(0, trackController.tracks.Length);
-        for (int i = 0; i < trackController.tracks.Length; i++)
+        foreach (var t in trackController.tracks)
         {
-            if (chosenTrack == i)
-            {
-                RemixTrack(trackController.tracks[i]);
-            }
-            else
-            {
-                trackController.tracks[i].ClearLoopedNotes(TrackClearType.Remix);   
-            }
+            RemixTrack(t);
         }
 
         trackController.UpdateVisualizer();
     }
-
     public void RemixTrack(InstrumentTrack track)
     {
         track.ClearLoopedNotes(TrackClearType.Remix);
@@ -490,14 +512,13 @@ public class DrumTrack : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            int step = steps[UnityEngine.Random.Range(0, steps.Count)];
+            int step = steps[Random.Range(0, steps.Count)];
             int note = noteSet.GetNextArpeggiatedNote(step);
             int duration = track.CalculateNoteDuration(step, noteSet);
             float velocity = UnityEngine.Random.Range(60f, 100f);
             track.AddNoteToLoop(step, note, duration, velocity);
         }
     }
-
     public int GetSpawnGridWidth()
     {
         return spawnGrid.gridWidth;
@@ -574,14 +595,18 @@ public class DrumTrack : MonoBehaviour
 
         return new Vector2Int(gridX, gridY);
     }    
-
     public float GetLoopLengthInSeconds()
     {
-        return loopDurationInSeconds;
+        return loopLengthInSeconds;
+    }
+    
+    public float GetTimeToLoopEnd()
+    {
+        float elapsed = (float)((AudioSettings.dspTime - startDspTime) % loopLengthInSeconds);
+        return Mathf.Max(0f, loopLengthInSeconds - elapsed);
     }
 
-   
-    public void SpawnPhaseStar(MusicalPhase phase, SpawnStrategyProfile profile)
+    public void SpawnPhaseStar(MusicalPhase phase, SpawnStrategyProfile profile, bool armFirstPokeCommit = false)
     {
         Vector2Int cell = GetRandomAvailableCell();
         if (cell.x == -1)
@@ -596,20 +621,46 @@ public class DrumTrack : MonoBehaviour
         isPhaseStarActive = true;
 
         star = starObject.GetComponent<PhaseStar>();
-        if (star != null)
-        {
-            star.Initialize(this, profile, phase, progressionManager);
-        }
-        else
+        if (star == null)
         {
             Debug.LogWarning("PhaseStar prefab missing PhaseStar script.");
+            return;
+        }
+
+        var mgr = progressionManager != null ? progressionManager : GetComponent<MineNodeProgressionManager>();
+        // Decide which tracks to target (up to 4). Adjust selection policy if you like.
+        IEnumerable<InstrumentTrack> targets = trackController.tracks
+            .OrderBy(_ => Random.value)
+            .Take(4);
+        // Give the star its spawner strategy (so bursts/misses can honor it later)
+        star.SetSpawnStrategyProfile(profile);
+        var profileAsset = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(phase) : null;
+        if (hexMazeGenerator != null && profileAsset != null)
+            hexMazeGenerator.ApplyProfile(profileAsset);
+        // Initialize using YOUR current signature
+        star.Initialize(this, mgr, targets, armFirstPokeCommit, profileAsset);
+
+        // (Optional) bind the musical phase profile for “first poke commits loop” flow
+        var phaseProfile = mgr.GetProfileForPhase(phase);
+        if (phaseProfile != null) mgr.BindPendingPhase(phaseProfile);
+    }
+
+    // Queue a specific phase and its drum loop to switch on the next loop boundary.
+    public void SchedulePhaseAndLoopChange(MusicalPhase nextPhase)
+    {
+        queuedPhase = nextPhase;
+        var clip = MusicalPhaseLibrary.GetRandomClip(nextPhase);
+        if (clip == null)
+        {
+            Debug.LogWarning($"SchedulePhaseAndLoopChange: No drum loop found for phase {nextPhase}");
+            return;
+        }
+        ScheduleDrumLoopChange(clip); 
+        if (hexMazeGenerator != null) { 
+            hexMazeGenerator.cycleMode = (nextPhase == MusicalPhase.Release) ? CosmicDustGenerator.MazeCycleMode.ClassicLoopAligned : CosmicDustGenerator.MazeCycleMode.Progressive;
         }
     }
     
-    public Vector3 GetStarPosition()
-    {
-        return star.transform.position;
-    }
     private int GetCurrentStep()
     {
         return currentStep;
@@ -618,8 +669,6 @@ public class DrumTrack : MonoBehaviour
     {
         return patternVisuals.FirstOrDefault(v => v.patternType == pattern);
     }
-
-
     private IEnumerator InitializeDrumLoop()
     {
         // ✅ Wait until the AudioSource has a valid clip
@@ -671,11 +720,6 @@ public class DrumTrack : MonoBehaviour
         }
         
         pendingDrumLoop = null;
-
-        // Finalize queued phase change
-        Debug.Log($"🔍 WaitAndChangeDrumLoop: queuedPhase = {queuedPhase}, awaitingDarkStar = {progressionManager.IsAwaitingDarkStar()}");
-        if (queuedPhase.HasValue && !progressionManager.IsAwaitingDarkStar())
-        {
             if (GetRemainingMineNodeCount() > 0)
             {
                 Debug.Log("⏳ Waiting: Mine nodes still active. Postpone phase shift.");
@@ -683,24 +727,28 @@ public class DrumTrack : MonoBehaviour
             }
             else
             {
-                currentPhase = queuedPhase.Value;
+                if (queuedPhase.HasValue)
+                {
+                    currentPhase = queuedPhase.Value;
+                }
                 progressionManager.isPhaseInProgress = false;
-                StartCoroutine(DelayedBeginPhase(queuedPhase.Value, progressionManager.GetCurrentSpawnerStrategyProfile()));
+                StartCoroutine(DelayedBeginPhase(currentPhase, progressionManager.GetCurrentSpawnerStrategyProfile()));
             }
-            // ✅ Slow maze growth instead of instant
-            if (hexMazeGenerator != null)
+// ✅ Slow maze growth instead of instant; use queued or current phase
+            if (hexMazeGenerator != null && !GameFlowManager.Instance.ghostCycleInProgress)
             {
+                var phaseForRegrowth = queuedPhase ?? currentPhase;
                 Vector2Int centerCell = WorldToGridPosition(transform.position);
                 float radius = progressionManager.GetHollowRadiusForCurrentPhase();
-                var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, queuedPhase.Value, radius);
+                var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);
                 hexMazeGenerator.BeginStaggeredMazeRegrowth(growthCells);
             }
-        }
+
 
         lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / loopLengthInSeconds);
     }
-    
-    public void ScheduleDrumLoopChange(AudioClip newLoop)
+
+    private void ScheduleDrumLoopChange(AudioClip newLoop)
     {
         // Store the new loop clip.
         pendingDrumLoop = newLoop;
@@ -755,7 +803,5 @@ public class DrumTrack : MonoBehaviour
         Debug.Log("🌟 Calling SpawnPhaseStar now...");
         SpawnPhaseStar(phase, profile);
     }
-
-
-
+    
 }

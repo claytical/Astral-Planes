@@ -24,7 +24,6 @@ public class VisualNoteMarker : MonoBehaviour
         
     }
     
-
     private IEnumerator FadeAndScaleIn(Color targetColor)
     {
         targetColor.a = .5f;

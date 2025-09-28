@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using System.Collections;
 using Gameplay.Mining;
-using UnityEngine.Rendering.Universal;
 using Random = UnityEngine.Random;
 [Serializable]
 
@@ -15,6 +14,7 @@ public class MinedObject : MonoBehaviour
     public MinedObjectType minedObjectType;
     public TrackModifierType? trackModifierType;
     public MusicalRole musicalRole;
+    public MusicalRoleProfile roleProfile;
     private NoteSet currentNoteSet;
     private bool wasCollected = false;
     
@@ -38,7 +38,6 @@ public class MinedObject : MonoBehaviour
         }        
 
     }
-    
     
     public void AssignTrack(InstrumentTrack track)
     {
@@ -67,7 +66,8 @@ public class MinedObject : MonoBehaviour
         yield return new WaitForSeconds(delay);
         col.enabled = true; // ✅ Collider is enabled after delay
     }
-    public void AssignVisuals()
+
+    private void AssignVisuals()
     {
         sprite.color = assignedTrack.trackColor;
         switch (minedObjectType)
@@ -80,10 +80,12 @@ public class MinedObject : MonoBehaviour
     }
     public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSet noteSet = null, TrackModifierType? modifier = null)
     {
+        Debug.Log($"Initializing mined object of type {type} on {track} with note set {noteSet}");
         minedObjectType = type;
         assignedTrack = track;
         this.trackModifierType = modifier;
         currentNoteSet = noteSet;
+        Debug.Log($"Note set track: {noteSet.assignedInstrumentTrack}");
         var explode = GetComponent<Explode>();
         if (explode != null)
         {
@@ -95,6 +97,7 @@ public class MinedObject : MonoBehaviour
 
         if (noteSpawnerMinedObject != null)
         {
+            Debug.Log($"Initializing mined object of type {noteSpawnerMinedObject.GetType()} on {track}");
             noteSpawnerMinedObject.Initialize(assignedTrack, noteSet);
         }
         
@@ -107,60 +110,8 @@ public class MinedObject : MonoBehaviour
         AssignVisuals();
     }
 
-
-
-    private IEnumerator FadeOutGlow()
-    {
-        SpriteRenderer sr = sprite;
-        Color original = sr.color;
-        float duration = 0.75f;
-
-        for (float t = 0f; t < duration; t += Time.deltaTime)
-        {
-            float alpha = Mathf.Lerp(original.a, 0f, t / duration);
-            sr.color = new Color(original.r, original.g, original.b, alpha);
-            yield return null;
-        }
-
-        sr.color = new Color(original.r, original.g, original.b, 0f);
-    }
-    private IEnumerator PulseExpand()
-    {
-        float duration = 0.4f;
-        Vector3 start = transform.localScale;
-    //    Vector3 expanded = start * 1.4f;
-
-        for (float t = 0f; t < duration; t += Time.deltaTime)
-        {
-            float scale = Mathf.SmoothStep(1f, 1.4f, Mathf.Sin(t / duration * Mathf.PI));
-            transform.localScale = start * scale;
-            yield return null;
-        }
-
-        transform.localScale = start;
-    }
-    private IEnumerator JitterEffect()
-    {
-        Vector3 originalPos = transform.localPosition;
-        float duration = 0.3f;
-        float magnitude = 0.05f;
-
-        for (float t = 0f; t < duration; t += Time.deltaTime)
-        {
-            float offsetX = Random.Range(-magnitude, magnitude);
-            float offsetY = Random.Range(-magnitude, magnitude);
-            transform.localPosition = originalPos + new Vector3(offsetX, offsetY, 0);
-            yield return null;
-        }
-
-        transform.localPosition = originalPos;
-    }
-
-
     protected virtual void OnCollected(Vehicle vehicle)
     {
-
-
         // Default behavior
         Destroy(gameObject);
     }

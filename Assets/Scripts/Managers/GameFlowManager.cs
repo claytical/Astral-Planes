@@ -5,7 +5,6 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Users;
 using UnityEngine.SceneManagement;
 
 public enum GameState { Begin, Selection, Playing, GameOver }
@@ -13,6 +12,12 @@ public enum GameState { Begin, Selection, Playing, GameOver }
 public class GameFlowManager : MonoBehaviour
 {
     public static GameFlowManager Instance { get; private set; }
+    [System.Serializable]
+    public struct PhaseChordMap { public MusicalPhase phase; public ChordProgressionProfile progression; }
+
+    [Header("Harmony")]
+    public HarmonyDirector harmony;
+    public List<PhaseChordMap> chordMaps = new();
 
     [Header("Settings")]
     public float quoteDisplayDuration = 5f;
@@ -26,29 +31,31 @@ public class GameFlowManager : MonoBehaviour
     private List<Vehicle> vehicles;
     public List<Vehicle> GetAllVehicles() => vehicles;
     private bool hasGameOverStarted = false;
-    private bool ghostCycleInProgress = false;
+// --- Ghost/burst state so PhaseStar can wait correctly ---
+    public bool ghostCycleInProgress { get; private set; }
+
     private List<InstrumentTrack> activeTracks = new();
     public InstrumentTrackController controller;
     public DrumTrack activeDrumTrack;
     public NoteSetFactory noteSetFactory;
-
-    public void RegisterInstrumentTrack(InstrumentTrack track)
+// At top-level fields
+    private bool remixArmed = false;                  // true once previous star’s set is completed
+    private MusicalPhaseProfile pendingPhaseProfile;  // optional: set when the next star is known
+    public bool IsRemixArmed => remixArmed;
+    private bool _nextPhaseLoopArmed = false;
+    private MusicalPhase _armedNextPhase;
+    public event System.Action<MusicalPhaseProfile> OnRemixCommitted;
+    
+    public void ArmNextPhaseLoop(MusicalPhase nextPhase)
     {
-     Debug.Log($"Register Instrument Track: {track.name}");
-        if (!activeTracks.Contains(track))
-            activeTracks.Add(track);
-    }
-    public void SetGhostCycleState(bool inProgress)
-    {
-        ghostCycleInProgress = inProgress;
+        _armedNextPhase = nextPhase;
+        _nextPhaseLoopArmed = true;
 
-        if (!inProgress)
-        {
-            // Ghost cycle just ended, re-check game over condition
-            CheckAllTracksExpired();
-        }
+        // New: pre-stage the chord progression for Option C
+        var prof = GetProfileForPhase(nextPhase);
+        harmony?.SetActiveProfile(prof, applyImmediately: false);
     }
-
+    
     private void CheckAllTracksExpired()
     {
         Debug.Log($"[CheckAllTracksExpired] hasGameOverStarted={hasGameOverStarted}, activeTracks={activeTracks.Count}, ghostCycleInProgress={ghostCycleInProgress}");
@@ -59,13 +66,7 @@ public class GameFlowManager : MonoBehaviour
             StartCoroutine(HandleGameOverSequence());
         }
     }
-
-    public void UnregisterInstrumentTrack(InstrumentTrack track)
-    {
-        activeTracks.Remove(track);
-        CheckAllTracksExpired(); // Check after each removal
-    }
-
+    
     private void Awake()
     {
         if (Instance == null)
@@ -92,6 +93,7 @@ public class GameFlowManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
+        OnRemixCommitted += _ => harmony?.CommitNextChordNow();
     }
 
     public GameState CurrentState
@@ -131,6 +133,16 @@ public class GameFlowManager : MonoBehaviour
         return null;
     }
 
+    private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
+    {
+        Debug.Log($"Getting Profile for Phase: {phase}");
+        for (int i = 0; i < chordMaps.Count; i++)
+        {
+            Debug.Log($"Profile for Phase: {chordMaps[i].phase} / {phase}");
+            if (chordMaps[i].phase == phase) return chordMaps[i].progression;
+        }
+        return null; // optional: fall back to a default
+    }
     public void CheckAllPlayersReady()
     {
         if (localPlayers.All(p => p.IsReady))
@@ -142,7 +154,7 @@ public class GameFlowManager : MonoBehaviour
     public void CheckAllPlayersOutOfEnergy()
     {
         if (hasGameOverStarted) return;
-
+        if (ghostCycleInProgress) return;
         if (localPlayers.Where(p => p != null).All(p => !p.IsReady || p.GetVehicleEnergy() <= 0f))
 
         {
@@ -287,6 +299,8 @@ public class GameFlowManager : MonoBehaviour
         currentState = GameState.Playing;
         activeDrumTrack = FindAnyObjectByType<DrumTrack>();
         activeDrumTrack?.ManualStart();
+        harmony = FindAnyObjectByType<HarmonyDirector>();
+        var arp   = FindAnyObjectByType<ChordChangeArpeggiator>();
         controller = FindAnyObjectByType<InstrumentTrackController>();
         if (controller != null)
         {
@@ -295,6 +309,8 @@ public class GameFlowManager : MonoBehaviour
                 localPlayers.Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName())).ToList(), controller.noteSetPrefab
             );
         }
+        // e.g., GameFlowManager.HandleTrackSceneSetup()
+        arp.Bind(activeDrumTrack, controller);
 
 
         foreach (var player in localPlayers)
@@ -302,12 +318,18 @@ public class GameFlowManager : MonoBehaviour
             player.Launch(FindAnyObjectByType<DrumTrack>());
             vehicles.Add(player.plane);
         }
+        harmony.Initialize(activeDrumTrack, controller, arp);
+
+        // Apply the progression for the phase we’re starting in
+        var prof = GetProfileForPhase(activeDrumTrack.currentPhase);
+        harmony.SetActiveProfile(prof, applyImmediately: true);        
     }
 
     private void HandleTrackFinishedSceneSetup()
     {
         currentState = GameState.GameOver;
-        // TODO: Final stats screen setup
+        harmony?.CancelBoostArp();
+        harmony?.Initialize(null, null, null); // drops subscriptions safely
     }
     public void StartShipSelectionPhase()
     {
@@ -354,23 +376,5 @@ public class GameFlowManager : MonoBehaviour
         // Search for a child named "GameStats" in its UI hierarchy
         return visualizer.GetUIParent().Find("GameStats");
     }
-
-    public void TriggerRumbleForAll(float lowFreq, float highFreq, float duration)
-    {
-        foreach (var player in localPlayers)
-        {
-            var gamepad = player.GetComponent<PlayerInput>()?.devices[0] as Gamepad;
-            if (gamepad != null)
-            {
-                gamepad.SetMotorSpeeds(lowFreq, highFreq);
-                player.StartCoroutine(StopRumbleAfterDelay(gamepad, duration));
-            }
-        }
-    }
-
-    private IEnumerator StopRumbleAfterDelay(Gamepad pad, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        pad.SetMotorSpeeds(0, 0);
-    }
+    
 }

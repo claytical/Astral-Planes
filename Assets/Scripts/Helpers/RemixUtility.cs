@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "RemixUtility", menuName = "Astral Planes/Remix Utility")]
 [System.Serializable]
+
 public class RemixUtility : ScriptableObject
 {
     public MusicalRole targetRole;
@@ -90,6 +91,23 @@ public class RemixUtility : ScriptableObject
 
         return phrase;
     }
+// RemixUtility.cs  (add anywhere inside the class)
+    public static void ApplyPhase(MusicalPhaseProfile profile)
+    {
+        var gm = GameFlowManager.Instance;
+        var drums = gm != null ? gm.activeDrumTrack : null;
+        if (drums == null || profile == null) return;
+
+        // Queue the phase; DrumTrack will advance at a musical boundary
+        drums.queuedPhase = profile.phase;
+
+        // Restructure parts for the new phase (your existing remix logic)
+        drums.RestructureTracksWithRemixLogic();
+
+        // Swap the drum loop at the end of the current loop
+        var clip = MusicalPhaseLibrary.GetRandomClip(profile.phase);
+        drums.SchedulePhaseAndLoopChange(profile.phase);
+    }
 
     private int SelectNoteFromStrategy(List<int> collected, NoteSet context, int index)
     {
@@ -110,4 +128,14 @@ public class RemixUtility : ScriptableObject
                 return collected[index % collected.Count];
         }
     }
+}
+public enum GhostPatternStrategy
+{
+    Arpeggiated,
+    StaticRoot,
+    WalkingBass,
+    MelodicPhrase,
+    PercussiveLoop,
+    Drone,
+    Randomized
 }

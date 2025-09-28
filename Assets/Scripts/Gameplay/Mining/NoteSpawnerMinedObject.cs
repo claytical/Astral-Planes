@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using Effects;
 using Gameplay.Mining;
 using UnityEngine;
@@ -12,7 +11,6 @@ public class NoteSpawnerMinedObject : MonoBehaviour
 
     public InstrumentTrack assignedTrack;
     public NoteSet selectedNoteSet;
-    public GameObject ghostTrigger;
     private bool wasCollected = false;
     private float timeToLive = 8f; // seconds or 1 loop cycle
     
@@ -22,6 +20,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     }
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
+        Debug.Log($"Initializing Spawner Mined Object");
         assignedTrack = track;
         musicalRole = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         selectedNoteSet = noteSet;
@@ -33,9 +32,11 @@ public class NoteSpawnerMinedObject : MonoBehaviour
 
         if (selectedNoteSet != null)
         {
+            Debug.Log($"Selected Note Set on Spawner is {selectedNoteSet} for {track} with {musicalRole}");
             selectedNoteSet.assignedInstrumentTrack = track;
             selectedNoteSet.Initialize(track, track.drumTrack.totalSteps);
         }
+
 
         ApplyTrackVisuals(track.trackColor);
 
@@ -44,8 +45,8 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         {
             explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.NoteSpawner));
         }
-
     }
+
     private IEnumerator AutoFadeIfUncollected() {
         yield return new WaitForSeconds(timeToLive);
         if (!wasCollected) {
@@ -54,12 +55,6 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             // Play dissolve particles or shimmer
             Destroy(gameObject); // remove ghost
         }
-    }
-
-    private IEnumerator ResetTriggerCooldown()
-    {
-        yield return new WaitForSeconds(3f); // or whatever
-        hasBeenTriggered = false;
     }
 
     void OnCollisionEnter2D(Collision2D coll)

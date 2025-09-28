@@ -874,6 +874,22 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Join
         m_Flags: 0
+      - m_Name: 
+        m_Id: 5b7db92f-3023-4e16-a1c3-f2f4be57c357
+        m_Path: <Keyboard>/anyKey
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Join
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 529c4061-3fc2-4643-8a1c-177a8adad720
+        m_Path: <Gamepad>/buttonEast
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Join
+        m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PlayerPrefab: {fileID: 8086964223068625411, guid: 49bb6ff7c53dfd34eb7c04a030b91976,
@@ -924,7 +940,7 @@ MonoBehaviour:
   m_PointAction: {fileID: 0}
   m_MoveAction: {fileID: 4899113442294940520, guid: ee0b4d020931d8f408934443acaa080d,
     type: 3}
-  m_SubmitAction: {fileID: 4818609618911341735, guid: ee0b4d020931d8f408934443acaa080d,
+  m_SubmitAction: {fileID: 5665369310006246134, guid: ee0b4d020931d8f408934443acaa080d,
     type: 3}
   m_CancelAction: {fileID: 0}
   m_LeftClickAction: {fileID: 2063729218611550993, guid: ee0b4d020931d8f408934443acaa080d,

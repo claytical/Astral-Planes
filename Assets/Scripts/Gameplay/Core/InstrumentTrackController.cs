@@ -75,59 +75,15 @@ public class InstrumentTrackController : MonoBehaviour
 
     void Start()
     {
-        //MidiPlayerGlobal.OnEventPresetLoaded.AddListener(EndLoadingSF);
-        //MidiPlayerGlobal.MPTK_LoadLiveSF("file:///Users/clayewing/Documents/Moonlight.sf2");
-            if (!GameFlowManager.Instance.ReadyToPlay())
-            {
-                return;
-            }
-    }
-    public void EndLoadingSF()
-    {
-        // when SoundFont is dynamically loaded, MidiPlayerGlobal.ImSFCurrent.SoundFontName not contains name - TBD
-     
-        Debug.LogFormat($"End loading: '{MidiPlayerGlobal.ImSFCurrent?.SoundFontName}' Status: {MidiPlayerGlobal.MPTK_StatusLastSoundFontLoaded}");
-        Debug.Log("Load statistique");
-        Debug.Log($"   Time To Download SF:     {Math.Round(MidiPlayerGlobal.MPTK_TimeToDownloadSoundFont.TotalSeconds, 3)} second");
-        Debug.Log($"   Time To Load SoundFont:  {Math.Round(MidiPlayerGlobal.MPTK_TimeToLoadSoundFont.TotalSeconds, 3)} second");
-        Debug.Log($"   Time To Load Samples:    {Math.Round(MidiPlayerGlobal.MPTK_TimeToLoadWave.TotalSeconds, 3).ToString()} second");
-        Debug.Log($"   Presets Loaded: {MidiPlayerGlobal.MPTK_CountPresetLoaded}");
-        Debug.Log($"   Samples Loaded: {MidiPlayerGlobal.MPTK_CountWaveLoaded}");
+        if (!GameFlowManager.Instance.ReadyToPlay()) {
+            return;
+        }
     }
 
     public int GetMaxLoopMultiplier()
     {
         return tracks.Max(track => track.loopMultiplier);
     }
-    public InstrumentTrack ClearAndReturnTrack(Vehicle vehicle)
-    {
-        var nonEmptyTracks = tracks.Where(t => t.GetNoteDensity() > 0).ToList();
-        if (nonEmptyTracks.Count == 0) return null;
-
-        var track = nonEmptyTracks[Random.Range(0, nonEmptyTracks.Count)];
-        track.ClearLoopedNotes(TrackClearType.EnergyRestore, vehicle);
-        return track;
-    }
-
-    public List<MusicalRole> RemixRoles()
-    {
-        var roles = tracks.Select(t => t.assignedRole).ToList();
-        for (int i = 0; i < roles.Count; i++)
-        {
-            int j = Random.Range(i, roles.Count);
-            (roles[i], roles[j]) = (roles[j], roles[i]);
-        }
-        return roles;
-    }
-    public void RemixTrackByRole(MusicalRole role)
-    {
-        var track = FindTrackByRole(role);
-        if (track != null && GameFlowManager.Instance.activeDrumTrack != null)
-        {
-            GameFlowManager.Instance.activeDrumTrack.RemixTrack(track);
-        }
-    }
-
     
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips, GameObject notesetPrefab)
     {
@@ -135,7 +91,7 @@ public class InstrumentTrackController : MonoBehaviour
         ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList(), notesetPrefab);
         UpdateVisualizer();
     }
-//TODO: NEEDED?
+
     public void UpdateVisualizer()
     {
         if (noteVisualizer == null) return;
@@ -188,13 +144,6 @@ public class InstrumentTrackController : MonoBehaviour
         Debug.Log("Configured roles: " + 
                   string.Join(", ", tracks.Select(t => t.assignedRole)));
         return tracks.FirstOrDefault(t => t.assignedRole == role);
-    }
-    public InstrumentTrack FindRandomTrackByRole(MusicalRole role)
-    {
-        var matching = tracks.Where(t => t.assignedRole == role).ToList();
-        
-        if (matching.Count == 0) return null;
-        return matching[Random.Range(0, matching.Count)];
     }
 
 }
