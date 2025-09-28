@@ -12,11 +12,9 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     public InstrumentTrack assignedTrack;
     public NoteSet selectedNoteSet;
     private bool wasCollected = false;
-    private float timeToLive = 8f; // seconds or 1 loop cycle
+    private float timeToLive = 888f; // seconds or 1 loop cycle
     
     void Start() {
-        if (assignedTrack.drumTrack.collectionMode == NoteCollectionMode.TimedPuzzle)
-            StartCoroutine(AutoFadeIfUncollected());
     }
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {

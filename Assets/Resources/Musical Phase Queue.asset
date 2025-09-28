@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phaseGroups:
   - phase: 0
-    hollowRadius: 5
+    hollowRadius: 10
     spawnStrategies:
     - {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94, type: 2}
     remixUtilities:
@@ -24,7 +24,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: db693f1f904514032bf3d04968850e52, type: 2}
     allowRandomSelection: 1
   - phase: 1
-    hollowRadius: 4.5
+    hollowRadius: 7
     spawnStrategies:
     - {fileID: 11400000, guid: 9efebe1ecf02f4b1fa80ae985e839133, type: 2}
     remixUtilities:
@@ -34,7 +34,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: f058c6f040ccd4c8482938ad5d9fa792, type: 2}
     allowRandomSelection: 1
   - phase: 2
-    hollowRadius: 3
+    hollowRadius: 5
     spawnStrategies:
     - {fileID: 11400000, guid: cd4291b92268a40a6a48a3228f9210e6, type: 2}
     remixUtilities:
@@ -44,7 +44,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 9a767cb716b4a4c268645d4b45807787, type: 2}
     allowRandomSelection: 1
   - phase: 3
-    hollowRadius: 3.5
+    hollowRadius: 7
     spawnStrategies:
     - {fileID: 11400000, guid: 16b216a1495834db981d9b6909fd9e2d, type: 2}
     remixUtilities:
@@ -64,7 +64,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: dce3e6feebbd24d139bd8c04ab0ec7ea, type: 2}
     allowRandomSelection: 1
   - phase: 5
-    hollowRadius: 4
+    hollowRadius: 6
     spawnStrategies:
     - {fileID: 11400000, guid: d2745de784c2544fc9d9185c4ea68bec, type: 2}
     remixUtilities:

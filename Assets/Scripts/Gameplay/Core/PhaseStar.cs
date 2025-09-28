@@ -115,7 +115,7 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private float _regrowDelayMul;
     [SerializeField] private bool _feedsDust;
     [SerializeField] private float shardScatterRadius;
-
+    private bool _isVisible;
     private void Awake()
     {
         _explosionMap.Clear();
@@ -218,7 +218,7 @@ public class PhaseStar : MonoBehaviour
     private void RefreshPreviewFromCache()
     {
         // Sprites/diamonds from cached track color
-        SetStarTint(_cachedPreviewColor);            // you already have SetStarTint(...)
+        SetStarTint(_cachedPreviewColor, false);            // you already have SetStarTint(...)
 
         // Particles from phase/anti-phase (your existing helper)
         ConfigureInhalingParticles(ComputeAntiColor(GetDustPhaseColor()));
@@ -568,27 +568,6 @@ public class PhaseStar : MonoBehaviour
         //trails.widthOverTrail = 0.03f;
     }
     
-
-    private void SetStarTint(Color c, bool enableObjects = true)
-    { 
-        for (int i = 0; i < starSprites.Length; i++) {
-            if (!enableObjects) continue; 
-            var sr = starSprites[i]; 
-            if (!sr) continue; 
-            sr.enabled = true; 
-            var cc = c; cc.a = sr.color.a;  // keep current alpha
-            sr.color = cc;
-        }
-        if (!starParticles) starParticles = GetComponentInChildren<ParticleSystem>(true);
-        if (starParticles)
-        {
-            if (enableObjects && !starParticles.gameObject.activeSelf)
-                starParticles.gameObject.SetActive(true);
-            var m = starParticles.main;
-            m.startColor = c;
-        }
-    }
-
     private IEnumerator EntrancePulse() { yield return null; }
     private Color GetAntiPhaseColor() => ComputeAntiColor(GetPhaseColor()); // from your earlier anti-color helper
     private Color GetPhaseColor() => MusicalPhaseLibrary.Get(drumTrack.currentPhase).visualColor;
@@ -1004,7 +983,15 @@ private void SpawnColoredMineNode(
     // Lock directive to preview choice
     directive.assignedTrack = track;
     directive.displayColor  = previewColor;
-Debug.Log($"Preview Color: {previewColor} for {track}");
+    if (directive.role == default && track != null)
+    {
+        directive.role = track.assignedRole;   // Bass, Groove, Harmony, Lead
+    }
+    if (directive.roleProfile == null && directive.role != default)
+    {
+        directive.roleProfile = MusicalRoleProfileLibrary.GetProfile(directive.role);
+    }
+
     if (directive.noteSet == null)
     {
         var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, assignedPhase);
@@ -1040,6 +1027,12 @@ Debug.Log($"Preview Color: {previewColor} for {track}");
     Debug.Log($"Directive in PhaseStar: {directive}");
     var node = spawner.SpawnNode(cell, directive);
     if (!node) { Destroy(wrapper); return; }
+    node.OnResolved += (kind, dir) =>
+    {
+        // This routine should internally wait on any note motion
+        // and only then re-arm/show the star.
+        StartCoroutine(ClearThenSpawnAndRearm(track, dir.noteSet));
+    };
     InitializeChildFromDirective(node.gameObject, directive);
     // Make sure the node has its color BEFORE hiding
     // --- COLOR + POSITION FIRST (prevents white-on-reveal and teleport glitches)
@@ -1062,22 +1055,16 @@ Debug.Log($"Preview Color: {previewColor} for {track}");
             nodeGO,
             shardFlightSeconds,
             onLanded: () => {  // <-- replaces node.OnResolved usage
-                awaitingBurstResolution = false;
-
+                awaitingBurstResolution = true;
                 // plan + repaint the next preview now
                 PrepareNextDirective();
                 PreviewNextTargetVisual();
-
-                // re-arm the star for the next collision
-                state = PhaseStarState.IdleWandering;
-                SetStarVisible(true);
-                EnableAllCollidersAndRenderers();
             }
         )
     );
 }
 
-// PhaseStar (or MineNodeSpawner) — helper
+
 private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDirective dir)
 {
     // 1) Resolve role profile deterministically:
@@ -1130,17 +1117,9 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
             // Clear loop & markers (uses your existing visualizer hookup).
             // If your ClearLoopedNotes signature differs, call the variant you have.
             track.ClearLoopedNotes(TrackClearType.Remix);
-
-            // Also remove any still-spawned collectables (and their tethers).
-            if (track.spawnedCollectables != null)
-            {
-                for (int i = track.spawnedCollectables.Count - 1; i >= 0; i--)
-                {
-                    var go = track.spawnedCollectables[i];
-                    if (go) Destroy(go);
-                    track.spawnedCollectables.RemoveAt(i);
-                }
-            }
+            foreach (var go in track.spawnedCollectables.ToList())
+                if (go) Destroy(go);
+            track.spawnedCollectables.Clear();
         }
 
         // Give the visualizer a frame to delete markers/tethers cleanly.
@@ -1148,7 +1127,9 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
 
         // Fresh burst for this node
         if (track != null && noteSet != null)
+        {
             track.SpawnCollectableBurst(noteSet);
+        }
 
         // Wait until all collectables from this burst are gone, then re-arm the star.
         yield return StartCoroutine(WatchTrackThenRearm(track));
@@ -1204,6 +1185,7 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
 
     private void SetStarVisible(bool visible)
     {
+        _isVisible = visible;
         if (visible)
         {
             EnableAllCollidersAndRenderers();
@@ -1215,6 +1197,30 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
         }
     }
 
+// Make SetStarTint respect visibility
+    private void SetStarTint(Color c, bool enableObjects = true)
+    {
+        enableObjects &= _isVisible;  // <-- don't re-enable while hidden
+
+        for (int i = 0; i < starSprites.Length; i++)
+        {
+            if (!enableObjects) continue;
+            var sr = starSprites[i];
+            if (!sr) continue;
+            sr.enabled = true; // safe: only runs if _isVisible
+            var cc = c; cc.a = sr.color.a;
+            sr.color = cc;
+        }
+
+        if (!starParticles) starParticles = GetComponentInChildren<ParticleSystem>(true);
+        if (starParticles)
+        {
+            if (enableObjects && !starParticles.gameObject.activeSelf)
+                starParticles.gameObject.SetActive(true);
+            var m = starParticles.main;
+            m.startColor = c;
+        }
+    }
     void ShrinkNearbyDust() {
                // Let DarkStar-style profiles preserve dust.
         if (behaviorProfile != null && behaviorProfile.feedsDust) return;
