@@ -4,7 +4,6 @@ using UnityEngine;
 public class DrumLoopPatternVisual : ScriptableObject
 {
     public MusicalPhase patternType;
-
     public Color color = Color.white;
     public ParticleSystem particleEffectPrefab;
 

@@ -28,11 +28,7 @@ public class VehicleRemixController : MonoBehaviour
     private float remixWaveSpeed = 0f;
     private float maxWaveSpeed = 3f;
     private float waveSpeedLerpUp = 2f;
-    private float waveSpeedLerpDown = 1f;
-
     private float amplitudeLerpUp = 3f;
-    private float amplitudeLerpDown = 1f;
-
     private float remixPrimingThreshold = 0.9f;
 
     private void Start()

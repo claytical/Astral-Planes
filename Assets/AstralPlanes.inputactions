@@ -58,6 +58,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Join",
+                    "type": "Button",
+                    "id": "b7a66551-1443-404e-9d84-578744d68d7b",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -74,8 +83,30 @@
                 },
                 {
                     "name": "",
+                    "id": "3ce67577-bc72-4f2b-a3e6-fc1cb2d1a648",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "NextVehicle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "0e5c404d-cb5e-4457-80a8-ee6f43620c07",
                     "path": "<Gamepad>/dpad/left",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PreviousVehicle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "fba10f34-db6f-4482-85ce-0663d9437e8e",
+                    "path": "<Keyboard>/leftArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -129,11 +160,33 @@
                 },
                 {
                     "name": "",
+                    "id": "3cb25328-95fa-45b9-b8aa-0ab87770bb02",
+                    "path": "<Keyboard>/enter",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "ba47cf2c-4c5d-4404-a4f8-97b7a0878a5f",
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
+                    "action": "Leave",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7aea1677-5795-4a2a-93a2-02deec74247a",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
                     "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -151,12 +204,45 @@
                 },
                 {
                     "name": "",
+                    "id": "816ad38a-b761-45b4-91da-df4c573cf7e4",
+                    "path": "<Keyboard>/downArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "NextColor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "231baeb4-2fbb-49cd-8c58-bbe835f74ff1",
                     "path": "<Gamepad>/dpad/up",
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
                     "action": "PreviousColor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9b17b558-97bf-4d10-a04b-be45f9af0b37",
+                    "path": "<Keyboard>/upArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PreviousColor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3af31d52-14af-446b-9579-288674dc7f8a",
+                    "path": "<Keyboard>/anyKey",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Join",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -255,6 +341,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "MoveMouse",
+                    "type": "Value",
+                    "id": "eef69fac-cc82-4337-8f3e-5ba6beca37df",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -293,11 +388,44 @@
                 },
                 {
                     "name": "",
+                    "id": "71dff459-f855-4321-b32f-8db5498b4d79",
+                    "path": "<Keyboard>/enter",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "226ff6af-6b3c-4d40-ac82-387a59536498",
                     "path": "<Gamepad>/rightTrigger",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "Thrust",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1b722273-da12-45d4-a540-7c09ce991748",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Thrust",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b8f6f877-bf39-43fb-b51a-968bdc1ce86f",
+                    "path": "<Mouse>/press",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
                     "action": "Thrust",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -315,11 +443,33 @@
                 },
                 {
                     "name": "",
+                    "id": "c80896d5-ffd2-4618-a06a-c312b864ff7f",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "Press(behavior=2)",
+                    "processors": "",
+                    "groups": "",
+                    "action": "East",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "f168ab98-f600-45fb-969e-4cebdc34007e",
                     "path": "<Gamepad>/rightShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "RightShoulder",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "13d4d2f3-4920-4d05-9a90-63c6d151fe4d",
+                    "path": "<Keyboard>/rightMeta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
                     "action": "RightShoulder",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -338,7 +488,7 @@
                 {
                     "name": "",
                     "id": "f4f0556e-2d41-41a4-84a6-25cce686c781",
-                    "path": "",
+                    "path": "<Keyboard>/leftMeta",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -381,11 +531,33 @@
                 },
                 {
                     "name": "",
+                    "id": "3d14c093-ad7d-4a19-a429-887602f501a0",
+                    "path": "<Keyboard>/leftArrow",
+                    "interactions": "Press(behavior=2)",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
+                    "action": "West",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "1d50aa73-c1a0-4019-9816-094162d721d4",
                     "path": "<Gamepad>/buttonNorth",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "North",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9fc23645-2626-4f0d-8c6f-c387e3dae76b",
+                    "path": "<Keyboard>/upArrow",
+                    "interactions": "Press(behavior=2)",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
                     "action": "North",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -398,6 +570,28 @@
                     "processors": "",
                     "groups": ";Playstation;Xbox;Switch;Generic Gamepad",
                     "action": "South",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b9eb0ed8-0993-4d87-aa23-f65132bf02a0",
+                    "path": "<Keyboard>/downArrow",
+                    "interactions": "Press(behavior=2)",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
+                    "action": "South",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "95d896d9-5c00-4776-be5a-330086c83f0a",
+                    "path": "<Mouse>/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
+                    "action": "MoveMouse",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -444,6 +638,22 @@
             "devices": [
                 {
                     "devicePath": "<DualShockGamepad>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        },
+        {
+            "name": "Keyboard and Mouse",
+            "bindingGroup": "Keyboard and Mouse",
+            "devices": [
+                {
+                    "devicePath": "<Keyboard>",
+                    "isOptional": false,
+                    "isOR": false
+                },
+                {
+                    "devicePath": "<Mouse>",
                     "isOptional": false,
                     "isOR": false
                 }

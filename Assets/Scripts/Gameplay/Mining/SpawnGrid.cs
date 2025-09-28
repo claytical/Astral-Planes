@@ -96,13 +96,13 @@ public class SpawnGrid : MonoBehaviour
         }
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
         {
-            Debug.Log($"Cell check out of bounds: {x}, {y}");
+//            Debug.Log($"Cell check out of bounds: {x}, {y}");
             return false;
         }
 
         if (gridCells[x, y] == null)
         {
-            Debug.Log($"Cell {x}, {y} is null.");
+  //          Debug.Log($"Cell {x}, {y} is null.");
             return false;
         }
 
@@ -148,7 +148,7 @@ public class SpawnGrid : MonoBehaviour
         gridCells[x, y].isOccupied = false;
         gridCells[x, y].objectType = GridObjectType.Empty;
 
-        Debug.Log($"Cell {x}, {y} successfully freed.");
+    //    Debug.Log($"Cell {x}, {y} successfully freed.");
     }
     public void ClearAll()
     {
@@ -202,43 +202,18 @@ public class SpawnGrid : MonoBehaviour
         return availableCells[Random.Range(0, availableCells.Count)];
     }
     
-    public Vector2Int GetRandomAvailableCell(NoteBehavior noteBehavior)
-    {
-        List<Vector2Int> availableCells = new List<Vector2Int>();
-
-        for (int x = 0; x < gridWidth; x++)
-        {
-            for (int y = 0; y < gridHeight; y++)
-            {
-                if (IsCellAvailable(x, y))
-                {
-                    availableCells.Add(new Vector2Int(x, y));
-                }
-            }
-        }
-        
-        if (availableCells.Count > 0)
-        {
-            return availableCells[Random.Range(0, availableCells.Count)];
-        }
-
-        Debug.LogWarning("No available cells found!");
-        return new Vector2Int(-1, -1); // No available cells
-    }
-
-
-
 }
 
-public class GridCell
+    public class GridCell
 {
     public bool isOccupied;
     public GridObjectType objectType = GridObjectType.Empty;
 }
 
-public enum GridObjectType
+    public enum GridObjectType
 {
     Note,
     Node,
-    Empty
+    Empty,
+    Dust
 }

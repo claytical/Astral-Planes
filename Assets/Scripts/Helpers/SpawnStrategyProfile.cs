@@ -40,7 +40,7 @@ public class SpawnStrategyProfile : ScriptableObject
 
         WeightedMineNode selected = ChooseRandomWeighted(validNodes);
         InstrumentTrack selectedTrack = trackController.FindTrackByRole(selected.role);
-        Color color = ShardColorUtility.RoleColor(selected.role);
+
         if (selected == null)
         {
             Debug.LogError("SpawnStrategyProfile: No suitable WeightedMineNode was selected.");
@@ -64,7 +64,7 @@ public class SpawnStrategyProfile : ScriptableObject
         return selected.ToDirective(
             selectedTrack,
             generatedNoteSet,
-            color,
+            selectedTrack.trackColor,
             nodeRegistry,
             objectRegistry,
             noteSetFactory,

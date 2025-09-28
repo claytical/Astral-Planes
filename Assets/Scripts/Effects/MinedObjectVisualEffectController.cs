@@ -27,19 +27,6 @@ public class MinedObjectVisualEffectController : MonoBehaviour
             // Instantiate particle system and set color
             if (activeProfile.particlePrefab != null)
             {
-                //note spawner
-                if (noteSpawner != null)
-                {
-                    // Instantiate the full GameObject prefab
-                    noteSpawner.ghostTrigger = Instantiate(activeProfile.particlePrefab, transform.position, Quaternion.identity, transform);
-                    GhostPatternTrigger trigger = noteSpawner.ghostTrigger.GetComponent<GhostPatternTrigger>();
-                    if (trigger != null)
-                    {
-                        if (noteSpawner != null)
-                            trigger.Initialize(noteSpawner.selectedNoteSet, noteSpawner.assignedTrack,
-                                noteSpawner.musicalRole);
-                    }
-                }
                 
                 // Then get the ParticleSystem from the instantiated object
                 particles = minedObject.GetComponent<ParticleSystem>();
@@ -132,19 +119,7 @@ public class MinedObjectVisualEffectController : MonoBehaviour
             transform.Rotate(Vector3.forward, activeProfile.rotationSpeed * Time.deltaTime);
         }
     }
-
-
-    private IEnumerator PulseLoop()
-    {
-        while (gameObject.activeSelf) ;
-        {
-            float pulse = (Mathf.Sin(Time.time * activeProfile.pulseSpeed) + 1f) / 2f;
-            float scale = Mathf.Lerp(1f, activeProfile.pulseScaleAmount, pulse);
-            transform.localScale = Vector3.one * scale;
-            yield return null;
-        }
-    }
-
+    
     private VisualEffectProfile GetProfileForRole(MusicalRole role)
     {
         foreach (var profile in roleProfiles)

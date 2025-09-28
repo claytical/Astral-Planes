@@ -1,0 +1,158 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
+  m_Name: Intensify Behavior
+  m_EditorClassIdentifier: 
+  personality: 2
+  starTint: {r: 0.8666667, g: 0.44918352, b: 0, a: 1}
+  particlePulseSpeed: 1
+  starAlphaMin: 0.1
+  starAlphaMax: 1
+  starDriftSpeed: 2
+  starDriftJitter: 0.15
+  orbitBias: 0
+  teleportChancePerSec: 0
+  dustShrinkRadius: 6
+  dustShrinkUnitsPerSec: 1.2
+  dustFalloff:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: -1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  feedsDust: 0
+  dustRegrowDelayMul: 1
+  ejectionStyle: 1
+  nodesPerStar: 3
+  scatterRadius: 1.6
+  nodeFlightSeconds: 0.6
+  nodeFlightEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  ejectionStagger: 0.03
+  expirePolicy: 0
+  noteVisibility: 1
+  emitMissedAsCorrection: 0
+  allowShardRecyclingWhenMissed: 0
+  shardHavocChance: 0
+  nodeBaseMaxSpeed: 3
+  nodeBaseMaxForce: 10
+  leadFrolicBias: 0.6
+  bassHideBias: 0.6
+  grooveEvadeBias: 0.6
+  harmonyOrbitBias: 0.6
+  establishSpeedMul: 0.8
+  evolveSpeedMul: 1
+  intensifySpeedMul: 1.2
+  releaseSpeedMul: 0.9
+  wildcardSpeedMul: 1.35
+  popSpeedMul: 1.1
+  dustSpeedCapMul: 0.9
+  dustExtraBrake: 0.25
+  dustLateralMul: 1
+  dustTurbulenceMul: 1
+  wiggleTorqueStrength: 1
+  wiggleFrequency: 2
+  wiggleDrift: 0
+  wiggleDriftAmplitude: 0.05
+  wiggleDriftFrequency: 1
+  bass:
+    maxSpeedMul: 1
+    maxForceMul: 1
+    frolicBiasDelta: 0
+    hideBiasDelta: 0
+    evadeBiasDelta: 0
+    orbitBiasDelta: 0
+    dustSpeedCapDelta: 0
+    dustExtraBrakeDelta: 0
+    dustLateralDelta: 0
+    dustTurbulenceDelta: 0
+    wiggleTorqueDelta: 0
+    wiggleFreqDelta: 0
+  harmony:
+    maxSpeedMul: 1
+    maxForceMul: 1
+    frolicBiasDelta: 0
+    hideBiasDelta: 0
+    evadeBiasDelta: 0
+    orbitBiasDelta: 0
+    dustSpeedCapDelta: 0
+    dustExtraBrakeDelta: 0
+    dustLateralDelta: 0
+    dustTurbulenceDelta: 0
+    wiggleTorqueDelta: 0
+    wiggleFreqDelta: 0
+  lead:
+    maxSpeedMul: 1
+    maxForceMul: 1
+    frolicBiasDelta: 0
+    hideBiasDelta: 0
+    evadeBiasDelta: 0
+    orbitBiasDelta: 0
+    dustSpeedCapDelta: 0
+    dustExtraBrakeDelta: 0
+    dustLateralDelta: 0
+    dustTurbulenceDelta: 0
+    wiggleTorqueDelta: 0
+    wiggleFreqDelta: 0
+  groove:
+    maxSpeedMul: 1
+    maxForceMul: 1
+    frolicBiasDelta: 0
+    hideBiasDelta: 0
+    evadeBiasDelta: 0
+    orbitBiasDelta: 0
+    dustSpeedCapDelta: 0
+    dustExtraBrakeDelta: 0
+    dustLateralDelta: 0
+    dustTurbulenceDelta: 0
+    wiggleTorqueDelta: 0
+    wiggleFreqDelta: 0

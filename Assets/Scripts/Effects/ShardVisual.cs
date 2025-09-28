@@ -78,28 +78,5 @@ public class DiamondVisual : MonoBehaviour
         sprite.color = color;
         storedHue = 0f;
     }
-
-    public void RotateToCross(float delay = 0.2f)
-    {
-        StartCoroutine(RotateAfterDelay(delay));
-    }
-
-    private IEnumerator RotateAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        Quaternion startRot = visualTarget.rotation;
-        Quaternion targetRot = Quaternion.Euler(0, 0, 90f);
-        float t = 0f;
-        float duration = 0.4f;
-
-        while (t < 1f)
-        {
-            t += Time.deltaTime / duration;
-            visualTarget.rotation = Quaternion.Slerp(startRot, targetRot, t);
-            yield return null;
-        }
-
-        visualTarget.rotation = targetRot;
-    }
+    
 }

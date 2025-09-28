@@ -1,6 +1,5 @@
-// HexagonShield.cs
-
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class CosmicDust : MonoBehaviour
@@ -9,9 +8,9 @@ public class CosmicDust : MonoBehaviour
     public Vector3 referenceScale = new Vector3(0.75f, 0.75f, 1f); // <- tweak to your taste
 // === PhaseStar interaction ===
     [Header("PhaseStar Proximity")]
-    public bool starRemovesWithoutRegrow = true;   // if false, it will regrow via generator
+    public bool starRemovesWithoutRegrow;   // if false, it will regrow via generator
     public float starAlphaFadeBias = 0.9f;         // keep a little glow as it shrinks
-    private bool shrinkingFromStar = false;
+    private bool shrinkingFromStar;
     private Coroutine growInRoutine;               // to cancel grow-in while shrinking
 
     public enum CosmicDustType { Friendly, Depleting }
@@ -21,95 +20,168 @@ public class CosmicDust : MonoBehaviour
     [Range(0f,1.5f)] public float slowBrake = 0.4f;   // extra braking force
     [Range(0.4f, 1f)] public float speedScale = 0.8f;   // cap scale
     [Range(0.4f, 1f)] public float accelScale = 0.8f;   // thrust scale
-    public bool dissipateOnExit = false;
+    public bool dissipateOnExit;
+// Add field + setter
+    private float growInOverride = -1f; // <0 means "use default random"
+    [Header("Accommodation (vehicle)")]
+    [Range(0.3f, 1f)] public float minScaleFactor = 0.55f;   // never shrink below 55% of full
+    [Range(0f, 0.5f)] public float shrinkStep = 0.12f;        // how much each ENTRY tries to shave off
+    [Range(0.05f, 1.5f)] public float shrinkEaseTime = 0.25f; // ease time to reach the new target
+    [Range(0f, 3f)] public float regrowDelay = 0.6f;          // wait before regrowing
+    [Range(0.1f, 6f)] public float regrowTime = 2.0f;         // ease time back to full
 
-    private float baseStartSize = 1f;         // particle reset
-    private float baseStartLifetime = 1f;
-    private bool cachedPS = false;
+    private Vector3 accomodationTarget;
+    private Coroutine accomodateRoutine;
+    private Coroutine regrowRoutine;
+    private Coroutine fadeRoutine;
+    private SpriteRenderer cachedSR;
+    private List<SpriteRenderer> childSRs;
+
     [Header("Behavior")]
     public DustBehavior behavior = DustBehavior.ViscousSlow; // NEW
     [Range(0.2f,1f)] public float slowFactor = 0.7f;         // NEW (velocity multiplier while inside)
     [Range(0f,2f)]   public float slowDuration = 0.35f;       // NEW (seconds)
     [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
-    public bool dissipateOnHit = false;                       // NEW (Silt cloud)
-    public bool particleSwellOnHit = true;                    // NEW
-    private bool hasDissipated = false;                       // NEW
     private SpriteRenderer sr;
     private Color depletingColor = new Color(1f, 0.2f, 0.2f, 0.2f);
     public SpriteRenderer baseSprite;
+    [SerializeField] private float fadeSeconds = 0.25f;
+    [SerializeField] private Vector3 fullScale = Vector3.one; // set in Awake/Begin()
+
+// OPTIONAL: track who destroyed us (useful for debugging)
+
     public ParticleSystem particleSystem;
-    //public SpriteRenderer halo;
-    public float amplitude = 1f; // drift radius
-    public float speed = 0.5f;     // speed of drift
-    public Vector2 offset;
-    private float alphaBreathingOffset = 0;
-    private static readonly float ChainRadius = 1.5f;
     private DrumTrack drumTrack;
     private float originalAlpha;
-    private Vector3 fullScale;
     private Vector3 velocity;
     private Vector3 baseScale;
-// Add at top-level of CosmicDust
-    [System.Serializable]
-    public struct DustTuning {
-        public float speedScale;       // multiply ship terminalVelocity (0.5–1.0)
-        public float accelScale;       // multiply ship thrust/force (0.5–1.0)
-        public float extraDamping;     // added linear damping on ship (0–2)
-        public float drainPerSecond;   // energy/sec if Depleting
-        public float puffScale;        // particle expansion multiplier on enter
+    [SerializeField] private int epochId;
+    public enum DustDestroyCause { None, ManualBreak, PhaseStarPrune, VehicleEat, Lifetime, Debug }
+    public static class DustDestroyStats
+    {
+        public static int manualBreaks, starPrunes, vehicleEats, lifetimes, debugs;
     }
 
-// Per-phase defaults (tweak to taste)
-    public DustTuning establish = new(){ speedScale=.90f, accelScale=.95f, extraDamping=.10f, drainPerSecond=0f,   puffScale=1.2f };
-    public DustTuning evolve    = new(){ speedScale=.85f, accelScale=.90f, extraDamping=.20f, drainPerSecond=0f,   puffScale=1.3f };
-    public DustTuning intensify = new(){ speedScale=.60f, accelScale=.75f, extraDamping=.60f, drainPerSecond=.7f,  puffScale=1.5f };
-    public DustTuning release   = new(){ speedScale=.80f, accelScale=.85f, extraDamping=.25f, drainPerSecond=0f,   puffScale=1.25f };
-    public DustTuning wildcard  = new(){ speedScale=.70f, accelScale=.80f, extraDamping=.35f, drainPerSecond=.3f,  puffScale=1.4f };
-    public DustTuning pop       = new(){ speedScale=.90f, accelScale=.95f, extraDamping=.10f, drainPerSecond=0f,   puffScale=1.6f };
+    [SerializeField] private DustDestroyCause lastDestroy = DustDestroyCause.None;
+    [SerializeField] private bool cachedPS;
 
-    private DustTuning CurrentTuning() {
-        switch (drumTrack.currentPhase) {
-            case MusicalPhase.Establish:  return establish;
-            case MusicalPhase.Evolve:     return evolve;
-            case MusicalPhase.Intensify:  return intensify;
-            case MusicalPhase.Release:    return release;
-            case MusicalPhase.Wildcard:   return wildcard;
-            case MusicalPhase.Pop:        return pop;
-            default:                      return establish;
-        }
+    public CosmicDust(ParticleSystem particleSystem)
+    {
+        this.particleSystem = particleSystem;
     }
+
+    public void SetEpoch(int id) => epochId = id;
+    public int GetEpoch() => epochId;
 
     void Awake() {
+        if (cachedSR == null) cachedSR = GetComponent<SpriteRenderer>();
+        if (childSRs == null)
+            childSRs = new List<SpriteRenderer>(GetComponentsInChildren<SpriteRenderer>(includeInactive: true));
+
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         if (transform.localScale.sqrMagnitude < 1e-6f)
             transform.localScale = referenceScale;
 
         fullScale = transform.localScale * 2f; // your intended “final size”
-        alphaBreathingOffset = Random.Range(0f, 1f);
+        accomodationTarget = fullScale;
         if (particleSystem != null) {
             var main = particleSystem.main;
-            baseStartSize = main.startSizeMultiplier;
-            baseStartLifetime = main.startLifetimeMultiplier;
             cachedPS = true;
         }
     }
-    private IEnumerator GrowIn()
+    public void StartFadeAndScaleDown(float duration)
     {
-        float tGrow = 0f;
-        float duration = Random.Range(5, 20);
-        
-        while (tGrow < duration)
+        if (fadeRoutine != null) StopCoroutine(fadeRoutine);
+        fadeRoutine = StartCoroutine(FadeAndScaleDown(duration));
+    }
+    private IEnumerator FadeAndDestroy(float strength01)
+    {
+        // strength01 lets closer tiles fade faster (optional)
+        float dur = Mathf.Lerp(fadeSeconds * 0.3f, fadeSeconds, Mathf.Clamp01(strength01));
+
+        // snapshot start
+        Color c0 = baseSprite ? baseSprite.color : Color.white;
+        Vector3 s0 = transform.localScale;
+        if (s0.sqrMagnitude < 1e-6f) s0 = fullScale; // safety if spawned at 0
+
+        float t = 0f;
+        while (t < dur)
         {
-            tGrow += Time.deltaTime;
-            float s = Mathf.SmoothStep(0f, 1f, tGrow / duration);
-            transform.localScale = fullScale * s;
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / dur);
+
+            if (baseSprite)
+            {
+                var c = c0; c.a = Mathf.Lerp(c0.a, 0f, u);
+                baseSprite.color = c;
+            }
+            transform.localScale = Vector3.Lerp(s0, Vector3.zero, u);
             yield return null;
         }
-        transform.localScale = fullScale; // Ensure exact final size
+
+        Destroy(gameObject);
     }
+    private IEnumerator FadeAndScaleDown(float duration)
+    {
+        // Cancel any ongoing growth/shrink coroutines here if you keep handles to them.
+        // e.g., if (growRoutine != null) { StopCoroutine(growRoutine); growRoutine = null; }
 
+        float t = 0f;
+        Vector3 startScale = transform.localScale;
+        Color[] startColors = null;
 
+        // Collect all renderers to fade (self + children)
+        var renderers = new List<SpriteRenderer>();
+        if (cachedSR != null) renderers.Add(cachedSR);
+        if (childSRs != null) renderers.AddRange(childSRs);
+
+        if (renderers.Count > 0)
+        {
+            startColors = new Color[renderers.Count];
+            for (int i = 0; i < renderers.Count; i++)
+                if (renderers[i] != null) startColors[i] = renderers[i].color;
+        }
+
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / duration);
+
+            // Scale down to zero
+            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, u);
+
+            // Fade alpha
+            if (renderers.Count > 0)
+            {
+                for (int i = 0; i < renderers.Count; i++)
+                {
+                    var sr = renderers[i];
+                    if (sr == null) continue;
+                    Color c = startColors[i];
+                    c.a = Mathf.Lerp(startColors[i].a, 0f, u);
+                    sr.color = c;
+                }
+            }
+
+            yield return null;
+        }
+
+        // Ensure we end invisible and tiny
+        transform.localScale = Vector3.zero;
+        if (renderers.Count > 0)
+        {
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                var sr = renderers[i];
+                if (sr == null) continue;
+                var c = sr.color; c.a = 0f; sr.color = c;
+            }
+        }
+
+        // Remove the object
+        Destroy(gameObject);
+    }
     public void Begin()
     {
         SetColorVariance();
@@ -127,7 +199,7 @@ public class CosmicDust : MonoBehaviour
 
     }
     // Called repeatedly by PhaseStar while in range
-public void ShrinkByPhaseStar(float unitsPerSecond)
+    public void ShrinkByPhaseStar(float unitsPerSecond)
 {
     if (shrinkingFromStar) { DoShrink(unitsPerSecond); return; }
 
@@ -138,8 +210,7 @@ public void ShrinkByPhaseStar(float unitsPerSecond)
     DoShrink(unitsPerSecond);
 }
 
-private void DoShrink(float unitsPerSecond)
-{
+    private void DoShrink(float unitsPerSecond) {
     Vector3 s = transform.localScale;
     float step = unitsPerSecond * Time.deltaTime;
     float nx = Mathf.Max(0f, s.x - step);
@@ -165,10 +236,13 @@ private void DoShrink(float unitsPerSecond)
     // reached ~zero? remove cleanly (with or without regrow)
     if (nx <= 0.01f || ny <= 0.01f)
         DestroyFromPhaseStar();
-}
+    }
 
-private void DestroyFromPhaseStar()
+    private void DestroyFromPhaseStar()
 {
+    lastDestroy = DustDestroyCause.PhaseStarPrune;
+    DustDestroyStats.starPrunes++;
+    StartCoroutine(FadeAndDestroy(1));
     // free cell + remove from generator map, just like BreakHexagon
     if (drumTrack != null)
     {
@@ -233,47 +307,30 @@ private void DestroyFromPhaseStar()
         var main = particleSystem.main;
         main.startColor = new ParticleSystem.MinMaxGradient(c);
     }
-
-    public void TriggerRippleEffect()
-    {
-        foreach (CosmicDust dust in FindObjectsOfType<CosmicDust>())
-        {
-            float dist = Vector2.Distance(transform.position, dust.transform.position);
-            float delay = dist * 0.05f;
-        }
-    }
-
+    
     public void SetDrumTrack(DrumTrack track)
     {
         drumTrack = track;
     }
+    public void SetGrowInDuration(float seconds) { growInOverride = Mathf.Max(0.05f, seconds); }
 
-    public void ShiftToPhaseColor(MusicalPhaseProfile profile, float duration)
-    {
-        StartCoroutine(PhaseColorLerpRoutine(profile.visualColor, duration));
-    }
+    private IEnumerator GrowIn() {
+        float duration = (growInOverride > 0f)
+        ? growInOverride
+        : Random.Range(5f, 20f); // keep your old fallback if override not set
+        Debug.Log($"[DUST] GrowIn duration={duration:0.00}s for {name}");
 
-    private IEnumerator PhaseColorLerpRoutine(Color phaseColor, float duration)
-    {
-        if (baseSprite == null) yield break;
-
-        Color startColor = baseSprite.color;
         float t = 0f;
-
-        while (t < duration)
-        {
+        while (t < duration) {
             t += Time.deltaTime;
-            Color lerped = Color.Lerp(startColor, phaseColor, t / duration);
-            baseSprite.color = lerped;
-            SetParticleColor(lerped);
+            float s = Mathf.SmoothStep(0f, 1f, t / duration);
+            transform.localScale = fullScale * s;
             yield return null;
         }
-
-        baseSprite.color = phaseColor;
-        SetParticleColor(phaseColor);
-
+        
+        transform.localScale = fullScale;
     }
-
+    
     public void SetPhaseColor(MusicalPhase phase)
     {
         Color phaseColor = phase switch
@@ -299,7 +356,6 @@ private void DestroyFromPhaseStar()
                 baseSprite.color = depletingColor;
             }
         }
-        Debug.Log($"Configuring New Phase: {phase}");
         ConfigureForPhase(phase); // NEW: tie feel to phase
     }
 
@@ -342,71 +398,92 @@ private void DestroyFromPhaseStar()
         drumTrack.hexMazeGenerator.TriggerRegrowth(gridPos, drumTrack.currentPhase);
     }
     // PHASE → BEHAVIOR mapping (call this when phase changes or on spawn)
-    public void ConfigureForPhase(MusicalPhase phase)
+    private void ConfigureForPhase(MusicalPhase phase)
     {
+        float s = phase switch {
+            MusicalPhase.Establish  => 0.85f,
+            MusicalPhase.Evolve     => 1.00f,
+            MusicalPhase.Intensify  => 1.20f,
+            MusicalPhase.Release    => 1.00f,
+            MusicalPhase.Wildcard   => 1.10f,
+            MusicalPhase.Pop        => 0.95f,
+            _ => 1.0f
+        };
+        fullScale = referenceScale * s; // existing field
         switch (phase)
         {
             case MusicalPhase.Establish:
                 behavior = DustBehavior.ViscousSlow;
                 slowFactor = 0.8f; slowDuration = 0.25f;
-                lateralForce = 0f; turbulence = 0f; dissipateOnHit = false;
+                lateralForce = 0f; turbulence = 0f;
+                
                 break;
             case MusicalPhase.Evolve:
                 behavior = DustBehavior.CrossCurrent;
                 slowFactor = 0.9f; slowDuration = 0.2f;
-                lateralForce = 2.5f; turbulence = 0.25f; dissipateOnHit = false;
+                lateralForce = 2.5f; turbulence = 0.25f; 
+                
                 break;
             case MusicalPhase.Intensify:
                 behavior = DustBehavior.StaticCling;
                 slowFactor = 0.5f; slowDuration = 0.5f;
-                lateralForce = 0.5f; turbulence = 0.4f; dissipateOnHit = false;
+                lateralForce = 0.5f; turbulence = 0.4f; 
+                
                 break;
             case MusicalPhase.Release:
                 behavior = DustBehavior.SiltDissipate;
                 slowFactor = 0.85f; slowDuration = 0.2f;
-                lateralForce = 0f; turbulence = 0f; dissipateOnHit = true;
+                lateralForce = 0f; turbulence = 0f; 
+                
                 break;
             case MusicalPhase.Wildcard:
                 behavior = DustBehavior.Turbulent;
                 slowFactor = 0.7f; slowDuration = 0.4f;
-                lateralForce = 1.2f; turbulence = 2.0f; dissipateOnHit = Random.value < 0.3f;
+                lateralForce = 1.2f; turbulence = 2.0f;
+                
                 break;
             case MusicalPhase.Pop:
                 behavior = DustBehavior.ViscousSlow;
                 slowFactor = 0.6f; slowDuration = 0.3f;
-                lateralForce = 0f; turbulence = 0.2f; dissipateOnHit = true;
+                lateralForce = 0f; turbulence = 0.2f;
+                
                 break;
         }
         Debug.Log($"Chose Behavior: {behavior}");
     }
+    
+    private void AccommodateToVehicle()
+{
+    // If PhaseStar is actively shrinking this hex, don't fight it.
+    if (shrinkingFromStar) return;
 
-    /*
-    private void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
-        {
-            Vector2 impactDir = coll.relativeVelocity.sqrMagnitude > 0.001f
-                ? coll.relativeVelocity.normalized : (Vector2)(vehicle.transform.position - transform.position).normalized;
+    // Cancel a pending regrow so we can stack multiple entries sanely
+    if (regrowRoutine != null) { StopCoroutine(regrowRoutine); regrowRoutine = null; }
 
-            AbsorbDiamondGhost(impactDir);
+    // Compute a new target factor: current factor minus a step, clamped to a floor
+    float currentFactor = Mathf.Clamp01(transform.localScale.x / Mathf.Max(0.0001f, fullScale.x));
+    float targetFactor  = Mathf.Max(minScaleFactor, currentFactor - shrinkStep);
+    accomodationTarget  = fullScale * targetFactor;
 
-            // ENERGY penalty only if Depleting (you already do this)
-            if (shieldType == CosmicDustType.Depleting)
-            {
-                vehicle.ConsumeEnergy(1f);
-            }
+    // Ease down to the new target
+    if (accomodateRoutine != null) StopCoroutine(accomodateRoutine);
+    accomodateRoutine = StartCoroutine(ScaleTo(accomodationTarget, shrinkEaseTime));
 
-            // Feel driver
-            if (dissipateOnHit && !hasDissipated)
-            {
-                StartCoroutine(DissipateCloud()); // NEW
-            }
+    // Schedule a smooth regrow after a delay
+    regrowRoutine = StartCoroutine(RegrowAfterDelay());
+}
 
-            StartCoroutine(ApplyDustEffect(vehicle, impactDir)); // NEW
-            if (particleSwellOnHit) SwellParticlesOnce(); // NEW
-        }
-    }
-*/
+    private IEnumerator RegrowAfterDelay()
+{
+    yield return new WaitForSeconds(regrowDelay);
+    // If a later entry pushed the target even smaller, wait for that ease to finish
+    if (accomodateRoutine != null) yield return accomodateRoutine;
+
+    // Ease back up to full
+    yield return ScaleTo(fullScale, regrowTime);
+    regrowRoutine = null;
+}
+    
     private void OnTriggerEnter2D(Collider2D other) {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
         v.EnterDustField(speedScale, accelScale);  // new in Vehicle.cs (next section)
@@ -416,15 +493,15 @@ private void DestroyFromPhaseStar()
         {
             Vector2 dir = rb.linearVelocity.sqrMagnitude > 0.0001f
                 ? rb.linearVelocity.normalized
-                : (Vector2)(v.transform.position - transform.position).normalized;
+                : (v.transform.position - transform.position).normalized;
 
             StartCoroutine(ApplyDustEffect(v, dir));  // <- uses your behavior switches
         }
-
+        Debug.Log($"Accomodating to Vehicle: {v}");
+        AccommodateToVehicle();
         // Particle puff as a pulse (no accumulation)
-        if (cachedPS) StartCoroutine(ParticleSwellPulse(1.5f, 0.3f));
+//        if (cachedPS) StartCoroutine(ParticleSwellPulse(1.5f, 0.3f));
     }
-
     private void OnTriggerStay2D(Collider2D other)
     {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
@@ -443,7 +520,6 @@ private void DestroyFromPhaseStar()
         if (shieldType == CosmicDustType.Depleting)
             v.ConsumeEnergy(Time.deltaTime);
     }
-
     private void OnTriggerExit2D(Collider2D other)
     {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
@@ -453,36 +529,6 @@ private void DestroyFromPhaseStar()
         if (dissipateOnExit)
             BreakHexagon(SoundEffectMood.Friendly);
     }
-
-    private IEnumerator SwellAndFadeSprite() {
-        if (baseSprite == null) yield break;
-        float t = 0f, dur = 0.25f;
-        var start = transform.localScale;
-        var end   = start * 1.05f;
-        while (t < dur) { t += Time.deltaTime; transform.localScale = Vector3.Lerp(start,end,t/dur); yield return null; }
-        t = 0f;
-        while (t < dur) { t += Time.deltaTime; transform.localScale = Vector3.Lerp(end,start,t/dur); yield return null; }
-    }
-    private IEnumerator ParticleSwellPulse(float scale = 1.5f, float dur = 0.3f) {
-        if (!cachedPS) yield break;
-        var main = particleSystem.main;
-        float t = 0f;
-        while (t < dur) { // swell
-            t += Time.deltaTime;
-            float e = Mathf.SmoothStep(0,1,t/dur);
-            main.startSizeMultiplier = Mathf.Lerp(baseStartSize, baseStartSize*scale, e);
-            yield return null;
-        }
-        t = 0f;
-        while (t < dur) { // relax
-            t += Time.deltaTime;
-            float e = Mathf.SmoothStep(0,1,t/dur);
-            main.startSizeMultiplier = Mathf.Lerp(baseStartSize*scale, baseStartSize, e);
-            yield return null;
-        }
-        main.startSizeMultiplier = baseStartSize; // hard reset
-    }
-
     private IEnumerator ApplyDustEffect(Vehicle vehicle, Vector2 impactDir)
     {
         // Grab RB directly so we don't need Vehicle changes
@@ -520,84 +566,35 @@ private void DestroyFromPhaseStar()
             // Static cling = add linear drag temporarily
             if (behavior == DustBehavior.StaticCling)
             {
-                rb.AddForce(-rb.linearVelocity * 0.5f * Time.deltaTime, ForceMode2D.Force);
+                rb.AddForce(-rb.linearVelocity * (0.5f * Time.deltaTime), ForceMode2D.Force);
             }
 
             yield return null;
         }
     }
-
-    private void SwellParticlesOnce()
+    private IEnumerator ScaleTo(Vector3 target, float duration)
     {
-        if (particleSystem == null) return;
-        var main = particleSystem.main;
-        float s0 = main.startSizeMultiplier;
-        float t0 = main.startLifetimeMultiplier;
-
-        // transient swell
-        StartCoroutine(ParticleSwellRoutine(s0, t0));
-    }
-
-    private IEnumerator ParticleSwellRoutine(float baseSize, float baseLife)
-    {
-        var main = particleSystem.main;
-        float t = 0f;
-        float dur = 0.35f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float e = Mathf.SmoothStep(0f, 1f, t / dur);
-            main.startSizeMultiplier = Mathf.Lerp(baseSize, baseSize * 1.6f, e);
-            main.startLifetimeMultiplier = Mathf.Lerp(baseLife, baseLife * 1.4f, e);
-            yield return null;
-        }
-        // relax back
-        t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float e = Mathf.SmoothStep(0f, 1f, t / dur);
-            main.startSizeMultiplier = Mathf.Lerp(baseSize * 1.6f, baseSize, e);
-            main.startLifetimeMultiplier = Mathf.Lerp(baseLife * 1.4f, baseLife, e);
-            yield return null;
-        }
-        main.startSizeMultiplier = baseSize;
-        main.startLifetimeMultiplier = baseLife;
-    }
-
-    private IEnumerator DissipateCloud()
-    {
-        hasDissipated = true;
-        // stop interacting
-        if (TryGetComponent<Collider2D>(out var col)) col.enabled = false;
-
-        // expand + fade out
         Vector3 start = transform.localScale;
-        Vector3 end   = start * 1.6f;
-        float t = 0f, dur = 0.35f;
-
-        Color c = baseSprite.color;
-        float a0 = c.a;
-
-        while (t < dur)
+        float t = 0f;
+        while (t < duration)
         {
             t += Time.deltaTime;
-            float e = t / dur;
-            transform.localScale = Vector3.Lerp(start, end, Mathf.SmoothStep(0f,1f,e));
-            c.a = Mathf.Lerp(a0, 0f, e);
-            baseSprite.color = c;
+            float e = Mathf.SmoothStep(0f, 1f, t / duration);
+            transform.localScale = Vector3.Lerp(start, target, e);
+            UpdateSpriteAlphaByScale();
             yield return null;
         }
-
-        if (particleSystem != null)
-        {
-            StartCoroutine(WaitForParticlesThenDestroy());
-            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        transform.localScale = target;
+        UpdateSpriteAlphaByScale();
+    }
+    private void UpdateSpriteAlphaByScale()
+    {
+        if (baseSprite == null || fullScale.x <= 0.0001f) return;
+        float t = Mathf.Clamp01(transform.localScale.x / fullScale.x);
+        // Match the PhaseStar fade logic feel, but keep a small floor so it’s visible.
+        Color c = baseSprite.color;
+        c.a = Mathf.Lerp(0.1f, originalAlpha, t); // 0.1 floor prevents “invisible walls”
+        baseSprite.color = c;
     }
     public void SwitchType(CosmicDustType newType)
     {
@@ -613,25 +610,8 @@ private void DestroyFromPhaseStar()
                 break;
         }
     }
+    
 
-    public void AbsorbDiamondGhost(Vector2 impactDirection)
-    {
-        Vector2 worldImpactPoint = transform.position + (Vector3)impactDirection;
-        Vector2Int center = drumTrack.WorldToGridPosition(worldImpactPoint);
-        if (drumTrack.hexMazeGenerator != null)
-        {
-            if (CollectionSoundManager.Instance != null)
-            {
-                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, SoundEffectMood.Friendly, center, 2, .2f));
-            }
-            else
-            {
-                StartCoroutine(drumTrack.hexMazeGenerator.BreakSelfThenNeighbors(this, SoundEffectMood.Friendly, center, 2, .2f));
-            }
-        }
-
-        TriggerRippleEffect();
-    }
-
-
+    
+    
 }

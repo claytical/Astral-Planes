@@ -1,104 +1,102 @@
-// ShardPickup.cs (patch)
-using System.Collections;
+using System;
 using UnityEngine;
 
-[RequireComponent(typeof(Collider2D))]
 public class ShardPickup : MonoBehaviour
 {
-    [Header("Ghost Payload")]
-    public InstrumentTrack track;
-    public int   step;
-    public int   note;
-    public int   duration;
-    public float velocity = 80f;
-    private PhaseStar owner;
-    [Header("Behavior")]
-    public float energyCost = 0.06f;
-    public float flyToRibbonDuration = 0.22f;
+    public InstrumentTrack targetTrack { get; private set; }
+    public NoteSet targetNoteSet { get; private set; }
+    public PhaseStar owner { get; private set; }
 
-    private bool armed = false;          // ⬅ default FALSE now
-    private bool initialized = false;
-    private Collider2D col;
+    // Tunables
+    [SerializeField] private float armingDelay = 0.05f; // avoid same-frame double-triggers
+    private bool armed = false;
+    private bool burstTriggered = false;
 
-    void Awake()
+    // Optional: little bob
+    [SerializeField] private float bobAmp = 0.1f;
+    [SerializeField] private float bobHz  = 1.2f;
+    private Vector3 startPos;
+
+    void Awake() { startPos = transform.position; }
+
+    public void SetOwner(PhaseStar star) => owner = star;
+
+    public void Configure(InstrumentTrack track, NoteSet noteSet)
     {
-        col = GetComponent<Collider2D>();
-        if (col) col.enabled = false;    // ⬅ collider off until configured+armed
-        Debug.Log($"Shard Created {gameObject.name}");
+        targetTrack  = track;
+        targetNoteSet = noteSet;
     }
 
-    public void SetOwner(PhaseStar ps)
+    public void ArmNextFixedUpdate(float extraDelay = 0f)
     {
-        owner = ps;
-    }    // Called by PhaseStar immediately after Instantiate
-    public void Configure(InstrumentTrack t, int s, int n, int d, float v,
-                          float cost, float flyDur)
-    {
-        track = t; step = s; note = n; duration = d; velocity = v;
-        energyCost = cost; flyToRibbonDuration = flyDur;
-        initialized = true;
+        if (!gameObject.activeInHierarchy) return;
+        StartCoroutine(ArmRoutine(extraDelay));
     }
 
-    // Called by PhaseStar right after Configure
-    public void ArmNextFixedUpdate(float extraDelaySeconds = 0f)
+    private System.Collections.IEnumerator ArmRoutine(float extra)
     {
-        StartCoroutine(ArmRoutine(extraDelaySeconds));
-    }
-
-    private IEnumerator ArmRoutine(float delay)
-    {
-        // ensure we pass at least one physics step
-        yield return new WaitForFixedUpdate();
-        if (delay > 0f) yield return new WaitForSeconds(delay);
-
-        if (col) col.enabled = true;
+        yield return new WaitForSeconds(armingDelay + Mathf.Max(0f, extra));
         armed = true;
+    }
+
+    void Update()
+    {
+        // gentle bob
+        if (bobAmp > 0f)
+        {
+            float y = Mathf.Sin(Time.time * Mathf.PI * 2f * bobHz) * bobAmp;
+            transform.position = new Vector3(startPos.x, startPos.y + y, startPos.z);
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // ⬅ hard guards
-        if (!initialized || !armed || track == null) return;
+        if (!armed || burstTriggered) return;
+        if (!other.TryGetComponent<Vehicle>(out _)) return;
 
-        var v = other.GetComponent<Vehicle>();
-        if (v == null) return;
-
-        armed = false; // single-use
-        v.ConsumeEnergy(energyCost);
-
-        // safe now: track was assigned in Configure
-        var nv = track.controller.noteVisualizer;
-        Vector3 ribbonPos = nv.ComputeRibbonWorldPosition(track, step);
-
-        StartCoroutine(FlyThenCommit(ribbonPos));
+        TriggerBurst();
     }
-    private IEnumerator FlyThenCommit(Vector3 ribbonTarget)
-    {
-        Vector3 start = transform.position;
-        float t = 0f;
 
-        while (t < 1f)
+    private void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (!armed || burstTriggered) return;
+        if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
+
+        TriggerBurst();
+    }
+
+    private void TriggerBurst()
+    {
+        if (burstTriggered) return;
+        burstTriggered = true;
+
+        if (targetTrack == null || targetNoteSet == null)
         {
-            t += Time.deltaTime / Mathf.Max(0.01f, flyToRibbonDuration);
-            float eased = Mathf.SmoothStep(0f, 1f, t);
-            transform.position = Vector3.Lerp(start, ribbonTarget, eased);
-            yield return null;
+            Debug.LogWarning("ShardPickup: missing targetTrack or targetNoteSet.");
+            Destroy(gameObject);
+            owner?.NotifyShardBurstComplete(null);
+            return;
         }
 
-        var myTrack = track; var myStep = step; var myNote = note;
-        var myDur = duration; var myVel = Mathf.Clamp(velocity, 50f, 127f);
+        var dt = targetTrack.drumTrack;
+        var parent = targetTrack.collectableParent != null
+            ? targetTrack.collectableParent
+            : targetTrack.transform;
 
-        // single, ordered placement
-        RemixCorrectionQueue.Instance.Enqueue(() =>
-        {
-            myTrack.AddNoteToLoop(myStep, myNote, myDur, myVel);
-            myTrack.controller.noteVisualizer.PlacePersistentNoteMarker(myTrack, myStep);
-            CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
-            owner?.NotifyShardResolved();
-        });
+        // Spawn a one-track burst that uses the GhostPattern math
+        NoteBurstSpawner.SpawnBurst(
+            targetTrack,
+            targetNoteSet,
+            parent,
+            transform.position,
+            dt.GetLoopLengthInSeconds()
+        );
 
-        var explode = GetComponent<Explode>();
-        if (explode != null) explode.Permanent(); else Destroy(gameObject);
+        // Inform the owner star that the burst started; the star will watch the track until all despawn
+        owner?.NotifyShardBurstComplete(targetTrack);
+
+        // optional fx here…
+
+        Destroy(gameObject);
     }
-
 }

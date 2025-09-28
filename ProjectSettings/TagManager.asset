@@ -12,6 +12,7 @@ TagManager:
   - Hazard
   - Glow
   - Vehicle
+  - Dust
   layers:
   - Default
   - TransparentFX

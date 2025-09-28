@@ -54,10 +54,7 @@ public class CollectableParticles : MonoBehaviour
         main.gravityModifier = isOnBeat ? 0f : 2.5f; // tweak the gravity value to taste
     }
 
-
-
-    public void Configure(NoteSet noteSet)
-{
+    public void Configure(NoteSet noteSet) {
     if (particleSystem == null || noteSet == null) return;
     // 🟣 Color tint — use track color with soft gradient
     Gradient gradient = new Gradient();
@@ -65,11 +62,11 @@ public class CollectableParticles : MonoBehaviour
     Debug.Log($"[Particles] Playing at {transform.position}, color: {baseColor}");
     baseColor.a = 1f;
     gradient.SetKeys(
-        new GradientColorKey[] {
+        new[] {
             new GradientColorKey(baseColor, 0f),
             new GradientColorKey(baseColor * 0.9f, 1f)
         },
-        new GradientAlphaKey[] {
+        new[] {
             new GradientAlphaKey(0f, 0f),
             new GradientAlphaKey(0.8f, 0.2f),
             new GradientAlphaKey(0.7f, 0.8f),

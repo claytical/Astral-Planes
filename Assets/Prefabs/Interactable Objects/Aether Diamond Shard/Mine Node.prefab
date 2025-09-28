@@ -10,14 +10,13 @@ GameObject:
   m_Component:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 4180682225686574285}
+  - component: {fileID: 8337744200482214873}
+  - component: {fileID: 2404411601338668691}
+  - component: {fileID: 1784781495894534207}
   - component: {fileID: 8668376557347016044}
-  - component: {fileID: 5944583382499287716}
   - component: {fileID: 2442014530722922072}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7493033509501386839}
-  - component: {fileID: 6181109060186163687}
-  - component: {fileID: 2404411601338668691}
-  - component: {fileID: 5945880808699000198}
   m_Layer: 0
   m_Name: Mine Node
   m_TagString: Untagged
@@ -52,10 +51,63 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00868c843009442dca5e83993027f2b5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  debrisPrefab: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d,
-    type: 3}
   coreSprite: {fileID: 2442014530722922072}
   maxStrength: 100
+--- !u!114 &8337744200482214873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6d5a83c4ddf54264a6b5b87661a0604, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cellsPerSecond: 4
+  replanCooldown: 0.15
+  snapAtCorners: 1
+--- !u!114 &2404411601338668691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speedCapMul: 0.9
+  extraBrake: 0.25
+  lateralNudgeMul: 1
+  turbulenceMul: 1
+--- !u!114 &1784781495894534207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faa4693963b0b40518ccad23f88e8645, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  outerSprite: {fileID: 2442014530722922072}
+  innerSprite: {fileID: 2442014530722922072}
+  frenzySpinDegPerSec: 480
+  thinkBurstRange: {x: 0.12, y: 0.25}
+  thinkDampen: 7
+  faceTurnDegPerSec: 420
+  wobbleDeg: 12
+  wobbleHzRange: {x: 2.5, y: 4.5}
+  innerCounterFactor: -0.4
+  minSpeedForSwim: 0.05
+  spritePivotOuter: {fileID: 0}
+  spritePivotInner: {fileID: 0}
 --- !u!114 &8668376557347016044
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -72,23 +124,6 @@ MonoBehaviour:
     type: 3}
   lifetime: 0
   randomizeLifetimer: 0
---- !u!114 &5944583382499287716
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0308b33128516431ea0caf85f421c372, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  wiggleTorqueStrength: 1
-  wiggleFrequency: 2
-  enableDrift: 1
-  driftAmplitude: 0.05
-  driftFrequency: 1
 --- !u!212 &2442014530722922072
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -132,8 +167,8 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 1323053393346916588, guid: 7887f854ff2ed4ade93d8aa72188ccc8,
+  m_SortingOrder: 100
+  m_Sprite: {fileID: 4238760236804092455, guid: b19675685c2f5458f94446d15d5f3f02,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -143,7 +178,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
+  m_MaskInteraction: 2
   m_SpriteSortPoint: 0
 --- !u!50 &4561843143948562615
 Rigidbody2D:
@@ -160,7 +195,7 @@ Rigidbody2D:
   m_Mass: 10
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 0.01
+  m_GravityScale: 0
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -210,7 +245,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.28, y: 1.15}
+    oldSize: {x: 0.64, y: 0.58}
     newSize: {x: 1.28, y: 1.15}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -218,114 +253,7 @@ PolygonCollider2D:
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.32999998, y: 0.074999996}
-      - {x: 0.26999998, y: 0.185}
-      - {x: 0.13, y: 0.445}
-      - {x: 0.08, y: 0.565}
-      - {x: 0.06, y: 0.575}
-      - {x: -0.03, y: 0.575}
-      - {x: -0.62, y: -0.465}
-      - {x: -0.64, y: -0.525}
-      - {x: -0.64, y: -0.555}
-      - {x: -0.62, y: -0.575}
-      - {x: 0.63, y: -0.575}
-      - {x: 0.64, y: -0.565}
-      - {x: 0.64, y: -0.505}
-      - {x: 0.53999996, y: -0.295}
-    - - {x: -0.52, y: -0.49499997}
-      - {x: -0.099999994, y: 0.24499999}
-      - {x: -0.02, y: 0.385}
-      - {x: 0.02, y: 0.465}
-      - {x: 0.01, y: 0.465}
-      - {x: 0.03, y: 0.415}
-      - {x: 0.16, y: 0.175}
-      - {x: 0.42999998, y: -0.325}
-      - {x: 0.53999996, y: -0.505}
-      - {x: -0.53999996, y: -0.505}
-    - - {x: 0.32, y: -0.325}
-      - {x: 0.16, y: -0.105}
-      - {x: 0.06, y: 0.114999995}
-      - {x: 0.02, y: 0.175}
-      - {x: -0.01, y: 0.175}
-      - {x: -0.13, y: -0.105}
-      - {x: -0.28, y: -0.305}
-      - {x: -0.29, y: -0.345}
-      - {x: -0.28, y: -0.36499998}
-      - {x: -0.14999999, y: -0.36499998}
-      - {x: -0.02, y: -0.33499998}
-      - {x: 0.14999999, y: -0.36499998}
-      - {x: 0.32, y: -0.36499998}
+    - - {x: 0.3, y: -0.3}
+      - {x: -0.3, y: -0.3}
+      - {x: 0, y: 0.3}
   m_UseDelaunayMesh: 0
---- !u!114 &6181109060186163687
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6b053dc576c0b439292ad62c00011fd7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  baseMaxSpeed: 3
-  baseMaxForce: 10
-  wanderRadius: 1.75
-  wanderJitter: 2
-  evadeDistance: 6
-  hideDistanceInsideDust: 0.75
-  cosmicDustMask:
-    serializedVersion: 2
-    m_Bits: 128
-  playerTag: Vehicle
-  establishSpeedMul: 0.8
-  evolveSpeedMul: 1
-  intensifySpeedMul: 1.2
-  releaseSpeedMul: 0.9
-  wildcardSpeedMul: 1.35
-  popSpeedMul: 1.1
-  leadFrolicBias: 0.6
-  bassHideBias: 0.6
-  grooveEvadeBias: 0.6
-  harmonyOrbitBias: 0.6
-  trackWaypoints: []
---- !u!114 &2404411601338668691
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  speedCapMul: 0.9
-  extraBrake: 0.25
-  lateralNudgeMul: 1
-  turbulenceMul: 1
---- !u!114 &5945880808699000198
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f7e54704abc8748509377aff03c1c443, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  dustMask:
-    serializedVersion: 2
-    m_Bits: 128
-  senseRadius: 7
-  vehicleTag: Vehicle
-  trackWaypoints: []
-  wanderImpulse: 3
-  evadeImpulse: 4
-  dustSeekImpulse: 1.8
-  orbitImpulse: 1.2
-  maxSpeed: 10
-  impulseIntervalRange: {x: 0.25, y: 0.6}

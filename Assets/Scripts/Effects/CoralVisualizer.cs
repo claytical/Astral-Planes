@@ -27,7 +27,7 @@ public class CoralVisualizer : MonoBehaviour
         coralRoot.SetParent(this.transform, false);
     }
 
-public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
+    public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
 {
     ClearExisting();
     if (snapshots == null || snapshots.Count == 0) return;
@@ -98,8 +98,7 @@ public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
         spawnedParts.Add(branch);
     }
 }
-
-
+    
     private void SetColor(GameObject obj, Color color)
     {
         if (obj.TryGetComponent<SpriteRenderer>(out var sr))

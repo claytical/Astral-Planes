@@ -23,7 +23,7 @@ MonoBehaviour:
     requiresRemixToSpawn: 0
   - minedObjectType: 0
     trackModifierType: 0
-    role: 2
+    role: 0
     weight: 1
     quota: 1
     allowedPhases: 000000000100000002000000030000000400000005000000
@@ -50,7 +50,7 @@ MonoBehaviour:
     role: 1
     weight: 1
     quota: 1
-    allowedPhases: 000000000100000002000000030000000400000005000000
+    allowedPhases: 03000000
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
@@ -58,7 +58,7 @@ MonoBehaviour:
     role: 0
     weight: 1
     quota: 1
-    allowedPhases: 000000000100000002000000030000000400000005000000
+    allowedPhases: 03000000
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
@@ -66,14 +66,14 @@ MonoBehaviour:
     role: 2
     weight: 1
     quota: 1
-    allowedPhases: 000000000100000002000000030000000400000005000000
+    allowedPhases: 050000000200000003000000
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
     trackModifierType: 2
-    role: 2
+    role: 3
     weight: 1
     quota: 1
-    allowedPhases: 000000000100000002000000030000000400000005000000
+    allowedPhases: 0500000004000000
     rarityTier: 0
     requiresRemixToSpawn: 0

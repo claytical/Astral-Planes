@@ -56,51 +56,5 @@ public class TrackUtilityTrigger : MonoBehaviour
         Destroy(pulse, 2f);
     }
 
-    private IEnumerator HandleAstralTransfer(Vehicle vehicle)
-    {
-        // 🛑 Early exit if setup is invalid
-        if (selectedInstrument == null || selectedNoteSet == null)
-        {
-            Debug.LogWarning("❌ Astral transfer failed — missing InstrumentTrack or NoteSet.");
-            yield break;
-        }
-
-        // ✨ 1. Trigger vehicle color flicker & pulse
-        if (vehicle != null)
-        {
-            Color pulseColor = selectedInstrument.trackColor;
-            vehicle.TriggerFlickerAndPulse(0.5f, pulseColor);
-        }
-
-        // 💨 2. Play gas cloud pulse
-        PlayEnvelopePulse();
-
-        // 👻 3. Spawn the ghost pattern
-        Vector3 spawnPosition = transform.position;
-        GameObject ghostObj = Instantiate(vehicle.ghostVehiclePrefab, spawnPosition, Quaternion.identity);
-
-        if (!ghostObj.TryGetComponent(out GhostPattern ghost))
-        {
-            Debug.LogError("❌ Ghost prefab missing GhostPattern component.");
-            yield break;
-        }
-
-        // ⚡ 4. Grant vehicle energy and start the ghost routine
-        vehicle.CollectEnergy(10);
-        ghost.Initialize(vehicle, selectedNoteSet, selectedInstrument, selectedMusicalRoleProfile);
-        ghost.Create();
-
-        // 🌫 5. Remove or fade out this trigger object
-        if (TryGetComponent(out Explode explode))
-        {
-            explode.Permanent(); // fade/poof
-        }
-        else
-        {
-            Destroy(gameObject); // fallback
-        }
-
-        yield return null;
-    }
 
 }

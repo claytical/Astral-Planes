@@ -32,10 +32,11 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3732494607500995976}
+  - {fileID: 8294084348089236440}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!50 &3706479320875781435
@@ -114,61 +115,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   referenceScale: {x: 0.75, y: 0.75, z: 1}
-  starRemovesWithoutRegrow: 1
+  starRemovesWithoutRegrow: 0
   starAlphaFadeBias: 0.9
   shieldType: 0
-  slowBrake: 0.4
-  speedScale: 0.8
-  accelScale: 0.8
+  slowBrake: 0.231
+  speedScale: 0.748
+  accelScale: 0.662
   dissipateOnExit: 0
+  minScaleFactor: 0.813
+  shrinkStep: 0.205
+  shrinkEaseTime: 0.25
+  regrowDelay: 0.6
+  regrowTime: 0.86
   behavior: 0
-  slowFactor: 0.7
+  slowFactor: 0.257
   slowDuration: 0.35
-  lateralForce: 2
-  turbulence: 0
-  dissipateOnHit: 0
-  particleSwellOnHit: 1
+  lateralForce: 1.59
+  turbulence: 0.97
   baseSprite: {fileID: 7236654244480378721}
+  fadeSeconds: 0.25
+  fullScale: {x: 1, y: 1, z: 1}
   particleSystem: {fileID: 7497572302500479706}
-  amplitude: 2
-  speed: 1
-  offset: {x: 0, y: 0}
-  establish:
-    speedScale: 0.9
-    accelScale: 0.95
-    extraDamping: 0.1
-    drainPerSecond: 0
-    puffScale: 1.2
-  evolve:
-    speedScale: 0.85
-    accelScale: 0.9
-    extraDamping: 0.2
-    drainPerSecond: 0
-    puffScale: 1.3
-  intensify:
-    speedScale: 0.6
-    accelScale: 0.75
-    extraDamping: 0.6
-    drainPerSecond: 0.7
-    puffScale: 1.5
-  release:
-    speedScale: 0.8
-    accelScale: 0.85
-    extraDamping: 0.25
-    drainPerSecond: 0
-    puffScale: 1.25
-  wildcard:
-    speedScale: 0.7
-    accelScale: 0.8
-    extraDamping: 0.35
-    drainPerSecond: 0.3
-    puffScale: 1.4
-  pop:
-    speedScale: 0.9
-    accelScale: 0.95
-    extraDamping: 0.1
-    drainPerSecond: 0
-    puffScale: 1.6
+  dissipateOnHit: 0
+  epochId: 0
+  lastDestroy: 0
 --- !u!114 &8747843313378906591
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4952,7 +4922,7 @@ ParticleSystemRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 50
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -5001,7 +4971,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &3732494607500995976
 Transform:
   m_ObjectHideFlags: 0
@@ -5063,7 +5033,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: 4412486014302810088, guid: d74e19106b29d4bfab46b0e4cd838279,
     type: 3}
-  m_Color: {r: 0, g: 1, b: 0.78431374, a: 0.0627451}
+  m_Color: {r: 0, g: 1, b: 0.78431374, a: 0}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -5073,3 +5043,91 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!1 &8081140791669243937
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8294084348089236440}
+  - component: {fileID: 6341341344399459146}
+  m_Layer: 7
+  m_Name: Mask
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8294084348089236440
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8081140791669243937}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4213040972611002}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!331 &6341341344399459146
+SpriteMask:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8081140791669243937}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10758, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 4412486014302810088, guid: d74e19106b29d4bfab46b0e4cd838279,
+    type: 3}
+  m_MaskAlphaCutoff: 0.541
+  m_FrontSortingLayerID: 0
+  m_BackSortingLayerID: 0
+  m_FrontSortingLayer: 0
+  m_BackSortingLayer: 0
+  m_FrontSortingOrder: 0
+  m_BackSortingOrder: 0
+  m_IsCustomRangeActive: 0
+  m_SpriteSortPoint: 0
+  m_MaskSource: 0

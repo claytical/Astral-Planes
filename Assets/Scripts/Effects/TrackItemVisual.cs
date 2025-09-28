@@ -76,8 +76,7 @@ namespace Effects
             circleRenderer.color = trackColor;
             circleRenderer.sortingOrder = 0;
         }
-
-
+        
         private void ApplyItemStyle()
         {
             circleRenderer.color = GetModifiedTrackColor(itemType, trackColor);

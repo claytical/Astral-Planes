@@ -165,11 +165,7 @@ public class NoteSet : MonoBehaviour
         }
         return GetNextArpeggiatedNote(phraseIndex);
     }
-    public int GetPercussiveHit()
-    {
-        if (notes.Count == 0) return rootMidi;
-        return notes[Random.Range(0, notes.Count)];
-    }
+
     public int GetSustainedNote()
     {
         List<int> chord = GetChordNotes();
@@ -212,12 +208,6 @@ public class NoteSet : MonoBehaviour
         }
 
         ghostNoteSequence = remixUtility.GeneratePhrase(this);
-    }
-
-    public int GetPitchIndexInSet(int pitch)
-    {
-        var sorted = GetSortedNoteList();
-        return sorted.IndexOf(pitch);
     }
 
     public List<int> GetSortedNoteList()
@@ -370,7 +360,7 @@ public class NoteSet : MonoBehaviour
             note = Mathf.Clamp(note, lowestNote, highestNote);
         }
 
-        Debug.Log($"🎹 Returning arpeggiated note {note} for step {stepIndex}");
+//        Debug.Log($"🎹 Returning arpeggiated note {note} for step {stepIndex}");
         return note;
     }
 
