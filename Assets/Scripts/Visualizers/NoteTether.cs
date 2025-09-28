@@ -32,11 +32,14 @@ public class NoteTether : MonoBehaviour
 
     private LineRenderer lr;
     private Vector3[] points;
-
+    private CollectableParticles dripEmitter;
+    [SerializeField] private float dripBaseSpeed = 0.6f;
+    [SerializeField] private float dripGravity   = 0.0f;
+    private float endpointNullGrace = 0.1f;
+    private float endpointNullTimer = 0f;
     void Awake()
     {
-        lr = GetComponent<LineRenderer>();
-        if (!lr) lr = gameObject.AddComponent<LineRenderer>();
+        lr = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();
         lr.useWorldSpace = true;
         lr.positionCount = segments;
         lr.widthMultiplier = baseWidth;
@@ -44,24 +47,50 @@ public class NoteTether : MonoBehaviour
         lr.receiveShadows = false;
         lr.material = lr.material ? lr.material : new Material(Shader.Find("Sprites/Default"));
 
+        // neutral gradient; will be replaced in SetEndpoints
         var g = new Gradient();
         g.SetKeys(
-            new []
-            {
-                new GradientColorKey(baseColor,0f),
-                new GradientColorKey(baseColor,1f)
-            },
-            new []
-            {
-                new GradientAlphaKey(baseColor.a,0f),
-                new GradientAlphaKey(baseColor.a,1f)
-            }
+            new[] { new GradientColorKey(baseColor, 0f), new GradientColorKey(baseColor, 1f) },
+            new[] { new GradientAlphaKey(baseColor.a, 0f), new GradientAlphaKey(baseColor.a, 1f) }
         );
         lr.colorGradient = g;
+
         points = new Vector3[segments];
+
+        // ✅ Make sure we actually have a PS ready
+        EnsureShimmer();
+    }
+    public void RegisterDripEmitter(CollectableParticles cp, float speed = -1f)
+    {
+        dripEmitter = cp;
+        if (speed > 0f) dripBaseSpeed = speed;
+    }
+
+    void Update()
+    {
+        if (!start || !end)
+        {
+            endpointNullTimer += Time.deltaTime;
+            if (endpointNullTimer > endpointNullGrace) { Destroy(gameObject); }
+            return;
+        }
+        endpointNullTimer = 0f;
+        
+        if (start == null || end == null) { Destroy(gameObject); return; }
+
+        RebuildCurve();                 // make sure `points` and LR positions are set
         curveLength = ComputeCurveLength();
+        if (dripEmitter != null)
+        {
+            Vector3 dir = (end.position - start.position).normalized;
+            // Drip goes from collectable toward marker; flip if you want reverse
+            dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
+        }
+
+        // ✅ Emit every frame, scaled by Time.deltaTime and the current curve length
         EmitShimmer(Time.deltaTime);
     }
+
     // Add to NoteTether.cs
     public Vector3 EvaluatePosition01(float t)
     {
@@ -80,12 +109,16 @@ public class NoteTether : MonoBehaviour
         var go = new GameObject("ShimmerPS");
         go.transform.SetParent(transform, worldPositionStays: false);
         shimmerPS = go.AddComponent<ParticleSystem>();
+
         var main = shimmerPS.main;
         main.loop = false;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.startLifetime = shimmerLifetime;
-        main.startSize = shimmerSize;
-        main.startColor = new Color(baseColor.r, baseColor.g, baseColor.b, shimmerAlpha);
+
+        // 🔧 Visibility bump — tweak to taste
+        main.startLifetime = Mathf.Max(0.25f, shimmerLifetime);  // e.g., 0.35–0.6
+        main.startSize     = Mathf.Max(0.06f, shimmerSize);      // e.g., 0.06–0.12
+
+        // gradient set later in SetEndpoints
         main.maxParticles = 2048;
 
         var emission = shimmerPS.emission;
@@ -96,9 +129,10 @@ public class NoteTether : MonoBehaviour
 
         var renderer = shimmerPS.GetComponent<ParticleSystemRenderer>();
         renderer.material = new Material(Shader.Find("Sprites/Default"));
-        renderer.sortingLayerName = "Foreground"; // adjust to your layering
-        renderer.sortingOrder = 20;
+        renderer.sortingLayerName = "Foreground";
+        renderer.sortingOrder = 40; // 🔧 ensure on top of dust/maze
     }
+
     // compute length each frame (after lr.SetPositions)
     private float ComputeCurveLength()
     {
@@ -134,15 +168,41 @@ public class NoteTether : MonoBehaviour
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
     {
         start = a; end = b; baseColor = c;
-        if (lr) { lr.startColor = lr.endColor = c; lr.widthMultiplier = baseWidth * widthMul; }
-        Update();
-    }
 
+        if (lr)
+        {
+            // “electric filament” gradient
+            var g = new Gradient();
+            g.SetKeys(
+                new []
+                {
+                    new GradientColorKey(c * 0.6f, 0f),
+                    new GradientColorKey(Color.white, 0.5f),
+                    new GradientColorKey(c, 1f)
+                },
+                new []
+                {
+                    new GradientAlphaKey(0f, 0f),
+                    new GradientAlphaKey(Mathf.Clamp01(c.a * 0.9f), 0.12f),
+                    new GradientAlphaKey(Mathf.Clamp01(c.a), 0.5f),
+                    new GradientAlphaKey(Mathf.Clamp01(c.a * 0.7f), 0.88f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            lr.colorGradient = g;
+            lr.widthMultiplier = baseWidth * widthMul;
+        }
 
-    void Update()
-    {
-        if (start == null || end == null) { Destroy(gameObject); return; }
-        RebuildCurve();
+        EnsureShimmer();
+        if (shimmerPS != null)
+        {
+            var main = shimmerPS.main;
+            // colored sparks with occasional white pops
+            main.startColor = new ParticleSystem.MinMaxGradient(
+                new Color(c.r, c.g, c.b, shimmerAlpha),
+                Color.white
+            );
+        }
     }
 
     private void RebuildCurve()
@@ -210,12 +270,12 @@ public class NoteTether : MonoBehaviour
             float t = i / 5f;
             Color c = baseColor;
             float a = baseColor.a;
-
+            litColor = Color.Lerp(c, litColor, .5f);
             if (t <= head && t >= Mathf.Max(0, head - headSpan))
             {
                 float k = Mathf.InverseLerp(head - headSpan, head, t);
                 c = Color.Lerp(baseColor, litColor, k * 0.9f + 0.1f);
-                a = Mathf.Lerp(baseColor.a, 1f, k);
+                a = Mathf.Lerp(baseColor.a, 1f, Mathf.Max(.25f, k));
             }
 
             cks.Add(new GradientColorKey(c, t));

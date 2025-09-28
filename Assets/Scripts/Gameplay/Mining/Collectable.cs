@@ -33,7 +33,11 @@ public class Collectable : MonoBehaviour
     private double _availableUntilDsp;
     [SerializeField] [Range(0.6f, 1.4f)]
     private float availabilityFactor = 1.0f;
-
+    [SerializeField] private float pulseSpeed = 1.6f;
+    [SerializeField] private float minAlpha = 0.25f;
+    [SerializeField] private float maxAlpha = 0.65f;
+    [SerializeField] private float pulseScale = 1.08f;
+    private Coroutine pulseRoutine;
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
@@ -44,13 +48,14 @@ public class Collectable : MonoBehaviour
     {
         originalScale = transform.localScale;
         isInitialized = true;
-
+/*
         if (energySprite != null)
         {
             var c = energySprite.color;
             c.a = 0f;
             energySprite.color = c;
         }
+ */
     }
 
     private void OnEnable()
@@ -58,9 +63,8 @@ public class Collectable : MonoBehaviour
         _handled = false;
         _destroyNotified = false;
     }
-
-// Collectable.cs  (replace the existing method)
-    public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor)
+    
+    public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, float durSteps)
     {
         Debug.Log($"AttachingTetherAtSpawn { (marker ? marker.name : "(null)") }");
         ribbonMarker = marker;
@@ -69,6 +73,15 @@ public class Collectable : MonoBehaviour
         var go = Instantiate(tetherPrefabGO);
         tether = go.GetComponent<NoteTether>() ?? go.AddComponent<NoteTether>();
         tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
+        if (TryGetComponent(out CollectableParticles cp) && tether != null)
+        {
+            Debug.Log($"Has tether!");
+            // speed can be scaled by duration if you like (durSteps) to make long notes ooze slower
+            float dripSpeed = Mathf.Lerp(0.3f, 0.9f, Mathf.Clamp01(durSteps / 6f)); // longer → faster or slower, your call
+            cp.RegisterTether(tether, pull: 0.7f);
+            //tether.RegisterDripEmitter(cp, dripSpeed);
+        }
+
     }
 
     public void TravelAlongTetherAndFinalize(int durationTicks, float force, float seconds = 0.35f)
@@ -144,10 +157,23 @@ public class Collectable : MonoBehaviour
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
 
         if (TryGetComponent(out CollectableParticles particleScript) && noteSet != null)
-            particleScript.Configure(noteSet);
+            particleScript.ConfigureByDuration(noteSet, duration, track);
 
+// Existing:
         if (track != null)
             energySprite.color = track.trackColor;
+
+// NEW: soften + start pulse
+        if (energySprite != null && track != null)
+        {
+            var c = track.trackColor;
+            c.a = Mathf.Clamp01(maxAlpha);     // start semi-transparent
+            energySprite.color = c;
+
+            if (pulseRoutine != null) StopCoroutine(pulseRoutine);
+            pulseRoutine = StartCoroutine(PulseEnergySprite());
+        }
+
 
         if (assignedInstrumentTrack == null)
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
@@ -155,12 +181,12 @@ public class Collectable : MonoBehaviour
         // Lifetime profile if available, otherwise a safe TTL fallback
         if (TryGetComponent(out Explode explode))
         {
-            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.Note));
+//            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.Note));
         }
         else
         {
             float ttl = Mathf.Max(3f, track.drumTrack.GetLoopLengthInSeconds() * 1.1f);
-            StartCoroutine(AutoExpire(ttl));
+  //          StartCoroutine(AutoExpire(ttl));
         }
 
         // (Optional) duration-based availability window — enable if you want “true miss” by time.
@@ -169,7 +195,22 @@ public class Collectable : MonoBehaviour
         // int durSteps     = Mathf.Max(1, Mathf.RoundToInt((float)duration / Mathf.Max(1, ticksPerStep)));
         // _availableUntilDsp = AudioSettings.dspTime + durSteps * dt * availabilityFactor;
     }
-// Call this from your existing "player collected me" path
+    private IEnumerator PulseEnergySprite()
+    {
+        Vector3 startScale = transform.localScale;
+        while (true)
+        {
+            float t = (Mathf.Sin(Time.time * pulseSpeed) * 0.5f) + 0.5f; // 0..1
+            float a = Mathf.Lerp(minAlpha, maxAlpha, t);
+            if (energySprite != null)
+            {
+                var col = energySprite.color; col.a = a; energySprite.color = col;
+            }
+            transform.localScale = startScale * Mathf.Lerp(1f, pulseScale, t);
+            yield return null;
+        }
+    }
+
     public void HandleCollectedWithTether(System.Action afterPulse)
     {
         if (awaitingPulse || ribbonMarker == null || tether == null)

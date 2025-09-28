@@ -218,12 +218,14 @@ public class NoteVisualizer : MonoBehaviour
         }
     }
 }
-public Transform EnsureMarker(InstrumentTrack track, int step)
-{
+public Transform EnsureMarker(InstrumentTrack track, int step) {
+    var key = (track, step);
+    if (noteMarkers.TryGetValue(key, out var t) && t && t.gameObject) return t;
+    noteMarkers.Remove(key); // purge stale
     var go = PlacePersistentNoteMarker(track, step);
-    if (go != null) return go.transform;
-    return noteMarkers.TryGetValue((track, step), out var t) ? t : null;
+    return go ? go.transform : null;
 }
+
     public List<Vector3> GetRibbonWorldPositionsForSteps(InstrumentTrack track, List<int> steps)
 {
     var result = new List<Vector3>();
@@ -271,8 +273,22 @@ public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
     public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex)
     {
         var key = (track, stepIndex);
-        if (noteMarkers.ContainsKey(key)) return null;
-
+        // If we have a stale/null Transform, purge it so we can recreate.
+        if (noteMarkers.TryGetValue(key, out var existing))
+        {
+            if (existing == null || existing.gameObject == null)
+            {
+                noteMarkers.Remove(key);
+            }
+            else if (existing == null || existing.gameObject == null || !existing.gameObject.activeInHierarchy)
+            {
+                noteMarkers.Remove(key); // stale, recreate
+            }
+            else
+            {
+                return null;
+            }
+        }
         int trackIndex = Array.IndexOf(tracks.tracks, track);
         if (trackIndex < 0 || trackIndex >= trackRows.Count) return null;
 
@@ -365,12 +381,44 @@ public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
 }
 public void TriggerNoteBlastOff(InstrumentTrack track)
 {
-    Debug.Log($"Triggered note blast off");
-    foreach (var marker in GetNoteMarkers(track))
+    // 1) Capture all live marker GOs for this track BEFORE purging keys
+    var gos = GetNoteMarkers(track); // uses noteMarkers; OK while keys still present
+
+    // 2) Purge this track’s keys from the dictionary
+    var keys = new List<(InstrumentTrack,int)>();
+    foreach (var kvp in noteMarkers)
+        if (kvp.Key.Item1 == track) keys.Add(kvp.Key);
+    foreach (var k in keys) noteMarkers.Remove(k);
+
+    // 3) Animate & destroy the captured GOs
+    foreach (var go in gos)
+        if (go) StartCoroutine(BlastOffAndDestroy(go));
+
+    // 4) Safety: also nuke any stray row children that match the prefab type
+    DestroyOrphanRowMarkers(track);
+}
+private void DestroyOrphanRowMarkers(InstrumentTrack track)
+{
+    int trackIndex = Array.IndexOf(tracks.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+
+    var row = trackRows[trackIndex];
+    var orphans = row.GetComponentsInChildren<VisualNoteMarker>(includeInactive: true);
+    foreach (var vnm in orphans)
     {
-        if (marker == null) continue;
-        Debug.Log($"Blasting off {marker.name}");
-        StartCoroutine(BlastOffAndDestroy(marker));
+        // If the dictionary no longer points at this Transform, it’s safe to remove
+        bool referenced = false;
+        foreach (var kvp in noteMarkers)
+        {
+            if (kvp.Key.Item1 != track) continue;
+            if (kvp.Value == vnm.transform) { referenced = true; break; }
+        }
+        if (!referenced)
+        {
+            // optional: quick “pop” instead of silent destroy
+            if (vnm.TryGetComponent<Explode>(out var explode)) explode.Permanent();
+            else Destroy(vnm.gameObject);
+        }
     }
 }
 

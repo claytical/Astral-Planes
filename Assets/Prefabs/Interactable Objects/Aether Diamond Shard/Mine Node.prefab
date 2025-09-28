@@ -65,7 +65,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6d5a83c4ddf54264a6b5b87661a0604, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cellsPerSecond: 4
+  cellsPerSecond: 1
   replanCooldown: 0.15
   snapAtCorners: 1
 --- !u!114 &2404411601338668691

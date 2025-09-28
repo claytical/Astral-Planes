@@ -745,7 +745,7 @@ public class InstrumentTrack : MonoBehaviour
 
             // Fallback: if somehow no tether yet, attach now (nv.noteTetherPrefab should be a GameObject)
             if (collectable.tether == null && nv.noteTetherPrefab != null)
-                collectable.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor);
+                collectable.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor, durationTicks);
         }
     }
 
@@ -801,15 +801,14 @@ public class InstrumentTrack : MonoBehaviour
 
                 c.intendedStep = step;
 
-                var markerGO = nv.PlacePersistentNoteMarker(this, step);
-                Transform marker = markerGO ? markerGO.transform
-                    : (nv.noteMarkers.TryGetValue((this, step), out var t) ? t : null);
+                Transform marker = nv.EnsureMarker(this, step); // <- use EnsureMarker and make it robust (below)
                 if (marker != null)
                 {
                     var ml = marker.GetComponent<MarkerLight>() ?? marker.gameObject.AddComponent<MarkerLight>();
                     ml.SetGrey(new Color(1f,1f,1f,0.25f));
-                    c.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor);
+                    c.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor, dur);
                 }
+
 
                 drumTrack.OccupySpawnGridCell(gp.x, gp.y, GridObjectType.Note);
                 spawnedCollectables.Add(go);
