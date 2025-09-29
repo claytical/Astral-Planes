@@ -10,7 +10,8 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 {
     [Header("Identity & Mood")]
     public PhasePersonality personality;
-    public Color starTint = Color.white;
+    public Color starColor = Color.white;
+    public Color dustColor = Color.white;
     [Range(0.25f,3f)] public float particlePulseSpeed = 1f;
     [Range(0f,1f)] public float starAlphaMin = 0.1f, starAlphaMax = 1f;
 

@@ -145,5 +145,20 @@ public class InstrumentTrackController : MonoBehaviour
                   string.Join(", ", tracks.Select(t => t.assignedRole)));
         return tracks.FirstOrDefault(t => t.assignedRole == role);
     }
+// InstrumentTrackController.cs
+    private bool spawningEnabled = true;
+    public void SetSpawningEnabled(bool enabled) { spawningEnabled = enabled; /* gate your spawn entry points */ }
+
+    public void ApplySeedVisibility(List<InstrumentTrack> seeds)
+    {
+        // Example: mute non-seeds briefly
+        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
+        foreach (var t in tracks)
+        {
+            bool on = seedSet.Contains(t);
+            t.SetMuted(!on); // implement SetMuted on InstrumentTrack or via your mixer
+        }
+        // Optionally fade unmuted ones back in over ~0.5s
+    }
 
 }

@@ -3,6 +3,19 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
+
+public enum PatternStrategy
+{
+    Arpeggiated,
+    StaticRoot,
+    WalkingBass,
+    MelodicPhrase,
+    PercussiveLoop,
+    Drone,
+    Randomized
+}
+
+
 public static class ChordLibrary
 {
     public static readonly Dictionary<string, int[]> Formulas = new()
@@ -69,17 +82,39 @@ public static class RhythmPatterns
     public static readonly Dictionary<RhythmStyle, RhythmPattern> Patterns =
         new Dictionary<RhythmStyle, RhythmPattern>
         {
-            { RhythmStyle.FourOnTheFloor, new RhythmPattern { Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Syncopated,     new RhythmPattern { Offsets = new[] { 2, 3, 6, 7, 10, 11, 14, 15 }, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
-            { RhythmStyle.Swing,          new RhythmPattern { Offsets = new[] { 0, 3, 4, 7, 8, 11, 12, 15 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Sparse,         new RhythmPattern { Offsets = new[] { 0, 8 }, DurationMultiplier = 2f, LoopMultiplier = 2 } },
-            { RhythmStyle.Dense,          new RhythmPattern { Offsets = Enumerable.Range(0, 16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } },
-            { RhythmStyle.Steady,         new RhythmPattern { Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Triplet,        new RhythmPattern { Offsets = new[] { 0, 5, 10, 15 }, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
-            { RhythmStyle.PulseBuild,     new RhythmPattern { Offsets = new[] { 0, 8, 4, 12, 2, 10 }, DurationMultiplier = 1.2f, LoopMultiplier = 1 } },
-            { RhythmStyle.Stutter,        new RhythmPattern { Offsets = new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, DurationMultiplier = 0.6f, LoopMultiplier = 1 } },
-            { RhythmStyle.Scatter,        new RhythmPattern { Offsets = new[] { 1, 5, 7, 10, 13, 14 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Breakbeat,      new RhythmPattern { Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
+            { RhythmStyle.FourOnTheFloor, new RhythmPattern {
+                Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Syncopated,     new RhythmPattern {
+                Offsets = new[] { 2, 3, 6, 7, 10, 11, 14, 15 }, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
+            { RhythmStyle.Swing,          new RhythmPattern {
+                Offsets = new[] { 0, 3, 4, 7, 8, 11, 12, 15 }, DurationMultiplier = 1f, LoopMultiplier = 1 } }, 
+            { RhythmStyle.Sparse,         new RhythmPattern {
+                Offsets = new[] { 0, 8 }, DurationMultiplier = 2f, LoopMultiplier = 2 } },
+            { RhythmStyle.Dense,          new RhythmPattern {
+                Offsets = Enumerable.Range(0, 16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } },
+            { RhythmStyle.Steady,         new RhythmPattern {
+                Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.Triplet,        new RhythmPattern {
+                Offsets = new[] { 0, 5, 10, 15 }, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
+            { RhythmStyle.PulseBuild,     new RhythmPattern {
+                Offsets = new[] { 0, 8, 4, 12, 2, 10 }, DurationMultiplier = 1.2f, LoopMultiplier = 1 } },
+            { RhythmStyle.Stutter,        new RhythmPattern {
+                Offsets = new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, DurationMultiplier = 0.6f, LoopMultiplier = 1 } },
+            { RhythmStyle.Scatter,        new RhythmPattern {
+                Offsets = new[] { 1, 5, 7, 10, 13, 14 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+            { RhythmStyle.StaccatoEighths, new RhythmPattern {
+                Offsets = new[] {0,2,4,6,8,10,12,14}, DurationMultiplier = 0.5f, LoopMultiplier = 1 } },
+            { RhythmStyle.DroneFade, new RhythmPattern {
+                Offsets = new[] {0}, DurationMultiplier = 4.0f, LoopMultiplier = 1 } },
+            { RhythmStyle.TripletFlare, new RhythmPattern {
+                Offsets = new[] {0,5,10,15}, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
+            { RhythmStyle.CallResponse, new RhythmPattern {
+                Offsets = new[] {0,4,8,12}, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
+            { RhythmStyle.PulseBuild2Bar, new RhythmPattern {
+                Offsets = new[] {0,8,4,12,2,6,10,14}, DurationMultiplier = 0.9f, LoopMultiplier = 2 } },
+            { RhythmStyle.Breakbeat,      new RhythmPattern
+            {
+                Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
         };
 }
 
@@ -224,22 +259,22 @@ public class NoteSet : MonoBehaviour
     public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
         var currentPhase = track.drumTrack.currentPhase; // assuming this exists on the same track ref
-        var strategy = MusicalPhaseLibrary.GetGhostStrategyForRole(currentPhase, track.assignedRole);
+        var strategy = MusicalPhaseLibrary.GetPatternStrategyForRole(currentPhase, track.assignedRole);
         switch (strategy)
         {
-            case GhostPatternStrategy.StaticRoot:
+            case PatternStrategy.StaticRoot:
                 return GetRootNote();
-            case GhostPatternStrategy.WalkingBass:
+            case PatternStrategy.WalkingBass:
                 return GetNextWalkingNote(step);
-            case GhostPatternStrategy.MelodicPhrase:
+            case PatternStrategy.MelodicPhrase:
                 return GetPhraseNote(step);
-            case GhostPatternStrategy.PercussiveLoop:
+            case PatternStrategy.PercussiveLoop:
                 return GetGrooveNote(out _);
-            case GhostPatternStrategy.Randomized: // treated the same now
+            case PatternStrategy.Randomized: // treated the same now
                 return GetRandomNote();
-            case GhostPatternStrategy.Drone:
+            case PatternStrategy.Drone:
                 return GetSustainedNote();
-            case GhostPatternStrategy.Arpeggiated:
+            case PatternStrategy.Arpeggiated:
             default:
                 return GetNextArpeggiatedNote(step);
         }

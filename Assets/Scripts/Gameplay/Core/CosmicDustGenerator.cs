@@ -121,10 +121,11 @@ public class CosmicDustGenerator : MonoBehaviour
             {
                 dust.SetEpoch(GetCurrentEpoch());
                 dust.SwitchType(isToxic ? CosmicDust.CosmicDustType.Depleting : CosmicDust.CosmicDustType.Friendly);
-                dust.SetPhaseColor(drumTrack.currentPhase); // same phase tint :contentReference[oaicite:10]{index=10}
+                dust.SetColor(Color.gray); 
                 dust.SetDrumTrack(drumTrack);
-                dust.SetGrowInDuration(hexGrowInSeconds);              // short, consistent grow-in
-                dust.Begin();                                // standard start path :contentReference[oaicite:11]{index=11}
+                dust.SetGrowInDuration(hexGrowInSeconds);    
+                dust.ConfigureForPhase(drumTrack.currentPhase);
+                dust.Begin();                               
             }
 
             RegisterHex(grid, hex);
@@ -528,7 +529,7 @@ public class CosmicDustGenerator : MonoBehaviour
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
-
+    
         // Make dust appear “more/less deliberate” per personality
         // (Shorter grow-in for hectic phases; slower for patient ones.)
         hexGrowInSeconds = Mathf.Clamp(

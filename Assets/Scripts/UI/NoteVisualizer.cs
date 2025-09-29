@@ -397,6 +397,35 @@ public void TriggerNoteBlastOff(InstrumentTrack track)
     // 4) Safety: also nuke any stray row children that match the prefab type
     DestroyOrphanRowMarkers(track);
 }
+// NoteVisualizer.cs
+public IEnumerator FadeRibbonsTo(float targetAlpha, float seconds)
+{
+    float t = 0f;
+    // capture current alphas once
+    var startColors = new List<Color>(ribbons.Count);
+    for (int i = 0; i < ribbons.Count; i++)
+        startColors.Add(ribbons[i].startColor);
+
+    while (t < seconds)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / seconds));
+        for (int i = 0; i < ribbons.Count; i++)
+        {
+            var c = startColors[i];
+            c.a = Mathf.Lerp(c.a, targetAlpha, u);
+            ribbons[i].startColor = ribbons[i].endColor = c;
+        }
+        yield return null;
+    }
+}
+
+public void SetUIVisible(bool visible)
+{
+    var parent = GetUIParent();
+    if (parent) parent.gameObject.SetActive(visible);
+}
+
 private void DestroyOrphanRowMarkers(InstrumentTrack track)
 {
     int trackIndex = Array.IndexOf(tracks.tracks, track);

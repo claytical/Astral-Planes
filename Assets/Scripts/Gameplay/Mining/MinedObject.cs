@@ -100,12 +100,6 @@ public class MinedObject : MonoBehaviour
             Debug.Log($"Initializing mined object of type {noteSpawnerMinedObject.GetType()} on {track}");
             noteSpawnerMinedObject.Initialize(assignedTrack, noteSet);
         }
-        
-        MinedObjectVisualEffectController visualEffectController = GetComponent<MinedObjectVisualEffectController>();
-        if (visualEffectController != null)
-        {
-            visualEffectController.Initialize(this);
-        }            
 
         AssignVisuals();
     }

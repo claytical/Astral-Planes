@@ -330,7 +330,11 @@ public class CosmicDust : MonoBehaviour
         
         transform.localScale = fullScale;
     }
-    
+
+    public void SetColor(Color color)
+    {
+        baseSprite.color = color;
+    }
     public void SetPhaseColor(MusicalPhase phase)
     {
         Color phaseColor = phase switch
@@ -356,7 +360,7 @@ public class CosmicDust : MonoBehaviour
                 baseSprite.color = depletingColor;
             }
         }
-        ConfigureForPhase(phase); // NEW: tie feel to phase
+
     }
 
     public void BreakHexagon(SoundEffectMood mood)
@@ -397,8 +401,7 @@ public class CosmicDust : MonoBehaviour
         yield return new WaitForSeconds(0.5f); // delay long enough for Explode effect
         drumTrack.hexMazeGenerator.TriggerRegrowth(gridPos, drumTrack.currentPhase);
     }
-    // PHASE → BEHAVIOR mapping (call this when phase changes or on spawn)
-    private void ConfigureForPhase(MusicalPhase phase)
+    public void ConfigureForPhase(MusicalPhase phase)
     {
         float s = phase switch {
             MusicalPhase.Establish  => 0.85f,

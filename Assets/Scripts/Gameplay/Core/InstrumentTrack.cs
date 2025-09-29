@@ -758,6 +758,21 @@ public class InstrumentTrack : MonoBehaviour
     if (spawnedCollectables != null)
         spawnedCollectables.Remove(collectable.gameObject);
 }
+    // InstrumentTrack.cs
+    public void SetMuted(bool muted)
+    {
+        // Route to your synth/MIDI/FMOD layer
+        // e.g., midiOut.SetTrackGain(trackIndex, muted ? -80f : 0f);
+    }
+
+// InstrumentTrack.cs
+    public NoteSet GetActiveNoteSet()
+    {
+        // Implement according to your setup:
+        // - If the track owns a current NoteSet instance -> return it.
+        // - If the NoteSet lives on the active NoteSpawner/MinedObject, cache a ref when it spawns.
+        return currentNoteSet; // <-- replace with your backing field/property
+    }
 
     public void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1)
 {

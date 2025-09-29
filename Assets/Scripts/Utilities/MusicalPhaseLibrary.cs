@@ -54,10 +54,10 @@ public static class MusicalPhaseLibrary
     }
 
 
-    public static GhostPatternStrategy GetGhostStrategyForRole(MusicalPhase phase, MusicalRole role)
+    public static PatternStrategy GetPatternStrategyForRole(MusicalPhase phase, MusicalRole role)
     {
         var profile = GetProfile(phase);
-        return profile != null ? profile.GetGhostStrategyForRole(role) : GhostPatternStrategy.Arpeggiated;
+        return profile != null ? profile.GetPatternStrategyForRole(role) : PatternStrategy.Arpeggiated;
     }
 
    

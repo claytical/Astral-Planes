@@ -99,7 +99,6 @@ GameObject:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 8268204866429990808}
   - component: {fileID: -8292252293387876616}
-  - component: {fileID: 3131405781893535292}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 2866961932351380823}
   - component: {fileID: 8668376557347016044}
@@ -143,7 +142,8 @@ MonoBehaviour:
   sprite: {fileID: 212053718670736404}
   assignedTrack: {fileID: 0}
   minedObjectType: 1
-  noteSetSeries: {fileID: 0}
+  musicalRole: 0
+  roleProfile: {fileID: 0}
 --- !u!114 &-8292252293387876616
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -157,26 +157,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   type: 2
-  targetRole: 0
   chordProfile: {fileID: 0}
---- !u!114 &3131405781893535292
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b6b910e5ca23a4c0c9f7ac46a51b164d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  roleProfiles:
-  - {fileID: 11400000, guid: 5f44bcd7dabe44e21945a370cf93b0d5, type: 2}
-  - {fileID: 11400000, guid: 282adc52e033c40bebc3f2d561afbaa0, type: 2}
-  - {fileID: 11400000, guid: c1b04b838e56449f4b8256d7fb2b8500, type: 2}
-  - {fileID: 11400000, guid: a98a60101b1e94ba6b42aab3f92889ab, type: 2}
-  utilityProfiles: []
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5

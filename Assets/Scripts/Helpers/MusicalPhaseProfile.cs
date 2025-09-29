@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -5,7 +6,7 @@ using UnityEngine;
 public class PhaseRoleStrategy
 {
     public MusicalRole role;
-    public List<GhostPatternStrategy> ghostStrategies;
+    public List<PatternStrategy> ghostStrategies;
 }
 [System.Serializable]
 public class RoleNoteSetSeries
@@ -17,7 +18,12 @@ public class RoleNoteSetSeries
 public class RoleGhostStrategy
 {
     public MusicalRole role;
-    public GhostPatternStrategy strategy;
+    public PatternStrategy strategy;
+}
+public class RoleStrategy
+{
+    public MusicalRole role;
+    public PatternStrategy strategy;
 }
 
 [CreateAssetMenu(menuName = "Astral Planes/Musical Phase Profile")]
@@ -25,59 +31,70 @@ public class MusicalPhaseProfile : ScriptableObject
 {
     public MusicalPhase phase;
     
-    [Range(1, 8)]
-    public int ghostLoopCount = 4; // Default value, customize per phase
-
     [Header("Note Set Series Per Role")]
     public List<RoleNoteSetSeries> roleNoteSetSeriesList = new();
     
     [Header("Audio")]
     public AudioClip[] drumClips;
-
-    [Header("Visual")]
-    public Color visualColor = Color.white;
-    public RotationMode rotationMode = RotationMode.Uniform;
-    public float rotationSpeed = 20f;
-
+    
     [Header("Track Utility")]
     public TrackUtilityStrategy defaultRemixStrategy;
     public List<RemixRoleStrategy> remixRoleOverrides = new List<RemixRoleStrategy>();
-
-    [Header("Spawning")]
-    public int hitsRequired = 8;
-    public int energyPerCollectable = 1;
-
+    
     [Header("Labels")]
     public string shortLabel;
     [TextArea] public string moodDescription;
     [SerializeField]
-    private List<RoleGhostStrategy> roleGhostStrategies = new List<RoleGhostStrategy>();
+    private List<RoleStrategy> roleStrategies = new List<RoleStrategy>();
 
-    public TrackUtilityStrategy GetRemixStrategyForRole(MusicalRole role)
+ 
+    public PatternStrategy GetPatternStrategyForRole(MusicalRole role)
     {
-        foreach (var overrideEntry in remixRoleOverrides)
-        {
-            if (overrideEntry.role == role)
-                return overrideEntry.strategy;
-        }
-
-        return defaultRemixStrategy;
-    }
-
-
-    public GhostPatternStrategy GetGhostStrategyForRole(MusicalRole role)
-    {
-        foreach (var pair in roleGhostStrategies)
+        foreach (var pair in roleStrategies)
         {
             if (pair.role == role)
                 return pair.strategy;
         }
 
-        return GhostPatternStrategy.Arpeggiated; // Default fallback
+        return PatternStrategy.Arpeggiated; // Default fallback
     }
 
 
 }
+[Serializable]
+public class BridgeSignature {
+    public MusicalPhase fromPhase;
+    public MusicalPhase toPhase;
+
+    // who plays the bridge
+    public bool useOnlyPerfectTracks = true;     // perfect tracks only
+    public int maxBridgeTracks = 4;              // cap the count if you want fewer than perfect set
+    public bool includeDrums = true;             // drum accent during bridge
+
+    // timing
+    public int bars = 2;                         // bridge length in bars of the *current* loop
+    public float humanizeMs = 12f;               // small jitter on onsets
+
+    // musical transforms applied temporarily during the bridge
+    public RhythmStyle rhythmOverride;           // e.g., StaccatoEighths, DroneFade
+    public NoteBehavior noteBehaviorOverride;    // e.g., Arpeggiated, Drone, Percussive
+    public float durationScale = 1.0f;           // (0.4..1.6) short/long
+    public float velocityScale = 1.0f;           // scale MIDI vel
+    public bool staccatissimo = false;           // hard gate time
+
+    // harmony handoff
+    public enum HarmonyCommit { AtBridgeStart, MidBridge, AtBridgeEnd }
+    public HarmonyCommit commitTiming = HarmonyCommit.AtBridgeEnd;
+
+    // after the bridge: which tracks remain as “seeds” in the next phase
+    public int seedTrackCountNextPhase = 1;      // keep this many tracks sounding
+    public MusicalRole[] preferredSeedRoles;     // optional bias (e.g., Bass + Groove)
+
+    // visuals
+    public bool fadeRibbons = true;              // fade NoteVisualizer ribbons during bridge
+    public bool growCoral = true;                // pipe bridge notes to CoralVisualizer
+}
+
 [System.Serializable]
 public class RemixRoleStrategy
 {
