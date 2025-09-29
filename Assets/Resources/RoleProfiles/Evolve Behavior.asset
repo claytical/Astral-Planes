@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Evolve Behavior
   m_EditorClassIdentifier: 
   personality: 1
-  starTint: {r: 0.5546277, g: 0.8666667, b: 0, a: 1}
+  starColor: {r: 1, g: 0, b: 0.8945532, a: 1}
+  dustColor: {r: 0, g: 1, b: 0.10618591, a: 1}
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 1

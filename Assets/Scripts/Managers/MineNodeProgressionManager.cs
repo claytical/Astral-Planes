@@ -74,6 +74,32 @@ public class MineNodeProgressionManager : MonoBehaviour
             )
         );
     }
+// MineNodeProgressionManager.cs
+    public void BeginBridgeToNextPhase(MusicalPhase from, MusicalPhase to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
+    {
+        var g = GameFlowManager.Instance;
+        if (!g) { Debug.LogWarning("GameFlowManager missing; spawning star immediately"); SpawnNextPhaseStarWithoutLoopChange(); return; }
+        g.BeginPhaseBridge(from, to, perfectTracks, nextStarColor);
+    }
+    public MusicalPhase GetNextPhase() => PeekNextPhase();
+// MineNodeProgressionManager.cs
+    public Color ResolveNextPhaseStarColor(MusicalPhase phase)
+    {
+        Color c = drumTrack.phasePersonalityRegistry.Get(phase).starColor;
+        if (c != Color.white)
+        {
+            return c;
+        }
+        // Or: derive from your current spawn strategy/phase visuals if available
+
+        // Fallback: reuse the current star color (safe but not ideal),
+        // or borrow a deterministic track color so the bridge coral matches something stable.
+        var ctrl = GetComponent<InstrumentTrackController>();
+        if (ctrl != null && ctrl.tracks != null && ctrl.tracks.Length > 0 && ctrl.tracks[0] != null)
+            return ctrl.tracks[0].trackColor;
+
+        return Color.white;
+    }
 
     public void SpawnNextPhaseStarWithoutLoopChange()
     {

@@ -327,19 +327,12 @@ public class Collectable : MonoBehaviour
             }
         }
 
-        if (matchedStep >= 0)
-        {
             // success path
             float force = vehicle.GetForceAsMidiVelocity();
             vehicle.CollectEnergy(amount);
             assignedInstrumentTrack.OnCollectableCollected(this, intendedStep >= 0 ? intendedStep : matchedStep, noteDurationTicks, force);
             if (TryGetComponent(out Collider2D col)) col.enabled = false;
-        }
-        else
-        {
-            // miss (outside timing window)
-            OnFailedCollect();
-        }
+
     }
 
     public void DriftToTarget(Vector3 from, Vector3 to, float duration)

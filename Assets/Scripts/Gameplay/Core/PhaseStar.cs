@@ -219,7 +219,6 @@ public class PhaseStar : MonoBehaviour
     {
         // Sprites/diamonds from cached track color
         SetStarTint(_cachedPreviewColor, false);            // you already have SetStarTint(...)
-
         // Particles from phase/anti-phase (your existing helper)
         ConfigureInhalingParticles(ComputeAntiColor(GetDustPhaseColor()));
 
@@ -251,7 +250,7 @@ public class PhaseStar : MonoBehaviour
 {
     // If you have a single source of truth for dust color, use that here.
     // Fallback to your phase visual color:
-    return MusicalPhaseLibrary.Get(drumTrack.currentPhase).visualColor;
+    return ComputeAntiColor(_cachedPreviewColor);
 }
 
 // --- UTIL: compute the "anti" color ---
@@ -401,40 +400,41 @@ public class PhaseStar : MonoBehaviour
 
     // ======= ENTRYPOINT =======
     public void Initialize(
-    DrumTrack track,
-    MineNodeProgressionManager manager,
-    IEnumerable<InstrumentTrack> targets,
-    bool armFirstPokeCommit,
-    PhaseStarBehaviorProfile profile = null)
-{
-    // 0) Core refs
-    behaviorProfile   = profile;
-    drumTrack         = track;
-    controller        = drumTrack.trackController;
-    progressionManager= manager;
-    assignedPhase     = drumTrack.currentPhase;
-
-    // 1) Apply behavior profile (visuals, pacing)
-    if (behaviorProfile != null)
+        DrumTrack track,
+        MineNodeProgressionManager manager,
+        IEnumerable<InstrumentTrack> targets,
+        bool armFirstPokeCommit,
+        PhaseStarBehaviorProfile profile)
     {
-        pulseSpeed               = behaviorProfile.particlePulseSpeed;
-        minAlpha                 = behaviorProfile.starAlphaMin;
-        maxAlpha                 = behaviorProfile.starAlphaMax;
-        shardScatterRadius       = behaviorProfile.scatterRadius;
-        missedSpawnStagger       = behaviorProfile.ejectionStagger;
-        dustShrinkRadius         = behaviorProfile.dustShrinkRadius;
+        // 0) Core refs
+        behaviorProfile = profile;
+        drumTrack = track;
+        controller = drumTrack.trackController;
+        progressionManager = manager;
+        assignedPhase = drumTrack.currentPhase;
+        SetBehaviorProfile(profile);
+        if (behaviorProfile == null) return;
+        pulseSpeed = behaviorProfile.particlePulseSpeed;
+        minAlpha = behaviorProfile.starAlphaMin;
+        maxAlpha = behaviorProfile.starAlphaMax;
+        shardScatterRadius = behaviorProfile.scatterRadius;
+        missedSpawnStagger = behaviorProfile.ejectionStagger;
+        dustShrinkRadius = behaviorProfile.dustShrinkRadius;
         dustShrinkUnitsPerSecond = behaviorProfile.dustShrinkUnitsPerSec;
-        dustFalloff              = behaviorProfile.dustFalloff;
-
+        dustFalloff = behaviorProfile.dustFalloff;
+        TintToPhaseColor();
         // hitsRequired governs “nodes per star”
         int nodes = Mathf.Max(1, behaviorProfile.nodesPerStar);
         typeof(PhaseStar)
-            .GetField("hitsRequired", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .GetField("hitsRequired",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
             ?.SetValue(this, nodes);
         typeof(PhaseStar)
-            .GetField("maxMineNodesPerStar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .GetField("maxMineNodesPerStar",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
             ?.SetValue(this, Mathf.Max(nodes, 4));
-    }
+
+    
 
     // 2) Physics & drift
     rb = GetComponent<Rigidbody2D>();
@@ -570,7 +570,7 @@ public class PhaseStar : MonoBehaviour
     
     private IEnumerator EntrancePulse() { yield return null; }
     private Color GetAntiPhaseColor() => ComputeAntiColor(GetPhaseColor()); // from your earlier anti-color helper
-    private Color GetPhaseColor() => MusicalPhaseLibrary.Get(drumTrack.currentPhase).visualColor;
+    private Color GetPhaseColor() => behaviorProfile.starColor;
 
     void FixedUpdate()
     {
@@ -614,11 +614,18 @@ public class PhaseStar : MonoBehaviour
         }
         ShrinkNearbyDust();
     }
-    private Color GetTrackColor(InstrumentTrack t) => t ? t.trackColor : GetPhaseColor();
+
     // ======= COLLISION → SHARD CHASE =======
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (!coll.gameObject.TryGetComponent(out Vehicle _)) return;
+        var track = PickNextTargetTrack();
+        if (track == null)
+        {
+            state = PhaseStarState.Completed;                  // <-- be explicit
+            StartCoroutine(FinishPhaseAndAdvance());
+            return;
+        }
         if (state == PhaseStarState.Completed) return;
         if (state != PhaseStarState.IdleWandering) return;
 
@@ -700,9 +707,26 @@ private IEnumerator EnsureEnabledNextFrame(GameObject go)
             _deferredMissed ??= new Dictionary<InstrumentTrack, List<(int step, int note, int duration, float velocity)>>();
             _deferredMissed[track] = missed;
         }
-
-        // Mark this target “handled” so the star can move on
         perfectTracks.Add(track);
+        Debug.Log($"Adding perfect {track}. {perfectTracks.Count} perfect tracks.");
+        if (perfectTracks.Count >= targetTracks.Count)
+        {
+            
+            if (!_phaseAdvanceStarted)
+            {
+                state = PhaseStarState.Completed;
+
+                var from = assignedPhase; // the phase this star belongs to
+                var to   = progressionManager.GetNextPhase(); // new helper
+                var color = progressionManager.ResolveNextPhaseStarColor(to);
+                Debug.Log($"Moving to next phase {to}");
+                // Pass the actual perfect set to seed the bridge
+                progressionManager.BeginBridgeToNextPhase(from, to, new List<InstrumentTrack>(perfectTracks), color);
+
+                StartCoroutine(FinishPhaseAndAdvance()); // keep your existing cleanup path
+            }
+            yield break;
+        }
 
         // Rearm visuals
         TintToPhaseColor();
@@ -882,9 +906,10 @@ private IEnumerator EnsureEnabledNextFrame(GameObject go)
     if (_phaseAdvanceStarted) yield break;
     _phaseAdvanceStarted = true;
 
+    state = PhaseStarState.Completed;
     // Stop taking new defers immediately
     _acceptingDefers = false;
-
+    FireExplosion(ExplosionCue.PhaseAdvance, transform.position, GetAntiPhaseColor(), 1.2f);
     float loop = drumTrack.GetLoopLengthInSeconds();
 
     // 1) Transition beat
@@ -907,8 +932,6 @@ private IEnumerator EnsureEnabledNextFrame(GameObject go)
         if (!_correctionsDone.Add(track)) continue; // already corrected this track
 
         SetStarVisible(true);
-        //SetStarTint(track.trackColor);
-        //TintToTrack(track);
         RefreshVisuals(track);
         // after checking remaining collectables:
         switch (behaviorProfile?.expirePolicy ?? ExpirePolicy.WaitForAll)
@@ -943,7 +966,10 @@ private IEnumerator EnsureEnabledNextFrame(GameObject go)
     yield return null; // let flags propagate this frame
 
     // 5) Ask progression to spawn the next star
-    progressionManager?.SpawnNextPhaseStarWithoutLoopChange();
+    if (GameFlowManager.Instance == null)
+    {
+        progressionManager?.SpawnNextPhaseStarWithoutLoopChange();
+    }
 
     // 6) Safety: wait briefly for the new star to appear; if it doesn't, re-arm this one
     float wait = 0f, maxWait = 1.0f; // one second is plenty
@@ -956,13 +982,23 @@ private IEnumerator EnsureEnabledNextFrame(GameObject go)
         yield return null;
     }
 
+// PhaseStar.cs inside FinishPhaseAndAdvance timeout path
+    bool bridgeActive = GameFlowManager.Instance != null && GameFlowManager.Instance.IsBridgeActive;
     if (!newStarSeen)
     {
-        // Fallback: keep this star alive and ready
+        if (bridgeActive)
+        {
+            // Bridge owns spawning; keep waiting a bit longer instead of re-arming
+            yield return new WaitForSeconds(0.5f);
+            // optional: add another check/loop here, or just exit quietly
+            yield break;
+        }
+
+        // no bridge, fallback re-arm
         Debug.LogWarning("[PhaseStar] Next star failed to spawn in time; re-arming current star.");
         state = PhaseStarState.IdleWandering;
         SetStarVisible(true);
-        _phaseAdvanceStarted = false; // allow finish to run again later
+        _phaseAdvanceStarted = false;
         yield break;
     }
 
@@ -978,7 +1014,7 @@ private void SpawnColoredMineNode(
     InstrumentTrack track,
     Color previewColor)
 {
-    if (index >= hitsRequired || drumTrack == null || mineNodeSpawnerPrefab == null) return;
+    if (drumTrack == null || mineNodeSpawnerPrefab == null) return;
 
     // Lock directive to preview choice
     directive.assignedTrack = track;
@@ -1135,6 +1171,7 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
         yield return StartCoroutine(WatchTrackThenRearm(track));
     }
 
+// PhaseStar.cs
     private IEnumerator WatchTrackThenRearm(InstrumentTrack track)
     {
         float start = Time.time, timeout = 8f;
@@ -1144,8 +1181,13 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
             yield return null;
         }
         yield return new WaitForSeconds(0.05f);
+
+        // ✅ NEW: mark this burst as completed so the "perfect" path can run
+        NotifyShardBurstComplete(track);
+
         StartCoroutine(RearmStarNoBurst());
     }
+
 
     private IEnumerator NodeResolutionWatchdog(MineNode node, InstrumentTrack track)
     {
@@ -1167,20 +1209,15 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
         PreviewNextTargetVisual();
     }
     
-    // ======= visuals/helpers =======
-    private void TintToTrack(InstrumentTrack track)
-    {
-        foreach (var t in starSprites)
-        {
-            t.color = track.trackColor;
-        }
-    }
 
     private void TintToPhaseColor()
     {
         if (particleSystem == null) return;
-        var col = MusicalPhaseLibrary.Get(drumTrack.currentPhase).visualColor;
-        var m = particleSystem.main; m.startColor = col;
+        if (behaviorProfile != null)
+        {
+            var col = behaviorProfile.starColor;
+            var m = particleSystem.main; m.startColor = col;
+        }
     }
 
     private void SetStarVisible(bool visible)
@@ -1197,7 +1234,7 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
         }
     }
 
-// Make SetStarTint respect visibility
+    
     private void SetStarTint(Color c, bool enableObjects = true)
     {
         enableObjects &= _isVisible;  // <-- don't re-enable while hidden
@@ -1211,7 +1248,7 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
             var cc = c; cc.a = sr.color.a;
             sr.color = cc;
         }
-
+/*
         if (!starParticles) starParticles = GetComponentInChildren<ParticleSystem>(true);
         if (starParticles)
         {
@@ -1220,6 +1257,7 @@ private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDire
             var m = starParticles.main;
             m.startColor = c;
         }
+        */
     }
     void ShrinkNearbyDust() {
                // Let DarkStar-style profiles preserve dust.

@@ -321,8 +321,8 @@ public class DrumTrack : MonoBehaviour
             star.SetSpawnStrategyProfile(profile);
             var targets = (trackController != null ? trackController.tracks : GetComponentsInChildren<InstrumentTrack>())
                 .Where(t => t != null).OrderBy(_ => UnityEngine.Random.value).Take(4);
-
-            star.Initialize(this, mgr, targets, armFirstPokeCommit: false);
+//HACK: behavior profile set on prefab
+            star.Initialize(this, mgr, targets, armFirstPokeCommit: false,  star.behaviorProfile);
 
             // Cache the musical phase profile for the upcoming “first poke commits” path, if you use it
             if (phaseProfile != null) mgr.BindPendingPhase(phaseProfile);
@@ -391,6 +391,7 @@ public class DrumTrack : MonoBehaviour
     }
     private void BeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
     {
+        
         Debug.Log($"📣 BeginPhase called for: {phase} with profile: {profile}");
         StartCoroutine(SpawnPhaseStarDelayed(phase, profile)); // ⬅ new
     }
@@ -604,6 +605,12 @@ public class DrumTrack : MonoBehaviour
     {
         float elapsed = (float)((AudioSettings.dspTime - startDspTime) % loopLengthInSeconds);
         return Mathf.Max(0f, loopLengthInSeconds - elapsed);
+    }
+// DrumTrack.cs
+    public void SetBridgeAccent(bool on)
+    {
+        // Simple example: LPF + lower hats when on
+        // Wire into your mixer/filters as appropriate.
     }
 
     public void SpawnPhaseStar(MusicalPhase phase, SpawnStrategyProfile profile, bool armFirstPokeCommit = false)

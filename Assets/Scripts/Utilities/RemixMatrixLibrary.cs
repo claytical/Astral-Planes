@@ -11,6 +11,11 @@ public enum RhythmStyle
     PulseBuild,
     Stutter,
     Scatter,
+    StaccatoEighths,
+    DroneFade,
+    TripletFlare,
+    CallResponse,
+    PulseBuild2Bar,    
     Breakbeat
 }
 

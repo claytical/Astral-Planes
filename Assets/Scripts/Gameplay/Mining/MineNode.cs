@@ -5,13 +5,6 @@ using Effects;
 using Gameplay.Mining;
 using UnityEngine;
 
-// Example interface the child directive could implement
-public interface IMinedObjectDirective
-{
-    string GetObjectType();         // e.g., "NoteSpawner", "LoopExpansion", "TrackClear", ...
-    string GetMusicalRole();        // e.g., "Bass", "Lead", "Harmony", "Groove"
-    int GetAssignedTrackIndex();    // 0..3 (or however many)
-}
 
 
 public class MineNode : MonoBehaviour

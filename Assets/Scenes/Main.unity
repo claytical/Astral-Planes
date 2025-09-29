@@ -1441,6 +1441,10 @@ MonoBehaviour:
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}
   noteSetFactory: {fileID: 0}
+  coralPrefab: {fileID: -4676709209624449764, guid: 8d387e67775794007ba96dfadbea003d,
+    type: 3}
+  noteViz: {fileID: 0}
+  progressionManager: {fileID: 0}
 --- !u!114 &1151719979
 MonoBehaviour:
   m_ObjectHideFlags: 0

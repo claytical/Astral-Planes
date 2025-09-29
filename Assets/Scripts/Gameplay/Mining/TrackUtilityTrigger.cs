@@ -39,22 +39,4 @@ public class TrackUtilityTrigger : MonoBehaviour
 
     }
 
-    private void PlayEnvelopePulse()
-    {
-        if (selectedMusicalRoleProfile == null || selectedMusicalRoleProfile.envelopeParticlePrefab == null) return;
-
-        GameObject pulse = Instantiate(selectedMusicalRoleProfile.envelopeParticlePrefab, transform.position, Quaternion.identity);
-    
-        var ps = pulse.GetComponent<ParticleSystem>();
-        if (ps != null)
-        {
-            var main = ps.main;
-            main.startColor = selectedMusicalRoleProfile.defaultColor;
-            ps.Play();
-        }
-
-        Destroy(pulse, 2f);
-    }
-
-
 }

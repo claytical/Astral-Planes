@@ -9,7 +9,7 @@ public class RemixUtility : ScriptableObject
     public MusicalRole targetRole;
     public MusicalPhase targetPhase;
 
-    public GhostPatternStrategy patternStrategy = GhostPatternStrategy.Arpeggiated;
+    public PatternStrategy patternStrategy = PatternStrategy.Arpeggiated;
     public RhythmStyle rhythmStyleOverride = RhythmStyle.Steady;
     public NoteBehavior noteBehaviorOverride = NoteBehavior.Sustain;
     public bool overrideDefaults = false;
@@ -42,37 +42,37 @@ public class RemixUtility : ScriptableObject
         return result;
     }
 
-    private List<int> GenerateFromPattern(NoteSet noteSet, GhostPatternStrategy strategy)
+    private List<int> GenerateFromPattern(NoteSet noteSet, PatternStrategy strategy)
     {
         List<int> phrase = new();
 
         switch (strategy)
         {
-            case GhostPatternStrategy.Arpeggiated:
+            case PatternStrategy.Arpeggiated:
                 var arp = noteSet.GetSortedNoteList();
                 for (int i = 0; i < notesPerLoop; i++)
                     phrase.Add(arp[i % arp.Count]);
                 break;
 
-            case GhostPatternStrategy.Drone:
+            case PatternStrategy.Drone:
                 int root = noteSet.GetRootNote();
                 for (int i = 0; i < notesPerLoop; i++)
                     phrase.Add(root);
                 break;
 
-            case GhostPatternStrategy.Randomized:
+            case PatternStrategy.Randomized:
                 var pool = noteSet.GetNoteList();
                 for (int i = 0; i < notesPerLoop; i++)
                     phrase.Add(pool[Random.Range(0, pool.Count)]);
                 break;
 
-            case GhostPatternStrategy.StaticRoot:
+            case PatternStrategy.StaticRoot:
                 int staticRoot = noteSet.GetRootNote();
                 for (int i = 0; i < notesPerLoop; i++)
                     phrase.Add(staticRoot);
                 break;
 
-            case GhostPatternStrategy.WalkingBass:
+            case PatternStrategy.WalkingBass:
                 var walk = noteSet.GetSortedNoteList();
                 int dir = Random.value > 0.5f ? 1 : -1;
                 int current = walk.Count / 2;
@@ -113,29 +113,19 @@ public class RemixUtility : ScriptableObject
     {
         switch (patternStrategy)
         {
-            case GhostPatternStrategy.Arpeggiated:
-            case GhostPatternStrategy.WalkingBass:
+            case PatternStrategy.Arpeggiated:
+            case PatternStrategy.WalkingBass:
                 return collected[index % collected.Count];
 
-            case GhostPatternStrategy.Randomized:
+            case PatternStrategy.Randomized:
                 return collected[Random.Range(0, collected.Count)];
 
-            case GhostPatternStrategy.Drone:
-            case GhostPatternStrategy.StaticRoot:
+            case PatternStrategy.Drone:
+            case PatternStrategy.StaticRoot:
                 return context.GetRootNote();
 
             default:
                 return collected[index % collected.Count];
         }
     }
-}
-public enum GhostPatternStrategy
-{
-    Arpeggiated,
-    StaticRoot,
-    WalkingBass,
-    MelodicPhrase,
-    PercussiveLoop,
-    Drone,
-    Randomized
 }
