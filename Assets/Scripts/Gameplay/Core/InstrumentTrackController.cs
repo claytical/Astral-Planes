@@ -3,7 +3,6 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
-using Gameplay.Mining;
 using MidiPlayerTK;
 using Random = UnityEngine.Random;
 public static class ShipTrackAssigner
@@ -35,7 +34,6 @@ public static class ShipTrackAssigner
                     noteSet.assignedInstrumentTrack = track;
                     noteSet.noteBehavior = roleProfile.defaultBehavior;
                     noteSet.Initialize(track, track.GetTotalSteps());
-//                    track.SpawnCollectables(noteSet);
                     Debug.Log($"Assigned track {track.name} to preset {preset} with noteset: {noteSet} for profile {roleProfile}");
 
                     unassignedTracks.Remove(track);
@@ -69,9 +67,9 @@ public static class ShipTrackAssigner
 public class InstrumentTrackController : MonoBehaviour
 {
     public InstrumentTrack[] tracks;
-    public InstrumentTrack activeTrack;
     public NoteVisualizer noteVisualizer;
     public GameObject noteSetPrefab;
+    private bool spawningEnabled = true;
 
     void Start()
     {
@@ -79,19 +77,56 @@ public class InstrumentTrackController : MonoBehaviour
             return;
         }
     }
-
-    public int GetMaxLoopMultiplier()
-    {
-        return tracks.Max(track => track.loopMultiplier);
-    }
-    
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips, GameObject notesetPrefab)
     {
         
         ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList(), notesetPrefab);
         UpdateVisualizer();
     }
+    public InstrumentTrack FindTrackByRole(MusicalRole role)
+    {
+        Debug.Log("Configured roles: " + 
+                  string.Join(", ", tracks.Select(t => t.assignedRole)));
+        return tracks.FirstOrDefault(t => t.assignedRole == role);
+    }
+    public void ApplySeedVisibility(List<InstrumentTrack> seeds)
+    {
+        // Example: mute non-seeds briefly
+        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
+        foreach (var t in tracks)
+        {
+            bool on = seedSet.Contains(t);
+            t.SetMuted(!on); // implement SetMuted on InstrumentTrack or via your mixer
+        }
+        // Optionally fade unmuted ones back in over ~0.5s
+    }
+    private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
+    {
+        float startVolume = player.MPTK_Volume;
+        float elapsed = 0f;
 
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            player.MPTK_Volume = Mathf.Lerp(startVolume, 0f, elapsed / duration);
+            yield return null;
+        }
+
+        player.MPTK_Volume = 0f;
+    }
+    public void ApplyPhaseSeedOutcome(MusicalPhase nextPhase, List<InstrumentTrack> seeds)
+    {
+        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+            if (seedSet.Contains(t))
+                RemixSeedForPhase(t, nextPhase);     // keep + lightly remix for the new phase
+            else
+                ClearTrackForNewPhase(t);            // silence + clear objects so the new star can rebuild
+        }
+    }
+    public void SetSpawningEnabled(bool enabled) { spawningEnabled = enabled; /* gate your spawn entry points */ }
     public void UpdateVisualizer()
     {
         if (noteVisualizer == null) return;
@@ -102,7 +137,10 @@ public class InstrumentTrackController : MonoBehaviour
                 noteVisualizer.PlacePersistentNoteMarker(track, step);
         }
     }
-
+    public int GetMaxLoopMultiplier()
+    {
+        return tracks.Max(track => track.loopMultiplier);
+    }
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)
@@ -125,40 +163,85 @@ public class InstrumentTrackController : MonoBehaviour
 
         
     }
-    private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
-    {
-        float startVolume = player.MPTK_Volume;
-        float elapsed = 0f;
 
-        while (elapsed < duration)
+    private void ClearTrackForNewPhase(InstrumentTrack t)
+{
+    // 1) Soft audio fade/mute
+    t.SetMuted(true);                        // your existing or stubbed mute
+
+    // 2) Despawn/clear any lingering collectables/mined objects on this track
+    //    (prevents "already perfect" and stale rot artifacts)
+    if (t.spawnedCollectables != null)
+    {
+        for (int i = t.spawnedCollectables.Count - 1; i >= 0; i--)
         {
-            elapsed += Time.deltaTime;
-            player.MPTK_Volume = Mathf.Lerp(startVolume, 0f, elapsed / duration);
-            yield return null;
+            var go = t.spawnedCollectables[i];
+            if (go) Destroy(go);
+            t.spawnedCollectables.RemoveAt(i);
         }
-
-        player.MPTK_Volume = 0f;
     }
-    public InstrumentTrack FindTrackByRole(MusicalRole role)
-    {
-        Debug.Log("Configured roles: " + 
-                  string.Join(", ", tracks.Select(t => t.assignedRole)));
-        return tracks.FirstOrDefault(t => t.assignedRole == role);
-    }
-// InstrumentTrackController.cs
-    private bool spawningEnabled = true;
-    public void SetSpawningEnabled(bool enabled) { spawningEnabled = enabled; /* gate your spawn entry points */ }
 
-    public void ApplySeedVisibility(List<InstrumentTrack> seeds)
+    // 3) Reset per-track perfection bookkeeping (so the new star doesn't start perfect)
+    t.ResetPerfectionFlagForPhase();         // add this tiny helper on InstrumentTrack (see below)
+
+    // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
+    // NoteVisualizer can read t.IsMuted to dim rows, if you want.
+}
+    private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase)
+{
+    // Keep it audible
+    t.SetMuted(false);
+
+    // Nudge its pattern/behavior so the new phase has a recognizable seed
+    var ns = t.GetActiveNoteSet();
+    if (ns != null)
     {
-        // Example: mute non-seeds briefly
-        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
-        foreach (var t in tracks)
+        var (behavior, rhythm) = GetDefaultStyleForPhaseAndRole(phase, t.assignedRole);
+        ns.ChangeNoteBehavior(t, behavior);
+        ns.rhythmStyle = rhythm;
+
+        // Optional: quick spice if you’re re-integrating “remix boost”
+        // ns.RandomizeArpOrder();
+        // ns.ShiftOctave(phase == MusicalPhase.Intensify ? +1 : 0);
+    }
+
+    // Also clear old collectables to avoid stale rot on seeds
+    if (t.spawnedCollectables != null)
+    {
+        for (int i = t.spawnedCollectables.Count - 1; i >= 0; i--)
         {
-            bool on = seedSet.Contains(t);
-            t.SetMuted(!on); // implement SetMuted on InstrumentTrack or via your mixer
+            var go = t.spawnedCollectables[i];
+            if (go) Destroy(go);
+            t.spawnedCollectables.RemoveAt(i);
         }
-        // Optionally fade unmuted ones back in over ~0.5s
     }
+
+    t.ResetPerfectionFlagForPhase();
+}
+    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MusicalPhase phase, MusicalRole role)
+{
+    switch (phase)
+    {
+        case MusicalPhase.Intensify:
+            return role == MusicalRole.Groove
+                ? (NoteBehavior.Percussion, RhythmStyle.Dense)
+                : (NoteBehavior.Lead, RhythmStyle.Syncopated);
+
+        case MusicalPhase.Release:
+            return (NoteBehavior.Drone, RhythmStyle.Sparse);
+
+        case MusicalPhase.Evolve:
+            return (NoteBehavior.Lead, RhythmStyle.Steady);
+
+        case MusicalPhase.Wildcard:
+            return (NoteBehavior.Glitch, RhythmStyle.Triplet);
+
+        case MusicalPhase.Pop:
+            return (NoteBehavior.Harmony, RhythmStyle.Steady);
+
+        default: // Establish
+            return (NoteBehavior.Lead, RhythmStyle.Steady);
+    }
+}
 
 }

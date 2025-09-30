@@ -7,21 +7,27 @@ public class ChordChangeArpeggiator : MonoBehaviour
 {
     public DrumTrack drums;
     public InstrumentTrackController tracks;
-
+    public bool commitHandledByHarmonyDirector = true; 
     private bool _armed;
     private bool _holding;
     private Chord _pendingChord;
     private List<Coroutine> _livePreviews = new();
-    public bool commitHandledByHarmonyDirector = true; 
-    public System.Action HeldThroughBoundary;
     private int _lastLoopIdx = -1;
+    public System.Action HeldThroughBoundary;
+
     void OnDisable(){ if (drums != null) drums.OnLoopBoundary -= OnLoopBoundary; }
 
     void Awake()
     {
         if (drums != null) drums.OnLoopBoundary += OnLoopBoundary;
     }
-
+    public void Bind(DrumTrack d, InstrumentTrackController t)
+    {
+        if (drums != null) drums.OnLoopBoundary -= OnLoopBoundary;
+        drums = d;
+        tracks = t;
+        if (drums != null) drums.OnLoopBoundary += OnLoopBoundary;
+    }
     public void ArmChordWhileHolding(Chord chord)
     {
         if (_armed) return;               // only one at a time
@@ -32,16 +38,6 @@ public class ChordChangeArpeggiator : MonoBehaviour
         float remain = drums.GetTimeToLoopEnd();
         StartPreviews(chord, remain);
     }
-
-    public void CancelIfReleased()
-    {
-        _holding = false;
-        if (!_armed) return;
-        _armed = false;
-        StopPreviews();
-        // TODO: optionally refund a chord-charge here
-    }
-    
     public void Begin(Chord chord, float secondsRemaining)
     {
         if (_armed || drums == null || tracks == null || tracks.tracks == null) return;
@@ -51,15 +47,6 @@ public class ChordChangeArpeggiator : MonoBehaviour
         _armed = true; _holding = true; _pendingChord = chord;
         StartPreviews(chord, Mathf.Max(0.05f, secondsRemaining));
     }
-    private void StartPreviews(Chord chord, float remainSeconds)
-    {
-        if (tracks == null || tracks.tracks == null) return;
-        StopPreviews();
-        foreach (var t in tracks.tracks)
-            if (t != null)
-                _livePreviews.Add(StartCoroutine(PreviewArp(t, chord, remainSeconds)));
-    }
-
     public void Cancel()
     {
         _holding = false;
@@ -67,7 +54,15 @@ public class ChordChangeArpeggiator : MonoBehaviour
         _armed = false;
         StopPreviews();
     }
-
+    
+    public void CancelIfReleased()
+    {
+        _holding = false;
+        if (!_armed) return;
+        _armed = false;
+        StopPreviews();
+        // TODO: optionally refund a chord-charge here
+    }
     private void OnLoopBoundary()
     {
         if (!_armed) return;
@@ -89,22 +84,6 @@ public class ChordChangeArpeggiator : MonoBehaviour
         _armed = false;
         _holding = false;
     }
-    // ChordChangeArpeggiator.cs
-    public void Bind(DrumTrack d, InstrumentTrackController t)
-    {
-        if (drums != null) drums.OnLoopBoundary -= OnLoopBoundary;
-        drums = d;
-        tracks = t;
-        if (drums != null) drums.OnLoopBoundary += OnLoopBoundary;
-    }
-
-    private void StopPreviews()
-    {
-        foreach (var c in _livePreviews)
-            if (c != null) StopCoroutine(c);
-        _livePreviews.Clear();
-    }
-
     private IEnumerator PreviewArp(InstrumentTrack track, Chord chord, float remainSeconds)
     {
         // Build playable chord tones across the track range
@@ -145,4 +124,19 @@ public class ChordChangeArpeggiator : MonoBehaviour
             t += stepDur;
         }
     }
+    private void StartPreviews(Chord chord, float remainSeconds)
+    {
+        if (tracks == null || tracks.tracks == null) return;
+        StopPreviews();
+        foreach (var t in tracks.tracks)
+            if (t != null)
+                _livePreviews.Add(StartCoroutine(PreviewArp(t, chord, remainSeconds)));
+    }
+    private void StopPreviews()
+    {
+        foreach (var c in _livePreviews)
+            if (c != null) StopCoroutine(c);
+        _livePreviews.Clear();
+    }
+
 }

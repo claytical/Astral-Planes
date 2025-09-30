@@ -1,64 +1,51 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Effects;
 using Gameplay.Mining;
 using UnityEngine;
-
-
 
 public class MineNode : MonoBehaviour
 {
     public SpriteRenderer coreSprite;
     public int maxStrength = 100;
-    private int strength;
-    private GameObject preloadedObject;
-    private Vector3 originalScale;
-    private bool objectRevealed = false;
-    private Color? lockedColor;
-    private Rigidbody2D rb;
-    private MinedObject minedObject;
-    private bool _depletedHandled;
-    public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
-    private bool _resolvedFired;
+
+    private int _strength;
+    private GameObject _preloadedObject;
+    private Vector3 _originalScale;
+    private Color? _lockedColor;
+    private MinedObject _minedObject;
+    private bool _objectRevealed, _depletedHandled, _resolvedFired;
     private MinedObjectSpawnDirective _directive;  // cache the directive
-    private MinedObjectType _carriedType;          // cache the type
+
+    public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
     private void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
-        originalScale = transform.localScale;
-        strength = maxStrength;
-    }
-    private void FireResolvedOnce(MinedObjectType kind, MinedObjectSpawnDirective dir)
-    {
-        if (_resolvedFired) return;
-        _resolvedFired = true;
-        try { OnResolved?.Invoke(kind, dir); }
-        catch (System.Exception e) { Debug.LogException(e, this); }
+        GetComponent<Rigidbody2D>();
+        _originalScale = transform.localScale;
+        _strength = maxStrength;
     }
     public void Initialize(MinedObjectSpawnDirective directive)
     {
         _directive    = directive;                 // ⬅ cache
-        _carriedType  = directive.minedObjectType; // ⬅ cache
 
         GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
-        lockedColor = directive.displayColor;
-        minedObject = obj.GetComponent<MinedObject>();
+        _lockedColor = directive.displayColor;
+        _minedObject = obj.GetComponent<MinedObject>();
         obj.transform.SetParent(transform);
         obj.SetActive(false);
-        minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
-        minedObject.assignedTrack.drumTrack.RegisterMinedObject(minedObject);
-        minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
+        _minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
+        _minedObject.assignedTrack.drumTrack.RegisterMinedObject(_minedObject);
+        _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
         // NoteSpawn carries a Ghost trigger
         NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
-        minedObject.assignedTrack.drumTrack.activeMineNodes.Add(this);
+        _minedObject.assignedTrack.drumTrack.activeMineNodes.Add(this);
 //        if (spawner != null) this.preloadedObject = spawner.ghostTrigger;
 
         // TrackUtility carries itself
         TrackUtilityMinedObject track = obj.GetComponent<TrackUtilityMinedObject>();
         if (track != null)
         {
-            this.preloadedObject = obj;
+            this._preloadedObject = obj;
             if (directive.remixUtility != null)
                 track.Initialize(GameFlowManager.Instance.controller, directive);
         }
@@ -67,22 +54,46 @@ public class MineNode : MonoBehaviour
         {
             Debug.Log($"It's not null...");
             // prefer directive.displayColor; otherwise use the assigned track's color
-            var fallback = (minedObject != null && minedObject.assignedTrack != null)
-                ? (Color?)minedObject.assignedTrack.trackColor
+            var fallback = (_minedObject != null && _minedObject.assignedTrack != null)
+                ? (Color?)_minedObject.assignedTrack.trackColor
                 : null;
 
-            var finalColor = lockedColor ?? fallback;
+            var finalColor = _lockedColor ?? fallback;
             Debug.Log($"It's not null... fallback: {fallback}, finalColor: {finalColor}");
 
             if (finalColor.HasValue) coreSprite.color = finalColor.Value;
         }
 
     }
+    public void RevealPreloadedObject()
+    {
+        if (_preloadedObject == null || _preloadedObject.gameObject == null || _objectRevealed)
+        {
+            Debug.LogWarning("⚠️ Preloaded object was destroyed before reveal.");
+            return;
+        }
 
+        Debug.Log($"Reveal Preloaded Object: {_preloadedObject.name}");
+
+        _preloadedObject.transform.position = transform.position;
+
+        if (_preloadedObject.TryGetComponent(out MinedObject mined))
+        {
+            mined.EnableColliderAfterDelay(0.5f);
+        }
+
+        Destroy(gameObject);
+        _objectRevealed = true;
+    }
+    private IEnumerator DelayedReveal(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        RevealPreloadedObject();
+    }
     private void OnCollisionEnter2D(Collision2D coll)
     { 
-        if (objectRevealed) return; 
-        var spawner = minedObject.GetComponent<NoteSpawnerMinedObject>(); 
+        if (_objectRevealed) return; 
+        var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
         if (spawner != null) {
             // Normal note spawner feedback
             CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
@@ -93,13 +104,13 @@ public class MineNode : MonoBehaviour
         }
         if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
         {
-            strength -= vehicle.GetForceAsDamage();
-            strength = Mathf.Max(0, strength); // Ensure it doesn’t go below 0
-            float normalized = (float)strength / maxStrength; // [0, 1]
+            _strength -= vehicle.GetForceAsDamage();
+            _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
+            float normalized = (float)_strength / maxStrength; // [0, 1]
             float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
 
-            StartCoroutine(ScaleSmoothly(originalScale * scaleFactor, 0.1f));
-            if (strength <= 0 && !_depletedHandled)
+            StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
+            if (_strength <= 0 && !_depletedHandled)
             {
                 _depletedHandled = true;
                 // Fresh burst for this node
@@ -110,7 +121,7 @@ public class MineNode : MonoBehaviour
                     if (spawner.selectedNoteSet == null)
                     {
                         // Prefer any directive you cached; otherwise rebuild from track/phase
-                        var track = spawner.assignedTrack ?? minedObject.assignedTrack;
+                        var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
                         var phase = track.drumTrack.currentPhase;
                         if (track != null && phase != null)
                         {
@@ -132,11 +143,11 @@ public class MineNode : MonoBehaviour
                 }
 
                 // Reveal any preloaded object AFTER spawning
-                if (preloadedObject != null)
+                if (_preloadedObject != null)
                 {
-                    preloadedObject.transform.SetParent(null, true); // keep world pos
-                    preloadedObject.transform.localScale = originalScale;
-                    preloadedObject.SetActive(true);
+                    _preloadedObject.transform.SetParent(null, true); // keep world pos
+                    _preloadedObject.transform.localScale = _originalScale;
+                    _preloadedObject.SetActive(true);
                 }
 
                 // Now run your existing VFX/cleanup
@@ -145,93 +156,25 @@ public class MineNode : MonoBehaviour
             
         }
     }
-
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
         //preloadedObject
-        minedObject.assignedTrack.drumTrack.UnregisterMinedObject(minedObject);
+        _minedObject.assignedTrack.drumTrack.UnregisterMinedObject(_minedObject);
         // 🔔 Notify listeners (PhaseStar) of the outcome kind and payload
         FireResolvedOnce(_directive.minedObjectType, _directive);
         StartCoroutine(DelayedReveal(0.2f));
     }
-
-    private IEnumerator DelayedReveal(float delay)
+    private void FireResolvedOnce(MinedObjectType kind, MinedObjectSpawnDirective dir)
     {
-        yield return new WaitForSeconds(delay);
-        RevealPreloadedObject();
+        if (_resolvedFired) return;
+        _resolvedFired = true;
+        try { OnResolved?.Invoke(kind, dir); }
+        catch (System.Exception e) { Debug.LogException(e, this); }
     }
-
-    private void RevealPreloadedObject()
-    {
-        if (preloadedObject == null || preloadedObject.gameObject == null || objectRevealed)
-        {
-            Debug.LogWarning("⚠️ Preloaded object was destroyed before reveal.");
-            return;
-        }
-
-        Debug.Log($"Reveal Preloaded Object: {preloadedObject.name}");
-
-        preloadedObject.transform.position = transform.position;
-
-        if (preloadedObject.TryGetComponent(out MinedObject mined))
-        {
-            mined.EnableColliderAfterDelay(0.5f);
-        }
-
-        Destroy(gameObject);
-        objectRevealed = true;
-    }
-    void OnDisable(){ Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); }
-    void OnDestroy(){ Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); }
+    private void OnDisable(){ Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); }
+    private void OnDestroy(){ Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); }
     // Call this right after you instantiate the child mined object (inside MineNode or the spawner).
-
-// PhaseStar (or MineNodeSpawner) — helper
-    private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDirective dir)
-    {
-        // 1) Resolve role profile deterministically:
-        // preference: directive.roleProfile → track.assignedRole → directive.role
-        MusicalRoleProfile profile = dir.roleProfile
-                                     ?? (dir.assignedTrack != null
-                                         ? MusicalRoleProfileLibrary.GetProfile(dir.assignedTrack.assignedRole)
-                                         : null)
-                                     ?? MusicalRoleProfileLibrary.GetProfile(dir.role);
-
-        // 2) Base component: enum role + shared fields
-        var baseMO = child.GetComponent<MinedObject>();
-        if (baseMO != null)
-        {
-            baseMO.assignedTrack   = dir.assignedTrack;
-            baseMO.minedObjectType = dir.minedObjectType;
-            baseMO.musicalRole     = dir.role;           // enum (Bass/Lead/Harmony/…)
-            // (If you added a roleProfile field on MinedObject, assign it here too.)
-        }
-
-        // 3) NoteSpawner component: expects a PROFILE object
-        var spawnerMO = child.GetComponent<NoteSpawnerMinedObject>();
-        if (spawnerMO != null)
-        {
-            spawnerMO.assignedTrack   = dir.assignedTrack;
-            spawnerMO.musicalRole     = profile;         // profile object, not enum
-            spawnerMO.selectedNoteSet = dir.noteSet;     // must be non-null (see #4)
-        }
-
-        // 4) Color: lock to directive.displayColor (fallback to track color)
-        var tint = (dir.displayColor.a > 0f)
-            ? dir.displayColor
-            : (dir.assignedTrack != null ? dir.assignedTrack.trackColor : Color.white);
-
-        // Apply to the actual renderer used by the prefab
-        var trackVisual = child.GetComponent<TrackItemVisual>();
-        if (trackVisual != null) trackVisual.trackColor = tint;
-
-        foreach (var sr in child.GetComponentsInChildren<SpriteRenderer>(true))
-        {
-            var c = tint; c.a = sr.color.a; // preserve existing alpha
-            sr.color = c;
-        }
-    }
-
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)
     {
         Vector3 initialScale = transform.localScale;

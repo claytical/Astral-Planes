@@ -15,15 +15,15 @@ public static class ConstellationMemoryStore
             sessionTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             snapshots = raw.Select(s => new SerializablePhaseSnapshot
             {
-                pattern = s.pattern.ToString(),
-                color = s.color,
-                timestamp = (long)s.timestamp,
-                collectedNotes = s.collectedNotes.Select(n => new SerializableNoteEntry
+                pattern = s.Pattern.ToString(),
+                color = s.Color,
+                timestamp = (long)s.Timestamp,
+                collectedNotes = s.CollectedNotes.Select(n => new SerializableNoteEntry
                 {
-                    step = n.step,
-                    note = n.note,
-                    velocity = n.velocity,
-                    trackColor = n.trackColor
+                    step = n.Step,
+                    note = n.Note,
+                    velocity = n.Velocity,
+                    trackColor = n.TrackColor
                 }).ToList()
             }).ToList()
         };
@@ -34,10 +34,10 @@ public static class ConstellationMemoryStore
     {
         return session.snapshots.Select(s => new PhaseSnapshot
         {
-            pattern = Enum.TryParse<MusicalPhase>(s.pattern, out var parsedPhase) ? parsedPhase : MusicalPhase.Establish,
-            color = s.color,
-            timestamp = s.timestamp,
-            collectedNotes = s.collectedNotes.Select(n => new PhaseSnapshot.NoteEntry(
+            Pattern = Enum.TryParse<MusicalPhase>(s.pattern, out var parsedPhase) ? parsedPhase : MusicalPhase.Establish,
+            Color = s.color,
+            Timestamp = s.timestamp,
+            CollectedNotes = s.collectedNotes.Select(n => new PhaseSnapshot.NoteEntry(
                 n.step, n.note, n.velocity, n.trackColor
             )).ToList()
         }).ToList();
@@ -98,11 +98,11 @@ public static class ConstellationMemoryStore
     {
         cachedSnapshots = snapshots.Select(s => new PhaseSnapshot
         {
-            pattern = s.pattern,
-            color = s.color,
-            timestamp = s.timestamp,
-            collectedNotes = s.collectedNotes
-                .Select(n => new PhaseSnapshot.NoteEntry(n.step, n.note, n.velocity, n.trackColor))
+            Pattern = s.Pattern,
+            Color = s.Color,
+            Timestamp = s.Timestamp,
+            CollectedNotes = s.CollectedNotes
+                .Select(n => new PhaseSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor))
                 .ToList()
         }).ToList(); // Deep copy for safety
     }

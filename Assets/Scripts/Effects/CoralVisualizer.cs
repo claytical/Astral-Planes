@@ -14,19 +14,26 @@ public class CoralVisualizer : MonoBehaviour
     public float tendrilSpacing = 0.3f;
     public float rotationSpeed = 5f;
 
-    private List<GameObject> spawnedParts = new();
+    private List<GameObject> _spawnedParts = new();
     public List<PhaseSnapshot> snapshots = new();
-    private Transform coralRoot;     // Optional: parent transform for hierarchy
+    private Transform _coralRoot;     // Optional: parent transform for hierarchy
 
     public Vector3 coralOrigin = new Vector3(-10f, -3f, 0f); // Move off center if needed
     public float branchScale = 5f; // Amplify size of visuals
     
     void Awake()
     {
-        coralRoot = new GameObject("CoralRoot").transform;
-        coralRoot.SetParent(this.transform, false);
+        _coralRoot = new GameObject("CoralRoot").transform;
+        _coralRoot.SetParent(this.transform, false);
     }
-
+    private void ClearExisting()
+    {
+        foreach (var obj in _spawnedParts)
+        {
+            if (obj != null) Destroy(obj);
+        }
+        _spawnedParts.Clear();
+    }
     public void GenerateCoralFromSnapshots(List<PhaseSnapshot> snapshots)
 {
     ClearExisting();
@@ -39,11 +46,11 @@ public class CoralVisualizer : MonoBehaviour
     for (int i = 0; i < snapshots.Count; i++)
     {
         var snapshot = snapshots[i];
-        var notes = snapshot.collectedNotes;
+        var notes = snapshot.CollectedNotes;
         if (notes == null || notes.Count == 0) continue;
 
         // 🌱 Create branch GameObject
-        GameObject branch = Instantiate(branchPrefab, coralRoot);
+        GameObject branch = Instantiate(branchPrefab, _coralRoot);
         float xOffset = i * horizontalSpacing;
         Vector3 branchBaseWorld = coralOrigin + new Vector3(xOffset, 0, 0);
         branch.transform.position = branchBaseWorld; // world position
@@ -70,11 +77,11 @@ public class CoralVisualizer : MonoBehaviour
 
             // 🌸 Tendril in world space at correct location
             Vector3 worldTendrilPos = branch.transform.TransformPoint(pos);
-            GameObject tendril = Instantiate(tendrilPrefab, worldTendrilPos, Quaternion.identity, coralRoot);
-            float tendrilScale = Mathf.Lerp(0.1f, 0.3f, notes[j].velocity / 127f);
+            GameObject tendril = Instantiate(tendrilPrefab, worldTendrilPos, Quaternion.identity, _coralRoot);
+            float tendrilScale = Mathf.Lerp(0.1f, 0.3f, notes[j].Velocity / 127f);
             tendril.transform.localScale = Vector3.one * tendrilScale;
-            SetColor(tendril, notes[j].trackColor);
-            spawnedParts.Add(tendril);
+            SetColor(tendril, notes[j].TrackColor);
+            _spawnedParts.Add(tendril);
         }
 
         for (int p = 0; p < points.Count; p++)
@@ -85,7 +92,7 @@ public class CoralVisualizer : MonoBehaviour
         // 🎨 Style the branch
         Gradient gradient = new Gradient();
         gradient.SetKeys(
-            new GradientColorKey[] { new GradientColorKey(snapshot.color, 0f), new GradientColorKey(snapshot.color, 1f) },
+            new GradientColorKey[] { new GradientColorKey(snapshot.Color, 0f), new GradientColorKey(snapshot.Color, 1f) },
             new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.1f, 1f) }
         );
         lr.colorGradient = gradient;
@@ -95,7 +102,7 @@ public class CoralVisualizer : MonoBehaviour
         widthCurve.AddKey(1f, 0.02f);
         lr.widthCurve = widthCurve;
 
-        spawnedParts.Add(branch);
+        _spawnedParts.Add(branch);
     }
 }
     
@@ -117,17 +124,5 @@ public class CoralVisualizer : MonoBehaviour
         }
     }
 
-    private void ClearExisting()
-    {
-        foreach (var obj in spawnedParts)
-        {
-            if (obj != null) Destroy(obj);
-        }
-        spawnedParts.Clear();
-    }
 
-    private void Update()
-    {
-        //transform.Rotate(Vector3.forward * rotationSpeed * Time.deltaTime);
-    }
 }

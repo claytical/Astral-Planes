@@ -4,27 +4,17 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 public enum GameState { Begin, Selection, Playing, GameOver }
-[System.Serializable]
-public struct CollectedNote
-{
-    public int step;          // optional for coral (not used there)
-    public int note;          // MIDI (0–127); coral doesn’t use it now
-    public int velocity;      // 0–127  ← CoralVisualizer uses this
-    public Color trackColor;  //         ← CoralVisualizer uses this
-}
+
 public class GameFlowManager : MonoBehaviour
 {
     public static GameFlowManager Instance { get; private set; }
-    [System.Serializable]
     public struct PhaseChordMap { public MusicalPhase phase; public ChordProgressionProfile progression; }
 
-    [Header("Harmony")]
     public HarmonyDirector harmony;
-    public List<PhaseChordMap> chordMaps = new();
+    private List<PhaseChordMap> chordMaps = new();
 
     [Header("Settings")]
     public float quoteDisplayDuration = 5f;
@@ -56,7 +46,7 @@ public class GameFlowManager : MonoBehaviour
     public event System.Action<MusicalPhaseProfile> OnRemixCommitted;
     // GameFlowManager.cs (fields)
     private CoralVisualizer _coralInstance;
-    public CoralVisualizer coralPrefab;  
+    public GameObject coralPrefab;  
     public NoteVisualizer noteViz;    // assign in scene
     public MineNodeProgressionManager progressionManager; // ensure assigned
 
@@ -78,10 +68,55 @@ public void BeginPhaseBridge(MusicalPhase from, MusicalPhase to, List<Instrument
 private CoralVisualizer EnsureCoral()
 {
     if (_coralInstance != null) return _coralInstance;
-    if (coralPrefab == null) return null;
-    _coralInstance = Instantiate(coralPrefab);
+
+    if (coralPrefab == null)
+    {
+        Debug.LogWarning("[Bridge/Coral] No coralPrefab assigned; skipping coral.");
+        return null;
+    }
+
+    var go = Instantiate(coralPrefab);
+    _coralInstance = go.GetComponentInChildren<CoralVisualizer>(true);
+    if (_coralInstance == null)
+    {
+        Debug.LogWarning("[Bridge/Coral] Coral prefab has no CoralVisualizer component (root or children). Skipping coral.");
+        return null;
+    }
+
     _coralInstance.gameObject.SetActive(false);
     return _coralInstance;
+}
+
+private IEnumerator _SpawnNextStarWatchdog(string tag, float timeoutSec = 1.5f)
+{
+    if (progressionManager == null || activeDrumTrack == null)
+        yield break;
+
+    // Try once
+    progressionManager.SpawnNextPhaseStarWithoutLoopChange();
+
+    // Wait for DrumTrack to report the new star is active
+    float t = 0f;
+    while (t < timeoutSec)
+    {
+        if (activeDrumTrack.isPhaseStarActive) yield break;
+        t += Time.deltaTime;
+        yield return null;
+    }
+
+    // Retry once, louder
+    Debug.LogWarning($"[Bridge/SpawnWatchdog] No PhaseStar after {timeoutSec:0.00}s ({tag}). Retrying spawn.");
+    progressionManager.SpawnNextPhaseStarWithoutLoopChange();
+
+    // Wait a bit more, then give a last-ditch log (so we know where to look next)
+    t = 0f;
+    while (t < 1.0f)
+    {
+        if (activeDrumTrack.isPhaseStarActive) yield break;
+        t += Time.deltaTime;
+        yield return null;
+    }
+    Debug.LogError("[Bridge/SpawnWatchdog] PhaseStar still not active. Check DrumTrack.SpawnPhaseStar and PhaseQueue setup.");
 }
 
 private IEnumerator FadeCoralAlpha(CoralVisualizer cv, float target, float seconds)
@@ -133,14 +168,20 @@ private IEnumerator PlayPhaseBridge(
     Color nextStarColor)
 {
     ghostCycleInProgress = true;
+
+    // --- Timing locked to loop length ---
+    float loopLen = activeDrumTrack ? Mathf.Max(0.05f, activeDrumTrack.GetLoopLengthInSeconds()) : 4f;
+    int   bars    = Mathf.Max(1, sig.bars);
+    float bridgeSecs = Mathf.Min(bars * loopLen, 20f);  // hard cap safety
+
     double startDsp = AudioSettings.dspTime;
+    double endDsp   = startDsp + bridgeSecs;
 
-    // Durations from the current loop
-    int   totalSteps = activeDrumTrack ? activeDrumTrack.totalSteps : 16;
-    float loopLen    = activeDrumTrack ? activeDrumTrack.GetLoopLengthInSeconds() : 4f;
-    float bridgeSecs = Mathf.Max(0.05f, sig.bars * loopLen);
+    // --- Stage harmony for NEXT phase (no audible retune yet) ---
+    var nextProf = GetProfileForPhase(nextPhase);
+    harmony?.SetActiveProfile(nextProf, applyImmediately:false);
 
-    // Who plays the bridge
+    // --- Who plays (perfect-only by default) ---
     var players = new List<InstrumentTrack>();
     var cand = (sig.useOnlyPerfectTracks && perfectTracks != null && perfectTracks.Count > 0)
         ? new List<InstrumentTrack>(perfectTracks)
@@ -148,36 +189,30 @@ private IEnumerator PlayPhaseBridge(
     for (int i = 0; i < cand.Count && players.Count < sig.maxBridgeTracks; i++)
         if (cand[i] != null) players.Add(cand[i]);
 
-    // Stage harmony for next phase (no audible retune yet)
-    var nextProf = GetProfileForPhase(nextPhase);
-    harmony?.SetActiveProfile(nextProf, applyImmediately: false);
+    // --- PRE: clear the screen before coral (mine nodes + maze) ---
+    ClearScreenForBridge(); // no-yield, kicks internal coroutines if needed
 
-    // Optional coral (skips cleanly if prefab/instance missing)
+    // --- Prep coral (skips cleanly if prefab/component missing) ---
     CoralVisualizer coral = null;
     List<PhaseSnapshot> bridgeSnaps = null;
-    if (sig.growCoral)
+    coral = EnsureCoral(); // returns null if prefab or component missing
+    if (coral != null && sig.growCoral)
     {
-        coral = EnsureCoral();
-        if (coral != null)
-        {
-            bridgeSnaps = new List<PhaseSnapshot> {
-                new PhaseSnapshot {
-                    color = nextStarColor,
-                    collectedNotes = new List<PhaseSnapshot.NoteEntry>()
-                }
-            };
-            coral.gameObject.SetActive(true);
-        }
+        bridgeSnaps = new List<PhaseSnapshot> {
+            new PhaseSnapshot {
+                Color = nextStarColor,
+                CollectedNotes = new List<PhaseSnapshot.NoteEntry>()
+            }
+        };
+        coral.gameObject.SetActive(true);
     }
 
-    // Drum accent during bridge
+    // --- Freeze gameplay affordances + soften visuals ---
     if (sig.includeDrums && activeDrumTrack) activeDrumTrack.SetBridgeAccent(true);
-
-    // Freeze spawns + fade ribbons down
     controller?.SetSpawningEnabled(false);
-    if (noteViz && sig.fadeRibbons) yield return StartCoroutine(noteViz.FadeRibbonsTo(0f, 0.4f));
+    if (noteViz && sig.fadeRibbons) yield return StartCoroutine(noteViz.FadeRibbonsTo(0f, 0.25f));
 
-    // Apply temporary musical overrides
+    // --- Apply temporary musical overrides to bridge players ---
     var saved = new List<SavedTrackState>();
     foreach (var t in players)
     {
@@ -188,39 +223,43 @@ private IEnumerator PlayPhaseBridge(
         ns.rhythmStyle = sig.rhythmOverride;
     }
 
-    // Harmony commit timing
+    // --- Harmony commit timing ---
     bool midCommitted = false;
     if (sig.commitTiming == HarmonyCommit.AtBridgeStart) harmony?.CommitNextChordNow();
 
-    // Coral sampling cadence (approx 1/8th)
-    float  sampleStep    = loopLen / 8f;
+    // --- Coral timing (fade in/out total == bridgeSecs) ---
+    float fadeIn  = Mathf.Min(0.30f, bridgeSecs * 0.25f);
+    float fadeOut = Mathf.Min(0.30f, bridgeSecs * 0.25f);
+    float sampleStep    = loopLen / 8f;
     double nextSampleDsp = AudioSettings.dspTime + sampleStep;
 
-    // -------- try/finally (no catch!) so yields are legal --------
+    // =========================
+    // try/finally (NO yield in finally)
+    // =========================
     try
     {
-        // Bridge wait with optional mid-commit and coral echo sampling
-        while (AudioSettings.dspTime - startDsp < bridgeSecs)
-        {
-            float elapsed = (float)(AudioSettings.dspTime - startDsp);
+        if (coral != null && bridgeSnaps != null)
+            yield return StartCoroutine(FadeCoralAlpha(coral, 0.65f, fadeIn));
 
-            if (!midCommitted && sig.commitTiming == HarmonyCommit.MidBridge && elapsed >= bridgeSecs * 0.5f)
+        while (AudioSettings.dspTime < endDsp)
+        {
+            if (!midCommitted && sig.commitTiming == HarmonyCommit.MidBridge &&
+                AudioSettings.dspTime - startDsp >= bridgeSecs * 0.5f)
             {
                 harmony?.CommitNextChordNow();
                 midCommitted = true;
             }
 
+            // Lightweight coral “echo” sampling
             if (coral != null && bridgeSnaps != null && AudioSettings.dspTime >= nextSampleDsp)
             {
                 nextSampleDsp += sampleStep;
-
                 foreach (var t in players)
                 {
-                    int midi = 60; // fallback middle C
-                    int vel = Mathf.RoundToInt(Mathf.Lerp(90f, 120f, UnityEngine.Random.value));
-                    var col = t != null ? t.trackColor : nextStarColor;
-                   
-                    bridgeSnaps[0].collectedNotes.Add(new PhaseSnapshot.NoteEntry(0, midi, vel, col));
+                    int midi = 60; //try { midi = t.GetRepresentativeMidi(); } catch { }
+                    int vel  = Mathf.RoundToInt(Mathf.Lerp(90f, 120f, UnityEngine.Random.value));
+                    var col  = t != null ? t.trackColor : nextStarColor;
+                    bridgeSnaps[0].CollectedNotes.Add(new PhaseSnapshot.NoteEntry(0, midi, vel, col) { Step=0, Note=midi, Velocity=vel, TrackColor=col });
                 }
             }
 
@@ -232,15 +271,15 @@ private IEnumerator PlayPhaseBridge(
         if (coral != null && bridgeSnaps != null)
         {
             coral.GenerateCoralFromSnapshots(bridgeSnaps);
-            yield return StartCoroutine(FadeCoralAlpha(coral, 0.65f, 0.30f)); // fade in
-            yield return new WaitForSeconds(0.25f);
-            yield return StartCoroutine(FadeCoralAlpha(coral, 0.00f, 0.30f)); // fade out
+            yield return StartCoroutine(FadeCoralAlpha(coral, 0.00f, fadeOut));
             coral.gameObject.SetActive(false);
         }
     }
     finally
     {
-        // Restore original behaviors
+        // --- NON-yield cleanup & setup for new phase ---
+
+        // 1) Restore original behaviors
         foreach (var s in saved)
         {
             var ns = s.track?.GetActiveNoteSet();
@@ -249,24 +288,137 @@ private IEnumerator PlayPhaseBridge(
             ns.rhythmStyle = s.originalRhythm;
         }
 
-        // Seeds for clarity in new phase
+        // 2) Apply seed/remix/clear BEFORE regrowing the maze
         var seeds = PickSeeds(players, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
-        controller?.ApplySeedVisibility(seeds);
+        controller?.ApplyPhaseSeedOutcome(nextPhase, seeds); // no-yield
+        controller?.ApplySeedVisibility(seeds);              // no-yield
 
-        // Fade ribbons back up
-        if (noteViz && sig.fadeRibbons)
-        {
-            StartCoroutine(noteViz.FadeRibbonsTo(0.55f, 0.35f));
-        }
+        // 3) Kick a loop-aligned maze transition/build for the new phase visuals
+        StartCoroutine(GenerateMazeAndPlaceStar(nextPhase));
+        // 4) Spawn next star with watchdog so we can’t stall
+        StartCoroutine(SpawnNextStarWatchdog(nextPhase, 2f));
 
-        // Spawn next star (bridge owns the handoff)
-        progressionManager?.SpawnNextPhaseStarWithoutLoopChange();
-
-        // Unfreeze + clear accent + release flag
+        // 5) Unfreeze + clear accent + release bridge flag
         controller?.SetSpawningEnabled(true);
         if (sig.includeDrums && activeDrumTrack) activeDrumTrack.SetBridgeAccent(false);
         ghostCycleInProgress = false;
     }
+
+    // Post-finally: fade ribbons back (OK to yield here)
+    if (noteViz && sig.fadeRibbons) yield return StartCoroutine(noteViz.FadeRibbonsTo(0.55f, 0.25f));
+}
+// Clear all on-screen mined objects + current maze before coral
+private void ClearScreenForBridge()
+{
+    // 1) Despawn lingering mined objects
+    if (activeDrumTrack != null)
+        activeDrumTrack.ClearAllActiveMinedObjects();
+
+    // 2) Clear the maze immediately (or start a quick fade-out if you prefer)
+    if (activeDrumTrack != null && activeDrumTrack.hexMazeGenerator != null)
+        activeDrumTrack.hexMazeGenerator.ClearMaze();
+}
+
+// Start a loop-aligned rebuild for the next phase’s maze visuals
+public void BeginMazeTransitionForNextPhase(float loopLenSeconds)
+{
+    // If your maze generator has a timed build, call it here.
+    // Else, just rebuild now to keep order deterministic.
+    if (activeDrumTrack != null && activeDrumTrack.hexMazeGenerator != null)
+    {
+        
+    }
+}
+// GameFlowManager.cs
+private IEnumerator GenerateMazeAndPlaceStar(MusicalPhase nextPhase)
+{
+    // Resolve from DrumTrack (source of truth)
+    var drum = activeDrumTrack ?? FindObjectOfType<DrumTrack>();
+    if (drum == null)
+    {
+        Debug.LogError("[Bridge] DrumTrack is null; cannot build maze.");
+        yield break;
+    }
+
+    var gen  = drum.hexMazeGenerator;                       // may be null (fallback below)
+    var prog = drum.progressionManager ?? progressionManager;
+    if (prog == null)
+    {
+        Debug.LogError("[Bridge] progressionManager is null; cannot select spawn strategy.");
+        yield break;
+    }
+
+    // 1) Get the MusicalPhaseGroup for this phase
+    var group = prog.GetPhaseGroup(nextPhase);              // see §2 below
+    if (group == null)
+    {
+        Debug.LogError($"[Bridge] No MusicalPhaseGroup found for phase {nextPhase}.");
+        yield break;
+    }
+
+    // 2) Select a strategy using your existing API
+    var profile = prog.SelectSpawnStrategy(group);
+    if (profile == null)
+    {
+        Debug.LogError($"[Bridge] No SpawnStrategyProfile available for group {group} ({nextPhase}).");
+        yield break;
+    }
+
+    // 3) Pre-clear any lingering objects so growth isn’t occluded
+    drum.ClearAllActiveMinedObjects();
+
+    if (gen == null)
+    {
+        // No generator? Fallback to direct random-cell spawn.
+        Debug.LogWarning("[Bridge] No hexMazeGenerator; falling back to DrumTrack.SpawnPhaseStar.");
+        drum.SpawnPhaseStar(nextPhase, profile);
+        yield break;
+    }
+
+    // 4) Clear old maze, then build + place star via your robust pipeline
+    gen.ClearMaze();
+    yield return StartCoroutine(gen.GenerateMazeThenPlacePhaseStar(nextPhase, profile));
+
+    // 5) Safety: if placement failed silently, try one direct spawn attempt
+    if (!drum.isPhaseStarActive)
+    {
+        Debug.LogWarning("[Bridge] Maze built but no PhaseStar active; attempting direct DrumTrack.SpawnPhaseStar.");
+        drum.SpawnPhaseStar(nextPhase, profile);
+    }
+}
+
+
+// Spawn watchdog: guarantees a new PhaseStar or logs loudly
+private IEnumerator SpawnNextStarWatchdog(MusicalPhase phase, float timeoutSec)
+{
+    if (progressionManager == null || activeDrumTrack == null)
+        yield break;
+
+    progressionManager.SpawnNextPhaseStarWithoutLoopChange();
+
+    float t = 0f;
+    while (t < timeoutSec)
+    {
+        if (activeDrumTrack.isPhaseStarActive)
+        {
+            Debug.Log($"[Bridge] ✅ New PhaseStar active for {phase}");
+            yield break;
+        }
+        t += Time.deltaTime;
+        yield return null;
+    }
+
+    Debug.LogWarning($"[Bridge] ⚠️ PhaseStar for {phase} not active after {timeoutSec:0.00}s. Retrying.");
+    progressionManager.SpawnNextPhaseStarWithoutLoopChange();
+
+    t = 0f;
+    while (t < 1.0f)
+    {
+        if (activeDrumTrack.isPhaseStarActive) yield break;
+        t += Time.deltaTime;
+        yield return null;
+    }
+    Debug.LogError("[Bridge] ❌ PhaseStar still not active. Check DrumTrack.SpawnPhaseStar / phase group setup.");
 }
 
 private List<InstrumentTrack> PickSeeds(List<InstrumentTrack> pool, int n, MusicalRole[] preferred)
@@ -419,7 +571,6 @@ private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
             load.allowSceneActivation = false;
 
             yield return new WaitUntil(() => load.progress >= 0.9f);
-            yield return StartCoroutine(DisplayRandomQuote(sceneName));
             load.allowSceneActivation = true;
 
             yield return new WaitUntil(() => load.isDone);
@@ -430,54 +581,7 @@ private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
             handler?.Invoke();
         }
     }
-
-    private IEnumerator DisplayRandomQuote(string sceneName)
-    {
-        var quoteGO = FindByNameIncludingInactive("QuoteText");
-        var quoteText = quoteGO?.GetComponent<TextMeshProUGUI>();
-        if (quoteText != null)
-        {
-            string quote = sceneName switch
-            {
-                "TrackFinished" => "Whether you burned out or broke through—\nthe system remembers the motion.",
-                "TrackSelection" => "Choose your path wisely.",
-                "GeneratedTrack" => "The first note is yours.",
-                _ => string.Empty
-            };
-
-            quoteText.text = quote;
-            yield return StartCoroutine(FadeTextIn(quoteText));
-            yield return new WaitForSeconds(quoteDisplayDuration);
-            yield return StartCoroutine(FadeTextOut(quoteText));
-        }
-    }
-
-    private IEnumerator FadeTextIn(TextMeshProUGUI quoteText)
-    {
-        float t = 0f;
-        while (t < fadeDuration)
-        {
-            t += Time.deltaTime;
-            var color = quoteText.color;
-            color.a = Mathf.Clamp01(t / fadeDuration);
-            quoteText.color = color;
-            yield return null;
-        }
-    }
-
-    private IEnumerator FadeTextOut(TextMeshProUGUI quoteText)
-    {
-        float t = 0f;
-        while (t < fadeDuration)
-        {
-            t += Time.deltaTime;
-            var color = quoteText.color;
-            color.a = Mathf.Clamp01(1f - t / fadeDuration);
-            quoteText.color = color;
-            yield return null;
-        }
-    }
-
+    
     private IEnumerator HandleGameOverSequence()
     {
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 
@@ -506,14 +610,14 @@ private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
             visualizer.GetUIParent().gameObject.SetActive(false);
         }
 
-        if (galaxy != null && activeDrumTrack.sessionPhases != null)
+        if (galaxy != null && activeDrumTrack.SessionPhases != null)
         {
-            foreach (var snapshot in activeDrumTrack.sessionPhases)
+            foreach (var snapshot in activeDrumTrack.SessionPhases)
             {
                 galaxy.AddSnapshot(snapshot);
             }
         }
-        ConstellationMemoryStore.StoreSnapshot(activeDrumTrack.sessionPhases);
+        ConstellationMemoryStore.StoreSnapshot(activeDrumTrack.SessionPhases);
 
         yield return new WaitForSeconds(2f);
 

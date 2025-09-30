@@ -7,15 +7,13 @@ using UnityEngine;
 public class NoteSpawnerMinedObject : MonoBehaviour
 {
     public MusicalRoleProfile musicalRole;
-    private bool hasBeenTriggered = false;
 
     public InstrumentTrack assignedTrack;
     public NoteSet selectedNoteSet;
-    private bool wasCollected = false;
-    private float timeToLive = 888f; // seconds or 1 loop cycle
-    
-    void Start() {
-    }
+    private bool _wasCollected = false;
+    private float _timeToLive = 888f; // seconds or 1 loop cycle
+    private bool _hasBeenTriggered = false;
+
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
         Debug.Log($"Initializing Spawner Mined Object");
@@ -44,17 +42,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.NoteSpawner));
         }
     }
-
-    private IEnumerator AutoFadeIfUncollected() {
-        yield return new WaitForSeconds(timeToLive);
-        if (!wasCollected) {
-            // Fade out ghost
-            assignedTrack.ClearLoopedNotes(TrackClearType.Remix);
-            // Play dissolve particles or shimmer
-            Destroy(gameObject); // remove ghost
-        }
-    }
-
+    
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"NoteSpawnerMinedObject.OnCollisionEnter2D: {coll.gameObject.name}");

@@ -17,17 +17,14 @@ public class PhaseTransitionManager : MonoBehaviour
         {
             case MusicalPhase.Evolve:
             case MusicalPhase.Wildcard:
-//                ApplyDriftToTracks(1);
                 break;
 
             case MusicalPhase.Intensify:
             case MusicalPhase.Pop:
-//                ApplyRemixToAllTracks();
                 break;
 
             case MusicalPhase.Release:
             case MusicalPhase.Establish:
-                // Soft transition: no action or subtle visuals
                 break;
         }
     }
