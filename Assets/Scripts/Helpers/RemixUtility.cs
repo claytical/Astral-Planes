@@ -99,7 +99,7 @@ public class RemixUtility : ScriptableObject
         if (drums == null || profile == null) return;
 
         // Queue the phase; DrumTrack will advance at a musical boundary
-        drums.queuedPhase = profile.phase;
+        drums.QueuedPhase = profile.phase;
 
         // Restructure parts for the new phase (your existing remix logic)
         drums.RestructureTracksWithRemixLogic();

@@ -100,31 +100,28 @@ public class MineNodeProgressionManager : MonoBehaviour
 
         return Color.white;
     }
-
     public void SpawnNextPhaseStarWithoutLoopChange()
     {
         var next = PeekNextPhase();
-
-        // Update bookkeeping so the next star initializes correctly
+        Debug.Log($"Current Phase: {currentPhase}, Next Phase: {next}");
         currentPhase = next;
-        drumTrack.currentPhase = currentPhase;
+        
+        if (drumTrack != null) drumTrack.currentPhase = currentPhase;
 
-        // pick a profile/strategy the same way MoveToNextPhase does
-        var group = phaseQueue.phaseGroups.FirstOrDefault(g => g.phase == currentPhase);
-        if (group == null)
+        var group = GetPhaseGroup(currentPhase);
+        var profile = SelectSpawnStrategy(group);
+        if (profile == null) { Debug.LogError($"[Progression] No strategy for {currentPhase}"); return; }
+
+        if (drumTrack != null && drumTrack.hexMazeGenerator != null)
         {
-            Debug.LogWarning($"No phase group for {currentPhase}");
-            return;
+            // Build+place star with the proper timing instead of direct spawn:
+            drumTrack.StartCoroutine(drumTrack.hexMazeGenerator.GenerateMazeThenPlacePhaseStar(currentPhase, profile));
         }
-
-        currentPhaseIndex = phaseQueue.phaseGroups.FindIndex(g => g == group);
-
-        currentSpawnStrategy = group.allowRandomSelection
-            ? group.spawnStrategies[UnityEngine.Random.Range(0, group.spawnStrategies.Count)]
-            : group.spawnStrategies.FirstOrDefault();
-
-        // Do NOT schedule loop change here; just spawn the star
-        drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
+        else
+        {
+            // Fallback: direct spawn (previous behavior)
+            drumTrack?.SpawnPhaseStar(currentPhase, profile);
+        }
     }
 
     public void MoveToNextPhase(
@@ -255,6 +252,21 @@ public class MineNodeProgressionManager : MonoBehaviour
                 MoveToNextPhase(specificPhase: MusicalPhase.Evolve);
                 break;
         }
+    }
+    public MusicalPhaseGroup GetPhaseGroup(MusicalPhase phase)
+    {
+        if (phaseQueue == null || phaseQueue.phaseGroups == null) return null;
+        for (int i = 0; i < phaseQueue.phaseGroups.Count; i++)
+            if (phaseQueue.phaseGroups[i].phase == phase) return phaseQueue.phaseGroups[i];
+        return null;
+    }
+
+    public SpawnStrategyProfile SelectSpawnStrategy(MusicalPhaseGroup group)
+    {
+        if (group == null || group.spawnStrategies == null || group.spawnStrategies.Count == 0) return null;
+        if (group.allowRandomSelection)
+            return group.spawnStrategies[UnityEngine.Random.Range(0, group.spawnStrategies.Count)];
+        return group.spawnStrategies[0];
     }
 
     public SpawnStrategyProfile GetCurrentSpawnerStrategyProfile()

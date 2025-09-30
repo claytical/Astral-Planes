@@ -3,14 +3,22 @@ using UnityEngine;
 public class CollectableParticles : MonoBehaviour
 {
     public ParticleSystem particleSystem; // Assign in prefab
-    private ParticleSystem.MainModule main;
-    private ParticleSystem.EmissionModule emission;
-    private ParticleSystem.ShapeModule shape;
-    private ParticleSystem.ColorOverLifetimeModule colorOverLifetime;
-    private NoteTether tetherRef;
     public ParticleSystem coreParticleSystem;
+    private ParticleSystem.MainModule _main;
+    private ParticleSystem.EmissionModule _emission;
+    private ParticleSystem.ShapeModule _shape;
+    private ParticleSystem.ColorOverLifetimeModule _colorOverLifetime;
+    private NoteTether _tetherRef;
     [SerializeField] private float pullStrength = 0.7f;  // force toward tether
     [SerializeField] private float baseUpSpeed  = 0.35f; // fountain upward component
+    public void EmitZap()
+    {
+        if (particleSystem == null) return;
+
+        var burst = new ParticleSystem.Burst(0f, 8); // 8 sparks immediately
+        _emission.SetBursts(new[] { burst });
+        particleSystem.Play();
+    }
 
     void Awake()
     {
@@ -19,140 +27,36 @@ public class CollectableParticles : MonoBehaviour
 
         if (particleSystem != null)
         {
-            main = particleSystem.main;
-            emission = particleSystem.emission;
-            shape = particleSystem.shape;
-            colorOverLifetime = particleSystem.colorOverLifetime;
+            _main = particleSystem.main;
+            _emission = particleSystem.emission;
+            _shape = particleSystem.shape;
+            _colorOverLifetime = particleSystem.colorOverLifetime;
         }
 
     }
-    public void EmitZap()
+    void LateUpdate()
     {
-        if (particleSystem == null) return;
+        if (!particleSystem) return;
 
-        var burst = new ParticleSystem.Burst(0f, 8); // 8 sparks immediately
-        emission.SetBursts(new[] { burst });
-        particleSystem.Play();
-    }
-    public void SetEmissionActive(bool isActive)
-    {
-        if (particleSystem == null) return;
-
-        if (isActive)
+        // Pull everything slightly toward the tether endpoint (if present)
+        var fol = particleSystem.forceOverLifetime;
+        if (_tetherRef && _tetherRef.end)  // attraction target = marker end
         {
-            emission.rateOverTime = 10f; // or whatever suits your looped look
-            if (!particleSystem.isPlaying)
-                particleSystem.Play();
+            Vector3 dir = (_tetherRef.end.position - transform.position).normalized;
+            fol.enabled = true;
+            fol.space   = ParticleSystemSimulationSpace.World;
+
+            // apply a constant directional force (small!)
+            fol.x = new ParticleSystem.MinMaxCurve(dir.x * pullStrength);
+            fol.y = new ParticleSystem.MinMaxCurve(dir.y * pullStrength);
+            fol.z = new ParticleSystem.MinMaxCurve(dir.z * pullStrength);
         }
         else
         {
-            emission.rateOverTime = 0f;
-            // This combination forces emission to halt while allowing particles to fade naturally
-            particleSystem.Stop(withChildren: false, ParticleSystemStopBehavior.StopEmitting);
+            fol.enabled = false; // no tether yet: pure fountain
         }
     }
-    public void SetGravityForBeat(bool isOnBeat)
-    {
-        if (particleSystem == null) return;
-
-        var main = particleSystem.main;
-        main.gravityModifier = isOnBeat ? 0f : 2.5f; // tweak the gravity value to taste
-    }
-
-    public void Configure(NoteSet noteSet) {
-    if (particleSystem == null || noteSet == null) return;
-    // 🟣 Color tint — use track color with soft gradient
-    Gradient gradient = new Gradient();
-    Color baseColor = noteSet.assignedInstrumentTrack.trackColor;
-    Debug.Log($"[Particles] Playing at {transform.position}, color: {baseColor}");
-    baseColor.a = 1f;
-    gradient.SetKeys(
-        new[] {
-            new GradientColorKey(baseColor, 0f),
-            new GradientColorKey(baseColor * 0.9f, 1f)
-        },
-        new[] {
-            new GradientAlphaKey(0f, 0f),
-            new GradientAlphaKey(0.8f, 0.2f),
-            new GradientAlphaKey(0.7f, 0.8f),
-            new GradientAlphaKey(0f, 1f)
-        }
-    );
-    colorOverLifetime.enabled = true;
-    colorOverLifetime.color = gradient;
-
-    // 💫 RhythmStyle → emission density (musical "breath")
-    emission.rateOverTime = noteSet.rhythmStyle switch
-    {
-        RhythmStyle.FourOnTheFloor => 6f,
-        RhythmStyle.Dense => 14f,
-        RhythmStyle.Sparse => 3f,
-        RhythmStyle.Swing => 5f,
-        RhythmStyle.Syncopated => 7f,
-        _ => 4f
-    };
-
-    // 🔊 NoteBehavior → motion shape and energy
-    shape.shapeType = ParticleSystemShapeType.Cone;
-    shape.radius = 0.1f;
-
-    float speed = 0.5f;
-    float angle = 15f;
-
-    switch (noteSet.noteBehavior)
-    {
-        case NoteBehavior.Bass:
-            angle = 5f;
-            speed = 0.2f;
-            shape.shapeType = ParticleSystemShapeType.Circle;
-            shape.radius = 0.05f; // tighter radius
-            break;
-        case NoteBehavior.Drone:
-            speed = 0.05f;
-            shape.shapeType = ParticleSystemShapeType.Circle;
-            shape.radius = 0.1f; // looser but still limited
-            break;
-        case NoteBehavior.Lead:
-            angle = 60f;
-            speed = 1.2f;
-            shape.radius = 0.05f;
-            break;
-        case NoteBehavior.Harmony:
-            shape.shapeType = ParticleSystemShapeType.Donut;
-            shape.radius = 0.07f;
-            break;
-        case NoteBehavior.Percussion:
-            angle = 90f;
-            speed = 2f;
-            shape.radius = 0.05f;
-            break;
-        default:
-            shape.radius = 0.1f;
-            break;
-    }
-
-
-    shape.angle = angle;
-    main.startSpeed = speed;
-    main.startLifetime = 1.2f;
-    main.startSize = new ParticleSystem.MinMaxCurve(0.1f, 0.3f);
-    main.startRotation = new ParticleSystem.MinMaxCurve(0, 360 * Mathf.Deg2Rad);
-    main.simulationSpace = ParticleSystemSimulationSpace.Local;
-
-    // 🫧 Soft breathing burst
-    var sizeOverLifetime = particleSystem.sizeOverLifetime;
-    sizeOverLifetime.enabled = true;
-    AnimationCurve growShrink = new AnimationCurve(
-        new Keyframe(0f, 0f),
-        new Keyframe(0.2f, 1f),
-        new Keyframe(0.8f, 0.8f),
-        new Keyframe(1f, 0f)
-    );
-    sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, growShrink);
-
-    particleSystem.Play();
-}
-public void ConfigureByDuration(NoteSet noteSet, int durationTicks, InstrumentTrack track)
+    public void ConfigureByDuration(NoteSet noteSet, int durationTicks, InstrumentTrack track)
 {
     if (!particleSystem || noteSet == null || track == null) return;
 
@@ -253,63 +157,64 @@ public void ConfigureByDuration(NoteSet noteSet, int durationTicks, InstrumentTr
         particleSystem.Play();
     }
 }
-public void RegisterTether(NoteTether tether, float pull = 0.7f)
+    public void RegisterTether(NoteTether tether, float pull = 0.7f)
 {
-    tetherRef = tether;
+    _tetherRef = tether;
     pullStrength = pull;
 }
-
-void LateUpdate()
-{
-    if (!particleSystem) return;
-
-    // Pull everything slightly toward the tether endpoint (if present)
-    var fol = particleSystem.forceOverLifetime;
-    if (tetherRef && tetherRef.end)  // attraction target = marker end
+    public void SetDripDirection(Vector3 worldDir, float baseSpeed, float gravity = 0f)
     {
-        Vector3 dir = (tetherRef.end.position - transform.position).normalized;
-        fol.enabled = true;
-        fol.space   = ParticleSystemSimulationSpace.World;
+        if (!particleSystem) return;
 
-        // apply a constant directional force (small!)
-        fol.x = new ParticleSystem.MinMaxCurve(dir.x * pullStrength);
-        fol.y = new ParticleSystem.MinMaxCurve(dir.y * pullStrength);
-        fol.z = new ParticleSystem.MinMaxCurve(dir.z * pullStrength);
+        worldDir = worldDir.sqrMagnitude < 1e-6f ? Vector3.down : worldDir.normalized;
+
+        var main = particleSystem.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = gravity;
+
+        var vel = particleSystem.velocityOverLifetime;
+        vel.enabled = true;
+
+        // push along line, then ease out
+        vel.x = new ParticleSystem.MinMaxCurve(worldDir.x);
+        vel.y = new ParticleSystem.MinMaxCurve(worldDir.y);
+        vel.z = new ParticleSystem.MinMaxCurve(worldDir.z);
+
+        var speed = new AnimationCurve(
+            new Keyframe(0f, baseSpeed * 1.0f),
+            new Keyframe(0.25f, baseSpeed * 0.8f),
+            new Keyframe(1f, baseSpeed * 0.2f)
+        );
+        vel.speedModifier = new ParticleSystem.MinMaxCurve(1f, speed);
+
+        var limit = particleSystem.limitVelocityOverLifetime;
+        limit.enabled = true;
+        limit.dampen  = 0.6f; // keeps them hugging the line
     }
-    else
+
+    public void SetEmissionActive(bool isActive)
     {
-        fol.enabled = false; // no tether yet: pure fountain
+        if (particleSystem == null) return;
+
+        if (isActive)
+        {
+            _emission.rateOverTime = 10f; // or whatever suits your looped look
+            if (!particleSystem.isPlaying)
+                particleSystem.Play();
+        }
+        else
+        {
+            _emission.rateOverTime = 0f;
+            // This combination forces emission to halt while allowing particles to fade naturally
+            particleSystem.Stop(withChildren: false, ParticleSystemStopBehavior.StopEmitting);
+        }
     }
-}
+    public void SetGravityForBeat(bool isOnBeat)
+    {
+        if (particleSystem == null) return;
 
-public void SetDripDirection(Vector3 worldDir, float baseSpeed, float gravity = 0f)
-{
-    if (!particleSystem) return;
-
-    worldDir = worldDir.sqrMagnitude < 1e-6f ? Vector3.down : worldDir.normalized;
-
-    var main = particleSystem.main;
-    main.simulationSpace = ParticleSystemSimulationSpace.World;
-    main.gravityModifier = gravity;
-
-    var vel = particleSystem.velocityOverLifetime;
-    vel.enabled = true;
-
-    // push along line, then ease out
-    vel.x = new ParticleSystem.MinMaxCurve(worldDir.x);
-    vel.y = new ParticleSystem.MinMaxCurve(worldDir.y);
-    vel.z = new ParticleSystem.MinMaxCurve(worldDir.z);
-
-    var speed = new AnimationCurve(
-        new Keyframe(0f, baseSpeed * 1.0f),
-        new Keyframe(0.25f, baseSpeed * 0.8f),
-        new Keyframe(1f, baseSpeed * 0.2f)
-    );
-    vel.speedModifier = new ParticleSystem.MinMaxCurve(1f, speed);
-
-    var limit = particleSystem.limitVelocityOverLifetime;
-    limit.enabled = true;
-    limit.dampen  = 0.6f; // keeps them hugging the line
-}
+        var main = particleSystem.main;
+        main.gravityModifier = isOnBeat ? 0f : 2.5f; // tweak the gravity value to taste
+    }
 
 }

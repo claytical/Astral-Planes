@@ -28,7 +28,7 @@ public class GalaxyVisualizer : MonoBehaviour
         var starRenderer = star.GetComponentInChildren<SpriteRenderer>();
         if (starRenderer != null)
         {
-            Color c = snapshot.color;
+            Color c = snapshot.Color;
             c.a = 0.5f;
             starRenderer.color = c;
         }
@@ -38,24 +38,24 @@ public class GalaxyVisualizer : MonoBehaviour
         int minNote = 36;
         int maxNote = 84;
 
-        for (int i = 0; i < snapshot.collectedNotes.Count; i++)
+        for (int i = 0; i < snapshot.CollectedNotes.Count; i++)
         {
-            var note = snapshot.collectedNotes[i];
+            var note = snapshot.CollectedNotes[i];
 
-            float normalizedStep = Mathf.InverseLerp(0, totalSteps, note.step);
-            float normalizedPitch = Mathf.InverseLerp(minNote, maxNote, note.note);
+            float normalizedStep = Mathf.InverseLerp(0, totalSteps, note.Step);
+            float normalizedPitch = Mathf.InverseLerp(minNote, maxNote, note.Note);
 
             float orbitRadius = (i + 1) * orbitRadiusStep * clusterScale;
             float speed = baseOrbitSpeed * 0.5f * (0.5f + normalizedPitch); // Higher pitch → faster orbit
 
             GameObject planet = Instantiate(planetPrefab, systemCenter, Quaternion.identity, transform);
-            planet.transform.localScale = Vector3.one * Mathf.Lerp(0.1f, 0.3f, note.velocity / 127f); // Scale by velocity
+            planet.transform.localScale = Vector3.one * Mathf.Lerp(0.1f, 0.3f, note.Velocity / 127f); // Scale by velocity
 
             // Planet color = track color
             var r = planet.GetComponentInChildren<SpriteRenderer>();
             if (r != null)
             {
-                Color pc = note.trackColor;
+                Color pc = note.TrackColor;
                 pc.a = 0.3f;
                 r.color = pc;
             }

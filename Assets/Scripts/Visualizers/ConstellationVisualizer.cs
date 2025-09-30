@@ -27,14 +27,14 @@ public class ConstellationVisualizer : MonoBehaviour
         {
             PhaseSnapshot phase = phases[i];
 
-            int starCount = Mathf.Max(1, phase.collectedNotes.Count);
+            int starCount = Mathf.Max(1, phase.CollectedNotes.Count);
             float angleStep = 360f / starCount;
 
             for (int j = 0; j < starCount; j++)
             {
                 float radius = (baseRadius + (i * ringSpacing)) * scaleFactor;
 
-                var note = phase.collectedNotes[j];
+                var note = phase.CollectedNotes[j];
 
                 float angle = angleOffset + j * angleStep;
                 
@@ -42,7 +42,7 @@ public class ConstellationVisualizer : MonoBehaviour
 
                 GameObject star = Instantiate(starPrefab, pos, Quaternion.identity, transform);
 
-                float size = Mathf.Lerp(0.4f, 1f, Mathf.InverseLerp(60f, 127f, note.velocity));
+                float size = Mathf.Lerp(0.4f, 1f, Mathf.InverseLerp(60f, 127f, note.Velocity));
                 star.transform.localScale = Vector3.one * Mathf.Max(size, 0.2f);
 
                 var sr = star.GetComponent<SpriteRenderer>();

@@ -7141,18 +7141,10 @@ MonoBehaviour:
     type: 2}
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
     type: 2}
-  starProgressUI: {fileID: 2057904930}
   drumLoopBPM: 120
   gridPadding: 1
   galaxyVisualizer: {fileID: 1041262113}
   collectionMode: 0
-  patternVisuals:
-  - {fileID: 11400000, guid: 386206b565e804180ad46cae7498e8a9, type: 2}
-  - {fileID: 11400000, guid: 1758281faaf56489c9501e5ddd20dc93, type: 2}
-  - {fileID: 11400000, guid: 14416cc353ea047d795ee1b2eee0ecb3, type: 2}
-  - {fileID: 11400000, guid: 30c3680fb57584ccaabd5962405eef7e, type: 2}
-  - {fileID: 11400000, guid: 9e9cdea4f7b364dc1893d720a9e9fe10, type: 2}
-  - {fileID: 11400000, guid: 52bbbbd6ed52640fcb3ab3ea4fa5fd33, type: 2}
   totalSteps: 16
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
@@ -7331,7 +7323,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 36dd79ade9e1040efa29d9ec25d71669, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentSetIndex: 0
   requiredNotesPerTrack: 6
   minimumLoopCount: 0
   requireLoopCount: 0
@@ -7345,7 +7336,6 @@ MonoBehaviour:
   totalMinedObjectsCollected: 0
   loopsCompleted: 0
   phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
-  phaseLocked: 0
   isPhaseInProgress: 0
   isPhaseTransitioning: 0
   pendingNextPhase: 0
@@ -9171,7 +9161,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2057904928
 RectTransform:
   m_ObjectHideFlags: 0
