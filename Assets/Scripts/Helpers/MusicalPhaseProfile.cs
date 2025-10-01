@@ -1,25 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
-[System.Serializable]
+[Serializable]
 public class PhaseRoleStrategy
 {
     public MusicalRole role;
     public List<PatternStrategy> ghostStrategies;
 }
-[System.Serializable]
-public class RoleNoteSetSeries
-{
-    public MusicalRole role;
-}
 
-[System.Serializable]
-public class RoleGhostStrategy
-{
-    public MusicalRole role;
-    public PatternStrategy strategy;
-}
+[Serializable]
+
 public class RoleStrategy
 {
     public MusicalRole role;
@@ -31,19 +21,14 @@ public class MusicalPhaseProfile : ScriptableObject
 {
     public MusicalPhase phase;
     
-    [Header("Note Set Series Per Role")]
-    public List<RoleNoteSetSeries> roleNoteSetSeriesList = new();
-    
     [Header("Audio")]
     public AudioClip[] drumClips;
     
     [Header("Track Utility")]
     public TrackUtilityStrategy defaultRemixStrategy;
-    public List<RemixRoleStrategy> remixRoleOverrides = new List<RemixRoleStrategy>();
-    
+
     [Header("Labels")]
     public string shortLabel;
-    [TextArea] public string moodDescription;
     [SerializeField]
     private List<RoleStrategy> roleStrategies = new List<RoleStrategy>();
 
@@ -58,8 +43,7 @@ public class MusicalPhaseProfile : ScriptableObject
 
         return PatternStrategy.Arpeggiated; // Default fallback
     }
-
-
+    
 }
 [Serializable]
 public class BridgeSignature {
@@ -95,7 +79,7 @@ public class BridgeSignature {
     public bool growCoral = true;                // pipe bridge notes to CoralVisualizer
 }
 
-[System.Serializable]
+[Serializable]
 public class RemixRoleStrategy
 {
     public MusicalRole role;

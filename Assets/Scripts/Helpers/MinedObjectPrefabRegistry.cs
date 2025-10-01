@@ -7,9 +7,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "MinedObjectPrefabRegistry", menuName = "Astral Planes/Mined Object Prefab Registry")]
 public class MinedObjectPrefabRegistry : ScriptableObject
 {
-
     [SerializeField] private List<Entry> entries = new();
-
     private Dictionary<(MinedObjectType, TrackModifierType), GameObject> map;
 
     private void OnEnable()

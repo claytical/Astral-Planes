@@ -5,29 +5,27 @@ public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
     public int gridHeight = 12;
-    public GridCell[,] gridCells;
+    public GridCell[,] GridCells;
     public float cellSize = 1f; // Adjust to match the world space size
 
     
     private void Awake()
     {
-        if (gridCells == null || gridCells.Length == 0)
+        if (GridCells == null || GridCells.Length == 0)
         {
             InitializeGrid();
         }
     }
-    
-
 
     private void InitializeGrid()
     {
-        gridCells = new GridCell[gridWidth, gridHeight];
+        GridCells = new GridCell[gridWidth, gridHeight];
 
         for (int x = 0; x < gridWidth; x++)
         {
             for (int y = 0; y < gridHeight; y++)
             {
-                gridCells[x, y] = new GridCell(); // ✅ Ensure every cell is initialized
+                GridCells[x, y] = new GridCell(); // ✅ Ensure every cell is initialized
             }
         }
     }
@@ -48,13 +46,13 @@ public class SpawnGrid : MonoBehaviour
         }
 
         // Draw occupied cells
-        if (gridCells != null)
+        if (GridCells != null)
         {
             for (int x = 0; x < gridWidth; x++)
             {
                 for (int y = 0; y < gridHeight; y++)
                 {
-                    if (gridCells[x, y].isOccupied)
+                    if (GridCells[x, y].IsOccupied)
                     {
                         Gizmos.color = Color.red; // Highlight occupied cells
                         Vector3 cellCenter = new Vector3(x * cellSize - (gridWidth * cellSize / 2) + cellSize / 2,
@@ -73,7 +71,7 @@ public class SpawnGrid : MonoBehaviour
             string row = "";
             for (int x = 0; x < gridWidth; x++)
             {
-                if (gridCells[x, y].isOccupied)
+                if (GridCells[x, y].IsOccupied)
                 {
                     row += "[X] "; // Mark occupied cells
                 }
@@ -86,99 +84,6 @@ public class SpawnGrid : MonoBehaviour
         }
         Debug.Log("---- End of Grid Debug ----");
     }
-
-    public bool IsCellAvailable(int x, int y)
-    {
-        if (gridCells == null)
-        {
-            Debug.LogError("SpawnGrid: GridCell is Null!");
-            return false;
-        }
-        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
-        {
-//            Debug.Log($"Cell check out of bounds: {x}, {y}");
-            return false;
-        }
-
-        if (gridCells[x, y] == null)
-        {
-  //          Debug.Log($"Cell {x}, {y} is null.");
-            return false;
-        }
-
-        return !gridCells[x, y].isOccupied; // ✅ Correctly check occupancy
-    }
-
-
-    public void OccupyCell(int x, int y, GridObjectType type)
-    {
-        // ✅ Ensure indices are within grid boundaries
-        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
-        {
-            Debug.LogError($"OccupyCell: Attempted to occupy cell out of bounds! (x:{x}, y:{y}), Grid Size: {gridWidth}x{gridHeight}");
-            return;
-        }
-
-        if (gridCells[x, y] == null)
-        {
-            Debug.LogError($"OccupyCell: gridCells[{x}, {y}] is NULL!");
-            return;
-        }
-
-        gridCells[x, y].isOccupied = true;
-        gridCells[x, y].objectType = type;
-    }
-
-    public void FreeCell(int x, int y)
-    {
-        // Ensure the coordinates are within valid bounds
-        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
-        {
-            Debug.LogWarning($"Trying to free a cell out of bounds: {x}, {y}");
-            return;
-        }
-
-        if (gridCells[x, y] == null)
-        {
-            Debug.LogWarning($"Trying to free a null cell at: {x}, {y}");
-            return;
-        }
-
-        // Mark the cell as available
-        gridCells[x, y].isOccupied = false;
-        gridCells[x, y].objectType = GridObjectType.Empty;
-
-    //    Debug.Log($"Cell {x}, {y} successfully freed.");
-    }
-    public void ClearAll()
-    {
-        for (int x = 0; x < gridWidth; x++)
-        {
-            for (int y = 0; y < gridHeight; y++)
-            {
-                gridCells[x, y].isOccupied = false;
-                gridCells[x, y].objectType = GridObjectType.Empty;
-
-                // Optionally reset other cell state like visual effects, colors, or behavior
-                ResetCellBehavior(x, y); // Call this if you already use it elsewhere
-            }
-        }
-
-        Debug.Log("[SpawnGrid] Grid cleared.");
-    }
-
-    public void ResetCellBehavior(int x, int y)
-    {
-        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
-        {
-            Debug.LogError($"ResetCellBehavior: Out of bounds ({x}, {y})");
-            return;
-        }
-        gridCells[x, y].objectType = GridObjectType.Empty;
-        gridCells[x, y].isOccupied = false;
-    }
-
-    
     public Vector2Int GetRandomAvailableCell()
     {
         List<Vector2Int> availableCells = new List<Vector2Int>();
@@ -187,7 +92,7 @@ public class SpawnGrid : MonoBehaviour
         {
             for (int y = 0; y < gridHeight; y++)
             {
-                if (!gridCells[x, y].isOccupied)
+                if (!GridCells[x, y].IsOccupied)
                 {
                     availableCells.Add(new Vector2Int(x, y));
                 }
@@ -201,17 +106,100 @@ public class SpawnGrid : MonoBehaviour
 
         return availableCells[Random.Range(0, availableCells.Count)];
     }
-    
+    public bool IsCellAvailable(int x, int y)
+    {
+        if (GridCells == null)
+        {
+            Debug.LogError("SpawnGrid: GridCell is Null!");
+            return false;
+        }
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+//            Debug.Log($"Cell check out of bounds: {x}, {y}");
+            return false;
+        }
+
+        if (GridCells[x, y] == null)
+        {
+  //          Debug.Log($"Cell {x}, {y} is null.");
+            return false;
+        }
+
+        return !GridCells[x, y].IsOccupied; // ✅ Correctly check occupancy
+    }
+    public void OccupyCell(int x, int y, GridObjectType type)
+    {
+        // ✅ Ensure indices are within grid boundaries
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+            Debug.LogError($"OccupyCell: Attempted to occupy cell out of bounds! (x:{x}, y:{y}), Grid Size: {gridWidth}x{gridHeight}");
+            return;
+        }
+
+        if (GridCells[x, y] == null)
+        {
+            Debug.LogError($"OccupyCell: gridCells[{x}, {y}] is NULL!");
+            return;
+        }
+
+        GridCells[x, y].IsOccupied = true;
+        GridCells[x, y].ObjectType = type;
+    }
+    public void FreeCell(int x, int y)
+    {
+        // Ensure the coordinates are within valid bounds
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+            Debug.LogWarning($"Trying to free a cell out of bounds: {x}, {y}");
+            return;
+        }
+
+        if (GridCells[x, y] == null)
+        {
+            Debug.LogWarning($"Trying to free a null cell at: {x}, {y}");
+            return;
+        }
+
+        // Mark the cell as available
+        GridCells[x, y].IsOccupied = false;
+        GridCells[x, y].ObjectType = GridObjectType.Empty;
+
+    //    Debug.Log($"Cell {x}, {y} successfully freed.");
+    } 
+    public void ResetCellBehavior(int x, int y)
+    {
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
+        {
+            Debug.LogError($"ResetCellBehavior: Out of bounds ({x}, {y})");
+            return;
+        }
+        GridCells[x, y].ObjectType = GridObjectType.Empty;
+        GridCells[x, y].IsOccupied = false;
+    }    public void ClearAll()
+    {
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                GridCells[x, y].IsOccupied = false;
+                GridCells[x, y].ObjectType = GridObjectType.Empty;
+
+                // Optionally reset other cell state like visual effects, colors, or behavior
+                ResetCellBehavior(x, y); // Call this if you already use it elsewhere
+            }
+        }
+
+        Debug.Log("[SpawnGrid] Grid cleared.");
+    }
+
 }
 
-    public class GridCell
-{
-    public bool isOccupied;
-    public GridObjectType objectType = GridObjectType.Empty;
+public class GridCell {
+    public bool IsOccupied;
+    public GridObjectType ObjectType = GridObjectType.Empty;
 }
 
-    public enum GridObjectType
-{
+public enum GridObjectType {
     Note,
     Node,
     Empty,

@@ -9,8 +9,8 @@ public class NoteVisualizer : MonoBehaviour
     public RectTransform playheadLine;
     public DrumTrack drums;
     public InstrumentTrackController tracks;
-    private Dictionary<InstrumentTrack, float> waveAmplitudes = new();
-    private Dictionary<InstrumentTrack, HashSet<int>> ghostNoteSteps = new();
+    private Dictionary<InstrumentTrack, float> _waveAmplitudes = new();
+    private Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
 
     public ParticleSystem playheadParticles;
 
@@ -21,24 +21,23 @@ public class NoteVisualizer : MonoBehaviour
     private List<LineRenderer> ribbons = new List<LineRenderer>();
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
-
-
     [Header("Ribbon Animation")]
     public float waveSpeed = 2f;
     public float velocityMultiplier = 0.2f;
-
     public List<RectTransform> trackRows;
-    private Canvas worldSpaceCanvas;
-    private Transform uiParent;
-    private Dictionary<InstrumentTrack, Dictionary<int, Vector3>> trackStepWorldPositions = new();
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
-    private Dictionary<InstrumentTrack, float> ribbonWidths = new();
-    private Dictionary<InstrumentTrack, float> ribbonIntensities = new();
-    private Vehicle energyTransferVehicle;
+
+    private Canvas _worldSpaceCanvas;
+    private Transform _uiParent;
+    private Dictionary<InstrumentTrack, Dictionary<int, Vector3>> _trackStepWorldPositions = new();
+    private Dictionary<InstrumentTrack, float> _ribbonWidths = new();
+    private Dictionary<InstrumentTrack, float> _ribbonIntensities = new();
+    private Vehicle _energyTransferVehicle;
+
     private void Start()
     {
-        uiParent = transform.parent;
-        worldSpaceCanvas = uiParent.GetComponentInParent<Canvas>();
+        _uiParent = transform.parent;
+        _worldSpaceCanvas = _uiParent.GetComponentInParent<Canvas>();
         foreach (RectTransform row in trackRows) {
             GameObject ribbonGO = new GameObject("TrackRibbon");
             ribbonGO.transform.SetParent(row, false);
@@ -58,7 +57,7 @@ public class NoteVisualizer : MonoBehaviour
         }
         foreach (InstrumentTrack track in tracks.tracks)
         {
-            waveAmplitudes[track] = 0; // Initial wavy state
+            _waveAmplitudes[track] = 0; // Initial wavy state
         }
         foreach (var row in trackRows)
         {
@@ -68,23 +67,7 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
     }
-
-
-    public float GetTopWorldY()
-    {
-        RectTransform rt = GetComponent<RectTransform>();
-        Vector3[] worldCorners = new Vector3[4];
-        rt.GetWorldCorners(worldCorners);
-        return worldCorners[1].y; // Top-left corner
-    }
-
-    public Transform GetUIParent()
-    {
-        return uiParent;
-    }
-
-  void Update()
-{
+    void Update() {
     if (playheadLine == null || drums == null || tracks == null)
         return;
 
@@ -112,7 +95,7 @@ public class NoteVisualizer : MonoBehaviour
     {
         float v = track.GetVelocityAtStep(currentStep);
         maxVelocity = Mathf.Max(maxVelocity, v / 127f);
-        if (ghostNoteSteps.TryGetValue(track, out var steps) && steps.Contains(currentStep))
+        if (_ghostNoteSteps.TryGetValue(track, out var steps) && steps.Contains(currentStep))
         {
             shimmer = true; break;
         }
@@ -152,7 +135,7 @@ public class NoteVisualizer : MonoBehaviour
         float xRight  = rowRect.xMax;
         float yMid    = (rowRect.yMin + rowRect.yMax) * 0.5f;
 
-        float amplitude = waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
+        float amplitude = _waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
 
         // local-space positions for the LR
         int res = Mathf.Max(2, ribbonResolution);
@@ -191,16 +174,16 @@ public class NoteVisualizer : MonoBehaviour
         float minWidth = 1f, maxWidth = 3f;
         float targetWidth = Mathf.Lerp(minWidth, maxWidth, densityT);
         lr.widthMultiplier = targetWidth;
-        ribbonWidths[track] = targetWidth;
+        _ribbonWidths[track] = targetWidth;
 
         Color baseColor = track.trackColor;
         float vibrancy  = Mathf.Lerp(0.5f, 1f, densityT);
         Color scaled    = baseColor * vibrancy; scaled.a = Mathf.Lerp(0.1f, 0.65f, densityT);
         lr.startColor = lr.endColor = scaled;
-        ribbonIntensities[track] = vibrancy;
+        _ribbonIntensities[track] = vibrancy;
 
         // publish step map
-        trackStepWorldPositions[track] = stepMap;
+        _trackStepWorldPositions[track] = stepMap;
     }
 
     // keep marker sync + vine anim
@@ -208,6 +191,7 @@ public class NoteVisualizer : MonoBehaviour
 
     float windowSeconds = stepDuration * 2f;
     float dElapsed      = drumElapsed;
+    /*
     foreach (var track in tracks.tracks)
     {
         foreach (var go in track.spawnedCollectables)
@@ -217,8 +201,22 @@ public class NoteVisualizer : MonoBehaviour
             vine.AnimateToNextStep(dElapsed, stepDuration, windowSeconds);
         }
     }
+    */
 }
-public Transform EnsureMarker(InstrumentTrack track, int step) {
+
+    public float GetTopWorldY()
+    {
+        RectTransform rt = GetComponent<RectTransform>();
+        Vector3[] worldCorners = new Vector3[4];
+        rt.GetWorldCorners(worldCorners);
+        return worldCorners[1].y; // Top-left corner
+    }
+    public Transform GetUIParent()
+    {
+        return _uiParent;
+    }
+    
+    public Transform EnsureMarker(InstrumentTrack track, int step) {
     var key = (track, step);
     if (noteMarkers.TryGetValue(key, out var t) && t && t.gameObject) return t;
     noteMarkers.Remove(key); // purge stale
@@ -226,10 +224,9 @@ public Transform EnsureMarker(InstrumentTrack track, int step) {
     return go ? go.transform : null;
 }
 
-    public List<Vector3> GetRibbonWorldPositionsForSteps(InstrumentTrack track, List<int> steps)
-{
+    public List<Vector3> GetRibbonWorldPositionsForSteps(InstrumentTrack track, List<int> steps) {
     var result = new List<Vector3>();
-    if (trackStepWorldPositions.TryGetValue(track, out var stepMap))
+    if (_trackStepWorldPositions.TryGetValue(track, out var stepMap))
     {
         foreach (int step in steps)
         {
@@ -239,7 +236,6 @@ public Transform EnsureMarker(InstrumentTrack track, int step) {
     }
     return result;
 }
-// NoteVisualizer.cs
     public Vector3 ComputeRibbonWorldPosition(InstrumentTrack track, int stepIndex)
     {
         int trackIndex = System.Array.IndexOf(tracks.tracks, track);
@@ -258,18 +254,6 @@ public Transform EnsureMarker(InstrumentTrack track, int step) {
         return row.TransformPoint(localPos);
     }
 
-public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
-{
-    if (noteMarkers.TryGetValue((track, stepIndex), out var markerTransform))
-    {
-        return markerTransform.position;
-    }
-
-    // fallback
-    return ComputeRibbonWorldPosition(track, stepIndex);
-}
-
-// NoteVisualizer.cs
     public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex)
     {
         var key = (track, stepIndex);
@@ -322,7 +306,7 @@ public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
 
             if (marker == null) { deadKeys.Add(kvp.Key); continue; }
 
-            if (!trackStepWorldPositions.TryGetValue(track, out var map))
+            if (!_trackStepWorldPositions.TryGetValue(track, out var map))
                 continue;
 
             int trackIndex = Array.IndexOf(tracks.tracks, track);
@@ -345,41 +329,49 @@ public Vector3 GetNoteMarkerPosition(InstrumentTrack track, int stepIndex)
         foreach (var key in deadKeys)
             noteMarkers.Remove(key);
     }
-
-public float GetWaveAmplitude(InstrumentTrack track)
+    public float GetWaveAmplitude(InstrumentTrack track)
 {
-    if (waveAmplitudes.TryGetValue(track, out var amplitude))
+    if (_waveAmplitudes.TryGetValue(track, out var amplitude))
         return amplitude;
 
     return 0f;
 }
-
-public void SetWaveAmplitudeForTrack(InstrumentTrack track, float amplitude)
+    public void SetWaveAmplitudeForTrack(InstrumentTrack track, float amplitude)
 {
-    if (waveAmplitudes.ContainsKey(track))
+    if (_waveAmplitudes.ContainsKey(track))
     {
-        waveAmplitudes[track] = amplitude;
+        _waveAmplitudes[track] = amplitude;
     }
 }
-public void SetWaveSpeed(float speed)
+    public void SetWaveSpeed(float speed)
 {
     waveSpeed = Mathf.Clamp(speed, 2f, 32f);
 }
-public void ResetWaves()
-{
-    foreach (var track in tracks.tracks)
-        waveAmplitudes[track] = 0f;
-        waveSpeed = 2f;
-}
+    private List<GameObject> GetNoteMarkers(InstrumentTrack track)
+    {
+        var result = new List<GameObject>();
+        foreach (var kvp in noteMarkers)
+        {
+            if (kvp.Key.Item1 != track) continue;
+            var transform = kvp.Value;
+            if (transform == null) continue;
 
-public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
+            var go = transform.gameObject;
+            if (go != null)
+            {
+                result.Add(go);
+            }
+        }
+        return result;
+    }
+    public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
 {
     foreach (var marker in GetNoteMarkers(track))
     {
         StartCoroutine(RushToVehicle(marker, marker.transform.position, v));
     }
 }
-public void TriggerNoteBlastOff(InstrumentTrack track)
+    public void TriggerNoteBlastOff(InstrumentTrack track)
 {
     // 1) Capture all live marker GOs for this track BEFORE purging keys
     var gos = GetNoteMarkers(track); // uses noteMarkers; OK while keys still present
@@ -397,8 +389,7 @@ public void TriggerNoteBlastOff(InstrumentTrack track)
     // 4) Safety: also nuke any stray row children that match the prefab type
     DestroyOrphanRowMarkers(track);
 }
-// NoteVisualizer.cs
-public IEnumerator FadeRibbonsTo(float targetAlpha, float seconds)
+    public IEnumerator FadeRibbonsTo(float targetAlpha, float seconds)
 {
     float t = 0f;
     // capture current alphas once
@@ -419,14 +410,7 @@ public IEnumerator FadeRibbonsTo(float targetAlpha, float seconds)
         yield return null;
     }
 }
-
-public void SetUIVisible(bool visible)
-{
-    var parent = GetUIParent();
-    if (parent) parent.gameObject.SetActive(visible);
-}
-
-private void DestroyOrphanRowMarkers(InstrumentTrack track)
+    private void DestroyOrphanRowMarkers(InstrumentTrack track)
 {
     int trackIndex = Array.IndexOf(tracks.tracks, track);
     if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
@@ -450,8 +434,7 @@ private void DestroyOrphanRowMarkers(InstrumentTrack track)
         }
     }
 }
-
-private IEnumerator BlastOffAndDestroy(GameObject marker)
+    private IEnumerator BlastOffAndDestroy(GameObject marker)
 {
     if (marker == null) yield break;
     Vector3 start = marker.transform.position;
@@ -485,26 +468,7 @@ private IEnumerator BlastOffAndDestroy(GameObject marker)
     }
     yield return null;
 }
-
-public List<GameObject> GetNoteMarkers(InstrumentTrack track)
-{
-    var result = new List<GameObject>();
-    foreach (var kvp in noteMarkers)
-    {
-        if (kvp.Key.Item1 != track) continue;
-        var transform = kvp.Value;
-        if (transform == null) continue;
-
-        var go = transform.gameObject;
-        if (go != null)
-        {
-            result.Add(go);
-        }
-    }
-    return result;
-}
-
-private IEnumerator RushToVehicle(GameObject marker, Vector3 position, Vehicle target)
+    private IEnumerator RushToVehicle(GameObject marker, Vector3 position, Vehicle target)
 {
     float duration = 0.6f;
     float t = 0f;
@@ -532,10 +496,9 @@ private IEnumerator RushToVehicle(GameObject marker, Vector3 position, Vehicle t
     }
 }
 
-
-private float GetScreenWidth()
+    private float GetScreenWidth()
     {
-        RectTransform rt = worldSpaceCanvas.GetComponent<RectTransform>();
+        RectTransform rt = _worldSpaceCanvas.GetComponent<RectTransform>();
         return rt.rect.width;
     }
 }

@@ -57,24 +57,6 @@ public class MineNodeCharacterVis : MonoBehaviour
             agent.OnPlanReady  -= HandlePlanReady;
         }
     }
-
-    void HandlePlanStart()
-    {
-        // start/refresh a short frenzy burst
-        thinkTimer = Random.Range(thinkBurstRange.x, thinkBurstRange.y);
-    }
-
-    void HandlePlanReady()
-    {
-        lastPlanReadyTime = Time.time;
-        // quick snap toward new heading feels decisive
-        var v = rb ? rb.linearVelocity : Vector2.zero;
-        if (v.sqrMagnitude > 1e-4f)
-            facedAngle = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg - 90f;
-        // kick wobble phase so the “swim” starts immediately
-        wobblePhase = 0f;
-    }
-
     void FixedUpdate()
     {
         var v = rb ? rb.linearVelocity : Vector2.zero;
@@ -105,6 +87,24 @@ public class MineNodeCharacterVis : MonoBehaviour
 
         ApplyRotation(facedAngle, wob);
     }
+
+    void HandlePlanStart()
+    {
+        // start/refresh a short frenzy burst
+        thinkTimer = Random.Range(thinkBurstRange.x, thinkBurstRange.y);
+    }
+
+    void HandlePlanReady()
+    {
+        lastPlanReadyTime = Time.time;
+        // quick snap toward new heading feels decisive
+        var v = rb ? rb.linearVelocity : Vector2.zero;
+        if (v.sqrMagnitude > 1e-4f)
+            facedAngle = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg - 90f;
+        // kick wobble phase so the “swim” starts immediately
+        wobblePhase = 0f;
+    }
+
 
     void ApplyRotation(float baseDeg, float wobbleOffsetDeg)
     {

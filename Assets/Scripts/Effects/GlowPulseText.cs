@@ -9,16 +9,16 @@ public class GlowPulseText : MonoBehaviour
     public float speed = 2f;
     public string glowProperty = "_GlowPower"; // Some shaders might use "_GlowStrength"
 
-    private TextMeshProUGUI tmpText;
-    private Material textMaterial;
-    private float timer;
+    private TextMeshProUGUI _tmpText;
+    private Material _textMaterial;
+    private float _timer;
 
     void Start()
     {
-        tmpText = GetComponent<TextMeshProUGUI>();
-        textMaterial = tmpText.fontMaterial;
+        _tmpText = GetComponent<TextMeshProUGUI>();
+        _textMaterial = _tmpText.fontMaterial;
 
-        if (!textMaterial.HasProperty(glowProperty))
+        if (!_textMaterial.HasProperty(glowProperty))
         {
             Debug.LogWarning($"GlowPulseText: Material does not contain property '{glowProperty}'.");
         }
@@ -26,10 +26,10 @@ public class GlowPulseText : MonoBehaviour
 
     void Update()
     {
-        if (textMaterial == null || !textMaterial.HasProperty(glowProperty)) return;
+        if (_textMaterial == null || !_textMaterial.HasProperty(glowProperty)) return;
 
-        timer += Time.deltaTime * speed;
-        float glow = Mathf.Lerp(minGlow, maxGlow, (Mathf.Sin(timer) + 1f) / 2f);
-        textMaterial.SetFloat(glowProperty, glow);
+        _timer += Time.deltaTime * speed;
+        float glow = Mathf.Lerp(minGlow, maxGlow, (Mathf.Sin(_timer) + 1f) / 2f);
+        _textMaterial.SetFloat(glowProperty, glow);
     }
 }

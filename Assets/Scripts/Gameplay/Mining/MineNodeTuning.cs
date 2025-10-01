@@ -10,8 +10,6 @@ public class MineNodeTuning : MonoBehaviour
     {
         if (!dustInteractor)  dustInteractor = GetComponent<MineNodeDustInteractor>();
         if (!wiggle)          wiggle       = GetComponent<WiggleMotion>();
-        var movement = GetComponent<MineNodeMovement>();     // legacy/alternate motor?
-        if (movement) movement.enabled = false;              // <-- disable rival motor
         if (wiggle) wiggle.enabled = true;     // visual or small signal only
         if (dustInteractor) dustInteractor.enabled = true; // sets multipliers only
 

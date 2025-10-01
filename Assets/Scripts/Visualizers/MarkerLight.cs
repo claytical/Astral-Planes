@@ -16,8 +16,7 @@ public class MarkerLight : MonoBehaviour
         if (sr != null) _base = sr.color;
         _startScale = transform.localScale;
     }
-
-    // Switch from gray → track color and give a quick pulse
+    public void SetGrey(Color grey) { if (sr) sr.color = grey; }
     public void LightUp(Color trackColor)
     {
         if (sr == null) return;
@@ -47,6 +46,5 @@ public class MarkerLight : MonoBehaviour
         }
     }
 
-    // If you want a pre-lit gray, call this on spawn:
-    public void SetGrey(Color grey) { if (sr) sr.color = grey; }
+
 }

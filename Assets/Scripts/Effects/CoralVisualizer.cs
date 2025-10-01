@@ -11,11 +11,8 @@ public class CoralVisualizer : MonoBehaviour
     [Header("Coral Settings")]
     public float branchLength = 2f;
     public float branchSpreadAngle = 45f;
-    public float tendrilSpacing = 0.3f;
-    public float rotationSpeed = 5f;
 
     private List<GameObject> _spawnedParts = new();
-    public List<PhaseSnapshot> snapshots = new();
     private Transform _coralRoot;     // Optional: parent transform for hierarchy
 
     public Vector3 coralOrigin = new Vector3(-10f, -3f, 0f); // Move off center if needed
@@ -92,8 +89,8 @@ public class CoralVisualizer : MonoBehaviour
         // 🎨 Style the branch
         Gradient gradient = new Gradient();
         gradient.SetKeys(
-            new GradientColorKey[] { new GradientColorKey(snapshot.Color, 0f), new GradientColorKey(snapshot.Color, 1f) },
-            new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.1f, 1f) }
+            new[] { new GradientColorKey(snapshot.Color, 0f), new GradientColorKey(snapshot.Color, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.1f, 1f) }
         );
         lr.colorGradient = gradient;
 

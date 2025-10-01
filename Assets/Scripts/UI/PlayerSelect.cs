@@ -12,17 +12,18 @@ public class PlayerSelect : MonoBehaviour
     public GameObject controlsAndStats;
     public Image border;
 
-    private int selectedColor = 0;
-    private Hangar hangar;
-    private GameObject chosenPlane;
+    private int _selectedColor = 0;
+    private Hangar _hangar;
+    private GameObject _chosenPlane;
+    private string _currentShipName;
 
     void Start()
     {
-        hangar = FindAnyObjectByType<Hangar>();
-        transform.SetParent(hangar.planeSelection.transform);
+        _hangar = FindAnyObjectByType<Hangar>();
+        transform.SetParent(_hangar.planeSelection.transform);
         transform.localScale = Vector3.one;
 
-        if (hangar)
+        if (_hangar)
         {
             AssignFirstAvailablePlane();
             SetVehicleStats();
@@ -35,45 +36,29 @@ public class PlayerSelect : MonoBehaviour
 
     private void AssignFirstAvailablePlane()
     {
-        chosenPlane = hangar.FirstAvailablePlane();
-        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
+        _chosenPlane = _hangar.FirstAvailablePlane();
+        SetCurrentShipName(_chosenPlane.name.Replace("(Clone)", "").Trim());
 
-        if (chosenPlane == null)
+        if (_chosenPlane == null)
         {
             Debug.LogWarning("No available planes to assign.");
             return;
         }
 
         ApplyVisuals();
-        hangar.MarkPlaneInUse(chosenPlane, true);
+        _hangar.MarkPlaneInUse(_chosenPlane, true);
     }
-
-    private void ApplyVisuals()
-    {
-        SpriteRenderer sr = chosenPlane.GetComponent<SpriteRenderer>();
-        if (sr != null)
-        {
-            planeIcon.sprite = sr.sprite;
-            planeIcon.color = planeColors[selectedColor];
-        }
-        else
-        {
-            Debug.LogWarning("Selected plane has no SpriteRenderer.");
-        }
-    }
-
     private void SetVehicleStats()
     {
-        if (chosenPlane && chosenPlane.TryGetComponent(out Vehicle vehicle))
+        if (_chosenPlane && _chosenPlane.TryGetComponent(out Vehicle vehicle))
         {
             SetStats(vehicle);
         }
     }
-
-    public void SetStats(Vehicle vehicle)
+    private void SetStats(Vehicle vehicle)
     {
         float capacity = vehicle.capacity;
-        float maxCapacity = hangar.GetMaxCapacity();
+        float maxCapacity = _hangar.GetMaxCapacity();
         if (fuel != null && maxCapacity > 0)
         {
             float ratio = Mathf.Clamp01(capacity / maxCapacity);
@@ -84,74 +69,78 @@ public class PlayerSelect : MonoBehaviour
             fuel?.UpdateFuelUI(1f); // fallback
         }
     }
-
-    public void SetVehicleIconColor(Color color)
+    private void SetVehicleIconColor(Color color)
     {
         planeIcon.color = color;
     }
-
-    public void NextColor()
+    private void ApplyVisuals()
     {
-        selectedColor = (selectedColor + 1) % planeColors.Length;
-        SetVehicleIconColor(planeColors[selectedColor]);
+        SpriteRenderer sr = _chosenPlane.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            planeIcon.sprite = sr.sprite;
+            planeIcon.color = planeColors[_selectedColor];
+        }
+        else
+        {
+            Debug.LogWarning("Selected plane has no SpriteRenderer.");
+        }
     }
-
-    public void PreviousColor()
-    {
-        selectedColor = (selectedColor - 1 + planeColors.Length) % planeColors.Length;
-        SetVehicleIconColor(planeColors[selectedColor]);
-    }
-
-    public void NextVehicle()
-    {
-        if (chosenPlane != null)
-            hangar.MarkPlaneInUse(chosenPlane, false);
-
-        int currentIndex = System.Array.IndexOf(hangar.planes, chosenPlane);
-        int nextIndex = hangar.NextAvailablePlane(currentIndex);
-        chosenPlane = hangar.planes[nextIndex];
-        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
-        ApplyVisuals();
-        SetVehicleStats();
-        hangar.MarkPlaneInUse(chosenPlane, true);
-    }
-
-    public void PreviousVehicle()
-    {
-        if (chosenPlane != null)
-            hangar.MarkPlaneInUse(chosenPlane, false);
-
-        int currentIndex = System.Array.IndexOf(hangar.planes, chosenPlane);
-        int prevIndex = hangar.PreviousAvailableVehicle(currentIndex);
-        chosenPlane = hangar.planes[prevIndex];
-        SetCurrentShipName(chosenPlane.name.Replace("(Clone)", "").Trim());
-
-        ApplyVisuals();
-        SetVehicleStats();
-        hangar.MarkPlaneInUse(chosenPlane, true);
-    }
-
-    public GameObject GetChosenPlane()
-    {
-        return chosenPlane;
-    }
-    
-    public string GetCurrentShipName()
-    {
-        return currentShipName; // or however you're storing it internally
-    }
-
-    private string currentShipName;
-
-    public void SetCurrentShipName(string name)
-    {
-        currentShipName = name;
-    }
-
     public void Confirm()
     {
         controlsAndStats.SetActive(false);
         planeIcon.transform.parent.gameObject.SetActive(false);
         border.enabled = false;
     }
+    public void NextColor()
+    {
+        _selectedColor = (_selectedColor + 1) % planeColors.Length;
+        SetVehicleIconColor(planeColors[_selectedColor]);
+    }
+    public void PreviousColor()
+    {
+        _selectedColor = (_selectedColor - 1 + planeColors.Length) % planeColors.Length;
+        SetVehicleIconColor(planeColors[_selectedColor]);
+    }
+    public void NextVehicle()
+    {
+        if (_chosenPlane != null)
+            _hangar.MarkPlaneInUse(_chosenPlane, false);
+
+        int currentIndex = System.Array.IndexOf(_hangar.planes, _chosenPlane);
+        int nextIndex = _hangar.NextAvailablePlane(currentIndex);
+        _chosenPlane = _hangar.planes[nextIndex];
+        SetCurrentShipName(_chosenPlane.name.Replace("(Clone)", "").Trim());
+        ApplyVisuals();
+        SetVehicleStats();
+        _hangar.MarkPlaneInUse(_chosenPlane, true);
+    }
+    public void PreviousVehicle()
+    {
+        if (_chosenPlane != null)
+            _hangar.MarkPlaneInUse(_chosenPlane, false);
+
+        int currentIndex = System.Array.IndexOf(_hangar.planes, _chosenPlane);
+        int prevIndex = _hangar.PreviousAvailableVehicle(currentIndex);
+        _chosenPlane = _hangar.planes[prevIndex];
+        SetCurrentShipName(_chosenPlane.name.Replace("(Clone)", "").Trim());
+
+        ApplyVisuals();
+        SetVehicleStats();
+        _hangar.MarkPlaneInUse(_chosenPlane, true);
+    }
+    public GameObject GetChosenPlane()
+    {
+        return _chosenPlane;
+    }
+    public string GetCurrentShipName()
+    {
+        return _currentShipName; // or however you're storing it internally
+    }
+    private void SetCurrentShipName(string name)
+    {
+        _currentShipName = name;
+    }
+
+
 }

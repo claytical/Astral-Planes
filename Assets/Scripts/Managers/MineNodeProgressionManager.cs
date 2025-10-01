@@ -5,18 +5,13 @@ using UnityEngine;
 
 public class MineNodeProgressionManager : MonoBehaviour
 {
-    private DrumTrack drumTrack;
-    private InstrumentTrackController trackController;
+    private DrumTrack _drumTrack;
+    private InstrumentTrackController _trackController;
 
     [Header("Progression Settings")]
-    public int requiredNotesPerTrack = 1;
-    public int minimumLoopCount;
-    public bool requireLoopCount;
     public List<MusicalPhaseProfile> phaseProfiles;
     
     [Header("Tracking")]
-    public int totalMinedObjectsCollected;
-    public int loopsCompleted;
     public MusicalPhaseQueue phaseQueue;
     private int currentPhaseIndex;
     SpawnStrategyProfile currentSpawnStrategy;
@@ -46,26 +41,26 @@ public class MineNodeProgressionManager : MonoBehaviour
     
     private void Awake()
     {
-        drumTrack = GetComponent<DrumTrack>();
-        trackController = GetComponent<InstrumentTrackController>();
+        _drumTrack = GetComponent<DrumTrack>();
+        _trackController = GetComponent<InstrumentTrackController>();
         // 🌟 Register globally
         MusicalPhaseLibrary.InitializeProfiles(phaseProfiles);
-        if (!drumTrack || !trackController)
+        if (!_drumTrack || !_trackController)
             Debug.LogError("MineNodeProgressionManager is missing required components on the same GameObject.");
     }
     public void BeginMazeTransitionForNextPhase(float approxSeconds)
     {
-        if (drumTrack?.hexMazeGenerator == null) return;
+        if (_drumTrack?.hexMazeGenerator == null) return;
 
         // N.B. Your RunLoopAlignedMazeCycle already takes phase + center + durations.
         // Use current phase as a visual reset before spawning the next star.
-        Vector2Int centerCell = drumTrack.WorldToGridPosition(drumTrack.transform.position);
-        float loopSeconds = drumTrack.GetLoopLengthInSeconds();
+        Vector2Int centerCell = _drumTrack.WorldToGridPosition(_drumTrack.transform.position);
+        float loopSeconds = _drumTrack.GetLoopLengthInSeconds();
         float growPct = 0.25f;
         float holdPct = 0.50f;
 
-        drumTrack.hexMazeGenerator.StartCoroutine(
-            drumTrack.hexMazeGenerator.RunLoopAlignedMazeCycle(
+        _drumTrack.hexMazeGenerator.StartCoroutine(
+            _drumTrack.hexMazeGenerator.RunLoopAlignedMazeCycle(
                 currentPhase,
                 centerCell,
                 loopSeconds,
@@ -79,13 +74,14 @@ public class MineNodeProgressionManager : MonoBehaviour
     {
         var g = GameFlowManager.Instance;
         if (!g) { Debug.LogWarning("GameFlowManager missing; spawning star immediately"); SpawnNextPhaseStarWithoutLoopChange(); return; }
+        Debug.Log($"Begin Phase Bridge {from} to {to} with {perfectTracks.Count} tracks using {nextStarColor} for next color");
         g.BeginPhaseBridge(from, to, perfectTracks, nextStarColor);
     }
     public MusicalPhase GetNextPhase() => PeekNextPhase();
 // MineNodeProgressionManager.cs
     public Color ResolveNextPhaseStarColor(MusicalPhase phase)
     {
-        Color c = drumTrack.phasePersonalityRegistry.Get(phase).starColor;
+        Color c = _drumTrack.phasePersonalityRegistry.Get(phase).starColor;
         if (c != Color.white)
         {
             return c;
@@ -106,21 +102,21 @@ public class MineNodeProgressionManager : MonoBehaviour
         Debug.Log($"Current Phase: {currentPhase}, Next Phase: {next}");
         currentPhase = next;
         
-        if (drumTrack != null) drumTrack.currentPhase = currentPhase;
+        if (_drumTrack != null) _drumTrack.currentPhase = currentPhase;
 
         var group = GetPhaseGroup(currentPhase);
         var profile = SelectSpawnStrategy(group);
         if (profile == null) { Debug.LogError($"[Progression] No strategy for {currentPhase}"); return; }
 
-        if (drumTrack != null && drumTrack.hexMazeGenerator != null)
+        if (_drumTrack != null && _drumTrack.hexMazeGenerator != null)
         {
             // Build+place star with the proper timing instead of direct spawn:
-            drumTrack.StartCoroutine(drumTrack.hexMazeGenerator.GenerateMazeThenPlacePhaseStar(currentPhase, profile));
+            _drumTrack.StartCoroutine(_drumTrack.hexMazeGenerator.GenerateMazeThenPlacePhaseStar(currentPhase, profile));
         }
         else
         {
             // Fallback: direct spawn (previous behavior)
-            drumTrack?.SpawnPhaseStar(currentPhase, profile);
+            _drumTrack?.SpawnPhaseStar(currentPhase, profile);
         }
     }
 
@@ -138,7 +134,7 @@ public class MineNodeProgressionManager : MonoBehaviour
         isPhaseInProgress = true;
         isPhaseTransitioning = false;
 
-        drumTrack.ClearAllActiveMinedObjects();
+        _drumTrack.ClearAllActiveMinedObjects();
         MusicalPhaseGroup selectedGroup = null;
 
         if (specificPhase.HasValue)
@@ -160,7 +156,7 @@ public class MineNodeProgressionManager : MonoBehaviour
 
         currentPhaseIndex = phaseQueue.phaseGroups.IndexOf(selectedGroup);
         currentPhase = selectedGroup.phase;
-        drumTrack.currentPhase = currentPhase;
+        _drumTrack.currentPhase = currentPhase;
         Debug.Log($"Moving to phase: {currentPhase}");
 
         if (selectedGroup.allowRandomSelection)
@@ -176,7 +172,7 @@ public class MineNodeProgressionManager : MonoBehaviour
         // Arm the loop for the phase we just selected — commit on FIRST POKE of the new star
         GameFlowManager.Instance.ArmNextPhaseLoop(currentPhase);
 
-        drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
+        _drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
 
     }
     public string GetCurrentPhaseName()
@@ -278,11 +274,6 @@ public class MineNodeProgressionManager : MonoBehaviour
     {
         return currentPhaseIndex;
     }
-
-    public void OnLoopCompleted()
-    {
-        loopsCompleted++;
-
-    }
+    
     
 }

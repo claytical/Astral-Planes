@@ -5,35 +5,39 @@ public class RemixRingHolder : MonoBehaviour
 {
     [SerializeField] private List<SpriteRenderer> ringSprites;
 
-    private float flipTimer = 0f;
-    private float flipInterval = 0.5f;
-    private List<Color> currentColors = new();
+    private float _flipTimer = 0f;
+    private float _flipInterval = 0.5f;
+    private List<Color> _currentColors = new();
 
     void Update()
     {
-        if (currentColors.Count <= 1) return;
+        if (_currentColors.Count <= 1) return;
 
-        flipTimer += Time.deltaTime;
-        if (flipTimer >= flipInterval)
+        _flipTimer += Time.deltaTime;
+        if (_flipTimer >= _flipInterval)
         {
-            flipTimer = 0f;
-            Color last = currentColors[^1];
-            currentColors.RemoveAt(currentColors.Count - 1);
-            currentColors.Insert(0, last);
+            _flipTimer = 0f;
+            Color last = _currentColors[^1];
+            _currentColors.RemoveAt(_currentColors.Count - 1);
+            _currentColors.Insert(0, last);
 
-            for (int i = 0; i < currentColors.Count; i++)
+            for (int i = 0; i < _currentColors.Count; i++)
             {
-                ringSprites[i].color = currentColors[i];
+                ringSprites[i].color = _currentColors[i];
             }
         }
     }
-    
-    public void CycleColors(List<Color> shiftedColors)
+    public void SetColor(Color newColor)
     {
-        for (int i = 0; i < ringSprites.Count; i++)
+        foreach (var t in ringSprites)
         {
-            if (i < shiftedColors.Count)
-                ringSprites[i].color = shiftedColors[i];
+            if (t != null)
+            {
+                if (t.enabled)
+                {
+                    t.color = newColor;
+                }
+            }
         }
     }
     public void ActivateRing(MusicalRole role, Color color)
@@ -46,35 +50,21 @@ public class RemixRingHolder : MonoBehaviour
                 ringSprites[i].enabled = true;
                 ringSprites[i].color = color;
 
-                currentColors.Add(color);
+                _currentColors.Add(color);
                 return;
             }
         }
 
         Debug.LogWarning("No available ring slots to activate new remix role.");
     }
-    public void SetColor(Color newColor)
-    {
-        for (int i = 0; i < ringSprites.Count; i++)
-        {
-            if (ringSprites[i] != null)
-            {
-                if (ringSprites[i].enabled)
-                {
-                    ringSprites[i].color = newColor;
-                }
-            }
-        }
-    }
-
     public void ClearAllRings()
     {
         foreach (var ring in ringSprites)
         {
             ring.enabled = false;
         }
-        currentColors.Clear();
-        flipTimer = 0f;
+        _currentColors.Clear();
+        _flipTimer = 0f;
     }
 
 

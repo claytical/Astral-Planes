@@ -17,14 +17,8 @@ public class MusicalRoleProfile : ScriptableObject
     public Color defaultColor = Color.white;
     [TextArea]
     public string description;
-//    public GameObject envelopeParticlePrefab; // for PlayEnvelopePulse()
-//    public GameObject sparkParticlePrefab;    // for ghost path sparks
 
     [Header("Behavior & Presets")]
     public NoteBehavior defaultBehavior;
     public List<int> allowedMidiPresets = new List<int>();
-
-    [Header("Audio Tags (Optional/Future Use)")]
-    public string textureDescriptor;
-    public AudioClip samplePreview;
 }

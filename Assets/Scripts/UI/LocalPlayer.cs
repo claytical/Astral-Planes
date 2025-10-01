@@ -9,102 +9,44 @@ public class LocalPlayer : MonoBehaviour
 {
     public GameObject playerSelect;
     public GameObject playerVehicle;
+    public Vehicle plane;
     public GameObject playerStatsUI;
     public AudioClip clickFx;
     public AudioClip confirmFx;
-
-    public Vehicle plane;
-    public int astralPlaneIndex = 0;
-    private PlayerSelect selection;
-    private PlayerStatsTracking playerStats;
-    private PlayerStats ui;
-    private PlayerInput playerInput;
-    private Color color;
-    private bool isReady = false;
-    private Vector2 moveInput;
-    private bool suppressChoose = true;
-    private bool confirmEnabled = false;
-    private bool decelerate = false;
-    private InputAction confirmAction;
     public float friction = 0.5f;
+    
+    private Color _color;
+    private bool _isReady, _decelerate, _confirmEnabled, _suppressChoose = true;
+    private Vector2 _moveInput;
+    private PlayerSelect _selection;
+    private PlayerStatsTracking _playerStats;
+    private PlayerStats _ui;
+    private PlayerInput _playerInput;
+    private InputAction _confirmAction;
     public bool IsReady
     {
-        get => isReady;
-        set => isReady = value;
-    }
-
-    IEnumerator Start()
-    {
-        yield return null; // wait one frame so input system "settles"
-        suppressChoose = false;
-        DontDestroyOnLoad(this);
-        GameFlowManager.Instance.RegisterPlayer(this);
-        playerInput = GetComponent<PlayerInput>();
-        CreatePlayerSelect();
-        playerInput.SwitchCurrentActionMap("Selection");
-        confirmAction = playerInput.actions["Choose"]; // use your actual action name
-        confirmAction.started += ctx =>
-        {
-            if (!confirmEnabled)
-            {
-                // Wait for release before enabling
-                return;
-            }
-
-            HandleConfirm();
-        };
-
-        confirmAction.canceled += ctx =>
-        {
-            // Button released — allow confirm on next press
-            confirmEnabled = true;
-        };
-
-    }
-    private void HandleConfirm()
-    {
-        if (isReady) return;
-
-        switch (GameFlowManager.Instance.CurrentState)
-        {
-            case GameState.Selection:
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                playerVehicle = selection.GetChosenPlane();
-                selection.Confirm();
-                SetColor();
-                isReady = true;
-                Debug.Log($"Player {name} is ready");
-                GameFlowManager.Instance.CheckAllPlayersReady();
-                break;
-
-            case GameState.GameOver:
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                Restart();
-                break;
-        }
+        get => _isReady;
+        set => _isReady = value;
     }
 
     public void CreatePlayerSelect()
     {
         GameObject ps = Instantiate(playerSelect);
-        selection = ps.GetComponent<PlayerSelect>();
+        _selection = ps.GetComponent<PlayerSelect>();
         StartRumble(.1f,1, .5f);
     }
-
     public void SetStats()
     {
-        ui?.SetStats(plane);
+        _ui?.SetStats(plane);
     }
-
     private void SetColor()
     {
-        color = selection.planeIcon.color;
+        _color = _selection.planeIcon.color;
     }
-
     public void Launch(DrumTrack drums)
     {
         GameObject statsUI = Instantiate(playerStatsUI, GameFlowManager.Instance.GetUIParent());
-        ui = statsUI.GetComponent<PlayerStats>();
+        _ui = statsUI.GetComponent<PlayerStats>();
         GameObject vehicle = Instantiate(playerVehicle, transform);
         plane = vehicle.GetComponent<Vehicle>();
         plane.SetDrumTrack(drums);
@@ -116,19 +58,19 @@ public class LocalPlayer : MonoBehaviour
                 FindAnyObjectByType<ChordChangeArpeggiator>());
         }
 
-        playerStats = GetComponent<PlayerStatsTracking>();
+        _playerStats = GetComponent<PlayerStatsTracking>();
 
         if (plane != null)
         {
-            plane.playerStats = playerStats;
-            plane.playerStatsUI = ui;
+            plane.playerStats = _playerStats;
+            plane.playerStatsUI = _ui;
             plane.SyncEnergyUI();
-            plane.GetComponent<SpriteRenderer>().color = color;
+            plane.GetComponent<SpriteRenderer>().color = _color;
             SetStats();
-            ui.SetColor(color);
+            _ui.SetColor(_color);
             Debug.Log($"Switching action map to play.");
 //            plane.Fly();
-            playerInput.SwitchCurrentActionMap("Play");
+            _playerInput.SwitchCurrentActionMap("Play");
         }
     }
 
@@ -139,16 +81,78 @@ public class LocalPlayer : MonoBehaviour
 
     public string GetSelectedShipName()
     {
-        return selection?.GetCurrentShipName();
+        return _selection?.GetCurrentShipName();
     }
 
+    IEnumerator Start()
+    {
+        yield return null; // wait one frame so input system "settles"
+        _suppressChoose = false;
+        DontDestroyOnLoad(this);
+        GameFlowManager.Instance.RegisterPlayer(this);
+        _playerInput = GetComponent<PlayerInput>();
+        CreatePlayerSelect();
+        _playerInput.SwitchCurrentActionMap("Selection");
+        _confirmAction = _playerInput.actions["Choose"]; // use your actual action name
+        _confirmAction.started += ctx =>
+        {
+            if (!_confirmEnabled)
+            {
+                // Wait for release before enabling
+                return;
+            }
+
+            HandleConfirm();
+        };
+
+        _confirmAction.canceled += ctx =>
+        {
+            // Button released — allow confirm on next press
+            _confirmEnabled = true;
+        };
+
+    }
+    void FixedUpdate()
+    {
+        
+        if (plane != null && _moveInput.sqrMagnitude > 0.01f)
+        {
+            plane.Move(_moveInput);
+            if (_decelerate)
+            {
+                _moveInput = Vector2.zero;
+            }
+        }
+    }
+    private void HandleConfirm()
+    {
+        if (_isReady) return;
+
+        switch (GameFlowManager.Instance.CurrentState)
+        {
+            case GameState.Selection:
+                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                playerVehicle = _selection.GetChosenPlane();
+                _selection.Confirm();
+                SetColor();
+                _isReady = true;
+                Debug.Log($"Player {name} is ready");
+                GameFlowManager.Instance.CheckAllPlayersReady();
+                break;
+
+            case GameState.GameOver:
+                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                Restart();
+                break;
+        }
+    }
     private void Restart()
     {
-        isReady = false;
+        _isReady = false;
 
-        if (selection != null)
+        if (_selection != null)
         {
-            Destroy(selection.gameObject);
+            Destroy(_selection.gameObject);
         }
 
         GetComponent<PlayerInput>().SwitchCurrentActionMap("Selection");
@@ -156,29 +160,20 @@ public class LocalPlayer : MonoBehaviour
         GameFlowManager.Instance.QuitToSelection();
     }
 
-    // Input System Actions
-
-    void FixedUpdate()
+    public void OnThrust(InputValue value)
     {
-        
-        if (plane != null && moveInput.sqrMagnitude > 0.01f)
-        {
-            plane.Move(moveInput);
-            if (decelerate)
-            {
-                moveInput = Vector2.zero;
-            }
-        }
+        float v = value.Get<float>();
+        if (v > 0) plane?.TurnOnBoost(v);
+        else plane?.TurnOffBoost();
     }
     public void OnMove(InputValue value)
     {
-        moveInput = value.Get<Vector2>().normalized * friction;
+        _moveInput = value.Get<Vector2>().normalized * friction;
     }
-
     public void OnMouseMove(InputValue value)
     {
         Debug.Log($"OnMouseMove: {value}");
-        moveInput = value.Get<Vector2>().normalized * friction;
+        _moveInput = value.Get<Vector2>().normalized * friction;
     }
     public void OnQuit(InputValue value)
     {
@@ -189,98 +184,43 @@ public class LocalPlayer : MonoBehaviour
         }
     }
 
-    public void OnThrust(InputValue value)
-    {
-        float v = value.Get<float>();
-        if (v > 0) plane?.TurnOnBoost(v);
-        else plane?.TurnOffBoost();
-    }
-
-
+    
     public void OnNextVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        if (selection != null)
+        if (_selection != null)
         {
-            selection.NextVehicle();
+            _selection.NextVehicle();
             
         }
     }
-
     public void OnPreviousVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        if (selection != null)
+        if (_selection != null)
         {
-            selection.PreviousVehicle();
+            _selection.PreviousVehicle();
         }
     }
-
     public void OnNextColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        if (selection != null)
+        if (_selection != null)
         {
 
-            selection.NextColor();
+            _selection.NextColor();
         }
     }
-
     public void OnPreviousColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
-        if (selection != null)
+        if (_selection != null)
         {
-            selection.PreviousColor();
-        }
-    }
-
-    public void StartRumble(float lowFreq, float highFreq, float duration)
-    {
-//        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
-//            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
-    }
-
-    // Wildcard Glitch Toggles
-    public void OnNorth(InputValue value)
-    {
-        moveInput = Vector2.up * friction;
-        if (!value.isPressed)
-        {
-            decelerate = true;
-        }
-    }
-
-    public void OnEast(InputValue value)
-    {
-        moveInput = Vector2.right * friction;
-        if (!value.isPressed)
-        {
-            decelerate = true;
-        }
-
-    }
-
-    public void OnWest(InputValue value)
-    {
-        moveInput = Vector2.left * friction;
-        if (!value.isPressed)
-        {
-            decelerate = true;
-        }
-
-    }
-
-    public void OnSouth(InputValue value)
-    {
-        moveInput = Vector2.down * friction;
-        if (!value.isPressed)
-        {
-            decelerate = true;
+            _selection.PreviousColor();
         }
     }
 
@@ -293,6 +233,45 @@ public class LocalPlayer : MonoBehaviour
             {
                 GameFlowManager.Instance.glitch.ToggleEffect(index);
             }
+        }
+    }
+    private void StartRumble(float lowFreq, float highFreq, float duration)
+    {
+//        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
+//            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
+    }
+    public void OnNorth(InputValue value)
+    {
+        _moveInput = Vector2.up * friction;
+        if (!value.isPressed)
+        {
+            _decelerate = true;
+        }
+    }
+    public void OnEast(InputValue value)
+    {
+        _moveInput = Vector2.right * friction;
+        if (!value.isPressed)
+        {
+            _decelerate = true;
+        }
+
+    }
+    public void OnWest(InputValue value)
+    {
+        _moveInput = Vector2.left * friction;
+        if (!value.isPressed)
+        {
+            _decelerate = true;
+        }
+
+    }
+    public void OnSouth(InputValue value)
+    {
+        _moveInput = Vector2.down * friction;
+        if (!value.isPressed)
+        {
+            _decelerate = true;
         }
     }
     

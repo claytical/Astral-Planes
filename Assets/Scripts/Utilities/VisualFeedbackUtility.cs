@@ -3,16 +3,7 @@ using UnityEngine;
 
 public static class VisualFeedbackUtility
 {
-    // Inside VisualFeedbackUtility.cs
-
-    public static IEnumerator SpectrumFlickerWithPulse(
-        SpriteRenderer sr,
-        Transform t,
-        float duration = 0.4f,
-        float scaleMultiplier = 1.2f,
-        Color? baseTintOverride = null,
-        bool cycleHue = false
-    )
+    public static IEnumerator SpectrumFlickerWithPulse(SpriteRenderer sr, Transform t, float duration = 0.4f, float scaleMultiplier = 1.2f, Color? baseTintOverride = null, bool cycleHue = false)
     {
         float tElapsed = 0f;
 

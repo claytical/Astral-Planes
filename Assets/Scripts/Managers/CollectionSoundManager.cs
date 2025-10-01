@@ -4,22 +4,6 @@ using System.Linq;
 using UnityEngine;
 using MidiPlayerTK;
 
-public enum CollectionEffectType
-{
-    // 🌌 New lifecycle-aware types
-    PhaseStar,        // Collision with the star itself
-    Aether,           // Diamond
-    Burst,            // Triangle
-    Core,              // Hexagon
-    MazeToxic,
-    MazeFriendly
-}
-
-public enum SoundEffectMood {
-    Friendly = 10,
-    Toxic = 9
-}
-
 public enum SoundEffectPreset
 {
     Aether = 1,
@@ -37,7 +21,7 @@ public class CollectionSoundManager : MonoBehaviour
     private const int fxBank = 0;
 
     public static CollectionSoundManager Instance;
-    private static readonly int[] cMajorNotes = new int[]
+    private static readonly int[] CMajorNotes = new int[]
     {
         60, // C4
         62, // D4
@@ -48,43 +32,6 @@ public class CollectionSoundManager : MonoBehaviour
         71, // B4
         72  // C5
     };
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-
-        Debug.Log("🎵 Presets loaded so far: " + MidiPlayerGlobal.MPTK_CountPresetLoaded);
-
-        // Wait until SoundFont is ready
-        StartCoroutine(WaitForSoundFontReady());
-    }
-
-    private IEnumerator WaitForSoundFontReady()
-    {
-        // Wait until MPTK_Channels is initialized and soundfont is ready
-        while (!MidiPlayerGlobal.MPTK_IsReady() || midiStreamPlayer.MPTK_Channels == null || midiStreamPlayer.MPTK_Channels.Length <= midiChannel)
-        {
-            yield return null;
-        }
-        foreach (var presets in MidiPlayerGlobal.MPTK_ListPreset)
-        {
-            Debug.Log($"🎹 Preset #{presets.Label}");
-        }
-
-
-        Debug.Log("✅ SoundFont ready. Assigning preset and bank.");
-
-        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = (int)SoundEffectPreset.Dust;
-        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedBank = fxBank;
-    }
-
-
     public void PlayEffect(SoundEffectPreset preset)
     {
         midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = (int)preset;
@@ -124,54 +71,38 @@ public class CollectionSoundManager : MonoBehaviour
 
         midiStreamPlayer.MPTK_PlayEvent(noteEvent);
     }
-    public void PlayMazeChime(MusicalPhase phase, int midiPresetId)
+
+    private void Awake()
     {
-        if (midiStreamPlayer == null) return;
-
-        int rootNote = 60 + ((int)phase % 7); // C4 + offset
-        ScaleType scale = (ScaleType)((int)phase % System.Enum.GetValues(typeof(ScaleType)).Length);
-
-        // Manually simulate allowed note range
-        int lowest = 48;
-        int highest = 84;
-
-        // Build note list manually (subset of NoteSet logic)
-        int[] pattern = ScalePatterns.Patterns[scale];
-        List<int> notes = new();
-        for (int pitch = lowest; pitch <= highest; pitch++)
+        if (Instance != null && Instance != this)
         {
-            int semitoneAboveRoot = (pitch - rootNote) % 12;
-            if (semitoneAboveRoot < 0) semitoneAboveRoot += 12;
-
-            if (pattern.Contains(semitoneAboveRoot))
-            {
-                notes.Add(pitch);
-            }
-        }
-
-        if (notes.Count == 0)
-        {
-            Debug.LogWarning("⚠️ No notes available for maze chime.");
+            Destroy(gameObject);
             return;
         }
 
-        int note = notes[Random.Range(0, notes.Count)];
-        int velocity = Random.Range(60, 100);
-        int duration = 200 + Random.Range(-40, 40);
+        Instance = this;
 
-        midiStreamPlayer.MPTK_ChannelPresetChange(midiChannel, midiPresetId);
-        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = midiPresetId;
+        Debug.Log("🎵 Presets loaded so far: " + MidiPlayerGlobal.MPTK_CountPresetLoaded);
 
-        var noteEvent = new MPTKEvent()
-        {
-            Command = MPTKCommand.NoteOn,
-            Value = note,
-            Channel = midiChannel,
-            Duration = duration,
-            Velocity = velocity
-        };
-
-        midiStreamPlayer.MPTK_PlayEvent(noteEvent);
+        // Wait until SoundFont is ready
+        StartCoroutine(WaitForSoundFontReady());
     }
+    private IEnumerator WaitForSoundFontReady()
+    {
+        // Wait until MPTK_Channels is initialized and soundfont is ready
+        while (!MidiPlayerGlobal.MPTK_IsReady() || midiStreamPlayer.MPTK_Channels == null || midiStreamPlayer.MPTK_Channels.Length <= midiChannel)
+        {
+            yield return null;
+        }
+        foreach (var presets in MidiPlayerGlobal.MPTK_ListPreset)
+        {
+            Debug.Log($"🎹 Preset #{presets.Label}");
+        }
 
+
+        Debug.Log("✅ SoundFont ready. Assigning preset and bank.");
+
+        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = (int)SoundEffectPreset.Dust;
+        midiStreamPlayer.MPTK_Channels[midiChannel].ForcedBank = fxBank;
+    }
 }

@@ -37,11 +37,8 @@ public class MineNode : MonoBehaviour
         _minedObject.assignedTrack.drumTrack.RegisterMinedObject(_minedObject);
         _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
         // NoteSpawn carries a Ghost trigger
-        NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
+//        NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
         _minedObject.assignedTrack.drumTrack.activeMineNodes.Add(this);
-//        if (spawner != null) this.preloadedObject = spawner.ghostTrigger;
-
-        // TrackUtility carries itself
         TrackUtilityMinedObject track = obj.GetComponent<TrackUtilityMinedObject>();
         if (track != null)
         {
@@ -92,26 +89,33 @@ public class MineNode : MonoBehaviour
     }
     private void OnCollisionEnter2D(Collision2D coll)
     { 
-        if (_objectRevealed) return; 
-        var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
-        if (spawner != null) {
-            // Normal note spawner feedback
-            CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
-        }
-        else {
-            // Utility payload (remix ring etc.) — use a generic pickup cue
-            CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
-        }
-        if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
+        Debug.Log($"Hit MineNode: {coll.gameObject.name} object revealed? {_objectRevealed}");
+        if (_objectRevealed) return;
+        if (_minedObject != null)
+        {
+            var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
+            if (spawner != null) {
+                // Normal note spawner feedback
+                Debug.Log($"Playing collision sound");
+                CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
+            }
+            else {
+                // Utility payload (remix ring etc.) — use a generic pickup cue
+                Debug.Log($"Playing default sound");
+                CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
+            }          
+            if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
         {
             _strength -= vehicle.GetForceAsDamage();
             _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
             float normalized = (float)_strength / maxStrength; // [0, 1]
             float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
+            Debug.Log($"Strength: {_strength}, Normalized: {normalized}, Scale: {scaleFactor}");
 
             StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
             if (_strength <= 0 && !_depletedHandled)
             {
+                Debug.Log($"No more strength...");
                 _depletedHandled = true;
                 // Fresh burst for this node
                 // Try to spawn notes if this payload is a NoteSpawner
@@ -120,13 +124,17 @@ public class MineNode : MonoBehaviour
                     // Ensure there is a NoteSet
                     if (spawner.selectedNoteSet == null)
                     {
+                        Debug.Log($"No note set found, creating new one");
                         // Prefer any directive you cached; otherwise rebuild from track/phase
                         var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
                         var phase = track.drumTrack.currentPhase;
                         if (track != null && phase != null)
                         {
+
                             var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, phase);
                             spawner.selectedNoteSet = ns;
+                            Debug.Log($"Note set: {ns}");
+
                         }
                     }
 
@@ -134,10 +142,12 @@ public class MineNode : MonoBehaviour
                     // CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
 
                     // Emit notes BEFORE we reveal/destroy anything
+                    Debug.Log($"Bursting Collectables");
                     spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet);
                 }
                 else
                 {
+                    Debug.Log($"Nothing to spawn, because spawner is null...");
                     // Utility payload path keeps your generic pickup cue
                     CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
                 }
@@ -145,6 +155,7 @@ public class MineNode : MonoBehaviour
                 // Reveal any preloaded object AFTER spawning
                 if (_preloadedObject != null)
                 {
+                    Debug.Log($"Revealing Preloaded object");
                     _preloadedObject.transform.SetParent(null, true); // keep world pos
                     _preloadedObject.transform.localScale = _originalScale;
                     _preloadedObject.SetActive(true);
@@ -155,6 +166,11 @@ public class MineNode : MonoBehaviour
             }
             
         }
+        }
+       
+
+
+        
     }
     private void TriggerExplosion()
     {
@@ -169,7 +185,11 @@ public class MineNode : MonoBehaviour
     {
         if (_resolvedFired) return;
         _resolvedFired = true;
-        try { OnResolved?.Invoke(kind, dir); }
+        try
+        {
+            Debug.Log($"Fire Resolved Once, trying to invoke resolution {kind} / {dir}...");
+            OnResolved?.Invoke(kind, dir);
+        }
         catch (System.Exception e) { Debug.LogException(e, this); }
     }
     private void OnDisable(){ Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); }

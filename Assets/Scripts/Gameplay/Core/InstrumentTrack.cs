@@ -78,13 +78,11 @@ public class InstrumentTrack : MonoBehaviour
                 spawnedCollectables.RemoveAt(i); // 💥 clean up dead reference
                 continue;
             }
-
-            if (obj.TryGetComponent(out Collectable c))
-                c.PulseIfOnStep(localStep);
         }
 
     }
-    public int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
+
+    private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
     {
         List<int> allowedSteps = noteSet.GetStepList();
         int totalSteps = GetTotalSteps();

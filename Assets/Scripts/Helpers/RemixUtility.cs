@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "RemixUtility", menuName = "Astral Planes/Remix Utility")]
 [System.Serializable]
-
+//NOT CURRENTLY INTEGRATED.
+//Could be used with chord progression rings: "upgraded" when duplicate existing track utility collected. 
 public class RemixUtility : ScriptableObject
 {
     public MusicalRole targetRole;

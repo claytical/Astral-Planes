@@ -5,22 +5,22 @@ using UnityEngine;
 public class NoteSetConfigLibrary : ScriptableObject
 {
     public List<RolePhaseNoteSetConfig> configs;
-    private Dictionary<(MusicalRole, MusicalPhase), RolePhaseNoteSetConfig> lookup;
+    private Dictionary<(MusicalRole, MusicalPhase), RolePhaseNoteSetConfig> _lookup;
 
-    public void Initialize()
+    private void Initialize()
     {
-        lookup = new();
+        _lookup = new();
         foreach (var cfg in configs)
         {
-            lookup[(cfg.role, cfg.phase)] = cfg;
+            _lookup[(cfg.role, cfg.phase)] = cfg;
         }
     }
-
     public RolePhaseNoteSetConfig GetConfig(MusicalRole role, MusicalPhase phase)
     {
-        if (lookup == null) Initialize();
-        lookup.TryGetValue((role, phase), out var config);
+        if (_lookup == null) Initialize();
+        _lookup.TryGetValue((role, phase), out var config);
         return config;
     }
+
 }
 
