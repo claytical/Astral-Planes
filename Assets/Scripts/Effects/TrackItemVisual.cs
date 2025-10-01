@@ -25,16 +25,16 @@ namespace Effects
         public bool tintParticlesToTrackColor = true;
         public bool burstOnStart = false;
 
-        private SpriteRenderer circleRenderer;
-        private TextMeshPro iconText;
-        private Vector3 originalPosition;
-        private bool shouldPulse;
-        private bool shouldHover = true;
-        private bool shouldRotate = true;
+        private SpriteRenderer _circleRenderer;
+        private TextMeshPro _iconText;
+        private Vector3 _originalPosition;
+        private bool _shouldPulse;
+        private bool _shouldHover = true;
+        private bool _shouldRotate = true;
 
         void Start()
         {
-            originalPosition = transform.position;
+            _originalPosition = transform.position;
             CreateCircle();
             ApplyItemStyle();
             SetupParticles();
@@ -42,26 +42,26 @@ namespace Effects
 
         void Update()
         {
-            if (shouldPulse)
+            if (_shouldPulse)
             {
                 float scale = baseScale + Mathf.Sin(Time.time * pulseSpeed) * pulseAmplitude;
                 transform.localScale = new Vector3(scale, scale, 1f);
             }
 
-            if (shouldHover)
+            if (_shouldHover)
             {
                 float offsetY = Mathf.Sin(Time.time * hoverSpeed) * hoverAmplitude;
-                transform.position = originalPosition + new Vector3(0f, offsetY, 0f);
+                transform.position = _originalPosition + new Vector3(0f, offsetY, 0f);
             }
 
-            if (shouldRotate)
+            if (_shouldRotate)
             {
                 transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
             }
             if (itemType == TrackModifierType.RootShift)
             {
                 float hue = Mathf.PingPong(Time.time * 0.2f, 1f);
-                circleRenderer.color = Color.HSVToRGB(hue, 0.6f, 1f);
+                _circleRenderer.color = Color.HSVToRGB(hue, 0.6f, 1f);
             }
 
         }
@@ -71,34 +71,34 @@ namespace Effects
             GameObject circleObj = new GameObject("Circle");
             circleObj.transform.SetParent(transform, false);
 
-            circleRenderer = circleObj.AddComponent<SpriteRenderer>();
-            circleRenderer.sprite = Resources.Load<Sprite>("Circle");
-            circleRenderer.color = trackColor;
-            circleRenderer.sortingOrder = 0;
+            _circleRenderer = circleObj.AddComponent<SpriteRenderer>();
+            _circleRenderer.sprite = Resources.Load<Sprite>("Circle");
+            _circleRenderer.color = trackColor;
+            _circleRenderer.sortingOrder = 0;
         }
         
         private void ApplyItemStyle()
         {
-            circleRenderer.color = GetModifiedTrackColor(itemType, trackColor);
+            _circleRenderer.color = GetModifiedTrackColor(itemType, trackColor);
 
             switch (itemType)
             {
                 case TrackModifierType.RhythmStyle:
-                    shouldPulse = true;
-                    shouldRotate = false;
+                    _shouldPulse = true;
+                    _shouldRotate = false;
                     break;
                 case  TrackModifierType.Remix:
-                    shouldPulse = false;
-                    shouldRotate = true;
+                    _shouldPulse = false;
+                    _shouldRotate = true;
                     break;
 
                 case  TrackModifierType.RootShift:
-                    shouldPulse = true;
-                    shouldRotate = true;
+                    _shouldPulse = true;
+                    _shouldRotate = true;
                     break;
                 case  TrackModifierType.ChordProgression:
-                    shouldPulse = true;
-                    shouldRotate = true;
+                    _shouldPulse = true;
+                    _shouldRotate = true;
                     break;
             }
         }

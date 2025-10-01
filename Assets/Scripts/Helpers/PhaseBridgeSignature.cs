@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-
+//CHATGPT REMOVAL HICCUP - NOT CURRENTLY INTEGRATED
 public enum HarmonyCommit { AtBridgeStart, MidBridge, AtBridgeEnd }
 
 [Serializable]

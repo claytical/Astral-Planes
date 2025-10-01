@@ -5,6 +5,7 @@ using System.Linq;
 using Effects;
 using Gameplay.Mining;
 using UnityEngine;
+using UnityEngine.Rendering.UI;
 
 public class PhaseStar : MonoBehaviour
 {
@@ -22,6 +23,12 @@ public class PhaseStar : MonoBehaviour
     public float dustShrinkUnitsPerSecond = 1.2f;
     public LayerMask dustLayer;
     public AnimationCurve dustFalloff = AnimationCurve.Linear(0,1,1,0);
+    [SerializeField] private float _dustShrinkRadius;
+    [SerializeField] private float _dustUnitsPerSec;
+    [SerializeField] private AnimationCurve _dustFalloff;
+    [SerializeField] private float _regrowDelayMul;
+    [SerializeField] private bool _feedsDust;
+    [SerializeField] private float shardScatterRadius;
 
     private int mineNodesEjected = 0, _startIndex = 0;
     private float _smoothedFaceAngle, _faceAngularVel,_spin, _driftRechooseTimer;
@@ -50,12 +57,6 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private SpriteRenderer[] starSprites;          // root SR (can be null in prefab; we’ll find it)
     [SerializeField] private ParticleSystem starParticles;       // child VFX
     [SerializeField] private SpawnStrategyProfile spawnStrategyProfile;
-    [SerializeField] private float _dustShrinkRadius;
-    [SerializeField] private float _dustUnitsPerSec;
-    [SerializeField] private AnimationCurve _dustFalloff;
-    [SerializeField] private float _regrowDelayMul;
-    [SerializeField] private bool _feedsDust;
-    [SerializeField] private float shardScatterRadius;
     
     private enum AntiColorMode { ComplementHue, InvertRGB }
     private enum PhaseStarState
@@ -65,15 +66,15 @@ public class PhaseStar : MonoBehaviour
         MissedCorrection,// visible; eject only missed notes for the burst track
         Completed        // all targeted tracks are perfect
     }
-    private enum ExplosionCue { Contact, Eject, ChaseStart, ChaseEnd, PhaseAdvance }
-    private struct ExplosionCueConfig {
+    public enum ExplosionCue { Contact, Eject, ChaseStart, ChaseEnd, PhaseAdvance }
+    public struct ExplosionCueConfig {
         public ExplosionCue cue;
         public GameObject   vfxPrefab;  // optional (pool-friendly)
         public AudioClip    sfx;        // optional
         [Range(0.2f,3f)] public float   defaultScale;
     }
-    [SerializeField] private ExplosionCueConfig[] explosionConfigs;
-    private readonly Dictionary<ExplosionCue, ExplosionCueConfig> _explosionMap = new();
+    [SerializeField] private List<ExplosionCueConfig> _explosionConfigs;  // assign in prefab
+    private Dictionary<ExplosionCue, ExplosionCueConfig> _explosionMap;
     [SerializeField] private AntiColorMode antiMode = AntiColorMode.ComplementHue;
     [SerializeField, Range(0.0f, 2.0f)] private float antiSaturationScale = 1.05f;
     [SerializeField, Range(0.2f, 1.8f)] private float antiValueScale      = 1.05f;
@@ -99,7 +100,7 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private AnimationCurve shardFlightEase = AnimationCurve.EaseInOut(0,0,1,1);
 
     // ======= ENTRYPOINT =======
-    public void Initialize(DrumTrack track, MineNodeProgressionManager manager, IEnumerable<InstrumentTrack> targets, bool armFirstPokeCommit, PhaseStarBehaviorProfile profile)
+    public void Initialize(DrumTrack track, MineNodeProgressionManager manager, IEnumerable<InstrumentTrack> targets, bool armFirstPokeCommit, PhaseStarBehaviorProfile profile, MusicalPhase phase)
     {
         // 0) Core refs
         ResetForNewLife();
@@ -107,7 +108,7 @@ public class PhaseStar : MonoBehaviour
         drumTrack = track;
         controller = drumTrack.trackController;
         progressionManager = manager;
-        assignedPhase = drumTrack.currentPhase;
+        assignedPhase = phase;
         SetBehaviorProfile(profile);
         if (behaviorProfile == null) return;
         pulseSpeed = behaviorProfile.particlePulseSpeed;
@@ -175,17 +176,29 @@ public class PhaseStar : MonoBehaviour
     public void SetSpawnStrategyProfile(SpawnStrategyProfile profile) => spawnStrategyProfile = profile;
     public void NotifyShardBurstComplete(InstrumentTrack track)
     {
+        Debug.Log($"Shard Burst Complete: {track}");
         if (_phaseAdvanceStarted) return;
+        Debug.Log($"Watching Burst Before Resolution: {track}");
         
         StartCoroutine(WatchBurstThenResolve(track));
     }
 
     private void Awake()
     {
-        ResetForNewLife();
+        // Always init the map
+        _explosionMap = _explosionMap ?? new Dictionary<ExplosionCue, ExplosionCueConfig>();
         _explosionMap.Clear();
-        foreach (var cfg in explosionConfigs) _explosionMap[cfg.cue] = cfg;
-        ApplyBehavior();
+
+        if (_explosionConfigs == null || _explosionConfigs.Count == 0)
+        {
+            Debug.LogWarning("[PhaseStar] No explosionConfigs assigned on prefab; explosions will be disabled.");
+            return; // leave map empty; callers must handle gracefully
+        }
+
+        foreach (var cfg in _explosionConfigs)
+        {
+            _explosionMap[cfg.cue] = cfg;   // last one wins on duplicates
+        }
     }
     void FixedUpdate()
     {
@@ -213,8 +226,6 @@ public class PhaseStar : MonoBehaviour
         Vector2 v = (_driftDir + j).normalized * speed;
 
         rb.linearVelocity = v;
-//        AlignAndSpinToVelocity(v);
-        //UpdateDiamonds(v);
         OrientDiamondsToVelocity(v);
         PulseSpriteAlpha();
         // optional blink/teleport spice (Wildcard)
@@ -234,7 +245,7 @@ public class PhaseStar : MonoBehaviour
         if (!_behaviorApplied) ApplyBehavior();
     }
     private void FireExplosion(ExplosionCue cue, Vector2 worldPos, Color tint, float scale = 1f) {
-        if (!_explosionMap.TryGetValue(cue, out var cfg)) return;
+        if (_explosionMap == null || !_explosionMap.TryGetValue(cue, out var cfg)) return;
 
         if (cfg.vfxPrefab) {
             var go = Instantiate(cfg.vfxPrefab, worldPos, Quaternion.identity);
@@ -260,7 +271,9 @@ public class PhaseStar : MonoBehaviour
     }
     private void PrepareNextDirective()
     {
+        Debug.Log($"Preparing Next Directive");
         var phaseProfile = progressionManager?.GetProfileForPhase(assignedPhase);
+        Debug.Log($"Phase Profile: {phaseProfile}");
         if (spawnStrategyProfile == null)
         {
             Debug.LogWarning("[PhaseStar] No SpawnStrategyProfile assigned — falling back to simple directive.");
@@ -279,7 +292,7 @@ public class PhaseStar : MonoBehaviour
         );
 
         _cachedTrack = _cachedDirective?.assignedTrack;
-
+        Debug.Log($"Cached Directive: {_cachedDirective} Cached Track: {_cachedTrack}");
         if (_cachedDirective == null || _cachedTrack == null)
         {
             Debug.LogWarning("[PhaseStar] Strategy returned null directive or track — falling back.");
@@ -303,12 +316,14 @@ public class PhaseStar : MonoBehaviour
         _cachedTrack = PickNextTargetTrack();
         if (_cachedTrack == null)
         {
+            Debug.Log($"Cached Track is null, setting cached directive to null");
             _cachedDirective = null;
             return;
         }
         Debug.Log($"Fallback for {_cachedTrack}");
         var ns = GameFlowManager.Instance.noteSetFactory.Generate(_cachedTrack, assignedPhase);
         _cachedTrack.SetNoteSet(ns);
+        Debug.Log($"New Cached Track Noteset {ns}");
 
         _cachedDirective = new MinedObjectSpawnDirective {
             assignedTrack   = _cachedTrack,
@@ -316,10 +331,12 @@ public class PhaseStar : MonoBehaviour
             minedObjectType = MinedObjectType.NoteSpawner,
             displayColor    = _cachedTrack.trackColor
         };
+        Debug.Log($"New Cached Direction {_cachedDirective}");
         _cachedPreviewColor = _cachedDirective.displayColor;
     }
     private void RefreshPreviewFromCache()
     {
+        Debug.Log($"Refreshing Preview from Cache");
         // Sprites/diamonds from cached track color
         SetStarTint(_cachedPreviewColor, false);            // you already have SetStarTint(...)
         // Particles from phase/anti-phase (your existing helper)
@@ -330,6 +347,7 @@ public class PhaseStar : MonoBehaviour
     }
     private void SetBehaviorProfile(PhaseStarBehaviorProfile profile, bool applyNow = true)
     {
+        Debug.Log($"Setting behavior profile {profile} and appliny {applyNow}");
         behaviorProfile = profile;
         if (applyNow) ApplyBehavior();
     }
@@ -342,6 +360,7 @@ public class PhaseStar : MonoBehaviour
             _regrowDelayMul   = Mathf.Max(0.1f, behaviorProfile.dustRegrowDelayMul);
             // CosmicDustGenerator.GlobalRegrowDelayMul = _regrowDelayMul;
            _behaviorApplied = true;
+           Debug.Log($"Behavior applied for {behaviorProfile}");
     }
     private Color GetDustPhaseColor() { return ComputeAntiColor(_cachedPreviewColor); }
     private Color ComputeAntiColor(Color src) {
@@ -448,6 +467,7 @@ public class PhaseStar : MonoBehaviour
     }
     private void DisableAllCollidersAndRenderers()
     {
+        Debug.Log($"Disabling All Colliders and Renderers");
         if (_allRenderers == null || _allColliders == null) CacheAllVis();
 
         foreach (var r in _allRenderers)
@@ -461,6 +481,7 @@ public class PhaseStar : MonoBehaviour
     }
     private void EnableAllCollidersAndRenderers()
     {
+        Debug.Log($"Enabling all colliders and renderers");
         if (_allRenderers == null || _allColliders == null) CacheAllVis();
 
         foreach (var r in _allRenderers) if (r) r.enabled = true;
@@ -471,6 +492,7 @@ public class PhaseStar : MonoBehaviour
         if (rb) { rb.linearVelocity = Vector2.zero; rb.angularVelocity = 0f; rb.constraints = RigidbodyConstraints2D.FreezeRotation; }
     }
     private void ResetForNewLife() { 
+        Debug.Log($"Reset for New Life");
         state = PhaseStarState.IdleWandering;
         _phaseAdvanceStarted = false;
         _acceptingDefers = true;
@@ -492,6 +514,7 @@ public class PhaseStar : MonoBehaviour
     }
     private void MarkStarInactive()
     {
+        Debug.Log($"Marking Star Inactive");
         if (drumTrack) drumTrack.isPhaseStarActive = false;
         if (progressionManager) progressionManager.phaseStarActive = false;
     }
@@ -569,6 +592,7 @@ public class PhaseStar : MonoBehaviour
         trails.lifetime = 0.3f;
         trails.minVertexDistance = 0.05f;
         //trails.widthOverTrail = 0.03f;
+        Debug.Log($"Configured Inhaling Particles with {phaseColor}");
     }
     
     private IEnumerator EntrancePulse() { yield return null; }
@@ -583,8 +607,11 @@ public class PhaseStar : MonoBehaviour
         Debug.Log($"[PhaseStar] Vehicle collision; state={state} cachedTrack={_cachedTrack}");
 
         var track = PickNextTargetTrack();
+        Debug.Log($"Picked Track {track}");
+
         if (track == null)
         {
+            Debug.Log($"No Track Selected, Setting Phase Star to Complete");
             state = PhaseStarState.Completed;                  // <-- be explicit
             StartCoroutine(FinishPhaseAndAdvance());
             return;
@@ -595,9 +622,9 @@ public class PhaseStar : MonoBehaviour
         var contactPoint = coll.GetContact(0).point;
 
         if (_cachedDirective == null || _cachedTrack == null)
-            PrepareNextDirective();
-        if (_cachedDirective == null || _cachedTrack == null)
         {
+            PrepareNextDirective();
+            Debug.Log($"Cached Directive or Cached Track is null, Finish Phase and Advance Started");
             StartCoroutine(FinishPhaseAndAdvance());
             return;
         }
@@ -617,10 +644,13 @@ public class PhaseStar : MonoBehaviour
             _startIndex = (_startIndex + 1) % targetTracks.Count;
 
         if (!_firstPokeHandled) _firstPokeHandled = true;
+        Debug.Log($"First Poke Handled: {_firstPokeHandled} new start index {_startIndex} ");
     }
     private InstrumentTrack PickNextTargetTrack()
 {
+    Debug.Log("Looking for next target...");
     if (targetTracks == null || targetTracks.Count == 0) return null;
+    Debug.Log($"Found Tracks to Target");
     int n = targetTracks.Count;
 
     for (int i = 0; i < n; i++)
@@ -629,14 +659,17 @@ public class PhaseStar : MonoBehaviour
         var t = targetTracks[idx];
         if (!perfectTracks.Contains(t)) return t;
     }
+    Debug.Log($"Returning null for track");
     return null;
 }
     private IEnumerator WatchBurstThenResolve(InstrumentTrack track)
     {
+        
         // 1) wait while ghost/pattern is emitting (global flag)
         float start = Time.time, hardTimeout = 12f;
-        while (GameFlowManager.Instance != null && GameFlowManager.Instance.ghostCycleInProgress)
+        while (GameFlowManager.Instance != null && GameFlowManager.Instance.GhostCycleInProgress)
         {
+        Debug.Log($"Cycle in process... time left {Time.time - start}, hard time out {hardTimeout}");            
             if (Time.time - start > hardTimeout) break;
             yield return null;
         }
@@ -662,6 +695,7 @@ public class PhaseStar : MonoBehaviour
         // Only defer if we’re still accepting; ignore late adds once phase end starts
         if (_acceptingDefers && missed != null && missed.Count > 0)
         {
+            Debug.Log($"Deferring missed notes...");
             _deferredMissed ??= new Dictionary<InstrumentTrack, List<(int step, int note, int duration, float velocity)>>();
             _deferredMissed[track] = missed;
         }
@@ -673,19 +707,18 @@ public class PhaseStar : MonoBehaviour
             if (!_phaseAdvanceStarted)
             {
                 state = PhaseStarState.Completed;
-
                 var from = assignedPhase; // the phase this star belongs to
                 var to   = progressionManager.GetNextPhase(); // new helper
                 var color = progressionManager.ResolveNextPhaseStarColor(to);
-                Debug.Log($"Moving to next phase {to}");
+                Debug.Log($"Moving to next phase {to} from {from}");
                 // Pass the actual perfect set to seed the bridge
                 progressionManager.BeginBridgeToNextPhase(from, to, new List<InstrumentTrack>(perfectTracks), color);
-
+                Debug.Log($"Finishing Phase...");
                 StartCoroutine(FinishPhaseAndAdvance()); // keep your existing cleanup path
             }
             yield break;
         }
-
+        Debug.Log($"Rearming Visuals");
         // Rearm visuals
         TintToPhaseColor();
         state = PhaseStarState.IdleWandering;
@@ -924,12 +957,14 @@ public class PhaseStar : MonoBehaviour
     Destroy(gameObject);
 }
     private bool SpawnColoredMineNode(int index, Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track, Color previewColor) {
+        Debug.Log($"Spawning Colored Mine Node: {directive}");
         if (drumTrack == null || mineNodeSpawnerPrefab == null) return false;
         if (spawnStrategyProfile == null || track == null) return false;
 
         // Lock directive to chosen track
         directive.assignedTrack = track;
         directive.displayColor  = previewColor;
+        Debug.Log($"Spawning {track} with {previewColor}");
 
         if (directive.role == default && track != null)
             directive.role = track.assignedRole;
@@ -941,6 +976,7 @@ public class PhaseStar : MonoBehaviour
             var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, assignedPhase);
             track.SetNoteSet(ns);
             directive.noteSet = ns;
+            Debug.Log($"Generated NoteSet: {ns} for {track}");
         }
 
         // --- Choose a free cell with fallbacks ---
@@ -975,19 +1011,37 @@ public class PhaseStar : MonoBehaviour
 
         node.OnResolved += (kind, dir) =>
         {
+            Debug.Log($"Resolved Node, starting clear and rearm {track} with {dir.noteSet}");
             StartCoroutine(ClearThenSpawnAndRearm(track, dir.noteSet));
         };
 
-        InitializeChildFromDirective(node.gameObject, directive);
+// Wire the node *and* its payload spawner if present
+        InitializeChildFromDirective(node.gameObject, directive); // fallback in case spawner is on root
+
+// Ensure the real payload gets the same directive wiring (track, role profile, noteset)
+        var childSpawner = node.GetComponentInChildren<NoteSpawnerMinedObject>(true);
+        if (childSpawner != null)
+        {
+            InitializeChildFromDirective(childSpawner.gameObject, directive);
+            Debug.Log($"[PhaseStar] NoteSpawner payload wired for {track.name} ({directive.noteSet?.name})");
+        }
+        else
+        {
+            Debug.LogWarning("[PhaseStar] Spawned MineNode has no NoteSpawnerMinedObject in children — payload may not emit.");
+        }
         ApplyNodeColor(node, previewColor);
         var nodeGO = node.gameObject;
         node.transform.position = targetPos;
 
         // Enter chase state only now that a node exists
         state = PhaseStarState.ShardChase;
+        Debug.Log($"Back to shard chase...");
         _awaitingBurstResolution = true;
         DisableAllCollidersAndRenderers();
         SetStarVisible(false);
+        Debug.Log($"[PhaseStar] Spawn armed → role={directive.role} " +
+                  $"profile={directive.roleProfile?.name} " +
+                  $"track={track.name} noteset={directive.noteSet?.name ?? "(null)"}");
 
         StartCoroutine(
             MoveShardToTarget(
@@ -1210,6 +1264,8 @@ public class PhaseStar : MonoBehaviour
     }
     private IEnumerator MoveShardToTarget(Vector3 from, Vector3 to, GameObject wrapper, GameObject nodeGO, float seconds, System.Action onLanded // NEW
     ){
+        Debug.Log($"Moving Shard to Target...");
+
         if (!nodeGO) yield break;
         if (nodeGO)
         {

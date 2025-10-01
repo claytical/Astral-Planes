@@ -9,82 +9,81 @@ public class MineNodeRailAgent : MonoBehaviour
     public bool  snapAtCorners  = true;
     public event System.Action OnPlanStart;
     public event System.Action OnPlanReady;
-    public bool HasPath => path != null && pathIndex < path.Count;
+    public bool HasPath => _path != null && _pathIndex < _path.Count;
 
-    Rigidbody2D rb;
-    DrumTrack drum;
-    List<Vector2Int> path = new();
-    int pathIndex = 0;
-    float lastReplanTime = -999f;
+    private Rigidbody2D _rb;
+    private DrumTrack _drum;
+    private List<Vector2Int> _path = new();
+    private int _pathIndex = 0;
+    private float _lastReplanTime = -999f;
 
-    public System.Func<Vector2Int> targetProvider; // plug a goal function (vehicle, corner, etc.)
+    private System.Func<Vector2Int> _targetProvider; // plug a goal function (vehicle, corner, etc.)
 
     void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        drum = FindAnyObjectByType<DrumTrack>();
+        _rb = GetComponent<Rigidbody2D>();
+        _drum = FindAnyObjectByType<DrumTrack>();
     }
-
-    public void SetPath(IList<Vector2Int> cells)
-    {
-        path.Clear();
-        if (cells != null) path.AddRange(cells);
-        pathIndex = 0;
-    }
-
-    public void SetTargetProvider(System.Func<Vector2Int> provider) => targetProvider = provider;
-
     void FixedUpdate()
     {
-        if (drum == null) return;
+        if (_drum == null) return;
 
         // If we have no path or we've reached the end, (re)plan toward target
         if (NeedsPath())
         {
             TryPlanToTarget();
-            rb.linearVelocity = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
             return;
         }
 
         // Move toward next cell center
-        var next = path[pathIndex];
-        Vector2 nextPos = drum.CellCenter(next);
-        Vector2 curPos  = rb.position;
+        var next = _path[_pathIndex];
+        Vector2 nextPos = _drum.CellCenter(next);
+        Vector2 curPos  = _rb.position;
         Vector2 delta   = nextPos - curPos;
 
-        float step = cellsPerSecond * Time.fixedDeltaTime * drum.GetCellWorldSize();// implement GetCellWorldSize() or divide by your world scale
+        float step = cellsPerSecond * Time.fixedDeltaTime * _drum.GetCellWorldSize();// implement GetCellWorldSize() or divide by your world scale
         if (delta.magnitude <= step)
         {
             // Arrive at cell center
-            rb.position = nextPos;
-            pathIndex++;
+            _rb.position = nextPos;
+            _pathIndex++;
 
             // At intersections or if the next step is blocked by freshly spawned dust, replan
-            if (Time.time - lastReplanTime > replanCooldown)
+            if (Time.time - _lastReplanTime > replanCooldown)
             {
-                if (pathIndex >= path.Count || !drum.IsSpawnCellAvailable(path[pathIndex].x, path[pathIndex].y))
+                if (_pathIndex >= _path.Count || !_drum.IsSpawnCellAvailable(_path[_pathIndex].x, _path[_pathIndex].y))
                 {
                     TryPlanToTarget();
                 }
             }
-            rb.linearVelocity = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
         }
         else
         {
             // Constant-speed glide along corridor
-            rb.linearVelocity = delta.normalized * (cellsPerSecond * drum.GetCellWorldSize());
+            _rb.linearVelocity = delta.normalized * (cellsPerSecond * _drum.GetCellWorldSize());
         }
     }
 
-    bool NeedsPath() => pathIndex >= path.Count || path.Count == 0;
+    bool NeedsPath() => _pathIndex >= _path.Count || _path.Count == 0;
 
+    public void SetPath(IList<Vector2Int> cells)
+    {
+        _path.Clear();
+        if (cells != null) _path.AddRange(cells);
+        _pathIndex = 0;
+    }
+
+    public void SetTargetProvider(System.Func<Vector2Int> provider) => _targetProvider = provider;
+    
     void TryPlanToTarget()
     {
-        if (targetProvider == null) return;
-        Vector2Int start = drum.CellOf(rb.position);
-        Vector2Int goal  = targetProvider.Invoke();
+        if (_targetProvider == null) return;
+        Vector2Int start = _drum.CellOf(_rb.position);
+        Vector2Int goal  = _targetProvider.Invoke();
         var scratch = new List<Vector2Int>();
-        if (drum.TryFindPath(start, goal, scratch))
+        if (_drum.TryFindPath(start, goal, scratch))
         {
             SetPath(scratch);
             OnPlanStart?.Invoke();     
@@ -94,11 +93,11 @@ public class MineNodeRailAgent : MonoBehaviour
             // No path? Nudge randomly to nearest free neighbor
             foreach (var n in Neighbors(start))
             {
-                if (drum.IsSpawnCellAvailable(n.x, n.y)) { SetPath(new[]{ n }); break; }
+                if (_drum.IsSpawnCellAvailable(n.x, n.y)) { SetPath(new[]{ n }); break; }
             }
         }
 
-        lastReplanTime = Time.time;
+        _lastReplanTime = Time.time;
     }
 
     IEnumerable<Vector2Int> Neighbors(Vector2Int c)

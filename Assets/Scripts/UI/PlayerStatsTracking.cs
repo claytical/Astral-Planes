@@ -1,5 +1,7 @@
 using UnityEngine;
-
+/// <summary>
+/// NOT INTEGRATED
+/// </summary>
 public class PlayerStatsTracking : MonoBehaviour
 {
     public int score = 0;

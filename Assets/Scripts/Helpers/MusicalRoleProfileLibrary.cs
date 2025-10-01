@@ -5,7 +5,7 @@ public static class MusicalRoleProfileLibrary
 {
     private static Dictionary<MusicalRole, MusicalRoleProfile> _roleToProfile;
 
-    public static void LoadProfiles()
+    private static void LoadProfiles()
     {
         _roleToProfile = new Dictionary<MusicalRole, MusicalRoleProfile>();
         var profiles = Resources.LoadAll<MusicalRoleProfile>("RoleProfiles");

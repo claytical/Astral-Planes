@@ -3,13 +3,11 @@ using System.Collections.Generic;
 
 public class MineNodeSpawner : MonoBehaviour
 {
-    public ParticleSystem particles;
-    
     public GameObject nodePrefab;
-    private GameObject spawnedNode;
-    private Vector2Int gridPosition;
-    private DrumTrack drumTrack;
     public Color resolvedColor;
+    private GameObject _spawnedNode;
+    private Vector2Int _gridPosition;
+    private DrumTrack _drumTrack;
     
     void Start()
     {
@@ -17,21 +15,15 @@ public class MineNodeSpawner : MonoBehaviour
         if (childRenderer != null)
         {
             childRenderer.color = resolvedColor;
-            
         }
-    }
-   
-    public void SetDrumTrack(DrumTrack drums)
-    {
-        drumTrack = drums;
     }
     public MineNode SpawnNode(Vector2Int cell, MinedObjectSpawnDirective directive)
     {
-        gridPosition = cell;
-        Vector3 worldPos = drumTrack.GridToWorldPosition(cell);
+        _gridPosition = cell;
+        Vector3 worldPos = _drumTrack.GridToWorldPosition(cell);
     
         GameObject obj = Instantiate(nodePrefab, worldPos, Quaternion.identity);
-        spawnedNode = obj;
+        _spawnedNode = obj;
         Debug.Log($"[MineNodeSpawner] SpawnNode -> '{obj.name}' ({obj.GetInstanceID()}) at {worldPos}, parent={obj.transform.parent?.name}");
         
         var node = obj.GetComponent<MineNode>();
@@ -46,25 +38,29 @@ public class MineNodeSpawner : MonoBehaviour
                 rail.SetTargetProvider(() =>
                 {
                     // Start from the node’s current cell and choose the farthest reachable passable cell.
-                    Vector2Int start = drumTrack.WorldToGridPosition(rail.transform.position);
-                    return drumTrack.FarthestReachableCellInComponent(start); // helper shown below
+                    Vector2Int start = _drumTrack.WorldToGridPosition(rail.transform.position);
+                    return _drumTrack.FarthestReachableCellInComponent(start); // helper shown below
                 });
 
                 // Kick the first path immediately
-                var start = drumTrack.WorldToGridPosition(rail.transform.position);
-                var goal  = drumTrack.FarthestReachableCellInComponent(start);
+                var start = _drumTrack.WorldToGridPosition(rail.transform.position);
+                var goal  = _drumTrack.FarthestReachableCellInComponent(start);
                 var path  = new List<Vector2Int>();
-                if (drumTrack.TryFindPath(start, goal, path))
+                if (_drumTrack.TryFindPath(start, goal, path))
                     rail.SetPath(path);
             }
 
-            drumTrack.OccupySpawnGridCell(cell.x, cell.y, GridObjectType.Node);
+            _drumTrack.OccupySpawnGridCell(cell.x, cell.y, GridObjectType.Node);
         }
         else
         {
             Debug.LogError("🚨 nodePrefab is missing a MineNode component.");
         }
         return node;
+    }
+    public void SetDrumTrack(DrumTrack drums)
+    {
+        _drumTrack = drums;
     }
 
 

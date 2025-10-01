@@ -6,7 +6,7 @@ public static class ShipMusicalProfileLoader
 {
     private static Dictionary<string, ShipMusicalProfile> _profilesByName;
 
-    public static void Load()
+    private static void Load()
     {
         if (_profilesByName != null) return; // Already loaded
 

@@ -116,6 +116,7 @@ public class HarmonyDirector : MonoBehaviour
         Mathf.Max(1, steps);
     }
     public void CommitNextChordNow() {
+        Debug.Log($"Committing next chord now");
         _armedChordAdvance = true;
         _pendingCharges = Mathf.Clamp(_pendingCharges + 1, 1, MaxCharges);
         Debug.Log($"[HD] CommitNextChordNow armed=true pendingCharges={_pendingCharges}");

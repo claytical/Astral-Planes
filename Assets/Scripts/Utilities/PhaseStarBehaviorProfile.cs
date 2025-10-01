@@ -11,7 +11,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Header("Identity & Mood")]
     public PhasePersonality personality;
     public Color starColor = Color.white;
-    public Color dustColor = Color.white;
     [Range(0.25f,3f)] public float particlePulseSpeed = 1f;
     [Range(0f,1f)] public float starAlphaMin = 0.1f, starAlphaMax = 1f;
 
@@ -20,15 +19,16 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public float starDriftSpeed = 0.6f;
     [Tooltip("Random steering jitter; higher feels erratic/trickster.")]
     public float starDriftJitter = 0.15f;
-    [Range(0f,1f)] public float orbitBias = 0.0f;     // tendency to arc
-    [Range(0f,0.2f)] public float teleportChancePerSec = 0f; // Wildcard spice (0=off)
+    [Range(0f,1f)] public float orbitBias;     // tendency to arc
+    [Range(0f,0.2f)] public float teleportChancePerSec; // Wildcard spice (0=off)
 
     [Header("Dust Pruning / Feeding")]
     public float dustShrinkRadius = 6f;
     public float dustShrinkUnitsPerSec = 1.2f;
     public AnimationCurve dustFalloff = AnimationCurve.Linear(0,1,1,0);
+
     [Tooltip("If true (Dark Star), dust grows/lingers rather than fades.")]
-    public bool feedsDust = false;
+    public bool feedsDust;
     [Range(0.1f,2f)] public float dustRegrowDelayMul = 1f; // >1 = slower regrow
 
     [Header("MineNode Ejection")]
@@ -41,21 +41,8 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 
     [Header("Ghost / Collectable Rules")]
     public ExpirePolicy expirePolicy = ExpirePolicy.WaitForAll;
-    public NoteVisibility noteVisibility = NoteVisibility.PulseOnStep;
-    public bool emitMissedAsCorrection = true;     // current “missed correction” burst
-    public bool allowShardRecyclingWhenMissed = false; // turn misses into ShardPickup bursts
-    [Range(0f,1f)] public float shardHavocChance = 0f;  // 0 = always helpful, 1 = mostly havoc
-
-    [Header("MineNode (role-aware) movement base")]
-    [Tooltip("Global cap for node speed. Roles & phase multipliers ride on top.")]
-    public float nodeBaseMaxSpeed = 3.0f;
-    public float nodeBaseMaxForce = 10f;
-    [Tooltip("Describes the species’ temperament for gaits / steering.")]
-    public float leadFrolicBias = 0.6f;
-    public float bassHideBias   = 0.6f;
-    public float grooveEvadeBias = 0.6f;
-    public float harmonyOrbitBias = 0.6f;
-
+    public bool allowShardRecyclingWhenMissed ; // turn misses into ShardPickup bursts
+    
     [Header("Per-Phase speed multipliers for nodes")]
     public float establishSpeedMul = 0.8f;
     public float evolveSpeedMul     = 1.0f;
@@ -84,20 +71,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public MineRoleTuning groove;
 
     // Resolve phase speed multiplier (for MineNodeLocomotion)
-    public float GetPhaseSpeedMul(PhasePersonality p)
-    {
-        return p switch
-        {
-            PhasePersonality.Establish => establishSpeedMul,
-            PhasePersonality.Evolve    => evolveSpeedMul,
-            PhasePersonality.Intensify => intensifySpeedMul,
-            PhasePersonality.Release   => releaseSpeedMul,
-            PhasePersonality.Wildcard  => wildcardSpeedMul,
-            PhasePersonality.Pop       => popSpeedMul,
-            PhasePersonality.DarkStar  => evolveSpeedMul, // or unique mul
-            _ => 1f
-        };
-    }
 
     public MineRoleTuning GetRoleTuning(MusicalRole role)
     {

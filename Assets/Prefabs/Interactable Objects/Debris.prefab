@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4213040972611002}
-  - component: {fileID: 5907910837567832253}
   - component: {fileID: 3706479320875781435}
   - component: {fileID: 4993008824631711877}
   - component: {fileID: 8747843313378906591}
@@ -36,25 +35,6 @@ Transform:
   - {fileID: 3732494607500995976}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &5907910837567832253
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1be0bc7487a24594a80ec8fcf38e6fa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  track: {fileID: 0}
-  step: 0
-  note: 0
-  duration: 0
-  velocity: 80
-  energyCost: 0.08
-  flyToRibbonDuration: 0.25
 --- !u!50 &3706479320875781435
 Rigidbody2D:
   serializedVersion: 5

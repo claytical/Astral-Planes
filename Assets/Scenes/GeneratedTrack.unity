@@ -5693,8 +5693,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
-  tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
-    type: 3}
   assignedRole: 0
   lowestAllowedNote: 48
   highestAllowedNote: 72
@@ -6105,8 +6103,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
-  tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
-    type: 3}
   assignedRole: 1
   lowestAllowedNote: 36
   highestAllowedNote: 72
@@ -6186,8 +6182,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
-  tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
-    type: 3}
   assignedRole: 3
   lowestAllowedNote: 48
   highestAllowedNote: 96
@@ -6940,7 +6934,6 @@ RectTransform:
   m_Children:
   - {fileID: 45202785}
   - {fileID: 657963291}
-  - {fileID: 2057904928}
   - {fileID: 1758545868}
   m_Father: {fileID: 48689788}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7142,22 +7135,20 @@ MonoBehaviour:
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
     type: 2}
   drumLoopBPM: 120
+  spawnGrid: {fileID: 1354683687}
   gridPadding: 1
-  galaxyVisualizer: {fileID: 1041262113}
-  collectionMode: 0
   totalSteps: 16
+  timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   startDspTime: 0
   currentPhase: 0
-  spawnGrid: {fileID: 1354683687}
+  progressionManager: {fileID: 1354683688}
   activeHexagons: []
   activeMinedObjects: []
   activeMineNodes: []
   isPhaseStarActive: 0
   currentStep: 0
-  progressionManager: {fileID: 1354683688}
-  timingWindowSteps: 4
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -7194,7 +7185,6 @@ MonoBehaviour:
   - {fileID: 1690824280}
   - {fileID: 627412777}
   - {fileID: 652946508}
-  activeTrack: {fileID: 652946508}
   noteVisualizer: {fileID: 45202786}
   noteSetPrefab: {fileID: 5821295020177947933, guid: b2b7f0ea1bccb49aeb72c00af25a23bb,
     type: 3}
@@ -7323,9 +7313,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 36dd79ade9e1040efa29d9ec25d71669, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  requiredNotesPerTrack: 6
-  minimumLoopCount: 0
-  requireLoopCount: 0
   phaseProfiles:
   - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
   - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
@@ -7333,8 +7320,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4d38e6e924afc450a8b4dc5f1c8b4ca8, type: 2}
   - {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
   - {fileID: 11400000, guid: c36ca097ec10c4fd2b51488a8fef5cb9, type: 2}
-  totalMinedObjectsCollected: 0
-  loopsCompleted: 0
   phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
   isPhaseInProgress: 0
   isPhaseTransitioning: 0
@@ -7426,9 +7411,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   drumTrack: {fileID: 1354683682}
-  hexagonShieldPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c,
-    type: 3}
+  dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   iterations: 1
+  cycleMode: 0
+  minClassicCycleInterval: 0.25
   hexagons: []
   regrowCooldownSeconds: 3
   progressiveMaze: 1
@@ -7437,8 +7423,6 @@ MonoBehaviour:
   featureSpawnBudgetFrac: 0.12
   featureFadeDurationFrac: 0.25
   hexGrowInSeconds: 0.45
-  cycleMode: 0
-  minClassicCycleInterval: 0.25
 --- !u!114 &1354683697
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8448,8 +8432,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
-  tetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
-    type: 3}
   assignedRole: 2
   lowestAllowedNote: 60
   highestAllowedNote: 96
@@ -9144,83 +9126,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1979255051}
   m_CullTransparentMesh: 1
---- !u!1 &2057904927
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2057904928}
-  - component: {fileID: 2057904930}
-  - component: {fileID: 2057904929}
-  m_Layer: 5
-  m_Name: ProgressUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &2057904928
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2057904927}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1248605496}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 1}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -20}
-  m_SizeDelta: {x: 100, y: 75}
-  m_Pivot: {x: 1, y: 1}
---- !u!114 &2057904929
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2057904927}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_IgnoreLayout: 1
-  m_MinWidth: -1
-  m_MinHeight: -1
-  m_PreferredWidth: -1
-  m_PreferredHeight: -1
-  m_FlexibleWidth: -1
-  m_FlexibleHeight: -1
-  m_LayoutPriority: 1
---- !u!114 &2057904930
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2057904927}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d95f908426ed429d8cc51f5b05b3079, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  shardPrefab: {fileID: 8298565027156972493, guid: e208df4c6293d42399a991c8eb66fe25,
-    type: 3}
-  totalShards: 7
-  radius: 0
-  startRotationOffset: 90
-  lockedColor: {r: 1, g: 1, b: 1, a: 0.2}
-  debugColor: {r: 1, g: 0, b: 0, a: 0.6}
-  fixColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
 --- !u!1 &2067870200
 GameObject:
   m_ObjectHideFlags: 0

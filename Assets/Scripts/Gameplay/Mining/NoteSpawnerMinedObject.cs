@@ -1,18 +1,11 @@
-using System;
-using System.Collections;
 using Effects;
-using Gameplay.Mining;
 using UnityEngine;
 
 public class NoteSpawnerMinedObject : MonoBehaviour
 {
     public MusicalRoleProfile musicalRole;
-
     public InstrumentTrack assignedTrack;
     public NoteSet selectedNoteSet;
-    private bool _wasCollected = false;
-    private float _timeToLive = 888f; // seconds or 1 loop cycle
-    private bool _hasBeenTriggered = false;
 
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
@@ -42,7 +35,20 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.NoteSpawner));
         }
     }
-    
+    // NoteSpawnerMinedObject
+    private void OnEnable()
+    {
+        if (assignedTrack != null && selectedNoteSet != null)
+        {
+            Debug.Log($"[NoteSpawner] Emitting burst for {assignedTrack.name} ({selectedNoteSet.name})");
+            assignedTrack.SpawnCollectableBurst(selectedNoteSet, maxToSpawn: 8); // pick a sensible number
+        }
+        else
+        {
+            Debug.LogWarning("[NoteSpawner] Missing track or noteset on enable; no burst.");
+        }
+    }
+
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"NoteSpawnerMinedObject.OnCollisionEnter2D: {coll.gameObject.name}");

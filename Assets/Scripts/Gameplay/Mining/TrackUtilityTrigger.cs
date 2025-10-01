@@ -1,23 +1,14 @@
 using System;
 using System.Collections;
 using UnityEngine;
+//TODO: Implement Ring utilities for chord progressions
 
 public class TrackUtilityTrigger : MonoBehaviour
 {
     public NoteSet selectedNoteSet;
     public InstrumentTrack selectedInstrument;
-    public MusicalRoleProfile selectedMusicalRoleProfile;
     private bool hasBeenTriggered = false;
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    public void Initialize(NoteSet noteSet, InstrumentTrack instrument, MusicalRoleProfile profile)
-    {
-        selectedNoteSet = noteSet;
-        selectedInstrument = instrument;
-        selectedMusicalRoleProfile = profile;
-    }
-
-    // Update is called once per frame
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (hasBeenTriggered) return;

@@ -4,10 +4,7 @@ public class CollectableParticles : MonoBehaviour
 {
     public ParticleSystem particleSystem; // Assign in prefab
     public ParticleSystem coreParticleSystem;
-    private ParticleSystem.MainModule _main;
     private ParticleSystem.EmissionModule _emission;
-    private ParticleSystem.ShapeModule _shape;
-    private ParticleSystem.ColorOverLifetimeModule _colorOverLifetime;
     private NoteTether _tetherRef;
     [SerializeField] private float pullStrength = 0.7f;  // force toward tether
     [SerializeField] private float baseUpSpeed  = 0.35f; // fountain upward component
@@ -27,10 +24,7 @@ public class CollectableParticles : MonoBehaviour
 
         if (particleSystem != null)
         {
-            _main = particleSystem.main;
             _emission = particleSystem.emission;
-            _shape = particleSystem.shape;
-            _colorOverLifetime = particleSystem.colorOverLifetime;
         }
 
     }

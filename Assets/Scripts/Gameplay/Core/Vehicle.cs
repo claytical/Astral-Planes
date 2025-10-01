@@ -58,7 +58,7 @@ public class Vehicle : MonoBehaviour
     private const float remixBoostDuration = 4f;
     private bool remixCharging = false;
     private Color currentColorBlend = Color.white;
-    private VehicleRemixController remixController;
+    private VehicleRemixController _remixController;
     private float envSpeedScale = 1f;
     private float envAccelScale = 1f;
     private float envExtraDamping = 0f;
@@ -93,9 +93,9 @@ public class Vehicle : MonoBehaviour
                 appliedForce = force * burnRateMultiplier * boostMultiplier; // existing【:contentReference[oaicite:10]{index=10}】
                 fuelConsumption = burnRateMultiplier * baseBurnAmount * Time.fixedDeltaTime;
 
-                if (remixController.HasRemixRoles())
+                if (_remixController.HasRemixRoles())
                 {
-                    remixController.FixedUpdateBoosting(Time.fixedDeltaTime, drumTrack.currentStep);
+                    _remixController.FixedUpdateBoosting(Time.fixedDeltaTime, drumTrack.currentStep);
                     UpdateRemixParticleEmission();
                 }
 
@@ -157,7 +157,7 @@ public class Vehicle : MonoBehaviour
         Color roleColor = profile.defaultColor;
 
         // Let the remix controller handle visuals and logic
-        remixController.AddRemixRole(role, roleColor, directive);
+        _remixController.AddRemixRole(role, roleColor, directive);
 
         // Optional: give immediate visual feedback (e.g., pulse, swap sprite color)
         ApplyTrackColorToShip(roleColor);
@@ -182,12 +182,12 @@ public class Vehicle : MonoBehaviour
         var emission = remixParticleEffect.emission;
         emission.rateOverTime = boosting ? 50f : 5f;
 
-        if (!remixParticleEffect.isPlaying && remixController.HasRemixRoles())
+        if (!remixParticleEffect.isPlaying && _remixController.HasRemixRoles())
         {
             Debug.Log("Playing Remix Particle Effect");
             remixParticleEffect.Play();
         }
-        else if (!remixController.HasRemixRoles())
+        else if (!_remixController.HasRemixRoles())
         {
             Debug.Log("Stopping particles");
             remixParticleEffect.Stop();
@@ -229,7 +229,7 @@ public class Vehicle : MonoBehaviour
             shipRenderer = baseSprite;
             audioManager = GetComponent<AudioManager>();
             originalScale = transform.localScale;
-            remixController = GetComponent<VehicleRemixController>();
+            _remixController = GetComponent<VehicleRemixController>();
             loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
             if (rb == null)
             {
@@ -287,7 +287,7 @@ public class Vehicle : MonoBehaviour
     
 
     private void EvaluateRemixCondition() {
-       if(remixController.EvaluateRemixCondition()) {
+       if(_remixController.EvaluateRemixCondition()) {
        }
     }
             
@@ -402,7 +402,7 @@ public class Vehicle : MonoBehaviour
         }
         boosting = false;
         harmony?.CancelBoostArp();
-        remixController.ResetRemixVisuals();
+        _remixController.ResetRemixVisuals();
         burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
         // Disable the trail's emission when boosting stops
