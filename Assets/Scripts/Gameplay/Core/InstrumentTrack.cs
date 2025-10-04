@@ -144,7 +144,7 @@ public class InstrumentTrack : MonoBehaviour
     public void ClearLoopedNotes(TrackClearType type = TrackClearType.Remix, Vehicle vehicle = null)
     {
         if (persistentLoopNotes.Count == 0) return;
-
+        ResetPerfectionFlag();
         switch (type)
         {
             case TrackClearType.EnergyRestore:
@@ -421,7 +421,10 @@ public class InstrumentTrack : MonoBehaviour
     public void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1)
 {
     if (noteSet == null || collectablePrefab == null || controller?.noteVisualizer == null) return;
-
+    if (_currentNoteSet != noteSet)
+    {
+        SetNoteSet(noteSet);
+    }
     var nv = controller.noteVisualizer;
     var stepList  = noteSet.GetStepList();
     var noteList  = noteSet.GetNoteList();
@@ -515,10 +518,17 @@ public class InstrumentTrack : MonoBehaviour
         }
     }
 
-    // Authoritative commit is INSTANT (no motion/lerp in logic layer)
-    CollectNote(targetStep, collectable.GetNote(), durationTicks, force);
-    // Visual: ride pre-attached tether to marker, light it, raise events inside Collectable, then self-destroy
-    collectable.TravelAlongTetherAndFinalize(durationTicks, force, seconds: 0.35f);
+    int note = collectable.GetNote();
+    if (collectable.IsDark) {
+        // Still lands in the loop but uses a darker articulation
+        AddNoteToLoop(targetStep, note, durationTicks, force);
+        PlayDarkNote(note, durationTicks, force);
+        RecalculatePerfectionForCurrentNoteSet(); }
+    else { 
+        // Normal bright collection
+        CollectNote(targetStep, note, durationTicks, force);
+    }
+    collectable.TravelAlongTetherAndFinalize(durationTicks, force, seconds: 1f);
 
     // List hygiene (avoid double-remove)
     if (spawnedCollectables != null)
@@ -600,18 +610,40 @@ public class InstrumentTrack : MonoBehaviour
                 return true; // fallback: assume useful
         }
     }
+    public void ClearLiveCollectablesAndLoop(TrackClearType type = TrackClearType.Remix)
+    {
+        // explode/destroy pickups and free their grid cells
+        for (int i = spawnedCollectables.Count - 1; i >= 0; i--)
+        {
+            var go = spawnedCollectables[i];
+            if (!go) { spawnedCollectables.RemoveAt(i); continue; }
+
+            // free cell now (prevents stale reservations)
+            var gp = drumTrack.WorldToGridPosition(go.transform.position);
+            drumTrack.FreeSpawnCell(gp.x, gp.y);
+            drumTrack.ResetSpawnCellBehavior(gp.x, gp.y);
+
+            if (go.TryGetComponent(out Explode ex)) ex.Permanent();
+            else Destroy(go);
+
+            spawnedCollectables.RemoveAt(i);
+        }
+
+        // clear the persistent loop (visual blast or energy restore depending on 'type')
+        ClearLoopedNotes(type);
+        ResetPerfectionFlagForPhase();
+    }
+    
     public void PerformSmartNoteModification(Vector3 sourcePosition)
     {
         Debug.Log($"Performing SmartNoteModification on {gameObject.name}");
         if (drumTrack == null || !HasNoteSet())
             return;
 
-        MusicalPhase phase = drumTrack.currentPhase;
-
         string[] options;
         Debug.Log($"Assessing options for {_currentNoteSet}");
 
-        switch (phase)
+        switch (GameFlowManager.Instance.phaseTransitionManager.currentPhase)
         {
             case MusicalPhase.Establish:
                 options = new[] { "RootShift", "ChordChange" };
@@ -653,8 +685,33 @@ public class InstrumentTrack : MonoBehaviour
 
         controller.UpdateVisualizer();
     }
+    public void MarkPerfectThisPhase() => IsPerfectThisPhase = true;
     public bool IsPerfectThisPhase { get; private set; }
     public void ResetPerfectionFlag() => IsPerfectThisPhase = false;
+// InstrumentTrack.cs
+    private void RecalculatePerfectionForCurrentNoteSet()
+    {
+        var noteSet = _currentNoteSet;
+        if (noteSet == null)
+        {
+            IsPerfectThisPhase = false;
+            return;
+        }
+
+        // Required steps for this track in the current phase
+        var required = noteSet.GetStepList();
+        if (required == null || required.Count == 0)
+        {
+            IsPerfectThisPhase = false;
+            return;
+        }
+
+        // Steps we actually have in the loop now
+        var have = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
+
+        // Perfect iff we’ve landed at least one note on every required step
+        IsPerfectThisPhase = required.All(step => have.Contains(step));
+    }
 
     private IEnumerator WaitForDrumTrackStartTime() {
         while (drumTrack == null || drumTrack.GetLoopLengthInSeconds() <= 0 || drumTrack.startDspTime == 0)
@@ -784,6 +841,7 @@ public class InstrumentTrack : MonoBehaviour
     {
         AddNoteToLoop(stepIndex, note, durationTicks, force);
         PlayNote(note, durationTicks, force);
+        RecalculatePerfectionForCurrentNoteSet();
         return stepIndex;
     }
     private IEnumerator ResetPitchBendAfterDelay(float delay)

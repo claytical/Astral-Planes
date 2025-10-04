@@ -14,16 +14,15 @@ public class MineNodeProgressionManager : MonoBehaviour
     [Header("Tracking")]
     public MusicalPhaseQueue phaseQueue;
     private int currentPhaseIndex;
-    SpawnStrategyProfile currentSpawnStrategy;
-    SpawnStrategyProfile overrideSpawnStrategy;
-
+    public SpawnStrategyProfile _globalProfile;
     public bool isPhaseInProgress;
     public bool isPhaseTransitioning;
     [HideInInspector] public bool pendingNextPhase = false;
-    private bool hasStartedFirstPhase = false;
-    private MusicalPhase currentPhase;
+    private bool _hasStartedFirstPhase, _spawnInFlight;
     public bool phaseStarActive = false; // 🛡️ Blocks progression until PhaseStar completes
-// === Perfect-loop hold gate ===
+
+    public bool IsSpawnInFlight => _spawnInFlight;
+    // === Perfect-loop hold gate ===
     private bool remixArmed = false;
     private MusicalPhaseProfile pendingPhaseProfileOnCommit = null;
 
@@ -38,7 +37,9 @@ public class MineNodeProgressionManager : MonoBehaviour
     {
         if (remixArmed) pendingPhaseProfileOnCommit = profile;
     }
-    
+    // MineNodeProgressionManager (or wherever you choose a strategy)
+
+
     private void Awake()
     {
         _drumTrack = GetComponent<DrumTrack>();
@@ -48,28 +49,7 @@ public class MineNodeProgressionManager : MonoBehaviour
         if (!_drumTrack || !_trackController)
             Debug.LogError("MineNodeProgressionManager is missing required components on the same GameObject.");
     }
-    public void BeginMazeTransitionForNextPhase(float approxSeconds)
-    {
-        if (_drumTrack?.hexMazeGenerator == null) return;
 
-        // N.B. Your RunLoopAlignedMazeCycle already takes phase + center + durations.
-        // Use current phase as a visual reset before spawning the next star.
-        Vector2Int centerCell = _drumTrack.WorldToGridPosition(_drumTrack.transform.position);
-        float loopSeconds = _drumTrack.GetLoopLengthInSeconds();
-        float growPct = 0.25f;
-        float holdPct = 0.50f;
-
-        _drumTrack.hexMazeGenerator.StartCoroutine(
-            _drumTrack.hexMazeGenerator.RunLoopAlignedMazeCycle(
-                currentPhase,
-                centerCell,
-                loopSeconds,
-                growPct,
-                holdPct
-            )
-        );
-    }
-// MineNodeProgressionManager.cs
     public void BeginBridgeToNextPhase(MusicalPhase from, MusicalPhase to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
     {
         var g = GameFlowManager.Instance;
@@ -96,27 +76,99 @@ public class MineNodeProgressionManager : MonoBehaviour
 
         return Color.white;
     }
+
+    public void NotifyPhaseStarActivated(MusicalPhase phaseFromStar)
+    {
+        pendingNextPhase     = false;
+        isPhaseTransitioning = false;
+        isPhaseInProgress    = true;
+        phaseStarActive      = true;
+        _spawnInFlight       = false;
+    }
+
+
+// Mirrors PhaseTransitionManager's phase, used only for local sequencing.
+    private int _phaseIndexCursor = 0;
+
+    private int GetPhaseIndex(MusicalPhase phase)
+    {
+        if (phaseQueue?.phaseGroups == null || phaseQueue.phaseGroups.Count == 0) return 0;
+        var idx = phaseQueue.phaseGroups.FindIndex(g => g.phase == phase);
+        return Mathf.Max(0, idx);
+    }
+
+    private MusicalPhase PhaseAt(int index)
+    {
+        if (phaseQueue?.phaseGroups == null || phaseQueue.phaseGroups.Count == 0) return MusicalPhase.Establish;
+        var i = Mathf.Clamp(index, 0, phaseQueue.phaseGroups.Count - 1);
+        return phaseQueue.phaseGroups[i].phase;
+    }
+    private void SyncCursorFromPTM()
+    {
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+        if (ptm == null) return;
+        _phaseIndexCursor = GetPhaseIndex(ptm.currentPhase); // expose a CurrentPhase property on PTM if not already
+    }
+
     public void SpawnNextPhaseStarWithoutLoopChange()
     {
-        var next = PeekNextPhase();
-        Debug.Log($"Current Phase: {currentPhase}, Next Phase: {next}");
-        currentPhase = next;
-        
-        if (_drumTrack != null) _drumTrack.currentPhase = currentPhase;
-
-        var group = GetPhaseGroup(currentPhase);
-        var profile = SelectSpawnStrategy(group);
-        if (profile == null) { Debug.LogError($"[Progression] No strategy for {currentPhase}"); return; }
-
-        if (_drumTrack != null && _drumTrack.hexMazeGenerator != null)
+        // Hard guards (keep your existing ones if you have them higher up)
+        if (_spawnInFlight) { Debug.Log("[Progression] Spawn in flight; skip."); return; }
+        if (phaseStarActive || (_drumTrack != null && _drumTrack.isPhaseStarActive))
         {
-            // Build+place star with the proper timing instead of direct spawn:
-            _drumTrack.StartCoroutine(_drumTrack.hexMazeGenerator.GenerateMazeThenPlacePhaseStar(currentPhase, profile));
+            Debug.Log("[Progression] PhaseStar already active; skip spawn.");
+            return;
         }
-        else
+        _spawnInFlight = true;
+
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+
+        // Derive “next” based on PTM’s current phase, not a local copy/index
+        var next = PeekNextPhaseUsingPTM();
+
+        // Ask PTM to move; PTM is the only writer of phase state
+        ptm?.HandlePhaseTransition(next);
+
+        // Pick strategy for that next phase
+        var group   = GetPhaseGroup(next);
+        var profile = SelectSpawnStrategy(group);
+        if (profile == null)
         {
-            // Fallback: direct spawn (previous behavior)
-            _drumTrack?.SpawnPhaseStar(currentPhase, profile);
+            Debug.LogError($"[Progression] No spawn strategy for {next}");
+            _spawnInFlight = false;
+            return;
+        }
+
+        // Build/Place the star for the authoritative phase 'next'
+        if (_drumTrack != null && _drumTrack.hexMazeGenerator != null)
+            _drumTrack.StartCoroutine(_drumTrack.hexMazeGenerator.GenerateMazeThenPlacePhaseStar(next, profile));
+        else
+            _drumTrack?.SpawnPhaseStar(next, profile);
+
+        // NOTE: do not clear _spawnInFlight here; PhaseStar.Initialize should call NotifyPhaseStarActivated().
+    }
+    private MusicalPhase PeekNextPhaseUsingPTM()
+    {
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+        if (phaseQueue?.phaseGroups == null || phaseQueue.phaseGroups.Count == 0 || ptm == null)
+            return MusicalPhase.Establish;
+
+        int idx = phaseQueue.phaseGroups.FindIndex(g => g.phase == ptm.currentPhase);
+        if (idx < 0) idx = 0; // defensive
+
+        // reuse your existing mapping if you want,
+        // or just step forward in your designed sequence:
+        var current = phaseQueue.phaseGroups[idx].phase;
+
+        switch (current) // matches your current mapping
+        {
+            case MusicalPhase.Establish: return MusicalPhase.Evolve;
+            case MusicalPhase.Evolve:    return MusicalPhase.Intensify;
+            case MusicalPhase.Intensify: return MusicalPhase.Release;
+            case MusicalPhase.Release:   return MusicalPhase.Wildcard;
+            case MusicalPhase.Wildcard:  return MusicalPhase.Pop;
+            case MusicalPhase.Pop:       return MusicalPhase.Evolve;
+            default:                     return MusicalPhase.Establish;
         }
     }
 
@@ -125,7 +177,6 @@ public class MineNodeProgressionManager : MonoBehaviour
         Func<MusicalPhaseGroup, bool> filter = null
     )
     {
-        overrideSpawnStrategy = null;
 
         if (isPhaseInProgress || isPhaseTransitioning || pendingNextPhase)
             return;
@@ -155,25 +206,11 @@ public class MineNodeProgressionManager : MonoBehaviour
         }
 
         currentPhaseIndex = phaseQueue.phaseGroups.IndexOf(selectedGroup);
-        currentPhase = selectedGroup.phase;
-        _drumTrack.currentPhase = currentPhase;
-        Debug.Log($"Moving to phase: {currentPhase}");
-
-        if (selectedGroup.allowRandomSelection)
-        {
-            currentSpawnStrategy = selectedGroup.spawnStrategies[
-                UnityEngine.Random.Range(0, selectedGroup.spawnStrategies.Count)
-            ];
-        }
-        else
-        {
-            currentSpawnStrategy = selectedGroup.spawnStrategies[0];
-        }
+        GameFlowManager.Instance.phaseTransitionManager.HandlePhaseTransition(selectedGroup.phase);
+        Debug.Log($"Moving to phase: {selectedGroup.phase}");
+        _globalProfile.ResetForNewPhase();
         // Arm the loop for the phase we just selected — commit on FIRST POKE of the new star
-        GameFlowManager.Instance.ArmNextPhaseLoop(currentPhase);
-
-        _drumTrack.SpawnPhaseStar(currentPhase, currentSpawnStrategy);
-
+        GameFlowManager.Instance.ArmNextPhaseLoop(selectedGroup.phase);
     }
     public string GetCurrentPhaseName()
     {
@@ -197,22 +234,13 @@ public class MineNodeProgressionManager : MonoBehaviour
         Debug.LogWarning($"No profile found for phase: {phase}");
         return null;
     }
-
-    private MusicalPhase PeekNextPhase()
+    public MusicalPhase PeekNextPhase()
     {
-        var current = phaseQueue.phaseGroups[currentPhaseIndex].phase;
-
-        switch (current)
-        {
-            case MusicalPhase.Establish: return MusicalPhase.Evolve;
-            case MusicalPhase.Evolve: return MusicalPhase.Intensify;
-            case MusicalPhase.Intensify: return MusicalPhase.Release;
-            case MusicalPhase.Release: return MusicalPhase.Wildcard;
-            case MusicalPhase.Wildcard: return MusicalPhase.Pop;
-            case MusicalPhase.Pop: return MusicalPhase.Evolve;
-            default: return MusicalPhase.Establish;
-        }
+        if (phaseQueue?.phaseGroups == null || phaseQueue.phaseGroups.Count == 0) return MusicalPhase.Establish;
+        var nextIdx = (_phaseIndexCursor + 1) % phaseQueue.phaseGroups.Count;
+        return PhaseAt(nextIdx);
     }
+
 
     public void EvaluateProgression()
     {
@@ -257,17 +285,15 @@ public class MineNodeProgressionManager : MonoBehaviour
         return null;
     }
 
-    public SpawnStrategyProfile SelectSpawnStrategy(MusicalPhaseGroup group)
+// MineNodeProgressionManager (or wherever you choose a strategy)
+public SpawnStrategyProfile SelectSpawnStrategy(MusicalPhaseGroup group)
     {
-        if (group == null || group.spawnStrategies == null || group.spawnStrategies.Count == 0) return null;
-        if (group.allowRandomSelection)
-            return group.spawnStrategies[UnityEngine.Random.Range(0, group.spawnStrategies.Count)];
-        return group.spawnStrategies[0];
+        return _globalProfile; // ignore the group; A-mode uses one global profile
     }
 
     public SpawnStrategyProfile GetCurrentSpawnerStrategyProfile()
     {
-        return overrideSpawnStrategy ?? phaseQueue?.phaseGroups[currentPhaseIndex].spawnStrategies.FirstOrDefault();
+        return _globalProfile;
     }
     
     public int GetCurrentPhaseIndex()

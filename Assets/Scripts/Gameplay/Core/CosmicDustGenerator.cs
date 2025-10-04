@@ -267,7 +267,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 dust.SetColor(Color.gray); 
                 dust.SetDrumTrack(drumTrack);
                 dust.SetGrowInDuration(hexGrowInSeconds);    
-                dust.ConfigureForPhase(drumTrack.currentPhase);
+                dust.ConfigureForPhase(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
                 dust.Begin();                               
             }
 

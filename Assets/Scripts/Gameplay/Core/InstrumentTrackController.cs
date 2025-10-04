@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using Gameplay.Mining;
 using MidiPlayerTK;
 using Random = UnityEngine.Random;
 public static class ShipTrackAssigner
@@ -187,6 +188,62 @@ public class InstrumentTrackController : MonoBehaviour
     // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
     // NoteVisualizer can read t.IsMuted to dim rows, if you want.
 }
+
+    
+public void RemixAllTracksForBridge(MusicalPhase phase, PhaseBridgeSignature sig)
+{
+    if (tracks == null) return;
+    foreach (var t in tracks)
+        RemixTrackForBridge(t, phase, sig);
+}
+
+private void RemixTrackForBridge(InstrumentTrack track, MusicalPhase phase, PhaseBridgeSignature sig)
+{
+    if (track == null) return;
+
+    // 1) Clear the loop so the bridge is audibly different
+    track.ClearLoopedNotes(TrackClearType.Remix);
+
+    // 2) Get / ensure a NoteSet
+    var ns = track.GetActiveNoteSet();
+    if (ns == null) return; // nothing to remix
+
+    // 3) Phase/role defaults, then bridge overrides
+    var (defBehavior, defRhythm) = GetDefaultStyleForPhaseAndRole(phase, track.assignedRole);
+
+    ns.ChangeNoteBehavior(track, defBehavior);     // you already use this elsewhere
+    ns.rhythmStyle = defRhythm;                    // rhythm impacts durations downstream
+
+    // 4) Inline seeding: pick a few allowed steps and add arpeggiated notes
+    var steps = ns.GetStepList();               // <-- you use this pattern already
+    if (steps == null || steps.Count == 0) return;
+
+    int seeds = 6;                               // similar to prior suggestion; tweak to taste
+    for (int i = 0; i < seeds; i++)
+    {
+        int step = steps[UnityEngine.Random.Range(0, steps.Count)];
+        int note = ns.GetNextArpeggiatedNote(step);                    // same pattern as DrumTrack’s helper
+        int dur  = track.CalculateNoteDuration(step, ns);              // see InstrumentTrack.CalculateNoteDuration
+        float vel = Mathf.Lerp(60f, 100f, UnityEngine.Random.value);   // modest velocity spread
+        track.AddNoteToLoop(step, note, dur, vel);                     // adds + visualizes
+    }
+
+    // 5) If extremely sparse, top up a bit
+    int density = track.GetNoteDensity();                               // existing API
+    if (density < 4)
+    {
+        int toAdd = 4 - density;
+        for (int i = 0; i < toAdd; i++)
+        {
+            int step = steps[UnityEngine.Random.Range(0, steps.Count)];
+            int note = ns.GetNextArpeggiatedNote(step);
+            int dur  = track.CalculateNoteDuration(step, ns);
+            float vel = Mathf.Lerp(70f, 100f, UnityEngine.Random.value);
+            track.AddNoteToLoop(step, note, dur, vel);
+        }
+    }
+}
+
     private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase)
 {
     // Keep it audible

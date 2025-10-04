@@ -14,12 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   personality: 1
   starColor: {r: 1, g: 0, b: 0.8945532, a: 1}
-  dustColor: {r: 0, g: 1, b: 0.10618591, a: 1}
-  particlePulseSpeed: 1
+  particlePulseSpeed: 1.2
   starAlphaMin: 0.1
-  starAlphaMax: 1
+  starAlphaMax: 0.659
   starDriftSpeed: 0.8
-  starDriftJitter: 0.15
+  starDriftJitter: 0.2
   orbitBias: 0
   teleportChancePerSec: 0
   dustShrinkRadius: 6
@@ -80,16 +79,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   ejectionStagger: 0.03
   expirePolicy: 0
-  noteVisibility: 1
-  emitMissedAsCorrection: 0
   allowShardRecyclingWhenMissed: 0
-  shardHavocChance: 0
-  nodeBaseMaxSpeed: 3
-  nodeBaseMaxForce: 10
-  leadFrolicBias: 0.6
-  bassHideBias: 0.6
-  grooveEvadeBias: 0.6
-  harmonyOrbitBias: 0.6
   establishSpeedMul: 0.8
   evolveSpeedMul: 1
   intensifySpeedMul: 1.2

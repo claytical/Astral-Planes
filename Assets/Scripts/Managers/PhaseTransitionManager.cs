@@ -7,6 +7,7 @@ public class PhaseTransitionManager : MonoBehaviour
     public InstrumentTrackController trackController;
     public MusicalPhase previousPhase;
     public MusicalPhase currentPhase;
+    private PhaseStarBehaviorProfile _activeBehaviorProfile;
 
     public void HandlePhaseTransition(MusicalPhase nextPhase)
     {
@@ -29,6 +30,23 @@ public class PhaseTransitionManager : MonoBehaviour
         }
     }
 
+    private void HandlePhaseStarSpawned(MusicalPhase phase, PhaseStarBehaviorProfile profile) {
+        // Only update if we're actually changing phases
+        if (phase != currentPhase) {
+            previousPhase = currentPhase;
+            currentPhase  = phase;
+        }
+        _activeBehaviorProfile = profile;
+    }
+
+    void OnEnable() {
+        var drums = GetComponent<DrumTrack>();
+        if (drums != null) drums.OnPhaseStarSpawned += HandlePhaseStarSpawned;
+    }
+    void OnDisable() {
+        var drums = GetComponent<DrumTrack>();
+        if (drums != null) drums.OnPhaseStarSpawned -= HandlePhaseStarSpawned;
+    }
 
 
 }

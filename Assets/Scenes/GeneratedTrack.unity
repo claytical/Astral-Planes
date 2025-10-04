@@ -7142,7 +7142,6 @@ MonoBehaviour:
   drumAudioSource: {fileID: 1354683685}
   trackController: {fileID: 1354683684}
   startDspTime: 0
-  currentPhase: 0
   progressionManager: {fileID: 1354683688}
   activeHexagons: []
   activeMinedObjects: []
@@ -7321,6 +7320,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
   - {fileID: 11400000, guid: c36ca097ec10c4fd2b51488a8fef5cb9, type: 2}
   phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
+  _globalProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94, type: 2}
   isPhaseInProgress: 0
   isPhaseTransitioning: 0
   pendingNextPhase: 0

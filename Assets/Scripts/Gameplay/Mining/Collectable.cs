@@ -38,6 +38,7 @@ public class Collectable : MonoBehaviour
 
     public List<int> sharedTargetSteps = new List<int>();
     public int GetNote() => assignedNote;
+    public bool IsDark { get; private set; } = false;
 
     // 🔹 Initializes the collectable with its note data
     public void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
@@ -68,16 +69,7 @@ public class Collectable : MonoBehaviour
         if (assignedInstrumentTrack == null)
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
 
-        // Lifetime profile if available, otherwise a safe TTL fallback
-        if (TryGetComponent(out Explode explode))
-        {
-//            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.Note));
-        }
-        else
-        {
-            float ttl = Mathf.Max(3f, track.drumTrack.GetLoopLengthInSeconds() * 1.1f);
-        }
-
+        StartCoroutine(DarkTimeoutRoutine(track));
     }
     public void AttachTether(Transform marker, Color trackColor, LineRenderer tetherTemplate = null)
     {
@@ -167,6 +159,33 @@ public class Collectable : MonoBehaviour
     {
         originalScale = transform.localScale;
         isInitialized = true;
+    }
+    private IEnumerator DarkTimeoutRoutine(InstrumentTrack track)
+    {
+        var drums = track != null ? track.drumTrack : null;
+        if (drums == null) yield break;
+
+        // ~just over one loop; tweak to taste or make profile-driven
+        float ttl = Mathf.Max(3f, drums.GetLoopLengthInSeconds() * 1.1f);
+        yield return new WaitForSeconds(ttl);
+
+        // Become "dark" (muted look), but keep collider & collection live
+        IsDark = true;
+
+        if (energySprite != null)
+        {
+            var c = energySprite.color;
+            // desaturate & lower alpha a bit
+            var grey = new Color(0.25f, 0.25f, 0.25f, Mathf.Clamp01(c.a * 0.55f));
+            energySprite.color = grey;
+        }
+
+        // If we have a marker, ensure it’s greyed
+        if (ribbonMarker != null)
+        {
+            var ml = ribbonMarker.GetComponent<MarkerLight>() ?? ribbonMarker.gameObject.AddComponent<MarkerLight>();
+            ml.SetGrey(new Color(1f, 1f, 1f, 0.18f));
+        }
     }
 
     private IEnumerator TravelRoutine(int durationTicks, float force, float seconds)

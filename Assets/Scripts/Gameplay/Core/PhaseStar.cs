@@ -1,11 +1,9 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Effects;
 using Gameplay.Mining;
 using UnityEngine;
-using UnityEngine.Rendering.UI;
 
 public class PhaseStar : MonoBehaviour
 {
@@ -57,7 +55,8 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private SpriteRenderer[] starSprites;          // root SR (can be null in prefab; we’ll find it)
     [SerializeField] private ParticleSystem starParticles;       // child VFX
     [SerializeField] private SpawnStrategyProfile spawnStrategyProfile;
-    
+    [SerializeField, Range(0.5f, 8f)] private float spriteColorLerpSpeed = 3f;
+    private Color _targetSpriteColor;  // track color for diamonds
     private enum AntiColorMode { ComplementHue, InvertRGB }
     private enum PhaseStarState
     {
@@ -120,6 +119,8 @@ public class PhaseStar : MonoBehaviour
         dustShrinkUnitsPerSecond = behaviorProfile.dustShrinkUnitsPerSec;
         dustFalloff = behaviorProfile.dustFalloff;
         TintToPhaseColor();
+        SetParticlesToPhaseColor(GetPhaseColor());
+
         // hitsRequired governs “nodes per star”
         int nodes = Mathf.Max(1, behaviorProfile.nodesPerStar);
         typeof(PhaseStar)
@@ -141,7 +142,7 @@ public class PhaseStar : MonoBehaviour
     // 3) Global flags
     drumTrack.isPhaseStarActive       = true;
     progressionManager.phaseStarActive= true;
-
+    progressionManager.NotifyPhaseStarActivated(MusicalPhase.Establish);
     // 4) Visual prerequisites (so preview can safely tint)
     _psMain = particleSystem != null ? particleSystem.main : default;
     EnsureSpritesAndPivots();
@@ -172,7 +173,11 @@ public class PhaseStar : MonoBehaviour
     SetStarVisible(true);
     state = PhaseStarState.IdleWandering;
     StartCoroutine(EntrancePulse());
-}
+    if (_allColliders == null || _allRenderers == null) CacheAllVis();
+    foreach (var c in _allColliders) if (c) c.enabled = true;
+    var rootCol = GetComponent<Collider2D>(); if (rootCol) rootCol.enabled = true;
+
+    }
     public void SetSpawnStrategyProfile(SpawnStrategyProfile profile) => spawnStrategyProfile = profile;
     public void NotifyShardBurstComplete(InstrumentTrack track)
     {
@@ -238,8 +243,48 @@ public class PhaseStar : MonoBehaviour
                 rb.position += off;
             }
         }
+        LerpSpritesTowardTargetColor();
         ShrinkNearbyDust();
     }
+    private void SetParticlesToPhaseColor(Color phaseColor)
+    {
+        if (!particleSystem) return;
+
+        var main = particleSystem.main;
+        main.startColor = phaseColor;
+
+        // keep your other particle modules as-is, or set a simple phase-colored gradient:
+        var col = particleSystem.colorOverLifetime;
+        col.enabled = true;
+        var grad = new Gradient();
+        grad.SetKeys(
+            new[] { new GradientColorKey(phaseColor, 0f), new GradientColorKey(phaseColor, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f),        new GradientAlphaKey(0f, 1f) }
+        );
+        col.color = grad;
+    }
+    private void LerpSpritesTowardTargetColor()
+    {
+        if (starSprites == null || starSprites.Length == 0) return;
+
+        for (int i = 0; i < starSprites.Length; i++)
+        {
+            var sr = starSprites[i];
+            if (!sr) continue;
+
+            // keep the alpha that your pulse already set
+            float a = sr.color.a;
+
+            // smooth toward the target track color
+            var c = Color.Lerp(sr.color, new Color(_targetSpriteColor.r, _targetSpriteColor.g, _targetSpriteColor.b, a),
+                Mathf.Clamp01(Time.deltaTime * spriteColorLerpSpeed));
+
+            // force the alpha back to the pulsing amount
+            c.a = a;
+            sr.color = c;
+        }
+    }
+
     private void OnEnable()
     {
         if (!_behaviorApplied) ApplyBehavior();
@@ -269,22 +314,41 @@ public class PhaseStar : MonoBehaviour
         // Optional: light camera nudge/shake here if you want
         // CameraShaker.Instance?.Shake(cfg.defaultScale * 0.1f);
     }
-    private void PrepareNextDirective()
+private bool _prepareInFlight = false;
+
+private void PrepareNextDirective()
+{
+    if (_prepareInFlight) { Debug.LogWarning("[PhaseStar] PrepareNextDirective re-entered; ignoring to avoid recursion."); return; }
+    _prepareInFlight = true;
+
+    try
     {
-        Debug.Log($"Preparing Next Directive");
-        var phaseProfile = progressionManager?.GetProfileForPhase(assignedPhase);
-        Debug.Log($"Phase Profile: {phaseProfile}");
+        Debug.Log("[PhaseStar] Preparing Next Directive");
+
+        // 1) Use PTM as the authority; warn if the star’s assignedPhase disagrees.
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+        var authoritativePhase = ptm != null ? ptm.currentPhase : assignedPhase;
+
+        if (ptm != null && assignedPhase != authoritativePhase)
+            Debug.LogWarning($"[PhaseStar] assignedPhase={assignedPhase} != PTM.currentPhase={authoritativePhase}. Using PTM.");
+
+        var phaseForSelection = authoritativePhase;
+        var phaseProfile = progressionManager?.GetProfileForPhase(authoritativePhase);
+        Debug.Log($"[PhaseStar] PhaseForSelection={phaseForSelection}, PhaseProfile={(phaseProfile ? phaseProfile.name : "null")}");
+
+        // 2) If there’s no profile OR no strategy, fall back once (no recursion).
         if (spawnStrategyProfile == null)
         {
-            Debug.LogWarning("[PhaseStar] No SpawnStrategyProfile assigned — falling back to simple directive.");
-            BuildFallbackDirective();  // see helper below
+            Debug.LogWarning("[PhaseStar] No SpawnStrategyProfile assigned — using fallback directive.");
+            BuildFallbackDirective();
             RefreshPreviewFromCache();
             return;
         }
 
+        // 3) Ask strategy for a directive (strictly for PTM phase)
         _cachedDirective = spawnStrategyProfile.GetMinedObjectDirective(
             drumTrack?.trackController,
-            assignedPhase,
+            authoritativePhase,
             phaseProfile,
             drumTrack?.minedObjectPrefabRegistry,
             drumTrack?.nodePrefabRegistry,
@@ -292,25 +356,102 @@ public class PhaseStar : MonoBehaviour
         );
 
         _cachedTrack = _cachedDirective?.assignedTrack;
-        Debug.Log($"Cached Directive: {_cachedDirective} Cached Track: {_cachedTrack}");
+        Debug.Log($"[PhaseStar] Selection result -> Directive={_cachedDirective?.ToString() ?? "null"}, Track={_cachedTrack?.name ?? "null"}");
+
+        // 4) ONE controlled retry path (no recursion): try a lax fallback selection
         if (_cachedDirective == null || _cachedTrack == null)
         {
-            Debug.LogWarning("[PhaseStar] Strategy returned null directive or track — falling back.");
-            BuildFallbackDirective();
-        }
-        else
-        {
-            Debug.Log($"cached directive: {_cachedDirective} cached tracK: {_cachedTrack} color : {_cachedPreviewColor} track color: {_cachedTrack.trackColor} dir color: {_cachedDirective.displayColor}");
+            Debug.LogWarning("[PhaseStar] No valid directive from strategy. Trying lax fallback.");
+            TryBuildLaxFallback(phaseForSelection, phaseProfile);
+
+            // Still nothing? End this star cleanly and advance.
+            if (_cachedDirective == null || _cachedTrack == null)
+            {
+                Debug.LogWarning("[PhaseStar] Still no directive/track after fallback; completing phase and advancing.");
+                state = PhaseStarState.Completed;
+                StartCoroutine(FinishPhaseAndAdvance());
+                return;
+            }
         }
 
-        // choose the preview color (prefer directive.displayColor if set)
+        // 5) Choose preview color
         _cachedPreviewColor =
             (_cachedDirective != null && _cachedDirective.displayColor.a > 0f)
                 ? _cachedDirective.displayColor
                 : (_cachedTrack != null ? _cachedTrack.trackColor : ComputeAntiColor(GetDustPhaseColor()));
-
+        _targetSpriteColor = (_cachedTrack != null) ? _cachedTrack.trackColor : _cachedPreviewColor;
         RefreshPreviewFromCache();
     }
+    finally
+    {
+        _prepareInFlight = false;
+    }
+}
+
+// Fallback that only spawns a basic, non-utility NoteSpawner if available
+private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhaseProfile phaseProfile)
+{
+    try
+    {
+        var ctrl = drumTrack?.trackController;
+        var objReg = drumTrack?.minedObjectPrefabRegistry;
+        var nodeReg = drumTrack?.nodePrefabRegistry;
+        var factory = GameFlowManager.Instance?.noteSetFactory;
+
+        if (ctrl == null || objReg == null || nodeReg == null || factory == null || spawnStrategyProfile == null)
+        {
+            Debug.LogWarning("[PhaseStar] Lax fallback aborted: missing refs.");
+            return;
+        }
+
+        // Ask the profile for candidates then filter locally for the simplest valid NoteSpawner
+        var candidates = spawnStrategyProfile.mineNodes; // if exposed; otherwise add an accessor
+        if (candidates == null || candidates.Count == 0) return;
+
+        // Only NoteSpawners, opt-in phase respect for utilities
+        var authoritativePhase = GameFlowManager.Instance?.phaseTransitionManager?.currentPhase ?? phaseForSelection;
+        var simple = candidates
+            .Where(n => n != null && n.minedObjectType == MinedObjectType.NoteSpawner)
+            .Where(n =>
+            {
+                // Spawners: empty allowedPhases = allowed everywhere; otherwise must include phase
+                if (n.allowedPhases != null && n.allowedPhases.Count > 0)
+                    return n.allowedPhases.Contains(authoritativePhase);
+                return true;
+            })
+            .OrderByDescending(n => n.weight) // bias toward the most common choice
+            .ToList();
+
+        foreach (var node in simple)
+        {
+            var track = ctrl.FindTrackByRole(node.role);
+            if (track == null) continue;
+
+            // Keep your existing “useful” check if needed:
+            // if (!SpawnStrategyProfile.IsNodeUsefulForTrack(...)) continue;  // if static; otherwise inline logic.
+
+            var directive = new MinedObjectSpawnDirective
+            {
+                minedObjectType = node.minedObjectType,
+                assignedTrack   = track,
+                // choose prefab & any needed fields:
+                prefab = nodeReg.GetPrefab(node.minedObjectType, TrackModifierType.Spawner), // replace with your actual resolver
+                displayColor = track.trackColor,
+                // ... fill the rest as your directive requires
+            };
+
+            _cachedDirective = directive;
+            _cachedTrack = track;
+            Debug.Log($"[PhaseStar] Lax fallback picked {node} on {track.name} for {authoritativePhase}");
+            return;
+        }
+    }
+    catch (System.Exception e)
+    {
+        Debug.LogError($"[PhaseStar] Lax fallback failed: {e.Message}");
+    }
+}
+
     private void BuildFallbackDirective()
     {
         _cachedTrack = PickNextTargetTrack();
@@ -340,8 +481,7 @@ public class PhaseStar : MonoBehaviour
         // Sprites/diamonds from cached track color
         SetStarTint(_cachedPreviewColor, false);            // you already have SetStarTint(...)
         // Particles from phase/anti-phase (your existing helper)
-        ConfigureInhalingParticles(ComputeAntiColor(GetDustPhaseColor()));
-
+        SetParticlesToPhaseColor(GetPhaseColor()); 
         // If you want the older preview flow too:
         RefreshVisuals(_cachedTrack);                // safe to call; it tints diamonds from track
     }
@@ -503,6 +643,10 @@ public class PhaseStar : MonoBehaviour
         var col = GetComponent<Collider2D>();
         if (col) col.enabled = true;
         SetStarVisible(true);
+        if (_allColliders == null || _allRenderers == null) CacheAllVis();
+        foreach (var c in _allColliders) if (c) c.enabled = true;
+        var rootCol = GetComponent<Collider2D>(); if (rootCol) rootCol.enabled = true;
+        
     }
     private void PickNewDriftDir()
     {
@@ -554,28 +698,20 @@ public class PhaseStar : MonoBehaviour
         main.loop = true;
         main.startSpeed = new ParticleSystem.MinMaxCurve(-3f); // inward
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.1f);
-        main.startColor = phaseColor;
-
+        main.startSize = new ParticleSystem.MinMaxCurve(1f);
+        
         var em = particleSystem.emission;
         em.rateOverTime = 28f;
 
         var sh = particleSystem.shape;
         sh.shapeType = ParticleSystemShapeType.Circle;
         sh.radius = 1.5f;
-        sh.radiusThickness = 0.1f; // thin ring
+        sh.radiusThickness = 1f; // thin ring
         sh.arc = 360f;
         sh.arcMode = ParticleSystemShapeMultiModeValue.Loop;
 
         var col = particleSystem.colorOverLifetime;
         col.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[]{ new GradientColorKey(phaseColor, 0f), new GradientColorKey(phaseColor, 1f) },
-            new[]{ new GradientAlphaKey(1f, 0f),        new GradientAlphaKey(0f, 1f) }
-        );
-        col.color = grad;
-
         var size = particleSystem.sizeOverLifetime;
         size.enabled = true;
         var curve = new AnimationCurve(new Keyframe(0,1f), new Keyframe(1f,0f));
@@ -604,6 +740,15 @@ public class PhaseStar : MonoBehaviour
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (!coll.gameObject.TryGetComponent(out Vehicle _)) return;
+
+// never spawn a second node while one exists
+        if (drumTrack != null && drumTrack.activeMineNodes != null &&
+            drumTrack.activeMineNodes.Any(n => n != null))
+        {
+            Debug.Log($"DrumTrack has {drumTrack.activeMineNodes.Count} nodes");
+            // A node is still active; ignore this hit.
+            return;
+        }
         Debug.Log($"[PhaseStar] Vehicle collision; state={state} cachedTrack={_cachedTrack}");
 
         var track = PickNextTargetTrack();
@@ -634,9 +779,13 @@ public class PhaseStar : MonoBehaviour
         bool spawned = SpawnColoredMineNode(mineNodesEjected, contactPoint, _cachedDirective, _cachedTrack, _cachedPreviewColor);
         if (!spawned)
         {
-            StartCoroutine(RearmStarNoBurst());
+            // Stay present and idle; DO NOT re-arm a new directive.
+            _awaitingBurstResolution = false;
+            state = PhaseStarState.IdleWandering;
+            SetStarVisible(true);
             return;
         }
+
         mineNodesEjected++;
 
 // NEW: rotate the target window so we don’t keep picking the same track
@@ -669,7 +818,7 @@ public class PhaseStar : MonoBehaviour
         float start = Time.time, hardTimeout = 12f;
         while (GameFlowManager.Instance != null && GameFlowManager.Instance.GhostCycleInProgress)
         {
-        Debug.Log($"Cycle in process... time left {Time.time - start}, hard time out {hardTimeout}");            
+            Debug.Log($"Cycle in process... time left {Time.time - start}, hard time out {hardTimeout}");            
             if (Time.time - start > hardTimeout) break;
             yield return null;
         }
@@ -689,6 +838,7 @@ public class PhaseStar : MonoBehaviour
         }
 
         yield return new WaitForSeconds(0.05f);
+        try { NotifyShardBurstComplete(track); } catch { /* safe to ignore */ }
 
         var missed = track.GetMissedGhostPayloads();
 
@@ -700,6 +850,7 @@ public class PhaseStar : MonoBehaviour
             _deferredMissed[track] = missed;
         }
         perfectTracks.Add(track);
+        try { track?.MarkPerfectThisPhase(); } catch { /* ignore */ }
         Debug.Log($"Adding perfect {track}. {perfectTracks.Count} perfect tracks.");
         if (perfectTracks.Count >= targetTracks.Count)
         {
@@ -710,6 +861,14 @@ public class PhaseStar : MonoBehaviour
                 var from = assignedPhase; // the phase this star belongs to
                 var to   = progressionManager.GetNextPhase(); // new helper
                 var color = progressionManager.ResolveNextPhaseStarColor(to);
+                 try { 
+                     // remove stragglers on all visible tracks
+                     if (controller != null && controller.tracks != null) 
+                         foreach (var t in controller.tracks) 
+                             if (t) ForceCleanupTrackCollectables(t);
+                            // explode/destroy any MineNodes still alive
+                     drumTrack?.ClearAllActiveMineNodes();
+                 } catch { /* safe */ }                
                 Debug.Log($"Moving to next phase {to} from {from}");
                 // Pass the actual perfect set to seed the bridge
                 progressionManager.BeginBridgeToNextPhase(from, to, new List<InstrumentTrack>(perfectTracks), color);
@@ -720,11 +879,9 @@ public class PhaseStar : MonoBehaviour
         }
         Debug.Log($"Rearming Visuals");
         // Rearm visuals
-        TintToPhaseColor();
         state = PhaseStarState.IdleWandering;
         _awaitingBurstResolution = false;
         SetStarVisible(true);
-        PreviewNextTargetVisual();
     }
     private void PulseSpriteAlpha()
     {
@@ -941,18 +1098,11 @@ public class PhaseStar : MonoBehaviour
     {
         bool bridgeActive = GameFlowManager.Instance != null && GameFlowManager.Instance.IsBridgeActive;
         if (!bridgeActive) break; // bridge finished (or never started) → proceed to fallback check
-        if (drumTrack != null && drumTrack.isPhaseStarActive) break; // new star is up
+        if (progressionManager != null && progressionManager.phaseStarActive) break; // new star is up
         t += Time.deltaTime;
         yield return null;
     }
-
-    // Fallback: if no bridge active AND still no active star, ask progression to spawn one now.
-    if ((GameFlowManager.Instance == null || !GameFlowManager.Instance.IsBridgeActive)
-        && (drumTrack == null || !drumTrack.isPhaseStarActive))
-    {
-        progressionManager?.SpawnNextPhaseStarWithoutLoopChange();
-    }
-
+    
     // 6) Finally, remove this star
     Destroy(gameObject);
 }
@@ -970,7 +1120,6 @@ public class PhaseStar : MonoBehaviour
             directive.role = track.assignedRole;
         if (directive.roleProfile == null && directive.role != default)
             directive.roleProfile = MusicalRoleProfileLibrary.GetProfile(directive.role);
-
         if (directive.noteSet == null)
         {
             var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, assignedPhase);
@@ -978,7 +1127,11 @@ public class PhaseStar : MonoBehaviour
             directive.noteSet = ns;
             Debug.Log($"Generated NoteSet: {ns} for {track}");
         }
-
+        if (_cachedTrack != null)
+            _targetSpriteColor = _cachedTrack.trackColor;
+        if ((track.spawnedCollectables?.Any(go => go != null) ?? false) || (track.GetPersistentLoopNotes()?.Count > 0)) {
+            track.ClearLiveCollectablesAndLoop(TrackClearType.Remix);
+        }
         // --- Choose a free cell with fallbacks ---
         Vector2Int cell = drumTrack.GetRandomAvailableCell();
         if (cell.x < 0)
@@ -1012,7 +1165,7 @@ public class PhaseStar : MonoBehaviour
         node.OnResolved += (kind, dir) =>
         {
             Debug.Log($"Resolved Node, starting clear and rearm {track} with {dir.noteSet}");
-            StartCoroutine(ClearThenSpawnAndRearm(track, dir.noteSet));
+            StartCoroutine(HandleNodeResolvedNoRearm(track, dir.noteSet));
         };
 
 // Wire the node *and* its payload spawner if present
@@ -1061,6 +1214,20 @@ public class PhaseStar : MonoBehaviour
         );
         return true;
     }
+    private IEnumerator HandleNodeResolvedNoRearm(InstrumentTrack track, NoteSet noteSet)
+    {
+        // Let the node finish reveal/detach/cleanup this frame
+        yield return null;
+
+        // A burst was just spawned. Hide the star and wait for actual collection.
+        _awaitingBurstResolution = true;
+        SetStarVisible(false);
+
+        // Defer the "perfect/bridge" decision to the watcher.
+        StartCoroutine(WatchBurstThenResolve(track));
+        yield break;
+    }
+
     private IEnumerator _RetrySpawnWhenCellFrees(Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track, Color previewColor) {
     float t = 0f, max = 0.6f; // small window
     while (t < max)
@@ -1078,7 +1245,9 @@ public class PhaseStar : MonoBehaviour
     }
 
     // Still no cell → just re-arm so the player isn’t stuck tapping a dead star
-    StartCoroutine(RearmStarNoBurst());
+    _awaitingBurstResolution = false;
+    state = PhaseStarState.IdleWandering;
+    SetStarVisible(true);
 }
     private void InitializeChildFromDirective(GameObject child, MinedObjectSpawnDirective dir)
 {
@@ -1117,37 +1286,12 @@ public class PhaseStar : MonoBehaviour
     // Apply to the actual renderer used by the prefab
     var trackVisual = child.GetComponent<TrackItemVisual>();
     if (trackVisual != null) trackVisual.trackColor = tint;
-
     foreach (var sr in child.GetComponentsInChildren<SpriteRenderer>(true))
     {
         var c = tint; c.a = sr.color.a; // preserve existing alpha
         sr.color = c;
     }
 }
-    private IEnumerator ClearThenSpawnAndRearm(InstrumentTrack track, NoteSet noteSet)
-    {
-        if (track != null)
-        {
-            // Clear loop & markers (uses your existing visualizer hookup).
-            // If your ClearLoopedNotes signature differs, call the variant you have.
-            track.ClearLoopedNotes(TrackClearType.Remix);
-            foreach (var go in track.spawnedCollectables.ToList())
-                if (go) Destroy(go);
-            track.spawnedCollectables.Clear();
-        }
-
-        // Give the visualizer a frame to delete markers/tethers cleanly.
-        yield return null;
-
-        // Fresh burst for this node
-        if (track != null && noteSet != null)
-        {
-            track.SpawnCollectableBurst(noteSet);
-        }
-
-        // Wait until all collectables from this burst are gone, then re-arm the star.
-        yield return StartCoroutine(WatchTrackThenRearm(track));
-    }
     private IEnumerator WatchTrackThenRearm(InstrumentTrack track)
     {
         float start = Time.time, timeout = 8f;
@@ -1158,19 +1302,12 @@ public class PhaseStar : MonoBehaviour
         }
         yield return new WaitForSeconds(0.05f);
 
-        // ✅ NEW: mark this burst as completed so the "perfect" path can run
         NotifyShardBurstComplete(track);
-
-        StartCoroutine(RearmStarNoBurst());
-    }
-    private IEnumerator RearmStarNoBurst()
-    {
-        yield return null;
         _awaitingBurstResolution = false;
         state = PhaseStarState.IdleWandering;
         SetStarVisible(true);
-        PreviewNextTargetVisual();
     }
+
     private void SetStarVisible(bool visible)
     {
         _isVisible = visible;
@@ -1221,16 +1358,7 @@ public class PhaseStar : MonoBehaviour
             var cc = c; cc.a = sr.color.a;
             sr.color = cc;
         }
-/*
-        if (!starParticles) starParticles = GetComponentInChildren<ParticleSystem>(true);
-        if (starParticles)
-        {
-            if (enableObjects && !starParticles.gameObject.activeSelf)
-                starParticles.gameObject.SetActive(true);
-            var m = starParticles.main;
-            m.startColor = c;
-        }
-        */
+
     }
     private void ShrinkNearbyDust() {
                // Let DarkStar-style profiles preserve dust.
