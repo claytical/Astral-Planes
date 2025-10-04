@@ -72,21 +72,15 @@ public class MineNode : MonoBehaviour
 
         Debug.Log($"Reveal Preloaded Object: {_preloadedObject.name}");
 
+        // Detach so the payload survives when the node is destroyed
+        _preloadedObject.transform.SetParent(null, true);
+
+        // Position the payload at the node and show it
         _preloadedObject.transform.position = transform.position;
-
-        if (_preloadedObject.TryGetComponent(out MinedObject mined))
-        {
-            mined.EnableColliderAfterDelay(0.5f);
-        }
-
-        Destroy(gameObject);
+        _preloadedObject.SetActive(true);
         _objectRevealed = true;
     }
-    private IEnumerator DelayedReveal(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        RevealPreloadedObject();
-    }
+
     private void OnCollisionEnter2D(Collision2D coll)
     { 
         Debug.Log($"Hit MineNode: {coll.gameObject.name} object revealed? {_objectRevealed}");
@@ -105,81 +99,92 @@ public class MineNode : MonoBehaviour
                 CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
             }          
             if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
-        {
-            _strength -= vehicle.GetForceAsDamage();
-            _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
-            float normalized = (float)_strength / maxStrength; // [0, 1]
-            float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
-            Debug.Log($"Strength: {_strength}, Normalized: {normalized}, Scale: {scaleFactor}");
-
-            StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
-            if (_strength <= 0 && !_depletedHandled)
             {
-                Debug.Log($"No more strength...");
-                _depletedHandled = true;
-                // Fresh burst for this node
-                // Try to spawn notes if this payload is a NoteSpawner
-                if (spawner != null)
+                _strength -= vehicle.GetForceAsDamage();
+                _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
+                float normalized = (float)_strength / maxStrength; // [0, 1]
+                float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
+                Debug.Log($"Strength: {_strength}, Normalized: {normalized}, Scale: {scaleFactor}");
+
+                StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
+                if (_strength <= 0 && !_depletedHandled)
                 {
-                    // Ensure there is a NoteSet
-                    if (spawner.selectedNoteSet == null)
+                    Debug.Log($"No more strength...");
+                    _depletedHandled = true;
+                    // Fresh burst for this node
+                    // Try to spawn notes if this payload is a NoteSpawner
+                    if (spawner != null)
                     {
-                        Debug.Log($"No note set found, creating new one");
-                        // Prefer any directive you cached; otherwise rebuild from track/phase
-                        var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
-                        var phase = track.drumTrack.currentPhase;
-                        if (track != null && phase != null)
+                        // Ensure there is a NoteSet
+                        if (spawner.selectedNoteSet == null)
                         {
+                            Debug.Log($"No note set found, creating new one");
+                            // Prefer any directive you cached; otherwise rebuild from track/phase
+                            var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
+                            
+                            if (track != null)
+                            {
 
-                            var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, phase);
-                            spawner.selectedNoteSet = ns;
-                            Debug.Log($"Note set: {ns}");
+                                var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+                                spawner.selectedNoteSet = ns;
+                                Debug.Log($"Note set: {ns}");
 
+                            }
                         }
+
+                        // 🔊 (you already play SFX above; keep or remove to avoid double)
+                        // CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
+
+                        // Emit notes BEFORE we reveal/destroy anything
+                        Debug.Log($"Bursting Collectables");
+                        spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet);
+                    }
+                    else
+                    {
+                        Debug.Log($"Nothing to spawn, because spawner is null...");
+                        // Utility payload path keeps your generic pickup cue
+                        CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
                     }
 
-                    // 🔊 (you already play SFX above; keep or remove to avoid double)
-                    // CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
+                    // Reveal any preloaded object AFTER spawning
+                    if (_preloadedObject != null)
+                    {
+                        Debug.Log($"Revealing Preloaded object");
+                        _preloadedObject.transform.SetParent(null, true); // keep world pos
+                        _preloadedObject.transform.localScale = _originalScale;
+                        _preloadedObject.SetActive(true);
+                    }
 
-                    // Emit notes BEFORE we reveal/destroy anything
-                    Debug.Log($"Bursting Collectables");
-                    spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet);
+                    // Now run your existing VFX/cleanup
+                    TriggerExplosion(); // destroy self, fade sprite, etc.
                 }
-                else
-                {
-                    Debug.Log($"Nothing to spawn, because spawner is null...");
-                    // Utility payload path keeps your generic pickup cue
-                    CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
-                }
-
-                // Reveal any preloaded object AFTER spawning
-                if (_preloadedObject != null)
-                {
-                    Debug.Log($"Revealing Preloaded object");
-                    _preloadedObject.transform.SetParent(null, true); // keep world pos
-                    _preloadedObject.transform.localScale = _originalScale;
-                    _preloadedObject.SetActive(true);
-                }
-
-                // Now run your existing VFX/cleanup
-                TriggerExplosion(); // destroy self, fade sprite, etc.
             }
-            
         }
+    }
+    private IEnumerator CleanupAndDestroy()
+    {
+        // brief frame to ensure Reveal finishes toggles
+        yield return null;
+
+        var dt = _minedObject?.assignedTrack?.drumTrack;
+        if (dt != null)
+        {
+            // Free the reserved grid cell for future spawns
+            dt.FreeSpawnCell(_directive.spawnCell.x, _directive.spawnCell.y);
+
+            // Remove this node from the active list
+            dt.activeMineNodes.Remove(this);
         }
-       
 
-
-        
+        Destroy(gameObject);
     }
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
-        //preloadedObject
-        _minedObject.assignedTrack.drumTrack.UnregisterMinedObject(_minedObject);
         // 🔔 Notify listeners (PhaseStar) of the outcome kind and payload
         FireResolvedOnce(_directive.minedObjectType, _directive);
-        StartCoroutine(DelayedReveal(0.2f));
+        RevealPreloadedObject();
+        StartCoroutine(CleanupAndDestroy());
     }
     private void FireResolvedOnce(MinedObjectType kind, MinedObjectSpawnDirective dir)
     {
@@ -192,6 +197,7 @@ public class MineNode : MonoBehaviour
         }
         catch (System.Exception e) { Debug.LogException(e, this); }
     }
+    
     private void OnDisable(){ Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); }
     private void OnDestroy(){ Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); }
     // Call this right after you instantiate the child mined object (inside MineNode or the spawner).
@@ -212,6 +218,12 @@ public class MineNode : MonoBehaviour
         if (transform.localScale.magnitude <= 0.05f)
             TriggerExplosion();
     }
+    private void OnEnable()
+    {
+        var col = GetComponent<Collider2D>();
+        if (col && !col.enabled) col.enabled = true;
+    }
+
 }
 
 [System.Serializable]

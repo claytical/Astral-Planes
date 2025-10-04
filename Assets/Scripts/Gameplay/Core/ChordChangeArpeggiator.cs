@@ -23,10 +23,10 @@ public class ChordChangeArpeggiator : MonoBehaviour
     }
     public void Bind(DrumTrack d, InstrumentTrackController t)
     {
-        if (drums != null) drums.OnLoopBoundary -= OnLoopBoundary;
+        if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary -= OnLoopBoundary;
         drums = d;
         tracks = t;
-        if (drums != null) drums.OnLoopBoundary += OnLoopBoundary;
+        if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary += OnLoopBoundary;
     }
     public void ArmChordWhileHolding(Chord chord)
     {

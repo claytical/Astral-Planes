@@ -46,7 +46,6 @@ public class DrumTrack : MonoBehaviour
     public AudioSource drumAudioSource;
     public InstrumentTrackController trackController;
     public double startDspTime;
-    public MusicalPhase currentPhase;
     public MineNodeProgressionManager progressionManager;
     public List<PhaseSnapshot> SessionPhases = new();
     public List<GameObject> activeHexagons = new List<GameObject>();
@@ -65,6 +64,7 @@ public class DrumTrack : MonoBehaviour
     private AudioClip _pendingDrumLoop;
     private PhaseStar _star;
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
+    public event System.Action<MusicalPhase, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
 
     void Start()
     {
@@ -105,6 +105,9 @@ public class DrumTrack : MonoBehaviour
             _lastLoopCount = currentLoop;
             LoopRoutines();
         }
+        if (activeMineNodes != null)
+            activeMineNodes.RemoveAll(n => n == null);
+
     }
     public void ManualStart()
     {
@@ -119,13 +122,13 @@ public class DrumTrack : MonoBehaviour
 
         // --- A) START THE CURRENT PHASE CLIP *NOW* (no queued change) ---
         // Establish is the first phase; play its loop immediately so timing is correct.
-        currentPhase = MusicalPhase.Establish;
-        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(currentPhase) : null; 
+        _phaseTransitionManager.HandlePhaseTransition(MusicalPhase.Establish);
+        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(MusicalPhase.Establish) : null; 
         if (hexMazeGenerator != null && bootProfile != null) { 
             hexMazeGenerator.ApplyProfile(bootProfile); 
             hexMazeGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.ClassicLoopAligned;
         }
-        var initialClip = MusicalPhaseLibrary.GetRandomClip(currentPhase);
+        var initialClip = MusicalPhaseLibrary.GetRandomClip(MusicalPhase.Establish);
         if (initialClip == null)
         {
             Debug.LogError("DrumTrack.ManualStart: No Establish clip found.");
@@ -150,7 +153,6 @@ public class DrumTrack : MonoBehaviour
         // --- B) BUILD MAZE + SPAWN FIRST STAR (NO CLIP CHANGE SCHEDULED) ---
         if (hexMazeGenerator != null)
         {
-            Debug.Log($"Building Maze for {currentPhase}");
             StartCoroutine(hexMazeGenerator.GenerateMazeThenPlacePhaseStar(
                 MusicalPhase.Establish,
                 progressionManager.GetCurrentSpawnerStrategyProfile()
@@ -159,6 +161,12 @@ public class DrumTrack : MonoBehaviour
     }
     public void SpawnPhaseStar(MusicalPhase phase, SpawnStrategyProfile profile, bool armFirstPokeCommit = false)
     {
+        if (progressionManager != null && progressionManager.phaseStarActive)
+        {
+            Debug.Log("[SpawnGuard] PhaseStar already active; aborting duplicate spawn.");
+            return;
+        }
+
         Vector2Int cell = GetRandomAvailableCell();
         if (cell.x == -1)
         {
@@ -186,18 +194,24 @@ public class DrumTrack : MonoBehaviour
             .Take(4);
         // Give the star its spawner strategy (so bursts/misses can honor it later)
         _star.SetSpawnStrategyProfile(profile);
+        profile?.BeginStarCycle();
         var profileAsset = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(phase) : null;
         if (hexMazeGenerator != null && profileAsset != null)
             hexMazeGenerator.ApplyProfile(profileAsset);
         // Initialize using YOUR current signature
         _star.Initialize(this, mgr, targets, armFirstPokeCommit, profileAsset, phase);
-
+        OnPhaseStarSpawned?.Invoke(phase, profileAsset);
         // (Optional) bind the musical phase profile for “first poke commits loop” flow
         var phaseProfile = mgr.GetProfileForPhase(phase);
         if (phaseProfile != null) mgr.BindPendingPhase(phaseProfile);
     }
     public void SpawnPhaseStarAtCell(MusicalPhase phase, SpawnStrategyProfile profile, Vector2Int cell)
     {
+        if (progressionManager != null && (progressionManager.phaseStarActive || isPhaseStarActive))
+        {
+            Debug.Log("[SpawnGuard] PhaseStar already active; aborting duplicate spawn (AtCell).");
+            return;
+        }
         if (cell.x < 0) { Debug.LogWarning("No valid cell for PhaseStar."); return; }
         if (phaseStarPrefab == null) { Debug.LogError("PhaseStar prefab is null."); return; }
 
@@ -217,6 +231,7 @@ public class DrumTrack : MonoBehaviour
                 .Where(t => t != null).OrderBy(_ => UnityEngine.Random.value).Take(4);
 //HACK: behavior profile set on prefab
             _star.Initialize(this, mgr, targets, armFirstPokeCommit: false, profileAsset, phase);
+            OnPhaseStarSpawned?.Invoke(phase, profileAsset);
             // Cache the musical phase profile for the upcoming “first poke commits” path, if you use it
             if (phaseProfile != null) mgr.BindPendingPhase(phaseProfile);
         }
@@ -450,6 +465,21 @@ public class DrumTrack : MonoBehaviour
     {
         return spawnGrid.gridHeight;
     }
+    public void ClearAllActiveMineNodes()
+    {
+        // Destroy tracked nodes if any
+        if (activeMineNodes != null)
+        {
+            foreach (var n in activeMineNodes.ToList())
+                if (n) Destroy(n.gameObject);
+            activeMineNodes.Clear();
+        }
+
+        // Belt-and-suspenders: purge any stragglers not in the list
+        foreach (var node in FindObjectsByType<MineNode>(FindObjectsSortMode.None))
+            if (node) Destroy(node.gameObject);
+    }
+    
     public void ClearAllActiveMinedObjects()
     {
         // Clear MinedObjects (notes, modifiers, etc.)
@@ -481,8 +511,6 @@ public class DrumTrack : MonoBehaviour
         }
         drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
         startDspTime = AudioSettings.dspTime;
-        drumAudioSource.Play();
-
     }
     private void LoopRoutines()
     {
@@ -494,7 +522,7 @@ public class DrumTrack : MonoBehaviour
         {
             float loopSeconds = GetLoopLengthInSeconds();
             Vector2Int centerCell = WorldToGridPosition(transform.position);
-            hexMazeGenerator.TryRequestLoopAlignedCycle(currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
+            hexMazeGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
         }
         OnLoopBoundary?.Invoke();
     }
@@ -562,24 +590,14 @@ public class DrumTrack : MonoBehaviour
         }
         
         _pendingDrumLoop = null;
-            if (GetRemainingMineNodeCount() > 0)
-            {
-                Debug.Log("⏳ Waiting: Mine nodes still active. Postpone phase shift.");
-                StartCoroutine(WaitForMineNodesThenAdvance());
-            }
-            else
-            {
-                if (QueuedPhase.HasValue)
-                {
-                    currentPhase = QueuedPhase.Value;
-                }
-                progressionManager.isPhaseInProgress = false;
-                StartCoroutine(DelayedBeginPhase(currentPhase, progressionManager.GetCurrentSpawnerStrategyProfile()));
-            }
+        // Phase/Star spawning is owned by the bridge now.
+        progressionManager.isPhaseInProgress = false;
+        QueuedPhase = null;
+
 // ✅ Slow maze growth instead of instant; use queued or current phase
             if (hexMazeGenerator != null && !GameFlowManager.Instance.GhostCycleInProgress)
             {
-                var phaseForRegrowth = QueuedPhase ?? currentPhase;
+                var phaseForRegrowth = QueuedPhase ?? GameFlowManager.Instance.phaseTransitionManager.currentPhase;
                 Vector2Int centerCell = WorldToGridPosition(transform.position);
                 float radius = progressionManager.GetHollowRadiusForCurrentPhase();
                 var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);
@@ -589,12 +607,6 @@ public class DrumTrack : MonoBehaviour
 
         _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _loopLengthInSeconds);
     }
-    private IEnumerator DelayedBeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
-    {
-        yield return null; // wait one frame
-        BeginPhase(phase, profile);
-        QueuedPhase = null; // ✅ now cleared AFTER BeginPhase is set up
-    }
     private void BeginPhase(MusicalPhase phase, SpawnStrategyProfile profile)
     {
         
@@ -603,48 +615,19 @@ public class DrumTrack : MonoBehaviour
     }
     private IEnumerator SpawnPhaseStarDelayed(MusicalPhase phase, SpawnStrategyProfile profile)
     {
-        Debug.Log($"🕓 Waiting for next step to spawn PhaseStar: {phase}");
+        // ✅ Wait for bridge/coral cycle to fully finish
+        yield return new WaitUntil(() => !GameFlowManager.Instance.GhostCycleInProgress);
 
+        // ✅ Optional: also ensure no star is alive
+        yield return new WaitUntil(() => !isPhaseStarActive);
+
+        // ✅ Align to transport
         yield return new WaitUntil(() => GetCurrentStep() == 0);
-        Debug.Log("✅ Hit step 0, starting 1.5s delay...");
-
         yield return new WaitForSeconds(1.5f);
-        Debug.Log("🌟 Calling SpawnPhaseStar now...");
+
         SpawnPhaseStar(phase, profile);
     }
-    private IEnumerator WaitForMineNodesThenAdvance()
-    {
-        yield return new WaitUntil(() => GetRemainingMineNodeCount() == 0);
-        if (QueuedPhase.HasValue)
-        {
-            StartCoroutine(WaitForPhaseStarToDieThenAdvance());
-        }
-
-    }
-    private int GetRemainingMineNodeCount()
-    {
-        // Most robust: count live MinedObject components in the scene
-        var objs = GameObject.FindObjectsOfType<MinedObject>(includeInactive: false);
-        Debug.Log($"Looking up remaining count:{ objs.Length } ");
-        return objs?.Length ?? 0;
-    }
-    private IEnumerator WaitForPhaseStarToDieThenAdvance()
-    {
-        // Wait until all mine nodes are gone AND no active phase star
-        yield return new WaitUntil(() => GetRemainingMineNodeCount() == 0 && !isPhaseStarActive);
-        if (QueuedPhase.HasValue)
-        {
-            currentPhase = QueuedPhase.Value;
-            progressionManager.MoveToNextPhase(specificPhase: QueuedPhase.Value);
-            _phaseTransitionManager.HandlePhaseTransition(currentPhase);
-            QueuedPhase = null;
-        }
-        else
-        {
-            Debug.Log("📡 No queuedPhase set — calling EvaluateProgression()");
-            progressionManager.EvaluateProgression();  // ✅ This will call MoveToNextPhase() based on currentPhase
-        }
-    }
+    
     private void RemixTrack(InstrumentTrack track)
     {
         track.ClearLoopedNotes(TrackClearType.Remix);
@@ -652,15 +635,13 @@ public class DrumTrack : MonoBehaviour
         if (noteSet == null) return;
 
         var profile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-        var phase = track.drumTrack.currentPhase;
-
         noteSet.noteBehavior = profile.defaultBehavior;
 
         switch (profile.role)
         {
             case MusicalRole.Bass:
                 noteSet.noteBehavior = NoteBehavior.Bass;
-                noteSet.rhythmStyle = (phase == MusicalPhase.Pop) ? RhythmStyle.FourOnTheFloor : RhythmStyle.Sparse;
+                noteSet.rhythmStyle = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Pop) ? RhythmStyle.FourOnTheFloor : RhythmStyle.Sparse;
                 break;
             case MusicalRole.Lead:
                 noteSet.noteBehavior = NoteBehavior.Lead;
@@ -668,7 +649,7 @@ public class DrumTrack : MonoBehaviour
                 break;
             case MusicalRole.Harmony:
                 noteSet.noteBehavior = NoteBehavior.Harmony;
-                noteSet.chordPattern = (phase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad;
+                noteSet.chordPattern = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad;
                 break;
             case MusicalRole.Groove:
                 noteSet.noteBehavior = NoteBehavior.Percussion;

@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
-  m_Name: Intensify Behavior
+  m_Name: Release Behavior
   m_EditorClassIdentifier: 
-  personality: 2
-  starColor: {r: 1, g: 0, b: 0, a: 1}
-  particlePulseSpeed: 1
+  personality: 3
+  starColor: {r: 0, g: 0.41509432, b: 0.3219217, a: 1}
+  particlePulseSpeed: 0.5
   starAlphaMin: 0.1
-  starAlphaMax: 0.916
-  starDriftSpeed: 3
-  starDriftJitter: 1
+  starAlphaMax: 0.601
+  starDriftSpeed: 1
+  starDriftJitter: 0.1
   orbitBias: 0
   teleportChancePerSec: 0
   dustShrinkRadius: 6
@@ -47,11 +47,11 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  feedsDust: 1
+  feedsDust: 0
   dustRegrowDelayMul: 1
   ejectionStyle: 1
   nodesPerStar: 3
-  scatterRadius: 4
+  scatterRadius: 1.6
   nodeFlightSeconds: 0.6
   nodeFlightEase:
     serializedVersion: 2
@@ -91,8 +91,8 @@ MonoBehaviour:
   dustLateralMul: 1
   dustTurbulenceMul: 1
   wiggleTorqueStrength: 1
-  wiggleFrequency: 4
-  wiggleDrift: 1
+  wiggleFrequency: 2
+  wiggleDrift: 0
   wiggleDriftAmplitude: 0.05
   wiggleDriftFrequency: 1
   bass:

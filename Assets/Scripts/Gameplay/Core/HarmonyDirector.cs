@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 public enum TrackRetunePolicy { BassHarmonyLead, DensestFirst, Manual }
 public class HarmonyDirector : MonoBehaviour
@@ -25,23 +24,20 @@ public class HarmonyDirector : MonoBehaviour
     [SerializeField] private bool spreadOverLoops = true;                 // retune 1 track per loop if true
     [SerializeField] private TrackRetunePolicy retunePolicy = TrackRetunePolicy.BassHarmonyLead;
     [SerializeField] private bool seedFromProfileOnPhaseStart;    // leave false for Option C
-    [Header("Scene refs")]
-    public DrumTrack drums;
-    public InstrumentTrackController tracks;
-    public ChordChangeArpeggiator arpeggiator;
-
+    
     private enum ConflictPolicy { DeferPlayerToNextLoop, LetPlayerOvertake }
     [SerializeField] private ConflictPolicy conflictPolicy = ConflictPolicy.DeferPlayerToNextLoop;
-    void OnEnable()  { if (drums != null) drums.OnLoopBoundary += OnLoopBoundary; }
-    void OnDisable() { if (drums != null) drums.OnLoopBoundary -= OnLoopBoundary; }
+    private bool _forceCommitNextBoundary;
+    void OnEnable()  { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary += OnLoopBoundary; }
+    void OnDisable() { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary -= OnLoopBoundary; }
     public void Initialize(DrumTrack d, InstrumentTrackController t, ChordChangeArpeggiator a = null) {
         // (your existing Initialize body)
         // After you set tracks, initialize per-track sequences:
-        if (tracks?.tracks != null)
+        if (GameFlowManager.Instance.controller?.tracks != null)
         {
             _trackSeq.Clear();
             _trackPos.Clear();
-            foreach (var tr in tracks.tracks)
+            foreach (var tr in GameFlowManager.Instance.controller.tracks)
             {
                 if (tr == null) continue;
                 _trackSeq[tr] = new List<int> { 0 }; // start at I for every track
@@ -52,41 +48,42 @@ public class HarmonyDirector : MonoBehaviour
     public void SetActiveProfile(ChordProgressionProfile profile, bool applyImmediately)
     {
         if (profile == null) return;
-        this.profile = profile;
 
-        // Reset builder state for the new phase
-        _globalBuiltCount = Mathf.Clamp(this.profile.chordSequence.Count > 0 ? 1 : 0, 0, this.profile.chordSequence.Count);
-        _previewChordIdx = -1;
-
-        // Do NOT seed notes (Option C): only retune existing notes to I for tracks that already have notes
-// HarmonyDirector.SetActiveProfile(...)
-        if (applyImmediately && tracks?.tracks != null)
+        if (applyImmediately)
         {
-            if (this.profile.chordSequence.Count > 0)
-            {
-                var chord0 = this.profile.chordSequence[0]; // I
+            // Swap NOW and snap everyone to chord 0
+            this.profile = profile;
+            _globalBuiltCount = (this.profile.chordSequence != null && this.profile.chordSequence.Count > 0) ? 1 : 0;
+            _previewChordIdx  = -1;
 
-                foreach (var tr in tracks.tracks)
+            if (GameFlowManager.Instance.controller?.tracks != null && this.profile.chordSequence.Count > 0)
+            {
+                var chord0 = this.profile.chordSequence[0];
+                foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
                     if (tr == null) continue;
-
                     _trackSeq[tr] = new List<int> { 0 };
                     _trackPos[tr] = 0;
-
                     if (tr.GetPersistentLoopNotes().Count > 0)
                         tr.RetuneLoopToChord(chord0);
                 }
             }
         }
-
+        else
+        {
+            // Stage for the next downbeat commit
+            _pendingProfile        = profile;
+            _hasPendingProfileSwap = true;
+        }
     }
+
     public void BeginBoostArp(float secondsRemaining)
     {
-        if (profile == null || profile.chordSequence == null || profile.chordSequence.Count == 0 || arpeggiator == null || drums == null)
+        if (profile == null || profile.chordSequence == null || profile.chordSequence.Count == 0 || GameFlowManager.Instance.arp == null || GameFlowManager.Instance.activeDrumTrack == null)
             return;
 
         // One preview per loop (you already debounce elsewhere; this is a cheap extra guard)
-        int loopIdx = Mathf.FloorToInt((float)((AudioSettings.dspTime - drums.startDspTime) / Mathf.Max(0.001f, drums.GetLoopLengthInSeconds())));
+        int loopIdx = Mathf.FloorToInt((float)((AudioSettings.dspTime - GameFlowManager.Instance.activeDrumTrack.startDspTime) / Mathf.Max(0.001f, GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds())));
         if (_previewActiveThisLoop && loopIdx == _lastPreviewLoopIdx) return;
         _previewActiveThisLoop = true;
         _lastPreviewLoopIdx = loopIdx;
@@ -94,10 +91,10 @@ public class HarmonyDirector : MonoBehaviour
         // Next unbuilt palette chord = index _globalBuiltCount (I=0 already "built")
         _previewChordIdx = Mathf.Clamp(_globalBuiltCount, 0, profile.chordSequence.Count - 1);
 
-        float beatsToDownbeat = secondsRemaining / Mathf.Max(0.001f, 60f / drums.drumLoopBPM);
+        float beatsToDownbeat = secondsRemaining / Mathf.Max(0.001f, 60f / GameFlowManager.Instance.activeDrumTrack.drumLoopBPM);
         _previewStartedInsideWindow = (beatsToDownbeat <= Mathf.Max(0f, commitWindowBeats));
 
-        arpeggiator.Begin(profile.chordSequence[_previewChordIdx], Mathf.Max(0.05f, secondsRemaining));
+        GameFlowManager.Instance.arp.Begin(profile.chordSequence[_previewChordIdx], Mathf.Max(0.05f, secondsRemaining));
     }
     public void AddRemixRings(int count = 1) {
         remixRings = Mathf.Clamp(remixRings + count, 0, MaxRings);
@@ -116,17 +113,15 @@ public class HarmonyDirector : MonoBehaviour
         Mathf.Max(1, steps);
     }
     public void CommitNextChordNow() {
-        Debug.Log($"Committing next chord now");
-        _armedChordAdvance = true;
-        _pendingCharges = Mathf.Clamp(_pendingCharges + 1, 1, MaxCharges);
-        Debug.Log($"[HD] CommitNextChordNow armed=true pendingCharges={_pendingCharges}");
+        Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
+        _forceCommitNextBoundary = true;
     }
-    public void CancelBoostArp() => arpeggiator?.Cancel();
+    public void CancelBoostArp() => GameFlowManager.Instance.arp?.Cancel();
     private IEnumerable<InstrumentTrack> SelectTracksByPolicy()
     {
-        if (tracks?.tracks == null) yield break;
+        if (GameFlowManager.Instance.controller?.tracks == null) yield break;
 
-        var list = tracks.tracks.Where(t => t != null && t.assignedRole != MusicalRole.Groove).ToList();
+        var list = GameFlowManager.Instance.controller.tracks.Where(t => t != null && t.assignedRole != MusicalRole.Groove).ToList();
 
         switch (retunePolicy)
         {
@@ -151,12 +146,12 @@ public class HarmonyDirector : MonoBehaviour
     }
     private void ApplyChordToAllTracks(int chordIndex)
     {
-        if (profile == null || tracks == null || tracks.tracks == null) return;
+        if (profile == null || GameFlowManager.Instance.controller == null || GameFlowManager.Instance.controller.tracks == null) return;
         var seq = profile.chordSequence;
         if (seq == null || seq.Count == 0) return;
 
         var chord = seq[chordIndex % seq.Count];
-        foreach (var tr in tracks.tracks)
+        foreach (var tr in GameFlowManager.Instance.controller.tracks)
         {
             Debug.Log($"Applying chord {chord.rootNote}");
             tr.RetuneLoopToChord(chord); // <-- new helper on InstrumentTrack (below)
@@ -165,7 +160,7 @@ public class HarmonyDirector : MonoBehaviour
     private void ApplyToAllTracksWithOffset(int offset)
     {
         Debug.Log($"[HD] ApplyToAllTracksWithOffset offset={offset}");
-        if (profile == null || tracks == null || tracks.tracks == null) return;
+        if (profile == null || GameFlowManager.Instance.controller.tracks == null || GameFlowManager.Instance.controller.tracks == null) return;
 
         // Rotate a transient profile for Option C
         var rotated = ScriptableObject.CreateInstance<ChordProgressionProfile>();
@@ -175,7 +170,7 @@ public class HarmonyDirector : MonoBehaviour
         for (int i = 0; i < n; i++)
             rotated.chordSequence.Add(profile.chordSequence[(i + offset) % n]);
 
-        foreach (var tr in tracks.tracks)
+        foreach (var tr in GameFlowManager.Instance.controller.tracks)
         {
             EnsureTrackHasNoteSet(tr);
             tr.ApplyChordProgression(rotated);
@@ -190,7 +185,7 @@ public class HarmonyDirector : MonoBehaviour
         if (tr == null || tr.HasNoteSet()) return;
 
         var factory = GameFlowManager.Instance != null ? GameFlowManager.Instance.noteSetFactory : null;
-        var phase   = drums != null ? drums.currentPhase : MusicalPhase.Establish;
+        var phase   = GameFlowManager.Instance.activeDrumTrack != null ? GameFlowManager.Instance.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
 
         if (factory != null)
         {
@@ -210,82 +205,52 @@ public class HarmonyDirector : MonoBehaviour
         _heldThroughBoundary       = false;
         _ringsArmedThisLoop        = 0;
     }
+
     private void OnLoopBoundary()
     {
-        if (profile == null || tracks?.tracks == null) { ResetLoopFlags(); return; }
-
-        int n = profile.chordSequence.Count;
-        var palette = profile.chordSequence;
-
-        // ===== PLAYER-DRIVEN BUILD (uses rings + timing) =====
-        bool commitOk = _heldThroughBoundary && _ringsArmedThisLoop > 0 &&
-                        (_previewStartedInsideWindow || !burnIfOutsideWindow);
-        var chosen = new List<InstrumentTrack>();
-
-        if (commitOk)
+        if (profile == null || GameFlowManager.Instance.controller.tracks == null)
         {
-            // Which tracks are affected this downbeat?
-            int toRetune = spreadOverLoops ? 1 : Mathf.Min(_ringsArmedThisLoop, remixRings);
-            var candidates = SelectTracksByPolicy()
-                             .Where(t => t != null && t.GetPersistentLoopNotes().Count > 0)
-                             .ToList();
+            ResetLoopFlags();
+            return;
+        }
 
-            if (candidates.Count > 0 && toRetune > 0)
+        // === Phase/Chord COMMIT path (system-driven) ===
+        if (_forceCommitNextBoundary || _hasPendingProfileSwap)
+        {
+            // Swap to pending profile if any
+            if (_hasPendingProfileSwap && _pendingProfile != null)
             {
-                chosen = candidates.Take(toRetune).ToList();
+                profile = _pendingProfile;
+                _pendingProfile = null;
+                _hasPendingProfileSwap = false;
+            }
 
-                bool addedNewChord = false;
-                foreach (var tr in chosen)
+            // Snap every track’s personal sequence back to I (index 0), retune to chord 0
+            if (profile.chordSequence != null && profile.chordSequence.Count > 0)
+            {
+                var chord0 = profile.chordSequence[0];
+
+                foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
-                    var seq = _trackSeq[tr];
-                    if (!seq.Contains(_previewChordIdx))
-                    {
-                        seq.Add(_previewChordIdx);      // extend the personal loop: I → [I, IV] → [I, IV, V]
-                        addedNewChord = true;
-                    }
+                    if (tr == null) continue;
+                    _trackSeq[tr] = new List<int> { 0 };
+                    _trackPos[tr] = 0;
+
+                    // If a loop exists, retune it so the whole band lands together
+                    if (tr.GetPersistentLoopNotes().Count > 0)
+                        tr.RetuneLoopToChord(chord0);
                 }
-                if (addedNewChord)
-                    _globalBuiltCount = Mathf.Min(_globalBuiltCount + 1, n); // unlock next palette chord globally
 
-                // Consume exactly what we used
-                remixRings = Mathf.Max(0, remixRings - chosen.Count);
-            }
-        }
-        else
-        {
-            // Burn (optional): consume rings without changing sequences
-            if (_ringsArmedThisLoop > 0 && burnIfOutsideWindow)
-                remixRings = Mathf.Max(0, remixRings - _ringsArmedThisLoop);
-        }
-
-        // ===== STEP EVERY TRACK ONE CHORD FOR THIS LOOP =====
-        foreach (var kv in _trackSeq.ToList())
-        {
-            var tr   = kv.Key;
-            var seq  = kv.Value;
-            if (tr == null || seq.Count == 0) continue;
-
-            int curPos = _trackPos.TryGetValue(tr, out var p) ? p : 0;
-
-            int nextPos;
-            if (chosen.Contains(tr) && seq.Contains(_previewChordIdx))
-            {
-                // If this track was chosen, *land on the newly previewed chord now*
-                nextPos = seq.IndexOf(_previewChordIdx);
-            }
-            else
-            {
-                // Otherwise, just advance by one within its personal sequence
-                nextPos = (curPos + 1) % seq.Count;
+                _globalBuiltCount = 1; // I is now the built baseline again
+                _previewChordIdx = -1;
             }
 
-            _trackPos[tr] = nextPos;
-            int paletteIdx = seq[nextPos];
-            tr.RetuneLoopToChord(palette[paletteIdx]);
+            _forceCommitNextBoundary = false;
+            ResetLoopFlags();
+            return; // Important: skip the player-build step this boundary
         }
-
-        ResetLoopFlags();
     }
+
     private void OnPreviewHeldThroughBoundary() { _heldThroughBoundary = true; }
 
 

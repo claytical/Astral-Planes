@@ -13,6 +13,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         assignedTrack = track;
         musicalRole = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         selectedNoteSet = noteSet;
+        track.SetNoteSet(noteSet);
         if (track == null || noteSet == null)
         {
             Debug.LogWarning("NoteSpawnerMinedObject initialized with missing track or NoteSet.");

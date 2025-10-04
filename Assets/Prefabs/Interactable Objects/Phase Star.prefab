@@ -49,49 +49,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  explosionConfigs:
-  - cue: 1
-    vfxPrefab: {fileID: 2567590292593330884, guid: a6e66e36d7009c54b9674939b661be45,
-      type: 3}
-    sfx: {fileID: 0}
-    defaultScale: 0
-  - cue: 2
-    vfxPrefab: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
-      type: 3}
-    sfx: {fileID: 0}
-    defaultScale: 0
-  - cue: 3
-    vfxPrefab: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
-      type: 3}
-    sfx: {fileID: 0}
-    defaultScale: 0
-  - cue: 3
-    vfxPrefab: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
-      type: 3}
-    sfx: {fileID: 0}
-    defaultScale: 0
-  antiMode: 1
-  antiSaturationScale: 1.05
-  antiValueScale: 1.05
-  starSpritesUseTrackColor: 1
-  rb: {fileID: 7872104301369236207}
-  maxFaceTurnDegPerSec: 24
-  faceVelocityAmount: 0.25
-  pairSwingDeg: 14
-  pairSwingHz: 0.14
-  pairSeparation: 0.12
-  wobbleDeg: 3
-  wobbleHz: 0.12
-  spriteAngleOffsets: []
+  behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
   shardPickupPrefab: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d,
     type: 3}
   particleSystem: {fileID: 382306593780773728}
   pulseSpeed: 2
   minAlpha: 0.1
   maxAlpha: 1
-  faceTurnRate: 2
-  spinDegPerSec: 12
-  shardScatterRadius: 1.6
   missedSpawnStagger: 0.03
   dustShrinkRadius: 1
   dustShrinkUnitsPerSecond: 1.2
@@ -122,6 +86,39 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  _dustShrinkRadius: 0
+  _dustUnitsPerSec: 0
+  _dustFalloff:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  _regrowDelayMul: 0
+  _feedsDust: 0
+  shardScatterRadius: 1.6
+  spritePivots: []
+  starSprites:
+  - {fileID: 6432059294630693968}
+  - {fileID: 7435224541743091032}
+  starParticles: {fileID: 382306593780773728}
+  spawnStrategyProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94,
+    type: 2}
+  antiMode: 1
+  antiSaturationScale: 1.05
+  antiValueScale: 1.05
+  starSpritesUseTrackColor: 1
+  rb: {fileID: 7872104301369236207}
+  maxFaceTurnDegPerSec: 24
+  faceVelocityAmount: 0.25
+  pairSwingDeg: 14
+  pairSwingHz: 0.14
+  pairSeparation: 0.12
+  wobbleDeg: 3
+  wobbleHz: 0.12
+  spriteAngleOffsets: []
+  faceTurnRate: 2
+  spinDegPerSec: 12
   mineNodeSpawnerPrefab: {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107,
     type: 3}
   hitsRequired: 8
@@ -151,14 +148,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  spritePivots: []
-  starSprites:
-  - {fileID: 6432059294630693968}
-  - {fileID: 7435224541743091032}
-  starParticles: {fileID: 382306593780773728}
-  spawnStrategyProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94,
-    type: 2}
-  behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
 --- !u!50 &7872104301369236207
 Rigidbody2D:
   serializedVersion: 5
@@ -509,7 +498,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
+      scalar: 1
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -4157,7 +4146,7 @@ ParticleSystem:
     maxLights: 20
   TrailModule:
     enabled: 1
-    mode: 0
+    mode: 1
     ratio: 1
     lifetime:
       serializedVersion: 2

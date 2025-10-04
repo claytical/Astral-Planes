@@ -504,7 +504,7 @@ public class Vehicle : MonoBehaviour
 
             if (coll.gameObject.tag == "Bump")
             {
-                CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Boundary);
+//                CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Boundary);
                 TriggerThud(coll.contacts[0].point);
             }
         }

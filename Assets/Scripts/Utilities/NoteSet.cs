@@ -156,8 +156,8 @@ public class NoteSet : MonoBehaviour
     }
     public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
-        var currentPhase = track.drumTrack.currentPhase; // assuming this exists on the same track ref
-        var strategy = MusicalPhaseLibrary.GetPatternStrategyForRole(currentPhase, track.assignedRole);
+        // assuming this exists on the same track ref
+        var strategy = MusicalPhaseLibrary.GetPatternStrategyForRole(GameFlowManager.Instance.phaseTransitionManager.currentPhase, track.assignedRole);
         switch (strategy)
         {
             case PatternStrategy.StaticRoot:

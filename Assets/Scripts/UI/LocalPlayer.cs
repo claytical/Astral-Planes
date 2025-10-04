@@ -229,7 +229,7 @@ public class LocalPlayer : MonoBehaviour
         if (GameFlowManager.Instance.ReadyToPlay() && GameFlowManager.Instance.CurrentState == GameState.Playing)
         {
             var drumTrack = FindAnyObjectByType<DrumTrack>();
-            if (drumTrack != null && drumTrack.currentPhase == MusicalPhase.Wildcard)
+            if (drumTrack != null && GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Wildcard)
             {
                 GameFlowManager.Instance.glitch.ToggleEffect(index);
             }

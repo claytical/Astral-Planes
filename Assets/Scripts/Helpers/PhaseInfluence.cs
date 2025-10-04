@@ -7,7 +7,7 @@ public class PhaseInfluence : DrumVolumeInfluence
 
     public override float EvaluateVolume(DrumTrack drumTrack)
     {
-        switch (drumTrack.currentPhase)
+        switch (GameFlowManager.Instance.phaseTransitionManager.currentPhase)
         {
             case MusicalPhase.Establish: return 0.3f;
             case MusicalPhase.Evolve: return 0.5f;

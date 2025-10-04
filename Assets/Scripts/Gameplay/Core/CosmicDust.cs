@@ -103,7 +103,7 @@ public class CosmicDust : MonoBehaviour
     private IEnumerator TriggerDelayedRegrowth(Vector2Int gridPos)
     {
         yield return new WaitForSeconds(0.5f); // delay long enough for Explode effect
-        _drumTrack.hexMazeGenerator.TriggerRegrowth(gridPos, _drumTrack.currentPhase);
+        _drumTrack.hexMazeGenerator.TriggerRegrowth(gridPos, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
     }
     private IEnumerator RegrowAfterDelay()
     {

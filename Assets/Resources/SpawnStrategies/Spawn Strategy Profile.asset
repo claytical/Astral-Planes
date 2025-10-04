@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0181f8dfb572491aa7cfe523caf5ba9b, type: 3}
-  m_Name: Establish Strategy Profile
+  m_Name: Spawn Strategy Profile
   m_EditorClassIdentifier: 
   mineNodes:
   - minedObjectType: 0
@@ -50,7 +50,7 @@ MonoBehaviour:
     role: 1
     weight: 1
     quota: 1
-    allowedPhases: 03000000
+    allowedPhases: 
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
@@ -58,7 +58,7 @@ MonoBehaviour:
     role: 0
     weight: 1
     quota: 1
-    allowedPhases: 03000000
+    allowedPhases: 
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
@@ -66,7 +66,7 @@ MonoBehaviour:
     role: 2
     weight: 1
     quota: 1
-    allowedPhases: 050000000200000003000000
+    allowedPhases: 
     rarityTier: 0
     requiresRemixToSpawn: 0
   - minedObjectType: 1
@@ -74,6 +74,7 @@ MonoBehaviour:
     role: 3
     weight: 1
     quota: 1
-    allowedPhases: 0500000004000000
+    allowedPhases: 
     rarityTier: 0
     requiresRemixToSpawn: 0
+  selectionMode: 1
