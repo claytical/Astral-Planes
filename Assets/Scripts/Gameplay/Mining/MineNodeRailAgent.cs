@@ -67,7 +67,57 @@ public class MineNodeRailAgent : MonoBehaviour
     }
 
     bool NeedsPath() => _pathIndex >= _path.Count || _path.Count == 0;
+public void ApplySpeed(PhaseStarBehaviorProfile profile, MusicalRole role, MusicalPhase phase)
+    {
+        float baseCps = (profile != null && profile.baseCellsPerSecond > 0f) ? profile.baseCellsPerSecond : 3.5f;
+        float roleMul = 1f;
+        switch (role)
+        {
+            case MusicalRole.Bass:    roleMul = 0.75f; break;
+            case MusicalRole.Harmony: roleMul = 1.00f; break;
+            case MusicalRole.Groove:  roleMul = 1.10f; break;
+            case MusicalRole.Lead:
+            default:                  roleMul = 1.25f; break;
+        }
+        float phaseMul = 1f;
+        if (profile != null)
+        {
+            switch (phase)
+            {
+                case MusicalPhase.Establish:  phaseMul = profile.establishSpeedMul; break;
+                case MusicalPhase.Evolve:     phaseMul = profile.evolveSpeedMul;    break;
+                case MusicalPhase.Intensify:  phaseMul = profile.intensifySpeedMul; break;
+                case MusicalPhase.Release:    phaseMul = profile.releaseSpeedMul;   break;
+                case MusicalPhase.Wildcard:   phaseMul = profile.wildcardSpeedMul;  break;
+                case MusicalPhase.Pop:        phaseMul = profile.popSpeedMul;       break;
+            }
+        }
+        else
+        {
+            phaseMul = phase switch
+            {
+                MusicalPhase.Establish => 0.9f,
+                MusicalPhase.Evolve    => 1.0f,
+                MusicalPhase.Intensify => 1.2f,
+                MusicalPhase.Release   => 0.85f,
+                MusicalPhase.Wildcard  => 1.3f,
+                MusicalPhase.Pop       => 1.05f,
+                _ => 1f
+            };
+        }
+        cellsPerSecond = Mathf.Max(0.5f, baseCps * roleMul * phaseMul);
+    }
 
+    public void ReplanToFarthest()
+    {
+        if (_drum == null) _drum = GetComponentInParent<DrumTrack>();
+        if (_drum == null) return;
+        Vector2Int start = _drum.WorldToGridPosition(transform.position);
+        Vector2Int goal  = _drum.FarthestReachableCellInComponent(start);
+        var path = new List<Vector2Int>();
+        if (_drum.TryFindPath(start, goal, path))
+            SetPath(path);
+    }
     public void SetPath(IList<Vector2Int> cells)
     {
         _path.Clear();

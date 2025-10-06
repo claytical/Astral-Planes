@@ -77,4 +77,4 @@ MonoBehaviour:
     allowedPhases: 
     rarityTier: 0
     requiresRemixToSpawn: 0
-  selectionMode: 1
+  selectionMode: 2

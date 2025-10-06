@@ -13,37 +13,8 @@ MonoBehaviour:
   m_Name: Establish
   m_EditorClassIdentifier: 
   phase: 0
-  ghostLoopCount: 4
-  roleNoteSetSeriesList:
-  - role: 0
-  - role: 3
-  - role: 1
-  - role: 2
   drumClips:
-  - {fileID: 8300000, guid: 6e93c379a8421408296593ca0940269e, type: 3}
-  - {fileID: 8300000, guid: 0eae5a698f3e247538b31bf322fb4db9, type: 3}
-  - {fileID: 8300000, guid: 97f3af0e001cb45d98f30f3ec43b14b9, type: 3}
-  - {fileID: 8300000, guid: 8bc6925b6990d4f8eb1a0a24382b29ce, type: 3}
-  - {fileID: 8300000, guid: ae5e89683f6c14ae38322c46da3331ec, type: 3}
-  - {fileID: 8300000, guid: 2ed06d876afa04dba891f4f482e4a250, type: 3}
-  - {fileID: 8300000, guid: 928324c29158d40fe807b9e08e10d949, type: 3}
-  visualColor: {r: 0.5330188, g: 0.82528865, b: 1, a: 1}
-  rotationMode: 0
-  rotationSpeed: 5
+  - {fileID: 8300000, guid: 116c4ebb8c05844b8a9df67a091dfe2f, type: 3}
   defaultRemixStrategy: {fileID: 0}
-  remixRoleOverrides: []
-  hitsRequired: 4
-  energyPerCollectable: 1
   shortLabel: Establish
-  moodDescription: 
-  roleGhostStrategies:
-  - role: 0
-    strategy: 5
-  - role: 0
-    strategy: 1
-  - role: 2
-    strategy: 3
-  - role: 1
-    strategy: 0
-  - role: 3
-    strategy: 4
+  roleStrategies: []

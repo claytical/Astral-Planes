@@ -13,22 +13,8 @@ MonoBehaviour:
   m_Name: Intensify
   m_EditorClassIdentifier: 
   phase: 2
-  ghostLoopCount: 4
-  roleNoteSetSeriesList:
-  - role: 0
-  - role: 1
-  - role: 2
-  - role: 3
   drumClips:
-  - {fileID: 8300000, guid: 417d325bbc85f4e349ada757fe5953fe, type: 3}
-  - {fileID: 8300000, guid: 8ab1fdfa595ad4f468991bd940e69c5a, type: 3}
-  visualColor: {r: 0.9555027, g: 1, b: 0.019607842, a: 1}
-  rotationMode: 3
-  rotationSpeed: 30
+  - {fileID: 8300000, guid: 5f8600fc7ef044b8082286a1a07bcf66, type: 3}
   defaultRemixStrategy: {fileID: 0}
-  remixRoleOverrides: []
-  hitsRequired: 5
-  energyPerCollectable: 1
   shortLabel: Intensify
-  moodDescription: 
-  roleGhostStrategies: []
+  roleStrategies: []

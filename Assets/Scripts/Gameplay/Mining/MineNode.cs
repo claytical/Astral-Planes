@@ -15,7 +15,8 @@ public class MineNode : MonoBehaviour
     private Color? _lockedColor;
     private MinedObject _minedObject;
     private bool _objectRevealed, _depletedHandled, _resolvedFired;
-    private MinedObjectSpawnDirective _directive;  // cache the directive
+    private MinedObjectSpawnDirective _directive;
+    private MineNodeRailAgent _rail;
 
     public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
     private void Start()
@@ -85,6 +86,7 @@ public class MineNode : MonoBehaviour
     { 
         Debug.Log($"Hit MineNode: {coll.gameObject.name} object revealed? {_objectRevealed}");
         if (_objectRevealed) return;
+        if(_rail != null) _rail.ReplanToFarthest();
         if (_minedObject != null)
         {
             var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
@@ -222,6 +224,7 @@ public class MineNode : MonoBehaviour
     {
         var col = GetComponent<Collider2D>();
         if (col && !col.enabled) col.enabled = true;
+        _rail = GetComponent<MineNodeRailAgent>();
     }
 
 }

@@ -76,7 +76,7 @@ CircleCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 2fcbac7036a964d589a6612c9a0c8204, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -101,7 +101,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.1
+  m_Radius: 0.5
 --- !u!114 &1980146515134306388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -115,9 +115,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   referenceScale: {x: 0.75, y: 0.75, z: 1}
+  particleSystem: {fileID: 7497572302500479706}
   starRemovesWithoutRegrow: 0
   starAlphaFadeBias: 0.9
-  shieldType: 0
   slowBrake: 0.231
   speedScale: 0.748
   accelScale: 0.662
@@ -135,10 +135,7 @@ MonoBehaviour:
   baseSprite: {fileID: 7236654244480378721}
   fadeSeconds: 0.25
   fullScale: {x: 1, y: 1, z: 1}
-  particleSystem: {fileID: 7497572302500479706}
-  dissipateOnHit: 0
   epochId: 0
-  lastDestroy: 0
 --- !u!114 &8747843313378906591
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5121,7 +5118,7 @@ SpriteMask:
   m_SortingOrder: 0
   m_Sprite: {fileID: 4412486014302810088, guid: d74e19106b29d4bfab46b0e4cd838279,
     type: 3}
-  m_MaskAlphaCutoff: 0.541
+  m_MaskAlphaCutoff: 0.665
   m_FrontSortingLayerID: 0
   m_BackSortingLayerID: 0
   m_FrontSortingLayer: 0

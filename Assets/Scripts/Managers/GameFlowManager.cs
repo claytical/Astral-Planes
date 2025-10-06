@@ -275,19 +275,12 @@ public class GameFlowManager : MonoBehaviour
         yield break;
     }
 
-    // 1) Get the MusicalPhaseGroup for this phase
-    var group = prog.GetPhaseGroup(nextPhase);              // see §2 below
-    if (group == null)
-    {
-        Debug.LogError($"[Bridge] No MusicalPhaseGroup found for phase {nextPhase}.");
-        yield break;
-    }
 
     // 2) Select a strategy using your existing API
-    var profile = prog.SelectSpawnStrategy(group);
+    var profile = prog.SelectSpawnStrategy(nextPhase);
     if (profile == null)
     {
-        Debug.LogError($"[Bridge] No SpawnStrategyProfile available for group {group} ({nextPhase}).");
+        Debug.LogError($"[Bridge] No SpawnStrategyProfile available for ({nextPhase}).");
         yield break;
     }
 
@@ -537,6 +530,7 @@ public class GameFlowManager : MonoBehaviour
         phaseTransitionManager?.HandlePhaseTransition(nextPhase);
         // 3) Kick a loop-aligned maze transition/build for the new phase visuals
         StartCoroutine(GenerateMazeAndPlaceStar(nextPhase));
+        
         // 4) Spawn next star with watchdog so we can’t stall
         StartCoroutine(SpawnNextStarWatchdog(nextPhase, 2f));
 
@@ -544,6 +538,13 @@ public class GameFlowManager : MonoBehaviour
         controller?.SetSpawningEnabled(true);
         if (sig.includeDrums && activeDrumTrack) activeDrumTrack.SetBridgeAccent(false);
         GhostCycleInProgress = false;
+        
+        if (progressionManager != null)
+        {
+            progressionManager.isPhaseInProgress = false;
+            progressionManager.isPhaseTransitioning = false;
+            progressionManager.pendingNextPhase = false;
+        }        
     }
 
     // Post-finally: fade ribbons back (OK to yield here)

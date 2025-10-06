@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Wildcard Behavior
   m_EditorClassIdentifier: 
   personality: 4
-  starColor: {r: 1, g: 0, b: 0.9371724, a: 1}
+  starColor: {r: 0.6039216, g: 0.8039216, b: 0.1960784, a: 1}
   particlePulseSpeed: 1.709
   starAlphaMin: 0.1
   starAlphaMax: 0.807
@@ -147,3 +147,4 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
+  starHoleRadius: 4

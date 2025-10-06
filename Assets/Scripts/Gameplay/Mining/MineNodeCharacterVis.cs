@@ -31,7 +31,49 @@ public class MineNodeCharacterVis : MonoBehaviour
     float lastPlanReadyTime;
     float facedAngle;  // current facing
     float wobblePhase;
+    float wobbleHz;
 
+    public void Configure(MusicalRole role, MusicalPhase phase)
+    {
+        // Base per-role personality
+        float baseFaceTurn = 0f, baseWobHz = 0f, baseWobDeg = 0f, baseThinkSpin = 0f;
+        Vector2 baseThinkBurst = Vector2.zero;
+        switch (role)
+        {
+            case MusicalRole.Bass:
+                baseFaceTurn = 240f; baseWobHz = 0.35f; baseWobDeg = 8f; baseThinkSpin = 240f; baseThinkBurst = new Vector2(0.18f, 0.28f);
+                break;
+            case MusicalRole.Harmony:
+                baseFaceTurn = 300f; baseWobHz = 0.45f; baseWobDeg = 6f; baseThinkSpin = 360f; baseThinkBurst = new Vector2(0.14f, 0.24f);
+                break;
+            case MusicalRole.Groove:
+                baseFaceTurn = 330f; baseWobHz = 0.55f; baseWobDeg = 7f; baseThinkSpin = 420f; baseThinkBurst = new Vector2(0.12f, 0.22f);
+                break;
+            case MusicalRole.Lead:
+            default:
+                baseFaceTurn = 420f; baseWobHz = 0.70f; baseWobDeg = 5f; baseThinkSpin = 540f; baseThinkBurst = new Vector2(0.10f, 0.18f);
+                break;
+        }
+
+        // Phase modifiers
+        float phaseSpeedMul = phase switch
+        {
+            MusicalPhase.Establish => 0.85f,
+            MusicalPhase.Evolve    => 1.00f,
+            MusicalPhase.Intensify => 1.20f,
+            MusicalPhase.Release   => 0.85f,
+            MusicalPhase.Wildcard  => 1.30f,
+            MusicalPhase.Pop       => 1.05f,
+            _ => 1f
+        };
+
+        faceTurnDegPerSec   = Mathf.Lerp(faceTurnDegPerSec,   baseFaceTurn * phaseSpeedMul, 1f);
+        wobbleHz            = Mathf.Lerp(wobbleHz,            baseWobHz   * phaseSpeedMul, 1f);
+        wobbleDeg           = Mathf.Lerp(wobbleDeg,           baseWobDeg,                  1f);
+        frenzySpinDegPerSec = Mathf.Lerp(frenzySpinDegPerSec, baseThinkSpin * phaseSpeedMul, 1f);
+        thinkBurstRange     = Vector2.Lerp(thinkBurstRange,   baseThinkBurst / phaseSpeedMul, 1f);
+        thinkDampen         = Mathf.Lerp(thinkDampen,         6f, 1f);
+    }
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();

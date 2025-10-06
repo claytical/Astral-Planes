@@ -14,62 +14,44 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phaseGroups:
   - phase: 0
-    hollowRadius: 10
-    spawnStrategies:
-    - {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: 180375eabb5e24dda84f1b51d7c32073, type: 2}
     - {fileID: 11400000, guid: 0492b3b726bce4df4aa11d3f53d71ebf, type: 2}
     - {fileID: 11400000, guid: dffd8a271ee3e4a888db836cbae882fb, type: 2}
     - {fileID: 11400000, guid: db693f1f904514032bf3d04968850e52, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
   - phase: 1
-    hollowRadius: 7
-    spawnStrategies:
-    - {fileID: 11400000, guid: 9efebe1ecf02f4b1fa80ae985e839133, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: 92e208fac6ebb4dcba94e2859a0538f6, type: 2}
     - {fileID: 11400000, guid: 465f5660ad24d417a82b9fa2c62305a0, type: 2}
     - {fileID: 11400000, guid: 9cf401300adb5487197b4af0fd108c44, type: 2}
     - {fileID: 11400000, guid: f058c6f040ccd4c8482938ad5d9fa792, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
   - phase: 2
-    hollowRadius: 5
-    spawnStrategies:
-    - {fileID: 11400000, guid: cd4291b92268a40a6a48a3228f9210e6, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: ed94c37e362c34c8ca1d4ca78d0210f5, type: 2}
     - {fileID: 11400000, guid: 6062c1e50922e4fda9d03e6c751201b2, type: 2}
     - {fileID: 11400000, guid: 0bc429fc516db4791a58989aeb38d9dd, type: 2}
     - {fileID: 11400000, guid: 9a767cb716b4a4c268645d4b45807787, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
   - phase: 3
-    hollowRadius: 7
-    spawnStrategies:
-    - {fileID: 11400000, guid: 16b216a1495834db981d9b6909fd9e2d, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: 851b5bbc087764db3ae11ad6a1d06a3d, type: 2}
     - {fileID: 11400000, guid: 2c58e2b63bb7a4eaca880c8665755f58, type: 2}
     - {fileID: 11400000, guid: cd5402aae2d3143fe90c6f51cce5ab55, type: 2}
     - {fileID: 11400000, guid: 91f7f6ae1a98c40e683f7ba041a963e7, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
   - phase: 4
-    hollowRadius: 5
-    spawnStrategies:
-    - {fileID: 11400000, guid: f6086ab38c2c444b999a96da1fb5c6fe, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: c018e7d5941e54a0fb304abbe350bb63, type: 2}
     - {fileID: 11400000, guid: 57cf5c939caae46239580a777a081319, type: 2}
     - {fileID: 11400000, guid: 56cd15728ca5f4ae0b6e8881dd9893a0, type: 2}
     - {fileID: 11400000, guid: dce3e6feebbd24d139bd8c04ab0ec7ea, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
   - phase: 5
-    hollowRadius: 6
-    spawnStrategies:
-    - {fileID: 11400000, guid: d2745de784c2544fc9d9185c4ea68bec, type: 2}
     remixUtilities:
     - {fileID: 11400000, guid: 4c5b28fdc21974a85a1337bbc245d7b3, type: 2}
     - {fileID: 11400000, guid: 1e926aceac43b441f89f08d42b5d4f7b, type: 2}
     - {fileID: 11400000, guid: 4ef5741e84320455fb781f4219f0d24f, type: 2}
     - {fileID: 11400000, guid: 54956bf1dc94a45cb95129351d1397e9, type: 2}
-    allowRandomSelection: 1
+    allowRandomSelection: 0
