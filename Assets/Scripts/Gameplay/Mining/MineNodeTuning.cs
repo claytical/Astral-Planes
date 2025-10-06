@@ -14,8 +14,6 @@ public class MineNodeTuning : MonoBehaviour
         if (dustInteractor) dustInteractor.enabled = true; // sets multipliers only
 
         var roleTuning = profile.GetRoleTuning(role);
-
-
         
         // --- Dust interaction (node in dust) ---
         if (dustInteractor)

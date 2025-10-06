@@ -12,8 +12,6 @@ public class MusicalPhaseQueue : ScriptableObject
 public class MusicalPhaseGroup
 {
     public MusicalPhase phase;
-    public float hollowRadius = 2.5f;
-    public List<SpawnStrategyProfile> spawnStrategies;
     public List<RemixUtility> remixUtilities;
     public bool allowRandomSelection = true;
 }

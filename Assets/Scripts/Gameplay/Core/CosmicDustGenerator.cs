@@ -6,10 +6,10 @@ using UnityEngine.Serialization;
 public class CosmicDustGenerator : MonoBehaviour
 {
     public DrumTrack drumTrack;
-    [FormerlySerializedAs("hexagonShieldPrefab")] public GameObject dustPrefab;
+    public GameObject dustPrefab;
     public int iterations = 3;
     [Header("Maze Cycle Control")]
-    public MazeCycleMode cycleMode = MazeCycleMode.ClassicLoopAligned;
+    public MazeCycleMode cycleMode = MazeCycleMode.Progressive;
     public enum MazeCycleMode {
         ClassicLoopAligned, // clear then regrow each loop (old behavior)
         Progressive,        // add/remove features over time; DON'T run classic cycle each loop
@@ -76,6 +76,7 @@ public class CosmicDustGenerator : MonoBehaviour
             featureSpawnBudgetFrac = 0.12f;
             featureFadeDurationFrac = 0.25f;
         }
+        regrowCooldownSeconds = Mathf.Clamp(0.6f * profile.dustRegrowDelayMul, 0.1f, 3.0f);
     }
     public void BeginStaggeredMazeRegrowth(List<(Vector2Int, Vector3)> cellsToGrow)
     {
@@ -91,7 +92,7 @@ public class CosmicDustGenerator : MonoBehaviour
         _regrowthCoroutines[freedCell] = StartCoroutine(RegrowElsewhere(freedCell, phase)); 
     }
 
-    public IEnumerator RunLoopAlignedMazeCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float regrowOffsetFrac, float destroySpanFrac)  {
+    private IEnumerator RunLoopAlignedMazeCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float regrowOffsetFrac, float destroySpanFrac)  {
         if (Time.time < _commitCooldownUntil)
             yield break; // skip this loop’s global destroy/regrow
         if (progressiveMaze)
@@ -185,14 +186,15 @@ public class CosmicDustGenerator : MonoBehaviour
                                          drumTrack.GetSpawnGridWidth()  > 0 &&
                                          drumTrack.GetSpawnGridHeight() > 0 &&
                                          Camera.main != null);
-        
-        var center = new Vector2Int(drumTrack.GetSpawnGridWidth()/2, drumTrack.GetSpawnGridHeight()/2); 
-        // Primary layout
-        var walls = CalculateCarvedMazeWalls(onScreenOnly:true, braidChance:0.12f, corridorThickness:1); 
-        if (walls == null || walls.Count == 0) { 
-            Debug.LogWarning("[MAZE] Primary pattern returned 0 — retrying without on-screen cull.");
-            walls = CalculateCarvedMazeWalls(onScreenOnly:false, braidChance:0.12f, corridorThickness:1);
-        } 
+        var center = new Vector2Int(drumTrack.GetSpawnGridWidth()/2, drumTrack.GetSpawnGridHeight()/2);
+        // Primary layout should respect the current phase personality
+         var walls = CalculateMazeGrowth(center, phase, hollowRadius: 0f, avoidStarHole: false);
+         if (walls == null || walls.Count == 0) { 
+             Debug.LogWarning("[MAZE] Phase-specific pattern returned 0 — retrying with carved walls fallback."); 
+             walls = CalculateCarvedMazeWalls(onScreenOnly:true, braidChance:0.12f, corridorThickness:1); 
+             if (walls == null || walls.Count == 0) 
+                 walls = CalculateCarvedMazeWalls(onScreenOnly:false, braidChance:0.12f, corridorThickness:1);
+         }
         if (walls == null || walls.Count == 0) {
             Debug.LogWarning("[MAZE] Fallback to CA seed."); walls = Build_CA(center, hollowRadius:0f, avoidStarHole:false);
         }
@@ -210,8 +212,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (cell.x != -1)
             drumTrack.SpawnPhaseStarAtCell(phase, profile, cell);
     }
-
-
     public Vector2Int ForceReserveCellNearCenter()
     {
         int w = drumTrack.GetSpawnGridWidth();
@@ -235,7 +235,6 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return new Vector2Int(-1,-1);
     }
-    
     public bool TryRequestLoopAlignedCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac)
         { 
             if (cycleMode != MazeCycleMode.ClassicLoopAligned) return false;
@@ -258,19 +257,17 @@ public class CosmicDustGenerator : MonoBehaviour
         foreach (var (grid, pos) in cells)
         {
             GameObject hex = Instantiate(dustPrefab, pos, Quaternion.identity);
-            drumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust);
-            hexagons.Add(hex);
-
-            if (hex.TryGetComponent<CosmicDust>(out var dust))
-            {
-                dust.SetEpoch(GetCurrentEpoch());
-                dust.SetColor(Color.gray); 
-                dust.SetDrumTrack(drumTrack);
-                dust.SetGrowInDuration(hexGrowInSeconds);    
+            GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust);
+            hexagons.Add(hex); 
+            if (hex.TryGetComponent<CosmicDust>(out var dust)) {
+                dust.SetEpoch(GetCurrentEpoch()); 
+                dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack); 
+                dust.SetGrowInDuration(hexGrowInSeconds);
+                // Phase-aware visuals + behavior from the outset
+                dust.SetPhaseColor(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
                 dust.ConfigureForPhase(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
-                dust.Begin();                               
+                dust.Begin();
             }
-
             RegisterHex(grid, hex);
             if (perHexDelay > 0f) yield return new WaitForSeconds(perHexDelay);
             else yield return null;

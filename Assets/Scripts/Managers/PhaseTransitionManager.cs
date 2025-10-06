@@ -9,25 +9,31 @@ public class PhaseTransitionManager : MonoBehaviour
     public MusicalPhase currentPhase;
     private PhaseStarBehaviorProfile _activeBehaviorProfile;
 
+    public event System.Action<MusicalPhase, MusicalPhase> OnPhaseChanged;
+
+    /// Preferred
+    public void HandlePhaseTransition(MusicalPhase nextPhase, string who)
+    {
+        if (nextPhase == currentPhase)
+        {
+            Debug.LogWarning($"[PTM] No-op transition {currentPhase}→{nextPhase} requested by {who}. Ignored.");
+            return;
+        }
+
+        var oldPrev = previousPhase;
+        var oldCur  = currentPhase;
+
+        previousPhase = currentPhase;
+        currentPhase  = nextPhase;
+
+        Debug.Log($"[PTM] {who}: {oldCur}→{nextPhase} (prev {oldPrev}→{previousPhase})");
+        OnPhaseChanged?.Invoke(previousPhase, currentPhase);
+    }
+
+    /// Backward-compatible shim
     public void HandlePhaseTransition(MusicalPhase nextPhase)
     {
-        previousPhase = currentPhase;
-        currentPhase = nextPhase;
-
-        switch (currentPhase)
-        {
-            case MusicalPhase.Evolve:
-            case MusicalPhase.Wildcard:
-                break;
-
-            case MusicalPhase.Intensify:
-            case MusicalPhase.Pop:
-                break;
-
-            case MusicalPhase.Release:
-            case MusicalPhase.Establish:
-                break;
-        }
+        HandlePhaseTransition(nextPhase, "UnknownCaller");
     }
 
     private void HandlePhaseStarSpawned(MusicalPhase phase, PhaseStarBehaviorProfile profile) {

@@ -13,22 +13,8 @@ MonoBehaviour:
   m_Name: Pop
   m_EditorClassIdentifier: 
   phase: 5
-  ghostLoopCount: 4
-  roleNoteSetSeriesList:
-  - role: 0
-  - role: 1
-  - role: 2
-  - role: 3
   drumClips:
-  - {fileID: 8300000, guid: fdd2ef21522af41fbb0c7538e76442a8, type: 3}
-  - {fileID: 8300000, guid: 86bf9bd2784784d78af16c6f103760f6, type: 3}
-  visualColor: {r: 1, g: 0.24056602, b: 0.49621707, a: 1}
-  rotationMode: 1
-  rotationSpeed: 30
+  - {fileID: 8300000, guid: 592391f2c123e46d98523607a2f22905, type: 3}
   defaultRemixStrategy: {fileID: 0}
-  remixRoleOverrides: []
-  hitsRequired: 4
-  energyPerCollectable: 1
   shortLabel: Pop
-  moodDescription: 
-  roleGhostStrategies: []
+  roleStrategies: []

@@ -147,3 +147,4 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
+  starHoleRadius: 5

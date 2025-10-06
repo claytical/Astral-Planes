@@ -17,12 +17,13 @@ MonoBehaviour:
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 0.916
+  baseCellsPerSecond: 3.8
   starDriftSpeed: 3
   starDriftJitter: 1
   orbitBias: 0
   teleportChancePerSec: 0
   dustShrinkRadius: 6
-  dustShrinkUnitsPerSec: 1.2
+  dustShrinkUnitsPerSec: 5
   dustFalloff:
     serializedVersion: 2
     m_Curve:
@@ -47,7 +48,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  feedsDust: 1
+  feedsDust: 0
   dustRegrowDelayMul: 1
   ejectionStyle: 1
   nodesPerStar: 3
@@ -147,3 +148,4 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
+  starHoleRadius: 1

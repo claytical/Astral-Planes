@@ -15,120 +15,99 @@ public class SpawnStrategyProfile : ScriptableObject
     [NonSerialized] private Dictionary<int,int> _quotaRemaining;// per-node quotas (by index)
     
 
-public MinedObjectSpawnDirective GetMinedObjectDirective(
-    InstrumentTrackController trackController,
-    MusicalPhase currentPhase,
-    MusicalPhaseProfile phaseProfile,
-    MinedObjectPrefabRegistry objectRegistry,
-    MineNodePrefabRegistry nodeRegistry,
-    NoteSetFactory noteSetFactory)
-{
-    if (trackController == null || mineNodes == null || mineNodes.Count == 0)
+// SpawnStrategyProfile.cs
+  public MinedObjectSpawnDirective GetMinedObjectDirective(
+        InstrumentTrackController trackController,
+        MusicalPhase currentPhase,
+        MusicalPhaseProfile phaseProfile,
+        MinedObjectPrefabRegistry objectRegistry,
+        MineNodePrefabRegistry nodeRegistry,
+        NoteSetFactory noteSetFactory,
+        HashSet<MusicalRole> avoidRoles = null // <-- NEW
+    )
     {
-        Debug.LogWarning("[SpawnStrategy:A] Missing controller or empty node list.");
-        return null;
-    }
-
-    // --- Authoritative phase is passed in (call site should pass PTM.currentPhase)
-    var phase = currentPhase;
-
-    // --- Build candidate set (Option A: ALL nodes require explicit allowedPhases opt-in) ---
-    List<(int idx, WeightedMineNode node)> valid = new();
-    int skippedPhase = 0, skippedRole = 0, skippedUsefulness = 0;
-
-    for (int i = 0; i < mineNodes.Count; i++)
-    {
-        var node = mineNodes[i];
-        if (node == null) continue;
-
-        // Strict phase gating for EVERYTHING (spawners & utilities)
-        var list = node.allowedPhases;
-        if (list == null || list.Count == 0 || !list.Contains(phase))
-        {
-            skippedPhase++;
-            continue;
-        }
-
-        var track = trackController.FindTrackByRole(node.role);
-        if (track == null)
-        {
-            skippedRole++;
-            continue;
-        }
-
-        // Keep your existing usefulness logic (handles utilities vs spawners)
-        if (!IsNodeUsefulForTrack(node, track, phase, phaseProfile))
-        {
-            skippedUsefulness++;
-            continue;
-        }
-
-        valid.Add((i, node));
-    }
-
-    if (valid.Count == 0)
-    {
-        Debug.LogWarning($"[SpawnStrategy:A] 0 candidates for phase={phase} " +
-                         $"(phase-gate={skippedPhase}, role-miss={skippedRole}, not-useful={skippedUsefulness}).");
-        return null; // let caller decide fallback/advance
-    }
-
-    // --- PICK ACCORDING TO MODE ---
-    (int idx, WeightedMineNode pick) chosen = selectionMode switch
-    {
-        MineNodeSelectionMode.RoundRobinUniqueFirst => PickRoundRobinUniqueFirst(valid),
-        MineNodeSelectionMode.QuotaBased           => PickQuotaBased(valid),
-        _                                          => PickWeighted(valid)
-    };
-
-    if (chosen.pick == null)
-    {
-        Debug.LogWarning("[SpawnStrategy:A] Selection produced null; falling back to weighted.");
-        chosen = PickWeighted(valid);
-        if (chosen.pick == null) return null;
-    }
-
-    // Consume any quota/counters
-    ConsumeQuota(chosen.idx);
-
-    // --- Build directive without doing side-effects on the Track ---
-    var selectedTrack = trackController.FindTrackByRole(chosen.pick.role);
-    if (selectedTrack == null)
-    {
-        Debug.LogError("[SpawnStrategy:A] Selected track is null.");
-        return null;
-    }
-
-    NoteSet generatedNoteSet = null;
-
-    if (chosen.pick.minedObjectType == MinedObjectType.NoteSpawner)
-    {
-        if (noteSetFactory == null)
-        {
-            Debug.LogError("[SpawnStrategy:A] NoteSetFactory is null for NoteSpawner.");
+        if (trackController == null || nodeRegistry == null || objectRegistry == null)
             return null;
+
+        // Build candidate list with original indices so the caller can keep quotas/round-robin if needed
+        var candidates = new List<(int idx, WeightedMineNode node)>(mineNodes.Count);
+
+        for (int i = 0; i < mineNodes.Count; i++)
+        {
+            var node = mineNodes[i];
+
+            // Phase gating
+            if (node.allowedPhases != null && node.allowedPhases.Count > 0 &&
+                !node.allowedPhases.Contains(currentPhase))
+                continue;
+
+            // Role avoidance: skip any item whose role is in the avoid set
+            if (avoidRoles != null && avoidRoles.Contains(node.role))
+                continue;
+
+            // Track must exist for this role (don’t assume FindTrackByRole exists)
+            var track = trackController.tracks?.FirstOrDefault(
+                t => t != null && t.assignedRole == node.role
+            );
+            if (track == null)
+                continue;
+
+            // Keep your existing usefulness checks if you have them (utility eligibility, etc.)
+            if (!IsNodeUsefulForTrack(node, track, currentPhase, phaseProfile))
+                continue;
+
+            // If it passed all filters, it’s a valid candidate
+            candidates.Add((i, node));
         }
 
-        // Generate a NoteSet for the directive, but DO NOT call selectedTrack.SetNoteSet() here.
-        // Let the spawn/collect pipeline apply it at the correct moment.
-        generatedNoteSet = noteSetFactory.Generate(selectedTrack, phase);
+        // If we filtered everything out, relax the avoidRoles once (so we still spawn something)
+        if (candidates.Count == 0)
+        {
+            for (int i = 0; i < mineNodes.Count; i++)
+            {
+                var node = mineNodes[i];
+
+                if (node.allowedPhases != null && node.allowedPhases.Count > 0 &&
+                    !node.allowedPhases.Contains(currentPhase))
+                    continue;
+
+                var track = trackController.tracks?.FirstOrDefault(
+                    t => t != null && t.assignedRole == node.role
+                );
+                if (track == null) continue;
+                if (!IsNodeUsefulForTrack(node, track, currentPhase, phaseProfile)) continue;
+
+                candidates.Add((i, node));
+            }
+            if (candidates.Count == 0) return null;
+        }
+
+        // Weighted pick (your function)
+        var picked = PickWeighted(candidates);
+
+        // Resolve the actual track object
+        var pickedTrack = trackController.tracks?.FirstOrDefault(
+            t => t != null && t.assignedRole == picked.node.role
+        );
+        if (pickedTrack == null) return null;
+
+        // Build the directive the same way you currently do (prefer your existing ToDirective)
+        var dir = picked.node.ToDirective(
+            pickedTrack,
+            /* noteSet: */ null,                     // let ToDirective / factory decide, or fill below
+            pickedTrack.trackColor,
+            nodeRegistry,
+            objectRegistry,
+            noteSetFactory,
+            currentPhase
+        );
+
+        // Attach the MusicalRoleProfile so instrument-specific behavior is preserved
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(pickedTrack.assignedRole);
+        if (dir != null) dir.roleProfile = roleProfile; // assumes directive has this field
+
+        return dir;
     }
-    // else: for TrackUtility, there is no NoteSet to generate here.
-
-    var directive = chosen.pick.ToDirective(
-        selectedTrack,
-        generatedNoteSet,
-        selectedTrack.trackColor,
-        nodeRegistry,
-        objectRegistry,
-        noteSetFactory,
-        phase
-    );
-
-    Debug.Log($"[SpawnStrategy:A] phase={phase} pick={chosen.pick} track={selectedTrack.name} type={chosen.pick.minedObjectType}");
-    return directive;
-}
-
     private (int idx, WeightedMineNode node) PickWeighted(List<(int idx, WeightedMineNode node)> nodes)
     {
         // your existing weighted logic
@@ -148,6 +127,7 @@ public MinedObjectSpawnDirective GetMinedObjectDirective(
         _rrUsedThisStar ??= new HashSet<int>();
         // 1) try to find a valid node we haven't used during this star
         int n = nodes.Count;
+        Debug.Log($"Nodes: {nodes}");
         for (int step = 0; step < n; step++)
         {
             var k = (_rrCursor + step) % n;
@@ -159,6 +139,7 @@ public MinedObjectSpawnDirective GetMinedObjectDirective(
                 return candidate;
             }
         }
+        Debug.Log($"Fallback to weighted from Round Robin Unique First.");
         // 2) everybody used once → fall back to weighted among valid
         return PickWeighted(nodes);
     }
@@ -175,6 +156,7 @@ public MinedObjectSpawnDirective GetMinedObjectDirective(
         int acc = 0;
         foreach (var n in withQuota)
         {
+            Debug.Log($"Adding {n.node.weight} to {n.node}");
             acc += n.node.weight;
             if (pick < acc) return n;
         }
@@ -185,11 +167,22 @@ public MinedObjectSpawnDirective GetMinedObjectDirective(
     {
         _rrCursor = 0;
         _rrUsedThisStar = new HashSet<int>();
-        _quotaRemaining = new Dictionary<int,int>();
+
+        if (_quotaRemaining == null)
+            _quotaRemaining = new Dictionary<int, int>(mineNodes.Count);
+        else
+            _quotaRemaining.Clear();
+
         for (int i = 0; i < mineNodes.Count; i++)
         {
-            var q = Mathf.Max(0, mineNodes[i].quota);
-            if (q > 0) _quotaRemaining[i] = q;
+            int q = mineNodes[i].quota;
+
+            if (q < 0)
+                continue; // disabled
+            else if (q == 0)
+                _quotaRemaining[i] = int.MaxValue; // unlimited
+            else
+                _quotaRemaining[i] = q;
         }
     }
 

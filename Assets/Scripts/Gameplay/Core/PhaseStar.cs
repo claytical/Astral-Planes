@@ -142,7 +142,7 @@ public class PhaseStar : MonoBehaviour
     // 3) Global flags
     drumTrack.isPhaseStarActive       = true;
     progressionManager.phaseStarActive= true;
-    progressionManager.NotifyPhaseStarActivated(MusicalPhase.Establish);
+    progressionManager.NotifyPhaseStarActivated(assignedPhase);
     // 4) Visual prerequisites (so preview can safely tint)
     _psMain = particleSystem != null ? particleSystem.main : default;
     EnsureSpritesAndPivots();
@@ -318,138 +318,100 @@ private bool _prepareInFlight = false;
 
 private void PrepareNextDirective()
 {
-    if (_prepareInFlight) { Debug.LogWarning("[PhaseStar] PrepareNextDirective re-entered; ignoring to avoid recursion."); return; }
-    _prepareInFlight = true;
+    Debug.Log($"Preparing Next Directive");
+    var phaseProfile = progressionManager?.GetProfileForPhase(assignedPhase);
 
-    try
+    if (spawnStrategyProfile == null)
     {
-        Debug.Log("[PhaseStar] Preparing Next Directive");
+        Debug.LogWarning("[PhaseStar] No SpawnStrategyProfile assigned — falling back.");
+        BuildFallbackDirective();
+        RefreshPreviewFromCache();
+        return;
+    }
 
-        // 1) Use PTM as the authority; warn if the star’s assignedPhase disagrees.
-        var ptm = GameFlowManager.Instance?.phaseTransitionManager;
-        var authoritativePhase = ptm != null ? ptm.currentPhase : assignedPhase;
+    _cachedDirective = null;
+    _cachedTrack     = null;
+    var avoidRoles = new HashSet<MusicalRole>(
+        GameFlowManager.Instance.controller.tracks.Where(t => t != null && (t.GetPersistentLoopNotes()?.Count ?? 0) > 0)
+            .Select(t => t.assignedRole)
+    );
 
-        if (ptm != null && assignedPhase != authoritativePhase)
-            Debug.LogWarning($"[PhaseStar] assignedPhase={assignedPhase} != PTM.currentPhase={authoritativePhase}. Using PTM.");
 
-        var phaseForSelection = authoritativePhase;
-        var phaseProfile = progressionManager?.GetProfileForPhase(authoritativePhase);
-        Debug.Log($"[PhaseStar] PhaseForSelection={phaseForSelection}, PhaseProfile={(phaseProfile ? phaseProfile.name : "null")}");
-
-        // 2) If there’s no profile OR no strategy, fall back once (no recursion).
-        if (spawnStrategyProfile == null)
-        {
-            Debug.LogWarning("[PhaseStar] No SpawnStrategyProfile assigned — using fallback directive.");
-            BuildFallbackDirective();
-            RefreshPreviewFromCache();
-            return;
-        }
-
-        // 3) Ask strategy for a directive (strictly for PTM phase)
-        _cachedDirective = spawnStrategyProfile.GetMinedObjectDirective(
+    // Try a few weighted rolls from the strategy but reject already-perfect or off-target picks
+    const int MaxAttempts = 6;
+    for (int attempt = 0; attempt < MaxAttempts; attempt++)
+    {
+        var dir = spawnStrategyProfile.GetMinedObjectDirective(
             drumTrack?.trackController,
-            authoritativePhase,
+            assignedPhase,
             phaseProfile,
             drumTrack?.minedObjectPrefabRegistry,
             drumTrack?.nodePrefabRegistry,
             GameFlowManager.Instance?.noteSetFactory
         );
 
-        _cachedTrack = _cachedDirective?.assignedTrack;
-        Debug.Log($"[PhaseStar] Selection result -> Directive={_cachedDirective?.ToString() ?? "null"}, Track={_cachedTrack?.name ?? "null"}");
+        var picked = dir?.assignedTrack;
+        bool ok =
+            picked != null &&
+            !perfectTracks.Contains(picked) &&
+            (targetTracks == null || targetTracks.Count == 0 || targetTracks.Contains(picked));
 
-        // 4) ONE controlled retry path (no recursion): try a lax fallback selection
-        if (_cachedDirective == null || _cachedTrack == null)
+        if (ok)
         {
-            Debug.LogWarning("[PhaseStar] No valid directive from strategy. Trying lax fallback.");
-            TryBuildLaxFallback(phaseForSelection, phaseProfile);
-
-            // Still nothing? End this star cleanly and advance.
-            if (_cachedDirective == null || _cachedTrack == null)
-            {
-                Debug.LogWarning("[PhaseStar] Still no directive/track after fallback; completing phase and advancing.");
-                state = PhaseStarState.Completed;
-                StartCoroutine(FinishPhaseAndAdvance());
-                return;
-            }
+            _cachedDirective = dir;
+            _cachedTrack     = picked;
+            break;
         }
+    }
 
-        // 5) Choose preview color
-        _cachedPreviewColor =
-            (_cachedDirective != null && _cachedDirective.displayColor.a > 0f)
-                ? _cachedDirective.displayColor
-                : (_cachedTrack != null ? _cachedTrack.trackColor : ComputeAntiColor(GetDustPhaseColor()));
-        _targetSpriteColor = (_cachedTrack != null) ? _cachedTrack.trackColor : _cachedPreviewColor;
-        RefreshPreviewFromCache();
-    }
-    finally
+    if (_cachedDirective == null || _cachedTrack == null)
     {
-        _prepareInFlight = false;
+        Debug.Log("[PhaseStar] Strategy pick invalid/already perfect — using fallback.");
+        BuildFallbackDirective(); // uses PickNextTargetTrack() which skips perfect
     }
+
+    // choose the preview color (prefer directive.displayColor if set)
+    _cachedPreviewColor =
+        (_cachedDirective != null && _cachedDirective.displayColor.a > 0f)
+            ? _cachedDirective.displayColor
+            : (_cachedTrack != null ? _cachedTrack.trackColor : ComputeAntiColor(GetDustPhaseColor()));
+
+    RefreshPreviewFromCache();
+}
+// Keep the star on-screen and let it try again next loop / next poke.
+// You can also schedule a delayed retry here if you prefer.
+private void RearmAfterFailedDirective()
+{
+    state = PhaseStarState.IdleWandering;      // or whatever your “ready” state is
+    SetStarVisible(true);
+    // Optional: debounce re-prepare to avoid tight loops
+    // StartCoroutine(PrepareAfterDelay(0.5f));
 }
 
-// Fallback that only spawns a basic, non-utility NoteSpawner if available
+// Very conservative fallback: pick a non-perfect track and request its simplest node type
 private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhaseProfile phaseProfile)
 {
-    try
-    {
-        var ctrl = drumTrack?.trackController;
-        var objReg = drumTrack?.minedObjectPrefabRegistry;
-        var nodeReg = drumTrack?.nodePrefabRegistry;
-        var factory = GameFlowManager.Instance?.noteSetFactory;
+    // Pick any track that isn't marked perfect this phase
+    var controller = drumTrack?.trackController;
+    if (controller == null || controller.tracks == null) return;
 
-        if (ctrl == null || objReg == null || nodeReg == null || factory == null || spawnStrategyProfile == null)
-        {
-            Debug.LogWarning("[PhaseStar] Lax fallback aborted: missing refs.");
-            return;
-        }
+    var track = controller.tracks.FirstOrDefault(t => t != null && !t.IsPerfectThisPhase);
+    if (track == null) track = controller.tracks.FirstOrDefault(t => t != null); // absolute last resort
 
-        // Ask the profile for candidates then filter locally for the simplest valid NoteSpawner
-        var candidates = spawnStrategyProfile.mineNodes; // if exposed; otherwise add an accessor
-        if (candidates == null || candidates.Count == 0) return;
+    if (track == null) return;
 
-        // Only NoteSpawners, opt-in phase respect for utilities
-        var authoritativePhase = GameFlowManager.Instance?.phaseTransitionManager?.currentPhase ?? phaseForSelection;
-        var simple = candidates
-            .Where(n => n != null && n.minedObjectType == MinedObjectType.NoteSpawner)
-            .Where(n =>
-            {
-                // Spawners: empty allowedPhases = allowed everywhere; otherwise must include phase
-                if (n.allowedPhases != null && n.allowedPhases.Count > 0)
-                    return n.allowedPhases.Contains(authoritativePhase);
-                return true;
-            })
-            .OrderByDescending(n => n.weight) // bias toward the most common choice
-            .ToList();
+    // Ask the strategy if it can give “any” directive for this track/phase ignoring usefulness.
+    // If your SpawnStrategyProfile doesn’t expose such an API, you can add one, or build a minimal directive here.
+    _cachedDirective = spawnStrategyProfile.GetMinedObjectDirective(
+        controller,
+        phaseForSelection,
+        phaseProfile,
+        drumTrack?.minedObjectPrefabRegistry,
+        drumTrack?.nodePrefabRegistry,
+        GameFlowManager.Instance?.noteSetFactory
+    );
 
-        foreach (var node in simple)
-        {
-            var track = ctrl.FindTrackByRole(node.role);
-            if (track == null) continue;
-
-            // Keep your existing “useful” check if needed:
-            // if (!SpawnStrategyProfile.IsNodeUsefulForTrack(...)) continue;  // if static; otherwise inline logic.
-
-            var directive = new MinedObjectSpawnDirective
-            {
-                minedObjectType = node.minedObjectType,
-                assignedTrack   = track,
-                // choose prefab & any needed fields:
-                prefab = nodeReg.GetPrefab(node.minedObjectType, TrackModifierType.Spawner), // replace with your actual resolver
-                displayColor = track.trackColor,
-                // ... fill the rest as your directive requires
-            };
-
-            _cachedDirective = directive;
-            _cachedTrack = track;
-            Debug.Log($"[PhaseStar] Lax fallback picked {node} on {track.name} for {authoritativePhase}");
-            return;
-        }
-    }
-    catch (System.Exception e)
-    {
-        Debug.LogError($"[PhaseStar] Lax fallback failed: {e.Message}");
-    }
+    _cachedTrack = track;
 }
 
     private void BuildFallbackDirective()
@@ -502,7 +464,18 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
            _behaviorApplied = true;
            Debug.Log($"Behavior applied for {behaviorProfile}");
     }
-    private Color GetDustPhaseColor() { return ComputeAntiColor(_cachedPreviewColor); }
+    private Color GetDustPhaseColor() {
+         // Prefer the behavior profile’s star/phase color
+         if (behaviorProfile != null) 
+            return behaviorProfile.starColor;
+            // Otherwise consult the registry by assignedPhase
+            var reg = drumTrack != null ? drumTrack.phasePersonalityRegistry : null;
+            if (reg != null) {
+                var prof = reg.Get(assignedPhase); 
+                if (prof != null) return prof.starColor;
+            }
+            return _cachedPreviewColor;
+    }
     private Color ComputeAntiColor(Color src) {
         switch (antiMode)
         {
@@ -631,12 +604,14 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
         transform.position = _returnPos;
         if (rb) { rb.linearVelocity = Vector2.zero; rb.angularVelocity = 0f; rb.constraints = RigidbodyConstraints2D.FreezeRotation; }
     }
+
     private void ResetForNewLife() { 
         Debug.Log($"Reset for New Life");
         state = PhaseStarState.IdleWandering;
         _phaseAdvanceStarted = false;
         _acceptingDefers = true;
         _cachedTrack = null;
+        _cachedDirective = null;
         perfectTracks.Clear();
         _correctionsDone.Clear();
 
@@ -671,7 +646,6 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
     {
         var dustPhaseColor = GetDustPhaseColor();
         var anti = ComputeAntiColor(dustPhaseColor);
-
         ConfigureInhalingParticles(anti);
 
         EnsureSpritesAndPivots();
@@ -698,13 +672,12 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
         main.loop = true;
         main.startSpeed = new ParticleSystem.MinMaxCurve(-3f); // inward
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f);
-        main.startSize = new ParticleSystem.MinMaxCurve(1f);
+        main.startSize = new ParticleSystem.MinMaxCurve(2f);
         
         var em = particleSystem.emission;
         em.rateOverTime = 28f;
 
         var sh = particleSystem.shape;
-        sh.shapeType = ParticleSystemShapeType.Circle;
         sh.radius = 1.5f;
         sh.radiusThickness = 1f; // thin ring
         sh.arc = 360f;
@@ -859,7 +832,12 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
             {
                 state = PhaseStarState.Completed;
                 var from = assignedPhase; // the phase this star belongs to
-                var to   = progressionManager.GetNextPhase(); // new helper
+                var to = progressionManager.ComputeNextPhase(); // new helper
+                if (to == from)
+                {
+                    Debug.LogWarning($"[PhaseStar] to==from ({to}); stepping by queue order.");
+                    to = progressionManager.ComputeNextPhase();
+                }
                 var color = progressionManager.ResolveNextPhaseStarColor(to);
                  try { 
                      // remove stragglers on all visible tracks
@@ -1360,36 +1338,61 @@ private void TryBuildLaxFallback(MusicalPhase phaseForSelection, MusicalPhasePro
         }
 
     }
-    private void ShrinkNearbyDust() {
-               // Let DarkStar-style profiles preserve dust.
-        if (behaviorProfile != null && behaviorProfile.feedsDust) return;
-        var gen = FindAnyObjectByType<CosmicDustGenerator>();
-        // Small “spawn grace” so new tiles don’t vanish instantly.
-        if (gen != null && gen.IsInRegrowGrace(0.8f)) return;
-        
-        float radius = (behaviorProfile != null ? behaviorProfile.dustShrinkRadius : dustShrinkRadius);
-        float units  = (behaviorProfile != null ? behaviorProfile.dustShrinkUnitsPerSec : dustShrinkUnitsPerSecond);
-        var fall     = (behaviorProfile != null && behaviorProfile.dustFalloff != null) ? behaviorProfile.dustFalloff : dustFalloff;
-        if (radius <= 0f || units <= 0f) return;
-        var filter = new ContactFilter2D { useTriggers = true };
-        if (dustLayer.value != 0) { filter.useLayerMask = true; filter.SetLayerMask(dustLayer); }
-        int count = Physics2D.OverlapCircle((Vector2)transform.position, radius, filter, _dustHits);
-        for (int i = 0; i < count; i++) { 
-            var col = _dustHits[i]; 
-            if (!col || !col.enabled) continue;
-            var dust = col.GetComponent<CosmicDust>() 
-                       ?? col.GetComponentInParent<CosmicDust>() 
-                       ?? col.GetComponentInChildren<CosmicDust>();
-            if (!dust || !dust.isActiveAndEnabled) continue;
-            // Optionally ignore tiles from the just-started epoch.
-            if (gen != null && dust.GetEpoch() == gen.GetCurrentEpoch() && gen.GetEpochAge() < 0.5f) 
-                continue;
-            float d = Vector2.Distance(transform.position, dust.transform.position); 
-            float t = Mathf.Clamp01(d / Mathf.Max(0.001f, radius)); 
-            float rate = units * fall.Evaluate(1f - t); 
-            dust.ShrinkByPhaseStar(rate); // smooth shrink; dust handles self-destroy
+// Add near other fields
+#if UNITY_EDITOR
+[SerializeField] private bool debugDustGizmo = true;
+#endif
+
+private void ShrinkNearbyDust()
+{
+    if (behaviorProfile != null && behaviorProfile.feedsDust) return;
+
+    var gen = FindAnyObjectByType<CosmicDustGenerator>();
+    if (gen != null && gen.IsInRegrowGrace(0.2f)) return; // temporarily shorter grace for testing
+
+    float radius = (behaviorProfile ? behaviorProfile.dustShrinkRadius : dustShrinkRadius);
+    float units  = (behaviorProfile ? behaviorProfile.dustShrinkUnitsPerSec : dustShrinkUnitsPerSecond);
+    var fall     = behaviorProfile.dustFalloff ?? dustFalloff;
+    if (radius <= 0f || units <= 0f) return;
+
+    var filter = new ContactFilter2D { useTriggers = true };
+    bool masking = (dustLayer.value != 0);
+    if (masking) { filter.useLayerMask = true; filter.SetLayerMask(dustLayer); }
+
+    int count = Physics2D.OverlapCircle((Vector2)transform.position, radius, filter, _dustHits);
+
+    // Fallback: if masked query found nothing, try once without mask and log a hint.
+    if (masking && count == 0) {
+        var noMask = new ContactFilter2D { useTriggers = true };
+        int tryAll = Physics2D.OverlapCircle((Vector2)transform.position, radius, noMask, _dustHits);
+        if (tryAll > 0) {
+            Debug.LogWarning("[PhaseStar] No dust on assigned dustLayer — found some with no mask. Check PhaseStar.dustLayer and CosmicDust prefab layers.");
+            count = tryAll;
         }
     }
+
+    for (int i = 0; i < count; i++) {
+        var col = _dustHits[i];
+        if (!col || !col.enabled) continue;
+        var dust = col.GetComponent<CosmicDust>() ?? col.GetComponentInParent<CosmicDust>() ?? col.GetComponentInChildren<CosmicDust>();
+        if (!dust || !dust.isActiveAndEnabled) continue;
+
+        if (gen != null && dust.GetEpoch() == gen.GetCurrentEpoch() && gen.GetEpochAge() < 0.5f) continue;
+
+        float d = Vector2.Distance(transform.position, dust.transform.position);
+        float t = Mathf.Clamp01(d / Mathf.Max(0.001f, radius));
+        float rate = units * fall.Evaluate(1f - t);
+        dust.ShrinkByPhaseStar(rate);
+    }
+}
+
+#if UNITY_EDITOR
+private void OnDrawGizmosSelected() {
+    if (!debugDustGizmo) return;
+    Gizmos.DrawWireSphere(transform.position, behaviorProfile ? behaviorProfile.dustShrinkRadius : dustShrinkRadius);
+}
+#endif
+
     private IEnumerator MoveShardToTarget(Vector3 from, Vector3 to, GameObject wrapper, GameObject nodeGO, float seconds, System.Action onLanded // NEW
     ){
         Debug.Log($"Moving Shard to Target...");

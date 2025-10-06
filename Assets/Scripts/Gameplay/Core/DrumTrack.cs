@@ -126,7 +126,8 @@ public class DrumTrack : MonoBehaviour
         var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(MusicalPhase.Establish) : null; 
         if (hexMazeGenerator != null && bootProfile != null) { 
             hexMazeGenerator.ApplyProfile(bootProfile); 
-            hexMazeGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.ClassicLoopAligned;
+            hexMazeGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.Progressive;
+            hexMazeGenerator.progressiveMaze = true;
         }
         var initialClip = MusicalPhaseLibrary.GetRandomClip(MusicalPhase.Establish);
         if (initialClip == null)
@@ -290,8 +291,9 @@ public class DrumTrack : MonoBehaviour
             return;
         }
         ScheduleDrumLoopChange(clip); 
-        if (hexMazeGenerator != null) { 
-            hexMazeGenerator.cycleMode = (nextPhase == MusicalPhase.Release) ? CosmicDustGenerator.MazeCycleMode.ClassicLoopAligned : CosmicDustGenerator.MazeCycleMode.Progressive;
+        if (hexMazeGenerator != null)
+        {
+            hexMazeGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.Progressive;
         }
     }
     public void SetBridgeAccent(bool on)
@@ -599,7 +601,7 @@ public class DrumTrack : MonoBehaviour
             {
                 var phaseForRegrowth = QueuedPhase ?? GameFlowManager.Instance.phaseTransitionManager.currentPhase;
                 Vector2Int centerCell = WorldToGridPosition(transform.position);
-                float radius = progressionManager.GetHollowRadiusForCurrentPhase();
+                float radius = progressionManager.GetHollowRadiusForCurrentPhase(phaseForRegrowth);
                 var growthCells = hexMazeGenerator.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);
                 hexMazeGenerator.BeginStaggeredMazeRegrowth(growthCells);
             }

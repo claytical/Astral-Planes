@@ -13,27 +13,8 @@ MonoBehaviour:
   m_Name: Evolve
   m_EditorClassIdentifier: 
   phase: 1
-  ghostLoopCount: 4
-  roleNoteSetSeriesList:
-  - role: 0
-    noteSetSeries: {fileID: 11400000, guid: 19bceef2077b84f51bba66b941e1f236, type: 2}
-  - role: 1
-    noteSetSeries: {fileID: 11400000, guid: df39c1ce4aa0146a6b3f7baad3883c22, type: 2}
-  - role: 0
-    noteSetSeries: {fileID: 11400000, guid: c580ee3ffa8154955bbc334f1161155c, type: 2}
-  - role: 2
-    noteSetSeries: {fileID: 11400000, guid: 4e368511c1f76408490023edd118bac8, type: 2}
   drumClips:
-  - {fileID: 8300000, guid: 9b58228a4135841b0b59a067be74335f, type: 3}
-  - {fileID: 8300000, guid: ecb5f1da771754e5fb206b350488eb89, type: 3}
-  - {fileID: 8300000, guid: 4f0b82911d614400598905e175ac796f, type: 3}
-  visualColor: {r: 0.34603062, g: 0.9056604, b: 0.578277, a: 1}
-  rotationMode: 0
-  rotationSpeed: 10
+  - {fileID: 8300000, guid: dd6557f1e4c1240c2a83f66dcf6d567e, type: 3}
   defaultRemixStrategy: {fileID: 0}
-  remixRoleOverrides: []
-  hitsRequired: 3
-  energyPerCollectable: 1
   shortLabel: Evolve
-  moodDescription: 
-  roleGhostStrategies: []
+  roleStrategies: []

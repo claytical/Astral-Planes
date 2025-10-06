@@ -14,7 +14,8 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Range(0.25f,3f)] public float particlePulseSpeed = 1f;
     [Range(0f,1f)] public float starAlphaMin = 0.1f, starAlphaMax = 1f;
 
-    [Header("Star Drift")]
+    [Header("Movement")]
+    public float baseCellsPerSecond = 3.8f;
     [Tooltip("Base drift speed of the PhaseStar body (not the nodes).")]
     public float starDriftSpeed = 0.6f;
     [Tooltip("Random steering jitter; higher feels erratic/trickster.")]
@@ -69,6 +70,7 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public MineRoleTuning harmony;
     public MineRoleTuning lead;
     public MineRoleTuning groove;
+    public float starHoleRadius;
 
     // Resolve phase speed multiplier (for MineNodeLocomotion)
 
