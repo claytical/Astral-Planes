@@ -8,7 +8,7 @@ public class DensityInfluence : DrumVolumeInfluence
 
     public override float EvaluateVolume(DrumTrack drumTrack)
     {
-        var controller = drumTrack.trackController;
+        var controller = GameFlowManager.Instance.controller;
         if (controller == null) return 0f;
 
         float total = controller.tracks.Length;

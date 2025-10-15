@@ -10,8 +10,11 @@ GameObject:
   m_Component:
   - component: {fileID: 162112303559718899}
   - component: {fileID: 5499195754171050824}
-  - component: {fileID: 7872104301369236207}
+  - component: {fileID: 6754461597857711404}
+  - component: {fileID: 1279126231376074408}
+  - component: {fileID: 7465792772216044867}
   - component: {fileID: 1335835332103871931}
+  - component: {fileID: 7872104301369236207}
   m_Layer: 0
   m_Name: Phase Star
   m_TagString: Untagged
@@ -49,133 +52,68 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
-  shardPickupPrefab: {fileID: 1781116594832268, guid: ac1509138216444e79c86f91c8bd3b0d,
-    type: 3}
-  particleSystem: {fileID: 382306593780773728}
-  pulseSpeed: 2
-  minAlpha: 0.1
-  maxAlpha: 1
-  missedSpawnStagger: 0.03
-  dustShrinkRadius: 1
-  dustShrinkUnitsPerSecond: 1.2
-  dustLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  dustFalloff:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: -1
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: -1
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _dustShrinkRadius: 0
-  _dustUnitsPerSec: 0
-  _dustFalloff:
-    serializedVersion: 2
-    m_Curve: []
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _regrowDelayMul: 0
-  _feedsDust: 0
-  shardScatterRadius: 1.6
-  spritePivots: []
-  starSprites:
-  - {fileID: 6432059294630693968}
-  - {fileID: 7435224541743091032}
-  starParticles: {fileID: 382306593780773728}
-  spawnStrategyProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94,
+  spawnStrategyProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c,
     type: 2}
-  spriteColorLerpSpeed: 3
-  antiMode: 1
-  antiSaturationScale: 1.05
-  antiValueScale: 1.05
-  starSpritesUseTrackColor: 1
-  rb: {fileID: 7872104301369236207}
-  maxFaceTurnDegPerSec: 24
-  faceVelocityAmount: 0.25
-  pairSwingDeg: 14
-  pairSwingHz: 0.14
-  pairSeparation: 0.12
-  wobbleDeg: 3
-  wobbleHz: 0.12
-  spriteAngleOffsets: []
-  faceTurnRate: 2
-  spinDegPerSec: 12
-  mineNodeSpawnerPrefab: {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107,
-    type: 3}
-  hitsRequired: 8
-  maxMineNodesPerStar: 6
+  behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
   shardFlightSeconds: 0.6
-  shardFlightEase:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!50 &7872104301369236207
-Rigidbody2D:
-  serializedVersion: 5
+  syncRotationToLoop: 1
+  visuals: {fileID: 6754461597857711404}
+  motion: {fileID: 1279126231376074408}
+  dust: {fileID: 7465792772216044867}
+  _progressionMul: 1
+  _isInFocusMode: 0
+  _oncePerLoop: 0
+  _minPreviewIntervalSec: 0.5
+  _personalityMul: 1
+--- !u!114 &6754461597857711404
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2312498068821558259}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 10
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 0
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  spritePivots: []
+  maxFaceTurnDegPerSec: 12
+  wobbleDeg: 3
+  wobbleHz: 0.12
+  spriteAngleOffsets: []
+--- !u!114 &1279126231376074408
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 669d1afb2e15b46259e03b493c0ebf4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  kinematicMode: 1
+  edgeBounce: 0.9
+  screenPadding: 0.5
+  focusSpeedMul: 0.5
+--- !u!114 &7465792772216044867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 546d9c7f0aaa1435894ba83077b35670, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  dustLayer:
     serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
-  m_Constraints: 2
+    m_Bits: 4294967295
+  maxHits: 64
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -212,6 +150,33 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.5
+--- !u!50 &7872104301369236207
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 10
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 0
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
 --- !u!1 &6090321477331913616
 GameObject:
   m_ObjectHideFlags: 0
@@ -253,7 +218,7 @@ ParticleSystem:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6090321477331913616}
   serializedVersion: 8
-  lengthInSec: 1
+  lengthInSec: 2
   simulationSpeed: 1
   stopAction: 0
   cullingMode: 0
@@ -441,7 +406,7 @@ ParticleSystem:
         key0: {r: 0, g: 0, b: 0, a: 0}
         key1: {r: 1, g: 1, b: 1, a: 0.49411765}
         key2: {r: 1, g: 1, b: 1, a: 1}
-        key3: {r: 0, g: 0, b: 0, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 1}
         key4: {r: 0, g: 0, b: 0, a: 0}
         key5: {r: 0, g: 0, b: 0, a: 0}
         key6: {r: 0, g: 0, b: 0, a: 0}
@@ -456,16 +421,16 @@ ParticleSystem:
         ctime7: 0
         atime0: 0
         atime1: 12068
-        atime2: 60172
-        atime3: 65535
-        atime4: 0
+        atime2: 19107
+        atime3: 41399
+        atime4: 65535
         atime5: 0
         atime6: 0
         atime7: 0
         m_Mode: 0
         m_ColorSpace: 0
         m_NumColorKeys: 3
-        m_NumAlphaKeys: 4
+        m_NumAlphaKeys: 5
       minGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -815,8 +780,8 @@ ParticleSystem:
         m_PostInfinity: 2
         m_RotationOrder: 4
     randomizeRotationDirection: 0
-    gravitySource: 0
-    maxNumParticles: 1000
+    gravitySource: 1
+    maxNumParticles: 10
     customEmitterVelocity: {x: 0, y: 0, z: 0}
     size3D: 0
     rotation3D: 0
@@ -876,7 +841,7 @@ ParticleSystem:
   ShapeModule:
     serializedVersion: 6
     enabled: 1
-    type: 19
+    type: 20
     angle: 25
     length: 5
     boxThickness: {x: 0, y: 0, z: 0}
@@ -949,7 +914,7 @@ ParticleSystem:
     m_SkinnedMeshRenderer: {fileID: 0}
     m_Sprite: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701,
       type: 3}
-    m_SpriteRenderer: {fileID: 0}
+    m_SpriteRenderer: {fileID: 6432059294630693968}
     m_UseMeshMaterialIndex: 0
     m_UseMeshColors: 1
     alignToDirection: 0
@@ -960,7 +925,7 @@ ParticleSystem:
     m_TextureColorAffectsParticles: 1
     m_TextureAlphaAffectsParticles: 1
     m_TextureBilinearFiltering: 0
-    randomDirectionAmount: 0
+    randomDirectionAmount: 1
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
@@ -1082,9 +1047,9 @@ ParticleSystem:
     serializedVersion: 4
     rateOverTime:
       serializedVersion: 2
-      minMaxState: 0
-      scalar: 50
-      minScalar: 10
+      minMaxState: 3
+      scalar: 100
+      minScalar: 1
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -1135,8 +1100,8 @@ ParticleSystem:
         m_RotationOrder: 4
     rateOverDistance:
       serializedVersion: 2
-      minMaxState: 0
-      scalar: 0
+      minMaxState: 1
+      scalar: 1
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -1522,7 +1487,7 @@ ParticleSystem:
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 0}
-        key1: {r: 1, g: 1, b: 1, a: 1}
+        key1: {r: 1, g: 1, b: 1, a: 0.827451}
         key2: {r: 1, g: 1, b: 1, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -4205,8 +4170,8 @@ ParticleSystem:
         m_RotationOrder: 4
     minVertexDistance: 0.2
     textureMode: 4
-    textureScale: {x: 2, y: 2}
-    ribbonCount: 1
+    textureScale: {x: 1.5, y: 1.5}
+    ribbonCount: 8
     shadowBias: 0.5
     worldSpace: 0
     dieWithParticles: 1
@@ -4214,8 +4179,8 @@ ParticleSystem:
     sizeAffectsLifetime: 0
     inheritParticleColor: 1
     generateLightingData: 0
-    splitSubEmitterRibbons: 0
-    attachRibbonsToTransform: 0
+    splitSubEmitterRibbons: 1
+    attachRibbonsToTransform: 1
     colorOverLifetime:
       serializedVersion: 2
       minMaxState: 0
@@ -4990,6 +4955,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5012,6 +4979,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -5058,7 +5026,7 @@ GameObject:
   - component: {fileID: 8434948653740959167}
   - component: {fileID: 7435224541743091032}
   m_Layer: 0
-  m_Name: Sprite_1
+  m_Name: Transparent Diamond
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5099,6 +5067,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5120,12 +5090,13 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 263648039
+  m_SortingLayer: 1
   m_SortingOrder: 0
   m_Sprite: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701,
     type: 3}
-  m_Color: {r: 0.9811321, g: 0.9811321, b: 0.9811321, a: 0.2}
+  m_Color: {r: 0.9811321, g: 0.9811321, b: 0.9811321, a: 0.9137255}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -5146,7 +5117,7 @@ GameObject:
   - component: {fileID: 349526950206080919}
   - component: {fileID: 6432059294630693968}
   m_Layer: 0
-  m_Name: Sprite
+  m_Name: Opaque Diamond
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5187,6 +5158,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5208,12 +5181,13 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 263648039
+  m_SortingLayer: 1
   m_SortingOrder: 0
   m_Sprite: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701,
     type: 3}
-  m_Color: {r: 0.9811321, g: 0.9811321, b: 0.9811321, a: 0.08627451}
+  m_Color: {r: 0.9811321, g: 0.9811321, b: 0.9811321, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

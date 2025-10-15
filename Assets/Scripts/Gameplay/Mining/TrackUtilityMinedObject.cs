@@ -6,9 +6,8 @@ namespace Gameplay.Mining
     [Serializable]
     public enum TrackModifierType
     {
-        Spawner, Clear, Remix,
+        Clear, Remix,
         RootShift, RhythmStyle,
-        ChordProgression
     }
     public enum TrackClearType
     {

@@ -10,19 +10,48 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
-  m_Name: Wildcard Behavior
+  m_Name: Establish Behavior
   m_EditorClassIdentifier: 
-  personality: 4
-  starColor: {r: 0.6039216, g: 0.8039216, b: 0.1960784, a: 1}
-  particlePulseSpeed: 1.709
+  personality: 0
+  mazeColor: {r: 1, g: 0.5490196, b: 0, a: 1}
+  particlePulseSpeed: 1
   starAlphaMin: 0.1
-  starAlphaMax: 0.807
-  starDriftSpeed: 3
-  starDriftJitter: 3
-  orbitBias: 0.284
-  teleportChancePerSec: 0.1466
-  dustShrinkRadius: 1
-  dustShrinkUnitsPerSec: 1.2
+  starAlphaMax: 0.848
+  rotationMode: 4
+  minPreviewIntervalSec: 2
+  personalitySpeedMul: 1
+  bpmToSpeedMul:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 60
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 160
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  progressionMulRange: 0
+  baseCellsPerSecond: 3.8
+  starDriftSpeed: 0.6
+  starDriftJitter: 0.15
+  orbitBias: 0
+  teleportChancePerSec: 0
+  dustShrinkRadius: 6
+  dustShrinkUnitsPerSec: 4
   dustFalloff:
     serializedVersion: 2
     m_Curve:
@@ -48,8 +77,8 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   feedsDust: 0
-  dustRegrowDelayMul: 1
-  ejectionStyle: 1
+  dustRegrowDelayMul: 0.84
+  ejectionStyle: 0
   nodesPerStar: 3
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6
@@ -147,4 +176,5 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
-  starHoleRadius: 4
+  starHoleRadius: 5
+  darkCleanupMaxLoops: 0

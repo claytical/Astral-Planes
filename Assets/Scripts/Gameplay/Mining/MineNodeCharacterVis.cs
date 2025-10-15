@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class MineNodeCharacterVis : MonoBehaviour
@@ -27,6 +28,8 @@ public class MineNodeCharacterVis : MonoBehaviour
     MineNodeRailAgent agent;
 
     // state
+    private bool _lockTint;
+    private Color _tint;
     float thinkTimer;
     float lastPlanReadyTime;
     float facedAngle;  // current facing
@@ -147,7 +150,14 @@ public class MineNodeCharacterVis : MonoBehaviour
         wobblePhase = 0f;
     }
 
-
+    public void SetTint(Color c) { _lockTint = true; _tint = c; Paint(c); }
+    public void ClearTintLock()  { _lockTint = false; }
+    private void Paint(Color c) { 
+        var outc = c; outc.a = innerSprite.color.a; 
+        innerSprite.color = outc;
+        outc = c; outc.a = outerSprite.color.a;
+        outerSprite.color = outc;
+    }
     void ApplyRotation(float baseDeg, float wobbleOffsetDeg)
     {
         if (spritePivotOuter)
@@ -156,4 +166,5 @@ public class MineNodeCharacterVis : MonoBehaviour
         if (spritePivotInner)
             spritePivotInner.localRotation = Quaternion.Euler(0,0, baseDeg + wobbleOffsetDeg * innerCounterFactor);
     }
+    
 }

@@ -7,8 +7,6 @@ using System.Linq;
 public class NoteVisualizer : MonoBehaviour
 {
     public RectTransform playheadLine;
-    public DrumTrack drums;
-    public InstrumentTrackController tracks;
     private Dictionary<InstrumentTrack, float> _waveAmplitudes = new();
     private Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
 
@@ -33,48 +31,15 @@ public class NoteVisualizer : MonoBehaviour
     private Dictionary<InstrumentTrack, float> _ribbonWidths = new();
     private Dictionary<InstrumentTrack, float> _ribbonIntensities = new();
     private Vehicle _energyTransferVehicle;
-
-    private void Start()
-    {
-        _uiParent = transform.parent;
-        _worldSpaceCanvas = _uiParent.GetComponentInParent<Canvas>();
-        foreach (RectTransform row in trackRows) {
-            GameObject ribbonGO = new GameObject("TrackRibbon");
-            ribbonGO.transform.SetParent(row, false);
-            LineRenderer lr = ribbonGO.AddComponent<LineRenderer>();
-
-            lr.material = ribbonMaterial;
-            lr.widthMultiplier = ribbonWidth;
-            lr.positionCount = ribbonResolution;
-            lr.useWorldSpace = false;
-            lr.numCapVertices = 4;
-            lr.alignment = LineAlignment.TransformZ;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            lr.receiveShadows = false;
-            lr.textureMode = LineTextureMode.Stretch;
-
-            ribbons.Add(lr);
-        }
-        foreach (InstrumentTrack track in tracks.tracks)
-        {
-            _waveAmplitudes[track] = 0; // Initial wavy state
-        }
-        foreach (var row in trackRows)
-        {
-            row.anchorMin = new Vector2(0f, row.anchorMin.y);
-            row.anchorMax = new Vector2(1f, row.anchorMax.y);
-            row.offsetMin = new Vector2(0f, row.offsetMin.y);
-            row.offsetMax = new Vector2(0f, row.offsetMax.y);
-        }
-    }
+    private bool isInitialized;
     void Update() {
-    if (playheadLine == null || drums == null || tracks == null)
+    if (!isInitialized || playheadLine == null || GameFlowManager.Instance.activeDrumTrack == null || GameFlowManager.Instance.controller.tracks == null)
         return;
 
     // --- Playhead (same logic, just safer clamps) ---
-    float globalElapsed = (float)(AudioSettings.dspTime - drums.startDspTime);
-    float baseLoopLength = drums.GetLoopLengthInSeconds();
-    int globalLoopMultiplier = tracks.GetMaxLoopMultiplier();
+    float globalElapsed = (float)(AudioSettings.dspTime - GameFlowManager.Instance.activeDrumTrack.startDspTime);
+    float baseLoopLength = GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds();
+    int globalLoopMultiplier = GameFlowManager.Instance.controller.GetMaxLoopMultiplier();
     float fullVisualLoopDuration = Mathf.Max(0.0001f, baseLoopLength * Mathf.Max(1, globalLoopMultiplier));
     float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
 
@@ -83,15 +48,15 @@ public class NoteVisualizer : MonoBehaviour
     playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
 
     // --- Drum timing / velocity shimmer ---
-    int   drumTotalSteps = drums.totalSteps;
-    float drumLoopLength = drums.GetLoopLengthInSeconds();
+    int   drumTotalSteps = GameFlowManager.Instance.activeDrumTrack.totalSteps;
+    float drumLoopLength = GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds();
     float stepDuration   = Mathf.Max(0.0001f, drumLoopLength / Mathf.Max(1, drumTotalSteps));
-    float drumElapsed    = (float)((AudioSettings.dspTime - drums.startDspTime) % drumLoopLength);
+    float drumElapsed    = (float)((AudioSettings.dspTime - GameFlowManager.Instance.activeDrumTrack.startDspTime) % drumLoopLength);
 
     int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % Mathf.Max(1, drumTotalSteps);
 
     bool shimmer = false; float maxVelocity = 0f;
-    foreach (var track in tracks.tracks)
+    foreach (var track in GameFlowManager.Instance.controller.tracks)
     {
         float v = track.GetVelocityAtStep(currentStep);
         maxVelocity = Mathf.Max(maxVelocity, v / 127f);
@@ -122,13 +87,13 @@ public class NoteVisualizer : MonoBehaviour
     }
 
     // --- Ribbons: build in ROW-LOCAL space; write world-space into step map ---
-    int longestLoopSteps = tracks.tracks.Max(t => t.GetTotalSteps());
+    int longestLoopSteps = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
 
     for (int i = 0; i < ribbons.Count; i++)
     {
         LineRenderer   lr   = ribbons[i];
         RectTransform  row  = trackRows[i];
-        InstrumentTrack track = tracks.tracks[i];
+        InstrumentTrack track = GameFlowManager.Instance.controller.tracks[i];
 
         Rect rowRect  = row.rect;
         float xLeft   = rowRect.xMin;
@@ -167,7 +132,7 @@ public class NoteVisualizer : MonoBehaviour
         lr.SetPositions(localPositions); // useWorldSpace = false
 
         // width/color by density
-        int maxNotes   = tracks.tracks.Max(t => t.GetNoteDensity());
+        int maxNotes   = GameFlowManager.Instance.controller.tracks.Max(t => t.GetNoteDensity());
         int trackNotes = Mathf.Max(1, track.GetNoteDensity());
         float densityT = (maxNotes > 0) ? (float)trackNotes / maxNotes : 0f;
 
@@ -204,6 +169,42 @@ public class NoteVisualizer : MonoBehaviour
     */
 }
 
+    public void Initialize()
+    {
+        isInitialized = true;
+        _uiParent = transform.parent;
+        _worldSpaceCanvas = _uiParent.GetComponentInParent<Canvas>();
+        foreach (RectTransform row in trackRows) {
+            GameObject ribbonGO = new GameObject("TrackRibbon");
+            ribbonGO.transform.SetParent(row, false);
+            LineRenderer lr = ribbonGO.AddComponent<LineRenderer>();
+
+            lr.material = ribbonMaterial;
+            lr.widthMultiplier = ribbonWidth;
+            lr.positionCount = ribbonResolution;
+            lr.useWorldSpace = false;
+            lr.numCapVertices = 4;
+            lr.alignment = LineAlignment.TransformZ;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            lr.textureMode = LineTextureMode.Stretch;
+
+            ribbons.Add(lr);
+        }
+        foreach (InstrumentTrack track in GameFlowManager.Instance.controller.tracks)
+        {
+            _waveAmplitudes[track] = 0; // Initial wavy state
+        }
+        foreach (var row in trackRows)
+        {
+            row.anchorMin = new Vector2(0f, row.anchorMin.y);
+            row.anchorMax = new Vector2(1f, row.anchorMax.y);
+            row.offsetMin = new Vector2(0f, row.offsetMin.y);
+            row.offsetMax = new Vector2(0f, row.offsetMax.y);
+        }
+
+    }
+
     public float GetTopWorldY()
     {
         RectTransform rt = GetComponent<RectTransform>();
@@ -238,7 +239,7 @@ public class NoteVisualizer : MonoBehaviour
 }
     public Vector3 ComputeRibbonWorldPosition(InstrumentTrack track, int stepIndex)
     {
-        int trackIndex = System.Array.IndexOf(tracks.tracks, track);
+        int trackIndex = System.Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
         if (trackIndex < 0 || trackIndex >= ribbons.Count) return transform.position;
 
         RectTransform row = trackRows[trackIndex];
@@ -273,7 +274,7 @@ public class NoteVisualizer : MonoBehaviour
                 return null;
             }
         }
-        int trackIndex = Array.IndexOf(tracks.tracks, track);
+        int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
         if (trackIndex < 0 || trackIndex >= trackRows.Count) return null;
 
         // Compute local position in the row (not world)
@@ -295,7 +296,7 @@ public class NoteVisualizer : MonoBehaviour
 
     private void UpdateNoteMarkerPositions()
     {
-        int globalSteps = tracks.tracks.Max(t => t.GetTotalSteps());
+        int globalSteps = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
         var deadKeys = new List<(InstrumentTrack, int)>();
 
         foreach (var kvp in noteMarkers)
@@ -309,7 +310,7 @@ public class NoteVisualizer : MonoBehaviour
             if (!_trackStepWorldPositions.TryGetValue(track, out var map))
                 continue;
 
-            int trackIndex = Array.IndexOf(tracks.tracks, track);
+            int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
             if (trackIndex < 0 || trackIndex >= trackRows.Count) continue;
 
             RectTransform row = trackRows[trackIndex];
@@ -412,7 +413,7 @@ public class NoteVisualizer : MonoBehaviour
 }
     private void DestroyOrphanRowMarkers(InstrumentTrack track)
 {
-    int trackIndex = Array.IndexOf(tracks.tracks, track);
+    int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
     if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
 
     var row = trackRows[trackIndex];

@@ -31,8 +31,8 @@ public class VehicleRemixController : MonoBehaviour
     private void Start()
     {
         vehicle = GetComponent<Vehicle>();
-        trackController = GameFlowManager.Instance.activeDrumTrack.trackController;
-        visualizer = GameFlowManager.Instance.activeDrumTrack.trackController.noteVisualizer;
+        trackController = GameFlowManager.Instance.controller;
+        visualizer = GameFlowManager.Instance.controller.noteVisualizer;
     }
     public void FixedUpdateBoosting(float deltaTime, int currentStep)
     {

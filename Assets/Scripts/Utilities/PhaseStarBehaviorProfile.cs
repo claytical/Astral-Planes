@@ -10,9 +10,17 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 {
     [Header("Identity & Mood")]
     public PhasePersonality personality;
-    public Color starColor = Color.white;
+    public Color mazeColor = Color.white;
     [Range(0.25f,3f)] public float particlePulseSpeed = 1f;
     [Range(0f,1f)] public float starAlphaMin = 0.1f, starAlphaMax = 1f;
+// PhaseStarBehaviorProfile.cs
+
+    [Header("Preview Rotation (color wheel)")]
+    public RotationMode rotationMode = RotationMode.PerBin;
+    [Range(0.25f, 2f)] public float minPreviewIntervalSec = 0.5f;
+    [Range(0.25f, 2f)] public float personalitySpeedMul = 1f;
+    public AnimationCurve bpmToSpeedMul = AnimationCurve.Linear(60, 1f, 160, 1f);
+    [Range(-0.5f, 0.5f)] public float progressionMulRange = 0.0f;
 
     [Header("Movement")]
     public float baseCellsPerSecond = 3.8f;
@@ -71,6 +79,7 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public MineRoleTuning lead;
     public MineRoleTuning groove;
     public float starHoleRadius;
+    public float darkCleanupMaxLoops;
 
     // Resolve phase speed multiplier (for MineNodeLocomotion)
 

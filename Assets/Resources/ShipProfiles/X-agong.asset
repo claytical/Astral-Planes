@@ -15,3 +15,17 @@ MonoBehaviour:
   shipName: X-agong
   allowedMidiPresets: 07000000
   description: Alien and forceful. Pulses with deep bass and strange percussive tones.
+  arcadeMaxSpeed: 10
+  arcadeAccel: 0
+  arcadeBoostAccel: 60
+  arcadeLinearDamping: 0.2
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 1
+  coastBrakeForce: 1.6
+  stopSpeed: 0.03
+  stopAngularSpeed: 5
+  inputDeadzone: 0.2
+  envScaleFloor: 0.8
+  mass: 1.3
+  capacity: 100
+  burnEfficiency: 1.05

@@ -17,4 +17,22 @@ MonoBehaviour:
   - {fileID: 8300000, guid: dd6557f1e4c1240c2a83f66dcf6d567e, type: 3}
   defaultRemixStrategy: {fileID: 0}
   shortLabel: Evolve
-  roleStrategies: []
+  roleStrategies:
+  - role: 0
+    strategy: 2
+  - role: 0
+    strategy: 5
+  - role: 1
+    strategy: 5
+  - role: 1
+    strategy: 2
+  - role: 1
+    strategy: 1
+  - role: 2
+    strategy: 0
+  - role: 2
+    strategy: 4
+  - role: 3
+    strategy: 4
+  - role: 3
+    strategy: 2

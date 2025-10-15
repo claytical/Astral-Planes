@@ -1,234 +1,223 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gameplay.Mining;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 [CreateAssetMenu(menuName = "Astral Planes/Spawn Strategy Profile")]
 public class SpawnStrategyProfile : ScriptableObject
 {
+    [Tooltip("Mixed list of NoteSpawner and TrackUtility entries.")]
     public List<WeightedMineNode> mineNodes;
+
+    [Tooltip("How to iterate entries when utilityBias is not used.")]
     public MineNodeSelectionMode selectionMode = MineNodeSelectionMode.WeightedRandom;
+
     // --- runtime (not serialized) ---
-    [NonSerialized] private int _rrCursor;                  // round-robin cursor
-    [NonSerialized] private HashSet<int> _rrUsedThisStar ;// “unique-first” set
-    [NonSerialized] private Dictionary<int,int> _quotaRemaining;// per-node quotas (by index)
-    
+    [NonSerialized] private int _rrCursor;                       // round-robin cursor
+    [NonSerialized] private HashSet<int> _rrUsedThisStar;        // “unique-first” set
+    [NonSerialized] private Dictionary<int,int> _quotaRemaining; // per-node quotas (by index)
+    [NonSerialized] private bool _loggedNoteSpawnerWithModifier; // one-time warning
 
-// SpawnStrategyProfile.cs
-  public MinedObjectSpawnDirective GetMinedObjectDirective(
-        InstrumentTrackController trackController,
-        MusicalPhase currentPhase,
-        MusicalPhaseProfile phaseProfile,
-        MinedObjectPrefabRegistry objectRegistry,
-        MineNodePrefabRegistry nodeRegistry,
-        NoteSetFactory noteSetFactory,
-        HashSet<MusicalRole> avoidRoles = null // <-- NEW
-    )
+    #region Public API (PhaseStar should call these)
+
+    /// <summary>Strict phase filter. Spawners ignore TrackModifierType.</summary>
+    public IEnumerable<WeightedMineNode> GetCandidates(MusicalPhase phase) =>
+        (mineNodes ?? s_empty).Where(n => n != null
+                                       && n.allowedPhases != null
+                                       && n.allowedPhases.Contains(phase));
+
+    public IEnumerable<WeightedMineNode> GetCandidates(MusicalPhase phase, MinedObjectType type) =>
+        GetCandidates(phase).Where(n => n.minedObjectType == type);
+
+    /// <summary>
+    /// Pick the next plan item for this star.
+    /// - Phase is strict.
+    /// - NoteSpawner ignores TrackModifierType (warns once if set).
+    /// - Optional utilityBias (0..1) raises probability of TrackUtility picks.
+    /// </summary>
+    public WeightedMineNode PickNext(MusicalPhase phase, float utilityBias01 = -1f)
     {
-        if (trackController == null || nodeRegistry == null || objectRegistry == null)
-            return null;
+        var cands = GetCandidates(phase).ToList();
+        if (cands.Count == 0) return null;
 
-        // Build candidate list with original indices so the caller can keep quotas/round-robin if needed
-        var candidates = new List<(int idx, WeightedMineNode node)>(mineNodes.Count);
-
-        for (int i = 0; i < mineNodes.Count; i++)
+        // sanitize: NoteSpawner must not rely on modifier
+        if (!_loggedNoteSpawnerWithModifier)
         {
-            var node = mineNodes[i];
-
-            // Phase gating
-            if (node.allowedPhases != null && node.allowedPhases.Count > 0 &&
-                !node.allowedPhases.Contains(currentPhase))
-                continue;
-
-            // Role avoidance: skip any item whose role is in the avoid set
-            if (avoidRoles != null && avoidRoles.Contains(node.role))
-                continue;
-
-            // Track must exist for this role (don’t assume FindTrackByRole exists)
-            var track = trackController.tracks?.FirstOrDefault(
-                t => t != null && t.assignedRole == node.role
-            );
-            if (track == null)
-                continue;
-
-            // Keep your existing usefulness checks if you have them (utility eligibility, etc.)
-            if (!IsNodeUsefulForTrack(node, track, currentPhase, phaseProfile))
-                continue;
-
-            // If it passed all filters, it’s a valid candidate
-            candidates.Add((i, node));
-        }
-
-        // If we filtered everything out, relax the avoidRoles once (so we still spawn something)
-        if (candidates.Count == 0)
-        {
-            for (int i = 0; i < mineNodes.Count; i++)
+            foreach (var c in cands)
             {
-                var node = mineNodes[i];
-
-                if (node.allowedPhases != null && node.allowedPhases.Count > 0 &&
-                    !node.allowedPhases.Contains(currentPhase))
-                    continue;
-
-                var track = trackController.tracks?.FirstOrDefault(
-                    t => t != null && t.assignedRole == node.role
-                );
-                if (track == null) continue;
-                if (!IsNodeUsefulForTrack(node, track, currentPhase, phaseProfile)) continue;
-
-                candidates.Add((i, node));
-            }
-            if (candidates.Count == 0) return null;
-        }
-
-        // Weighted pick (your function)
-        var picked = PickWeighted(candidates);
-
-        // Resolve the actual track object
-        var pickedTrack = trackController.tracks?.FirstOrDefault(
-            t => t != null && t.assignedRole == picked.node.role
-        );
-        if (pickedTrack == null) return null;
-
-        // Build the directive the same way you currently do (prefer your existing ToDirective)
-        var dir = picked.node.ToDirective(
-            pickedTrack,
-            /* noteSet: */ null,                     // let ToDirective / factory decide, or fill below
-            pickedTrack.trackColor,
-            nodeRegistry,
-            objectRegistry,
-            noteSetFactory,
-            currentPhase
-        );
-
-        // Attach the MusicalRoleProfile so instrument-specific behavior is preserved
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(pickedTrack.assignedRole);
-        if (dir != null) dir.roleProfile = roleProfile; // assumes directive has this field
-
-        return dir;
-    }
-    private (int idx, WeightedMineNode node) PickWeighted(List<(int idx, WeightedMineNode node)> nodes)
-    {
-        // your existing weighted logic
-        int total = nodes.Sum(n => n.node.weight);
-        int pick = Random.Range(0, Mathf.Max(1, total));
-        int acc = 0;
-        foreach (var n in nodes)
-        {
-            acc += n.node.weight;
-            if (pick < acc) return n;
-        }
-        return nodes[Random.Range(0, nodes.Count)];
-    }
-
-    private (int idx, WeightedMineNode node) PickRoundRobinUniqueFirst(List<(int idx, WeightedMineNode node)> nodes)
-    {
-        _rrUsedThisStar ??= new HashSet<int>();
-        // 1) try to find a valid node we haven't used during this star
-        int n = nodes.Count;
-        Debug.Log($"Nodes: {nodes}");
-        for (int step = 0; step < n; step++)
-        {
-            var k = (_rrCursor + step) % n;
-            var candidate = nodes[k];
-            if (!_rrUsedThisStar.Contains(candidate.idx))
-            {
-                _rrCursor = (k + 1) % n;
-                _rrUsedThisStar.Add(candidate.idx);
-                return candidate;
+                if (c.minedObjectType == MinedObjectType.NoteSpawner && c.trackModifierType != TrackModifierType.Clear /* any value */)
+                {
+                    Debug.LogWarning($"[SpawnStrategyProfile] NoteSpawner entry has a TrackModifierType ({c.trackModifierType}) which will be IGNORED.");
+                    _loggedNoteSpawnerWithModifier = true;
+                    break;
+                }
             }
         }
-        Debug.Log($"Fallback to weighted from Round Robin Unique First.");
-        // 2) everybody used once → fall back to weighted among valid
-        return PickWeighted(nodes);
-    }
 
-    private (int idx, WeightedMineNode node) PickQuotaBased(List<(int idx, WeightedMineNode node)> nodes)
-    {
-        // Prefer nodes with remaining quota; if none, fall back to weighted
-        var withQuota = nodes.Where(n => HasQuota(n.idx)).ToList();
-        if (withQuota.Count == 0) return PickWeighted(nodes);
+        if (utilityBias01 >= 0f)
+            return PickWithUtilityBias(cands, Mathf.Clamp01(utilityBias01));
 
-        // Optional: still respect weights inside the quota subset
-        int total = withQuota.Sum(n => n.node.weight);
-        int pick = Random.Range(0, Mathf.Max(1, total));
-        int acc = 0;
-        foreach (var n in withQuota)
+        return selectionMode switch
         {
-            Debug.Log($"Adding {n.node.weight} to {n.node}");
-            acc += n.node.weight;
-            if (pick < acc) return n;
-        }
-        return withQuota[Random.Range(0, withQuota.Count)];
+            MineNodeSelectionMode.RoundRobinUnique => PickRoundRobinUnique(cands),
+            MineNodeSelectionMode.RoundRobin       => PickRoundRobin(cands),
+            _                                      => PickWeightedRandom(cands)
+        };
     }
 
-    public void ResetForNewPhase()
+    /// <summary>
+    /// Build a directive shell from a chosen entry.
+    /// NOTE: This does NOT look up prefabs. PhaseStar should set:
+    /// - directive.prefab (MineNode shell from PhaseStar)
+    /// - directive.minedObjectPrefab (from DrumTrack's MinedObjectPrefabRegistry)
+    /// - directive.noteSet for NoteSpawner (via GameFlowManager.noteSetFactory)
+    /// - directive.displayColor = track.trackColor
+    /// </summary>
+    public MinedObjectSpawnDirective ToDirectiveShell(WeightedMineNode node, InstrumentTrack track)
+    {
+        if (node == null || track == null) return null;
+
+        var d = new MinedObjectSpawnDirective
+        {
+            minedObjectType   = node.minedObjectType,
+            assignedTrack     = track,
+            displayColor      = track.trackColor, // ← always inherit from track
+            remixUtility      = null,
+            noteSet           = null
+        };
+
+        // For utilities, carry the modifier; for spawners: ignore it.
+        if (node.minedObjectType == MinedObjectType.TrackUtility)
+            d.trackModifierType = node.trackModifierType;
+
+        return d;
+    }
+
+    /// <summary>Call when a new PhaseStar is spawned to reset round-robin state.</summary>
+    public void ResetForNewStar()
     {
         _rrCursor = 0;
         _rrUsedThisStar = new HashSet<int>();
+        _quotaRemaining = null; // lazily allocated if you add quotas per entry
+    }
 
-        if (_quotaRemaining == null)
-            _quotaRemaining = new Dictionary<int, int>(mineNodes.Count);
-        else
-            _quotaRemaining.Clear();
+    #endregion
 
-        for (int i = 0; i < mineNodes.Count; i++)
+    #region Pickers
+
+    private WeightedMineNode PickWeightedRandom(List<WeightedMineNode> cands)
+    {
+        int total = 0;
+        for (int i = 0; i < cands.Count; i++)
+            total += Mathf.Max(1, cands[i].weight);
+
+        int roll = Random.Range(0, Mathf.Max(1, total));
+        int sum  = 0;
+        for (int i = 0; i < cands.Count; i++)
         {
-            int q = mineNodes[i].quota;
-
-            if (q < 0)
-                continue; // disabled
-            else if (q == 0)
-                _quotaRemaining[i] = int.MaxValue; // unlimited
-            else
-                _quotaRemaining[i] = q;
+            sum += Mathf.Max(1, cands[i].weight);
+            if (roll < sum) return cands[i];
         }
+        return cands[cands.Count - 1];
     }
 
-    // Call each time a PhaseStar spawns (start of a star life)
-    public void BeginStarCycle()
+    private WeightedMineNode PickRoundRobin(List<WeightedMineNode> cands)
     {
-        // keep quotas, but reset the “unique-first” pass for this star
-        _rrUsedThisStar = new HashSet<int>();
+        if (cands.Count == 0) return null;
+        var idx = Mathf.Abs(_rrCursor) % cands.Count;
+        _rrCursor++;
+        return cands[idx];
     }
 
-    private bool HasQuota(int idx)
-        => _quotaRemaining != null && _quotaRemaining.TryGetValue(idx, out var left) && left > 0;
-
-    private void ConsumeQuota(int idx)
+    private WeightedMineNode PickRoundRobinUnique(List<WeightedMineNode> cands)
     {
-        if (_quotaRemaining == null) return;
-        if (_quotaRemaining.TryGetValue(idx, out var left))
+        if (cands.Count == 0) return null;
+
+        // produce a stable view (index into original list)
+        var indexed = cands.Select((n, i) => (Node:n, i)).ToList();
+
+        for (int k = 0; k < indexed.Count; k++)
         {
-            left = Mathf.Max(0, left - 1);
-            if (left == 0) _quotaRemaining.Remove(idx);
-            else _quotaRemaining[idx] = left;
+            var (n, i) = indexed[(_rrCursor + k) % indexed.Count];
+            if (_rrUsedThisStar.Contains(i)) continue;
+            _rrUsedThisStar.Add(i);
+            _rrCursor = (_rrCursor + k + 1) % indexed.Count;
+            return n;
         }
+
+        // all used → reset unique set and return next
+        _rrUsedThisStar.Clear();
+        return PickRoundRobin(cands);
     }
 
-    private bool IsNodeUsefulForTrack(
-        WeightedMineNode node,
-        InstrumentTrack track,
-        MusicalPhase phase,
-        MusicalPhaseProfile profile)
+    /// <summary>
+    /// Utility bias: raise probability of TrackUtility relative to NoteSpawner.
+    /// bias=0 → behave like WeightedRandom over all; bias=1 → prefer utilities if any exist.
+    /// </summary>
+    private WeightedMineNode PickWithUtilityBias(List<WeightedMineNode> cands, float bias)
     {
-        if (track == null)
-            return false;
+        var spawners = cands.Where(n => n.minedObjectType == MinedObjectType.NoteSpawner).ToList();
+        var utils    = cands.Where(n => n.minedObjectType == MinedObjectType.TrackUtility).ToList();
+
+        if (utils.Count == 0) return PickWeightedRandom(spawners.Count > 0 ? spawners : cands);
+        if (spawners.Count == 0) return PickWeightedRandom(utils);
+
+        // Decide the branch first, then pick weighted inside the branch
+        bool chooseUtility = Random.value < bias;
+        return chooseUtility ? PickWeightedRandom(utils) : PickWeightedRandom(spawners);
+    }
+
+    #endregion
+
+    private static readonly List<WeightedMineNode> s_empty = new();
+
+    // (Optional) Keep any per-track fit checks you had:
+    public bool NodeFitsTrack(WeightedMineNode node, InstrumentTrack track)
+    {
+        if (node == null || track == null) return false;
 
         if (node.minedObjectType == MinedObjectType.NoteSpawner)
         {
-            //var expectedSeries = profile.GetNoteSetSeriesForRole(node.role);
-            //return node.noteSetSeries == expectedSeries;
+            // Example policy: prefer node.role == assignedRole (if you keep role on entries)
             return node.role == track.assignedRole;
         }
 
         if (node.minedObjectType == MinedObjectType.TrackUtility)
         {
+            // Utilities: ask track if this utility makes sense (your function)
             return track.IsTrackUtilityRelevant(node.trackModifierType);
         }
 
         return true;
     }
+}
 
+/// <summary>
+/// Existing enum in your project:
+/// WeightedRandom, RoundRobin, RoundRobinUnique, ...
+/// </summary>
+public enum MineNodeSelectionMode { WeightedRandom, RoundRobin, RoundRobinUnique }
+
+/// <summary>
+/// This class already exists in your project; keeping the same name to avoid asset breakage.
+/// Only change is semantic: when type == NoteSpawner, trackModifierType is ignored.
+/// </summary>
+[Serializable]
+public class WeightedMineNode
+{
+    public string label;
+
+    public MinedObjectType minedObjectType = MinedObjectType.NoteSpawner;
+
+    [Tooltip("Only used when minedObjectType == TrackUtility")]
+    public TrackModifierType trackModifierType = TrackModifierType.RhythmStyle;
+
+    public MusicalRole role;                      // optional: used by your NodeFitsTrack policy
+    public List<MusicalPhase> allowedPhases = new List<MusicalPhase>();
+
+    [Min(1)] public int weight = 1;
+    public int quota = -1;                        // optional future use
+    public int rarity = 0;                        // optional future use
 }

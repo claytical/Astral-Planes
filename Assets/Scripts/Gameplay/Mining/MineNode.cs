@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using Gameplay.Mining;
 using UnityEngine;
 
@@ -13,11 +11,12 @@ public class MineNode : MonoBehaviour
     private GameObject _preloadedObject;
     private Vector3 _originalScale;
     private Color? _lockedColor;
-    private MinedObject _minedObject;
+    public MinedObject _minedObject;
     private bool _objectRevealed, _depletedHandled, _resolvedFired;
     private MinedObjectSpawnDirective _directive;
     private MineNodeRailAgent _rail;
-
+    private Collider2D _col;
+    private Rigidbody2D _rb;
     public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
     private void Start()
     {
@@ -28,13 +27,13 @@ public class MineNode : MonoBehaviour
     public void Initialize(MinedObjectSpawnDirective directive)
     {
         _directive    = directive;                 // ⬅ cache
-
         GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
         _lockedColor = directive.displayColor;
         _minedObject = obj.GetComponent<MinedObject>();
         obj.transform.SetParent(transform);
         obj.SetActive(false);
         _minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
+        coreSprite.color = directive.assignedTrack.trackColor;
         _minedObject.assignedTrack.drumTrack.RegisterMinedObject(_minedObject);
         _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
         // NoteSpawn carries a Ghost trigger
@@ -63,7 +62,8 @@ public class MineNode : MonoBehaviour
         }
 
     }
-    public void RevealPreloadedObject()
+
+    private void RevealPreloadedObject()
     {
         if (_preloadedObject == null || _preloadedObject.gameObject == null || _objectRevealed)
         {
@@ -85,10 +85,15 @@ public class MineNode : MonoBehaviour
     private void OnCollisionEnter2D(Collision2D coll)
     { 
         Debug.Log($"Hit MineNode: {coll.gameObject.name} object revealed? {_objectRevealed}");
-        if (_objectRevealed) return;
+        if (_objectRevealed)
+        {
+            Debug.Log($"Mine Node Object Already Revealed");
+            return;
+        }
         if(_rail != null) _rail.ReplanToFarthest();
         if (_minedObject != null)
         {
+            Debug.Log($"Found Object for Spawner: {_minedObject.name}");
             var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
             if (spawner != null) {
                 // Normal note spawner feedback
@@ -162,6 +167,11 @@ public class MineNode : MonoBehaviour
                 }
             }
         }
+        else
+        {
+            Debug.Log($"no object found for {gameObject.name}");
+
+        }
     }
     private IEnumerator CleanupAndDestroy()
     {
@@ -199,7 +209,6 @@ public class MineNode : MonoBehaviour
         }
         catch (System.Exception e) { Debug.LogException(e, this); }
     }
-    
     private void OnDisable(){ Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); }
     private void OnDestroy(){ Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); }
     // Call this right after you instantiate the child mined object (inside MineNode or the spawner).
@@ -219,22 +228,14 @@ public class MineNode : MonoBehaviour
 
         if (transform.localScale.magnitude <= 0.05f)
             TriggerExplosion();
-    }
-    private void OnEnable()
-    {
-        var col = GetComponent<Collider2D>();
-        if (col && !col.enabled) col.enabled = true;
-        _rail = GetComponent<MineNodeRailAgent>();
-    }
-
-}
-
-[System.Serializable]
-public enum MineNodeSelectionMode
-{
-    WeightedRandom,
-    RoundRobinUniqueFirst,
-    QuotaBased
+    } 
+    void OnEnable() { 
+        _rail = GetComponent<MineNodeRailAgent>(); 
+        _col = GetComponent<Collider2D>(); 
+        _rb  = GetComponent<Rigidbody2D>(); 
+        if (_col != null) _col.enabled = true; // ✅ ensure interactable
+        if (_rb  != null) _rb.simulated = true;
+        }
 }
 
 public class MinedObjectSpawnDirective
@@ -251,78 +252,4 @@ public class MinedObjectSpawnDirective
     public GameObject prefab;
     public GameObject minedObjectPrefab;
     public Vector2Int spawnCell;
-}
-
-[System.Serializable]
-public class WeightedMineNode
-{
-    public MinedObjectType minedObjectType;
-    public TrackModifierType trackModifierType;
-    public MusicalRole role;
-
-    [Range(0, 100)]
-    public int weight = 1;
-    
-    public int quota = 1;
-
-    [Tooltip("Leave empty for all phases")]
-    public List<MusicalPhase> allowedPhases;
-
-    [Tooltip("Higher = rarer")]
-    public int rarityTier = 0;
-
-    [Tooltip("If true, requires player to have collected at least one remix")]
-    public bool requiresRemixToSpawn = false;
-
-    public MinedObjectSpawnDirective ToDirective(
-        InstrumentTrack track,
-        NoteSet noteSet,
-        Color color,
-        MineNodePrefabRegistry nodeRegistry,
-        MinedObjectPrefabRegistry objectRegistry,
-        NoteSetFactory noteSetFactory,
-        MusicalPhase currentPhase)
-    {
-        Debug.Log($"🧭 Spawning directive for {minedObjectType} / {trackModifierType}");
-
-        RemixUtility remixUtil = null;
-
-        var phaseManager = track?.drumTrack?.progressionManager;
-        if (phaseManager != null)
-        {
-            int index = phaseManager.GetCurrentPhaseIndex();
-            if (index >= 0 && index < phaseManager.phaseQueue.phaseGroups.Count)
-            {
-                var group = phaseManager.phaseQueue.phaseGroups[index];
-                remixUtil = group.remixUtilities.FirstOrDefault(r => r.targetRole == track.assignedRole);
-            }
-        }
-
-        NoteSet generatedNoteSet = null;
-
-        if (minedObjectType == MinedObjectType.NoteSpawner && noteSetFactory != null)
-        {
-            generatedNoteSet = noteSetFactory.Generate(track, currentPhase);
-        }
-
-        return new MinedObjectSpawnDirective
-        {
-            minedObjectType = this.minedObjectType,
-            role = this.role,
-            assignedTrack = track,
-            //noteSetSeries = null, // 🔥 no longer needed in procedural system
-            trackModifierType = this.trackModifierType,
-            displayColor = color,
-            minedObjectPrefab = objectRegistry.GetPrefab(minedObjectType, trackModifierType),
-            prefab = nodeRegistry.GetPrefab(minedObjectType, trackModifierType),
-            remixUtility = remixUtil,
-            noteSet = generatedNoteSet // 🎯 Inject the runtime NoteSet
-        };
-    }
-
-
-    public override string ToString()
-    {
-        return $"{role} | {minedObjectType} [{trackModifierType}] | weight: {weight}, quota: {quota}, rarity: {rarityTier}";
-    }
 }

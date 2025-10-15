@@ -939,16 +939,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  phaseProfiles:
+  - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
+  - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
+  - {fileID: 11400000, guid: a756d4e83a53b43ed990e4579dde83e8, type: 2}
+  - {fileID: 11400000, guid: 4d38e6e924afc450a8b4dc5f1c8b4ca8, type: 2}
+  - {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
+  - {fileID: 11400000, guid: c36ca097ec10c4fd2b51488a8fef5cb9, type: 2}
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
+  arp: {fileID: 0}
   activeDrumTrack: {fileID: 0}
   progressionManager: {fileID: 0}
-  noteSetFactory: {fileID: 0}
+  dustGenerator: {fileID: 0}
+  spawnGrid: {fileID: 0}
+  noteSetFactory: {fileID: 1151719979}
   coralPrefab: {fileID: 3306639670150737611, guid: 8d387e67775794007ba96dfadbea003d,
     type: 3}
+  disableCoralDuringBridge: 1
   noteViz: {fileID: 0}
   glitch: {fileID: 0}
+  phaseTransitionManager: {fileID: 0}
   localPlayers: []
+  playerStatsGrid: {fileID: 0}
+  _activeTracks: []
+  playerProgress: 0
 --- !u!114 &1151719979
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -984,9 +999,6 @@ MonoBehaviour:
   spreadOverLoops: 1
   retunePolicy: 0
   seedFromProfileOnPhaseStart: 0
-  drums: {fileID: 0}
-  tracks: {fileID: 0}
-  arpeggiator: {fileID: 0}
   conflictPolicy: 0
 --- !u!1 &1241868050
 GameObject:
@@ -1391,7 +1403,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   quoteText: {fileID: 1057326950}
   gameModeSelect: {fileID: 0}
-  selectedGameMode: {fileID: 0}
 --- !u!114 &1725700399
 MonoBehaviour:
   m_ObjectHideFlags: 0

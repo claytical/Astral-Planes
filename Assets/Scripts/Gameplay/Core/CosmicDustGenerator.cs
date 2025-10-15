@@ -1,11 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
+using Random = UnityEngine.Random;
 
 public class CosmicDustGenerator : MonoBehaviour
 {
-    public DrumTrack drumTrack;
     public GameObject dustPrefab;
     public int iterations = 3;
     [Header("Maze Cycle Control")]
@@ -18,14 +18,12 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Debounce: minimum seconds between classic cycles.")]
     public float minClassicCycleInterval = 0.25f;
     public List<GameObject> hexagons = new List<GameObject>();
-   
-    
     private readonly Dictionary<Vector2Int, GameObject> _hexMap = new(); // Position → Hex
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
     private Dictionary<int, List<Vector2Int>> _featureCells = new(); // featureId -> cells
     private Dictionary<Vector2Int, int> _cellToFeature = new();     // grid -> featureId
-
+    [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, 1f);
     private Queue<int> _featureOrder = new();                       // FIFO for "oldest" removal
     private List<(Vector2Int grid, Vector3 pos)> _pendingSpawns = new();
     
@@ -35,8 +33,11 @@ public class CosmicDustGenerator : MonoBehaviour
     private int _currentEpoch = 0, _nextFeatureId = 1, _progressiveLoop = 0;
     double _lastClassicCycleDSP; 
     private MusicalPhase _progressivePhase = MusicalPhase.Establish;
+    private DrumTrack _drums;
+    private int _mazeBuildId = 0;
+    private int _lastPulseId = -1;
 
-
+    public event Action<Vector2Int?> OnMazeReady;
     [SerializeField] private float regrowCooldownSeconds = 3.0f;
     [SerializeField] public bool  progressiveMaze = true;
     [SerializeField] private int   maxFeatures = 3;                 // how many features we keep alive
@@ -47,7 +48,7 @@ public class CosmicDustGenerator : MonoBehaviour
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
-    
+        _mazeTint = profile.mazeColor;
         // Make dust appear “more/less deliberate” per personality
         // (Shorter grow-in for hectic phases; slower for patient ones.)
         hexGrowInSeconds = Mathf.Clamp(
@@ -84,12 +85,41 @@ public class CosmicDustGenerator : MonoBehaviour
 
         if (_spawnRoutine != null)
             StopCoroutine(_spawnRoutine); 
-        float fit = Mathf.Clamp(drumTrack.GetLoopLengthInSeconds()*0.25f, 0.08f, drumTrack.GetLoopLengthInSeconds()*0.5f);
+        float fit = Mathf.Clamp(GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.25f, 0.08f, GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.5f);
         _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToGrow, fit));
+    }
+    public void RetintExisting(float seconds = 0.35f)
+    {
+        foreach (var go in hexagons) // your existing collection of spawned tiles
+        {
+            if (!go) continue;
+            var d = go.GetComponent<CosmicDust>();
+            if (d != null) StartCoroutine(d.RetintOver(seconds, _mazeTint));
+        }
     }
     public void TriggerRegrowth(Vector2Int freedCell, MusicalPhase phase) { 
         if (_regrowthCoroutines.ContainsKey(freedCell)) return; 
+        Debug.Log($"Trigger regrowth for phase {phase}");
         _regrowthCoroutines[freedCell] = StartCoroutine(RegrowElsewhere(freedCell, phase)); 
+    }
+    public void RemoveHex(Vector2Int gridPos) {
+        _hexMap.Remove(gridPos);
+    }
+    public void ClearMaze()
+    {
+        foreach (var t in hexagons)
+        {
+            if(t == null) continue;
+            Explode explode = t.GetComponent<Explode>();
+            if (explode != null)
+            {
+                explode.Permanent();
+            }
+            Vector2Int gridPos = GameFlowManager.Instance.activeDrumTrack.WorldToGridPosition(t.transform.position);
+            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+        }
+        GameFlowManager.Instance.activeDrumTrack.activeHexagons.Clear();
+
     }
 
     private IEnumerator RunLoopAlignedMazeCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float regrowOffsetFrac, float destroySpanFrac)  {
@@ -126,26 +156,8 @@ public class CosmicDustGenerator : MonoBehaviour
         float regrowBudget = Mathf.Clamp(loopSeconds * 0.20f, 0.08f, loopSeconds * 0.45f);
         yield return StartCoroutine(StaggeredGrowthFitDuration(cells, regrowBudget));
     }
-    public void RemoveHex(Vector2Int gridPos) {
-        _hexMap.Remove(gridPos);
-    }
-    public void ClearMaze()
-    {
-        foreach (var t in hexagons)
-        {
-            if(t == null) continue;
-            Explode explode = t.GetComponent<Explode>();
-            if (explode != null)
-            {
-                explode.Permanent();
-            }
-            Vector2Int gridPos = drumTrack.WorldToGridPosition(t.transform.position);
-            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-        }
-        drumTrack.activeHexagons.Clear();
 
-    }
-    public int GetCurrentEpoch() => _currentEpoch;
+    private int GetCurrentEpoch() => _currentEpoch;
     public float GetEpochAge() => Time.time - _epochStartTime;
     public List<(Vector2Int, Vector3)> CalculateMazeGrowth(Vector2Int center, MusicalPhase phase, float hollowRadius = 0f, bool avoidStarHole = false)
     {
@@ -171,22 +183,31 @@ public class CosmicDustGenerator : MonoBehaviour
                 return Build_CA(center, hollowRadius, avoidStarHole);
         }
     }
-    private bool IsWorldPositionInsideScreen(Vector3 worldPos) {
-        var cam = Camera.main; 
-        if (!cam) return true; // no camera yet → don't cull
-        Vector3 viewport = cam.WorldToViewportPoint(worldPos); 
-        return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
-    } 
-    public bool IsInRegrowGrace(float seconds) => Time.time - _epochStartTime < seconds;
+    public bool TryRequestLoopAlignedCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac)
+    { 
+        if (cycleMode != MazeCycleMode.ClassicLoopAligned) return false;
+        if (_cycleRunning) return false;
+        _drums = GameFlowManager.Instance.activeDrumTrack;
+        double now = AudioSettings.dspTime; 
+        if (now - _lastClassicCycleDSP < minClassicCycleInterval) return false; 
+        StartCoroutine(_RunClassicCycleGuard(phase, centerCell, loopSeconds, breakFrac, growFrac)); 
+        _lastClassicCycleDSP = now; 
+        return true;
+    }
     public IEnumerator GenerateMazeThenPlacePhaseStar(MusicalPhase phase, SpawnStrategyProfile profile) { 
         Debug.Log($"Generating Maze with Profile {profile}"); 
+        if (_drums == null) 
+            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
+        // If we *still* don't have one, bail clearly
+        if (_drums == null) {
+            Debug.LogError("[MAZE] No DrumTrack available; cannot build maze or place star."); yield break;
+        }
         // ✅ Wait until the grid and camera are actually usable
-        yield return new WaitUntil(() => drumTrack != null &&
-                                         drumTrack.HasSpawnGrid() &&
-                                         drumTrack.GetSpawnGridWidth()  > 0 &&
-                                         drumTrack.GetSpawnGridHeight() > 0 &&
+        yield return new WaitUntil(() => _drums.HasSpawnGrid() &&
+                                         _drums.GetSpawnGridWidth()  > 0 &&
+                                         _drums.GetSpawnGridHeight() > 0 &&
                                          Camera.main != null);
-        var center = new Vector2Int(drumTrack.GetSpawnGridWidth()/2, drumTrack.GetSpawnGridHeight()/2);
+        var center = new Vector2Int(_drums.GetSpawnGridWidth()/2, _drums.GetSpawnGridHeight()/2);
         // Primary layout should respect the current phase personality
          var walls = CalculateMazeGrowth(center, phase, hollowRadius: 0f, avoidStarHole: false);
          if (walls == null || walls.Count == 0) { 
@@ -198,24 +219,46 @@ public class CosmicDustGenerator : MonoBehaviour
         if (walls == null || walls.Count == 0) {
             Debug.LogWarning("[MAZE] Fallback to CA seed."); walls = Build_CA(center, hollowRadius:0f, avoidStarHole:false);
         }
-        StartCoroutine(StaggeredGrowthFitDuration(walls, drumTrack.GetLoopLengthInSeconds() * 0.20f));
 
-        // Wait until StaggeredGrowth has finished occupying cells
-        yield return new WaitWhile(() => _isSpawningMaze);
-        yield return null; // one extra frame for Occupy() to settle
+        try
+        {
+            StartCoroutine(StaggeredGrowthFitDuration(walls, 1f));
+        }
+        catch (Exception ex) {
+            Debug.LogWarning($"[MAZE] Growth exception: {ex.Message}");
+        }
+         // Secondary guard (just in case)
+         _isSpawningMaze = false;
+        yield return null;
+        
+        Vector2Int cell = _drums.GetRandomAvailableCell();
+        Debug.Log($"[MAZE] OnMazeReady firing cell={cell}");
+        if (cell.x == -1) cell = ForceReserveCellNearCenter(); // will bulldoze a dust hex if needed
+        // (after you pick 'cell')
+// PICK ONE PLACE to invoke, not two:
+        int buildId = ++_mazeBuildId;
 
-        // Try to place PhaseStar into any free cell
-        Vector2Int cell = drumTrack.GetRandomAvailableCell();
-        if (cell.x == -1)
-            cell = ForceReserveCellNearCenter(); // fallback (below)
-
-        if (cell.x != -1)
-            drumTrack.SpawnPhaseStarAtCell(phase, profile, cell);
+        if (_lastPulseId != buildId) {
+            _lastPulseId = buildId;
+            Debug.Log($"[MAZE] OnMazeReady firing cell={cell} (buildId={buildId})");
+            OnMazeReady?.Invoke(cell);
+        } else {
+            Debug.LogWarning($"[MAZE] Duplicate OnMazeReady suppressed (buildId={buildId})");
+        }
     }
-    public Vector2Int ForceReserveCellNearCenter()
+
+
+    private bool IsWorldPositionInsideScreen(Vector3 worldPos) {
+        var cam = Camera.main; 
+        if (!cam) return true; // no camera yet → don't cull
+        Vector3 viewport = cam.WorldToViewportPoint(worldPos); 
+        return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
+    } 
+
+    private Vector2Int ForceReserveCellNearCenter()
     {
-        int w = drumTrack.GetSpawnGridWidth();
-        int h = drumTrack.GetSpawnGridHeight();
+        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
         var center = new Vector2Int(w/2, h/2);
 
         for (int r = 0; r < Mathf.Max(w,h); r++)
@@ -227,7 +270,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (_hexMap.TryGetValue(p, out var hex) && hex != null)
                 {
                     Destroy(hex);
-                    drumTrack.FreeSpawnCell(p.x, p.y);
+                    GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(p.x, p.y);
                     RemoveHex(p);
                     return p;
                 }
@@ -235,45 +278,50 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return new Vector2Int(-1,-1);
     }
-    public bool TryRequestLoopAlignedCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac)
-        { 
-            if (cycleMode != MazeCycleMode.ClassicLoopAligned) return false;
-            if (_cycleRunning) return false; 
-            double now = AudioSettings.dspTime; 
-            if (now - _lastClassicCycleDSP < minClassicCycleInterval) return false; 
-            StartCoroutine(_RunClassicCycleGuard(phase, centerCell, loopSeconds, breakFrac, growFrac)); 
-            _lastClassicCycleDSP = now; 
-            return true;
-        }
-    private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int, Vector3)> cells, float totalDuration)
+    
+
+    private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration)
     {
-        Debug.Log($"StaggeredGrowthFitDuration: {totalDuration} spawningMaze: {_isSpawningMaze}");
+        Debug.Log($"[MAZE] Growth begin: {cells.Count} cells, dur={totalDuration}s");
         int count = Mathf.Max(1, cells.Count);
-        float perHexDelay = Mathf.Max(0f, totalDuration / count); // pack tightly if needed
+        float perHexDelay = Mathf.Max(0f, totalDuration / count);
 
         _isSpawningMaze = true;
-        Debug.Log($"cells.Count: {cells.Count}");
-        
-        foreach (var (grid, pos) in cells)
+        try
         {
-            GameObject hex = Instantiate(dustPrefab, pos, Quaternion.identity);
-            GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust);
-            hexagons.Add(hex); 
-            if (hex.TryGetComponent<CosmicDust>(out var dust)) {
-                dust.SetEpoch(GetCurrentEpoch()); 
-                dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack); 
-                dust.SetGrowInDuration(hexGrowInSeconds);
-                // Phase-aware visuals + behavior from the outset
-                dust.SetPhaseColor(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
-                dust.ConfigureForPhase(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
-                dust.Begin();
+            Debug.Log($"cells.Count: {cells.Count}");
+            foreach (var (grid, pos) in cells)
+            {
+                if (dustPrefab == null)
+                {
+                    Debug.LogError("[MAZE] dustPrefab is NULL; skipping hex spawn but continuing.");
+                    break; // bail early but still finish
+                }
+
+                var hex = Instantiate(dustPrefab, pos, Quaternion.identity);
+                GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust);
+                hexagons.Add(hex);
+
+                if (hex.TryGetComponent<CosmicDust>(out var dust))
+                {
+                    dust.SetEpoch(GetCurrentEpoch());
+                    dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack);
+                    dust.SetGrowInDuration(hexGrowInSeconds);
+                    
+                    dust.SetTint(_mazeTint);
+                    dust.ConfigureForPhase(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+                    dust.Begin();
+                }
+                RegisterHex(grid, hex);
+                if (perHexDelay > 0f) yield return new WaitForSeconds(perHexDelay);
+                else yield return null;
             }
-            RegisterHex(grid, hex);
-            if (perHexDelay > 0f) yield return new WaitForSeconds(perHexDelay);
-            else yield return null;
         }
-        _isSpawningMaze = false;
-        Debug.Log($"SPawning maze false again");
+        finally
+        {
+            _isSpawningMaze = false;                 // <- ALWAYS clear
+            Debug.Log("[MAZE] Growth finished (or aborted); releasing wait.");
+        }
     }
 
     IEnumerator _RunClassicCycleGuard(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac) {
@@ -291,7 +339,7 @@ public class CosmicDustGenerator : MonoBehaviour
         foreach (var kv in new Dictionary<Vector2Int, GameObject>(_hexMap))
         {
             if (kv.Value != null) Destroy(kv.Value);
-            drumTrack.FreeSpawnCell(kv.Key.x, kv.Key.y);
+            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(kv.Key.x, kv.Key.y);
             RemoveHex(kv.Key);
         }
         _featureOrder.Clear();
@@ -351,11 +399,10 @@ public class CosmicDustGenerator : MonoBehaviour
                    .GetRange(0, Mathf.Min(12, Mathf.Max(0, _pendingSpawns.Count))); // tiny sprinkle
         }
     }
-
     private List<(Vector2Int, Vector3)> Build_RingBand(Vector2Int center, int distance, int thickness, float jitterCells) {
         var growth = new List<(Vector2Int, Vector3)>();
-        int w = drumTrack.GetSpawnGridWidth();
-        int h = drumTrack.GetSpawnGridHeight();
+        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
 
         // distance map via BFS (reuse your hex neighbors)
         var dist = new Dictionary<Vector2Int, int>();
@@ -367,7 +414,7 @@ public class CosmicDustGenerator : MonoBehaviour
             foreach (var d in GetHexDirections(p.y)) {
                 var n = p + d;
                 if ((uint)n.x >= (uint)w || (uint)n.y >= (uint)h) continue;
-                if (!drumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
+                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
                 if (dist.ContainsKey(n)) continue;
                 dist[n] = dist[p] + 1;
                 q.Enqueue(n);
@@ -379,7 +426,7 @@ public class CosmicDustGenerator : MonoBehaviour
             bool inBand = Mathf.Abs(d - distance + Random.Range(-jitterCells, jitterCells)) <= thickness * 0.5f;
             if (!inBand) continue;
             var grid  = kv.Key;
-            var world = drumTrack.GridToWorldPosition(grid);
+            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((grid, world));
         }
@@ -387,12 +434,12 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private List<(Vector2Int, Vector3)> Build_SingleStroke(int maxLen, float stepJitter, float dilate) {
         var pts = new HashSet<Vector2Int>();
-        int W = drumTrack.GetSpawnGridWidth();
-        int H = drumTrack.GetSpawnGridHeight();
+        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
         // random valid start
         Vector2Int p = new(Random.Range(0, W), Random.Range(0, H));
         int guard = 0;
-        while (guard++ < 64 && (!drumTrack.IsSpawnCellAvailable(p.x, p.y) || !IsWorldPositionInsideScreen(drumTrack.GridToWorldPosition(p)))) {
+        while (guard++ < 64 && (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(p.x, p.y) || !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(p)))) {
             p = new(Random.Range(0, W), Random.Range(0, H));
         }
         if (guard >= 64) return new();
@@ -406,8 +453,8 @@ public class CosmicDustGenerator : MonoBehaviour
             if (Random.value < stepJitter) nxt = dirs[Random.Range(0, dirs.Count)];
             var n = cur + nxt;
             if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) break;
-            if (!drumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
-            if (!IsWorldPositionInsideScreen(drumTrack.GridToWorldPosition(n))) break;
+            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
+            if (!IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n))) break;
             cur = n;
         }
 
@@ -421,10 +468,9 @@ public class CosmicDustGenerator : MonoBehaviour
 
         var list = new List<(Vector2Int, Vector3)>();
         foreach (var g in pts)
-            list.Add((g, drumTrack.GridToWorldPosition(g)));
+            list.Add((g, GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(g)));
         return list;
     }
-    
     private IEnumerator FadeOutFeature(int featureId, float duration) {
         if (!_featureCells.TryGetValue(featureId, out var cells)) yield break;
         foreach (var cell in cells) {
@@ -439,7 +485,6 @@ public class CosmicDustGenerator : MonoBehaviour
         } 
         _featureCells.Remove(featureId);
     }
-    
     private IEnumerator BreakEntireMazeSequenced(Vector2Int origin, float totalDuration) {
         // Snapshot the current maze tiles
         var targets = new List<(Vector2Int pos, float dist, GameObject go)>();
@@ -476,13 +521,11 @@ public class CosmicDustGenerator : MonoBehaviour
             if (i < count - 1) yield return new WaitForSeconds(perStep);
         }
     }
-
     private IEnumerator RemoveMappingAfter(Vector2Int pos, float delay) {
         yield return new WaitForSeconds(delay);
-        drumTrack.FreeSpawnCell(pos.x, pos.y);
+        GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(pos.x, pos.y);
         RemoveHex(pos); // keep hexMap in sync
     }
-
     private IEnumerator FadeTransformThenDestroy(Transform t, float duration) {
         var s0 = t.localScale;
         var sprites = t.GetComponentsInChildren<SpriteRenderer>(includeInactive: true);
@@ -503,16 +546,14 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         if (t != null) Destroy(t.gameObject);
     }
-    
     private void RegisterHex(Vector2Int gridPos, GameObject hex) {
         _hexMap[gridPos] = hex;
     }
-    
     private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
         var growth = new List<(Vector2Int, Vector3)>();
 
-    int w = drumTrack.GetSpawnGridWidth();   // grid size comes from SpawnGrid
-    int h = drumTrack.GetSpawnGridHeight();  // :contentReference[oaicite:3]{index=3}
+    int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();   // grid size comes from SpawnGrid
+    int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();  // :contentReference[oaicite:3]{index=3}
     if (w <= 0 || h <= 0) { 
         Debug.LogError($"[MAZE] Invalid grid size W={w} H={h} — grid not initialized yet."); return growth; 
     }
@@ -521,14 +562,14 @@ public class CosmicDustGenerator : MonoBehaviour
     for (int x = 0; x < w; x++)
     for (int y = 0; y < h; y++)
     {
-        if (!drumTrack.IsSpawnCellAvailable(x, y)) continue;      // :contentReference[oaicite:4]{index=4}
+        if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;      // :contentReference[oaicite:4]{index=4}
         var c = new Vector2Int(x, y);
-        if (onScreenOnly && !IsWorldPositionInsideScreen(drumTrack.GridToWorldPosition(c))) // :contentReference[oaicite:5]{index=5}
+        if (onScreenOnly && !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(c))) // :contentReference[oaicite:5]{index=5}
             continue;
         candidates.Add(c);
     } 
     if (candidates.Count == 0) { 
-        Debug.LogWarning($"[MAZE] No candidate cells. onScreenOnly={onScreenOnly}, W={w}, H={h}. Example avail[0,0]={drumTrack.IsSpawnCellAvailable(0,0)}"); 
+        Debug.LogWarning($"[MAZE] No candidate cells. onScreenOnly={onScreenOnly}, W={w}, H={h}. Example avail[0,0]={GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(0,0)}"); 
         return growth;
     }
     // 2) Carve passages via randomized DFS
@@ -600,7 +641,7 @@ public class CosmicDustGenerator : MonoBehaviour
     foreach (var cell in candidates)
     {
         if (passages.Contains(cell)) continue; // leave corridor empty
-        Vector3 world = drumTrack.GridToWorldPosition(cell);       // :contentReference[oaicite:7]{index=7}
+        Vector3 world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(cell);       // :contentReference[oaicite:7]{index=7}
         growth.Add((cell, world));
     }
     return growth;
@@ -609,7 +650,6 @@ public class CosmicDustGenerator : MonoBehaviour
     foreach (var v in set) return v;             // returns the first enumerated element
     return new Vector2Int(-1, -1);
 }
-
     private IEnumerator RegrowElsewhere(Vector2Int freedCell, MusicalPhase phase) {
         // reuse your phase-based delay so timing still feels musical
         float delay = phase switch { 
@@ -623,26 +663,25 @@ public class CosmicDustGenerator : MonoBehaviour
              yield return new WaitForSeconds(delay);
         
         //Build a fresh pattern and pick the first valid free cell that isn’t the one we freed.
-        var center = drumTrack.WorldToGridPosition(drumTrack.transform.position);
+        var center = GameFlowManager.Instance.activeDrumTrack.WorldToGridPosition(GameFlowManager.Instance.activeDrumTrack.transform.position);
         var pattern = CalculateMazeGrowth(center, phase, hollowRadius: 0f, avoidStarHole: false); // your existing routine
         foreach (var (grid, world) in pattern) {
             if (grid == freedCell) continue; 
             if (_hexMap.ContainsKey(grid)) continue;                       // already has dust
-            if (!drumTrack.IsSpawnCellAvailable(grid.x, grid.y)) continue;// reserved by something else
+            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(grid.x, grid.y)) continue;// reserved by something else
             // Spawn one dust tile and register it
             var go = Instantiate(dustPrefab, world, Quaternion.identity, transform); 
             _hexMap[grid] = go; 
-            drumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust); // ✅ DUST, not Node
+            GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust); // ✅ DUST, not Node
             if (go.TryGetComponent<CosmicDust>(out var dust)) {
-                dust.SetDrumTrack(drumTrack);
-                dust.SetPhaseColor(phase);
+                dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack);
+                dust.SetTint(_mazeTint);
                 dust.Begin();
             }
             _regrowthCoroutines.Remove(freedCell);
             yield break;
         }
     }
-    
     private int CountFilledNeighbors(Vector2Int cell)
     {
         int count = 0;
@@ -684,20 +723,20 @@ public class CosmicDustGenerator : MonoBehaviour
         List<(Vector2Int, Vector3)> growth = new();
         _fillMap.Clear();
 
-        Vector3 centerWorld = drumTrack.GridToWorldPosition(center);
+        Vector3 centerWorld = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(center);
         float fillChance = GetFillProbability(MusicalPhase.Establish);
-        int W = drumTrack.GetSpawnGridWidth();
-        int H = drumTrack.GetSpawnGridHeight();
+        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
 
         for (int x = 0; x < W; x++)
         for (int y = 0; y < H; y++)
         {
             var pos = new Vector2Int(x, y);
-            if (!drumTrack.IsSpawnCellAvailable(x, y)) continue;
+            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;
 
             if (avoidStarHole && hollowRadius > 0f)
             {
-                float d = Vector3.Distance(drumTrack.GridToWorldPosition(pos), centerWorld);
+                float d = Vector3.Distance(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(pos), centerWorld);
                 if (d < hollowRadius) continue;
             }
 
@@ -722,7 +761,7 @@ public class CosmicDustGenerator : MonoBehaviour
         {
             if (!kv.Value) continue;
             var grid = kv.Key;
-            var world = drumTrack.GridToWorldPosition(grid);
+            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((grid, world));
         }
@@ -730,9 +769,9 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private List<(Vector2Int, Vector3)> Build_RingChokepoints(Vector2Int center, int ringSpacing, int ringThickness, float jitter, float hollowRadius, bool avoidStarHole) {
         var growth = new List<(Vector2Int, Vector3)>();
-        int W = drumTrack.GetSpawnGridWidth();
-        int H = drumTrack.GetSpawnGridHeight();
-        Vector3 centerW = drumTrack.GridToWorldPosition(center);
+        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        Vector3 centerW = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(center);
 
         // BFS distance by hex steps (avoids axial conversion headaches)
         var dist = new Dictionary<Vector2Int, int>();
@@ -748,13 +787,13 @@ public class CosmicDustGenerator : MonoBehaviour
             {
                 var n = p + d;
                 if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) continue;
-                if (!drumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
+                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
                 if (seen.Contains(n)) continue;
 
                 // optional star hole
                 if (avoidStarHole && hollowRadius > 0f)
                 {
-                    float dd = Vector3.Distance(drumTrack.GridToWorldPosition(n), centerW);
+                    float dd = Vector3.Distance(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n), centerW);
                     if (dd < hollowRadius) continue;
                 }
 
@@ -774,7 +813,7 @@ public class CosmicDustGenerator : MonoBehaviour
             if (!onRing) continue;
 
             var grid = kv.Key;
-            var world = drumTrack.GridToWorldPosition(grid);
+            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((grid, world));
         }
@@ -784,8 +823,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private List<(Vector2Int, Vector3)> Build_DrunkenStrokes(int strokes, int maxLen, float stepJitter, float dilate)
     {
         var growth = new HashSet<Vector2Int>();
-        int W = drumTrack.GetSpawnGridWidth();
-        int H = drumTrack.GetSpawnGridHeight();
+        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
 
         for (int s = 0; s < strokes; s++)
         {
@@ -796,8 +835,8 @@ public class CosmicDustGenerator : MonoBehaviour
             );
             int safety = 0;
             while (safety++ < 100 &&
-                   (!drumTrack.IsSpawnCellAvailable(p.x, p.y) ||
-                    !IsWorldPositionInsideScreen(drumTrack.GridToWorldPosition(p))))
+                   (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(p.x, p.y) ||
+                    !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(p))))
             {
                 p = new(Random.Range(0, W), Random.Range(0, H));
             }
@@ -817,8 +856,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 var n = cur + nxt;
 
                 if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) break;
-                if (!drumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
-                if (!IsWorldPositionInsideScreen(drumTrack.GridToWorldPosition(n))) break;
+                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
+                if (!IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n))) break;
 
                 cur = n;
             }
@@ -837,23 +876,23 @@ public class CosmicDustGenerator : MonoBehaviour
         // Pack into list
         var list = new List<(Vector2Int, Vector3)>();
         foreach (var g in growth)
-            list.Add((g, drumTrack.GridToWorldPosition(g)));
+            list.Add((g, GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(g)));
         return list;
     }
     private List<(Vector2Int, Vector3)> Build_PopDots(int step, int phaseOffset) {
         var growth = new List<(Vector2Int, Vector3)>();
-        int W = drumTrack.GetSpawnGridWidth();
-        int H = drumTrack.GetSpawnGridHeight();
+        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
 
         for (int x = 0; x < W; x++)
         for (int y = 0; y < H; y++)
         {
-            if (!drumTrack.IsSpawnCellAvailable(x, y)) continue;
+            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;
             // simple periodic mask → polka dots
             if (((x + (y * 2) + phaseOffset) % step) != 0) continue;
 
             var grid = new Vector2Int(x, y);
-            var world = drumTrack.GridToWorldPosition(grid);
+            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
 
             growth.Add((grid, world));

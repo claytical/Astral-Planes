@@ -17,4 +17,18 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 5f8600fc7ef044b8082286a1a07bcf66, type: 3}
   defaultRemixStrategy: {fileID: 0}
   shortLabel: Intensify
-  roleStrategies: []
+  roleStrategies:
+  - role: 0
+    strategy: 0
+  - role: 0
+    strategy: 5
+  - role: 1
+    strategy: 1
+  - role: 1
+    strategy: 0
+  - role: 2
+    strategy: 0
+  - role: 3
+    strategy: 0
+  - role: 3
+    strategy: 4
