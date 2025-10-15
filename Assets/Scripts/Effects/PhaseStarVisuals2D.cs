@@ -87,14 +87,14 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         SetTintWithParticles(c);
         ToggleRenderers(true);
-        ApplyAlpha(1f);
+        ApplyAlpha(.9f);
     }
     public void ShowDim(Color _ignored)
     {
         var gray = new Color(0.6f, 0.6f, 0.6f, 1f); // pick your taste
         SetPreviewTint(gray);                       // use neutral, not track color
         ToggleRenderers(true);                      // keep visible while dim
-        ApplyAlpha(0.35f);
+        ApplyAlpha(0.25f);
     }
 
     void SetTintWithParticles(Color c)
@@ -138,18 +138,19 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     void ApplyAlpha(float a)
     {
         Debug.Log($"Applying alpha to {a}");
-        var srs = GetComponentsInChildren<SpriteRenderer>(true);
-        for (int i = 0; i < srs.Length; i++)
-            if (srs[i]) { var col = srs[i].color; col.a = a; srs[i].color = col; }
 
         var pss = GetComponentsInChildren<ParticleSystem>(true);
-        for (int i = 0; i < pss.Length; i++)
+        foreach (var ps in pss)
         {
-            var ps = pss[i]; if (!ps) continue;
+            if (!ps) continue;
             var main = ps.main;
             var c = main.startColor.color; c.a = a;
             main.startColor = new ParticleSystem.MinMaxGradient(c);
         }
+        var srs = GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (var t in srs)
+            if (t) { var col = t.color; col.a = a; t.color = col; }
+        
     }
 
     public Color GetLastTint() => _lastTint;

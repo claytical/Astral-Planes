@@ -9,7 +9,8 @@ public class NoteVisualizer : MonoBehaviour
     public RectTransform playheadLine;
     private Dictionary<InstrumentTrack, float> _waveAmplitudes = new();
     private Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
-
+    private readonly Dictionary<(InstrumentTrack track, int localStep, int k), Transform> _cloneMarkers
+        = new Dictionary<(InstrumentTrack, int, int), Transform>();
     public ParticleSystem playheadParticles;
 
     [Header("Note Ribbon Settings")]
@@ -32,6 +33,9 @@ public class NoteVisualizer : MonoBehaviour
     private Dictionary<InstrumentTrack, float> _ribbonIntensities = new();
     private Vehicle _energyTransferVehicle;
     private bool isInitialized;
+    private DrumTrack _drumTrack;
+    private readonly Dictionary<(InstrumentTrack, int), List<Transform>> _tiledClones = new ();
+    
     void Update() {
     if (!isInitialized || playheadLine == null || GameFlowManager.Instance.activeDrumTrack == null || GameFlowManager.Instance.controller.tracks == null)
         return;
@@ -86,9 +90,9 @@ public class NoteVisualizer : MonoBehaviour
         }
     }
 
-    // --- Ribbons: build in ROW-LOCAL space; write world-space into step map ---
-    int longestLoopSteps = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
 
+    // --- Ribbons: build in ROW-LOCAL space; write world-space into step map ---
+    int   longestLoopSteps = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
     for (int i = 0; i < ribbons.Count; i++)
     {
         LineRenderer   lr   = ribbons[i];
@@ -103,34 +107,36 @@ public class NoteVisualizer : MonoBehaviour
         float amplitude = _waveAmplitudes.TryGetValue(track, out var amp) ? amp : 0f;
 
         // local-space positions for the LR
+
         int res = Mathf.Max(2, ribbonResolution);
         Vector3[] localPositions = new Vector3[res];
 
         // world-space lookup for markers/tethers (keyed by GLOBAL step)
-        Dictionary<int, Vector3> stepMap = new Dictionary<int, Vector3>();
+        Dictionary<int, Vector3> stepMap = new Dictionary<int, Vector3>(); 
+        int   trackSteps    = Mathf.Max(1, track.GetTotalSteps());
+        int   longestSteps  = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
+        float localFraction = trackSteps / (float)Mathf.Max(1, longestSteps);
 
         for (int j = 0; j < res; j++)
         {
             float t01        = j / (float)(res - 1);                    // 0..1 across the row width
-            int   globalStep = Mathf.FloorToInt(t01 * longestLoopSteps);
-
-            float xLocal = Mathf.Lerp(xLeft, xRight, t01);
+            float xLocalLine = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t01);
+            int   localStep  = Mathf.FloorToInt(t01 * trackSteps); 
+            float tWidth     = t01 * localFraction;                      // compress into local segment
+            float xLocal     = Mathf.Lerp(xLeft, xRight, tWidth);
+            float xLocalMap  = Mathf.Lerp(rowRect.xMin, rowRect.xMax, tWidth);
 
             // vertical wave in local Y (kept! no overwrite)
             float yOffset = Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * amplitude;
-            float yLocal  = yMid + yOffset;
-
-            Vector3 localPos = new Vector3(xLocal, yLocal, 0f);
-            localPositions[j] = localPos;
-
-            // store a precise WORLD position for this global step
-            if (!stepMap.ContainsKey(globalStep))
-                stepMap[globalStep] = row.TransformPoint(localPos);
+            float yLocal = yMid + Mathf.Sin(Time.time * waveSpeed + j * velocityMultiplier) * amplitude;
+            localPositions[j] = new Vector3(xLocalLine, yLocal, 0f);
+            if (!stepMap.ContainsKey(localStep)) 
+                stepMap[localStep] = row.TransformPoint(new Vector3(xLocalMap, yLocal, 0f));
         }
 
         lr.positionCount = res;
         lr.SetPositions(localPositions); // useWorldSpace = false
-
+        _trackStepWorldPositions[track] = stepMap;
         // width/color by density
         int maxNotes   = GameFlowManager.Instance.controller.tracks.Max(t => t.GetNoteDensity());
         int trackNotes = Mathf.Max(1, track.GetNoteDensity());
@@ -153,20 +159,116 @@ public class NoteVisualizer : MonoBehaviour
 
     // keep marker sync + vine anim
     UpdateNoteMarkerPositions();
+    UpdateClonePositions();
+    foreach (var track in GameFlowManager.Instance.controller.tracks)
+        UpdateTiledClonePositions(track);
+    
+}
+public void SyncTiledClonesForTrack(InstrumentTrack track)
+{
+    if (_drumTrack == null || GameFlowManager.Instance?.controller == null) return;
 
-    float windowSeconds = stepDuration * 2f;
-    float dElapsed      = drumElapsed;
-    /*
-    foreach (var track in tracks.tracks)
+    int drumSteps   = _drumTrack.totalSteps;
+    int maxMult     = GameFlowManager.Instance.controller.GetMaxLoopMultiplier();
+    int myMult      = Mathf.Max(1, track.loopMultiplier);
+    int trackSteps  = drumSteps * myMult;
+    int globalSteps = drumSteps * Mathf.Max(1, maxMult);
+
+    // How many audible windows this track has across the global phrase:
+    int repeats = Mathf.Max(1, globalSteps / Mathf.Max(1, trackSteps));
+    int neededK = repeats - 1; // we tile for k=1..neededK
+
+    // 1) Build a set of required clone keys from current base markers (local keys)
+    var required = new HashSet<(InstrumentTrack,int,int)>();
+    foreach (var kv in noteMarkers)
     {
-        foreach (var go in track.spawnedCollectables)
+        var (t, localStep) = kv.Key;
+        if (t != track) continue;
+        for (int k = 1; k <= neededK; k++)
+            required.Add((track, localStep, k));
+    }
+
+    // 2) Create any missing clones
+    int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+    RectTransform row = trackRows[trackIndex];
+
+    foreach (var key in required)
+    {
+        if (_cloneMarkers.ContainsKey(key)) continue;
+
+        // Instantiate a visual-only clone under the correct row
+        var cloneGO = Instantiate(notePrefab, Vector3.zero, Quaternion.identity, row);
+        var t = cloneGO.transform;
+
+        // Mirror lit/grey state from base marker (if available)
+        if (noteMarkers.TryGetValue((track, key.Item2), out var baseT) && baseT != null)
         {
-            if (go == null) continue;
-            if (!go.TryGetComponent(out GhostNoteVine vine)) continue;
-            vine.AnimateToNextStep(dElapsed, stepDuration, windowSeconds);
+            // If the base is lit, light the clone; else keep it grey
+            var baseVnm = baseT.GetComponent<VisualNoteMarker>();
+            bool baseLit = baseVnm != null && baseVnm.IsLit; // add IsLit bool to your VisualNoteMarker if you don't have it
+
+            if (baseLit)
+            {
+                var vnm = cloneGO.GetComponent<VisualNoteMarker>(); if (vnm) vnm.Initialize(track.trackColor);
+                var ml  = cloneGO.GetComponent<MarkerLight>();      if (ml)  ml.LightUp(track.trackColor);
+            }
+            else
+            {
+                var ml = cloneGO.GetComponent<MarkerLight>() ?? cloneGO.AddComponent<MarkerLight>();
+                ml.SetGrey(new Color(1f,1f,1f,0.25f));
+            }
+        }
+
+        _cloneMarkers[key] = t;
+    }
+
+    // 3) Destroy any clones no longer required (note removed OR repeats decreased)
+    var toRemove = new List<(InstrumentTrack,int,int)>();
+    foreach (var kv in _cloneMarkers)
+    {
+        var (t, localStep, k) = kv.Key;
+        if (t != track) continue;
+
+        bool stillNeeded = required.Contains(kv.Key);
+        if (!stillNeeded)
+        {
+            var tr = kv.Value;
+            if (tr) Destroy(tr.gameObject);
+            toRemove.Add(kv.Key);
         }
     }
-    */
+    foreach (var k in toRemove) _cloneMarkers.Remove(k);
+}
+private void UpdateClonePositions()
+{
+    if (_drumTrack == null || GameFlowManager.Instance?.controller == null) return;
+
+    int drumSteps   = _drumTrack.totalSteps;
+    int maxMult     = GameFlowManager.Instance.controller.GetMaxLoopMultiplier();
+    int globalSteps = drumSteps * Mathf.Max(1, maxMult);
+
+    // Precompute per-track row & steps
+    foreach (var kv in _cloneMarkers)
+    {
+        var (track, localStep, k) = kv.Key;
+        Transform t = kv.Value;
+        if (!t) continue;
+
+        int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
+        if (trackIndex < 0 || trackIndex >= trackRows.Count) continue;
+        RectTransform row = trackRows[trackIndex];
+        Rect rowRect = row.rect;
+
+        int trackSteps = drumSteps * Mathf.Max(1, track.loopMultiplier);
+        int globalStep = (localStep + k * trackSteps) % Mathf.Max(1, globalSteps);
+
+        float u = globalSteps > 1 ? (globalStep / (float)globalSteps) : 0f;
+        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, u);
+        float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
+
+        t.localPosition = new Vector3(xLocal, yLocal, 0f);
+    }
 }
 
     public void Initialize()
@@ -202,7 +304,23 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMin = new Vector2(0f, row.offsetMin.y);
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
+        _drumTrack = GameFlowManager.Instance.activeDrumTrack;
+    }
+// NoteVisualizer.cs
+    public void MarkGhostPadding(InstrumentTrack track, int startStepInclusive, int count)
+    {
+        if (!_ghostNoteSteps.TryGetValue(track, out var set))
+            _ghostNoteSteps[track] = set = new HashSet<int>();
 
+        int total = Mathf.Max(1, GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps()));
+        for (int i = 0; i < count; i++)
+            set.Add((startStepInclusive + i) % total);
+    }
+
+    public void ClearGhostPadding(InstrumentTrack track)
+    {
+        if (_ghostNoteSteps.ContainsKey(track))
+            _ghostNoteSteps[track].Clear();
     }
 
     public float GetTopWorldY()
@@ -248,14 +366,116 @@ public class NoteVisualizer : MonoBehaviour
         int totalSteps = track.GetTotalSteps();
         float t = Mathf.Clamp01(stepIndex / (float)totalSteps);
 
-        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t);
         float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
+        int   longestSteps = GameFlowManager.Instance.controller.tracks.Max(tk => tk.GetTotalSteps());
+        float localFraction = totalSteps / (float)Mathf.Max(1, longestSteps);
+        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t * localFraction);
 
         Vector3 localPos = new Vector3(xLocal, yLocal, 0f);
         return row.TransformPoint(localPos);
     }
+// NoteVisualizer.cs – REPLACE your EnsureTiledClones with this
+public void EnsureTiledClones(InstrumentTrack track, int localStep, bool lit)
+{
+    int drumSteps   = _drumTrack.totalSteps;
+    int maxMult     = GameFlowManager.Instance.controller.GetMaxLoopMultiplier();
+    int myMult      = Mathf.Max(1, track.loopMultiplier);
+    int trackSteps  = drumSteps * myMult;
+    int globalSteps = drumSteps * maxMult;
+    int repeats     = Mathf.Max(1, globalSteps / trackSteps);
 
-    public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex)
+    // nothing to tile if we are the longest
+    if (repeats <= 1)
+    {
+        // clean up any past clones
+        if (_tiledClones.TryGetValue((track, localStep), out var old))
+        {
+            foreach (var t in old) if (t) Destroy(t.gameObject);
+            _tiledClones.Remove((track, localStep));
+        }
+        return;
+    }
+
+    if (!_tiledClones.TryGetValue((track, localStep), out var clones))
+        clones = _tiledClones[(track, localStep)] = new List<Transform>();
+
+    // we need (repeats - 1) clones for k = 1..repeats-1
+    int desired = repeats - 1;
+
+    // create or reuse
+    int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+    RectTransform row = trackRows[trackIndex];
+
+    // grow
+    for (int i = clones.Count; i < desired; i++)
+    {
+        var go = Instantiate(notePrefab, Vector3.zero, Quaternion.identity, row);
+        var t  = go.transform;
+
+        if (lit)
+        {
+            var vnm = go.GetComponent<VisualNoteMarker>(); if (vnm) vnm.Initialize(track.trackColor);
+            var ml  = go.GetComponent<MarkerLight>();      if (ml)  ml.LightUp(track.trackColor);
+        }
+        else
+        {
+            var ml = go.GetComponent<MarkerLight>() ?? go.AddComponent<MarkerLight>();
+            ml.SetGrey(new Color(1f,1f,1f,0.25f));
+        }
+        clones.Add(t);
+    }
+
+    // shrink
+    for (int i = clones.Count - 1; i >= desired; i--)
+    {
+        if (clones[i]) Destroy(clones[i].gameObject);
+        clones.RemoveAt(i);
+    }
+
+    // initial placement now; ongoing placement handled in UpdateTiledClonePositions()
+    UpdateTiledClonePositions(track);
+}
+// NoteVisualizer.cs – ADD this helper
+private void UpdateTiledClonePositions(InstrumentTrack track)
+{
+    int drumSteps   = _drumTrack.totalSteps;
+    int maxMult     = GameFlowManager.Instance.controller.GetMaxLoopMultiplier();
+    int myMult      = Mathf.Max(1, track.loopMultiplier);
+    int trackSteps  = drumSteps * myMult;
+    int globalSteps = drumSteps * maxMult;
+
+    int trackIndex = Array.IndexOf(GameFlowManager.Instance.controller.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+    RectTransform row = trackRows[trackIndex];
+    Rect rowRect = row.rect;
+
+    float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
+
+    // For each registered (track, localStep), position its clones at localStep + k*trackSteps
+    foreach (var kv in _tiledClones.ToArray())
+    {
+        if (kv.Key.Item1 != track) continue;
+
+        int localStep = kv.Key.Item2;
+        var clones    = kv.Value;
+
+        for (int i = 0; i < clones.Count; i++)
+        {
+            var t = clones[i]; if (!t) continue;
+            int k = i + 1; // clone index represents k=1..repeats-1
+            int globalStep = (localStep + k * trackSteps) % Mathf.Max(1, globalSteps);
+
+            // map globalStep (0..globalSteps-1) to full row width [xMin, xMax]
+            float u = globalSteps > 1 ? (globalStep / (float)globalSteps) : 0f;
+            float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, u);
+
+            t.localPosition = new Vector3(xLocal, yLocal, 0f);
+        }
+    }
+}
+
+    public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true)
     {
         var key = (track, stepIndex);
         // If we have a stale/null Transform, purge it so we can recreate.
@@ -283,20 +503,27 @@ public class NoteVisualizer : MonoBehaviour
 
         int totalSteps = track.GetTotalSteps();
         float t = Mathf.Clamp01(stepIndex / (float)totalSteps);
-        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t);
+        int   longestSteps = GameFlowManager.Instance.controller.tracks.Max(tk => tk.GetTotalSteps());
+        float localFraction = totalSteps / (float)Mathf.Max(1, longestSteps); 
+        float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, t * localFraction);
         float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
 
         // Parent under the row and place in local space
         GameObject marker = Instantiate(notePrefab, Vector3.zero, Quaternion.identity, row);
         marker.transform.localPosition = new Vector3(xLocal, yLocal, 0f);
-
         noteMarkers[key] = marker.transform;
+        if (lit)
+        {
+            var vnm = marker.GetComponent<VisualNoteMarker>();
+            if (vnm != null) vnm.Initialize(track.trackColor);
+            var light = marker.GetComponent<MarkerLight>();
+            if (light != null) light.LightUp(track.trackColor);
+        }
         return marker;
     }
 
     private void UpdateNoteMarkerPositions()
     {
-        int globalSteps = GameFlowManager.Instance.controller.tracks.Max(t => t.GetTotalSteps());
         var deadKeys = new List<(InstrumentTrack, int)>();
 
         foreach (var kvp in noteMarkers)
@@ -317,14 +544,12 @@ public class NoteVisualizer : MonoBehaviour
 
             // Convert the world point map back to the row's local space,
             // then assign localPosition so it never exceeds the row width.
-            int trackSteps = track.GetTotalSteps();
-            int globalStep = Mathf.FloorToInt((localStep / (float)trackSteps) * globalSteps);
 
-            if (map.TryGetValue(globalStep, out var worldPos))
+            if (map.TryGetValue(localStep, out var worldPos))
             {
-                Vector3 localPos = row.InverseTransformPoint(worldPos);
-                marker.localPosition = localPos;
+                marker.localPosition = row.InverseTransformPoint(worldPos);
             }
+            
         }
 
         foreach (var key in deadKeys)

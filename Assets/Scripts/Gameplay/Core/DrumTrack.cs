@@ -49,7 +49,7 @@ public class DrumTrack : MonoBehaviour
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
-
+    public int completedLoops { get; private set; } = 0;
     private float _loopLengthInSeconds, _phaseStartTime;
     private float _gridCheckTimer;
     private readonly float _gridCheckInterval = 10f;
@@ -554,6 +554,7 @@ private sealed class OnDestroyRelay : MonoBehaviour
             Vector2Int centerCell = WorldToGridPosition(transform.position);
             GameFlowManager.Instance.dustGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
         }
+        completedLoops++;
         OnLoopBoundary?.Invoke();
     }
     private IEnumerable<Vector2Int> HexNeighbors(Vector2Int c)

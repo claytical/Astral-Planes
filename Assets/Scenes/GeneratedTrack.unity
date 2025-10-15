@@ -8388,38 +8388,43 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
+      propertyPath: m_RoomHF
+      value: -454
+      objectReference: {fileID: 0}
+    - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_DecayTime
-      value: 8.39
+      value: 0.4
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbDelay
-      value: 0.03
+      value: 0.003
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbLevel
-      value: 985
+      value: 53
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_DecayHFRatio
-      value: 1.39
+      value: 0.83
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReverbPreset
-      value: 24
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 164058417202903070, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: m_ReflectionsLevel
-      value: -115
+      value: -1646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

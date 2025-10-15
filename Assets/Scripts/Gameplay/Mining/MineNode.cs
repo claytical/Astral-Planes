@@ -144,7 +144,7 @@ public class MineNode : MonoBehaviour
 
                         // Emit notes BEFORE we reveal/destroy anything
                         Debug.Log($"Bursting Collectables");
-                        spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet);
+                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8);
                     }
                     else
                     {

@@ -5,6 +5,8 @@ public class VisualNoteMarker : MonoBehaviour
 {
     private SpriteRenderer _spriteRenderer;
     private ParticleSystem _particleSystem;
+    public bool IsLit { get; set; }
+
     public void Initialize(Color color)
     {
         _spriteRenderer = GetComponentInChildren<SpriteRenderer>();

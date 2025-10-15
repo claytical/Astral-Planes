@@ -42,6 +42,16 @@ public class InstrumentTrack : MonoBehaviour
     private readonly HashSet<int> _ghostCollectedSteps = new HashSet<int>();
     [SerializeField] private LayerMask cosmicDustLayer;   // set this in the Inspector to your Dust layer
     [SerializeField] private float dustCheckRadius = 0.2f;
+    private bool _pendingExpandForBurst;
+    private bool _expandCommitted;    
+    private int  _oldTotalAtExpand;
+    private int  _halfOffsetAtExpand;
+    private HashSet<int> _expandSourceSteps;     // steps from the upcoming burst (old grid)
+    private bool _mapIncomingCollectionsToSecondHalf;
+    private bool _hookedBoundaryForExpand;
+    private int _pendingMapIntoSecondHalfCount = 0;   // how many pickups to offset
+    private float _pendingMapTimeout = 0f;            // safety timeout (seconds)
+
     void Start() {
         if (controller == null)
         {
@@ -60,16 +70,30 @@ public class InstrumentTrack : MonoBehaviour
     }
     void Update() {
         if (drumTrack == null) return;
-
+        if (_mapIncomingCollectionsToSecondHalf && _pendingMapTimeout > 0f)
+        {
+            _pendingMapTimeout -= Time.deltaTime;
+            if (_pendingMapTimeout <= 0f) {
+                _mapIncomingCollectionsToSecondHalf = false;
+                _pendingMapIntoSecondHalfCount = 0;
+            }
+        }
         float elapsedTime = (float)(AudioSettings.dspTime - drumTrack.startDspTime);
         float stepDuration = GetTrackLoopDurationInSeconds() / _totalSteps;
         int localStep = Mathf.FloorToInt(elapsedTime / stepDuration) % _totalSteps;
-
         if (localStep != _lastStep)
         {
-            PlayLoopedNotes(localStep);
-            _lastStep = localStep;
+            if (IsInAudibleWindow()) {
+                PlayLoopedNotes(localStep);
+                _lastStep = localStep;
+            }
         }
+        else
+        {
+            // Optional: still track step changes so there’s no “catch-up” pulse when window reopens
+            if (localStep != _lastStep) _lastStep = localStep;
+        }
+
         for (int i = spawnedCollectables.Count - 1; i >= 0; i--)
         {
             var obj = spawnedCollectables[i];
@@ -125,6 +149,7 @@ public class InstrumentTrack : MonoBehaviour
     }
     void PlayLoopedNotes(int localStep)
     {
+        if (!IsInAudibleWindow()) return;
         foreach (var (storedStep, note, duration, velocity) in persistentLoopNotes)
         {
             if (storedStep == localStep)
@@ -157,7 +182,7 @@ public class InstrumentTrack : MonoBehaviour
                 controller?.noteVisualizer?.TriggerNoteBlastOff(this);
                 break;
         }
-
+        controller.noteVisualizer.SyncTiledClonesForTrack(this);
         _spawnedNotes.Clear(); // Visuals are handled separately
         persistentLoopNotes.Clear();
     }
@@ -319,25 +344,20 @@ public class InstrumentTrack : MonoBehaviour
         }
 
         controller.UpdateVisualizer();
+        controller.noteVisualizer.SyncTiledClonesForTrack(this);
     }
     public int GetNoteDensity()
     {
         return persistentLoopNotes.Count;
     }
-    public void ExpandLoop()
+    private void ExpandLoop()
     {
-        if (loopMultiplier >= maxLoopMultiplier)
-        {
-            
-            return;
-            
-        }
-        
+        if (loopMultiplier >= maxLoopMultiplier) return;
 
         loopMultiplier *= 2;
         _totalSteps = drumTrack.totalSteps * loopMultiplier;
 
-        
+        controller?.UpdateVisualizer(); // <- add this
     }
     public void ContractLoop()
     {
@@ -462,16 +482,19 @@ public class InstrumentTrack : MonoBehaviour
                 c.Initialize(note, dur, this, noteSet, stepList);
 
                 c.intendedStep = step;
-
-                Transform marker = nv.EnsureMarker(this, step); // <- use EnsureMarker and make it robust (below)
-                if (marker != null)
-                {
-                    var ml = marker.GetComponent<MarkerLight>() ?? marker.gameObject.AddComponent<MarkerLight>();
-                    ml.SetGrey(new Color(1f,1f,1f,0.25f));
-                    c.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor, dur);
+                int markerStep = step;
+                // if this burst was staged to expand, place pings in the NEW half
+                if (_mapIncomingCollectionsToSecondHalf && _oldTotalAtExpand > 0 && _totalSteps == _oldTotalAtExpand * 2)
+                     markerStep = (_halfOffsetAtExpand + (step % _oldTotalAtExpand)) % _totalSteps;
+                
+                 // create a **grey** placeholder at the (possibly offset) markerStep
+                var markerGO = nv.PlacePersistentNoteMarker(this, markerStep, lit: false);
+                if (markerGO != null) { 
+                    var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.gameObject.AddComponent<MarkerLight>(); 
+                    ml.SetGrey(new Color(1f,1f,1f,0.25f)); 
+                    c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur);
                 }
-
-
+                
                 drumTrack.OccupySpawnGridCell(gp.x, gp.y, GridObjectType.Note);
                 spawnedCollectables.Add(go);
                 placed = true;
@@ -479,66 +502,208 @@ public class InstrumentTrack : MonoBehaviour
             }
             if (placed) break; // ✅ only break after successful placement
         }
-
-
-        // If couldn’t place at any column, keep going; no hard failure
     }
 }
-    public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force) {
+    // Call this instead of SpawnCollectableBurst when a new NoteSpawner activates.
+    public void SpawnCollectableBurstWithExpansionIfNeeded(NoteSet noteSet, int maxToSpawn = -1)
+    {
+        Debug.Log($"[ExpandStage] {name}: hasLoop={persistentLoopNotes.Count>0}, canExpand={loopMultiplier<maxLoopMultiplier}");
+
+        bool hasLoopAlready = persistentLoopNotes != null && persistentLoopNotes.Count > 0;
+        bool canExpand      = loopMultiplier < maxLoopMultiplier;
+        if (hasLoopAlready && canExpand && drumTrack != null)
+        {
+            // 1) stage expansion
+            _pendingExpandForBurst = true;
+            _oldTotalAtExpand      = _totalSteps;
+            _halfOffsetAtExpand    = _oldTotalAtExpand;
+            _expandSourceSteps     = new HashSet<int>(noteSet.GetStepList());
+            _pendingMapIntoSecondHalfCount = Mathf.Max(1, noteSet.GetStepList().Count);
+            _pendingMapTimeout = Mathf.Max(0.5f, drumTrack.GetLoopLengthInSeconds()); // 1 drum loop
+            _mapIncomingCollectionsToSecondHalf = true;
+            _expandCommitted = false;
+
+            HookExpandBoundary();
+            StartCoroutine(SpawnBurstAfterExpand(noteSet, maxToSpawn));
+        }
+        else
+        {
+            // No expansion needed — just spawn now
+            SpawnCollectableBurst(noteSet, maxToSpawn);
+        }
+    }
+    private IEnumerator SpawnBurstAfterExpand(NoteSet noteSet, int maxToSpawn)
+    {
+        // Wait until OnDrumDownbeat_CommitExpand actually runs
+        while (!_expandCommitted) yield return null;
+
+        // One extra frame so visual width/step maps have updated
+        yield return null;
+
+        SpawnCollectableBurst(noteSet, maxToSpawn);
+    }
+    private IEnumerator SpawnBurstOnNextBoundary(NoteSet noteSet, int maxToSpawn)
+    {
+        // Wait one loop boundary tick from DrumTrack
+        bool fired = false;
+        System.Action cb = () => fired = true;
+        drumTrack.OnLoopBoundary += cb;
+        // If we just crossed the boundary this frame, this will be next frame.
+        while (!fired) yield return null;
+        drumTrack.OnLoopBoundary -= cb;
+
+        // After commit (done in OnDrumDownbeat_CommitExpand) spawn the burst
+        SpawnCollectableBurst(noteSet, maxToSpawn);
+    }
+    private void HookExpandBoundary()
+    {
+        if (_hookedBoundaryForExpand || drumTrack == null) return;
+        drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitExpand;
+        _hookedBoundaryForExpand = true;
+    }
+
+    private void UnhookExpandBoundary()
+    {
+        if (!_hookedBoundaryForExpand || drumTrack == null) return;
+        drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitExpand;
+        _hookedBoundaryForExpand = false;
+    }
+
+    private void OnDrumDownbeat_CommitExpand()
+    {
+        if (!_pendingExpandForBurst) { UnhookExpandBoundary(); return; }
+
+        // Double the track length
+        _oldTotalAtExpand   = _totalSteps;
+        loopMultiplier     *= 2;
+        _totalSteps         = drumTrack.totalSteps * loopMultiplier;
+
+        // Visuals: widen now and show padding (new half)
+        controller?.UpdateVisualizer();
+        controller?.noteVisualizer?.MarkGhostPadding(this, _oldTotalAtExpand, _totalSteps - _oldTotalAtExpand);
+
+        // Arm mapping so the entire upcoming burst lands in the new half
+        _halfOffsetAtExpand                 = _oldTotalAtExpand;
+        _mapIncomingCollectionsToSecondHalf = true;
+        _pendingExpandForBurst              = false;
+        _expandCommitted = true;
+
+        UnhookExpandBoundary();
+    }
+
+    public void MergeNotesIntoLoop(IEnumerable<(int step,int note,int duration,float vel)> notes)
+    {
+        foreach (var (step, note, duration, vel) in notes)
+        {
+            // 1) remove any existing note at this step (your track is monophonic per step)
+            RemoveNoteAtStep(step);
+
+            // 2) add to model
+            AddNoteToLoop(step, note, duration, vel);
+
+            // 3) refresh or create the visual marker at this step
+            UpsertMarker(step);
+        }
+    }
+
+    private void RemoveNoteAtStep(int step)
+    {
+        int idx = persistentLoopNotes.FindIndex(t => t.stepIndex == step);
+        if (idx >= 0)
+        {
+            var key = (this, step);
+            if (controller.noteVisualizer.noteMarkers.TryGetValue(key, out var tr) && tr != null)
+                Destroy(tr.gameObject);
+            controller.noteVisualizer.noteMarkers.Remove(key);
+            persistentLoopNotes.RemoveAt(idx);
+        }
+    }
+
+    private void UpsertMarker(int step)
+    {
+        var marker = controller.noteVisualizer.PlacePersistentNoteMarker(this, step, lit: true); 
+        if (marker != null) _spawnedNotes.Add(marker);
+    }
+
+    public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force)
+{
     if (collectable == null || collectable.assignedInstrumentTrack != this) return;
 
-    // Free the vacated grid cell (safe-guarded)
-    if (drumTrack != null)
-    {
+    // 1) Free the vacated grid cell (defensive)
+    if (drumTrack != null) {
         Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
         drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
         drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
     }
 
-    // Prefer the step chosen at spawn so visuals/audio align with the existing tether
-    int targetStep = (collectable.intendedStep >= 0) ? collectable.intendedStep : GetCurrentStep();
+    // 2) Determine base step and whether we're in a mapped (expanded) burst
+    int baseStep = (collectable.intendedStep >= 0) ? collectable.intendedStep : GetCurrentStep();
+    bool expandedBurstActive =
+        _expandCommitted && // <— now use the committed flag
+        _oldTotalAtExpand > 0 &&
+        _totalSteps == _oldTotalAtExpand * 2;
+    
+    // 3) Compute the final target step (second half if mapping is armed)
+    int targetStep = expandedBurstActive
+        ? (_halfOffsetAtExpand + (baseStep % _oldTotalAtExpand)) % _totalSteps
+        : baseStep;
 
-    // Ensure ribbon marker exists and starts gray; attach tether if it wasn't attached at spawn
-    var nv = controller?.noteVisualizer;
-    if (nv != null)
-    {
-        Transform marker = null;
-        var markerGO = nv.PlacePersistentNoteMarker(this, targetStep); // creates if missing; returns null if already exists
-        if (markerGO != null) marker = markerGO.transform;
-        else nv.noteMarkers.TryGetValue((this, targetStep), out marker);
-
-        if (marker != null)
-        {
-            var ml = marker.GetComponent<MarkerLight>() ?? marker.gameObject.AddComponent<MarkerLight>();
-            ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-
-            // Fallback: if somehow no tether yet, attach now (nv.noteTetherPrefab should be a GameObject)
-            if (collectable.tether == null && nv.noteTetherPrefab != null)
-                collectable.AttachTetherAtSpawn(marker, nv.noteTetherPrefab, trackColor, durationTicks);
-        }
-    }
-
+    // 4) Model: add the note to the loop
     int note = collectable.GetNote();
     if (collectable.IsDark) {
-        // Still lands in the loop but uses a darker articulation
         AddNoteToLoop(targetStep, note, durationTicks, force);
         PlayDarkNote(note, durationTicks, force);
-        RecalculatePerfectionForCurrentNoteSet(); }
-    else { 
-        // Normal bright collection
-        CollectNote(targetStep, note, durationTicks, force);
+        RecalculatePerfectionForCurrentNoteSet();
+    } else {
+        CollectNote(targetStep, note, durationTicks, force); // your normal bright path (adds to loop, etc.)
     }
+
+    // 5) Visuals: LIGHT the existing ping (do NOT create grey, do NOT attach tether here)
+    LightMarkerAt(targetStep);
+    controller.noteVisualizer.SyncTiledClonesForTrack(this);
+    controller.noteVisualizer.EnsureTiledClones(this, baseStep, true);
+    // 6) Mapping book-keeping: decrement counter or time-out; prefer ONE mechanism
+    if (expandedBurstActive && _pendingMapIntoSecondHalfCount > 0) {
+        _pendingMapIntoSecondHalfCount--;
+        if (_pendingMapIntoSecondHalfCount == 0)
+            _mapIncomingCollectionsToSecondHalf = false;
+    }
+
+
+    // 7) Animate the pickup to the ribbon and finalize
     collectable.TravelAlongTetherAndFinalize(durationTicks, force, seconds: 1f);
 
-    // List hygiene (avoid double-remove)
-    if (spawnedCollectables != null)
-        spawnedCollectables.Remove(collectable.gameObject);
+    // 8) List hygiene
+    spawnedCollectables?.Remove(collectable.gameObject);
 }
     public void SetMuted(bool muted)
     {
         // Route to your synth/MIDI/FMOD layer
         // e.g., midiOut.SetTrackGain(trackIndex, muted ? -80f : 0f);
     }
+    private void LightMarkerAt(int step)
+    {
+        var nv = controller?.noteVisualizer;
+        if (nv == null) return;
+
+        // Prefer existing ping at (track, step)
+        if (!nv.noteMarkers.TryGetValue((this, step), out var t) || t == null)
+        {
+            // Fallback: place a lit marker under the correct row (rare if spawn path failed)
+            var go = nv.PlacePersistentNoteMarker(this, step, lit: true);
+            
+            if (go == null) return;
+            t = go.transform;
+        }
+
+        // Ensure it is colored and emitting now
+        var vnm = t.GetComponent<VisualNoteMarker>();
+        if (vnm != null) vnm.Initialize(trackColor);
+
+        var light = t.GetComponent<MarkerLight>();
+        if (light != null) light.LightUp(trackColor);
+    }
+
     public void ResetPerfectionFlagForPhase()
     {
         // Whatever you use to mark "this track was made perfect" for the star logic:
@@ -684,11 +849,11 @@ public class InstrumentTrack : MonoBehaviour
         }
 
         controller.UpdateVisualizer();
+        controller.noteVisualizer.SyncTiledClonesForTrack(this);
     }
     public void MarkPerfectThisPhase() => IsPerfectThisPhase = true;
     public bool IsPerfectThisPhase { get; private set; }
     public void ResetPerfectionFlag() => IsPerfectThisPhase = false;
-// InstrumentTrack.cs
     private void RecalculatePerfectionForCurrentNoteSet()
     {
         var noteSet = _currentNoteSet;
@@ -716,6 +881,7 @@ public class InstrumentTrack : MonoBehaviour
     private IEnumerator WaitForDrumTrackStartTime() {
         while (drumTrack == null || drumTrack.GetLoopLengthInSeconds() <= 0 || drumTrack.startDspTime == 0)
             yield return null;
+        _totalSteps = drumTrack.totalSteps * loopMultiplier;
 
     }
     private float GetTrackLoopDurationInSeconds()
@@ -732,42 +898,48 @@ public class InstrumentTrack : MonoBehaviour
         // You can track this via a bool, tag, or count of modified notes
         return false; // stub for now
     }
-    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modifiedNotes, Vector3 sourcePosition)
-{
-    persistentLoopNotes.Clear();
+    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modifiedNotes, Vector3 sourcePosition) {
+        persistentLoopNotes.Clear();
 
-    foreach (var obj in _spawnedNotes)
-    {
-        if (obj != null)
-            Destroy(obj);
-    }
-    _spawnedNotes.Clear();
-
-    foreach (var (step, note, duration, velocity) in modifiedNotes)
-    {
-        AddNoteToLoop(step, note, duration, velocity);
-        // compute the ribbon position yourself
-        Vector3 worldPos = controller.noteVisualizer.ComputeRibbonWorldPosition(this, step);
-//        var marker = controller.noteVisualizer.PlacePersistentNoteMarker(this, step);
-
+        foreach (var obj in _spawnedNotes) {
+            if (obj != null)
+                Destroy(obj);
+        }
+        _spawnedNotes.Clear();
+        foreach (var (step, note, duration, velocity) in modifiedNotes) {
+            AddNoteToLoop(step, note, duration, velocity);
+            // compute the ribbon position yourself
+            Vector3 worldPos = controller.noteVisualizer.ComputeRibbonWorldPosition(this, step);
+        
         var marker = Instantiate(controller.noteVisualizer.notePrefab, worldPos,
             Quaternion.identity, controller.noteVisualizer.transform);
         VisualNoteMarker noteMarker = marker.GetComponent<VisualNoteMarker>();
-        if (noteMarker != null)
-        {
+        if (noteMarker != null) {
             noteMarker.Initialize(trackColor);
             Debug.Log($"Adding note {note} with color {trackColor}");
         }
         else
         {
             Debug.Log($"{marker.gameObject} is missing the note marker");
-
         }
-        _spawnedNotes.Add(marker);
-        var key = (this, step);
-        controller.noteVisualizer.noteMarkers[key] = marker.transform;
+        _spawnedNotes.Add(marker); var key = (this, step);
+        controller.noteVisualizer.noteMarkers[key] = marker.transform; 
+        }
     }
-}
+    public void ResetTrackToDefaultLoop()
+    {
+        // Reset length to drum grid
+        loopMultiplier = 1;
+        _totalSteps    = drumTrack != null ? drumTrack.totalSteps : _totalSteps;
+
+        // Wipe notes & markers
+        ClearLoopedNotes(TrackClearType.Remix);
+        controller?.noteVisualizer?.ClearGhostPadding(this);
+
+        // Refresh visuals
+        controller?.UpdateVisualizer();
+    }
+    
     private int Closest(List<int> pool, int target)
 {
     int best = pool[0];
@@ -859,4 +1031,17 @@ public class InstrumentTrack : MonoBehaviour
 
         return step;
     }
+    
+    private bool IsInAudibleWindow()
+    {
+        if (drumTrack == null || controller == null) return true;
+
+        int maxMult = Mathf.Max(1, controller.GetMaxLoopMultiplier());
+        int myMult  = Mathf.Max(1, loopMultiplier);
+        int ratio   = Mathf.Max(1, maxMult / myMult); // power-of-two phases => OK
+
+        return (drumTrack.completedLoops % ratio) == 0;
+    }
+
+
 }
