@@ -24,13 +24,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1207128984433118}
+  serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4178816625693396}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &114711833869552618
 MonoBehaviour:
@@ -47,6 +47,7 @@ MonoBehaviour:
   PathToResources: 
   LoadSoundFontAtStartup: 1
   LoadWaveAtStartup: 0
+  verboseGlobal: 0
   InstanceOnEventPresetLoaded:
     m_PersistentCalls:
       m_Calls: []
@@ -78,6 +79,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1735678026735066}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
@@ -85,7 +87,6 @@ Transform:
   m_Children:
   - {fileID: 4157581141049346}
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &114404562875146932
 MonoBehaviour:
@@ -99,7 +100,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d7e384d88ea58b46a2aa808c578e957, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  waitThreadMidi: 10
+  audioThreadMidi: 0
+  priorityThreadMidi: 0
   DevicePerformance: 40
   MaxDspLoad: 40
   AudioBufferLenght: 0
@@ -120,11 +122,12 @@ MonoBehaviour:
   MPTK_ApplyRealTimeModulator: 1
   MPTK_ApplyModLfo: 1
   MPTK_ApplyVibLfo: 1
+  MPTK_EffectSoundFont: {fileID: 0}
+  MPTK_ThreadMidiWait: 10
   StatDspLoadPCT: 0
   StatDspLoadMIN: 3.4028235e+38
   StatDspLoadMAX: 0
   StatDspLoadAVG: 0
-  StatDspBufferSize: 0
   StatDspChannelCount: 0
   GcCollectionCout: 0
   AllocatedBytesForCurrentThread: 0
@@ -137,7 +140,7 @@ MonoBehaviour:
   StatEnqueueMidiMS: 0
   StatProcessMidiMS: 0
   StatProcessMidiMAX: 0
-  StatDeltaAudioFilterReadMS: 0
+  DeltaTimeAudioCall: 0
   StatAudioFilterReadMS: 0
   StatAudioFilterReadMAX: 0
   StatAudioFilterReadMIN: 0
@@ -147,7 +150,7 @@ MonoBehaviour:
   StatProcessListMS: 0
   StatProcessListAVG: 0
   keepPlayingNonLooped: 0
-  MPTK_CorePlayer: 1
+  mPTK_CorePlayer: 1
   MPTK_AudioSettingFromUnity: 0
   MPTK_EnableFreeSynthRate: 0
   indexSynthRate: -1
@@ -173,10 +176,11 @@ MonoBehaviour:
   InterpolationMethod: 1
   gain: 1
   VerboseSynth: 0
+  VerboseSoundfont: 0
+  VerboseSample: 0
   VerboseOverload: 0
   VerboseVoice: 0
   VerboseChannel: 0
-  VerboseKillByExclusive: 0
   VerboseGenerator: 0
   VerboseCalcGen: 0
   VerboseCalcMod: 0
@@ -184,10 +188,11 @@ MonoBehaviour:
   VerboseCalcModADSR: 0
   VerboseController: 0
   VerboseEnvVolume: 0
+  VerboseSpecialNoteOff: 0
   VerboseEnvModulation: 0
   VerboseFilter: 0
   VerboseVolume: 0
-  state: 0
+  VerboseSpatialSynth: 0
   AudiosourceTemplate: {fileID: 0}
   AdsrSimplified: 0
   MPTK_WeakDevice: 0
@@ -201,19 +206,20 @@ MonoBehaviour:
       m_Calls: []
   showMidiInfo: 0
   showSynthParameter: 0
-  showSpatialization: 1
-  showUnitySynthParameter: 0
+  showSpatialization: 0
+  showUnitySynthParameter: 1
   showUnityPerformanceParameter: 1
+  showExperimentalFeature: 0
+  showMidiPerformanceParameter: 0
   showSoundFontEffect: 0
+  showVerbose: 0
   showUnitySynthEffect: 0
   showMidiParameter: 0
+  showMidiPlaying: 0
   showSynthEvents: 0
   showEvents: 0
   showDefault: 0
   spatialize: 0
-  histoDspSize: 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-  histoCurrent: 0
-  MPTK_EffectSoundFont: {fileID: 0}
   MPTK_EffectUnity: {fileID: 0}
   MPTK_ModeSpatializer: 0
   MPTK_MaxSpatialSynth: 16
@@ -221,6 +227,7 @@ MonoBehaviour:
   MPTK_InstrumentNum: 0
   midiNameToPlay: Higelin Jacques - Champagne
   MPTK_StartPlayAtFirstNote: 0
+  MPTK_StopPlayOnLastNote: 0
   MPTK_ModeStopVoice: 1
   midiIndexToPlay: 42
   speed: 1
@@ -228,6 +235,7 @@ MonoBehaviour:
   playTimeEditorModeOnly: 
   MPTK_LogLoadEvents: 0
   MPTK_StatusLastMidiLoaded: 0
+  MPTK_WebRequestError: 
   OnEventNotesMidi:
     m_PersistentCalls:
       m_Calls: []
@@ -247,6 +255,7 @@ MonoBehaviour:
   keepEndTrack: 0
   needDelayToStart: 0
   needDelayToStop: 0
+  rawSeek: 0
   nextMidi: 1
   prevMidi: 0
   MPTK_PauseOnFocusLoss: 0

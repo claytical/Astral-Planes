@@ -118,7 +118,7 @@ namespace MidiPlayerTK
                     logSynthInfo.Append($"\n<b>Voice Stats</b>   Played:{synth.MPTK_StatVoicePlayed,-4}   Active:{synth.MPTK_StatVoiceCountActive,-3}");
 
                     logSynthInfo.Append($"  Reused:{synth.MPTK_StatVoiceCountReused,-3}  Ratio:{Mathf.RoundToInt(synth.MPTK_StatVoiceRatioReused),-2}%");
-                    logSynthInfo.Append($"   In Cache:{synth.MPTK_StatVoiceCountFree,-3}");
+                    logSynthInfo.Append($"   In Cache:{synth.MPTK_StatVoiceCountFree,-3} Free:{synth.FreeVoices?.Count,-3}"); 
 
 #if DEBUG_STATUS_STAT
                     /* FLUID_VOICE_CLEAN FLUID_VOICE_ON FLUID_VOICE_SUSTAINED FLUID_VOICE_OFF*/

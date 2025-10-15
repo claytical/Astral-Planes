@@ -14,33 +14,61 @@ public enum MusicalPhase
 public static class MusicalPhaseLibrary
 {
     private static Dictionary<MusicalPhase, MusicalPhaseProfile> _profiles;
-    private static Dictionary<MusicalPhase, MusicalPhaseProfile> profileLookup;
-
+ 
+// Call this once during boot (e.g., GFM.Start or PTM.Awake)
     public static void InitializeProfiles(List<MusicalPhaseProfile> profiles)
     {
-        profileLookup = profiles.ToDictionary(p => p.phase, p => p);
+        if (profiles == null)
+        {
+            _profiles = new Dictionary<MusicalPhase, MusicalPhaseProfile>();
+            return;
+        }
+
+        // Filter nulls and dedupe by phase (last one wins if duplicates)
+        _profiles = profiles
+            .Where(p => p != null)
+            .GroupBy(p => p.phase)
+            .ToDictionary(g => g.Key, g => g.Last());
     }
+
+// Lazy fallback (only if InitializeProfiles never ran)
+    private static void LoadFromResourcesIfEmpty()
+    {
+        if (_profiles != null && _profiles.Count > 0) return;
+
+        var loaded = Resources.LoadAll<MusicalPhaseProfile>("MusicalPhaseProfiles");
+        _profiles = loaded?
+                        .Where(p => p != null)
+                        .GroupBy(p => p.phase)
+                        .ToDictionary(g => g.Key, g => g.Last())
+                    ?? new Dictionary<MusicalPhase, MusicalPhaseProfile>();
+    }
+
+// Central getter used by all public APIs
+    private static MusicalPhaseProfile Get(MusicalPhase phase)
+    {
+        LoadFromResourcesIfEmpty();
+        return (_profiles != null && _profiles.TryGetValue(phase, out var prof)) ? prof : null;
+    }
+
+// Example public API stays the same, but now works with injected profiles:
+    public static AudioClip GetRandomClip(MusicalPhase phase)
+    {
+        var prof = Get(phase);
+        var list = prof?.drumClips;
+        if (list == null || list.Length == 0) return null;
+        return list[UnityEngine.Random.Range(0, list.Length)];
+    }
+
     public static PatternStrategy GetPatternStrategyForRole(MusicalPhase phase, MusicalRole role)
     {
         var profile = Get(phase);
         return profile != null ? profile.GetPatternStrategyForRole(role) : PatternStrategy.Arpeggiated;
     }
-    public static AudioClip GetRandomClip(MusicalPhase phase)
-    {
-        var profile = Get(phase);
-        if (profile == null || profile.drumClips == null || profile.drumClips.Length == 0) return null;
-        return profile.drumClips[Random.Range(0, profile.drumClips.Length)];
-    }
-
+    
     private static void Load()
     {
         _profiles = Resources.LoadAll<MusicalPhaseProfile>("MusicalPhases")
             .ToDictionary(p => p.phase, p => p);
     }
-    private static MusicalPhaseProfile Get(MusicalPhase phase)
-    {
-        if (_profiles == null) Load();
-        return _profiles.TryGetValue(phase, out var profile) ? profile : null;
-    }
-
 }

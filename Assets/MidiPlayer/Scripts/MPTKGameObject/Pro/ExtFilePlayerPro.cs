@@ -308,7 +308,7 @@ namespace MidiPlayerTK
                     if (MPTK_CorePlayer)
                         Routine.RunCoroutine(ThreadCorePlay(data).CancelWith(gameObject), Segment.RealtimeUpdate);
                     else
-                        Routine.RunCoroutine(ThreadLegacyPlay(data).CancelWith(gameObject), Segment.RealtimeUpdate);
+                        Routine.RunCoroutine(ThreadLegacyPlay(data, "").CancelWith(gameObject), Segment.RealtimeUpdate);
                 }
                 else
                 {
@@ -390,7 +390,7 @@ namespace MidiPlayerTK
                     MPTK_InitSynth(mfw2.ChannelCount); // 2.12.2
                     MPTK_StartSequencerMidi();
                     midiNameToPlay = string.IsNullOrEmpty(mfw2.MidiName) ? "(no name)" : mfw2.MidiName;
-                    // Start playing
+
                     if (Application.isPlaying)
                         Routine.RunCoroutine(ThreadMFWPlay(mfw2, fromPosition, toPosition, fromTick, toTick, timePosition).CancelWith(gameObject).CancelWith(gameObject), Segment.RealtimeUpdate);
                     else
@@ -498,16 +498,22 @@ namespace MidiPlayerTK
                     midiLoaded.MPTK_TickStart = fromTick;
                     midiLoaded.MPTK_TickEnd = toTick;
                 }
-                if (Application.isPlaying)
-                    Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition).CancelWith(gameObject), Segment.RealtimeUpdate);
+                if (MPTK_CorePlayer)
+                {
+                    if (Application.isPlaying)
+                        Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition).CancelWith(gameObject), Segment.RealtimeUpdate);
+                    else
+                        Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition), Segment.EditorUpdate);
+                }
                 else
-                    Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition), Segment.EditorUpdate);
+                {
+                    Debug.Log($"ThreadMFWPlay ThreadLegacyPlay");
+                    Routine.RunCoroutine(ThreadLegacyPlay(midiBytesToPlay: null, currentMidiName, fromPosition, toPosition, alreadyLoaded:true).CancelWith(gameObject), Segment.RealtimeUpdate);
+                }
             }
             yield return 0;
         }
         //! @endcond
-
-
     }
 }
 

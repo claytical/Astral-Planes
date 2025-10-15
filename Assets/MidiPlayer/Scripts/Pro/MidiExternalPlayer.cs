@@ -143,18 +143,20 @@ namespace MidiPlayerTK
                     MPTK_StartSequencerMidi();
                     StartCoroutine(ThreadLoadDataAndPlay());
                 }
-                else
-                {
-                    try
-                    {
-                        OnEventEndPlayMidi.Invoke(pathmidiNameToPlay, EventEndMidiEnum.MidiErr);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError("OnEventEndPlayMidi: exception detected. Check the callback code");
-                        Debug.LogException(ex);
-                    }
-                }
+
+                // removed with V2.16.0 - useful?
+                //else
+                //{
+                //    try
+                //    {
+                //        OnEventEndPlayMidi.Invoke(pathmidiNameToPlay, EventEndMidiEnum.MidiErr);
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        Debug.LogError("OnEventEndPlayMidi: exception detected. Check the callback code");
+                //        Debug.LogException(ex);
+                //    }
+                //}
             }
             catch (System.Exception ex)
             {
@@ -172,22 +174,17 @@ namespace MidiPlayerTK
             base.MPTK_MidiName = pathmidiNameToPlay;
             MPTK_WebRequestError = "";
             using (UnityWebRequest webRequest = UnityWebRequest.Get(pathmidiNameToPlay))
-            //using (UnityEngine.Networking.UnityWebRequest webRequest = UnityEngine.Networking.UnityWebRequest.Get(pathmidiNameToPlay))
             {
                 yield return webRequest.SendWebRequest();
-
-                //yield return Routine.WaitUntilDone(req.SendWebRequest());
                 byte[] data = null;
                 //Debug.Log($"result:{req.result} {pathmidiNameToPlay}");
                 MPTK_WebRequestError = webRequest.error;
-                if (webRequest.result != UnityEngine.Networking.UnityWebRequest.Result.ConnectionError)
-                {
-                    //Dictionary<string,string> headers=  req.GetResponseHeaders();
-                    //foreach (string key in headers.Keys) Debug.Log($"'{key}'   '{headers[key]}'");
 
+                if (webRequest.result != UnityWebRequest.Result.ConnectionError)
+                {
                     data = webRequest.downloadHandler.data;
-                    if (data == null || webRequest.result == UnityEngine.Networking.UnityWebRequest.Result.ConnectionError ||
-                        webRequest.result == UnityEngine.Networking.UnityWebRequest.Result.DataProcessingError || webRequest.result == UnityEngine.Networking.UnityWebRequest.Result.ProtocolError)
+                    if (data == null || webRequest.result == UnityWebRequest.Result.ConnectionError ||
+                        webRequest.result == UnityWebRequest.Result.DataProcessingError || webRequest.result == UnityWebRequest.Result.ProtocolError)
                     {
                         MPTK_StatusLastMidiLoaded = LoadingStatusMidiEnum.NotFound;
                         Debug.LogWarning($"Error Loading Midi: '{pathmidiNameToPlay}'");
@@ -221,6 +218,7 @@ namespace MidiPlayerTK
 
                 if (MPTK_StatusLastMidiLoaded == LoadingStatusMidiEnum.NotYetDefined)
                 {
+                    //Debug.Log($"ThreadLoadDataAndPlay1 {AudiosourceTemplate}");
                     // Start playing
                     if (MPTK_CorePlayer)
                         Routine.RunCoroutine(ThreadCorePlay(data).CancelWith(gameObject), Segment.RealtimeUpdate);
@@ -241,8 +239,6 @@ namespace MidiPlayerTK
                 }
             }
         }
-
-
 
         //        /// <summary>@brief
         //        /// Drive the MidiPlayer system thread from the Unity thread

@@ -103,12 +103,18 @@ namespace MidiPlayerTK
                     EditorGUILayout.EndHorizontal();
                 }
                 instance.LoadSoundFontAtStartup = EditorGUILayout.Toggle(
-                    new GUIContent("Load SoundFont at startup", "If enabled load the default SoundFont is loaded when application is started."),
+                    new GUIContent("Load SoundFont at startup (recommended)", "If enabled load the default SoundFont is loaded when application is started."),
                     instance.LoadSoundFontAtStartup);
 
-                instance.LoadWaveAtStartup = EditorGUILayout.Toggle(
-                    new GUIContent("Load Samples at startup (no core mode)", "Load all samples for non core mode when application is started else load when needed at playing."),
-                    instance.LoadWaveAtStartup);
+                // deprecated v2.16
+                //instance.LoadWaveAtStartup = EditorGUILayout.Toggle(
+                //    new GUIContent("Load samples at startup (no core mode)", "Load all samples for non core mode when application is started else load when needed at playing."),
+                //    instance.LoadWaveAtStartup);
+
+                // new v2.16
+                instance.verboseGlobal= EditorGUILayout.Toggle(
+                new GUIContent("Verbose Global"),
+                    instance.verboseGlobal);
 
                 string helpuri = "Define an url (prefix with http:// or https:/) or a full path to a local file (prefix with file://).";
                 EditorGUILayout.LabelField(new GUIContent("SoundFont URL or file path:", helpuri));

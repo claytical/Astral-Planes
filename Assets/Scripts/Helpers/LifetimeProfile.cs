@@ -4,8 +4,7 @@ using System.Collections.Generic;
 public enum MinedObjectType
 {
     NoteSpawner,
-    TrackUtility,
-    Note
+    TrackUtility
 }      
 [System.Serializable]
 public class LifetimeProfile

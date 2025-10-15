@@ -15,3 +15,17 @@ MonoBehaviour:
   shipName: Scuttle
   allowedMidiPresets: 0c000000
   description: Chaotic fun. Drops scattershot rhythms and sharp accents.
+  arcadeMaxSpeed: 12
+  arcadeAccel: 0
+  arcadeBoostAccel: 80
+  arcadeLinearDamping: 0.35
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 1
+  coastBrakeForce: 2.2
+  stopSpeed: 0.03
+  stopAngularSpeed: 5
+  inputDeadzone: 0.2
+  envScaleFloor: 0.6
+  mass: 1.1
+  capacity: 100
+  burnEfficiency: 0.95

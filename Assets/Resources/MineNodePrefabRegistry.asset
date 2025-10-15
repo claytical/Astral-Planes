@@ -15,7 +15,4 @@ MonoBehaviour:
   entries:
   - type: 0
     modifier: 0
-    prefab: {fileID: 1781116594832268, guid: c5defb6f172b24e218211ce471428107, type: 3}
-  - type: 1
-    modifier: 5
     prefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8, type: 3}

@@ -96,7 +96,7 @@ namespace MidiPlayerTK
                     new MPTKGui.StyleItem() { Width = 70, Caption = "Time (s)", Hidden = true, Tooltip = "Real time in seconds of this event from the start of the midi depending the tempo change." },
                     new MPTKGui.StyleItem() { Width = 120, Caption = "Time", Hidden = true, Tooltip = "Real time in seconds of this event from the start of the midi depending the tempo change." },
                     new MPTKGui.StyleItem() { Width = 70, Caption = "Track{*}", Offset = 25, ItemPopupContent = PopupFiltersTrack, ItemPopupWidth = 100, Tooltip = "Track index of the event in the midi. It's just a cool way to regroup MIDI events in a ... track. There is any impact on music played. Track 0 is the first track read from the midi file." },
-                    new MPTKGui.StyleItem() { Width = 70, Caption = "Channel{*}", Offset = 25, ItemPopupContent = PopupFiltersChannel, ItemPopupWidth = 100, Tooltip = "MIDI channel fom 0 to 15 (9 for drum). Only one instrument can be selected at a time for a chanel." },
+                    new MPTKGui.StyleItem() { Width = 70, Caption = "Channel{*}", Offset = 25, ItemPopupContent = PopupFiltersChannel, ItemPopupWidth = 100, Tooltip = "MIDI channel fom 0 to 15 (9 for drum). Only one instrument can be selected at a time for a channel." },
                     new MPTKGui.StyleItem() { Width = 200, Caption = "Command {Count}", Offset = 10, ItemPopupContent = PopupFiltersCommand, Tooltip = "MIDI Command. Defined the MIDI action to be done by the synthesizer." },
                     new MPTKGui.StyleItem() { Width = 180, Caption = "Value", Tooltip = "Contains a value in relation with the Command: Note pitch, instrument selected, control change value, text for Meta command. " },
                     new MPTKGui.StyleItem() { Width = 70, Caption = "Velocity", Tooltip = "Velocity between 0 and 127." },
@@ -236,8 +236,15 @@ namespace MidiPlayerTK
                 GUIStyle styleButtonPlayAndPause = midiPlayerLib.MidiPlayer.MPTK_IsPlaying && !midiPlayerLib.MidiPlayer.MPTK_IsPaused ? MPTKGui.ButtonHighLight : MPTKGui.Button;
                 if (GUILayout.Button("Play", styleButtonPlayAndPause, GUILayout.Width(WIDTH_BUTTON_PLAYER)))
                 {
-                    LoadMidiFileSelected(IndexEditItem, true);
-                    PlayMidiFileSelected();
+                    if (!midiPlayerLib.MidiPlayer.MPTK_CorePlayer)
+                    {
+                        EditorUtility.DisplayDialog("MIDI Player ", "Can't play MIDI in non core mode. WebGL build enabled?", "Ok");
+                    }
+                    else
+                    {
+                        LoadMidiFileSelected(IndexEditItem, true);
+                        PlayMidiFileSelected();
+                    }
                 }
 
                 styleButtonPlayAndPause = midiPlayerLib.MidiPlayer.MPTK_IsPaused ? MPTKGui.ButtonHighLight : MPTKGui.Button;

@@ -50,10 +50,10 @@ namespace MidiPlayerTK
     ///         Undo/Redo.
     ///         Add velocity edition with Piano roll UI.
     ///         Add control change edition with Piano roll UI.
-    ///         Playing and edtiting in run mode, feasability?
+    ///         Playing and editing in run mode, feasibility ?
     ///         Redesign color and texture like MIDI event, keyboard ... 
     ///         Specific MIDI events for integration with Unity.
-    ///         Multi events selection, feasability?
+    ///         Multi events selection, feasibility ?
     ///         Helper for building chords.
     ///         Helper for scale.
     ///         Helper for chords progression?

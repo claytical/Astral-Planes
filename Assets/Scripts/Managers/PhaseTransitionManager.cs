@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class PhaseTransitionManager : MonoBehaviour
 {
-    public InstrumentTrackController trackController;
     public MusicalPhase previousPhase;
     public MusicalPhase currentPhase;
     private PhaseStarBehaviorProfile _activeBehaviorProfile;
@@ -30,11 +29,6 @@ public class PhaseTransitionManager : MonoBehaviour
         OnPhaseChanged?.Invoke(previousPhase, currentPhase);
     }
 
-    /// Backward-compatible shim
-    public void HandlePhaseTransition(MusicalPhase nextPhase)
-    {
-        HandlePhaseTransition(nextPhase, "UnknownCaller");
-    }
 
     private void HandlePhaseStarSpawned(MusicalPhase phase, PhaseStarBehaviorProfile profile) {
         // Only update if we're actually changing phases

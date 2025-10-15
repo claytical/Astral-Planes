@@ -184,11 +184,11 @@ namespace MidiPlayerTK
 
                         //EditorGUILayout.LabelField(playing.MidiName, GUILayout.Width(250));
                         EditorGUILayout.LabelField(
-                            FormatingDuration(playing.StartFrom, playing.TickLengthMs),
+                            FormattingDuration(playing.StartFrom, playing.TickLengthMs),
                             myStyle.ItemNotSelected, GUILayout.Width(100), GUILayout.Height(hCell));
 
                         EditorGUILayout.LabelField(
-                            FormatingDuration(playing.EndFrom, playing.TickLengthMs),
+                            FormattingDuration(playing.EndFrom, playing.TickLengthMs),
                             myStyle.ItemNotSelected, GUILayout.Width(100), GUILayout.Height(hCell));
 
                         EditorGUILayout.EndHorizontal();
@@ -215,7 +215,7 @@ namespace MidiPlayerTK
                     EditorGUILayout.BeginVertical(styleBlockTime);
                     tooltip = "Position to start the midi";
                     EditorGUILayout.BeginHorizontal();
-                    string sStartFrom = FormatingDuration(itemSelected.StartFrom, itemSelected.TickLengthMs);
+                    string sStartFrom = FormattingDuration(itemSelected.StartFrom, itemSelected.TickLengthMs);
                     EditorGUILayout.PrefixLabel(new GUIContent("Start Playing At", tooltip));
                     EditorGUILayout.LabelField(new GUIContent(sStartFrom, "")/*, myStyle.ItemSelected*/);
                     EditorGUILayout.EndHorizontal();
@@ -242,7 +242,7 @@ namespace MidiPlayerTK
                     EditorGUILayout.BeginVertical(styleBlockTime);
                     tooltip = "Position to end playing the midi";
                     EditorGUILayout.BeginHorizontal();
-                    string sEndFrom = FormatingDuration(itemSelected.EndFrom, itemSelected.TickLengthMs);
+                    string sEndFrom = FormattingDuration(itemSelected.EndFrom, itemSelected.TickLengthMs);
                     EditorGUILayout.PrefixLabel(new GUIContent("Stop Playing At", tooltip));
                     EditorGUILayout.LabelField(new GUIContent(sEndFrom, "")/*, myStyle.ItemSelected*/);
                     EditorGUILayout.EndHorizontal();
@@ -273,8 +273,8 @@ namespace MidiPlayerTK
 
                     EditorGUILayout.BeginHorizontal();
 
-                    string sPosition = FormatingDuration(instance.MPTK_Position, itemSelected.TickLengthMs); ;
-                    string sDuration = FormatingDuration(itemSelected.EndFrom, itemSelected.TickLengthMs);
+                    string sPosition = FormattingDuration(instance.MPTK_Position, itemSelected.TickLengthMs); ;
+                    string sDuration = FormattingDuration(itemSelected.EndFrom, itemSelected.TickLengthMs);
 
                     EditorGUILayout.PrefixLabel(new GUIContent("Time Position", tooltip));
                     EditorGUILayout.LabelField(new GUIContent(sPosition + " / " + sDuration, tooltip));
@@ -373,7 +373,7 @@ namespace MidiPlayerTK
             }
         }
 
-        private string FormatingDuration(double tsDuration, double tickLengthMs)
+        private string FormattingDuration(double tsDuration, double tickLengthMs)
         {
             if (instance.indexlabFormatMidiTime == 0)
             {

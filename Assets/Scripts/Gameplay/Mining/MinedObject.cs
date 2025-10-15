@@ -70,13 +70,6 @@ public class MinedObject : MonoBehaviour
     private void AssignVisuals()
     {
         sprite.color = assignedTrack.trackColor;
-        switch (minedObjectType)
-        {
-            case MinedObjectType.NoteSpawner:
-                sprite.enabled = false;
-                break;
-        }
-
     }
     public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSet noteSet = null, TrackModifierType? modifier = null)
     {

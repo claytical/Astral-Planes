@@ -301,11 +301,13 @@ namespace MidiPlayerTK
                                 if (MPTK_LogWave)
                                 {
                                     sLogSampleUse.Clear();
-                                    sLogSampleUse.Append($"Voice Channel:{note.Channel:00} Bank:{Channels[note.Channel].BankNum:000} Preset:{Channels[note.Channel].PresetNum:000} ");
-                                    sLogSampleUse.Append($"{defpreset.Name,-21} Key:{note.Value,-3}({HelperNoteLabel.LabelFromMidi(note.Value),-3}) Velocity:{note.Velocity,-3} ");
-                                    sLogSampleUse.Append(note.Duration >= 0 ? $"Duration:{note.Duration,6} ms {voice.DurationTick,9} ticks " : "Infinite ");
+                                    sLogSampleUse.Append($"Channel:{note.Channel:00} Bank:{Channels[note.Channel].BankNum:000} Preset:{Channels[note.Channel].PresetNum:000} ");
+                                    sLogSampleUse.Append($"{defpreset.Name,-21} Key:{note.Value,-3}({HelperNoteLabel.LabelFromMidi(note.Value),-3}) ");
+                                    sLogSampleUse.Append($"Transp.:{(note.OriginalValue == -1 ? 0 : note.Value - note.OriginalValue),-3} ");
+                                    sLogSampleUse.Append($"Vel.:{note.Velocity,-3} ");
+                                    sLogSampleUse.Append(note.Duration >= 0 ? $"Duration:{note.Duration,6} ms {voice.DurationTick,9} ticks " : "Inf.  ");
                                     sLogSampleUse.Append($"Instr:{inst.Name,-21} Sample:{soundFont.HiSf.Samples[voice_zone.Index].Name,-21} ");
-                                    sLogSampleUse.Append($"Atten:{fluid_conv.fluid_cb2amp(voice.attenuation):F2} Pano:{voice.pan:F2}");
+                                    sLogSampleUse.Append($"Atten:{fluid_conv.fluid_cb2amp(voice.attenuation):F2} Pan:{voice.pan:F2}");
                                     //,Channels[note.Channel].cc[(int)MPTKController.VOLUME_MSB]  {12}
                                     Debug.Log(sLogSampleUse);
                                 }

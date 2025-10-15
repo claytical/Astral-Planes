@@ -851,7 +851,7 @@ namespace MidiPlayerTK
             //time = 0.0;
 
             if (VoiceAudio != null)
-                // Play sound with an AudioSource component
+                // Play sound with an AudioSource component (legacy mode)
                 VoiceAudio.RunUnityThread();
         }
 
@@ -1059,24 +1059,34 @@ namespace MidiPlayerTK
                 case (int)fluid_gen_type.GEN_PAN:
                     /* range checking is done in the fluid_pan function: range from -500 to 500 */
                     pan = genVal;
-                    //if (midiChannel.preset.Num % 2 == 0)
-                    //    pan = 500;
-                    //else
-                    //    pan = -500;
-                    if (synth.MPTK_CorePlayer)
+                    // Init with default volume channel value
+                    amp_left = channel.Volume;
+                    amp_right = channel.Volume;
+
+                    if (synth.MPTK_EnablePanChange)
                     {
-                        // Init with default volume channel value
-                        amp_left = channel.Volume;
-                        amp_right = channel.Volume;
-
-                        if (synth.MPTK_EnablePanChange)
+                        if (synth.MPTK_CorePlayer)
                         {
-                            amp_left *= fluid_conv.fluid_pan(pan, true);
-                            amp_right *= fluid_conv.fluid_pan(pan, false);
+                            float left = fluid_conv.fluid_pan(pan, true); // from 0 to 1
+                            float right = fluid_conv.fluid_pan(pan, false); // from 0 to 1 
+                            amp_left *= left;
+                            amp_right *= right;
+                            if (synth.VerboseCalcGen)
+                                Debug.LogFormat($"{header} EnablePanChange={synth.MPTK_EnablePanChange} synth.gain={synth.gain:0.00} pan={pan:0.00} amp_left={left:0.00} amp_right={right:0.00} mptkChannel.volume={channel.Volume}");
                         }
-
-                        if (synth.VerboseCalcGen)
-                            Debug.LogFormat($"{header} EnablePanChange={synth.MPTK_EnablePanChange} synth.gain={synth.gain:0.00} pan={pan:0.00} amp_left={amp_left:0.00} amp_right={amp_right:0.00} mptkChannel.volume={channel.Volume}");
+                        else
+                        {
+                            // Not useful! 
+                            // Pan change is handle in VoiceAudioSource.cs
+                            //if (VoiceAudio != null && VoiceAudio.Audiosource != null)
+                            //    // Values range from -1.0 to 1.0.
+                            //    // -1.0 = full left
+                            //    //  0.0 = center
+                            //    //  1.0 = full right
+                            //    VoiceAudio.Audiosource.panStereo = pan / 500f; // from pan -500 to 500 to audio source pan -1 to 1
+                            //if (synth.VerboseCalcGen)
+                            //    Debug.LogFormat($"{header} EnablePanChange={synth.MPTK_EnablePanChange} pan={pan:0.00} --> panStereo={VoiceAudio.Audiosource.panStereo:0.00}");
+                        }
                     }
                     break;
 

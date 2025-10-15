@@ -529,8 +529,19 @@ namespace MidiPlayerTK
         /// The default is true.\n 
         /// Warning: The non core mode player (MPTK_CorePlayer=false) will be removed with the next major version (V3)
         /// </summary>
+        public bool MPTK_CorePlayer
+        {
+            get =>
+#if UNITY_WEBGL
+                false;
+#else
+            mPTK_CorePlayer;
+#endif
+            set => mPTK_CorePlayer = value;
+        }
+
         [HideInInspector]
-        public bool MPTK_CorePlayer;
+        public bool mPTK_CorePlayer;
 
         /// <summary>@brief 
         /// If true then rate synth and buffer size will be automatically defined by Unity in accordance of the capacity of the hardware. -  V2.89.0 - \n
@@ -736,6 +747,14 @@ namespace MidiPlayerTK
             }
         }
 
+        [HideInInspector]
+        /// <summary>
+        /// If true, the MIDI player will be automatically paused 
+        /// when the distance from the listener exceeds MPTK_MaxDistance.
+        /// @version 2.16.1
+        /// </summary>
+        public bool MPTK_PauseOnMaxDistance = true;
+
         protected void SetSpatialization()
         {
             //Debug.Log("Set Max Distance " + maxDistance);
@@ -786,15 +805,6 @@ namespace MidiPlayerTK
         [HideInInspector]
         private float maxDistance;
 
-        /// <summary>@brief 
-        /// [obsolete] replaced by MPTK_Spatialize"); V2.83
-        /// </summary>
-        [HideInInspector]
-        public bool MPTK_PauseOnDistance
-        {
-            get { Debug.LogWarning("MPTK_PauseOnDistance is obsolete, replaced by MPTK_Spatialize"); return spatialize; }
-            set { Debug.LogWarning("MPTK_PauseOnDistance is obsolete, replaced by MPTK_Spatialize"); spatialize = value; }
-        }
 
         /// <summary>@brief 
         /// Should the Spatialization effect must be enabled?\n
@@ -990,7 +1000,7 @@ namespace MidiPlayerTK
         public MPTKChannels Channels;
         public List<fluid_voice> ActiveVoices;
 
-        private List<fluid_voice> FreeVoices;
+        public List<fluid_voice> FreeVoices;
         protected Queue<SynthCommand> QueueSynthCommand;
         protected Queue<List<MPTKEvent>> QueueMidiEvents;
 
@@ -1032,6 +1042,7 @@ namespace MidiPlayerTK
 
 
         public fluid_synth_status MPTK_SynthState { get => state; set => state = value; }
+
         private fluid_synth_status state = fluid_synth_status.FLUID_SYNTH_CLEAN;
 
         [Header("Attributes below applies only with AudioSource mode (Core Audio unchecked)")]
@@ -1225,13 +1236,24 @@ namespace MidiPlayerTK
             }
 
             // V2.83 Move these init from Start to Awake
-            if (CoreAudioSource == null)
+            if (MPTK_CorePlayer)
             {
-                //if (VerboseSynth) Debug.LogWarningFormat("CoreAudioSource not defined in the {0} inspector, search one", this.name);
-                CoreAudioSource = GetComponent<AudioSource>();
                 if (CoreAudioSource == null)
                 {
-                    Debug.LogErrorFormat("No AudioSource defined in the MPTK prefab '{0}'", this.name);
+                    CoreAudioSource = GetComponent<AudioSource>();
+                    if (CoreAudioSource == null)
+                    {
+                        Debug.LogErrorFormat("No AudioSource defined in the MPTK prefab '{0}'", this.name);
+                    }
+                }
+            }
+            else
+            {
+                // No need of the AudioSource 
+                CoreAudioSource = GetComponent<AudioSource>();
+                if (CoreAudioSource != null)
+                {
+                    CoreAudioSource.enabled = false;
                 }
             }
         }
@@ -1280,24 +1302,34 @@ namespace MidiPlayerTK
                 /* as soon as the synth is created it starts playing. */
                 // Too soon state = fluid_synth_status.FLUID_SYNTH_PLAYING;
 
-                if (CoreAudioSource != null)
+                if (MPTK_CorePlayer)
                 {
-                    //Debug.Log($"Create instance for effect.");
-
-                    if (MPTK_EffectSoundFont == null)
+                    if (CoreAudioSource != null)
                     {
-                        // Instance is deserialized when MidiSynth is loaded, but not at the first load
-                        //Debug.Log($"Create instance for MPTK_EffectSoundFont. <b>Set default setting in {this.name} Inspector / Synth Parameters / SoundFont Effect Parameters</b>");
-                        MPTK_EffectSoundFont = ScriptableObject.CreateInstance<MPTKEffectSoundFont>();
+                        // Special init for core mode
+
+                        //Debug.Log($"Create instance for effect.");
+                        if (MPTK_EffectSoundFont == null)
+                        {
+                            // Instance is deserialized when MidiSynth is loaded, but not at the first load
+                            //Debug.Log($"Create instance for MPTK_EffectSoundFont. <b>Set default setting in {this.name} Inspector / Synth Parameters / SoundFont Effect Parameters</b>");
+                            MPTK_EffectSoundFont = ScriptableObject.CreateInstance<MPTKEffectSoundFont>();
 #if MPTK_PRO
-                        MPTK_EffectSoundFont.DefaultAll();
+                            MPTK_EffectSoundFont.DefaultAll();
+#endif
+                        }
+                        MPTK_EffectSoundFont.Init(this);
+#if MPTK_PRO
+                        InitEffectUnity();
 #endif
                     }
-                    MPTK_EffectSoundFont.Init(this);
-#if MPTK_PRO
-                    InitEffectUnity();
-#endif
                 }
+                else
+                {
+                    // Special init for legacymode
+
+                }
+
                 //cur = FLUID_BUFSIZE;
                 //dither_index = 0;
 
@@ -1419,6 +1451,8 @@ namespace MidiPlayerTK
 #endif
         }
 
+        private CoroutineHandle handleManageCacheVoice;
+
         /// <summary>@brief 
         /// Initialize the synthetizer: 
         ///     - channels informartion: instrument & bank selected, pitch, volume, ...
@@ -1452,7 +1486,7 @@ namespace MidiPlayerTK
                 ActiveVoices = new List<fluid_voice>();
 
             if (!preserveActivVoice)
-                // Needed whrn another soundfont is loaded
+                // Needed when another soundfont is loaded
                 ActiveVoices.Clear();
 
             if (!MPTK_Spatialize)
@@ -1470,6 +1504,11 @@ namespace MidiPlayerTK
 
             MPTK_ResetStat();
             state = fluid_synth_status.FLUID_SYNTH_PLAYING;
+
+            if (!MPTK_CorePlayer && !handleManageCacheVoice.IsRunning)
+                // To be run only one time
+                handleManageCacheVoice = Routine.RunCoroutine(RoutineManageCacheVoice(), Segment.RealtimeUpdate);
+            //else Debug.Log(handleManageCacheVoice.IsRunning);
 
             /* TU Synth 
             MPTK_PlayDirectEvent(new MPTKEvent() { Command= MPTKCommand.PatchChange, Value=18 });
@@ -1649,37 +1688,40 @@ namespace MidiPlayerTK
         /// <summary>@brief 
         /// Start the MIDI sequencer: each midi events are read and play in a dedicated thread.\n
         /// This thread is automatically started by prefabs MidiFilePlayer, MidiListPlayer, MidiExternalPlayer.
+        /// @note: available only in MPTK_CorePlayer mode. No effect in Legacy mode
         /// </summary>
         public void MPTK_StartSequencerMidi()
         {
-            if (!AudioThreadMidi)
+            if (MPTK_CorePlayer)
             {
-                if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi {this.name} {((midiThread == null ? "Null" : "Alive:" + midiThread.IsAlive))}");
-                if (midiThread != null)
+                if (!AudioThreadMidi)
                 {
-                    //Debug.LogWarning($"MPTK_StartSequencerMidi {this.name} already alive {midiThread.IsAlive}");
-                    if (!midiThread.IsAlive)
-                        midiThread.Start();
-                }
-                else
-                {
-                    if (midiThread == null)
+                    if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi {this.name} {((midiThread == null ? "Null" : "Alive:" + midiThread.IsAlive))}");
+                    if (midiThread != null)
                     {
-                        midiThread = new Thread(ThreadMidiPlayer);
+                        //Debug.LogWarning($"MPTK_StartSequencerMidi {this.name} already alive {midiThread.IsAlive}");
+                        if (!midiThread.IsAlive)
+                            midiThread.Start();
                     }
+                    else
+                    {
+                        if (midiThread == null)
+                        {
+                            midiThread = new Thread(ThreadMidiPlayer);
+                        }
 
-                    if (midiThread != null && !midiThread.IsAlive)
-                    {
-                        midiThread.Name = "MidiThread_" + IdSynth.ToString();
-                        midiThread.Priority = MPTK_ThreadMidiPriority + System.Threading.ThreadPriority.Normal;
-                        midiThread.Start();
-                        if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi Started {this.name} {IdSynth} ManagedThreadId:{midiThread.ManagedThreadId}");
+                        if (midiThread != null && !midiThread.IsAlive)
+                        {
+                            midiThread.Name = "MidiThread_" + IdSynth.ToString();
+                            midiThread.Priority = MPTK_ThreadMidiPriority + System.Threading.ThreadPriority.Normal;
+                            midiThread.Start();
+                            if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi Started {this.name} {IdSynth} ManagedThreadId:{midiThread.ManagedThreadId}");
+                        }
+                        else if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi: Alive  {this.name} {IdSynth} ManagedThreadId:{midiThread.ManagedThreadId} Priority:{midiThread.Priority}");
                     }
-                    else if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi: Alive  {this.name} {IdSynth} ManagedThreadId:{midiThread.ManagedThreadId} Priority:{midiThread.Priority}");
                 }
+                else if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi - MIDI MPTK Thread disabled, MIDI reader from Audio Thread");
             }
-            else if (VerboseSynth) Debug.Log($"MPTK_StartSequencerMidi - MIDI MPTK Thread disabled, MIDI reader from Audio Thread");
-
         }
 
         /// <summary>@brief 
@@ -1829,7 +1871,7 @@ namespace MidiPlayerTK
             numberNote = -1;
 #endif
             MPTK_ResetStat();
-            //Debug.Log($" >>> {DateTime.Now} ThreadClearAllSound {_idSession}");
+            //Debug.Log($" >>> {DateTime.Now} ThreadClearAllSound:{_idSession} destroyAudioSource:{destroyAudioSource}");
             if (MPTK_CorePlayer)
             {
                 if (SpatialSynths != null && spatialSynthIndex == -1) // apply only for the MidiSynth reader
@@ -1843,7 +1885,6 @@ namespace MidiPlayerTK
                 }
                 else
                 {
-
                     if (QueueSynthCommand != null)
                         QueueSynthCommand.Enqueue(new SynthCommand() { Command = SynthCommand.enCmd.NoteOffAll, IdSession = _idSession });
                     // V2.84 yield return Timing.WaitUntilDone(Timing.RunCoroutine(ThreadWaitAllStop()), false);
@@ -1856,18 +1897,47 @@ namespace MidiPlayerTK
                     for (int i = 0; i < ActiveVoices.Count; i++)
                     {
                         fluid_voice voice = ActiveVoices[i];
+                        //Debug.LogFormat($"Release Active id:{voice.id} / {ActiveVoices.Count} {voice.VoiceAudio.name} {voice.status} {(voice.VoiceAudio.Audiosource.clip != null ? voice.VoiceAudio.Audiosource.clip.name : "no clip")}");
                         if (voice != null && (voice.status == fluid_voice_status.FLUID_VOICE_ON || voice.status == fluid_voice_status.FLUID_VOICE_SUSTAINED))
                         {
-                            //Debug.LogFormat("ReleaseAll {0} / {1}", voice.IdVoice, ActiveVoices.Count);
-                            yield return Routine.WaitUntilDone(Routine.RunCoroutine(voice.Release(), Segment.RealtimeUpdate));
+                            //voice.fluid_rvoice_noteoff(true);
+                            Routine.RunCoroutine(voice.Release(), Segment.RealtimeUpdate);
+                            //yield return Routine.WaitUntilDone(Routine.RunCoroutine(voice.Release(), Segment.RealtimeUpdate));
                         }
-                    }
-                    if (destroyAudioSource)
-                    {
-                        yield return Routine.WaitUntilDone(Routine.RunCoroutine(ThreadDestroyAllVoice(), Segment.RealtimeUpdate), false);
                     }
                 }
             }
+            if (destroyAudioSource)
+            {
+                if (!MPTK_CorePlayer)
+                    Routine.RunCoroutine(ThreadDestroyAllVoice(), Segment.RealtimeUpdate);
+                else
+                    yield return Routine.WaitUntilDone(Routine.RunCoroutine(ThreadDestroyAllVoice(), Segment.RealtimeUpdate), false);
+            }
+
+            //Debug.Log($" <<< {DateTime.Now} ThreadClearAllSound {_idSession}");
+
+            yield return 0;
+        }
+
+        public IEnumerator<float> ThreadVoiceAudioSourceRemove(float wait, int _idSession = -1)
+        {
+            //Debug.Log($" >>> {DateTime.Now} ThreadClearAllSound:{_idSession} ");
+            DateTime dateTime = DateTime.Now;
+            if (wait <= 0f)
+                wait = 2000f;
+            while (true)
+            {
+                VoiceAudioSource[] voiceAudioSources = FindObjectsByType<VoiceAudioSource>(FindObjectsSortMode.InstanceID);
+                //Debug.Log($"    MPTK_Stop {(DateTime.Now - dateTime).TotalMilliseconds} {voiceAudioSources.Length}");
+                if (voiceAudioSources.Length == 0)
+                    break;
+                if ((DateTime.Now - dateTime).TotalMilliseconds > wait)
+                    break;
+                yield return Routine.WaitForSeconds(0.1f);
+
+            }
+
 
             //Debug.Log($" <<< {DateTime.Now} ThreadClearAllSound {_idSession}");
 
@@ -1901,7 +1971,6 @@ namespace MidiPlayerTK
         public IEnumerator MPTK_WaitAllNotesOff(int _idSession = -1) // V2.84: new param idsession and CoRoutine compatible
         {
             //Debug.Log($"<<< {DateTime.Now} MPTK_WaitAllNotesOff {_idSession}");
-            //yield return Timing.WaitUntilDone(Timing.RunCoroutine(ThreadWaitAllStop(_idSession)), false);
             int count = 999;
             DateTime start = DateTime.Now;
             //Debug.Log($"ThreadWaitAllStop " + start);
@@ -1951,58 +2020,42 @@ namespace MidiPlayerTK
 
         }
 
-
         /// Remove AudioSource not playing
         /// </summary>
         protected IEnumerator<float> ThreadDestroyAllVoice()
         {
-            //Debug.Log("ThreadDestroyAllVoice");
+            //Debug.Log(">>> ThreadDestroyAllVoice");
             try
             {
-                //VoiceAudioSource[] voicesList = GetComponentsInChildren<VoiceAudioSource>();
-                //Debug.LogFormat("DestroyAllVoice {0}", (voicesList != null ? voicesList.Length.ToString() : "no voice found"));
-                //if (voicesList != null)
-                //{
-                //    foreach (VoiceAudioSource voice in voicesList)
-                //        try
-                //        {
-                //            //Debug.Log("Destroy " + voice.IdVoice + " " + (voice.Audiosource.clip != null ? voice.Audiosource.clip.name : "no clip"));
-                //            //Don't delete audio source template
-                //            if (voice.name.StartsWith("VoiceAudioId_"))
-                //                Destroy(voice.gameObject);
-                //        }
-                //        catch (System.Exception ex)
-                //        {
-                //            MidiPlayerGlobal.ErrorDetail(ex);
-                //        }
-                //    Voices.Clear();
-                //}
-                if (ActiveVoices != null)
+                if (MPTK_CorePlayer)
                 {
-                    if (MPTK_CorePlayer)
+                    if (QueueSynthCommand != null)
+                        // ActiveVoices and FreVoices clear
                         QueueSynthCommand.Enqueue(new SynthCommand() { Command = SynthCommand.enCmd.ClearAllVoices });
-                    else
-                    {
-                        for (int i = 0; i < ActiveVoices.Count; i++)
+                }
+                else
+                {
+                    // Search voice audio source but not template which is inactive
+                    VoiceAudioSource[] voiceAudioSources = FindObjectsByType<VoiceAudioSource>(FindObjectsSortMode.InstanceID);
+                    //Debug.Log($"    ThreadDestroyAllVoice - {voiceAudioSources.Length} AudioSource found");
+
+                    if (voiceAudioSources != null)
+                        foreach (VoiceAudioSource voice in voiceAudioSources)
                         {
-                            try
-                            {
-                                fluid_voice voice = ActiveVoices[i];
-                                if (voice != null && voice.VoiceAudio != null)
+                            //Debug.Log($"    Destroy id:{voice.name} {(voice.Audiosource.clip != null ? voice.Audiosource.clip.name : "no clip")}");
+                            if (voice.name != "VoiceAudioSourceTemplate") // Test in case template gas been enabled by error!
+                                try
                                 {
-                                    //Debug.Log("Destroy " + voice.IdVoice + " " + (voice.VoiceAudio.Audiosource.clip != null ? voice.VoiceAudio.Audiosource.clip.name : "no clip"));
-                                    //Don't delete audio source template
-                                    if (voice.VoiceAudio.name.StartsWith("VoiceAudioId_"))
-                                        Destroy(voice.VoiceAudio.gameObject);
+                                    // Delete voice audio source and its audio source 
+                                    Destroy(voice.gameObject);
                                 }
-                            }
-                            catch (System.Exception ex)
-                            {
-                                MidiPlayerGlobal.ErrorDetail(ex);
-                            }
+                                catch (System.Exception ex)
+                                {
+                                    MidiPlayerGlobal.ErrorDetail(ex);
+                                }
                         }
-                        ActiveVoices.Clear();
-                    }
+                    if (ActiveVoices != null) ActiveVoices.Clear();
+                    if (FreeVoices != null) FreeVoices.Clear();
                 }
             }
             catch (System.Exception ex)
@@ -2010,6 +2063,34 @@ namespace MidiPlayerTK
                 MidiPlayerGlobal.ErrorDetail(ex);
             }
             yield return 0;
+            //Debug.Log("<<< ThreadDestroyAllVoice");
+
+        }
+
+        private void killVoices(List<fluid_voice> voices)
+        {
+            if (voices != null)
+                for (int i = 0; i < voices.Count; i++)
+                {
+                    try
+                    {
+                        fluid_voice voice = voices[i];
+                        if (voice != null && voice.VoiceAudio != null)
+                        {
+                            //Debug.Log($"Destroy id:{voice.id} {voice.VoiceAudio.name} {(voice.VoiceAudio.Audiosource.clip != null ? voice.VoiceAudio.Audiosource.clip.name : "no clip")}");
+                            // Delete all audio source but not template
+                            if (voice.VoiceAudio.name.StartsWith("VoiceAudioId_"))
+                                Destroy(voice.VoiceAudio.gameObject);
+                        }
+                        //else Debug.Log($"Destroy not done id:{voice?.id} name:{voice.VoiceAudio?.name}");
+
+                    }
+                    catch (System.Exception ex)
+                    {
+                        MidiPlayerGlobal.ErrorDetail(ex);
+                    }
+                }
+            voices.Clear();
         }
 
         void OnApplicationQuit()
@@ -2051,12 +2132,26 @@ namespace MidiPlayerTK
         {
             if (ActiveVoices != null && ActiveVoices.Count > 0)
             {
+                Debug.Log("Active voice found");
                 Debug.Log(fluid_voice.HeaderVoiceInfo());
                 for (int i = 0; i < ActiveVoices.Count; i++)
                     Debug.Log(ActiveVoices[i].ToString());
             }
             else
                 Debug.Log("No active voice found");
+        }
+
+        public void MPTK_DebugFreeVoice()
+        {
+            if (FreeVoices != null && FreeVoices.Count > 0)
+            {
+                Debug.Log("Free voice found");
+                Debug.Log(fluid_voice.HeaderVoiceInfo());
+                for (int i = 0; i < FreeVoices.Count; i++)
+                    Debug.Log(FreeVoices[i].ToString());
+            }
+            else
+                Debug.Log("No free voice found");
         }
 
         /// <summary>@brief 
@@ -2517,40 +2612,70 @@ namespace MidiPlayerTK
                 {
                     // Play each voice with a dedicated AudioSource (legacy mode)
                     // ----------------------------------------------------------
-                    AudioClip clip = DicAudioClip.Get(hiSample.Name);
+                    AudioClip clip = null;
+                    if (MidiPlayerGlobal.ImSFCurrent != null && MidiPlayerGlobal.ImSFCurrent.LiveSF)
+                    {
+                        // each voice have a pointer to the full samples available in the SF
+                        hiSample.Data = MidiPlayerGlobal.ImSFCurrent.SamplesData;
+                        // TBD when sample comes from the SamplesData, we need to extract the sample related to the voice and create an AudioClip ....
+                        voice.sample = hiSample;
+                    }
+                    else if (/*MPTK_SoundFont.SoundFont != null && */MPTK_SoundFont.SoundFont.LiveSF)
+                    {
+                        hiSample.Data = MPTK_SoundFont.SoundFont.SamplesData;
+                        // TBD when sample comes from the SamplesData, we need to extract the sample related to the voice and create an AudioClip ....
+                        voice.sample = hiSample;
+                    }
+                    else
+                    {
+                        clip = DicAudioClip.Get(hiSample.Name);
+                        if (clip == null)
+                        {
+                            string path = MidiPlayerGlobal.WavePath + "/" + System.IO.Path.GetFileNameWithoutExtension(hiSample.Name);
+                            AudioClip ac = Resources.Load<AudioClip>(path);
+                            if (ac != null)
+                            {
+                                //Debug.Log("Wave load " + path);
+                                DicAudioClip.Add(hiSample.Name, ac);
+                            }
+                            clip = DicAudioClip.Get(hiSample.Name);
+                            if (clip == null /*|| clip.loadState != AudioDataLoadState.Loaded*/)
+                            {
+                                if (VerboseVoice) Debug.LogWarningFormat("fluid_synth_alloc_voice - Clip {0} not found", hiSample.Name);
+                                return null;
+                            }
+                            // v2.16.0 seems clip is not loaded until associated to the audio source
+                            //else if (clip.loadState != AudioDataLoadState.Loaded)
+                            //{
+                            //    if (VerboseVoice) Debug.LogWarningFormat("fluid_synth_alloc_voice - Clip {0} not ready to play {1}", hiSample.Name, clip.loadState);
+                            //    return null;
+                            //}
+                        }
+                        if (VerboseVoice) Debug.Log($"Voice idSession:{mptkEvent.IdSession} idVoice:{fluid_voice.LastId} - Clip created - name:'{clip.name}' loadState:{clip.loadState}");
+                        voice.sample = hiSample;
+                    }
+
                     if (clip == null)
                     {
-                        string path = MidiPlayerGlobal.WavePath + "/" + System.IO.Path.GetFileNameWithoutExtension(hiSample.Name);
-                        AudioClip ac = Resources.Load<AudioClip>(path);
-                        if (ac != null)
-                        {
-                            //Debug.Log("Wave load " + path);
-                            DicAudioClip.Add(hiSample.Name, ac);
-                        }
-                        clip = DicAudioClip.Get(hiSample.Name);
-                        if (clip == null || clip.loadState != AudioDataLoadState.Loaded)
-                        {
-                            Debug.LogWarningFormat("fluid_synth_alloc_voice - Clip {0} not found", hiSample.Name);
-                            return null;
-                        }
-                        else if (clip.loadState != AudioDataLoadState.Loaded)
-                        {
-                            Debug.LogWarningFormat("fluid_synth_alloc_voice - Clip {0} not ready to play {1}", hiSample.Name, clip.loadState);
-                            return null;
-                        }
+                        Debug.LogWarningFormat("fluid_synth_alloc_voice - Clip {0} data not loaded - not compliant with WebGL", hiSample.Name);
                     }
-                    voice.sample = hiSample;
-                    voice.VoiceAudio = Instantiate<VoiceAudioSource>(AudiosourceTemplate);
-                    voice.VoiceAudio.gameObject.SetActive(true);
-                    voice.VoiceAudio.fluidvoice = voice;
-                    voice.VoiceAudio.synth = this;
-                    voice.VoiceAudio.transform.position = AudiosourceTemplate.transform.position;
-                    voice.VoiceAudio.transform.SetParent(AudiosourceTemplate.transform.parent);
-                    voice.VoiceAudio.name = "VoiceAudioId_" + voice.id;
-                    voice.VoiceAudio.Audiosource.clip = clip;
-                    //voice.VoiceAudio.Audiosource.loop
-                    // seems to have no effect, issue open with Unity
-                    voice.VoiceAudio.hideFlags = VerboseVoice ? HideFlags.None : HideFlags.HideInHierarchy;
+                    else
+                    {
+
+                        voice.VoiceAudio = Instantiate<VoiceAudioSource>(AudiosourceTemplate);
+                        voice.VoiceAudio.gameObject.SetActive(true);
+                        voice.VoiceAudio.fluidvoice = voice;
+                        voice.VoiceAudio.synth = this;
+                        voice.VoiceAudio.transform.position = AudiosourceTemplate.transform.position;
+                        voice.VoiceAudio.transform.SetParent(AudiosourceTemplate.transform.parent);
+                        voice.VoiceAudio.name = "VoiceAudioId_" + voice.id;
+                        voice.VoiceAudio.Audiosource.clip = clip;
+                        //voice.VoiceAudio.Audiosource.loop
+                        // seems to have no effect, issue open with Unity
+                        voice.VoiceAudio.hideFlags = VerboseVoice ? HideFlags.None : HideFlags.HideInHierarchy;
+
+                        if (VerboseVoice) Debug.Log($"Voice idSession:{mptkEvent.IdSession} idVoice:{fluid_voice.LastId} - AudioSource Instanciated - name:'{clip.name}' loadState:{clip.loadState}");
+                    }
                 }
 
                 //AddDefaultMod(voice);
@@ -2572,12 +2697,14 @@ namespace MidiPlayerTK
             }
             else
             {
-                // Legacy mode, will be removed
+                // Legacy mode
                 if (voice.VoiceAudio != null)
                     voice.VoiceAudio.Audiosource.spatialBlend = MPTK_Spatialize ? 1f : 0f;
-                MoveVoiceToFree();
-                if (MPTK_AutoBuffer)
-                    AutoCleanVoice(DateTime.UtcNow.Ticks);
+
+                // Now done in a coroutine for legacy mode
+                //MoveVoiceToFree();
+                //if (MPTK_AutoBuffer)
+                //    AutoCleanVoice(DateTime.UtcNow.Ticks);
             }
 
             int chan = mptkEvent.Channel;
@@ -3016,11 +3143,7 @@ namespace MidiPlayerTK
                         watchPerfAudio.Reset();
                         watchPerfAudio.Start();
 #endif
-                        MoveVoiceToFree();
-                        if (MPTK_AutoBuffer)
-                            AutoCleanVoice(ticks);
-                        MPTK_StatVoiceCountActive = ActiveVoices.Count;
-                        MPTK_StatVoiceCountFree = FreeVoices.Count;
+                        ManageCacheVoice(ticks);
 
 #if DEBUG_PERF_AUDIO
                         //GcCollectionCoutSynth = 0;
@@ -3188,6 +3311,7 @@ namespace MidiPlayerTK
                                 break;
                             case SynthCommand.enCmd.ClearAllVoices:
                                 ActiveVoices.Clear();
+                                FreeVoices.Clear();
                                 break;
                             case SynthCommand.enCmd.NoteOffAll:
                                 //Debug.Log($"NoteOffAll");
@@ -3214,19 +3338,28 @@ namespace MidiPlayerTK
             }
         }
 
-        public void MoveVoiceToFree(fluid_voice v)
+
+        private IEnumerator<float> RoutineManageCacheVoice()
         {
-            ActiveVoices.RemoveAt(v.IndexActive);
-            FreeVoices.Add(v);
+            if (VerboseSynth) Debug.Log($"Start RoutineManageCacheVoice {IdSynth} {ActiveVoices?.Count} {FreeVoices?.Count}");
+            while (state == fluid_synth_status.FLUID_SYNTH_PLAYING)
+            {
+                long ticks = System.DateTime.UtcNow.Ticks;
+                ManageCacheVoice(ticks);
+                yield return Routine.WaitForSeconds(0.2f);
+            }
+            if (VerboseSynth) Debug.Log($"End RoutineManageCacheVoice {IdSynth} {ActiveVoices?.Count} {FreeVoices?.Count}");
         }
 
-        public void DebugVoice()
+        private void ManageCacheVoice(long ticks)
         {
-            foreach (fluid_voice v in ActiveVoices)
-            {
-                Debug.LogFormat("", v.LastTimeWrite);
-            }
+            MoveVoiceToFree();
+            if (!MPTK_CorePlayer && MPTK_AutoBuffer)
+                AutoCleanVoice(ticks);
+            MPTK_StatVoiceCountActive = ActiveVoices.Count;
+            MPTK_StatVoiceCountFree = FreeVoices.Count;
         }
+
 
         private void MoveVoiceToFree()
         {
@@ -3319,7 +3452,7 @@ namespace MidiPlayerTK
                 }
             }
 
-#if LOG_STATUS_STAT 
+#if LOG_STATUS_STAT
             if (StatDspLoadPCT > MaxDspLoad)
             {
                 Debug.Log(Math.Round(SynthElapsedMilli, 2) +
@@ -3335,6 +3468,13 @@ namespace MidiPlayerTK
                     " Off:" + StatusStat[(int)fluid_voice_status.FLUID_VOICE_OFF]);
             }
 #endif
+        }
+        public void DebugVoice()
+        {
+            foreach (fluid_voice v in ActiveVoices)
+            {
+                Debug.LogFormat("", v.LastTimeWrite);
+            }
         }
 
         private void AutoCleanVoice(long ticks)

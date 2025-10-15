@@ -5,7 +5,9 @@ public enum RotationMode
     Uniform,
     Swirl,
     SpiralOutward,
-    Randomized
+    Randomized,
+    PerBin,
+    OncePerLoop
 }
 
 public class RotateConstant : MonoBehaviour

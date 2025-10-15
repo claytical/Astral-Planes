@@ -174,8 +174,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playheadLine: {fileID: 657963291}
-  drums: {fileID: 1354683682}
-  tracks: {fileID: 1354683684}
   playheadParticles: {fileID: 264452581}
   ribbonMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   ribbonWidth: 5
@@ -651,6 +649,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -672,6 +672,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 263648039
   m_SortingLayer: 1
   m_SortingOrder: 0
@@ -5601,7 +5602,6 @@ MonoBehaviour:
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
-  m_Version: 2
   m_TaaSettings:
     m_Quality: 3
     m_FrameInfluence: 0.1
@@ -5609,6 +5609,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &318370296
 GameObject:
   m_ObjectHideFlags: 0
@@ -6508,6 +6509,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -6529,6 +6532,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -7096,17 +7100,18 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1354683683}
+  - component: {fileID: 1354683694}
   - component: {fileID: 1354683682}
   - component: {fileID: 1354683684}
-  - component: {fileID: 1354683693}
-  - component: {fileID: 1354683685}
-  - component: {fileID: 1354683692}
+  - component: {fileID: 1354683695}
   - component: {fileID: 1354683688}
   - component: {fileID: 1354683687}
   - component: {fileID: 1354683690}
-  - component: {fileID: 1354683694}
-  - component: {fileID: 1354683695}
   - component: {fileID: 1354683697}
+  - component: {fileID: 1354683692}
+  - component: {fileID: 1354683685}
+  - component: {fileID: 1354683693}
+  - component: {fileID: 1354683698}
   m_Layer: 0
   m_Name: Tracks
   m_TagString: Untagged
@@ -7126,7 +7131,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e136d82a23df714ea810b28e4170c3e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hexMazeGenerator: {fileID: 1354683695}
   phaseStarPrefab: {fileID: 2312498068821558259, guid: b780336bac3ca4cd69850ea7a221d987,
     type: 3}
   nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
@@ -7135,14 +7139,11 @@ MonoBehaviour:
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
     type: 2}
   drumLoopBPM: 120
-  spawnGrid: {fileID: 1354683687}
   gridPadding: 1
   totalSteps: 16
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
-  trackController: {fileID: 1354683684}
   startDspTime: 0
-  progressionManager: {fileID: 1354683688}
   activeHexagons: []
   activeMinedObjects: []
   activeMineNodes: []
@@ -7312,19 +7313,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 36dd79ade9e1040efa29d9ec25d71669, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  phaseProfiles:
-  - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
-  - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
-  - {fileID: 11400000, guid: a756d4e83a53b43ed990e4579dde83e8, type: 2}
-  - {fileID: 11400000, guid: 4d38e6e924afc450a8b4dc5f1c8b4ca8, type: 2}
-  - {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
-  - {fileID: 11400000, guid: c36ca097ec10c4fd2b51488a8fef5cb9, type: 2}
+  _globalProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c, type: 2}
   phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
-  _globalProfile: {fileID: 11400000, guid: 28b83ef9d93154ddd88495f6ab476a94, type: 2}
-  isPhaseInProgress: 0
-  isPhaseTransitioning: 0
-  pendingNextPhase: 0
-  phaseStarActive: 0
+  establishUtilityBias: 0.1
+  evolveUtilityBias: 0.2
+  intensifyUtilityBias: 0.3
+  releaseUtilityBias: 0.45
+  wildcardUtilityBias: 0.6
+  popUtilityBias: 0.7
+  establishRingMul: 1
+  evolveRingMul: 1.1
+  intensifyRingMul: 1.2
+  releaseRingMul: 1.3
+  wildcardRingMul: 1.4
+  popRingMul: 1.5
+  minNodesToAdvance: 3
+  dustGen: {fileID: 0}
+  drum: {fileID: 0}
 --- !u!114 &1354683690
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7395,7 +7400,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83100461a69a049b79c4f38e4bf15bb0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trackController: {fileID: 1354683684}
   previousPhase: 0
   currentPhase: 0
 --- !u!114 &1354683695
@@ -7410,12 +7414,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10df134e68a684e7fa84763b72dde178, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  drumTrack: {fileID: 1354683682}
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   iterations: 1
-  cycleMode: 0
+  cycleMode: 1
   minClassicCycleInterval: 0.25
   hexagons: []
+  _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   regrowCooldownSeconds: 3
   progressiveMaze: 1
   maxFeatures: 3
@@ -7438,6 +7442,26 @@ MonoBehaviour:
   drums: {fileID: 1354683682}
   tracks: {fileID: 1354683684}
   commitHandledByHarmonyDirector: 1
+--- !u!114 &1354683698
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354683681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e3040189a4864509a26eea2017d27a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  phaseTransitionManager: {fileID: 1354683694}
+  drumTrack: {fileID: 1354683682}
+  controller: {fileID: 1354683684}
+  dustGenerator: {fileID: 1354683695}
+  progressionManager: {fileID: 1354683688}
+  spawnGrid: {fileID: 1354683687}
+  glitchManager: {fileID: 1354683690}
+  arp: {fileID: 1354683697}
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -7834,6 +7858,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -7855,6 +7881,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -8051,6 +8078,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -8072,6 +8101,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -8214,6 +8244,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -8235,6 +8267,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -8326,7 +8359,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 0.4
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -8524,9 +8557,10 @@ GameObject:
   - component: {fileID: 1758545870}
   - component: {fileID: 1758545869}
   - component: {fileID: 1758545871}
+  - component: {fileID: 1758545872}
   m_Layer: 5
   m_Name: GameStats
-  m_TagString: Untagged
+  m_TagString: PlayersUI
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -8612,6 +8646,18 @@ MonoBehaviour:
   m_Spacing: {x: 100, y: 0}
   m_Constraint: 1
   m_ConstraintCount: 5
+--- !u!114 &1758545872
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1758545867}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9c579801622342ffa17bd846ccc95fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
 --- !u!1001 &1798320908
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8688,7 +8734,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -8799,7 +8845,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.85
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}

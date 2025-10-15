@@ -13,6 +13,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 115331
   packageName: Maestro - Midi Player Tool Kit - Pro
-  packageVersion: 2.15.0
+  packageVersion: 2.16.1
   assetPath: Assets/MidiPlayer/Scripts/Editor/TestMidiEditorWindow.cs
-  uploadId: 751843
+  uploadId: 786006

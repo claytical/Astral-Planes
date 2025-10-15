@@ -9,14 +9,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2614095863033673403}
+  - component: {fileID: 6267414685674281640}
+  - component: {fileID: -1083081321893026294}
+  - component: {fileID: 964252887607637339}
   - component: {fileID: 1970310610805977373}
   - component: {fileID: 3138199776794840757}
-  - component: {fileID: 6267414685674281640}
-  - component: {fileID: 964252887607637339}
+  - component: {fileID: 8186318885000004935}
   - component: {fileID: 2515959493319008489}
   - component: {fileID: 595433701453339581}
-  - component: {fileID: 8186318885000004935}
-  - component: {fileID: -1083081321893026294}
   m_Layer: 0
   m_Name: Drifter
   m_TagString: Vehicle
@@ -41,6 +41,79 @@ Transform:
   - {fileID: 5501607040083024162}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6267414685674281640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: 2b76ecc426bc14a7cab7214f9799f408, type: 2}
+  capacity: 1200
+  arcadeMaxSpeed: 14
+  arcadeAccel: 10
+  arcadeBoostAccel: 80
+  arcadeLinearDamping: 0.1
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 0
+  coastBrakeForce: 1
+  stopSpeed: 0.03
+  stopAngularSpeed: 5
+  envScale: 1
+  inputDeadzone: 0.2
+  inputTimeout: 0.15
+  energyLevel: 120
+  remixParticleEffect: {fileID: 4588939770941164239}
+  boosting: 0
+  trail: {fileID: 5973205746167519599, guid: 889b941c137ec9a4596ce338b941e05f, type: 3}
+  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
+  playerStatsUI: {fileID: 0}
+  playerStats: {fileID: 0}
+  soulSprite: {fileID: 0}
+  profileColor: {r: 0, g: 0, b: 0, a: 0}
+  minAlpha: 0.2
+  maxAlpha: 1
+  isLocked: 0
+  shipRenderer: {fileID: 0}
+  remixRingHolder: {fileID: 7343128530655426899}
+  harmony: {fileID: 0}
+  shipProfile: {fileID: 0}
+--- !u!114 &-1083081321893026294
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  vehicle: {fileID: 0}
+  trackController: {fileID: 0}
+  visualizer: {fileID: 0}
+--- !u!114 &964252887607637339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
+    type: 3}
+  lifetime: 0
+  randomizeLifetimer: 0
 --- !u!212 &1970310610805977373
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -61,6 +134,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -82,6 +157,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 0
@@ -124,65 +200,42 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 0
---- !u!114 &6267414685674281640
-MonoBehaviour:
+--- !u!58 &8186318885000004935
+CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5120608187766906454}
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  capacity: 120
-  energyLevel: 120
-  teleportationParticles: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
-    type: 3}
-  trailParticlePrefab: {fileID: 1728400142563202279, guid: ac49296c0e25142be8dee26a0a4af429,
-    type: 3}
-  remixParticleEffect: {fileID: 4588939770941164239}
-  ghostVehiclePrefab: {fileID: 5120608187766906454, guid: c6f4f1d5f85ec4fb3ac7b1480fb973ca,
-    type: 3}
-  force: 10
-  terminalVelocity: 22
-  boostMultiplier: 2.2
-  friction: 0.05
-  difficultyMultiplier: 1
-  baseBurnAmount: 5
-  burnRateMultiplier: 1.2
-  boosting: 0
-  trail: {fileID: 5973205746167519599, guid: 889b941c137ec9a4596ce338b941e05f, type: 3}
-  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
-  playerStatsUI: {fileID: 0}
-  playerStats: {fileID: 0}
-  soulSprite: {fileID: 0}
-  profileColor: {r: 0, g: 0, b: 0, a: 0}
-  minAlpha: 0.2
-  maxAlpha: 1
-  maxSpeed: 10
-  isLocked: 0
-  shipRenderer: {fileID: 0}
-  remixRingHolder: {fileID: 7343128530655426899}
-  boostPadding: 0.3
-  harmony: {fileID: 0}
---- !u!114 &964252887607637339
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
-    type: 3}
-  lifetime: 0
-  randomizeLifetimer: 0
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.25
 --- !u!82 &2515959493319008489
 AudioSource:
   m_ObjectHideFlags: 0
@@ -292,57 +345,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10eade318f31ba248b72c13c52f1c81c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!58 &8186318885000004935
-CircleCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_Radius: 0.25
---- !u!114 &-1083081321893026294
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vehicle: {fileID: 0}
-  trackController: {fileID: 0}
-  visualizer: {fileID: 0}
 --- !u!1 &5958635974756898733
 GameObject:
   m_ObjectHideFlags: 0
@@ -5120,6 +5122,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5141,6 +5145,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0

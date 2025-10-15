@@ -47,9 +47,9 @@ public class Boundaries : MonoBehaviour
         // ✅ Adjust Bottom Boundary
         if (bottomBoundary != null)
         {
-            if (track != null && track.trackController != null && track.trackController.noteVisualizer != null)
+            if (track != null && GameFlowManager.Instance.controller != null && GameFlowManager.Instance.controller.noteVisualizer != null)
             {
-                float bottomY = track.trackController.noteVisualizer.GetTopWorldY();
+                float bottomY = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
                 bottomBoundary.transform.position = new Vector3(0, bottomY - (boundaryThickness / 2), 0);
             }
             bottomBoundary.size = new Vector2(screenHalfWidth * 2, boundaryThickness);

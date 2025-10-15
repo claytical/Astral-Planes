@@ -21,7 +21,7 @@ namespace MidiPlayerTK
         {
             EditorGUI.indentLevel++;
             GUI.enabled = instance.MPTK_EffectSoundFont.EnableFilter;
-            instance.MPTK_EffectSoundFont.FilterFreqOffset = EditorGUILayout.Slider(new GUIContent("Offset Cutoff Frequence", "Offset to the cutoff frequency (Low Pass) defined in the SoundFont."), instance.MPTK_EffectSoundFont.FilterFreqOffset, -2000f, 3000f);
+            instance.MPTK_EffectSoundFont.FilterFreqOffset = EditorGUILayout.Slider(new GUIContent("Offset Cutoff Frequency", "Offset to the cutoff frequency (Low Pass) defined in the SoundFont."), instance.MPTK_EffectSoundFont.FilterFreqOffset, -2000f, 3000f);
             instance.MPTK_EffectSoundFont.FilterQModOffset = EditorGUILayout.Slider(new GUIContent("Offset Quality ", "Offset on the SF resonance peak defined in the SoundFont."), instance.MPTK_EffectSoundFont.FilterQModOffset, -96f, 96f);
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("SoundFont Filter", GUILayout.Width(150), GUILayout.Height(15));

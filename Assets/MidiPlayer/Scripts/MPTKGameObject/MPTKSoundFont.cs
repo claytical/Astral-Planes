@@ -13,7 +13,9 @@ namespace MidiPlayerTK
     /// For compatibility, the legacy mode still allows loading SoundFonts from the internal MPTK database. \n
     /// Additionally, Maestro MPTK supports assigning different SoundFonts to different MIDI players, enabling flexible and customized audio rendering across multiple instruments or scenes.\n
     /// @version 2.14
-    /// @note An instance of this class is automatically created for each MPTK prefab (MidiFilePlayer, MidiStreamPlayer ...) loaded in the scene. see MidiSynth.MPTK_SoundFont
+    /// @note
+    /// - An instance of this class is automatically created for each MPTK prefab (MidiFilePlayer, MidiStreamPlayer ...) loaded in the scene. see MidiSynth.MPTK_SoundFont
+    /// - To get logs when running set MidiFilePlayer.VerboseSoundfont to true.
     /// </summary>
     public partial class MPTKSoundFont
     {
@@ -30,14 +32,35 @@ namespace MidiPlayerTK
         public bool SaveToCache;
 
         /// <summary>@brief
-        /// Interesting only for external soundfont. Whether to only download and save in cache the SoundFont in a local cache. Default is false.
-        /// When true, the SoundFont is not loaded in the MidiSynth.
-        /// Set SaveToCache to true to save the SoundFont in the local cache.\n
-        /// Set LoadFromCache to false to force the SoundFont download.\n
-        /// Could be useful to download a SoundFont in the background and load it later in many MidiSynths.\n
+        /// Whether to only download the SoundFont. When true, the SoundFont is not loaded in the MidiSynth. Default is false.
+        /// @note
+        /// - Set SaveToCache to true to save the SoundFont in the local cache.
+        /// - Set LoadFromCache to false to force the SoundFont download.
+        /// - Interesting only for external soundfont, useful to download a SoundFont in the background and load it later in many MidiSynths.
         /// </summary>
         public bool DownloadOnly;
 
+
+        /// <summary>@brief
+        /// The default bank to use for instruments. Set to -1 to select the first bank.
+        /// </summary>
+        public int DefaultBank
+        {
+            get => sfLocal != null ? defaultBank : MidiPlayerGlobal.ImSFCurrent.DefaultBankNumber;
+            set => defaultBank = value;
+        }
+        private int defaultBank;
+
+
+        /// <summary>@brief
+        /// The bank to use for the drum kit. Set to -1 to select the last bank.
+        /// </summary>
+        public int DrumBank
+        {
+            get => sfLocal != null ? drumBank : MidiPlayerGlobal.ImSFCurrent.DrumKitBankNumber;
+            set => drumBank = value;
+        }
+        private int drumBank;
         private MidiSynth synth;
         private ImSoundFont sfLocal = null;
         private string soundFontName = string.Empty;
@@ -103,14 +126,14 @@ namespace MidiPlayerTK
         /// Find a presets name with its preset number from the default bank.\n
         /// The default bank can be changed with #MPTK_SelectBankInstrument or with the popup "SoundFont Setup Alt-F" in the Unity editor.
         /// </summary>
-        public string PresetName(int patch)
-        {
-
-            if (ListPreset != null && patch >= 0 && patch < ListPreset.Count && ListPreset[patch] != null)
-                return ListPreset[patch].Label;
-            else
-                return "";
-        }
+        //public string PresetName(int patch)
+        //{
+        // Not working, because there is no identity between preset index and patch number
+        //    if (ListPreset != null && patch >= 0 && patch < ListPreset.Count && ListPreset[patch] != null)
+        //        return ListPreset[patch].Label;
+        //    else
+        //        return "";
+        //}
 
         /// <summary>@brief
         /// This method change the default instrument drum bank and build the presets list associated. See #ListPreset.\n
@@ -177,47 +200,8 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// List of presets (instrument) for the default or selected bank.\n
-        /// MPTKListItem.Index give the number of the preset\n
-        /// The default bank can be changed with #MPTK_SelectBankInstrument.
-        /// </summary>
-        public List<MPTKListItem> ListPreset
-        {
-
-            get => sfLocal != null ? listPresetInstrument : MidiPlayerGlobal.MPTK_ListPreset;
-            set => listPresetInstrument = value;
-        }
-        private List<MPTKListItem> listPresetInstrument;
-
-        /// <summary>@brief
-        /// List of drum preset for the default or selected bank.\n
-        /// MPTKListItem.Index give the number of the preset\n
-        /// The default bank can be changed with #MPTK_SelectBankDrum or with the menu "MPTK / SoundFont" or Alt-F in the Unity editor.
-        /// </summary>
-        public List<MPTKListItem> ListPresetDrum
-        {
-            get => sfLocal != null ? listPresetDrum : MidiPlayerGlobal.MPTK_ListPresetDrum;
-            set => listPresetDrum = value;
-        }
-        private List<MPTKListItem> listPresetDrum;
-
-
-        /// <summary>@brief
-        /// Get the list of banks available. It's a full list of 129 MPTKListItem elements with element null if a bank is missing.\n
-        /// MPTKListItem.Index give the number of the bank\n
-        /// Prefer using the BanksName to get a list of bank available and BanksNumber to get the number at same corresponding index.\n
-        /// The default bank can be changed with #MPTK_SelectBankInstrument or #MPTK_SelectBankDrum.
-        /// </summary>
-        public List<MPTKListItem> ListBank
-        {
-            get => sfLocal != null ? listBank : MidiPlayerGlobal.MPTK_ListBank;
-            set => listBank = value;
-        }
-        private List<MPTKListItem> listBank;
-
-        /// <summary>@brief
         /// List of banks name available with the format "<number> - Bank". Unlike preset, there is no bank name defined in a Soundfont.\n
-        /// Index in the list is not the bank number, use the same index in BanksNumber to get the bank number.
+        /// Index in the list is not the bank number (missing bank have been removed), use the same index in #BanksNumber to get the bank number.
         /// </summary>
         public List<string> BanksName
         {
@@ -227,7 +211,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// List of banks number available. 
-        /// Use the same index in BanksName to get the bank name.
+        /// Index in the list is not the bank number (missing banks have been removed), use the same index in #BanksName to get the bank name.
         /// </summary>
         public List<int> BanksNumber
         {
@@ -238,7 +222,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// List of preset name available with the format "<number> - <name>".\n
-        /// Index in the list is not the preset number, use the same index in PresetsNumber to get the preset number.
+        /// Index in the list is not the preset number (preset missing has been removed), use the same index in #PresetsNumber to get the preset number.
         /// </summary>
         public List<string> PresetsName
         {
@@ -248,7 +232,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// List of preset number available.
-        /// Use the same index in PresetsName to get the preset name.
+        /// Use the same index in #PresetsName to get the preset name.
         /// </summary>
         public List<int> PresetsNumber
         {
@@ -256,25 +240,67 @@ namespace MidiPlayerTK
         }
         private List<int> presetsNumber;
 
-        /// <summary>@brief
-        /// The default bank to use for instruments. Set to -1 to select the first bank.
-        /// </summary>
-        public int DefaultBank
-        {
-            get => sfLocal != null ? defaultBank : MidiPlayerGlobal.ImSFCurrent.DefaultBankNumber;
-            set => defaultBank = value;
-        }
-        private int defaultBank;
-
 
         /// <summary>@brief
-        /// The bank to use for the drum kit. Set to -1 to select the last bank.
+        /// List of preset name available with the format "<number> - <name>" but dedicated to drum bank.\n
+        /// Index in the list is not the preset number (preset missing has been removed), use the same index in #PresetsDrumNumber to get the preset number.
         /// </summary>
-        public int DrumBank
+        public List<string> PresetsDrumName
         {
-            get => sfLocal != null ? drumBank : MidiPlayerGlobal.ImSFCurrent.DrumKitBankNumber;
-            set => drumBank = value;
+            get => sfLocal != null ? presetsDrumName : MidiPlayerGlobal.MPTK_PresetsName;
         }
-        private int drumBank;
+        private List<string> presetsDrumName;
+
+        /// <summary>@brief
+        /// List of preset number available but dedicated to drum bank.\n
+        /// Use the same index in #PresetsDrumName to get the preset name.
+        /// </summary>
+        public List<int> PresetsDrumNumber
+        {
+            get => sfLocal != null ? presetsDrumNumber : MidiPlayerGlobal.MPTK_PresetsNumber;
+        }
+        private List<int> presetsDrumNumber;
+
+        /// <summary>@brief
+        /// Get the list of banks available. It's a full and fixed list of 129 MPTKListItem with null value if a bank is missing.\n
+        /// MPTKListItem.Index give the number of the bank\n
+        /// Prefer using the #BanksName to get a list of bank available and #BanksNumber to get the bank number at same corresponding index.\n
+        /// @note
+        /// - The default bank can be changed with #SelectBankInstrument or #SelectBankDrum, the ListBank will be updated.
+        /// - Legacy list based on MPTKListItem. Please investigate #BanksName or #BanksNumber for an easier use.
+        /// </summary>
+        public List<MPTKListItem> ListBank
+        {
+            get => sfLocal != null ? listBank : MidiPlayerGlobal.MPTK_ListBank;
+            set => listBank = value;
+        }
+        private List<MPTKListItem> listBank;
+
+        /// <summary>@brief
+        /// List of presets for instrument for the default or selected bank. When using with preset change MIDI event, MPTKListItem.Index give the number of the preset\n
+        /// @note
+        /// - The default bank can be changed with #SelectBankInstrument, the ListPreset will be updated.
+        /// - Legacy list based on MPTKListItem. Please investigate #PresetsName or #PresetsNumber for an easier use.
+        /// </summary>
+        public List<MPTKListItem> ListPreset
+        {
+
+            get => sfLocal != null ? listPresetInstrument : MidiPlayerGlobal.MPTK_ListPreset;
+            set => listPresetInstrument = value;
+        }
+        private List<MPTKListItem> listPresetInstrument;
+
+        /// <summary>@brief
+        /// List of presets drum for the default or selected bank. When using with preset change MIDI event, MPTKListItem.Index give the number of the preset\n
+        /// @note
+        /// - The default bank can be changed with #SelectBankDrum, the ListPresetDrum will be updated.
+        /// - Legacy list based on MPTKListItem. Please investigate #PresetsDrumName or #PresetsDrumNumber for an easier use.
+        /// </summary>
+        public List<MPTKListItem> ListPresetDrum
+        {
+            get => sfLocal != null ? listPresetDrum : MidiPlayerGlobal.MPTK_ListPresetDrum;
+            set => listPresetDrum = value;
+        }
+        private List<MPTKListItem> listPresetDrum;
     }
 }

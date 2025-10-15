@@ -7,6 +7,38 @@ Please, before updating:
 
 Thank for your comments and talks, that help a lot to make Maestro better.
 
+V2.16.1 2025-09-06
+	New Feature
+		MPTK_PauseOnMaxDistance: MIDI player automatically paused when the distance from the listener exceeds MPTK_MaxDistance.
+			- Default is true (pause)
+	Demo & MVP
+		Helper to migrate MPTK demos to Unity 6.
+		Remove some design not compliant to Unity 6 :
+			- Water in TestMidiFilePlayerMulti
+			- Shadow in TestMidiFilePlayerScripting
+
+V2.16.0 2025-06-16
+	New Features
+		Official version compatible WebGL.
+		MPTK_Core set to false when Unity WebGL selected (legacy mode).
+		Added MPTK_ListPresetDrum, MPTK_PresetsNameDrum, MPTK_PresetsNumberDrum.
+
+	Demo & MVP
+		MidiChannel MVP: now displays channel information.
+		MidiFileWriter: now working with WebGL (removes local file management).
+		TestEuclideanRhythme: now working with WebGL (uses coroutine).
+		TestMidiExternalPlayer: now working with WebGL (uses coroutine).
+		TinyMidiSequencer: deprecated (source code still available).
+
+	Fix
+		WebGL: all voices are now cleared when stopping a MIDI.
+		WebGL: playback now starts at the first note.
+		WebGL: MidiExternalPlayer for WebGL compatibility (move MIDI to as CORS compliant server).
+		WebGL: MPTKWriter is now compliant (direct play only).
+		MPTK_CurrentTempo: get rounded to the nearest integer. Thanks to cihadturhan_unity.
+		Correct issue on quantization calculation. Thanks to cihadturhan_unity.
+
+
 V2.15.0 2025-04-25
 	New Features
 		SoundFonts can be dynamically loaded either from a local file system or directly from the web.

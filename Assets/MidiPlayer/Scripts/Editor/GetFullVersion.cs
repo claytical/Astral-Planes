@@ -55,7 +55,7 @@ namespace MidiPlayerTK
                 EditorGUI.LabelField(new Rect(xCol0, yStart + 8, 300, colHeight), "_________________________________");
 
                 yStart += 20;
-                EditorGUI.LabelField(new Rect(xCol0, yStart += ySpace, colWidth, colHeight), "This fonctionality is not available", styleBold);
+                EditorGUI.LabelField(new Rect(xCol0, yStart += ySpace, colWidth, colHeight), "This functionality is not available", styleBold);
                 EditorGUI.LabelField(new Rect(xCol0, yStart += ySpace, colWidth, colHeight), "        with the free version", styleBold);
                 yStart += 25;
                 EditorGUI.LabelField(new Rect(xCol0, yStart += ySpace, colWidth+20, colHeight), "The pro version includes these capacities :");

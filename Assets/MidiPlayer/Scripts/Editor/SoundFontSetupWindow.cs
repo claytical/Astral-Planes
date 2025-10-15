@@ -234,7 +234,7 @@ namespace MidiPlayerTK
 #endif
                 if (GUI.Button(new Rect(startX + localstartX + width - 65, startY + localstartY - 18, 35, 35), MPTKGui.IconHelp, MPTKGui.Button))
                 {
-                    //CreateWave createwave = new CreateWave();
+                    //CreateWave createWave = new CreateWave();
                     //string path = System.IO.Path.Combine(MidiPlayerGlobal.MPTK_PathToResources, "unitySample") + ".wav";
                     ////string path = "unitySample.wav";
                     //HiSample sample = new HiSample();
@@ -243,7 +243,7 @@ namespace MidiPlayerTK
                     //for (int i = 0; i < data.Length; i++) data[i] = (byte)255;
                     //sample.SampleRate = 44100;
                     //sample.End = (uint)data.Length/2;
-                    //createwave.Build(path, sample, data);
+                    //createWave.Build(path, sample, data);
                     Application.OpenURL("https://paxstellar.fr/setup-mptk-add-soundfonts-v2/");
                 }
 
@@ -290,7 +290,7 @@ namespace MidiPlayerTK
                         if (sf.PatchCount == 0)
                         {
                             colw = columnSF[1].Width + columnSF[2].Width + columnSF[3].Width;
-                            EditorGUI.LabelField(new Rect(boxX - 60, boxY + 3, colw+60, itemHeight - 7), "No presets have been extracted yet.", MPTKGui.styleAlertRed);
+                            EditorGUI.LabelField(new Rect(boxX - 60, boxY + 3, colw+60, itemHeight - 7), "Presets have not yet been extracted.", MPTKGui.styleAlertRed);
                             boxX += colw;
                         }
                         else
@@ -628,10 +628,11 @@ namespace MidiPlayerTK
                     content.tooltip = "";
                     content.text = "Setup recommended: 'Compressed In Memory' and 'PCM'";
                     GUILayout.Label(content, MPTKGui.styleBold);
-                    content.text = "but 'Decompressed On Load' for WebGL.";
-                    GUILayout.Label(content, MPTKGui.styleBold);
-                    content.text = "Parameters comes from Unity and can't be applied in all cases (error will be displayed).";
-                    GUILayout.Label(content, MPTKGui.styleBold);
+                    // v2.16: recommended setup works also for webGL
+                    // content.text = "but 'Decompressed On Load' for WebGL.";
+                    // GUILayout.Label(content, MPTKGui.styleBold);
+                    // content.text = "Parameters comes from Unity and can't be applied in all cases (error will be displayed).";
+                    // GUILayout.Label(content, MPTKGui.styleBold);
 
                     if (CompressionFormat != MidiPlayerGlobal.ImSFCurrent.CompressionFormat || LoadType != MidiPlayerGlobal.ImSFCurrent.LoadType)
                         GUILayout.Label("You need to extract to apply the changes.", MPTKGui.styleAlertRed);
@@ -745,7 +746,7 @@ namespace MidiPlayerTK
 #if MPTK_PRO
                 if (MidiPlayerGlobal.CurrentMidiSet.ActiveSounFontInfo != null && MidiPlayerGlobal.CurrentMidiSet.ActiveSounFontInfo.PatchCount == 0)
                 {
-                    GUILayout.Label("No presets or samples have been extracted yet.", MPTKGui.styleAlertRed);
+                    GUILayout.Label("Presets have not yet been extracted.", MPTKGui.styleAlertRed);
                     GUILayout.Label("In the top-right panel, either keep the default selection or:", MPTKGui.styleAlertRed);
                     GUILayout.Label("   - Select the banks you want to keep.", MPTKGui.styleAlertRed);
                     GUILayout.Label("   - Set the default bank for instruments and drum kits.", MPTKGui.styleAlertRed);

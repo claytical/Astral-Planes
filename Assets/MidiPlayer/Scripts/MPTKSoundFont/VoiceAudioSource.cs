@@ -27,6 +27,7 @@ namespace MidiPlayerTK
             //Debug.Log("Start fluid_voice");
         }
 
+        // From fluid_voice_start() fluid_voice.cs  when legacy mode is used
         public void RunUnityThread()
         {
 #if DEBUGPERF
@@ -95,12 +96,18 @@ namespace MidiPlayerTK
                         break;
                     if (!fluidvoice.weakDevice)
                     {
+                        // fluidvoice.pan is dynamically changed by fluid_voice_update_param (fluid_voice.cs)
                         if (last_pan != fluidvoice.pan)
                         {
-                            //Debug.Log("Pan change");
                             last_pan = fluidvoice.pan;
-                            Audiosource.panStereo = !synth.MPTK_EnablePanChange ? 0f : Mathf.Lerp(-1f, 1f, (fluidvoice.pan + 500f) / 1000f);
+                            //Audiosource.panStereo = !synth.MPTK_EnablePanChange ? 0f : Mathf.Lerp(-1f, 1f, (fluidvoice.pan + 500f) / 1000f);
+                            if (synth.MPTK_EnablePanChange)
+                                Audiosource.panStereo = fluidvoice.pan / 500f; ;
+                            if (synth.VerboseCalcGen)
+                                Debug.LogFormat($"CalcGen - EnablePanChange={synth.MPTK_EnablePanChange} last_pan={last_pan:0.00} new pan={fluidvoice.pan:0.00} --> panStereo={Audiosource.panStereo:0.00}");
                         }
+
+                        // fluidvoice.pitch is dynamically changed by fluid_voice_update_param (fluid_voice.cs)
                         if (last_pitch != fluidvoice.pitch)
                         {
                             //Debug.Log("Pitch change");
@@ -120,6 +127,7 @@ namespace MidiPlayerTK
                     yield return Routine.WaitForSeconds(0.010f); //0;
                 }
             }
+
             try
             {
                 //Debug.Log("Stop AudioSource " + Audiosource.clip.name + " vol:" + Audiosource.volume);
@@ -305,7 +313,8 @@ namespace MidiPlayerTK
 
             //******************* vibrato lfo **********************
             //------------------------------------------------------
-            ////// No vibrato available with the audiosource solution
+            ////// No vibrato available with the audiosource solution (modulation)
+            ////// as we can apply change directly on the sample play by the AudioSource
             //////if (synth.MPTK_ApplyVibLfo)
             //////{
             //////    if (fluidvoice.TimeFromStart >= fluidvoice.viblfo_delay)

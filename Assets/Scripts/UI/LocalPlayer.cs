@@ -8,15 +8,15 @@ using UnityEngine.SceneManagement;
 public class LocalPlayer : MonoBehaviour
 {
     public GameObject playerSelect;
-    public GameObject playerVehicle;
+    [SerializeField] private GameObject playerVehicle;
     public Vehicle plane;
-    public GameObject playerStatsUI;
+    [SerializeField] private GameObject playerStatsUI;
     public AudioClip clickFx;
     public AudioClip confirmFx;
     public float friction = 0.5f;
     
     private Color _color;
-    private bool _isReady, _decelerate, _confirmEnabled, _suppressChoose = true;
+    private bool _isReady, _decelerate, _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
     private Vector2 _moveInput;
     private PlayerSelect _selection;
     private PlayerStatsTracking _playerStats;
@@ -43,9 +43,10 @@ public class LocalPlayer : MonoBehaviour
     {
         _color = _selection.planeIcon.color;
     }
+    /*
     public void Launch(DrumTrack drums)
     {
-        GameObject statsUI = Instantiate(playerStatsUI, GameFlowManager.Instance.GetUIParent());
+        GameObject statsUI = Instantiate(playerStatsUI, GameFlowManager.Instance.PlayerStatsGrid);
         _ui = statsUI.GetComponent<PlayerStats>();
         GameObject vehicle = Instantiate(playerVehicle, transform);
         plane = vehicle.GetComponent<Vehicle>();
@@ -73,7 +74,58 @@ public class LocalPlayer : MonoBehaviour
             _playerInput.SwitchCurrentActionMap("Play");
         }
     }
+    */
+    public void Launch()  // <- no params
+    {
+        if (_launched || _launchStarted) return;
+        _launchStarted = true;
+        StartCoroutine(LaunchWhenReady());
+    }
 
+    private IEnumerator LaunchWhenReady()
+    {
+        // Wait for authoritative deps from GameFlowManager
+        yield return new WaitUntil(() =>
+                GameFlowManager.Instance &&
+                GameFlowManager.Instance.PlayerStatsGrid &&               // UI parent exists
+                GameFlowManager.Instance.activeDrumTrack &&               // drums ready
+                GameFlowManager.Instance.controller &&                    // tracks configured
+                GameFlowManager.Instance.harmony &&                       // HarmonyDirector bound
+                GameFlowManager.Instance.arp                              // ChordChangeArpeggiator bound
+        );
+
+        var gfm = GameFlowManager.Instance;
+
+        // --- UI: player stats card under the grid
+        var grid = gfm.PlayerStatsGrid;
+        var statsUI = Instantiate(playerStatsUI, grid);
+        _ui = statsUI.GetComponent<PlayerStats>();
+
+        // --- Vehicle
+        var vehicleGO = Instantiate(playerVehicle, transform);
+        plane = vehicleGO.GetComponent<Vehicle>();
+
+        // Use authoritative references from GameFlowManager
+        plane.SetDrumTrack(gfm.activeDrumTrack);
+        plane.SetHarmony(gfm.harmony);                 // Vehicle keeps a ref; DO NOT re-initialize harmony here
+
+        // Player stats plumbing
+        _playerStats = GetComponent<PlayerStatsTracking>();
+        if (plane)
+        {
+            plane.playerStats   = _playerStats;
+            plane.playerStatsUI = _ui;
+            plane.SyncEnergyUI();
+
+            var sr = plane.GetComponent<SpriteRenderer>();
+            if (sr) sr.color = _color;
+            SetStats();
+            _ui.SetColor(_color);
+            _playerInput.SwitchCurrentActionMap("Play");
+        }
+
+        _launched = true;
+    }
     public float GetVehicleEnergy()
     {
         return plane?.energyLevel ?? 0f;

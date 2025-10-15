@@ -45,10 +45,10 @@ namespace MidiPlayerTK
         //-------------Post Processors
 
         // This event is called as soon as the audio asset is imported successfully
-        //private void OnPostprocessAudio(AudioClip import)
-        //{
-        //    Debug.Log("import " + import.name);
-        //}
+        private void OnPostprocessAudio(AudioClip import)
+        {
+            //Debug.Log("import " + import.name);
+        }
     }
 }
 #endif

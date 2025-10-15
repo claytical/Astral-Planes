@@ -27,6 +27,11 @@ namespace MidiPlayerTK
 
         [Preserve]
         public MPTKStat() { }
+
+        /// <summary>
+        /// Calculate statistics from a list of MIDI events.\n
+        /// </summary>
+        /// <param name="midiEvents"></param>
         public void Calculate(List<MPTKEvent> midiEvents)
         {
             try
@@ -313,14 +318,13 @@ namespace MidiPlayerTK
     }
 
     /// <summary>
-    /// Contains information about signature change.\n
+    /// Contains information about time signature changes in a MIDI file.
     /// @version Maestro 2.10.0
     /// @note 
-    /// @li The signature map is automaticalled build when a MIDI file is loaded from the MIDI DB, from an external MIDI or from a MIDI Writer instance.
-    /// @li The signature map must be run by script on your MIDI events when created with MidiFileWriter2 with:\n
+    /// @li The signature map is automatically built when a MIDI file is loaded from the MIDI DB, from an external MIDI, or from a MIDI Writer instance.
+    /// @li The signature map must be processed by script on your MIDI events when created with MidiFileWriter2 using:
     ///     #MPTK_CalculateMap and #MPTK_CalculateMeasureBoundaries
-    /// @li Each segments defined the tick start/end, the measure start/end.
-
+    /// @li Each segment define the tick start/end and the measure start/end for the time signature.
     /// </summary>
     public class MPTKSignature
     {

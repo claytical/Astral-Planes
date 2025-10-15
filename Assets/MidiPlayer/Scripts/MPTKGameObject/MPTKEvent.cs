@@ -155,6 +155,7 @@ namespace MidiPlayerTK
 
         // initial value before transpose
         private int notTransposedValue;
+        public int OriginalValue { get { return notTransposedValue; } }
 
         // v2.15 - restore initial value before transpose
         public void TransposeValue(int transpose)

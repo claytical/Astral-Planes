@@ -1131,13 +1131,17 @@ namespace MidiPlayerTK
                         }
                         if (MPTK_CorePlayer)
                         {
+                            //Debug.Log($"MPTK_Play ThreadCorePlay");
                             if (Application.isPlaying)
                                 Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
                             else
                                 Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded), Segment.EditorUpdate);
                         }
                         else
+                        {
+                            //Debug.Log($"MPTK_Play ThreadLegacyPlay");
                             Routine.RunCoroutine(ThreadLegacyPlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
+                        }
                     }
                 }
             }
@@ -1151,16 +1155,16 @@ namespace MidiPlayerTK
         /// </summary>
         public void MPTK_Stop()
         {
-            MPTK_Stop(stopAllSound: true, wait: 0f);
+            MPTK_Stop(stopAllSound: true, wait: -1f);
         }
         /// <summary>@brief
         /// Stops MIDI playback and cancels all sounds. This operation is performed in background, so MIDI may really stop after this method returns.
         /// </summary>
         /// <param name="stopAllSound">Set to true to stop all sounds (default), otherwise currently playing notes will continue until they finish.</param>
-        /// <param name="wait">If greater than 0, waits until MIDI playback is fully stopped or the specified wait time (in milliseconds) is reached. Otherwise, returns immediately.</param>
-        public void MPTK_Stop(bool stopAllSound = true, float wait = 0f)
+        /// <param name="wait">With Legacy mode and if greater than -1 (v2.16), waits until MIDI playback is fully stopped or the specified wait time (in milliseconds) is reached. Otherwise, returns immediately.</param>
+        public void MPTK_Stop(bool stopAllSound = true, float wait = -1f)
         {
-            //Debug.Log($"MPTK_Stop");
+            //Debug.Log($">>> MPTK_Stop stopAllSound:{stopAllSound} wait:{wait}");
 
             if (midiLoaded != null)
             {
@@ -1169,22 +1173,14 @@ namespace MidiPlayerTK
                 playPause = false;
                 stopMidi = true;
             }
+
             if (stopAllSound)
-                if (Application.isPlaying)
-                    Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Segment.RealtimeUpdate);
-                else
-                    Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Segment.EditorUpdate);
-            if (wait > 0f)
             {
-                // V2.14 able to wait MIDI is really stop.
-                DateTime dateTime = DateTime.Now;
-                while (MPTK_IsPlaying)
-                {
-                    if ((DateTime.Now - dateTime).TotalMilliseconds > wait)
-                        break;
-                    System.Threading.Thread.Sleep(100);
-                }
+                Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
+                if (!MPTK_CorePlayer)
+                    Routine.RunCoroutine(ThreadVoiceAudioSourceRemove(wait, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
             }
+            //Debug.Log($"<<< MPTK_Stop");
         }
 
         /// <summary>@brief 
@@ -1476,14 +1472,14 @@ namespace MidiPlayerTK
         /// <param name="midiBytesToPlay"></param>
         /// <returns></returns>
         /*protected */
-        public IEnumerator<float> ThreadLegacyPlay(byte[] midiBytesToPlay = null, float fromPosition = 0, float toPosition = 0, bool alreadyLoaded = false)
+        public IEnumerator<float> ThreadLegacyPlay(byte[] midiBytesToPlay = null, string midiName = "", float fromPosition = 0, float toPosition = 0, bool alreadyLoaded = false)
         {
             double deltaTime = 0;
             midiIsPlaying = true;
             stopMidi = false;
             replayMidi = false;
             bool first = true;
-            string currentMidiName = "";
+            string currentMidiName = midiName != null ? midiName : "";
             //Debug.Log("Start play");
             if (alreadyLoaded)
             {
@@ -1507,6 +1503,7 @@ namespace MidiPlayerTK
                     midiLoaded.MPTK_KeepEndTrack = MPTK_KeepEndTrack;
                     midiLoaded.MPTK_LogLoadEvents = MPTK_LogLoadEvents;
                     midiLoaded.MPTK_EnableChangeTempo = MPTK_EnableChangeTempo;
+                    midiLoaded.MPTK_ExtendedText = MPTK_ExtendedText;
                     midiLoaded.MPTK_Load(midiBytesToPlay);
 #if MPTK_PRO
                     MPTK_InnerLoop.Clear();
@@ -1519,8 +1516,14 @@ namespace MidiPlayerTK
             }
             if (midiLoaded != null && midiLoaded.MPTK_MidiEvents != null && midiLoaded.MPTK_MidiEvents.Count != 0)
             {
-                // Clear all sound from a previous midi
-                yield return Routine.WaitUntilDone(Routine.RunCoroutine(ThreadClearAllSound(true), Segment.RealtimeUpdate), false);
+                // Clear all sound from a previous midi - v2.71 wait until all notes are stopped
+                // V2.84 yield return Timing.WaitUntilDone(Timing.RunCoroutine(ThreadClearAllSound(true)), false);
+                //Timing.RunCoroutine(ThreadClearAllSound(true));
+                // V2.84
+                if (Application.isPlaying)
+                    Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Segment.RealtimeUpdate);
+                else
+                    Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Segment.EditorUpdate);
 
                 try
                 {
@@ -1536,26 +1539,41 @@ namespace MidiPlayerTK
                 lastMidiTimePlayAS = Time.realtimeSinceStartup;
                 timeMidiFromStartPlay = fromPosition;
 
-                //if (MPTK_Spatialize)
                 SetSpatialization();
-                //else MPTK_MaxDistance = 500;
 
                 MPTK_ResetStat();
 
                 timeAtStartMidi = (System.DateTime.UtcNow.Ticks / 10000D);
                 ResetMidiPlayer();
+                if (MPTK_Channels.EnableResetChannel)
+                    MPTK_Channels.ResetExtension();
 
                 // Call Event StartPlayMidi
                 try
                 {
+                    // TO BE TESTED !!!!
+
+                    if (SpatialSynths != null)
+                        // Send to the channel synth
+                        foreach (MidiFilePlayer mfp in SpatialSynths)
+                            if (mfp.OnEventStartPlayMidi != null)
+                                mfp.OnEventStartPlayMidi.Invoke(currentMidiName);
+
                     if (OnEventStartPlayMidi != null) // v 2.10.0
                         OnEventStartPlayMidi.Invoke(currentMidiName);
                 }
-                catch (Exception ex)
+                catch (System.Exception ex)
                 {
                     Debug.LogError("OnEventStartPlayMidi: exception detected. Check the callback code");
                     Debug.LogException(ex);
                 }
+
+                if (midiLoaded.MPTK_TickStart > 0)
+                    midiLoaded.TickSeek = midiLoaded.MPTK_TickStart;
+                else if (fromPosition > 0)
+                    MPTK_Position = fromPosition;
+                else if (MPTK_StartPlayAtFirstNote && midiLoaded.MPTK_TickFirstNote > 0)
+                    midiLoaded.TickSeek = midiLoaded.MPTK_TickFirstNote;
 
                 //
                 // Read and play MIDI event from the Unity Main Thread
@@ -1566,11 +1584,12 @@ namespace MidiPlayerTK
                     midiLoaded.MPTK_KeepEndTrack = MPTK_KeepEndTrack;
                     midiLoaded.MPTK_LogLoadEvents = MPTK_LogLoadEvents;
                     midiLoaded.MPTK_EnableChangeTempo = MPTK_EnableChangeTempo;
+                    midiLoaded.endPlayAtLastNote = MPTK_StopPlayOnLastNote;
 
                     if (MPTK_Spatialize)
                     {
                         distanceToListener = MidiPlayerGlobal.MPTK_DistanceToListener(this.transform);
-                        if (distanceToListener > MPTK_MaxDistance)
+                        if (distanceToListener > MPTK_MaxDistance && MPTK_PauseOnMaxDistance)
                         {
                             yield return -1;
                             continue;
@@ -1870,25 +1889,21 @@ namespace MidiPlayerTK
                         if (MPTK_Spatialize)
                         {
                             distanceToListener = MidiPlayerGlobal.MPTK_DistanceToListener(this.transform);
-                            bool pause = distanceToListener > MPTK_MaxDistance ? true : false;
+                            bool pause = distanceToListener > MPTK_MaxDistance;
                             if (pause != distancePause)
                             {
-                                distancePause = pause;
-                                if (distancePause)
+                                if (MPTK_PauseOnMaxDistance)
                                 {
-                                    watchMidi.Stop();
+                                    distancePause = pause;
+                                    if (distancePause)
+                                    {
+                                        watchMidi.Stop();
+                                    }
+                                    else
+                                        watchMidi.Start();
                                 }
-                                else
-                                    watchMidi.Start();
                             }
-                            //if (distanceToListener > MPTK_MaxDistance)
-                            //    MPTK_Pause();
-                            //else if (playPause)
-                            //{
-                            //    MPTK_UnPause();
-                            //}
                         }
-
 
 
                         if (needDelayToStart && delayRampUpSecond > 0f)

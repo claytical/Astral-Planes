@@ -20,7 +20,7 @@ namespace MidiPlayerTK
         // @endcond
 
         /// <summary>@brief
-        /// Call when download is in progress.
+        /// Call every 200 ms when download is in progress. See also #ProgressValue
         /// @code
         ///   midiSynth.MPTK_SoundFont.ProgressCallback = (float progress) =>
         ///   {
@@ -89,15 +89,47 @@ namespace MidiPlayerTK
         private SFLoad sfLoad = null;
 
         /// <summary>@brief
-        /// Load a SoundFont file on the fly when the application is running.
-        /// <param name="pathSF">The full path to the SoundFont file.\n
-        /// Must start with file:// for local desktop loading, or with http:// or https:// for loading from a web resource.\n
-        /// If null or empty, the default internal soundfont is used.
+        /// Load a SoundFont file on the fly when the application is running (MPTK Pro).
+        /// <param name="pathSF">The path to the SoundFont, loading from:
+        /// - Local desktop  when path starts with file:// 
+        /// - a web resource when starts with http:// or https://
+        /// - else from the internal MPTK soundfont DB with this name,
+        /// - if null or empty, the default internal soundfont is selected.
         /// </param>
         /// <returns>
         ///     - true if loading is in progress. Defined LoadedCallback to get information when loading is complete.
         ///     - false if an error is detected in the parameters. The callback LoadedCallback is not called if the return value is false.
         /// </returns>
+        /// @code
+        /// List<MidiSynth> midiSynths = new List<MidiSynth>();
+        /// midiSynths.AddRange(FindObjectsByType<MidiFilePlayer>(FindObjectsSortMode.None));
+        /// foreach (MidiSynth midiSynth in midiSynths)
+        /// {
+        ///     midiSynth.MPTK_SoundFont.ProgressCallback = (float progress) =>
+        ///     {
+        ///         SoundfontInProgress(progress, midiSynth);
+        ///     };
+        ///
+        ///
+        ///     // This callback will be triggered when the soundfont is ready.
+        ///     midiSynth.MPTK_SoundFont.LoadedCallback = (MidiSynth synth) =>
+        ///     {
+        ///         SoundfontIsReady(synth);
+        ///     };
+        ///
+        ///     // Prepare switching between SoundFonts for each synths selected.
+        ///     // Here we load the SoundFont from the URI defined in the UI.
+        ///     // Set download options defined in the UI. 
+        ///     // -------------------------------------------------------------------
+        ///     midiSynth.MPTK_SoundFont.LoadFromCache = True;
+        ///     midiSynth.MPTK_SoundFont.SaveToCache = True;
+        ///     midiSynth.MPTK_SoundFont.DownloadOnly = False;
+        ///
+        ///     bool result = midiSynth.MPTK_SoundFont.Load("https://mptkapi.paxstellar.com/GeneralUser-GS-v2.0.1.sf2");
+        ///     if (!result)
+        ///         Debug.Log($"TestLoadSF - Download canceled, status:{MidiPlayerGlobal.MPTK_StatusLastSoundFontLoaded} URI:{InputURLSoundFontAtRun.text}");
+        /// }
+        /// @endcode
         public bool Load(string path = null)
         {
             //MidiPlayerGlobal.MPTK_SoundFontLoaded = false;
@@ -310,7 +342,7 @@ namespace MidiPlayerTK
         /// </summary>
         private void BuildBankList()
         {
-            listBank = new List<MPTKListItem>();
+           // listBank = new List<MPTKListItem>();
             banksName = new List<string>();
             banksNumber = new List<int>();
             try
@@ -322,12 +354,12 @@ namespace MidiPlayerTK
                     {
                         if (bank != null)
                         {
-                            listBank.Add(new MPTKListItem() { Index = bank.BankNumber, Label = "Bank " + bank.BankNumber });
+                            //listBank.Add(new MPTKListItem() { Index = bank.BankNumber, Label = "Bank " + bank.BankNumber });
                             banksName.Add(bank.BankNumber + " - Bank");
                             banksNumber.Add(bank.BankNumber);
                         }
-                        else
-                            listBank.Add(null);
+                        //else
+                        //    listBank.Add(null);
                     }
                 }
                 else
@@ -347,10 +379,24 @@ namespace MidiPlayerTK
         /// </summary>
         private void BuildPresetList(bool forInstrument)
         {
-            List<MPTKListItem> presets = new List<MPTKListItem>();
-            presetsName = new List<string>();
-            presetsNumber = new List<int>();
+            //List<MPTKListItem> presets = new List<MPTKListItem>();
+            List<string> names;
+            List<int> numbers;
 
+            if (forInstrument)
+            {
+                presetsName = new List<string>();
+                presetsNumber = new List<int>();
+                names = presetsName;
+                numbers = presetsNumber;
+            }
+            else
+            {
+                presetsDrumName = new List<string>();
+                presetsDrumNumber = new List<int>();
+                names = presetsDrumName;
+                numbers = presetsDrumNumber;
+            }
             try
             {
                 //Debug.Log(">>> Load Preset - b:" + ibank + " p:" + ipatch);
@@ -369,9 +415,9 @@ namespace MidiPlayerTK
                                 if (p != null)
                                 {
                                     string label = $"{p.Num} - {p.Name}";
-                                    presets.Add(new MPTKListItem() { Index = p.Num, Label = label, Position = presets.Count });
-                                    presetsName.Add(label);
-                                    presetsNumber.Add(p.Num);
+                                    //presets.Add(new MPTKListItem() { Index = p.Num, Label = label, Position = presets.Count });
+                                    names.Add(label);
+                                    numbers.Add(p.Num);
                                     sfLocal.Banks[ibank].PatchCount++;
                                 }
                             }
@@ -413,10 +459,10 @@ namespace MidiPlayerTK
             {
                 MidiPlayerGlobal.ErrorDetail(ex);
             }
-            if (forInstrument)
-                listPresetInstrument = presets;
-            else
-                listPresetDrum = presets;
+            //if (forInstrument)
+            //    listPresetInstrument = presets;
+            //else
+            //    listPresetDrum = presets;
         }
 
         // Load a SoundFont file on the fly when the application is running from a local file or from a web resource.

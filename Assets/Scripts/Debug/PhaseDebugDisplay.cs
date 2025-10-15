@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Text;
-using UnityEngine.InputSystem;
 
 public class PhaseDebugDisplay : MonoBehaviour
 {
@@ -52,10 +51,6 @@ public class PhaseDebugDisplay : MonoBehaviour
 
         GUI.Label(new Rect(20, 20, 500, 1000), label.ToString(), labelStyle);
     }
-    public void OnNavigate(InputValue value)
-    {
-        Vector2 direction = value.Get<Vector2>();
-        Debug.Log($"🧭 Navigate: {direction}");
-    }
+
 
 }

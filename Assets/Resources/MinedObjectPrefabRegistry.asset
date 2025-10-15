@@ -17,5 +17,6 @@ MonoBehaviour:
     modifier: 0
     prefab: {fileID: 1781116594832268, guid: b644b7f95bb324e49bfdeafb8b28d189, type: 3}
   - type: 1
-    modifier: 2
+    modifier: 1
     prefab: {fileID: 1781116594832268, guid: 363a3f07eac0a4a3dbc99a5a907707fb, type: 3}
+  spawnerOverride: {fileID: 0}

@@ -262,7 +262,7 @@ namespace MidiPlayerTK
                                             Routine.RunCoroutine(mps1.MPTK_MidiFilePlayer.ThreadCorePlay(null,
                                                 MPTK_PlayList[playIndex].StartFrom, endAt).CancelWith(gameObject), Segment.RealtimeUpdate);
                                         else
-                                            Routine.RunCoroutine(mps1.MPTK_MidiFilePlayer.ThreadLegacyPlay(null,
+                                            Routine.RunCoroutine(mps1.MPTK_MidiFilePlayer.ThreadLegacyPlay(null,"",
                                                 MPTK_PlayList[playIndex].StartFrom, endAt).CancelWith(gameObject), Segment.RealtimeUpdate);
                                     }
                                     else

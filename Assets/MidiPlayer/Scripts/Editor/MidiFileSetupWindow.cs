@@ -239,7 +239,7 @@ namespace MidiPlayerTK
                         {
                             IndexKeyItem = selected_index;
                             // 'cause an exception in GUILayout.BeginHorizontal more later
-                            //RefreshDislayMidi();
+                            //RefreshDisplayMidi();
                         }
                         // interesting post
                         // https://forum.unity.com/threads/unexplained-guilayout-mismatched-issue-is-it-a-unity-bug-or-a-miss-understanding.158375/
@@ -258,7 +258,7 @@ namespace MidiPlayerTK
                     {
                         IndexEditItem = IndexKeyItem;
                         IndexKeyItem = -1;
-                        RefreshDislayMidi();
+                        RefreshDisplayMidi();
                         SetMidiSelectedVisible();
                         GUI.changed = true;
                         Repaint();
@@ -315,7 +315,7 @@ namespace MidiPlayerTK
                     {
                         IndexEditItem = index;
                         SetMidiSelectedVisible();
-                        RefreshDislayMidi();
+                        RefreshDisplayMidi();
                     }
                 }
 
@@ -396,7 +396,7 @@ namespace MidiPlayerTK
                             IndexEditItem = i;
                             try
                             {
-                                RefreshDislayMidi();
+                                RefreshDisplayMidi();
                             }
                             catch (Exception)
                             {
@@ -485,7 +485,7 @@ namespace MidiPlayerTK
                     string smode = ModeDisplay == 0 ? "Player" : ModeDisplay == 1 ? "Raw" : "Stat";
                     GUILayout.Label($"Mode Display {smode}", MPTKGui.LabelBoldCentered, GUILayout.Width(130), GUILayout.Height(24));
                     if (modeChanged)
-                        RefreshDislayMidi();
+                        RefreshDisplayMidi();
 
                     string titleMidi;
                     if (ModeDisplay == 0)
@@ -537,9 +537,9 @@ namespace MidiPlayerTK
             // End MIDI events list
         }
 
-        private void RefreshDislayMidi()
+        private void RefreshDisplayMidi()
         {
-            //Debug.Log("RefreshDislayMidi ...");
+            //Debug.Log("RefreshDisplayMidi ...");
 
             if (ModeDisplay == 0)
             {
@@ -569,7 +569,7 @@ namespace MidiPlayerTK
             {
                 string selectedFile = EditorUtility.OpenFilePanelWithFilters(
                     "Open and import MIDI file", ToolsEditor.lastDirectoryMidi,
-                    new string[] { "MIDI files", "mid,midi", "Karoke files", "kar", "All", "*" });
+                    new string[] { "MIDI files", "mid,midi", "Karaoke files", "kar", "All", "*" });
                 if (!string.IsNullOrEmpty(selectedFile))
                 {
                     // selectedFile contins also the folder 
@@ -580,7 +580,7 @@ namespace MidiPlayerTK
                 ToolsEditor.LoadMidiSet();
                 ToolsEditor.CheckMidiSet();
                 AssetDatabase.Refresh();
-                window.RefreshDislayMidi();
+                window.RefreshDisplayMidi();
             }
             catch (System.Exception ex)
             {

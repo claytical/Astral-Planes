@@ -15,3 +15,17 @@ MonoBehaviour:
   shipName: HeartDrive
   allowedMidiPresets: 00000000
   description: Expressive and melodic. Leans into solos and emotional tones.
+  arcadeMaxSpeed: 12
+  arcadeAccel: 8
+  arcadeBoostAccel: 140
+  arcadeLinearDamping: 0.08
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 0
+  coastBrakeForce: 0.6
+  stopSpeed: 0.03
+  stopAngularSpeed: 5
+  inputDeadzone: 0.2
+  envScaleFloor: 0.6
+  mass: 2.2
+  capacity: 10
+  burnEfficiency: 1.1

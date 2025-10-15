@@ -88,7 +88,6 @@ public class CosmicDust : MonoBehaviour
         float duration = (_growInOverride > 0f)
             ? _growInOverride
             : Random.Range(5f, 20f); // keep your old fallback if override not set
-        Debug.Log($"[DUST] GrowIn duration={duration:0.00}s for {name}");
 
         float t = 0f;
         while (t < duration) {
@@ -102,8 +101,8 @@ public class CosmicDust : MonoBehaviour
     }
     private IEnumerator TriggerDelayedRegrowth(Vector2Int gridPos)
     {
-        yield return new WaitForSeconds(0.5f); // delay long enough for Explode effect
-        GameFlowManager.Instance.activeDrumTrack.hexMazeGenerator.TriggerRegrowth(gridPos, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+        yield return new WaitForSeconds(0.2f); // delay long enough for Explode effect
+        GameFlowManager.Instance.dustGenerator.TriggerRegrowth(gridPos, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
     }
     private IEnumerator RegrowAfterDelay()
     {
@@ -131,7 +130,8 @@ public class CosmicDust : MonoBehaviour
         switch (phase)
         {
             case MusicalPhase.Establish:
-                behavior = DustBehavior.ViscousSlow;
+                //behavior = DustBehavior.ViscousSlow;
+                behavior = DustBehavior.SiltDissipate;
                 slowFactor = 0.8f; slowDuration = 0.25f;
                 lateralForce = 0f; turbulence = 0f;
                 
@@ -167,7 +167,6 @@ public class CosmicDust : MonoBehaviour
                 
                 break;
         }
-        Debug.Log($"Chose Behavior: {behavior}");
     }
     private IEnumerator ApplyDustEffect(Vehicle vehicle, Vector2 impactDir)
     {
@@ -214,7 +213,6 @@ public class CosmicDust : MonoBehaviour
     }
 
     public void SetEpoch(int id) => epochId = id;
-    public int GetEpoch() => epochId;
     void SetColorVariance()
     {
         Color color = baseSprite.color;
@@ -231,30 +229,116 @@ public class CosmicDust : MonoBehaviour
     {
         _drumTrack = track;
     }
-    public void SetColor(Color color)
-    {
-        baseSprite.color = color;
-    }
-    public void SetPhaseColor(MusicalPhase phase)
-    {
-        Color phaseColor = phase switch
-        {
-            MusicalPhase.Establish => new Color(0.2f, 1f, 1f, 0.25f),     // Cyan / Gentle
-            MusicalPhase.Evolve    => new Color(0.4f, 0.8f, 1f, 0.25f),     // Blue / Reflective
-            MusicalPhase.Intensify => new Color(1f, 0.3f, 0.3f, 0.3f),     // Red / Bold
-            MusicalPhase.Release   => new Color(1f, 0.8f, 0.4f, 0.25f),     // Amber / Fading
-            MusicalPhase.Wildcard  => new Color(1f, 1f, 1f, 0.3f),         // White shimmer
-            MusicalPhase.Pop       => new Color(1f, 0.6f, 1f, 0.25f),       // Pinkish
-            _                      => new Color(0.5f, 0.5f, 0.5f, 0.2f),   // Default gray
-        };
 
-        if (baseSprite != null)
-        {
-            baseSprite.color = phaseColor;
-            SetParticleColor(phaseColor);
-        }
+/// <summary>Set the ParticleSystem tint immediately for new and existing particles.</summary>
+public void SetTint(Color tint)
+{
+    if (particleSystem == null) return;
 
+    // Main.startColor drives the base tint for NEW particles
+    var main = particleSystem.main;
+    // Preserve alpha behavior if you rely on it elsewhere
+    var target = tint;
+    if (main.startColor.mode == ParticleSystemGradientMode.Color)
+    {
+        var cur = main.startColor.color;
+        target.a = cur.a; // keep existing alpha
     }
+    main.startColor = target;
+
+    // ColorOverLifetime multiplies the base tint over the particle’s lifetime.
+    // We update (or create) a simple flat gradient multiplied by 'tint' so
+    // existing particles also shift color smoothly going forward.
+    var col = particleSystem.colorOverLifetime;
+    col.enabled = true;
+
+    Gradient grad = new Gradient();
+    // If there is already a gradient, multiply its color keys by the new tint;
+    // otherwise use a flat gradient at the target tint.
+    if (col.color.mode == ParticleSystemGradientMode.Gradient)
+    {
+        grad = MultiplyGradient(col.color.gradient, target);
+    }
+    else
+    {
+        grad.SetKeys(
+            new GradientColorKey[] {
+                new GradientColorKey(target, 0f),
+                new GradientColorKey(target, 1f)
+            },
+            new GradientAlphaKey[] {
+                new GradientAlphaKey(target.a, 0f),
+                new GradientAlphaKey(target.a, 1f)
+            }
+        );
+    }
+    col.color = new ParticleSystem.MinMaxGradient(grad);
+}
+
+/// <summary>Smoothly lerp the ParticleSystem tint over time.</summary>
+public IEnumerator RetintOver(float seconds, Color toTint)
+{
+    if (particleSystem == null) yield break;
+
+    var main = particleSystem.main;
+    Color from = (main.startColor.mode == ParticleSystemGradientMode.Color)
+        ? main.startColor.color
+        : Color.white;
+
+    float t = 0f;
+    while (t < seconds)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
+        Color now = Color.Lerp(from, toTint, u);
+        // Apply each step (affects new and in-flight particles)
+        SetTint(now);
+        yield return null;
+    }
+    SetTint(toTint);
+}
+
+// --- Utilities ---
+
+private static Gradient MultiplyGradient(Gradient g, Color mul)
+{
+    var srcC = g.colorKeys;
+    var srcA = g.alphaKeys;
+    var dstC = new GradientColorKey[srcC.Length];
+    var dstA = new GradientAlphaKey[srcA.Length];
+
+    for (int i = 0; i < srcC.Length; i++)
+    {
+        var c = srcC[i].color;
+        dstC[i] = new GradientColorKey(new Color(c.r * mul.r, c.g * mul.g, c.b * mul.b, 1f), srcC[i].time);
+    }
+    for (int i = 0; i < srcA.Length; i++)
+    {
+        var a = srcA[i].alpha * mul.a;
+        dstA[i] = new GradientAlphaKey(a, srcA[i].time);
+    }
+
+    Gradient outG = new Gradient();
+    outG.SetKeys(dstC, dstA);
+    return outG;
+}
+
+    public void ShrinkByPhaseStar(float unitsPerSecond)
+    {
+        if (_shrinkingFromStar) { DoShrink(unitsPerSecond); return; }
+
+        // first entry: cancel any ongoing grow-in so it doesn't fight the shrink
+        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
+        _shrinkingFromStar = true;
+
+        DoShrink(unitsPerSecond);
+    }
+    public void StartFadeAndScaleDown(float duration)
+    {
+        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
+        _fadeRoutine = StartCoroutine(FadeAndScaleDown(duration));
+    }
+
     private void SetParticleColor(Color c)
     {
         if (particleSystem == null) return;
@@ -262,7 +346,6 @@ public class CosmicDust : MonoBehaviour
         var main = particleSystem.main;
         main.startColor = new ParticleSystem.MinMaxGradient(c);
     }
-
     private void AccommodateToVehicle()
     {
         // If PhaseStar is actively shrinking this hex, don't fight it.
@@ -283,7 +366,6 @@ public class CosmicDust : MonoBehaviour
         // Schedule a smooth regrow after a delay
         _regrowRoutine = StartCoroutine(RegrowAfterDelay());
     }
-
     private IEnumerator FadeInAlpha(float targetAlpha)
     {
         if (baseSprite == null) yield break;
@@ -307,11 +389,6 @@ public class CosmicDust : MonoBehaviour
 
         color.a = finalAlpha;
         baseSprite.color = color;
-    }
-    public void StartFadeAndScaleDown(float duration)
-    {
-        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
-        _fadeRoutine = StartCoroutine(FadeAndScaleDown(duration));
     }
     private IEnumerator FadeAndScaleDown(float duration)
     {
@@ -376,7 +453,6 @@ public class CosmicDust : MonoBehaviour
         // Remove the object
         Destroy(gameObject);
     }
-
     private IEnumerator ScaleTo(Vector3 target, float duration)
     {
         Vector3 start = transform.localScale;
@@ -401,17 +477,6 @@ public class CosmicDust : MonoBehaviour
         c.a = Mathf.Lerp(0.1f, _originalAlpha, t); // 0.1 floor prevents “invisible walls”
         baseSprite.color = c;
     }
-
-    public void ShrinkByPhaseStar(float unitsPerSecond)
-{
-    if (_shrinkingFromStar) { DoShrink(unitsPerSecond); return; }
-
-    // first entry: cancel any ongoing grow-in so it doesn't fight the shrink
-    if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-    _shrinkingFromStar = true;
-
-    DoShrink(unitsPerSecond);
-}
     private void DoShrink(float unitsPerSecond) {
     Vector3 s = transform.localScale;
     float step = unitsPerSecond * Time.deltaTime;
@@ -439,7 +504,6 @@ public class CosmicDust : MonoBehaviour
     if (nx <= 0.01f || ny <= 0.01f)
         DestroyFromPhaseStar();
     }
-    
     private void BreakHexagon()
     {
         CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Dust);
@@ -447,7 +511,7 @@ public class CosmicDust : MonoBehaviour
         {
             Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
             _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-            _drumTrack.hexMazeGenerator.RemoveHex(gridPos);
+            GameFlowManager.Instance.dustGenerator.RemoveHex(gridPos);
             StartCoroutine(TriggerDelayedRegrowth(gridPos));
         }
 
@@ -460,7 +524,6 @@ public class CosmicDust : MonoBehaviour
             Destroy(gameObject);
         }
     }
-
     private void DestroyFromPhaseStar()
 {
     DustDestroyStats.StarPrunes++;
@@ -470,7 +533,7 @@ public class CosmicDust : MonoBehaviour
     {
         Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
         _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);                              // frees grid slot
-        _drumTrack.hexMazeGenerator.RemoveHex(gridPos);                              // remove map entry
+        GameFlowManager.Instance.dustGenerator.RemoveHex(gridPos);                              // remove map entry
         if (!starRemovesWithoutRegrow)
             StartCoroutine(TriggerDelayedRegrowth(gridPos));                        // only if you want regrowth
     }
@@ -525,8 +588,6 @@ public class CosmicDust : MonoBehaviour
 
         Destroy(gameObject);
     }
-
-    
     private void OnTriggerEnter2D(Collider2D other) {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
         v.EnterDustField(speedScale, accelScale);  // new in Vehicle.cs (next section)
@@ -551,7 +612,7 @@ public class CosmicDust : MonoBehaviour
         if (!other.TryGetComponent<Rigidbody2D>(out var rb)) return;
 
         // Clamp top speed while inside
-        float max = v.terminalVelocity * speedScale;
+        float max = v.GetMaxSpeed() * speedScale;
         Vector2 vel = rb.linearVelocity; // used elsewhere in your codebase
         if (vel.magnitude > max)
             rb.linearVelocity = vel.normalized * max; // hard cap while inside

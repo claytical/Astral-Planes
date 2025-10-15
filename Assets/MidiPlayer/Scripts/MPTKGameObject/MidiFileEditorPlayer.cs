@@ -8,6 +8,12 @@ namespace MidiPlayerTK
     [ExecuteAlways] 
     public partial class MidiFileEditorPlayer : MidiFilePlayer
     {
+        new void Awake()
+        {
+            MPTK_CorePlayer = true;
+            base.Awake();
+        }
+
     }
 }
 

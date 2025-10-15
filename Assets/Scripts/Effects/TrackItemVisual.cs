@@ -96,10 +96,6 @@ namespace Effects
                     _shouldPulse = true;
                     _shouldRotate = true;
                     break;
-                case  TrackModifierType.ChordProgression:
-                    _shouldPulse = true;
-                    _shouldRotate = true;
-                    break;
             }
         }
     
@@ -119,9 +115,6 @@ namespace Effects
                         break;
                     case  TrackModifierType.RhythmStyle:
                         main.startColor = new Color(1f, 0.7f, 1f);
-                        break;
-                    case  TrackModifierType.ChordProgression:
-                        main.startColor = new Color(1f, 0.8f, 0.9f);
                         break;
                     default:
                         if (tintParticlesToTrackColor)
@@ -146,8 +139,6 @@ namespace Effects
                     return Color.Lerp(baseColor, Color.cyan, 0.4f);
                 case  TrackModifierType.RhythmStyle:
                     return Color.Lerp(baseColor, Color.green, 0.3f);
-                case  TrackModifierType.ChordProgression:
-                    return new Color(0.6f, 0.7f, 1f); // indigo blend
                 case  TrackModifierType.RootShift:
                     return Color.Lerp(baseColor, Color.magenta, 0.3f);
                 default:

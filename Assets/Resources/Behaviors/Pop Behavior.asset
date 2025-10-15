@@ -10,18 +10,47 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
-  m_Name: Release Behavior
+  m_Name: Pop Behavior
   m_EditorClassIdentifier: 
-  personality: 3
-  starColor: {r: 0, g: 0.41509432, b: 0.3219217, a: 1}
-  particlePulseSpeed: 0.5
+  personality: 5
+  mazeColor: {r: 0.3921569, g: 0.5843138, b: 0.9294118, a: 1}
+  particlePulseSpeed: 1
   starAlphaMin: 0.1
-  starAlphaMax: 0.601
-  starDriftSpeed: 1
-  starDriftJitter: 0.1
-  orbitBias: 0
-  teleportChancePerSec: 0
-  dustShrinkRadius: 6
+  starAlphaMax: 0.774
+  rotationMode: 4
+  minPreviewIntervalSec: 0.5
+  personalitySpeedMul: 1
+  bpmToSpeedMul:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 60
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 160
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  progressionMulRange: 0
+  baseCellsPerSecond: 3.8
+  starDriftSpeed: 1.5
+  starDriftJitter: 0.5
+  orbitBias: 0.5
+  teleportChancePerSec: 0.2
+  dustShrinkRadius: 2
   dustShrinkUnitsPerSec: 1.2
   dustFalloff:
     serializedVersion: 2
@@ -147,4 +176,5 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
-  starHoleRadius: 2
+  starHoleRadius: 3
+  darkCleanupMaxLoops: 0

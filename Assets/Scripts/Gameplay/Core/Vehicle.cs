@@ -1,23 +1,39 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Random = UnityEngine.Random;
 
 
 public class Vehicle : MonoBehaviour
 {
+    public ShipMusicalProfile profile;
     public float capacity = 10f;
+    private float _baseBurnAmount = 5f;
+    private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
+
+    // === Arcade RB2D tuning ===
+    [Header("Arcade Movement")]
+    [SerializeField] private float arcadeMaxSpeed = 14f;
+    [SerializeField] private float arcadeAccel = 40f;
+    [SerializeField] private float arcadeBoostAccel = 80f;
+    [SerializeField] private float arcadeLinearDamping = 2f;   // typical 0–5
+    [SerializeField] private float arcadeAngularDamping = 0.5f; // optional: reduces spin after bumps
+    [SerializeField] private bool  requireBoostForThrust = false; // set true if you want “no boost, no thrust”
+    [Header("Coast/Stop (mass-dependent)")]
+    [SerializeField] private float coastBrakeForce   = 6f;   // N per (m/s). F = -k*v (independent of mass)
+    [SerializeField] private float stopSpeed         = 0.05f; // snap-to-rest threshold (m/s)
+    [SerializeField] private float stopAngularSpeed  = 5f;   // deg/s
+
+// Single environment scalar (0..1], replaces envSpeedScale/envAccelScale in movement
+    [SerializeField] private float envScale = 1f;
+    [Header("Input Filtering")]
+    [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
+    [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
+    float   _lastMoveStamp;
+    private Vector2 _moveInput;
+
     public float energyLevel;
     public ParticleSystem remixParticleEffect;
-    public float force = 10f;
-    public float terminalVelocity = 20f;
-    public float boostMultiplier = 2f;
-    private float lastDamageTime = -1f;
-    public float friction = 0.05f;
-    public float difficultyMultiplier = 1f;
-    public float baseBurnAmount = 5f;
-    public float burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
+    private float difficultyMultiplier = 1f;
 
     public bool boosting = false;
 
@@ -34,7 +50,6 @@ public class Vehicle : MonoBehaviour
     public Color profileColor;
     [SerializeField] private float minAlpha = 0.2f;
     [SerializeField] private float maxAlpha = 1f;
-    [SerializeField] private float maxSpeed = 10f;
     private SpriteRenderer baseSprite;
     [SerializeField] private bool isLocked = false;
     [SerializeField] private SpriteRenderer shipRenderer;
@@ -47,103 +62,158 @@ public class Vehicle : MonoBehaviour
     private double loopStartDSPTime;
     private float boostTimeThisLoop = 0f;
     [SerializeField] public RemixRingHolder remixRingHolder;
-
-    public float boostPadding = 0.3f; // configurable padding in seconds
-
+    private float _lastDamageTime = -1f;
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
     public HashSet<MusicalRole> collectedRemixRoles = new();
-    private const int maxRemixCapacity = 4;
-    private float remixChargeTime = 0f;
-    private const float remixBoostDuration = 4f;
-    private bool remixCharging = false;
     private Color currentColorBlend = Color.white;
     private VehicleRemixController _remixController;
-    private float envSpeedScale = 1f;
-    private float envAccelScale = 1f;
-    private float envExtraDamping = 0f;
-    private int   envStacks = 0;
-    private int   envInsideCount = 0;   // support overlapping dust
     [SerializeField] HarmonyDirector harmony;
-    void FixedUpdate()
-        {
-            if (incapacitated) return;
-            if (boosting)
-            {
-                boostTimeThisLoop += Time.deltaTime;
-            }
-            // Check loop boundaries
-            float loopLength = drumTrack.GetLoopLengthInSeconds();
-            double dspNow = AudioSettings.dspTime;
-            if (dspNow - loopStartDSPTime >= loopLength)
-            {
-                loopStartDSPTime = dspNow;
-                EvaluateRemixCondition();  // now calls controller.EvaluateRemixCondition()
-            }        
-            
-            float fuelConsumption = 0f;
-            float currentMaxSpeed = terminalVelocity;
-            float appliedForce = 0f;
-// Always respect environment slow (even when not boosting)
-            currentMaxSpeed *= envSpeedScale;
+// Vehicle.cs
+    [SerializeField] private ShipMusicalProfile shipProfile;
 
-            // Boosting movement
-            if (boosting && energyLevel > 0)
-            {
-                appliedForce = force * burnRateMultiplier * boostMultiplier; // existing【:contentReference[oaicite:10]{index=10}】
-                fuelConsumption = burnRateMultiplier * baseBurnAmount * Time.fixedDeltaTime;
+    public void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
+    {
+        shipProfile = p;
 
-                if (_remixController.HasRemixRoles())
-                {
-                    _remixController.FixedUpdateBoosting(Time.fixedDeltaTime, drumTrack.currentStep);
-                    UpdateRemixParticleEmission();
-                }
+        // Movement
+        arcadeMaxSpeed       = p.arcadeMaxSpeed;
+        arcadeAccel          = p.arcadeAccel;
+        arcadeBoostAccel     = p.arcadeBoostAccel;
+        arcadeLinearDamping  = p.arcadeLinearDamping;
+        arcadeAngularDamping = p.arcadeAngularDamping;
+        requireBoostForThrust= p.requireBoostForThrust;
 
-                currentMaxSpeed *= envSpeedScale;
-                appliedForce    *= envAccelScale;
-            }
-            
-            // Apply fuel drain (if any)
-            if (fuelConsumption > 0f)
-            {
-                fuelConsumption *= difficultyMultiplier;
-                ConsumeEnergy(fuelConsumption);
-                playerStats.RecordFuelUsed(fuelConsumption);
-            }
+        // Coast / Stop / Input
+        coastBrakeForce      = p.coastBrakeForce;
+        stopSpeed            = p.stopSpeed;
+        stopAngularSpeed     = p.stopAngularSpeed;
+        inputDeadzone        = p.inputDeadzone;
 
-            // Apply thrust force
-            if (appliedForce > 0f)
-            {
-                rb.AddForce(transform.up * appliedForce * friction, ForceMode2D.Force);
-            }
+        // Physics
+        rb.mass = p.mass;
 
-            // Clamp speed
-            if (rb.linearVelocity.magnitude > currentMaxSpeed)
-            {
-                rb.linearVelocity = rb.linearVelocity.normalized * currentMaxSpeed;
-            }
+        // Fuel tradeoffs (keep your semantics)
+        capacity = p.capacity;                    // tank size (you already track capacity/energyLevel)
+        _baseBurnAmount *= p.burnEfficiency;       // ship-specific efficiency multiplier
+        if (refillEnergy) energyLevel = capacity; // start full on selection
 
-            // Stat tracking
-            UpdateDistanceCovered();
-            ClampAngularVelocity();
-
-            // Audio feedback
-            audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
-        }
-
-    public void EnterDustField(float speedScale, float accelScale) {
-        envInsideCount++;
-        envSpeedScale = Mathf.Min(envSpeedScale, speedScale);
-        envAccelScale = Mathf.Min(envAccelScale, accelScale);
+        // Apply damping now
+        rb.linearDamping  = arcadeLinearDamping;
+        rb.angularDamping = arcadeAngularDamping;
     }
 
-    public void ExitDustField() {
-        envInsideCount = Mathf.Max(0, envInsideCount - 1);
-        if (envInsideCount == 0) {
-            envSpeedScale = 1f;
-            envAccelScale = 1f;
+void FixedUpdate()
+{
+    if (incapacitated) return;
+
+    float dt = Time.fixedDeltaTime;
+
+    // --- Boost timer (use fixed dt in FixedUpdate) ---
+    if (boosting) boostTimeThisLoop += dt;
+
+    // --- Loop boundary check (null-safe) ---
+    var gfm   = GameFlowManager.Instance;
+    var track = gfm != null ? gfm.activeDrumTrack : null;
+    if (track != null)
+    {
+        float  loopLen = track.GetLoopLengthInSeconds();
+        double dspNow  = AudioSettings.dspTime;
+        if (dspNow - loopStartDSPTime >= loopLen)
+        {
+            loopStartDSPTime = dspNow;
+            EvaluateRemixCondition();
         }
-    }    
+    }
+
+    // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
+    if (Time.time - _lastMoveStamp > inputTimeout) _moveInput = Vector2.zero;
+
+    bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
+    bool canThrust = !requireBoostForThrust || boosting;
+
+    // ---- movement ----
+    if (hasInput && canThrust)
+    {
+        // Target velocity from input (single env scalar)
+        Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
+
+        // Acceleration pick (handles boost-only ships with accel=0)
+        float accelUsed;
+        if (requireBoostForThrust)
+            accelUsed = boosting ? (arcadeBoostAccel * envScale) : 0f;
+        else
+            accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel) * envScale;
+
+        if (accelUsed > 0f)
+        {
+            Vector2 dv      = desiredVel - rb.linearVelocity;
+            float   maxStep = accelUsed * dt;
+            Vector2 step    = (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
+            rb.linearVelocity += step;
+        }
+
+        // Boost-time remix visuals (unchanged behavior)
+        if (boosting && _remixController != null && _remixController.HasRemixRoles())
+        {
+            int stepIdx = drumTrack != null ? drumTrack.currentStep : 0;
+            _remixController.FixedUpdateBoosting(dt, stepIdx);
+            UpdateRemixParticleEmission();
+        }
+    }
+    else
+    {
+        // MASS-DEPENDENT COAST/BRAKE when no input OR cannot thrust
+        Vector2 v = rb.linearVelocity;
+
+        // Viscous brake: F = -k * v  → a = -(k/m) v (heavier ships coast longer)
+        if (v.sqrMagnitude > 0f && coastBrakeForce > 0f)
+            rb.AddForce(-v * coastBrakeForce, ForceMode2D.Force);
+
+        // Snap to full rest near zero to kill jitter tails
+        if (v.magnitude < stopSpeed && Mathf.Abs(rb.angularVelocity) < stopAngularSpeed)
+        {
+            rb.linearVelocity        = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+    }
+
+    // Fuel burn only while boosting (keeps your baseBurnAmount/burnRateMultiplier economy)
+    if (boosting && energyLevel > 0f)
+    {
+        float burn = _burnRateMultiplier * _baseBurnAmount * dt * difficultyMultiplier;
+        ConsumeEnergy(burn);
+    }
+
+    // Face travel direction
+    if (rb.linearVelocity.sqrMagnitude > 0.0001f)
+    {
+        float angleDeg = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
+        rb.rotation = angleDeg;
+    }
+
+    // Stats + audio
+    UpdateDistanceCovered();
+    ClampAngularVelocity();
+    audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
+}
+
+    public void EnterDustField(float speedScale, float accelScale)
+    {
+        float incoming = Mathf.Min(speedScale, accelScale);
+        float floor    = shipProfile ? shipProfile.envScaleFloor : 0.60f;
+        envScale = Mathf.Max(floor, incoming);
+    }
+    public void ExitDustField()
+    {
+        envScale = 1f;
+    }
+
+    public float GetMaxSpeed()
+    {
+        return arcadeMaxSpeed;
+    }
+   
     public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
     {
         if (collectedRemixRoles.Contains(role)) return;
@@ -231,11 +301,22 @@ public class Vehicle : MonoBehaviour
             originalScale = transform.localScale;
             _remixController = GetComponent<VehicleRemixController>();
             loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
+            ApplyShipProfile(profile);
             if (rb == null)
             {
                 Debug.LogError("❌ Rigidbody2D component is missing.");
                 enabled = false;
                 return;
+            }
+            if (rb != null)
+            {
+                rb.gravityScale    = 0f;
+
+                rb.linearDamping  = arcadeLinearDamping;
+                rb.angularDamping = arcadeAngularDamping;
+                // Safety: ensure we start truly at rest.
+                rb.linearVelocity = Vector2.zero;
+                rb.angularVelocity = 0f;
             }
 
             if (audioManager == null)
@@ -306,61 +387,38 @@ public class Vehicle : MonoBehaviour
             float damage = baseDamage * massMultiplier;
 
             // If we hit something within the last 0.5s, pad the damage slightly
-            if (Time.time - lastDamageTime < 0.5f)
+            if (Time.time - _lastDamageTime < 0.5f)
             {
                 damage = Mathf.Max(damage, 10f); // Floor for quick follow-ups
             }
 
-            lastDamageTime = Time.time;
+            _lastDamageTime = Time.time;
 
             return Mathf.RoundToInt(Mathf.Clamp(damage, 0f, 120f));
         }
     public float GetForceAsMidiVelocity()
-        {
-            
-            float speed = rb.linearVelocity.sqrMagnitude;
-            float normalizedSpeed = Mathf.InverseLerp(0, terminalVelocity * terminalVelocity, speed);
-            return Mathf.Lerp(80f, 127f, normalizedSpeed);
-        }
+    {
+        float s2 = rb.linearVelocity.sqrMagnitude;
+        float t2 = arcadeMaxSpeed * arcadeMaxSpeed;
+        return Mathf.Lerp(80f, 127f, Mathf.InverseLerp(0, t2, s2));
+    }
+
     public void Move(Vector2 direction)
+    {
+        if (isLocked) return;
+
+        if (direction.magnitude < inputDeadzone) direction = Vector2.zero;
+
+        _moveInput     = direction;
+        _lastMoveStamp = Time.time;
+
+        // Optional: face input immediately if we’re currently stopped
+        if (rb && direction.sqrMagnitude > 0.0001f && rb.linearVelocity.sqrMagnitude < 0.0001f)
         {
-            if (isLocked) return;
-            if (rb != null && direction != Vector2.zero)
-            {
-                // Reset the existing rotational force (angular velocity)
-                rb.angularVelocity = 0f;
-
-                // Calculate the angle of the movement direction
-                float angleRad = Mathf.Atan2(direction.y, direction.x);
-                float angleDeg = angleRad * Mathf.Rad2Deg;
-
-                // Adjust the angle to account for the sprite's initial orientation (facing up)
-                angleDeg -= 90f;
-
-                // Rotate the vehicle to face the movement direction
-                rb.rotation = angleDeg;
-
-                // Apply force in the direction of movement
-                Vector2 forceDirection = direction.normalized * (force * envAccelScale);
-                rb.AddForce(forceDirection, ForceMode2D.Force);
-                if (envInsideCount > 0)
-                {
-                    rb.AddForce(-rb.linearVelocity * (1f - envAccelScale) * 3f, ForceMode2D.Force);
-                }
-
-                ConsumeEnergy(.01f);
-
-            }
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+            rb.rotation = angle;
         }
-    private void UpdateDistanceCovered()
-        {
-            // Calculate the distance covered since the last frame
-            float distance = Vector3.Distance(transform.position, lastPosition);
-            playerStats.distanceCovered += (int)distance;
-            playerStats.AddScore((int)distance); // Award points for distance
-
-            lastPosition = transform.position;
-        }
+    }
 
     private void Fly()
         {
@@ -391,7 +449,7 @@ public class Vehicle : MonoBehaviour
             Fly();
         }
 
-        burnRateMultiplier = Mathf.Max(0.2f, triggerValue);
+        _burnRateMultiplier = Mathf.Max(0.2f, triggerValue);
     }
 
     public void TurnOffBoost()
@@ -403,7 +461,7 @@ public class Vehicle : MonoBehaviour
         boosting = false;
         harmony?.CancelBoostArp();
         _remixController.ResetRemixVisuals();
-        burnRateMultiplier = 0f; // Reset the multiplier when not boosting
+        _burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
         // Disable the trail's emission when boosting stops
         if (activeTrail != null)
@@ -411,7 +469,8 @@ public class Vehicle : MonoBehaviour
             activeTrail.GetComponent<TrailRenderer>().emitting = false;
         }
     }
-    public void ConsumeEnergy(float amount)
+
+    private void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
@@ -419,17 +478,6 @@ public class Vehicle : MonoBehaviour
             {
                 rb.linearVelocity = Vector2.zero;
                 rb.angularVelocity = 0f;
-                Debug.Log($"[DEBUG] energyLevel={energyLevel}, drumTrack={drumTrack}, trackController={drumTrack?.trackController}");
-
-//                var clearedTrack = drumTrack.trackController.ClearAndReturnTrack(this);
-  //              if (clearedTrack != null)
-  //              {
-  //                  energyLevel = capacity;
-  //                  Debug.Log("Recharged from clearing " + clearedTrack.assignedRole);
-  //                  SyncEnergyUI();
-  //              }
-  //              else
-  //              {
                     Explode explode = GetComponent<Explode>();
                     if (explode != null)
                     {
@@ -456,7 +504,6 @@ public class Vehicle : MonoBehaviour
 
 
         }
-   
     public void CollectEnergy(int amount)
         {
             energyLevel += amount;
@@ -473,7 +520,16 @@ public class Vehicle : MonoBehaviour
             playerStats.RecordItemCollected();
             
         }
-    
+    private void UpdateDistanceCovered()
+    {
+        // Calculate the distance covered since the last frame
+        float distance = Vector3.Distance(transform.position, lastPosition);
+        playerStats.distanceCovered += (int)distance;
+        playerStats.AddScore((int)distance); // Award points for distance
+
+        lastPosition = transform.position;
+    }
+
     private void ClampAngularVelocity()
         {
             float maxAngularVelocity = 540f;
@@ -482,7 +538,6 @@ public class Vehicle : MonoBehaviour
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
             }
         }
-
     void OnCollisionEnter2D(Collision2D coll)
         {
             var node = coll.gameObject.GetComponent<MineNode>();
@@ -508,8 +563,7 @@ public class Vehicle : MonoBehaviour
                 TriggerThud(coll.contacts[0].point);
             }
         }
-
-    public void TriggerThud(Vector2 collisionPoint)
+    private void TriggerThud(Vector2 collisionPoint)
         {
             if (baseSprite == null || isFlickering) return;
 
@@ -519,7 +573,7 @@ public class Vehicle : MonoBehaviour
             }
             flickerPulseRoutine = StartCoroutine(ThudRoutine(collisionPoint));
         }
-    public void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
+    private void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
         {
             if (baseSprite == null || isFlickering) return;
 

@@ -82,8 +82,8 @@ namespace MidiPlayerTK
                                 else
                                     info += string.Format($"DSP Load:{Math.Round(MidiSynth.StatDspLoadPCT, 1),3:F2}");
 
-                                if (MidiSynth.GcCollectionCout > 0)
-                                    info += string.Format($"\nMidi Allocated:{MidiSynth.AllocatedBytesForCurrentThread} GcCollectionCout:{MidiSynth.GcCollectionCout} ");
+                                if (MidiSynth.GcCollectionCount > 0)
+                                    info += string.Format($"\nMidi Allocated:{MidiSynth.AllocatedBytesForCurrentThread} GcCollectionCount:{MidiSynth.GcCollectionCount} ");
 
                                 if (MidiSynth.StatDspLoadPCT >= 100f)
                                     info += string.Format("\n\t<color=red>\tDSP Load over 100%</color>");

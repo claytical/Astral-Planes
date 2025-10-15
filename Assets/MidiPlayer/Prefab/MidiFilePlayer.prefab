@@ -99,7 +99,7 @@ MonoBehaviour:
   StatProcessListMS: 0
   StatProcessListAVG: 0
   keepPlayingNonLooped: 0
-  MPTK_CorePlayer: 1
+  mPTK_CorePlayer: 1
   MPTK_AudioSettingFromUnity: 1
   MPTK_EnableFreeSynthRate: 0
   indexSynthRate: -1
@@ -156,7 +156,7 @@ MonoBehaviour:
   showMidiInfo: 0
   showSynthParameter: 0
   showSpatialization: 0
-  showUnitySynthParameter: 0
+  showUnitySynthParameter: 1
   showUnityPerformanceParameter: 0
   showExperimentalFeature: 0
   showMidiPerformanceParameter: 0
@@ -583,6 +583,7 @@ MonoBehaviour:
   PathToResources: 
   LoadSoundFontAtStartup: 1
   LoadWaveAtStartup: 0
+  verboseGlobal: 0
   InstanceOnEventPresetLoaded:
     m_PersistentCalls:
       m_Calls: []

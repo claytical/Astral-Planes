@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace MidiPlayerTK
 {
@@ -1428,14 +1429,30 @@ namespace MidiPlayerTK
             }
         }
 
+        // Level of quantization : 
+        //     -      0 = None 
+        //     -      1 = Beat Note
+        //     -      2 = Eighth Note
+        //     -      3 = 16th Note
+        //     -      4 = 32th Note
+        //     -      5 = 64th Note
+        //     -      6 = 128th Note
         public void ChangeQuantization(int level = 4)
         {
             try
             {
                 if (level <= 0)
+                {
+                    //Debug.Log($"ChangeQuantization to 0");
                     Quantization = 0;
+                }
                 else
-                    Quantization = MPTK_DeltaTicksPerQuarterNote / level;
+                {
+                    // Quantization = MPTK_DeltaTicksPerQuarterNote / level;
+                    // v2.16.0 Thanks to cihadturhan_unity
+                    //Debug.Log($"ChangeQuantization to {MPTK_DeltaTicksPerQuarterNote / (1 << (level - 1)):F2} for level {level} - previous was: {Quantization:F2} - DeltaTicksPerQuarterNote:{MPTK_DeltaTicksPerQuarterNote}");
+                    Quantization = MPTK_DeltaTicksPerQuarterNote / (1 << (level-1));
+                }
             }
             catch (System.Exception ex)
             {
@@ -1553,7 +1570,9 @@ namespace MidiPlayerTK
 
         private int fluid_player_get_bpm()
         {
-            return 60000000 / miditempo;
+            // return 60000000 / miditempo;
+            // v2.16.0 it’s floating point is something like 139.9xxx which is rounded to 139BPM.I changed my code as the following to fix this.
+            return Mathf.RoundToInt(60000000f / miditempo);
         }
 
         // not possible.  QueueMidiEvents.Enqueue will send list of events by reference ...
@@ -1617,8 +1636,9 @@ namespace MidiPlayerTK
 
                             MPTKEvent mptkEvent = MPTK_MidiEvents[next_event];
                             // 2.9.0 remove stupid shift half quanta
-                            long quantizedTick = Quantization != 0 ? ((mptkEvent.Tick /*+ Quantization / 2*/) / Quantization) * Quantization : mptkEvent.Tick;
-                            //Debug.Log($"MIDI events search. quantizedTick:{quantizedTick} ticks:{ticks}");
+
+                            long quantizedTick = Quantization != 0 ? (mptkEvent.Tick / Quantization) * Quantization : mptkEvent.Tick;
+                            //Debug.Log($"MIDI events search. {Quantization} ticks:{mptkEvent.Tick} --> quantizedTick:{quantizedTick}");
 
                             if (quantizedTick >= ticks) // V2.872 replaced > by >=    
                             {
@@ -1626,6 +1646,7 @@ namespace MidiPlayerTK
                                 //Debug.Log($"   Search over, break the loop. {((midiEvents == null) ? "No event.": midiEvents.Count.ToString()+" events.")} Player ticks:{ticks}  Next tick was:{quantizedTick} TickSeek:{TickSeek}");
                                 break;
                             }
+                            //Debug.Log($"MIDI events search. Quantization:{Quantization} TicksPerQuarterNote:{MPTK_DeltaTicksPerQuarterNote} ticks:{mptkEvent.Tick} --> quantizedTick:{quantizedTick}");
 
                             // If not seeking get next events
                             // If seeking exclude note-on and all META which are not SetTempo (MetaEvent.SetTempo, Preset, Control ... are kept)

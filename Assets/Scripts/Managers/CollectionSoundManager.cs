@@ -81,25 +81,17 @@ public class CollectionSoundManager : MonoBehaviour
         }
 
         Instance = this;
-
-        Debug.Log("🎵 Presets loaded so far: " + MidiPlayerGlobal.MPTK_CountPresetLoaded);
-
         // Wait until SoundFont is ready
         StartCoroutine(WaitForSoundFontReady());
     }
     private IEnumerator WaitForSoundFontReady()
     {
         // Wait until MPTK_Channels is initialized and soundfont is ready
-        while (!MidiPlayerGlobal.MPTK_IsReady() || midiStreamPlayer.MPTK_Channels == null || midiStreamPlayer.MPTK_Channels.Length <= midiChannel)
+        while (!MidiPlayerGlobal.MPTK_SoundFontIsReady || midiStreamPlayer.MPTK_Channels == null || midiStreamPlayer.MPTK_Channels.Length <= midiChannel)
         {
             yield return null;
         }
-        foreach (var presets in MidiPlayerGlobal.MPTK_ListPreset)
-        {
-            Debug.Log($"🎹 Preset #{presets.Label}");
-        }
-
-
+        
         Debug.Log("✅ SoundFont ready. Assigning preset and bank.");
 
         midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = (int)SoundEffectPreset.Dust;

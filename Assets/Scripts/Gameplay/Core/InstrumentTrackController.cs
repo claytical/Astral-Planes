@@ -164,7 +164,6 @@ public class InstrumentTrackController : MonoBehaviour
 
         
     }
-
     private void ClearTrackForNewPhase(InstrumentTrack t)
 {
     // 1) Soft audio fade/mute
@@ -188,16 +187,13 @@ public class InstrumentTrackController : MonoBehaviour
     // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
     // NoteVisualizer can read t.IsMuted to dim rows, if you want.
 }
-
-    
-public void RemixAllTracksForBridge(MusicalPhase phase, PhaseBridgeSignature sig)
+    public void RemixAllTracksForBridge(MusicalPhase phase, PhaseBridgeSignature sig)
 {
     if (tracks == null) return;
     foreach (var t in tracks)
         RemixTrackForBridge(t, phase, sig);
 }
-
-private void RemixTrackForBridge(InstrumentTrack track, MusicalPhase phase, PhaseBridgeSignature sig)
+    private void RemixTrackForBridge(InstrumentTrack track, MusicalPhase phase, PhaseBridgeSignature sig)
 {
     if (track == null) return;
 
@@ -243,7 +239,6 @@ private void RemixTrackForBridge(InstrumentTrack track, MusicalPhase phase, Phas
         }
     }
 }
-
     private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase)
 {
     // Keep it audible

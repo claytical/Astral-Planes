@@ -167,15 +167,13 @@ namespace MidiPlayerTK
                 if (instance != null)
                     instance.LoadSoundFontAtStartup = value;
                 else
-                    Debug.LogWarning("MPTK_LoadWaveAtStartup: no MidiPlayerGlobal instance found");
+                    Debug.LogWarning("MPTK_LoadSoundFontAtStartup: no MidiPlayerGlobal instance found");
             }
         }
 
-        /// <summary>@brief
-        /// If true load all waves when application is started else load when need when playing (default)
-        /// Useless?
-        /// </summary>
-        public static bool MPTK_LoadWaveAtStartup
+        // If true load all waves when application is started else load when need when playing (default)
+        // Useless? deprecated with v2.16
+        private bool MPTK_LoadWaveAtStartup
         {
             get { return instance != null ? instance.LoadWaveAtStartup : false; }
             set
@@ -185,6 +183,16 @@ namespace MidiPlayerTK
                 else
                     Debug.LogWarning("MPTK_LoadWaveAtStartup: no MidiPlayerGlobal instance found");
             }
+        }
+
+        /// <summary>@brief
+        /// If true load all waves when application is started else load when need when playing (default)
+        /// Useless?
+        /// </summary>
+        public static bool VerboseGlobal
+        {
+            get { return instance != null ? instance.verboseGlobal : false; }
+            set { if (instance != null) instance.verboseGlobal = value; }
         }
 
         /// <summary>@brief
@@ -257,6 +265,7 @@ namespace MidiPlayerTK
 
         public bool LoadSoundFontAtStartup = true;
         public bool LoadWaveAtStartup;
+        public bool verboseGlobal;
         public static TimeSpan timeToDownloadSoundFont = TimeSpan.Zero;
         public static TimeSpan timeToLoadSoundFont = TimeSpan.Zero;
         public static TimeSpan timeToLoadWave = TimeSpan.Zero;
@@ -280,47 +289,22 @@ namespace MidiPlayerTK
 
         private static AudioListener AudioListener;
         private static bool Initialized = false;
-        private static bool logDebug = false;
         private static DateTime startInstance;
 
 
         // create path. Useful only in editor mode in conjonction of Application.dataPath. (for OS point of view)
         public static void InitPath()
         {
-            //if (Instance != null)
-            //{
-            //    if (string.IsNullOrEmpty(MPTK_PathToResources))
-            //        Debug.Log("MPTK_PathToResources not defined");
-            //    else
-            //    {
-            //Debug.Log("InitPath Instance.PathToResources " + Instance.PathToResources);
-
             PathToSoundfonts = MPTK_PathToResources + SoundfontsDB;
             PathToMidiFile = MPTK_PathToResources + MidiFilesDB;
             PathToMidiSet = MPTK_PathToResources + FilenameMidiSet + ExtensionSoundFileDot;
-            //PathToSoundfonts = Instance.PathToResources + "/Resources/" + SoundfontsDB;
-            //PathToMidiFile = Instance.PathToResources + "/Resources/" + MidiFilesDB;
-            //PathToMidiSet = Instance.PathToResources + "/Resources/" + FilenameMidiSet + ExtensionSoundFileDot;
-            //    }
-            //}
         }
-        //public static void InitPath()
-        //{
-        //    if (string.IsNullOrEmpty(MPTK_PathToResources))
-        //        Debug.Log("MPTK_PathToResources not defined");
-        //    else
-        //    {
-        //        PathToSoundfonts = MPTK_PathToResources + SoundfontsDB;
-        //        PathToMidiFile = MPTK_PathToResources + MidiFilesDB;
-        //        PathToMidiSet = MPTK_PathToResources + FilenameMidiSet + ExtensionSoundFileDot;
-        //    }
-        //}
 
         void Awake()
         {
             HelperNoteLabel.Init();
 
-            //Debug.Log("Awake MidiPlayerGlobal " + (instance == null ? "instance null" : "instance exist"));
+            if (verboseGlobal) Debug.Log("Awake MidiPlayerGlobal " + (instance == null ? "instance null" : "instance exist"));
             InitPath();
             if (instance != null && instance != this)
             {
@@ -335,11 +319,9 @@ namespace MidiPlayerTK
 
         }
 
-        public void InitInstance(bool _logDebug = false)
+        public void InitInstance()
         {
-            logDebug = _logDebug;
-
-            if (logDebug)
+            if (verboseGlobal)
             {
                 startInstance = DateTime.Now;
                 //Debug.Log("Awake MidiPlayerGlobal - InitThread");
@@ -410,6 +392,8 @@ namespace MidiPlayerTK
 
         public static List<string> MPTK_PresetsName;
         public static List<int> MPTK_PresetsNumber;
+        public static List<string> MPTK_PresetsNameDrum;
+        public static List<int> MPTK_PresetsNumberDrum;
 
         /// <summary>@brief
         /// List of drum set for the default or selected bank.\n
@@ -463,13 +447,13 @@ namespace MidiPlayerTK
                 try
                 {
                     LoadMidiSetFromRsc();
-                    if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - LoadMidiSetFromRsc");
+                    if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - LoadMidiSetFromRsc");
 
                     DicAudioWave.Init();
-                    if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - DicAudioWave.Init");
+                    if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - DicAudioWave.Init");
 
                     DicAudioClip.Init();
-                    if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - DicAudioClip.Init");
+                    if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - DicAudioClip.Init");
                 }
                 catch (System.Exception ex)
                 {
@@ -486,14 +470,14 @@ namespace MidiPlayerTK
                     Debug.LogWarning(MidiPlayerGlobal.ErrorNoSoundFont);
                     yield return Routine.WaitForOneFrame;
                 }
-                if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - WaitForOneFrame");
+                if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - WaitForOneFrame");
 
                 BuildMidiList();
-                if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - BuildMidiList ");
+                if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - BuildMidiList ");
 
                 if (MPTK_LoadSoundFontAtStartup)
                     LoadCurrentSF();
-                if (logDebug) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - LoadCurrentSF ");
+                if (verboseGlobal) Debug.Log($"{(DateTime.Now - startInstance).TotalSeconds:F3} MidiPlayerGlobal - LoadCurrentSF ");
             }
         }
 
@@ -708,7 +692,7 @@ namespace MidiPlayerTK
         {
             MPTK_SoundFontLoaded = false;
             DateTime start = DateTime.Now;
-            // Load simplfied soundfont
+            // Load simplified soundfont
             try
             {
                 if (CurrentMidiSet == null)
@@ -722,7 +706,7 @@ namespace MidiPlayerTK
                         Debug.LogWarning(MidiPlayerGlobal.ErrorNoSoundFont);
                     else
                     {
-                        if (logDebug)
+                        if (VerboseGlobal)
                             Debug.Log("Start loading " + sfi.Name);
 
                         // Path to the soundfonts directory for this SF, start from resource folder
@@ -731,7 +715,7 @@ namespace MidiPlayerTK
                         WavePath = Path.Combine(pathToImSF + "/", PathToWave);
                         // Load all presets defined in the sf
                         ImSFCurrent = ImSoundFont.LoadMPTKSoundFont(pathToImSF, sfi.Name);
-                        if (logDebug) Debug.Log($"{(DateTime.Now - start).TotalSeconds:F3} ImSoundFont.LoadMPTKSoundFont");
+                        if (VerboseGlobal) Debug.Log($"{(DateTime.Now - start).TotalSeconds:F3} ImSoundFont.LoadMPTKSoundFont");
 
                         // Add
                         if (ImSFCurrent == null)
@@ -765,7 +749,7 @@ namespace MidiPlayerTK
                 return;
             }
 
-            if (logDebug) Debug.Log($"{(DateTime.Now - start).TotalSeconds:F3} SoundFont loaded");
+            if (VerboseGlobal) Debug.Log($"{(DateTime.Now - start).TotalSeconds:F3} SoundFont loaded");
 
             // Load samples only in run mode
             //if (Application.isPlaying) // check removes in v2.89.5
@@ -778,28 +762,29 @@ namespace MidiPlayerTK
 
                     // Load audio clip is used only in the legacy mode (non core mode)
                     // Loading at startup is useful only with the legacy mode for better performance (avoid loading AudioClip at each note-on
-                    if (MPTK_LoadWaveAtStartup)
-                    {
-                        LoadAudioClip();
-#if DEBUG_LOAD_WAVE
-                        Debug.Log($"LoadAudioClip {(DateTime.Now - start).TotalSeconds:F3} second");
-#endif
+                    // Add to DicAudioClip.
+                    //if (MPTK_LoadWaveAtStartup)
+                    //{
+                    //    LoadAudioClip();
+                    //    if (VerboseGlobal) Debug.Log($"Load DicAudioClip {(DateTime.Now - start).TotalSeconds:F3} second");
+                    //}
 
-                    }
-
-                    // Load sample for core mode
+#if !UNITY_WEBGL // WebGL doesn't support core mode, so no need to load AudioClip
+                    // Load sample for core mode which are using DicAudioWave. Not used when live SF or external SF are used.
                     // Attention, on ne peut pas utiliser AudioClip et Resources en dehors du main thread unity.
                     // Il faut donc charger tous les echantillons avant.
-                    LoadWave();
-#if DEBUG_LOAD_WAVE
-                    Debug.Log($"LoadWave {(DateTime.Now - start).TotalSeconds:F3} second");
+                    // Add to DicAudioWave.
+                    if (MPTK_LoadSoundFontAtStartup)
+                    {
+                        LoadWave();
+                        if (VerboseGlobal) Debug.Log($"Load DicAudioWave {(DateTime.Now - start).TotalSeconds:F3} second");
+                        if (Application.isPlaying && !DicAudioWave.Check())
+                            Debug.LogError($"<color=red>No sample found in the SoundFont {CurrentMidiSet.ActiveSounFontInfo.Name}. Have you extracted samples from the Maestro 'SoundFont Setup' menu in Unity Editor?</color>");
+                    }
+#else
+                    if (VerboseGlobal) Debug.Log($"Load DicAudioWave disabled with WebGL");
 #endif
-
-                    if (Application.isPlaying && !DicAudioWave.Check())
-                        Debug.Log($"<color=red>No sample found in the SoundFont {CurrentMidiSet.ActiveSounFontInfo.Name}. Have you extracted samples from the Maestro 'SoundFont Setup' menu in Unity Editor?</color>");
-
                     timeToLoadWave = watchLoadWave.Elapsed;
-                    //Debug.Log("End loading Waves " + timeToLoadWave.TotalSeconds + " seconds" + " count:" + MPTK_CountWaveLoaded);
                 }
                 catch (System.Exception ex)
                 {
@@ -899,7 +884,7 @@ namespace MidiPlayerTK
             string path = WavePath + "/" + Path.GetFileNameWithoutExtension(smpl.Name);// + ".wav";
             AudioClip ac = Resources.Load<AudioClip>(path);
             //Debug.Log("<<-------------------- " + smpl.Name);
-            if (ac != null)
+            if (ac != null && ac.loadType == AudioClipLoadType.CompressedInMemory)
             {
                 float[] data = new float[ac.samples * ac.channels];
                 if (ac.GetData(data, 0))
@@ -956,9 +941,52 @@ namespace MidiPlayerTK
         /// </summary>
         static public void BuildPresetList(bool forInstrument)
         {
-            List<MPTKListItem> presets = new List<MPTKListItem>();
-            MPTK_PresetsName = new List<string>();
-            MPTK_PresetsNumber = new List<int>();
+            List<MPTKListItem> presets;
+            List<string> presetsName;
+            List<int> presetsNumber;
+
+
+            if (forInstrument)
+            {
+                if (MPTK_ListPreset == null)
+                    MPTK_ListPreset = new List<MPTKListItem>();
+                else
+                    MPTK_ListPreset.Clear();
+
+                if (MPTK_PresetsName == null)
+                    MPTK_PresetsName = new List<string>();
+                else
+                    MPTK_PresetsName.Clear();
+
+                if (MPTK_PresetsNumber == null)
+                    MPTK_PresetsNumber = new List<int>();
+                else
+                    MPTK_PresetsNumber.Clear();
+                presets = MPTK_ListPreset;
+                presetsName = MPTK_PresetsName;
+                presetsNumber = MPTK_PresetsNumber;
+            }
+            else
+            {
+                if (MPTK_ListPresetDrum == null)
+                    MPTK_ListPresetDrum = new List<MPTKListItem>();
+                else
+                    MPTK_ListPresetDrum.Clear();
+
+                if (MPTK_PresetsNameDrum == null)
+                    MPTK_PresetsNameDrum = new List<string>();
+                else
+                    MPTK_PresetsNameDrum.Clear();
+
+                if (MPTK_PresetsNumberDrum == null)
+                    MPTK_PresetsNumberDrum = new List<int>();
+                else
+                    MPTK_PresetsNumberDrum.Clear();
+
+                presets = MPTK_ListPresetDrum;
+                presetsName = MPTK_PresetsNameDrum;
+                presetsNumber = MPTK_PresetsNumberDrum;
+            }
 
             try
             {
@@ -979,8 +1007,8 @@ namespace MidiPlayerTK
                                 {
                                     string label = $"{p.Num} - {p.Name}";
                                     presets.Add(new MPTKListItem() { Index = p.Num, Label = label, Position = presets.Count });
-                                    MPTK_PresetsName.Add(label);
-                                    MPTK_PresetsNumber.Add(p.Num);
+                                    presetsName.Add(label);
+                                    presetsNumber.Add(p.Num);
                                     ImSFCurrent.Banks[ibank].PatchCount++;
                                 }
                                 //else
@@ -1025,10 +1053,15 @@ namespace MidiPlayerTK
             {
                 MidiPlayerGlobal.ErrorDetail(ex);
             }
-            if (forInstrument)
-                MPTK_ListPreset = presets;
-            else
-                MPTK_ListPresetDrum = presets;
+
+            //if (forInstrument)
+            //{
+            //    MPTK_ListPreset = presets;
+            //}
+            //else
+            //{
+            //    MPTK_ListPresetDrum = presets;
+            //}
         }
 
         public static void BuildMidiList()
