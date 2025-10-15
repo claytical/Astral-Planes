@@ -27,7 +27,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         {
             Debug.Log($"Selected Note Set on Spawner is {selectedNoteSet} for {track} with {musicalRole}");
             selectedNoteSet.assignedInstrumentTrack = track;
-            selectedNoteSet.Initialize(track, track.drumTrack.totalSteps);
+            selectedNoteSet.Initialize(track, track.GetTotalSteps());
         }
 
 
@@ -45,7 +45,8 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         if (assignedTrack != null && selectedNoteSet != null)
         {
             Debug.Log($"[NoteSpawner] Emitting burst for {assignedTrack.name} ({selectedNoteSet.name})");
-            assignedTrack.SpawnCollectableBurst(selectedNoteSet, maxToSpawn: 8); // pick a sensible number
+            assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(selectedNoteSet, maxToSpawn: 8);
+
         }
         else
         {
