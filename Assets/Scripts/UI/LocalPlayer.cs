@@ -23,6 +23,18 @@ public class LocalPlayer : MonoBehaviour
     private PlayerStats _ui;
     private PlayerInput _playerInput;
     private InputAction _confirmAction;
+    private Vector2 _virtualStick;      // accumulated, clamped to radius 1
+    [Header("Mouse/Touchpad Virtual Stick")]
+    [SerializeField] private float mouseSensitivity = 0.015f; // px -> stick units per frame
+    [SerializeField] private float stickMax = 1.0f;           // clamp radius
+    [SerializeField] private float stickDecayPerSec = 2.5f;   // exponential decay rate to 0
+    [SerializeField] private float uiBlockRadius = 0f;        // optional UI guard
+    [SerializeField] private float mouseDeltaSmoothing = 12f; // higher = smoother (EMA rate per second)
+    [SerializeField] private float maxPixelsPerFrame = 50f;   // clamp spikes from touchpad/mouse
+    [SerializeField] private float angleSmoothTime = 0.08f;   // seconds to smooth heading changes
+    private Vector2 _smoothedDelta;
+    private float _angleVel; // SmoothDampAngle velocity
+    private bool _usingMouse;
     public bool IsReady
     {
         get => _isReady;
@@ -43,38 +55,7 @@ public class LocalPlayer : MonoBehaviour
     {
         _color = _selection.planeIcon.color;
     }
-    /*
-    public void Launch(DrumTrack drums)
-    {
-        GameObject statsUI = Instantiate(playerStatsUI, GameFlowManager.Instance.PlayerStatsGrid);
-        _ui = statsUI.GetComponent<PlayerStats>();
-        GameObject vehicle = Instantiate(playerVehicle, transform);
-        plane = vehicle.GetComponent<Vehicle>();
-        plane.SetDrumTrack(drums);
-        var hd = FindAnyObjectByType<HarmonyDirector>();
-        if (hd != null)
-        {
-            plane.SetHarmony(hd);                 // new helper on Vehicle
-            hd.Initialize(drums, GameFlowManager.Instance.controller,
-                FindAnyObjectByType<ChordChangeArpeggiator>());
-        }
 
-        _playerStats = GetComponent<PlayerStatsTracking>();
-
-        if (plane != null)
-        {
-            plane.playerStats = _playerStats;
-            plane.playerStatsUI = _ui;
-            plane.SyncEnergyUI();
-            plane.GetComponent<SpriteRenderer>().color = _color;
-            SetStats();
-            _ui.SetColor(_color);
-            Debug.Log($"Switching action map to play.");
-//            plane.Fly();
-            _playerInput.SwitchCurrentActionMap("Play");
-        }
-    }
-    */
     public void Launch()  // <- no params
     {
         if (_launched || _launchStarted) return;
@@ -166,15 +147,20 @@ public class LocalPlayer : MonoBehaviour
     }
     void FixedUpdate()
     {
-        
-        if (plane != null && _moveInput.sqrMagnitude > 0.01f)
-        {
-            plane.Move(_moveInput);
-            if (_decelerate)
-            {
-                _moveInput = Vector2.zero;
-            }
-        }
+        if (plane == null) return;
+        // Exponential decay toward center for the virtual stick
+        // (use fixed dt so it’s stable with physics timing)
+        float dt = Time.fixedDeltaTime;
+        if (_virtualStick.sqrMagnitude > 0f) { 
+            float k = Mathf.Exp(-stickDecayPerSec * dt); 
+            _virtualStick *= k; 
+            if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
+        } 
+        // Choose latest non-zero source, prefer explicit keyboard/gamepad Move over mouse when active
+        Vector2 chosen = (_moveInput.sqrMagnitude >= 0.0001f) ? _moveInput : _virtualStick;
+        // Always feed Vehicle.Move() to avoid Vehicle’s inputTimeout auto-zero
+        plane.Move(chosen);
+        if (_decelerate) _moveInput = Vector2.zero;
     }
     private void HandleConfirm()
     {
@@ -219,14 +205,51 @@ public class LocalPlayer : MonoBehaviour
         else plane?.TurnOffBoost();
     }
     public void OnMove(InputValue value)
-    {
-        _moveInput = value.Get<Vector2>().normalized * friction;
+    { 
+        // Gamepad/keyboard path; keeps working as before
+        _moveInput = value.Get<Vector2>().normalized * friction; 
+        if (_moveInput.sqrMagnitude > 0f) { 
+            _usingMouse = false; // prefer this source until it goes back to 0
+        }
     }
     public void OnMouseMove(InputValue value)
     {
-        Debug.Log($"OnMouseMove: {value}");
-        _moveInput = value.Get<Vector2>().normalized * friction;
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+        Vector2 raw = value.Get<Vector2>();        // pixels since last frame
+        if (raw.sqrMagnitude == 0f) return;
+
+        _usingMouse = true;
+
+        // 1) clamp per-frame spikes
+        raw = Vector2.ClampMagnitude(raw, maxPixelsPerFrame);
+
+        // 2) exponential moving average (frame-rate aware)
+        float a = 1f - Mathf.Exp(-mouseDeltaSmoothing * Time.unscaledDeltaTime);
+        _smoothedDelta = Vector2.Lerp(_smoothedDelta, raw, a);
+
+        // Convert to "stick units per second" and integrate per frame
+        Vector2 deltaStick = _smoothedDelta * mouseSensitivity * friction * Time.unscaledDeltaTime * 60f;
+
+        // Proposed stick (pre-clamp)
+        Vector2 proposed = _virtualStick + deltaStick;
+
+        // 3) optional angle smoothing to prevent twitchy heading changes
+        if (_virtualStick.sqrMagnitude > 0.000001f && proposed.sqrMagnitude > 0.000001f && angleSmoothTime > 0f)
+        {
+            float curAng = Mathf.Atan2(_virtualStick.y, _virtualStick.x) * Mathf.Rad2Deg;
+            float tgtAng = Mathf.Atan2(proposed.y, proposed.x) * Mathf.Rad2Deg;
+            float smAng  = Mathf.SmoothDampAngle(curAng, tgtAng, ref _angleVel, angleSmoothTime);
+            float mag    = proposed.magnitude;
+            proposed = new Vector2(Mathf.Cos(smAng * Mathf.Deg2Rad), Mathf.Sin(smAng * Mathf.Deg2Rad)) * mag;
+        }
+
+        // Final clamp to stick radius
+        _virtualStick = (proposed.sqrMagnitude > stickMax * stickMax)
+            ? proposed.normalized * stickMax
+            : proposed;
     }
+
     public void OnQuit(InputValue value)
     {
         if (GameFlowManager.Instance.CurrentState == GameState.GameOver)

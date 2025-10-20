@@ -53,7 +53,7 @@ public class InstrumentTrack : MonoBehaviour
     private readonly Dictionary<int, HashSet<int>> _burstSteps = new(); // burstId -> steps for that burst
     private int? _pendingLoopMultiplier;   // supports expand or collapse
     private readonly List<int> _pendingAscendRemovals = new();
-    private int currentBurstId;
+    public int currentBurstId;
     public int LastExpandOldTotal { get; private set; } = 0;
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);
@@ -130,6 +130,19 @@ public class InstrumentTrack : MonoBehaviour
     drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitCollapse;
     _hookedBoundaryForCollapse = false;
 }
+
+    public bool TryGetSplitLayout(out int leftHalfWidth)
+    {
+        // Prefer the committed value; fall back to the pending snapshot.
+        int candidate = (LastExpandOldTotal > 0) ? LastExpandOldTotal : _oldTotalAtExpand;
+        if (candidate > 0 && _totalSteps == candidate * 2)
+        {
+            leftHalfWidth = candidate;
+            return true;
+        }
+        leftHalfWidth = 0;
+        return false;
+    }
 
     private void OnDrumDownbeat_CommitCollapse()
 {
@@ -821,7 +834,8 @@ public class InstrumentTrack : MonoBehaviour
         _currentBurstRemaining = 0; 
     }
     _burstRemaining[burstId] = count;
-    controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, burstId);
+    controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
+    controller?.noteVisualizer?.DestroyOrphanRowMarkers(this);
     controller?.noteVisualizer?.RecomputeTrackLayout(this); 
 }
     public void SpawnCollectableBurstWithExpansionIfNeeded(NoteSet noteSet, int maxToSpawn = -1)
