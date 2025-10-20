@@ -38,6 +38,7 @@ public class Vehicle : MonoBehaviour
     private float difficultyMultiplier = 1f;
 
     public bool boosting = false;
+    private Vector2 _lastNonZeroInput; // remembers the last aim direction
 
     public GameObject trail; // Trail prefab
     public AudioClip thrustClip;
@@ -135,11 +136,12 @@ void FixedUpdate()
     bool canThrust = !requireBoostForThrust || boosting;
 
     // ---- movement ----
-    if (hasInput && canThrust)
-    {
+    if(canThrust && (hasInput || boosting)) {
         // Target velocity from input (single env scalar)
-        Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
-
+        //Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
+        Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
+        // Target velocity from steer direction (sing env scalar)
+        Vector2 desiredVel = steerDir * (arcadeMaxSpeed * envScale);
         // Acceleration pick (handles boost-only ships with accel=0)
         float accelUsed;
         if (requireBoostForThrust)
@@ -422,6 +424,7 @@ void FixedUpdate()
         if (direction.magnitude < inputDeadzone) direction = Vector2.zero;
 
         _moveInput     = direction;
+        if (direction.sqrMagnitude > 0f) _lastNonZeroInput = direction.normalized;
         _lastMoveStamp = Time.time;
 
         // Optional: face input immediately if we’re currently stopped

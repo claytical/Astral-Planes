@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "AstralPlanes",
     "maps": [
         {
@@ -245,6 +246,17 @@
                     "action": "Join",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c9f4e210-010d-41d8-a90c-1ba6541e3aa4",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Join",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -343,7 +355,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "MoveMouse",
+                    "name": "MouseMove",
                     "type": "Value",
                     "id": "eef69fac-cc82-4337-8f3e-5ba6beca37df",
                     "expectedControlType": "Vector2",
@@ -361,6 +373,28 @@
                     "processors": "",
                     "groups": "Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "95d896d9-5c00-4776-be5a-330086c83f0a",
+                    "path": "<Mouse>/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
+                    "action": "MouseMove",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "11629135-8746-44a8-bec3-ea129d5e3e99",
+                    "path": "<Pointer>/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard and Mouse",
+                    "action": "MouseMove",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -421,11 +455,11 @@
                 },
                 {
                     "name": "",
-                    "id": "b8f6f877-bf39-43fb-b51a-968bdc1ce86f",
-                    "path": "<Mouse>/press",
-                    "interactions": "",
+                    "id": "0e186062-f9ea-4bfd-a3b4-74f131f998fe",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "Press",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard and Mouse",
                     "action": "Thrust",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -581,17 +615,6 @@
                     "processors": "",
                     "groups": ";Keyboard and Mouse",
                     "action": "South",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "95d896d9-5c00-4776-be5a-330086c83f0a",
-                    "path": "<Mouse>/delta",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Keyboard and Mouse",
-                    "action": "MoveMouse",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
