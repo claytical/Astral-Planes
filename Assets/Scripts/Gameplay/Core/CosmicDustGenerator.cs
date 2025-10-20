@@ -35,8 +35,14 @@ public class CosmicDustGenerator : MonoBehaviour
     private MusicalPhase _progressivePhase = MusicalPhase.Establish;
     private DrumTrack _drums;
     private int _mazeBuildId = 0;
+    [SerializeField] private int flowTilesPerFrame = 256;   // tune to grid size (e.g., 32x18 grid ≈ 576 → 128–256 is good)
+    private int _flowUpdateCursor = 0;
+    private Vector2 _lastPhaseBias;
     private int _lastPulseId = -1;
-
+    [SerializeField] private int poolPrewarm = 200;             // tune to your grid size
+    [SerializeField] private Transform poolRoot;                 // optional, to keep Hierarchy tidy
+    private readonly Stack<GameObject> _dustPool = new();
+    [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
     [SerializeField] private float regrowCooldownSeconds = 3.0f;
     [SerializeField] public bool  progressiveMaze = true;
@@ -45,6 +51,218 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private float featureSpawnBudgetFrac = 0.12f;  // of loop seconds, per new feature
     [SerializeField] private float featureFadeDurationFrac = 0.25f; // of loop seconds, when removing oldest
     [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
+// direction bias per region, changes slowly over time
+    private Vector2[,] flowField;
+    [SerializeField] private float globalTurbulence = 0.5f;
+    private float hiveTimer;
+// 🔹 Hive-mind flow field
+    private Vector2[,] _flowField;
+    [SerializeField] private float hiveShiftInterval = 4f;  // how often the hive changes its mind
+    [SerializeField] private float hiveShiftBlend    = 0.40f; // how strongly to blend to the new direction
+    [SerializeField] private float baseFlowStrength  = 0.20f; // world units per second
+    [SerializeField] private float phaseFlowBias     = 0.15f; // extra per-phase bias
+// cache grid size so we can rebuild the field when grid changes
+    private int _ffW = -1, _ffH = -1;
+    [SerializeField] private float vehicleInfluenceRadius = 3.5f;
+    [SerializeField] private float vehicleNudge = 0.25f; // world units per sec
+    [SerializeField] private float starErodeRadius  = 1.2f;
+    [SerializeField] private int   starErodePerTick = 6;   // how many tiles max per call
+
+    public void ReactToVehicle(Vector3 vehPos, Vector2 vehDir, MusicalPhase phase)
+    {
+        // quick sweep of hexagons; if you track them by grid, you can cull smarter
+        foreach (var hex in hexagons)
+        {
+            if (!hex) continue;
+            float d = Vector2.Distance(vehPos, hex.transform.position);
+            if (d > vehicleInfluenceRadius) continue;
+
+            // phase logic: attract vs. repel
+            Vector2 nudge =
+                phase == MusicalPhase.Intensify ? -vehDir :
+                phase == MusicalPhase.Release   ?  vehDir * 0.5f :
+                phase == MusicalPhase.Wildcard  ? (Random.insideUnitCircle * 0.5f) :
+                Vector2.zero;
+
+            if (nudge.sqrMagnitude > 0.0001f)
+                hex.transform.position += (Vector3)(nudge.normalized * vehicleNudge * Time.deltaTime);
+        }
+    }
+    private void PrewarmPool()
+    {
+        if (!dustPrefab) return;
+        for (int i = 0; i < poolPrewarm; i++)
+        {
+            var go = Instantiate(dustPrefab, new Vector3(9999,9999,0), Quaternion.identity, poolRoot);
+            go.SetActive(false);
+            _dustPool.Push(go);
+        }
+    }
+    private void Start()
+    {
+        TryEnsureFlowField();
+        PrewarmPool();
+    }
+    // CosmicDustGenerator.cs  (helpers)
+    private GameObject GetDustFromPool()
+    {
+        if (_dustPool.Count > 0)
+        {
+            var go = _dustPool.Pop();
+            go.SetActive(true);
+            return go;
+        }
+        return Instantiate(dustPrefab, poolRoot);
+    }
+
+    private void ReturnDustToPool(GameObject go)
+    {
+        if (!go) return;
+        go.SetActive(false);
+        go.transform.SetParent(poolRoot, worldPositionStays:false);
+        _dustPool.Push(go);
+    }
+
+    public void ErodeDustDisk(Vector3 centerWorld, float appetite = 1f)
+    {
+        if (GameFlowManager.Instance?.activeDrumTrack == null) return;
+        var dt = GameFlowManager.Instance.activeDrumTrack;
+
+        float rWorld = Mathf.Max(0.2f, starErodeRadius * appetite);
+        int removed = 0;
+
+        // scan a small neighborhood in grid space
+        int W = dt.GetSpawnGridWidth(), H = dt.GetSpawnGridHeight();
+        var c = dt.WorldToGridPosition(centerWorld);
+        int rCells = Mathf.CeilToInt(rWorld / Mathf.Max(0.001f, dt.GetCellWorldSize()));
+
+        for (int x = c.x - rCells; x <= c.x + rCells; x++)
+        for (int y = c.y - rCells; y <= c.y + rCells; y++)
+        {
+            if ((uint)x >= (uint)W || (uint)y >= (uint)H) continue;
+            var gp = new Vector2Int(x, y);
+            if (!_hexMap.TryGetValue(gp, out var go) || !go) continue;
+
+            Vector3 wp = dt.GridToWorldPosition(gp);
+            if ((wp - centerWorld).sqrMagnitude > rWorld * rWorld) continue;
+
+            // fade out & free the cell — reuse your existing helpers
+            if (go.TryGetComponent<CosmicDust>(out var dust))
+                dust.StartFadeAndScaleDown(0.20f);
+            else
+                Destroy(go);
+
+            dt.FreeSpawnCell(x, y);
+            DespawnDustAt(gp);
+            removed++;
+
+            if (removed >= Mathf.RoundToInt(starErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f)))
+                return; // throttled
+        }
+    }
+    // CosmicDustGenerator.cs
+    private Vector2 ComputePhaseBias(MusicalPhase phase)
+    {
+        Vector2 bias =
+            phase == MusicalPhase.Establish  ? new Vector2( 0f, -1f) :
+            phase == MusicalPhase.Evolve     ? new Vector2( 0.6f, 0f) :
+            phase == MusicalPhase.Intensify  ? new Vector2( 0f,  1f) :
+            phase == MusicalPhase.Release    ? new Vector2(-0.6f, 0f) :
+            phase == MusicalPhase.Wildcard  ? Random.insideUnitCircle.normalized :
+            /* Pop */                          new Vector2( 0f, -0.4f);
+        return bias.normalized * phaseFlowBias;
+    }
+
+    private void TryEnsureFlowField()
+    {
+        if (GameFlowManager.Instance?.activeDrumTrack == null) return;
+
+        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
+        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        if (_flowField == null || w != _ffW || h != _ffH)
+        {
+            _flowField = new Vector2[w, h];
+            _ffW = w; _ffH = h;
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+                _flowField[x, y] = Random.insideUnitCircle.normalized;
+        }
+    }
+    void Update()
+    {
+        // Flow-field: incremental update each frame (prevents periodic spikes)
+        IncrementalFlowFieldUpdate();
+
+        // Existing hive "intent" shift timer just changes the target bias occasionally
+        hiveTimer += Time.deltaTime;
+        if (hiveTimer >= hiveShiftInterval)
+        {
+            hiveTimer = 0f;
+            _lastPhaseBias = ComputePhaseBias(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+        }
+    }
+    // CosmicDustGenerator.cs  (new method)
+    private void IncrementalFlowFieldUpdate()
+    {
+        if (_flowField == null) return;
+        int total = _ffW * _ffH;
+        if (total == 0) return;
+
+        int steps = Mathf.Clamp(flowTilesPerFrame, 1, total);
+        for (int n = 0; n < steps; n++)
+        {
+            int idx = _flowUpdateCursor++;
+            if (_flowUpdateCursor >= total) _flowUpdateCursor = 0;
+
+            int x = idx % _ffW;
+            int y = idx / _ffW;
+
+            // compute target with a little noise + last bias
+            Vector2 target = (Random.insideUnitCircle.normalized * 0.7f + _lastPhaseBias).normalized;
+            _flowField[x, y] = Vector2.Lerp(_flowField[x, y], target, hiveShiftBlend);
+            if (_flowField[x, y].sqrMagnitude < 1e-4f) _flowField[x, y] = Vector2.up;
+        }
+    }
+
+
+    private void ShiftFlowFieldByPhase(MusicalPhase phase)
+    {
+        if (_flowField == null) return;
+
+        // Global phase bias (directional “intent”)
+        Vector2 bias =
+            phase == MusicalPhase.Establish  ? new Vector2( 0f, -1f) :
+            phase == MusicalPhase.Evolve     ? new Vector2( 0.6f, 0f) :
+            phase == MusicalPhase.Intensify  ? new Vector2( 0f,  1f) :
+            phase == MusicalPhase.Release    ? new Vector2(-0.6f, 0f) :
+            phase == MusicalPhase.Wildcard   ? Random.insideUnitCircle.normalized :
+            /* Pop */                          new Vector2( 0f, -0.4f);
+
+        bias = bias.normalized * phaseFlowBias;
+
+        for (int x = 0; x < _ffW; x++)
+        for (int y = 0; y < _ffH; y++)
+        {
+            // new target = some noise + phase bias
+            Vector2 target = (Random.insideUnitCircle.normalized * 0.7f + bias).normalized;
+            _flowField[x, y] = Vector2.Lerp(_flowField[x, y], target, hiveShiftBlend);
+            if (_flowField[x, y].sqrMagnitude < 1e-4f) _flowField[x, y] = Vector2.up; // avoid zeros
+        }
+    }
+
+    public Vector2 SampleFlowAtWorld(Vector3 worldPos)
+    {
+        if (_flowField == null || GameFlowManager.Instance?.activeDrumTrack == null)
+            return Vector2.zero;
+
+        var grid = GameFlowManager.Instance.activeDrumTrack.WorldToGridPosition(worldPos);
+        if ((uint)grid.x >= (uint)_ffW || (uint)grid.y >= (uint)_ffH) return Vector2.zero;
+
+        return _flowField[grid.x, grid.y] * baseFlowStrength;
+    }
+    
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
@@ -81,13 +299,52 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     public void BeginStaggeredMazeRegrowth(List<(Vector2Int, Vector3)> cellsToGrow)
     {
-        Debug.Log($"[MAZE] Regrow START, tiles={cellsToGrow.Count}");
+        
 
         if (_spawnRoutine != null)
             StopCoroutine(_spawnRoutine); 
         float fit = Mathf.Clamp(GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.25f, 0.08f, GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.5f);
         _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToGrow, fit));
     }
+    public bool TryGetLowDensityZone(out Vector3 world, int sampleRadius = 3)
+    {
+        world = Vector3.zero;
+        if (GameFlowManager.Instance?.activeDrumTrack == null) return false;
+
+        var dt = GameFlowManager.Instance.activeDrumTrack;
+        // Pick a few random samples; choose the one with most available cells nearby
+        int bestScore = -1;
+        Vector2Int bestCell = new(-1,-1);
+
+        for (int i = 0; i < 16; i++)
+        {
+            var c = new Vector2Int(
+                UnityEngine.Random.Range(0, dt.GetSpawnGridWidth()),
+                UnityEngine.Random.Range(0, dt.GetSpawnGridHeight())
+            );
+
+            int score = 0;
+            for (int dx = -sampleRadius; dx <= sampleRadius; dx++)
+            for (int dy = -sampleRadius; dy <= sampleRadius; dy++)
+            {
+                var p = new Vector2Int(c.x + dx, c.y + dy);
+                if ((uint)p.x >= (uint)dt.GetSpawnGridWidth() ||
+                    (uint)p.y >= (uint)dt.GetSpawnGridHeight()) continue;
+                if (dt.IsSpawnCellAvailable(p.x, p.y)) score++;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell  = c;
+            }
+        }
+
+        if (bestScore <= 0) return false;
+        world = dt.GridToWorldPosition(bestCell);
+        return true;
+    }
+
     public void RetintExisting(float seconds = 0.35f)
     {
         foreach (var go in hexagons) // your existing collection of spawned tiles
@@ -99,7 +356,7 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     public void TriggerRegrowth(Vector2Int freedCell, MusicalPhase phase) { 
         if (_regrowthCoroutines.ContainsKey(freedCell)) return; 
-        Debug.Log($"Trigger regrowth for phase {phase}");
+        
         _regrowthCoroutines[freedCell] = StartCoroutine(RegrowElsewhere(freedCell, phase)); 
     }
     public void RemoveHex(Vector2Int gridPos) {
@@ -194,8 +451,7 @@ public class CosmicDustGenerator : MonoBehaviour
         _lastClassicCycleDSP = now; 
         return true;
     }
-    public IEnumerator GenerateMazeThenPlacePhaseStar(MusicalPhase phase, SpawnStrategyProfile profile) { 
-        Debug.Log($"Generating Maze with Profile {profile}"); 
+    public IEnumerator GenerateMazeThenPlacePhaseStar(MusicalPhase phase) { 
         if (_drums == null) 
             _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
         // If we *still* don't have one, bail clearly
@@ -271,7 +527,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 {
                     Destroy(hex);
                     GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(p.x, p.y);
-                    RemoveHex(p);
+                    DespawnDustAt(p);
                     return p;
                 }
             }
@@ -280,50 +536,59 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     
 
-    private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration)
+private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration)
+{
+    // Keep pacing similar, but enforce a per-frame millisecond budget
+    float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
+
+    _isSpawningMaze = true;
+    try
     {
-        Debug.Log($"[MAZE] Growth begin: {cells.Count} cells, dur={totalDuration}s");
-        int count = Mathf.Max(1, cells.Count);
-        float perHexDelay = Mathf.Max(0f, totalDuration / count);
-
-        _isSpawningMaze = true;
-        try
+        float lastPacedAt = Time.realtimeSinceStartup;
+        int i = 0;
+        while (i < cells.Count)
         {
-            Debug.Log($"cells.Count: {cells.Count}");
-            foreach (var (grid, pos) in cells)
-            {
-                if (dustPrefab == null)
-                {
-                    Debug.LogError("[MAZE] dustPrefab is NULL; skipping hex spawn but continuing.");
-                    break; // bail early but still finish
-                }
+            float frameStart = Time.realtimeSinceStartup;
+            float frameBudget = maxSpawnMillisPerFrame / 1000f;
 
-                var hex = Instantiate(dustPrefab, pos, Quaternion.identity);
+            // do as much as we can this frame within budget
+            while (i < cells.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
+            {
+                var (grid, pos) = cells[i++];
+
+                var hex = GetDustFromPool();
+                hex.transform.SetPositionAndRotation(pos, Quaternion.identity);
                 GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust);
                 hexagons.Add(hex);
 
                 if (hex.TryGetComponent<CosmicDust>(out var dust))
                 {
+                    dust.PrepareForReuse();
                     dust.SetEpoch(GetCurrentEpoch());
                     dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack);
                     dust.SetGrowInDuration(hexGrowInSeconds);
-                    
                     dust.SetTint(_mazeTint);
                     dust.ConfigureForPhase(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
                     dust.Begin();
                 }
                 RegisterHex(grid, hex);
-                if (perHexDelay > 0f) yield return new WaitForSeconds(perHexDelay);
-                else yield return null;
             }
-        }
-        finally
-        {
-            _isSpawningMaze = false;                 // <- ALWAYS clear
-            Debug.Log("[MAZE] Growth finished (or aborted); releasing wait.");
+
+            // Maintain the overall pacing without blocking the main thread for long
+            float elapsedSinceLast = Time.realtimeSinceStartup - lastPacedAt;
+            if (elapsedSinceLast < deadlineStep)
+                yield return new WaitForSeconds(deadlineStep - elapsedSinceLast);
+            else
+                yield return null;
+
+            lastPacedAt = Time.realtimeSinceStartup;
         }
     }
-
+    finally
+    {
+        _isSpawningMaze = false;
+    }
+}
     IEnumerator _RunClassicCycleGuard(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac) {
         _cycleRunning = true; 
         try { 
@@ -340,7 +605,7 @@ public class CosmicDustGenerator : MonoBehaviour
         {
             if (kv.Value != null) Destroy(kv.Value);
             GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(kv.Key.x, kv.Key.y);
-            RemoveHex(kv.Key);
+            DespawnDustAt(kv.Key);
         }
         _featureOrder.Clear();
         _featureCells.Clear();
@@ -523,8 +788,7 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private IEnumerator RemoveMappingAfter(Vector2Int pos, float delay) {
         yield return new WaitForSeconds(delay);
-        GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(pos.x, pos.y);
-        RemoveHex(pos); // keep hexMap in sync
+        DespawnDustAt(pos);
     }
     private IEnumerator FadeTransformThenDestroy(Transform t, float duration) {
         var s0 = t.localScale;
@@ -670,7 +934,9 @@ public class CosmicDustGenerator : MonoBehaviour
             if (_hexMap.ContainsKey(grid)) continue;                       // already has dust
             if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(grid.x, grid.y)) continue;// reserved by something else
             // Spawn one dust tile and register it
-            var go = Instantiate(dustPrefab, world, Quaternion.identity, transform); 
+            var go = GetDustFromPool();
+            go.transform.SetParent(transform, worldPositionStays:false);
+            go.transform.SetPositionAndRotation(world, Quaternion.identity);
             _hexMap[grid] = go; 
             GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust); // ✅ DUST, not Node
             if (go.TryGetComponent<CosmicDust>(out var dust)) {
@@ -682,6 +948,17 @@ public class CosmicDustGenerator : MonoBehaviour
             yield break;
         }
     }
+    // CosmicDustGenerator.cs
+    public void DespawnDustAt(Vector2Int gridPos)
+    {
+        if (_hexMap.TryGetValue(gridPos, out var go) && go != null)
+        {
+            _hexMap.Remove(gridPos);
+            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+            ReturnDustToPool(go);
+        }
+    }
+
     private int CountFilledNeighbors(Vector2Int cell)
     {
         int count = 0;

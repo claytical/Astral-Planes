@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -31,12 +32,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _driftDir = Random.insideUnitCircle.normalized;
         _rechooseTimer = 0f;
 
-        ApplyBodyType();
-    }
-// ADD:
-    public void SetKinematicMode(bool on)
-    {
-        kinematicMode = on;
         ApplyBodyType();
     }
 
@@ -141,6 +136,19 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             Vector2 off = UnityEngine.Random.insideUnitCircle * 1.5f;
             _rb.position += off;
             OnVelocityChanged?.Invoke(kinematicMode ? v : _rb.linearVelocity);
+        }
+    }
+    public void SetTarget(Vector3 target, float curiosity = 1f) {
+        StartCoroutine(MoveTowardTarget(target, curiosity));
+    }
+
+    private IEnumerator MoveTowardTarget(Vector3 target, float curiosity) {
+        while (true) {
+            Vector2 dir = (target - transform.position).normalized;
+            _rb.AddForce(dir * curiosity * 0.5f, ForceMode2D.Force);
+            yield return new WaitForSeconds(0.25f);
+            if (Vector2.Distance(transform.position, target) < 1f)
+                break;
         }
     }
 

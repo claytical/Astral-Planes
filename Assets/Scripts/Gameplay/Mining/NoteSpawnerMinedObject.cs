@@ -9,6 +9,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     
     private PhaseStar _ownerStar;
     private bool _isDark;
+    private bool _burstSpawned;
     public void BindPhaseStar(PhaseStar star) => _ownerStar = star;
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
@@ -39,12 +40,11 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.NoteSpawner));
         }
     }
-    
+
     private void OnEnable()
     {
         if (assignedTrack != null && selectedNoteSet != null)
         {
-            Debug.Log($"[NoteSpawner] Emitting burst for {assignedTrack.name} ({selectedNoteSet.name})");
             assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(selectedNoteSet, maxToSpawn: 8);
 
         }

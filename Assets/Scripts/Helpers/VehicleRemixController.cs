@@ -38,8 +38,7 @@ public class VehicleRemixController : MonoBehaviour
     {
         if (!HasRemixRoles()) return;
 
-        AnimateRemixWaveFeedback(deltaTime);
-
+        
         // Color cycling visuals
         _colorCycleTimer += deltaTime;
         if (_colorCycleTimer >= _colorCycleRate && _collectedColors.Count > 1)
@@ -109,41 +108,12 @@ public class VehicleRemixController : MonoBehaviour
                 }
             }
         }
-
-        visualizer.SetWaveSpeed(0f);
-        foreach (var role in _collectedRemixRoles)
-        {
-            var track = trackController.FindTrackByRole(role);
-            visualizer.SetWaveAmplitudeForTrack(track, 0f);
-        }
-
+        
         _remixPrimed = false;
         _colorCycleTimer = 0f;
         _colorCycleIndex = 0;
         _collectedRemixRoles.Clear();
         _collectedColors.Clear();
-    }
-    private void AnimateRemixWaveFeedback(float deltaTime)
-    {
-        float chargeRatio = Mathf.Clamp01(_boostTimeThisLoop / _requiredBoostTime);
-        float smoothedSpeed = Mathf.Lerp(visualizer.waveSpeed, _maxWaveSpeed, deltaTime * _waveSpeedLerpUp);
-        visualizer.SetWaveSpeed(smoothedSpeed);
-
-        foreach (var role in _collectedRemixRoles)
-        {
-            InstrumentTrack track = trackController.FindTrackByRole(role);
-            float current = visualizer.GetWaveAmplitude(track);
-            float fullAmp = Mathf.Pow(2f, _collectedRemixRoles.Count);
-            float target = Mathf.Lerp(0f, fullAmp, chargeRatio);
-            float smoothed = Mathf.Lerp(current, target, deltaTime * _amplitudeLerpUp);
-            visualizer.SetWaveAmplitudeForTrack(track, smoothed);
-        }
-
-        if (!_remixPrimed && chargeRatio >= _remixPrimingThreshold)
-        {
-            _remixPrimed = true;
-            // Optional: Add visual or audio feedback here
-        }
     }
 
 }

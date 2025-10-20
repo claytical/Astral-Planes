@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+public enum DustBehaviorType { PushThrough, Stop, Repel }
 public class CosmicDust : MonoBehaviour
 {
     [Header("Sizing (safe fallback)")]
@@ -45,7 +45,8 @@ public class CosmicDust : MonoBehaviour
     private DrumTrack _drumTrack;
     private float _originalAlpha, _growInOverride = -1f;
     [SerializeField] private int epochId;
-
+    [SerializeField] private float stayForceEvery = 0.05f; // seconds
+    private float _stayForceUntil;
     private static class DustDestroyStats
     {
         public static int ManualBreaks, StarPrunes, VehicleEats, Lifetimes, Debugs;
@@ -82,8 +83,18 @@ public class CosmicDust : MonoBehaviour
         transform.localScale = Vector3.zero;
         _growInRoutine = StartCoroutine(GrowIn());
         StartCoroutine(FadeInAlpha(targetAlpha: _originalAlpha));
-
     }
+    private void LateUpdate()
+    {
+        // Gentle drift along the hive flow
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null) return;
+
+        Vector2 flow = gen.SampleFlowAtWorld(transform.position);
+        if (flow.sqrMagnitude > 0.00001f)
+            transform.position += (Vector3)(flow * Time.deltaTime);
+    }
+
     private IEnumerator GrowIn() {
         float duration = (_growInOverride > 0f)
             ? _growInOverride
@@ -451,7 +462,13 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         }
 
         // Remove the object
-        Destroy(gameObject);
+        // hand off to generator to return to pool
+        var dt = GameFlowManager.Instance?.activeDrumTrack; 
+        if (dt != null) { 
+            var gridPos = dt.WorldToGridPosition(transform.position); 
+            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
+        }
+        else { gameObject.SetActive(false); }
     }
     private IEnumerator ScaleTo(Vector3 target, float duration)
     {
@@ -511,7 +528,7 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         {
             Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
             _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-            GameFlowManager.Instance.dustGenerator.RemoveHex(gridPos);
+            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
             StartCoroutine(TriggerDelayedRegrowth(gridPos));
         }
 
@@ -533,7 +550,7 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
     {
         Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
         _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);                              // frees grid slot
-        GameFlowManager.Instance.dustGenerator.RemoveHex(gridPos);                              // remove map entry
+        GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);                              // remove map entry
         if (!starRemovesWithoutRegrow)
             StartCoroutine(TriggerDelayedRegrowth(gridPos));                        // only if you want regrowth
     }
@@ -549,6 +566,36 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         Destroy(gameObject);
     }
 }
+    // CosmicDust.cs
+    public void PrepareForReuse()
+    {
+        // Stop any lingering coroutines from prior life
+        if (_accomodateRoutine != null) { StopCoroutine(_accomodateRoutine); _accomodateRoutine = null; }
+        if (_regrowRoutine     != null) { StopCoroutine(_regrowRoutine);     _regrowRoutine     = null; }
+        if (_fadeRoutine       != null) { StopCoroutine(_fadeRoutine);       _fadeRoutine       = null; }
+        if (_growInRoutine     != null) { StopCoroutine(_growInRoutine);     _growInRoutine     = null; }
+
+        _shrinkingFromStar = false;
+        _accomodationTarget = fullScale = referenceScale;
+        transform.localScale = referenceScale;
+        if (baseSprite) {
+            var c = baseSprite.color; c.a = 1f; baseSprite.color = c;
+        }
+        // Reset particles cheaply
+        if (particleSystem != null)
+        {
+            particleSystem.Clear(true);
+            particleSystem.Play(true);
+        }
+    }
+
+    public void DespawnToPoolInstant()
+    {
+        // Fast visual reset; pooling system handles SetActive(false)
+        if (particleSystem != null) { particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); }
+        gameObject.SetActive(false);
+    }
+
     private IEnumerator FadeAndDestroy(float strength01)
     {
         // strength01 lets closer tiles fade faster (optional)
@@ -585,8 +632,12 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         {
             yield return null;
         }
-
-        Destroy(gameObject);
+        var dt = GameFlowManager.Instance?.activeDrumTrack;
+        if (dt != null) { 
+            var gridPos = dt.WorldToGridPosition(transform.position); 
+            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
+        }
+        else { gameObject.SetActive(false); }
     }
     private void OnTriggerEnter2D(Collider2D other) {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
@@ -601,23 +652,22 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
 
             StartCoroutine(ApplyDustEffect(v, dir));  // <- uses your behavior switches
         }
-        Debug.Log($"Accomodating to Vehicle: {v}");
+        
         AccommodateToVehicle();
-        // Particle puff as a pulse (no accumulation)
-//        if (cachedPS) StartCoroutine(ParticleSwellPulse(1.5f, 0.3f));
     }
     private void OnTriggerStay2D(Collider2D other)
     {
+        if (Time.time < _stayForceUntil) return;
+        _stayForceUntil = Time.time + stayForceEvery;
+
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
         if (!other.TryGetComponent<Rigidbody2D>(out var rb)) return;
 
-        // Clamp top speed while inside
         float max = v.GetMaxSpeed() * speedScale;
-        Vector2 vel = rb.linearVelocity; // used elsewhere in your codebase
+        Vector2 vel = rb.linearVelocity;
         if (vel.magnitude > max)
-            rb.linearVelocity = vel.normalized * max; // hard cap while inside
+            rb.linearVelocity = vel.normalized * max;
 
-        // Add a gentle continuous counter-force to feel “thick”
         rb.AddForce(-vel.normalized * slowBrake, ForceMode2D.Force);
     }
     private void OnTriggerExit2D(Collider2D other)

@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 [CreateAssetMenu(fileName = "RemixUtility", menuName = "Astral Planes/Remix Utility")]
 [System.Serializable]
@@ -23,7 +25,7 @@ public class RemixUtility : ScriptableObject
 
     public List<int> GeneratePhrase(NoteSet noteSet)
     {
-        return GenerateFromPattern(noteSet, patternStrategy);
+        var use = noteSet != null && Enum.IsDefined(typeof(PatternStrategy), noteSet.patternStrategy) ? noteSet.patternStrategy : patternStrategy; return GenerateFromPattern(noteSet, use);
     }
 
     public List<(int step, int note, int dur, float vel)> Remix(List<int> collectedNotes, NoteSet context, int totalSteps)

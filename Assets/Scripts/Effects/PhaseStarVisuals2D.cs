@@ -45,10 +45,13 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             main.startColor = new ParticleSystem.MinMaxGradient(c);
         }
     }
-// PhaseStarVisuals2D.cs
+
+    public void EjectParticles()
+    {
+        Instantiate(_profile.ejectionPrefab, transform.position, Quaternion.identity);
+    }
     public void SetPreviewTint(Color c)
     {
-        Debug.Log($"Setting Preview Tint Color: {c}");
         // Sprites
         var srs = GetComponentsInChildren<SpriteRenderer>(true);
         for (int i = 0; i < srs.Length; i++)
@@ -137,7 +140,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     void ApplyAlpha(float a)
     {
-        Debug.Log($"Applying alpha to {a}");
+        
 
         var pss = GetComponentsInChildren<ParticleSystem>(true);
         foreach (var ps in pss)

@@ -16,15 +16,6 @@ public class TrackUtilityTrigger : MonoBehaviour
         if (vehicle != null)
         {
             CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Bloom);
-            if (selectedInstrument != null && selectedNoteSet != null)
-            {
-                Debug.Log($"Track Utility Engaged for {selectedNoteSet.name}...");
-                
-            }
-            else
-            {
-                Debug.Log($"Track Utility Aborted");
-            }
             hasBeenTriggered = true;
         }
 

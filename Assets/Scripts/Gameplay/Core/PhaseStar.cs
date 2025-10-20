@@ -12,11 +12,6 @@ public enum PhaseStarState
     BridgeInProgress
 }
 
-/// <summary>
-/// PhaseStar = the "vibe" object the player pokes to eject a MineNode.
-/// Selection logic comes from SpawnStrategyProfile (WeightedMineNode -> ToDirective).
-/// Grid/time come from DrumTrack. Phase bridging is orchestrated by GameFlowManager.
-/// </summary>
 public class PhaseStar : MonoBehaviour
 {
     // -------------------- Serialized config --------------------
@@ -53,10 +48,15 @@ public class PhaseStar : MonoBehaviour
     private MinedObjectSpawnDirective _cachedDirective;
     private InstrumentTrack _cachedTrack;
     private MineNode _activeNode;
-
+    private int _binCycleOffset = 0;
     // Targets this star can feed (if provided by spawner)
     private readonly List<InstrumentTrack> _targets = new(4);
+    private int _spawnSerial = 0;
+// PhaseStar.cs (fields)
+    private int _loopOffset = 0;        // which pair we’re showing this loop
+    private int _lastBinIndex = -1;     // for wrap detection when binIndex goes from N-1 -> 0
 
+    int NextSpawnSerial() => ++_spawnSerial;
     private List<WeightedMineNode> _phasePlan;
     private int _planPreviewIdx = -1;
     private int _targetPreviewIdx = -1;
@@ -72,6 +72,13 @@ public class PhaseStar : MonoBehaviour
 
     // -------------------- Lifecycle --------------------
     public void Initialize(DrumTrack drum, IEnumerable<InstrumentTrack> targets, PhaseStarBehaviorProfile profile, MusicalPhase assignedPhase) {
+
+// Safe, null-tolerant log:
+        var roleNames = targets?
+            .Select(t => t == null ? "null" : t.assignedRole.ToString())  // <-- note the ()
+            .ToArray() ?? Array.Empty<string>();
+
+        Debug.Log($"[PhaseStar] Initialize: received targets={roleNames.Length} :: {string.Join(", ", roleNames)}");
 
         _assignedPhase = assignedPhase;
         behaviorProfile = profile != null ? profile : behaviorProfile;
@@ -104,6 +111,9 @@ public class PhaseStar : MonoBehaviour
         if (motion)  motion.Initialize(behaviorProfile, this);    // sets _profile and subscribes OnArmed
         if (dust)    dust.Initialize(behaviorProfile, this);
         OnArmed?.Invoke(this);
+        _binCycleOffset = 0;
+        _loopOffset = 0;
+        _lastBinIndex = -1;
     }
     public void SetSpawnStrategyProfile(SpawnStrategyProfile profile, bool rebuild = true)
     {
@@ -160,6 +170,11 @@ public class PhaseStar : MonoBehaviour
             _cachedTrack     = null;
             UpdatePreviewTint();
         }
+        else
+        {
+            // per-bin mode: advance an offset once per loop so we eventually visit all tracks
+            _binCycleOffset = (_binCycleOffset + 1) % Mathf.Max(1, _targets.Count);
+        }
     }
 
     public void SetProgressionMul(float mul) { _progressionMul = mul; }
@@ -167,21 +182,40 @@ public class PhaseStar : MonoBehaviour
     private void HandleBinChanged(int binIndex, int binCount)
     {
         _lastBinCount = binCount;
-
         if (_rotateOnlyWhenIdle && _state != PhaseStarState.WaitingForPoke) return;
         if (_targets == null || _targets.Count == 0) return;
+        if (binCount <= 0) return;
+
+        // Detect loop wrap (e.g., binIndex: 1 -> 0 when binCount == 2)
+        if (_lastBinIndex >= 0 && binIndex < _lastBinIndex)
+        {
+            // move to the next pair on each new loop
+            _loopOffset = (_loopOffset + 2) % Mathf.Max(1, _targets.Count);
+            // If you prefer changing only one target per loop, use +1 instead of +2.
+        }
+        _lastBinIndex = binIndex;
 
         if (_oncePerLoop || binCount == 1)
+        {
             _targetPreviewIdx = (_targetPreviewIdx + 1) % _targets.Count;
+        }
         else
-            _targetPreviewIdx = binIndex % _targets.Count;
+        {
+            // keep per-loop speed the same, but select which targets appear this loop
+            // map current bin to a position within the "pair" shown this loop
+            int slotsThisLoop = Mathf.Min(binCount, _targets.Count); // e.g., 2
+            int posInLoop     = Mathf.FloorToInt((binIndex / (float)binCount) * slotsThisLoop); // 0..slots-1
 
-// 🔑 Invalidate cached directive when preview target changes
+            _targetPreviewIdx = (_loopOffset + posInLoop) % _targets.Count;
+        }
+
         _cachedDirective = null;
         _cachedTrack     = null;
         _previewVersion++;
-
         UpdatePreviewTint();
+
+        // optional tracing
+        // Debug.Log($"[PhaseStar] bin {binIndex+1}/{binCount}, loopOffset={_loopOffset}, idx={_targetPreviewIdx}, role={_targets[_targetPreviewIdx].assignedRole}");
     }
 
     private void BuildPhasePlan(MusicalPhase phase)
@@ -220,78 +254,88 @@ public class PhaseStar : MonoBehaviour
     }
 
 
-    private void PrepareNextDirective()
-{
-    _cachedDirective = null;
-    _cachedTrack     = null;
+    private void PrepareNextDirective() {
+        _cachedDirective = null;
+        _cachedTrack     = null;
 
-    if (_drum == null || spawnStrategyProfile == null) return;
-    int previewVerAtStart = _previewVersion; 
-    // Prefer from rolling plan (consume cursor), else ask profile once
-    WeightedMineNode planEntry = null;
-    if (_phasePlan != null && _phasePlan.Count > 0)
-        planEntry = _phasePlan[_planConsumeIdx];
-    else
-        planEntry = spawnStrategyProfile.PickNext(_assignedPhase, -1f);
+        if (_drum == null || spawnStrategyProfile == null) return;
+        int previewVerAtStart = _previewVersion; 
+        // Prefer from rolling plan (consume cursor), else ask profile once
+        WeightedMineNode planEntry = null;
+        if (_phasePlan != null && _phasePlan.Count > 0)
+            planEntry = _phasePlan[_planConsumeIdx];
+        else
+            planEntry = spawnStrategyProfile.PickNext(_assignedPhase, -1f);
 
-    if (planEntry == null) return;
+        if (planEntry == null) return;
 
-    // --- Choose the target track (bin-driven preview first; fallback to role-based pick) ---
-    InstrumentTrack track = null;
+        // --- Choose the target track (bin-driven preview first; fallback to role-based pick) ---
+        InstrumentTrack track = null;
 
-    // 1) Bin-driven preview target (WYSIWYG)
-    if (_targets != null && _targets.Count > 0 && _targetPreviewIdx >= 0)
-    {
-        track = _targets[Mathf.Clamp(_targetPreviewIdx, 0, _targets.Count - 1)];
+        // 1) Bin-driven preview target (WYSIWYG)
+        if (_targets != null && _targets.Count > 0 && _targetPreviewIdx >= 0)
+        {
+            track = _targets[Mathf.Clamp(_targetPreviewIdx, 0, _targets.Count - 1)];
+        }
+
+        // 2) Fallback to your existing role/legality picker
+        if (track == null)
+            track = PickTargetTrackFor(planEntry);
+
+        if (track == null) return; // still nothing to target
+
+        // --- Resolve prefabs via registries on DrumTrack ---
+        var nodePrefab    = _drum?.nodePrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
+        var payloadPrefab = _drum?.minedObjectPrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
+        if (nodePrefab == null || payloadPrefab == null)
+        {
+            Debug.LogWarning($"[PhaseStar] Missing prefab(s) for {planEntry.minedObjectType} / {planEntry.trackModifierType}");
+            return;
+        }
+
+        // --- Generate a NoteSet for spawners (NoteSpawner only) ---
+        NoteSet noteSet = null;
+        if (planEntry.minedObjectType == MinedObjectType.NoteSpawner)
+        {
+            var gfm    = GameFlowManager.Instance;
+            var phase  = gfm?.phaseTransitionManager?.currentPhase ?? _assignedPhase;
+            var factory= gfm?.noteSetFactory;
+            int entropy = NextSpawnSerial();
+            
+
+            try {
+                noteSet = factory != null ? factory.Generate(track, phase, entropy) : null;
+                if (noteSet == null)
+                    Debug.LogWarning($"[PhaseStar] No NoteSet generated for {phase}/{track.assignedRole}. Check RolePhaseNoteSetConfig & Library.");
+            }
+            catch (System.Exception ex) {
+                Debug.LogError($"[PhaseStar] NoteSetFactory exception: {ex.Message}");
+                noteSet = null; // fall back: spawn node without seeded phrase
+            }
+        }
+
+        // --- Build directive (MineNode shell + payload, plus display color) ---
+        var d = new MinedObjectSpawnDirective
+        {
+            minedObjectType   = planEntry.minedObjectType,
+            role              = planEntry.role,
+            assignedTrack     = track,
+            trackModifierType = planEntry.trackModifierType,
+            remixUtility      = null,          // (optional) fill from a phase recipe if/when you add it
+            noteSet           = noteSet,       // only for NoteSpawner
+            prefab            = nodePrefab,    // MineNode shell
+            minedObjectPrefab = payloadPrefab, // payload
+            displayColor      = track.trackColor,
+            spawnCell         = default        // filled at spawn
+        };
+
+        _cachedDirective = d;
+        _cachedTrack     = track;
+        _directiveVersion = previewVerAtStart;   
+        // Keep the on-screen preview in sync with what will spawn next
+        if(!_lockPreviewTintUntilIdle)
+            UpdatePreviewTint();
     }
-
-    // 2) Fallback to your existing role/legality picker
-    if (track == null)
-        track = PickTargetTrackFor(planEntry);
-
-    if (track == null) return; // still nothing to target
-
-    // --- Resolve prefabs via registries on DrumTrack ---
-    var nodePrefab    = _drum?.nodePrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
-    var payloadPrefab = _drum?.minedObjectPrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
-    if (nodePrefab == null || payloadPrefab == null)
-    {
-        Debug.LogWarning($"[PhaseStar] Missing prefab(s) for {planEntry.minedObjectType} / {planEntry.trackModifierType}");
-        return;
-    }
-
-    // --- Generate a NoteSet for spawners (NoteSpawner only) ---
-    NoteSet noteSet = null;
-    if (planEntry.minedObjectType == MinedObjectType.NoteSpawner)
-    {
-        var gfm   = GameFlowManager.Instance;
-        var phase = gfm?.phaseTransitionManager?.currentPhase ?? _assignedPhase;
-        var factory = gfm?.noteSetFactory;
-        noteSet = factory != null ? factory.Generate(track, phase) : null;
-    }
-
-    // --- Build directive (MineNode shell + payload, plus display color) ---
-    var d = new MinedObjectSpawnDirective
-    {
-        minedObjectType   = planEntry.minedObjectType,
-        role              = planEntry.role,
-        assignedTrack     = track,
-        trackModifierType = planEntry.trackModifierType,
-        remixUtility      = null,          // (optional) fill from a phase recipe if/when you add it
-        noteSet           = noteSet,       // only for NoteSpawner
-        prefab            = nodePrefab,    // MineNode shell
-        minedObjectPrefab = payloadPrefab, // payload
-        displayColor      = track.trackColor,
-        spawnCell         = default        // filled at spawn
-    };
-
-    _cachedDirective = d;
-    _cachedTrack     = track;
-    _directiveVersion = previewVerAtStart;   
-    // Keep the on-screen preview in sync with what will spawn next
-    if(!_lockPreviewTintUntilIdle)
-        UpdatePreviewTint();
-}
 
     private void SetStarPresence(VisualMode mode, Color tint)
     {
@@ -434,6 +478,7 @@ public class PhaseStar : MonoBehaviour
         int ticket = ++_spawnTicket;
         _ejectionInFlight = true;
         _state = PhaseStarState.PursuitActive;
+        visuals.EjectParticles();
         SetInteractableAndAppearance(false, VisualMode.Dim);
         SetStarPresence(VisualMode.Dim, Color.white);
 
@@ -449,6 +494,17 @@ public class PhaseStar : MonoBehaviour
             if (_retryCo != null) StopCoroutine(_retryCo);
             _retryCo = StartCoroutine(RetrySpawnWhenCellFrees(ticket, contact));
             return;
+        }
+        else
+        {
+             
+            NoteSet previewSet = usedTrack.GetActiveNoteSet() != null ? usedTrack.GetActiveNoteSet() : null; 
+            if (usedTrack == null) {
+                var ctrl = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null; 
+                usedTrack = ctrl != null ? ctrl.GetAmbientContextTrack() : null; 
+                previewSet = ctrl != null ? ctrl.GetGlobalContextNoteSet() : null;
+            } 
+            CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, previewSet, .8f);            
         }
 
         _activeNode = node;

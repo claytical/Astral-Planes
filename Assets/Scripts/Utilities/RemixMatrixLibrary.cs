@@ -19,20 +19,6 @@ public enum RhythmStyle
     Breakbeat
 }
 
-public enum NoteBehavior
-{
-    Bass,
-    Lead,
-    Harmony,
-    Percussion,
-    Drone,
-    Sustain,
-    Glitch,
-    Hook,
-    Pad,
-    Accent
-}
-
 public enum ChordPattern
 {
     RootTriad,

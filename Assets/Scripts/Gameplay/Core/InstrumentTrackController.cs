@@ -8,7 +8,7 @@ using MidiPlayerTK;
 using Random = UnityEngine.Random;
 public static class ShipTrackAssigner
 {
-    public static void AssignShipsToTracks(List<ShipMusicalProfile> selectedShips, List<InstrumentTrack> tracks, GameObject noteSetPrefab)
+    public static void AssignShipsToTracks(List<ShipMusicalProfile> selectedShips, List<InstrumentTrack> tracks)
     {
         List<InstrumentTrack> unassignedTracks = new List<InstrumentTrack>(tracks);
 
@@ -30,13 +30,8 @@ public static class ShipTrackAssigner
 
                     int preset = validPresets[Random.Range(0, validPresets.Count)];
                     track.preset = preset;
-                    GameObject noteSetGO = GameObject.Instantiate(noteSetPrefab);
-                    NoteSet noteSet = noteSetGO.GetComponent<NoteSet>();
-                    noteSet.assignedInstrumentTrack = track;
-                    noteSet.noteBehavior = roleProfile.defaultBehavior;
+                    var noteSet = new NoteSet { assignedInstrumentTrack = track, noteBehavior = roleProfile.defaultBehavior}; 
                     noteSet.Initialize(track, track.GetTotalSteps());
-                    Debug.Log($"Assigned track {track.name} to preset {preset} with noteset: {noteSet} for profile {roleProfile}");
-
                     unassignedTracks.Remove(track);
                     break;
                 }
@@ -52,15 +47,8 @@ public static class ShipTrackAssigner
             int randomPreset = fallbackProfile.allowedMidiPresets[Random.Range(0, fallbackProfile.allowedMidiPresets.Count)];
             track.preset = randomPreset;
 
-            GameObject noteSetGO = GameObject.Instantiate(noteSetPrefab);
-            NoteSet noteSet = noteSetGO.GetComponent<NoteSet>();
-
-            noteSet.assignedInstrumentTrack = track;
-            noteSet.noteBehavior = fallbackProfile.defaultBehavior;
-            noteSet.Initialize(track, track.GetTotalSteps());
-                //track.SpawnCollectables(noteSet);
-                Debug.Log($"Falback assigned track {track.name} to preset {randomPreset} with noteset: {noteSet} for profile {fallbackProfile}");
-
+            var noteSet = new NoteSet { assignedInstrumentTrack = track, noteBehavior = fallbackProfile.defaultBehavior };
+                        noteSet.Initialize(track, track.GetTotalSteps());
         }
     }
 }
@@ -69,21 +57,30 @@ public class InstrumentTrackController : MonoBehaviour
 {
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
-    public GameObject noteSetPrefab;
-    private bool spawningEnabled = true;
 
     void Start()
     {
-        if (!GameFlowManager.Instance.ReadyToPlay()) {
-            return;
-        }
-    }
-    public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips, GameObject notesetPrefab)
-    {
-        
-        ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList(), notesetPrefab);
+        if (!GameFlowManager.Instance.ReadyToPlay()) return;
+        noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
         UpdateVisualizer();
     }
+    public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
+    {
+        ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList());
+        UpdateVisualizer();
+    } 
+    public InstrumentTrack GetAmbientContextTrack() {
+        if (tracks == null || tracks.Length == 0) return null; 
+        // Prefer Harmony → Groove → Bass → Lead (falls back to first that has a NoteSet)
+        MusicalRole[] pref = { MusicalRole.Harmony, MusicalRole.Groove, MusicalRole.Bass, MusicalRole.Lead }; 
+        foreach (var role in pref) {
+            var t = tracks.FirstOrDefault(x => x != null && x.assignedRole == role && x.HasNoteSet()); if (t != null) return t;
+        } 
+        return tracks.FirstOrDefault(x => x != null && x.HasNoteSet()) ?? tracks[0];
+    }
+    public NoteSet GetGlobalContextNoteSet(){ var t = GetAmbientContextTrack(); 
+        return t != null ? t.GetActiveNoteSet() : null;
+        }
     public InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         Debug.Log("Configured roles: " + 
@@ -92,7 +89,6 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public void ApplySeedVisibility(List<InstrumentTrack> seeds)
     {
-        // Example: mute non-seeds briefly
         var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
         foreach (var t in tracks)
         {
@@ -127,7 +123,6 @@ public class InstrumentTrackController : MonoBehaviour
                 ClearTrackForNewPhase(t);            // silence + clear objects so the new star can rebuild
         }
     }
-    public void SetSpawningEnabled(bool enabled) { spawningEnabled = enabled; /* gate your spawn entry points */ }
     public void UpdateVisualizer()
     {
         if (noteVisualizer == null) return;
@@ -137,6 +132,20 @@ public class InstrumentTrackController : MonoBehaviour
             foreach (var (step, _, _, _) in track.GetPersistentLoopNotes())
                 noteVisualizer.PlacePersistentNoteMarker(track, step);
         }
+    }
+    public int GetMaxActiveLoopMultiplier()
+    {
+        if (tracks == null || tracks.Length == 0) return 1;
+
+        int maxMul = 1;
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+            var loopNotes = t.GetPersistentLoopNotes();
+            if (loopNotes != null && loopNotes.Count > 0)
+                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
+        }
+        return maxMul;
     }
     public int GetMaxLoopMultiplier()
     {
@@ -180,10 +189,7 @@ public class InstrumentTrackController : MonoBehaviour
             t.spawnedCollectables.RemoveAt(i);
         }
     }
-
-    // 3) Reset per-track perfection bookkeeping (so the new star doesn't start perfect)
-    t.ResetPerfectionFlagForPhase();         // add this tiny helper on InstrumentTrack (see below)
-
+    
     // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
     // NoteVisualizer can read t.IsMuted to dim rows, if you want.
 }
@@ -198,7 +204,7 @@ public class InstrumentTrackController : MonoBehaviour
     if (track == null) return;
 
     // 1) Clear the loop so the bridge is audibly different
-    track.ClearLoopedNotes(TrackClearType.Remix);
+//    track.ClearLoopedNotes(TrackClearType.Remix);
 
     // 2) Get / ensure a NoteSet
     var ns = track.GetActiveNoteSet();
@@ -214,30 +220,27 @@ public class InstrumentTrackController : MonoBehaviour
     var steps = ns.GetStepList();               // <-- you use this pattern already
     if (steps == null || steps.Count == 0) return;
 
-    int seeds = 6;                               // similar to prior suggestion; tweak to taste
-    for (int i = 0; i < seeds; i++)
-    {
-        int step = steps[UnityEngine.Random.Range(0, steps.Count)];
-        int note = ns.GetNextArpeggiatedNote(step);                    // same pattern as DrumTrack’s helper
-        int dur  = track.CalculateNoteDuration(step, ns);              // see InstrumentTrack.CalculateNoteDuration
-        float vel = Mathf.Lerp(60f, 100f, UnityEngine.Random.value);   // modest velocity spread
-        track.AddNoteToLoop(step, note, dur, vel);                     // adds + visualizes
-    }
-
-    // 5) If extremely sparse, top up a bit
-    int density = track.GetNoteDensity();                               // existing API
-    if (density < 4)
-    {
-        int toAdd = 4 - density;
-        for (int i = 0; i < toAdd; i++)
-        {
-            int step = steps[UnityEngine.Random.Range(0, steps.Count)];
-            int note = ns.GetNextArpeggiatedNote(step);
-            int dur  = track.CalculateNoteDuration(step, ns);
-            float vel = Mathf.Lerp(70f, 100f, UnityEngine.Random.value);
-            track.AddNoteToLoop(step, note, dur, vel);
+    var fresh = new List<(int step,int note,int duration,float velocity)>();
+    int seeds = 8; // a touch denser for lift-off; tweak to taste
+    for (int i = 0; i < seeds; i++) { 
+        int step = steps[UnityEngine.Random.Range(0, steps.Count)]; 
+        int note = ns.GetNextArpeggiatedNote(step); 
+        int dur  = track.CalculateNoteDuration(step, ns); 
+        float vel = Mathf.Lerp(70f, 110f, UnityEngine.Random.value); 
+        fresh.Add((step, note, dur, vel));
+    } 
+    if (fresh.Count < 6) { 
+        int topUp = 6 - fresh.Count; 
+        for (int i = 0; i < topUp; i++) {
+            int step = steps[UnityEngine.Random.Range(0, steps.Count)]; 
+            int note = ns.GetNextArpeggiatedNote(step); 
+            int dur  = track.CalculateNoteDuration(step, ns); 
+            float vel = Mathf.Lerp(80f, 115f, UnityEngine.Random.value); 
+            fresh.Add((step, note, dur, vel));
         }
     }
+    // Atomic swap: no blast visuals, no collapse-to-x1
+    track.SoftReplaceLoop(fresh);
 }
     private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase)
 {
@@ -267,8 +270,6 @@ public class InstrumentTrackController : MonoBehaviour
             t.spawnedCollectables.RemoveAt(i);
         }
     }
-
-    t.ResetPerfectionFlagForPhase();
 }
     private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MusicalPhase phase, MusicalRole role)
 {
@@ -295,5 +296,4 @@ public class InstrumentTrackController : MonoBehaviour
             return (NoteBehavior.Lead, RhythmStyle.Steady);
     }
 }
-
 }

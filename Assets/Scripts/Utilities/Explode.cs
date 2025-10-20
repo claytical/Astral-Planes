@@ -57,7 +57,7 @@ public class Explode : MonoBehaviour
     {
         Invoke(nameof(Permanent), delay);
     }
-    public void Permanent()
+    public void Permanent(bool permanent = true)
     {
         if (GetComponent<Vehicle>())
         { 
@@ -74,7 +74,11 @@ public class Explode : MonoBehaviour
         {
             Instantiate(explosion, transform.position, Quaternion.identity);
         }
-        Destroy(this.gameObject);
+
+        if (permanent)
+        {
+            Destroy(this.gameObject);
+        }
     }
 
 

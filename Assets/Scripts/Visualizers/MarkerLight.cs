@@ -16,7 +16,14 @@ public class MarkerLight : MonoBehaviour
         if (sr != null) _base = sr.color;
         _startScale = transform.localScale;
     }
-    public void SetGrey(Color grey) { if (sr) sr.color = grey; }
+
+    public void SetGrey(Color grey)
+    {
+        if (sr) sr.color = grey;
+        Color c = sr.color;
+        c.a = .01f;
+        sr.color = c;
+    }
     public void LightUp(Color trackColor)
     {
         if (sr == null) return;

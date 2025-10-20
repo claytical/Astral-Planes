@@ -7,10 +7,10 @@ public class PhaseTransitionManager : MonoBehaviour
     public MusicalPhase previousPhase;
     public MusicalPhase currentPhase;
     private PhaseStarBehaviorProfile _activeBehaviorProfile;
-
+    [SerializeField] private NoteSetFactory noteSetFactory;
+    private bool _phaseAdvanceArmed;
     public event System.Action<MusicalPhase, MusicalPhase> OnPhaseChanged;
 
-    /// Preferred
     public void HandlePhaseTransition(MusicalPhase nextPhase, string who)
     {
         if (nextPhase == currentPhase)
@@ -28,8 +28,7 @@ public class PhaseTransitionManager : MonoBehaviour
         Debug.Log($"[PTM] {who}: {oldCur}→{nextPhase} (prev {oldPrev}→{previousPhase})");
         OnPhaseChanged?.Invoke(previousPhase, currentPhase);
     }
-
-
+    
     private void HandlePhaseStarSpawned(MusicalPhase phase, PhaseStarBehaviorProfile profile) {
         // Only update if we're actually changing phases
         if (phase != currentPhase) {
@@ -42,6 +41,7 @@ public class PhaseTransitionManager : MonoBehaviour
     void OnEnable() {
         var drums = GetComponent<DrumTrack>();
         if (drums != null) drums.OnPhaseStarSpawned += HandlePhaseStarSpawned;
+        
     }
     void OnDisable() {
         var drums = GetComponent<DrumTrack>();

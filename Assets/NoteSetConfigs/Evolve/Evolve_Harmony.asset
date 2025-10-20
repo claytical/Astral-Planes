@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53549c2c693944c64a6e92afb7868d8e, type: 3}
+  m_Name: Evolve_Harmony
+  m_EditorClassIdentifier: Assembly-CSharp::RolePhaseNoteSetConfig
+  phase: 1
+  role: 1
+  scales:
+  - item: 0
+    weight: 0.35
+  - item: 1
+    weight: 0.2
+  - item: 5
+    weight: 0.2
+  - item: 3
+    weight: 0.15
+  - item: 2
+    weight: 0.1
+  patterns:
+  - item: 12
+    weight: 0.35
+  - item: 1
+    weight: 0.35
+  - item: 3
+    weight: 0.2
+  - item: 13
+    weight: 0.1
+  rhythms:
+  - item: 5
+    weight: 0.3
+  - item: 1
+    weight: 0.25
+  - item: 2
+    weight: 0.2
+  - item: 3
+    weight: 0.15
+  - item: 7
+    weight: 0.1
+  chordFunctions:
+  - item: I
+    weight: 0.35
+  - item: V
+    weight: 0.2
+  - item: IV
+    weight: 0.2
+  - item: vi
+    weight: 0.2
+  - item: ii
+    weight: 0.13
+  - item: bVII
+    weight: 0.02
+  chordsPerRegion: 2
+  behaviors:
+  - item: 10
+    weight: 0.35
+  - item: 3
+    weight: 0.25
+  - item: 11
+    weight: 0.2
+  - item: 8
+    weight: 0.2
+  maxBehaviorsStack: 2
+  variation:
+    extensionBias: 0.3
+    passingToneProb: 0.15
+    neighborOrnProb: 0.14
+    minMidi: 48
+    maxMidi: 84
+    leapProb: 0.15
+    octaveMoveProb: 0.1
+    restProb: 0.1
+    humanizeMs: 0.02
+    durJitter: 1
+    mutatePitch: 0.08
+    mutateVelocity: 0.12
+    mutateDuration: 0.1

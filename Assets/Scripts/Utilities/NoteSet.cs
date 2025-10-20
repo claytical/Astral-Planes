@@ -4,18 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
 
-public enum PatternStrategy
-{
-    Arpeggiated,
-    StaticRoot,
-    WalkingBass,
-    MelodicPhrase,
-    PercussiveLoop,
-    Drone,
-    Randomized
-}
-
-
 public static class ChordLibrary
 {
     private static readonly Dictionary<string, int[]> Formulas = new()
@@ -110,7 +98,7 @@ public static class RhythmPatterns
         };
 }
 
-public class NoteSet : MonoBehaviour
+public class NoteSet
 {
     public int rootMidi;             // e.g. 24 for C1
     public ScaleType scale;          // e.g. Major or Minor
@@ -118,7 +106,12 @@ public class NoteSet : MonoBehaviour
     public NoteBehavior noteBehavior;
     public RhythmStyle rhythmStyle = RhythmStyle.FourOnTheFloor;
     public InstrumentTrack assignedInstrumentTrack;
-    
+    public PatternStrategy patternStrategy;              // NEW: selected algorithm for this NoteSet
+    public ScaleType scaleType => scale;                 // alias for clarity with factory
+    public List<Chord> chordRegion;                      // NEW: realized chord region for this loop
+    public List<NoteBehavior> behaviorsSeed;             // NEW: candidates to apply via rings/auto-variation
+    public List<(int step,int note,int duration,float vel)> persistentTemplate; // NEW: initial phrase
+
     [Header("Remix System")]
     public RemixUtility remixUtility;
 
@@ -156,8 +149,8 @@ public class NoteSet : MonoBehaviour
     }
     public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
-        // assuming this exists on the same track ref
-        var strategy = MusicalPhaseLibrary.GetPatternStrategyForRole(GameFlowManager.Instance.phaseTransitionManager.currentPhase, track.assignedRole);
+        var strategy = this.patternStrategy; // prefer the NoteSet’s own strategy; fallback handled below
+        if (!Enum.IsDefined(typeof(PatternStrategy), strategy)) strategy = PatternStrategy.Arpeggiated; // safe default
         switch (strategy)
         {
             case PatternStrategy.StaticRoot:
@@ -298,41 +291,73 @@ public class NoteSet : MonoBehaviour
         if (_notes.Count == 0) return rootMidi;
         return _notes[Random.Range(0, _notes.Count)];
     }
-    private int AdjustRootOctave(InstrumentTrack track, int baseRoot)
+// Replace your AdjustRootOctave with this (and keep the same method name/signature)
+private int AdjustRootOctave(InstrumentTrack track, int baseRoot)
+{
+    if (track == null)
+        return baseRoot;
+
+    int lo   = track.lowestAllowedNote;
+    int hi   = track.highestAllowedNote;
+    int mid  = (lo + hi) / 2;
+
+    // 1) Start from base root; add a role bias in octaves
+    int semitoneBias = 0;
+    switch (track.assignedRole)
     {
-        int adjustedRoot = baseRoot;
-
-        int lowestAllowed = track.lowestAllowedNote;
-        int highestAllowed = track.highestAllowedNote;
-
-        // ✅ Apply octave shifts based on NoteBehavior
-        switch (noteBehavior)
-        {
-            case NoteBehavior.Bass:
-            case NoteBehavior.Pad:
-                adjustedRoot -= 12; // Shift down 1 octave
-                break;
-            case NoteBehavior.Lead:
-                adjustedRoot += 12; // Shift up 1 octave
-                break;
-            case NoteBehavior.Drone:
-                adjustedRoot -= 24; // Shift down 2 octaves
-                break;
-            case NoteBehavior.Hook:
-                adjustedRoot += 24;
-                break;
-            case NoteBehavior.Harmony:
-                adjustedRoot = 0;
-                break;
-            case NoteBehavior.Sustain: 
-                adjustedRoot = 0;
-                break;
-        }
-
-        // ✅ Clamp the adjusted root note within the instrument’s playable range
-        adjustedRoot = Mathf.Clamp(adjustedRoot, lowestAllowed, highestAllowed);
-        return adjustedRoot;
+        case MusicalRole.Bass:    semitoneBias -= 12; break; // down 1 oct
+        case MusicalRole.Lead:    semitoneBias += 12; break; // up 1 oct
+        case MusicalRole.Harmony: semitoneBias += 0;  break; // centered
+        case MusicalRole.Groove:  semitoneBias += 0;  break; // centered
     }
+
+    // 2) Apply behavior-derived octave hints (handles legacy aliases too)
+    semitoneBias += GetBehaviorOctaveBias();
+
+    int root = baseRoot + semitoneBias;
+
+    // 3) Fold/clamp into the playable range
+    // Prefer folding by octaves to keep pitch class; then clamp as a last resort.
+    while (root < lo) root += 12;
+    while (root > hi) root -= 12;
+
+    // If still out of range (very narrow instruments), clamp.
+    root = Mathf.Clamp(root, lo, hi);
+
+    // 4) Nudge toward the middle if the range is wide and we landed near edges
+    // (optional – keeps things from sitting on extremes)
+    if (hi - lo >= 24)
+    {
+        if (root - lo < 2)  root += 12;
+        if (hi - root < 2)  root -= 12;
+        root = Mathf.Clamp(root, lo, hi);
+    }
+
+    return root;
+}
+
+    private int GetBehaviorOctaveBias()
+    {
+        int bias = 0;
+        var source = behaviorsSeed != null && behaviorsSeed.Count > 0
+            ? behaviorsSeed
+            : new List<NoteBehavior> { NoteBehavior.None };
+
+        foreach (var raw in source)
+        foreach (var b in NoteBehaviorPolicy.MapLegacy(raw))
+        {
+            switch (b)
+            {
+                case NoteBehavior.Drone: bias -= 12; break;
+                case NoteBehavior.Lead:  bias += 12; break;
+                case NoteBehavior.Hook:  bias += 12; break;
+                case NoteBehavior.Bass:  bias -= 12; break;
+                // others neutral
+            }
+        }
+        return bias;
+    }
+
     private List<int> GetChordNotes()
     {
         int root = rootMidi;

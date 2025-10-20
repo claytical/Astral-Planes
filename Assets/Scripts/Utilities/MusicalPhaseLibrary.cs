@@ -45,7 +45,7 @@ public static class MusicalPhaseLibrary
     }
 
 // Central getter used by all public APIs
-    private static MusicalPhaseProfile Get(MusicalPhase phase)
+    public static MusicalPhaseProfile Get(MusicalPhase phase)
     {
         LoadFromResourcesIfEmpty();
         return (_profiles != null && _profiles.TryGetValue(phase, out var prof)) ? prof : null;
