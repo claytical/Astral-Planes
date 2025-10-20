@@ -1,4 +1,10 @@
 using UnityEngine;
+[System.Serializable]
+public class PhaseStarEmotion {
+    public float curiosity;   // how often it changes direction
+    public float fear;        // distance kept from vehicles
+    public float appetite;    // how fast it eats dust
+}
 
 public enum PhasePersonality { Establish, Evolve, Intensify, Release, Wildcard, Pop, DarkStar }
 public enum EjectionStyle { Burst, Spiral, ArcForward, LineScatter }
@@ -42,6 +48,7 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 
     [Header("MineNode Ejection")]
     public EjectionStyle ejectionStyle = EjectionStyle.Burst;
+    public GameObject ejectionPrefab;
     [Min(1)] public int nodesPerStar = 3;     // how many nodes total
     public float scatterRadius = 1.6f;        // local spawn scatter
     public float nodeFlightSeconds = 0.6f;    // shard -> grid travel time

@@ -1,6 +1,7 @@
 using System.Collections;
 using Gameplay.Mining;
 using UnityEngine;
+using Random = System.Random;
 
 public class MineNode : MonoBehaviour
 {
@@ -110,7 +111,7 @@ public class MineNode : MonoBehaviour
                 _strength -= vehicle.GetForceAsDamage();
                 _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
                 float normalized = (float)_strength / maxStrength; // [0, 1]
-                float scaleFactor = Mathf.Lerp(0f, 1f, normalized); // Linear scale from 1 to 0
+                float scaleFactor = Mathf.Lerp(.2f, 1.1f, normalized); // Linear scale from 1 to 0
                 Debug.Log($"Strength: {_strength}, Normalized: {normalized}, Scale: {scaleFactor}");
 
                 StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
@@ -144,7 +145,11 @@ public class MineNode : MonoBehaviour
 
                         // Emit notes BEFORE we reveal/destroy anything
                         Debug.Log($"Bursting Collectables");
-                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8);
+                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8); 
+                        var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
+                        float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 
+                        CollectionSoundManager.Instance?.PlayBurstLeadIn(spawner.assignedTrack, set, Mathf.Max(0.05f, remain));
+
                     }
                     else
                     {
@@ -193,6 +198,9 @@ public class MineNode : MonoBehaviour
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
+        var explosion = GetComponent<Explode>();
+        if(explosion != null) explosion.Permanent();
+        
         // 🔔 Notify listeners (PhaseStar) of the outcome kind and payload
         FireResolvedOnce(_directive.minedObjectType, _directive);
         RevealPreloadedObject();

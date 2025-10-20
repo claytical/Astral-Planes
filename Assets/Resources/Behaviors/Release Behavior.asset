@@ -79,6 +79,8 @@ MonoBehaviour:
   feedsDust: 0
   dustRegrowDelayMul: 1
   ejectionStyle: 1
+  ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
+    type: 3}
   nodesPerStar: 3
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6

@@ -11,8 +11,6 @@ public class SpawnStrategyProfile : ScriptableObject
     [Tooltip("Mixed list of NoteSpawner and TrackUtility entries.")]
     public List<WeightedMineNode> mineNodes;
 
-    [Tooltip("How to iterate entries when utilityBias is not used.")]
-    public MineNodeSelectionMode selectionMode = MineNodeSelectionMode.WeightedRandom;
 
     // --- runtime (not serialized) ---
     [NonSerialized] private int _rrCursor;                       // round-robin cursor
@@ -59,12 +57,7 @@ public class SpawnStrategyProfile : ScriptableObject
         if (utilityBias01 >= 0f)
             return PickWithUtilityBias(cands, Mathf.Clamp01(utilityBias01));
 
-        return selectionMode switch
-        {
-            MineNodeSelectionMode.RoundRobinUnique => PickRoundRobinUnique(cands),
-            MineNodeSelectionMode.RoundRobin       => PickRoundRobin(cands),
-            _                                      => PickWeightedRandom(cands)
-        };
+        return PickWeightedRandom(cands);
     }
 
     /// <summary>

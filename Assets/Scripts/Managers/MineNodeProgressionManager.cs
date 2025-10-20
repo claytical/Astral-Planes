@@ -11,8 +11,6 @@ public struct PhaseStrategyBinding {
 
 public class MineNodeProgressionManager : MonoBehaviour
 {
-    [Header("Strategy Authority")]
-    public SpawnStrategyProfile _globalProfile;
     
     [Header("Tracking")]
     public MusicalPhaseQueue phaseQueue;
@@ -82,10 +80,8 @@ public class MineNodeProgressionManager : MonoBehaviour
         if (ptm == null) { Debug.LogError("[MPM] PTM Null or Drum at maze ready."); return; }
         if (drum == null) { Debug.LogError("[MPM] DrumTrack null at MazeReady"); return; }
         var phase = ptm.currentPhase;               // 👈 after fix #1, this is the new phase
-        var strategy = SelectSpawnStrategy(phase);
-        if (strategy == null) { Debug.LogError($"[MPM] No strategy for phase={phase}."); return; }
         Debug.Log($"[MPM] Requesting star for {phase}");
-        drum.RequestPhaseStar(phase, strategy, cellHint);
+        drum.RequestPhaseStar(phase, cellHint);
     }
     public void BootFirstPhaseStar(MusicalPhase startPhase = MusicalPhase.Establish, bool regenerateMaze = true)
     {
@@ -94,18 +90,15 @@ public class MineNodeProgressionManager : MonoBehaviour
         var ptm = GameFlowManager.Instance?.phaseTransitionManager;
         if (ptm && ptm.currentPhase != startPhase)
             ptm.HandlePhaseTransition(startPhase, "Boot");
-
-        var strategy = SelectSpawnStrategy(startPhase);
-        if (strategy == null) { Debug.LogError("[MPM] No spawn strategy for boot."); return; }
-
+        
         if (regenerateMaze && dustGen != null)
         {
             // 🔒 Guaranteed alive: this component
-            StartCoroutine(dustGen.GenerateMazeThenPlacePhaseStar(startPhase, strategy));
+            StartCoroutine(dustGen.GenerateMazeThenPlacePhaseStar(startPhase));
         }
         else
         {
-            drum.RequestPhaseStar(startPhase, strategy, null);
+            drum.RequestPhaseStar(startPhase, null);
         }
     }
 
@@ -137,16 +130,7 @@ public class MineNodeProgressionManager : MonoBehaviour
 
         return 0f;
     }
-    public SpawnStrategyProfile SelectSpawnStrategy(MusicalPhase phase) {
-        if (_globalProfile != null) return _globalProfile;
 
-        Debug.LogError($"[Progression] No SpawnStrategyProfile for phase={phase} and no _globalProfile.");
-        return null;
-    }
-    public SpawnStrategyProfile GetCurrentSpawnerStrategyProfile()
-    {
-        return _globalProfile;
-    }
     public int GetCurrentPhaseIndex()
     {
         return currentPhaseIndex;

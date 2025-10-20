@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 
 public class VisualNoteMarker : MonoBehaviour
-{
+{ 
     private SpriteRenderer _spriteRenderer;
     private ParticleSystem _particleSystem;
     public bool IsLit { get; set; }
@@ -26,7 +26,7 @@ public class VisualNoteMarker : MonoBehaviour
     
     private IEnumerator FadeAndScaleIn(Color targetColor)
     {
-        targetColor.a = .5f;
+        targetColor.a = .1f;
         if (_spriteRenderer == null) yield break;
 
         float duration = 2f;

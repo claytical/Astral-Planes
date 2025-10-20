@@ -31,24 +31,10 @@ public class PhaseDebugDisplay : MonoBehaviour
             return;
 
         var group = phaseGroups[phaseIndex];
-        var currentSet = progressionManager.GetCurrentSpawnerStrategyProfile();
 
         StringBuilder label = new StringBuilder();
         label.AppendLine($"<b>🎼 Current Phase:</b> {group.phase}");
-
-        if (currentSet != null)
-        {
-            label.AppendLine($"<b>🎛 Set:</b> {currentSet.name}");
-
-            foreach (var nodePrefab in currentSet.mineNodes)
-            {
-                if (nodePrefab == null) continue;
-
-                label.AppendLine($"• <i>{nodePrefab.ToString()}</i>");
-                
-            }
-        }
-
+        
         GUI.Label(new Rect(20, 20, 500, 1000), label.ToString(), labelStyle);
     }
 

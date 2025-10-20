@@ -60,6 +60,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -81,6 +83,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 0
@@ -90,7 +93,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1.08, y: 0.44}
+  m_Size: {x: 0.64, y: 0.25}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -135,22 +138,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: 2b76ecc426bc14a7cab7214f9799f408, type: 2}
   capacity: 110
+  arcadeMaxSpeed: 14
+  arcadeAccel: 40
+  arcadeBoostAccel: 80
+  arcadeLinearDamping: 2
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 0
+  coastBrakeForce: 6
+  stopSpeed: 0.05
+  stopAngularSpeed: 5
+  envScale: 1
+  inputDeadzone: 0.2
+  inputTimeout: 0.15
   energyLevel: 110
-  teleportationParticles: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
-    type: 3}
-  trailParticlePrefab: {fileID: 1728400142563202279, guid: ac49296c0e25142be8dee26a0a4af429,
-    type: 3}
   remixParticleEffect: {fileID: 0}
-  ghostVehiclePrefab: {fileID: 5120608187766906454, guid: c6f4f1d5f85ec4fb3ac7b1480fb973ca,
-    type: 3}
-  force: 5
-  terminalVelocity: 27
-  boostMultiplier: 3
-  friction: 0.05
-  difficultyMultiplier: 1
-  baseBurnAmount: 5
-  burnRateMultiplier: 1.3
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: b7654e15148c40544b167c9e6da533ea, type: 3}
   thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
@@ -160,11 +163,11 @@ MonoBehaviour:
   profileColor: {r: 0, g: 0, b: 0, a: 0}
   minAlpha: 0.2
   maxAlpha: 1
-  maxSpeed: 10
   isLocked: 0
   shipRenderer: {fileID: 0}
   remixRingHolder: {fileID: 0}
-  boostPadding: 0.3
+  harmony: {fileID: 0}
+  shipProfile: {fileID: 0}
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -329,67 +332,58 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.08, y: 0.44}
-    newSize: {x: 1.08, y: 0.44}
+    oldSize: {x: 0.64, y: 0.25}
+    newSize: {x: 0.64, y: 0.25}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.53999996, y: 0.175}
-      - {x: 0.48999998, y: 0.21499999}
-      - {x: 0.22, y: 0.21499999}
-      - {x: -0.22999999, y: 0.015}
-      - {x: -0.39999998, y: 0.185}
-      - {x: -0.53999996, y: 0.175}
-      - {x: -0.53999996, y: -0.044999998}
-      - {x: -0.38, y: -0.21499999}
-      - {x: -0.07, y: -0.21499999}
-      - {x: 0.34, y: -0.005}
-      - {x: 0.45, y: -0.005}
-      - {x: 0.53999996, y: 0.105}
-    - - {x: -0.32999998, y: -0.125}
-      - {x: -0.39999998, y: -0.055}
-      - {x: -0.42999998, y: -0.015}
-      - {x: -0.37, y: -0.095}
-      - {x: -0.29999998, y: -0.125}
-      - {x: -0.24, y: -0.125}
-      - {x: -0.22999999, y: -0.13499999}
-      - {x: -0.21, y: -0.13499999}
-      - {x: -0.19999999, y: -0.125}
-      - {x: -0.13, y: -0.125}
-      - {x: -0.089999996, y: -0.114999995}
-      - {x: -0.03, y: -0.095}
-      - {x: 0.19, y: 0.015}
-      - {x: 0.21, y: 0.015}
-      - {x: 0.28, y: 0.055}
-      - {x: 0.29999998, y: 0.055}
-      - {x: 0.34, y: 0.074999996}
-      - {x: 0.41, y: 0.074999996}
-      - {x: 0.41, y: 0.085}
-      - {x: 0.39999998, y: 0.095}
-      - {x: 0.35, y: 0.095}
-      - {x: 0.31, y: 0.085}
-      - {x: 0.24, y: 0.055}
-      - {x: 0.21, y: 0.035}
-      - {x: 0.16, y: 0.015}
-      - {x: 0.11, y: -0.015}
-      - {x: 0.089999996, y: -0.035}
-      - {x: 0.04, y: -0.055}
-      - {x: 0.02, y: -0.074999996}
-      - {x: -0.03, y: -0.105}
-      - {x: -0.049999997, y: -0.105}
-      - {x: -0.099999994, y: -0.125}
-      - {x: -0.13, y: -0.13499999}
-      - {x: -0.17, y: -0.155}
-      - {x: -0.26999998, y: -0.155}
-      - {x: -0.28, y: -0.145}
-    - - {x: 0.45999998, y: 0.13499999}
-      - {x: 0.42999998, y: 0.175}
-      - {x: 0.29999998, y: 0.185}
-      - {x: -0.11, y: -0.024999999}
-      - {x: -0.06, y: -0.044999998}
+    - - {x: -0.32, y: 0.105}
+      - {x: -0.32, y: -0.005}
+      - {x: -0.25, y: -0.125}
+      - {x: -0.14, y: -0.125}
+      - {x: -0.14, y: 0.055}
+      - {x: -0.24, y: 0.105}
+    - - {x: -0.099999994, y: -0.125}
+      - {x: -0.11, y: -0.095}
+      - {x: -0.16, y: -0.095}
+      - {x: -0.17, y: -0.125}
+    - - {x: -0.099999994, y: -0.105}
+      - {x: -0.089999996, y: -0.125}
+      - {x: -0.04, y: -0.125}
+      - {x: -0.02, y: -0.105}
+      - {x: -0.02, y: -0.085}
+      - {x: -0.049999997, y: -0.074999996}
+    - - {x: 0.17, y: 0.125}
+      - {x: 0.12, y: 0.105}
+      - {x: 0.04, y: 0.085}
+      - {x: -0.04, y: 0.044999998}
+      - {x: -0.11, y: -0.005}
+      - {x: -0.12, y: -0.044999998}
+      - {x: -0.12, y: -0.065}
+      - {x: -0.11, y: -0.074999996}
+      - {x: -0.04, y: -0.074999996}
+      - {x: 0.26, y: -0.005}
+      - {x: 0.32, y: 0.055}
+      - {x: 0.32, y: 0.125}
+    - - {x: 0.049999997, y: -0.074999996}
+      - {x: 0.099999994, y: -0.055}
+      - {x: 0.099999994, y: -0.024999999}
+      - {x: 0.07, y: -0.015}
+      - {x: 0.03, y: -0.044999998}
+    - - {x: 0.089999996, y: 0.055}
+      - {x: 0.14, y: 0.074999996}
+      - {x: 0.14, y: 0.105}
+      - {x: 0.11, y: 0.114999995}
+      - {x: 0.07, y: 0.085}
+    - - {x: 0.14999999, y: 0.125}
+      - {x: 0.14, y: 0.114999995}
+      - {x: 0.14999999, y: 0.085}
+      - {x: 0.21, y: 0.085}
+      - {x: 0.26999998, y: 0.105}
+      - {x: 0.26999998, y: 0.125}
   m_UseDelaunayMesh: 0
 --- !u!114 &3258746400435223215
 MonoBehaviour:

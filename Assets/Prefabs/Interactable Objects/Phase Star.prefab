@@ -114,6 +114,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   maxHits: 64
+  erodeTick: 0.15
+  appetiteMul: 1
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -4113,7 +4115,7 @@ ParticleSystem:
     maxLights: 20
   TrailModule:
     enabled: 1
-    mode: 1
+    mode: 0
     ratio: 1
     lifetime:
       serializedVersion: 2

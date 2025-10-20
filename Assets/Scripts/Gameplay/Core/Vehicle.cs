@@ -9,7 +9,9 @@ public class Vehicle : MonoBehaviour
     public float capacity = 10f;
     private float _baseBurnAmount = 5f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
-
+    private float _dustSfxCooldown = 0f;
+    private const float DustSfxInterval = 0.10f; // at most 10 Hz when really grinding dust
+    private bool _inDust = false;
     // === Arcade RB2D tuning ===
     [Header("Arcade Movement")]
     [SerializeField] private float arcadeMaxSpeed = 14f;
@@ -192,6 +194,17 @@ void FixedUpdate()
         rb.rotation = angleDeg;
     }
 
+    var ctrl = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
+            if (ctrl != null && _inDust) // if you have a flag; otherwise gate on your current dust logic
+            { 
+                bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
+                var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
+                float force01 = Mathf.Clamp01(rb.linearVelocity.magnitude / Mathf.Max(1f, arcadeMaxSpeed)); 
+                _dustSfxCooldown -= Time.fixedDeltaTime; 
+                if (_dustSfxCooldown <= 0f) {
+                    CollectionSoundManager.Instance?.PlayDustInteraction(ctrl, force01, behavior); _dustSfxCooldown = 0.10f; // simple throttle
+                }
+            }
     // Stats + audio
     UpdateDistanceCovered();
     ClampAngularVelocity();
@@ -203,12 +216,14 @@ void FixedUpdate()
         float incoming = Mathf.Min(speedScale, accelScale);
         float floor    = shipProfile ? shipProfile.envScaleFloor : 0.60f;
         envScale = Mathf.Max(floor, incoming);
+        
     }
+    
     public void ExitDustField()
     {
         envScale = 1f;
+        _inDust = false;
     }
-
     public float GetMaxSpeed()
     {
         return arcadeMaxSpeed;
@@ -248,18 +263,15 @@ void FixedUpdate()
     private void UpdateRemixParticleEmission()
     {
         if (remixParticleEffect == null) return;
-        Debug.Log($"UpdateRemixParticleEmission");
         var emission = remixParticleEffect.emission;
         emission.rateOverTime = boosting ? 50f : 5f;
 
         if (!remixParticleEffect.isPlaying && _remixController.HasRemixRoles())
         {
-            Debug.Log("Playing Remix Particle Effect");
             remixParticleEffect.Play();
         }
         else if (!_remixController.HasRemixRoles())
         {
-            Debug.Log("Stopping particles");
             remixParticleEffect.Stop();
             
         }

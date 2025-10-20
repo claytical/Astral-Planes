@@ -60,6 +60,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -81,6 +83,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 2
@@ -135,22 +138,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
   capacity: 85
+  arcadeMaxSpeed: 14
+  arcadeAccel: 40
+  arcadeBoostAccel: 80
+  arcadeLinearDamping: 2
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 0
+  coastBrakeForce: 6
+  stopSpeed: 0.05
+  stopAngularSpeed: 5
+  envScale: 1
+  inputDeadzone: 0.2
+  inputTimeout: 0.15
   energyLevel: 85
-  teleportationParticles: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
-    type: 3}
-  trailParticlePrefab: {fileID: 1728400142563202279, guid: ac49296c0e25142be8dee26a0a4af429,
-    type: 3}
   remixParticleEffect: {fileID: 0}
-  ghostVehiclePrefab: {fileID: 5120608187766906454, guid: c6f4f1d5f85ec4fb3ac7b1480fb973ca,
-    type: 3}
-  force: 6
-  terminalVelocity: 30
-  boostMultiplier: 3.2
-  friction: 0.5
-  difficultyMultiplier: 1
-  baseBurnAmount: 5
-  burnRateMultiplier: 1.5
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: b8208b79aa374604699ea6099e1fbff6, type: 3}
   thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
@@ -160,11 +163,11 @@ MonoBehaviour:
   profileColor: {r: 0, g: 0, b: 0, a: 0}
   minAlpha: 0.2
   maxAlpha: 1
-  maxSpeed: 10
   isLocked: 0
   shipRenderer: {fileID: 0}
   remixRingHolder: {fileID: 0}
-  boostPadding: 0.3
+  harmony: {fileID: 0}
+  shipProfile: {fileID: 0}
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -329,7 +332,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.88, y: 0.74}
+    oldSize: {x: 0.64, y: 0.54}
     newSize: {x: 0.88, y: 0.74}
     adaptiveTilingThreshold: 0.5
     drawMode: 0

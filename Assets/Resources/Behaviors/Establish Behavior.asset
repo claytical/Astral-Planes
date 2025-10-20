@@ -47,7 +47,7 @@ MonoBehaviour:
   progressionMulRange: 0
   baseCellsPerSecond: 3.8
   starDriftSpeed: 0.6
-  starDriftJitter: 0.15
+  starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0
   dustShrinkRadius: 6
@@ -79,6 +79,8 @@ MonoBehaviour:
   feedsDust: 0
   dustRegrowDelayMul: 0.84
   ejectionStyle: 0
+  ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
+    type: 3}
   nodesPerStar: 3
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6

@@ -52,6 +52,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -73,6 +75,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
   m_SortingLayer: -1
   m_SortingOrder: 0
@@ -99,9 +102,9 @@ GameObject:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 8268204866429990808}
   - component: {fileID: 5196823741573283697}
+  - component: {fileID: 8668376557347016044}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 2866961932351380823}
-  - component: {fileID: 8668376557347016044}
   - component: {fileID: 4329107608517712159}
   - component: {fileID: 8839951452404857149}
   m_Layer: 0
@@ -156,9 +159,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d18b16b01aa9498294736cd54d3a7f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  musicalRole: {fileID: 0}
+  musicalRole: {fileID: 11400000, guid: b63a78a8afc9544ffaeacdd2306d6ee8, type: 2}
   assignedTrack: {fileID: 0}
   selectedNoteSet: {fileID: 0}
+--- !u!114 &8668376557347016044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
+    type: 3}
+  lifetime: 0
+  randomizeLifetimer: 0
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5
@@ -239,22 +258,6 @@ PolygonCollider2D:
       - {x: 0.5099609, y: 0.024816632}
       - {x: 0.26731288, y: 0.45354828}
   m_UseDelaunayMesh: 0
---- !u!114 &8668376557347016044
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
-    type: 3}
-  lifetime: 0
-  randomizeLifetimer: 0
 --- !u!198 &4329107608517712159
 ParticleSystem:
   m_ObjectHideFlags: 0
@@ -4999,6 +5002,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5020,6 +5025,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0

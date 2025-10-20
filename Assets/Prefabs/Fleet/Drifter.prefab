@@ -53,7 +53,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  profile: {fileID: 11400000, guid: 2b76ecc426bc14a7cab7214f9799f408, type: 2}
+  profile: {fileID: 11400000, guid: 7fedc7c34ab9f4494a7087dc7aefa55e, type: 2}
   capacity: 1200
   arcadeMaxSpeed: 14
   arcadeAccel: 10

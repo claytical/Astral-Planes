@@ -64,8 +64,6 @@ public class DrumTrack : MonoBehaviour
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
     public event System.Action<MusicalPhase, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int,int> OnBinChanged; // (idx, binCount)
-
-// Optional setter so PhaseStar can request its own binning (e.g., rotationOrder.Length)
     public void SetBinCount(int bins) => _binCount = Mathf.Max(1, bins);
 
     void Start()
@@ -173,7 +171,7 @@ public class DrumTrack : MonoBehaviour
         // Align to DSP so the transport is stable from frame 0.
         double dspStart = AudioSettings.dspTime + 0.05;
         drumAudioSource.PlayScheduled(dspStart);
-
+        startDspTime = dspStart;
         // If InitializeDrumLoop only sets counters/grid, keep it. If it also calls PlayScheduled, remove the call below.
         StartCoroutine(InitializeDrumLoop());
         isPhaseStarActive = false;
@@ -187,7 +185,7 @@ public class DrumTrack : MonoBehaviour
         
     }
 
-    public void RequestPhaseStar(MusicalPhase phase, SpawnStrategyProfile strategy, Vector2Int? cellHint = null)
+    public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
     {
         Debug.Log($"[Spawn] RequestPhaseStar phase={phase} active={isPhaseStarActive} " +
                   $"hint={(cellHint.HasValue ? cellHint.Value.ToString() : "<none>")} " +
@@ -256,20 +254,17 @@ public class DrumTrack : MonoBehaviour
         .ToList();
 
     // Wire star
-    _star.SetSpawnStrategyProfile(strategy);
+//    _star.SetSpawnStrategyProfile(strategy);
     _star.Initialize(this, targets, profileAsset, phase);
     _star.WireBinSource(this);
 
     OnPhaseStarSpawned?.Invoke(phase, profileAsset);
 }
-
-// Utility to clear flags on destroy
-private sealed class OnDestroyRelay : MonoBehaviour
+    private sealed class OnDestroyRelay : MonoBehaviour
 {
     public System.Action onDestroyed;
     private void OnDestroy() { try { onDestroyed?.Invoke(); } catch {} }
 }
-
     public float TryGetBPM()
     {
         // return current BPM if known; otherwise <= 0 to signal "unknown"
@@ -341,7 +336,6 @@ private sealed class OnDestroyRelay : MonoBehaviour
 
         GameFlowManager.Instance.controller.UpdateVisualizer();
     }
-
     public float GetCellWorldSize()
     {
         // distance (world units) between adjacent cell centers, matching GridToWorldPosition mapping
@@ -541,7 +535,6 @@ private sealed class OnDestroyRelay : MonoBehaviour
             Debug.LogError(("DrumTrack: Loop length in seconds is invalid."));
         }
         drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
-        startDspTime = AudioSettings.dspTime;
     }
     private void LoopRoutines()
     {
@@ -618,6 +611,8 @@ private sealed class OnDestroyRelay : MonoBehaviour
         if (startDspTime == 0)
         {
             startDspTime = nextStart;
+            _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _loopLengthInSeconds); 
+
         }
         
         _pendingDrumLoop = null;
@@ -644,25 +639,19 @@ private sealed class OnDestroyRelay : MonoBehaviour
 
         var profile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         noteSet.noteBehavior = profile.defaultBehavior;
-
-        switch (profile.role)
-        {
-            case MusicalRole.Bass:
-                noteSet.noteBehavior = NoteBehavior.Bass;
+        switch (profile.role) { 
+            case MusicalRole.Bass: 
                 noteSet.rhythmStyle = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Pop) ? RhythmStyle.FourOnTheFloor : RhythmStyle.Sparse;
-                break;
-            case MusicalRole.Lead:
-                noteSet.noteBehavior = NoteBehavior.Lead;
+                break; 
+            case MusicalRole.Lead: 
                 noteSet.rhythmStyle = RhythmStyle.Syncopated;
-                break;
-            case MusicalRole.Harmony:
-                noteSet.noteBehavior = NoteBehavior.Harmony;
-                noteSet.chordPattern = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad;
-                break;
-            case MusicalRole.Groove:
-                noteSet.noteBehavior = NoteBehavior.Percussion;
+                break; 
+            case MusicalRole.Harmony: 
+                noteSet.chordPattern = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad; 
+                break; 
+            case MusicalRole.Groove: 
                 noteSet.rhythmStyle = RhythmStyle.Dense;
-                break;
+                break; 
         }
 
         noteSet.Initialize(track, track.GetTotalSteps());

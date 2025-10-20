@@ -6,7 +6,7 @@ public class Collectable : MonoBehaviour
 {
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
     public SpriteRenderer energySprite;
-
+    public int burstId; 
     private int amount = 1;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
@@ -290,6 +290,8 @@ public class Collectable : MonoBehaviour
             vehicle.CollectEnergy(amount);
             assignedInstrumentTrack.OnCollectableCollected(this, intendedStep >= 0 ? intendedStep : matchedStep, noteDurationTicks, force);
             if (TryGetComponent(out Collider2D col)) col.enabled = false;
+            var explode = GetComponent<Explode>();
+            if(explode != null) explode.Permanent(false);
 
     }
     

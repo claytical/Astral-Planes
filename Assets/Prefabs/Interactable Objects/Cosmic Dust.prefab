@@ -9,10 +9,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4213040972611002}
-  - component: {fileID: 3706479320875781435}
-  - component: {fileID: 3358133898735144510}
   - component: {fileID: 1980146515134306388}
   - component: {fileID: 8747843313378906591}
+  - component: {fileID: 3706479320875781435}
+  - component: {fileID: 3358133898735144510}
   - component: {fileID: 7497572302500479706}
   - component: {fileID: 685144576044249051}
   m_Layer: 7
@@ -39,6 +39,56 @@ Transform:
   - {fileID: 8294084348089236440}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1980146515134306388
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  referenceScale: {x: 0.75, y: 0.75, z: 1}
+  particleSystem: {fileID: 7497572302500479706}
+  starRemovesWithoutRegrow: 0
+  starAlphaFadeBias: 0.9
+  slowBrake: 0.231
+  speedScale: 0.748
+  accelScale: 0.662
+  dissipateOnExit: 0
+  minScaleFactor: 0.822
+  shrinkStep: 0.118
+  shrinkEaseTime: 0.39
+  regrowDelay: 0.45
+  regrowTime: 0.43
+  behavior: 0
+  slowFactor: 0.257
+  slowDuration: 0.35
+  lateralForce: 1.59
+  turbulence: 0.97
+  baseSprite: {fileID: 7236654244480378721}
+  fadeSeconds: 0.25
+  fullScale: {x: 0.2, y: 0.2, z: 0.2}
+  epochId: 0
+--- !u!114 &8747843313378906591
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1781116594832268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  explosion: {fileID: 2567590292593330884, guid: 95e71e582f0ce4b44959d703d22207e9,
+    type: 3}
+  lifetime: 0
+  randomizeLifetimer: 0
 --- !u!50 &3706479320875781435
 Rigidbody2D:
   serializedVersion: 5
@@ -101,57 +151,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.5
---- !u!114 &1980146515134306388
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  referenceScale: {x: 0.75, y: 0.75, z: 1}
-  particleSystem: {fileID: 7497572302500479706}
-  starRemovesWithoutRegrow: 0
-  starAlphaFadeBias: 0.9
-  slowBrake: 0.231
-  speedScale: 0.748
-  accelScale: 0.662
-  dissipateOnExit: 0
-  minScaleFactor: 0.813
-  shrinkStep: 0.205
-  shrinkEaseTime: 0.25
-  regrowDelay: 0.6
-  regrowTime: 0.86
-  behavior: 0
-  slowFactor: 0.257
-  slowDuration: 0.35
-  lateralForce: 1.59
-  turbulence: 0.97
-  baseSprite: {fileID: 7236654244480378721}
-  fadeSeconds: 0.25
-  fullScale: {x: 1, y: 1, z: 1}
-  epochId: 0
---- !u!114 &8747843313378906591
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  explosion: {fileID: 2567590292593330884, guid: 95e71e582f0ce4b44959d703d22207e9,
-    type: 3}
-  lifetime: 0
-  randomizeLifetimer: 0
+  m_Radius: 0.25
 --- !u!198 &7497572302500479706
 ParticleSystem:
   m_ObjectHideFlags: 0
@@ -4896,6 +4896,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -4917,6 +4919,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 50
@@ -5004,6 +5007,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5025,6 +5030,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -5092,6 +5098,8 @@ SpriteMask:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -5113,6 +5121,7 @@ SpriteMask:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
