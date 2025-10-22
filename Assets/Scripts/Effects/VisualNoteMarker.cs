@@ -4,9 +4,19 @@ using UnityEngine;
 public class VisualNoteMarker : MonoBehaviour
 { 
     private SpriteRenderer _spriteRenderer;
-    private ParticleSystem _particleSystem;
+    public ParticleSystem capturedParticles;
+    public ParticleSystem preCaptureParticles;
     public bool IsLit { get; set; }
 
+    public void SetWaitingParticles(Color color)
+    {
+        if (preCaptureParticles != null)
+        {
+            ParticleSystem.MainModule pre = preCaptureParticles.main;
+            pre.startColor = color;
+        }
+   
+    }
     public void Initialize(Color color)
     {
         _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -14,25 +24,32 @@ public class VisualNoteMarker : MonoBehaviour
         {
             _spriteRenderer.color = color;
         }
-        _particleSystem = GetComponentInChildren<ParticleSystem>();
-        if (_particleSystem != null)
+        if (capturedParticles != null)
         {
-            ParticleSystem.MainModule main = _particleSystem.main;
+            ParticleSystem.MainModule main = capturedParticles.main;
             main.startColor = color;
         }
+
+        if (preCaptureParticles != null)
+        {
+            ParticleSystem.MainModule pre = preCaptureParticles.main;
+            pre.startColor = color;
+            preCaptureParticles.Play();
+        }
+
         StartCoroutine(FadeAndScaleIn(color));
         
     }
     
     private IEnumerator FadeAndScaleIn(Color targetColor)
     {
-        targetColor.a = .1f;
         if (_spriteRenderer == null) yield break;
 
         float duration = 2f;
         float elapsed = 0f;
 
         Color startColor = new Color(targetColor.r, targetColor.g, targetColor.b, 0f);
+        targetColor.a = .5f;
         _spriteRenderer.color = startColor;
 
         Vector3 originalScale = transform.localScale;
@@ -52,11 +69,12 @@ public class VisualNoteMarker : MonoBehaviour
         _spriteRenderer.color = targetColor;
         transform.localScale = originalScale;
 
-        if (_particleSystem != null)
+        if (capturedParticles != null)
         {
-            var main = _particleSystem.main;
+            targetColor.a = 1f;
+            var main = capturedParticles.main;
             main.startColor = targetColor;
-            _particleSystem.Play();
+            capturedParticles.Play();
         }
     }
 
