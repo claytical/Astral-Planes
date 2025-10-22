@@ -50,7 +50,7 @@ public class Boundaries : MonoBehaviour
             if (track != null && GameFlowManager.Instance.controller != null && GameFlowManager.Instance.controller.noteVisualizer != null)
             {
                 float bottomY = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
-                bottomBoundary.transform.position = new Vector3(0, bottomY - (boundaryThickness / 2), 0);
+                bottomBoundary.transform.position = new Vector3(0, bottomY, 0);
             }
             bottomBoundary.size = new Vector2(screenHalfWidth * 2, boundaryThickness);
         }

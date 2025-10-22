@@ -57,6 +57,7 @@ public class InstrumentTrackController : MonoBehaviour
 {
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
+    private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
 
     void Start()
     {
@@ -129,8 +130,24 @@ public class InstrumentTrackController : MonoBehaviour
 
         foreach (var track in tracks)
         {
+            int h = ComputeLoopHash(track);
+            if (_loopHash.TryGetValue(track, out var prev) && prev == h)
+                continue; // no loop change → no work this frame
+            _loopHash[track] = h;
+
             foreach (var (step, _, _, _) in track.GetPersistentLoopNotes())
-                noteVisualizer.PlacePersistentNoteMarker(track, step);
+                noteVisualizer.PlacePersistentNoteMarker(track, step); // lit=true default
+        }
+    }
+    private static int ComputeLoopHash(InstrumentTrack t)
+    {
+        // order-independent hash of loop steps (cheap + stable)
+        unchecked
+        {
+            int h = 17;
+            foreach (var (step, _, _, _) in t.GetPersistentLoopNotes().OrderBy(n => n.Item1))
+                h = h * 31 + step;
+            return h;
         }
     }
     public int GetMaxActiveLoopMultiplier()

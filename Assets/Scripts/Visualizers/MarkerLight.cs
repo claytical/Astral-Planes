@@ -17,11 +17,11 @@ public class MarkerLight : MonoBehaviour
         _startScale = transform.localScale;
     }
 
-    public void SetGrey(Color grey)
+    public void SetGrey(Color color)
     {
-        if (sr) sr.color = grey;
+        if (sr) sr.color = color;
         Color c = sr.color;
-        c.a = .01f;
+        c.a = .3f;
         sr.color = c;
     }
     public void LightUp(Color trackColor)

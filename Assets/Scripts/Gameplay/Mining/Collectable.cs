@@ -12,6 +12,7 @@ public class Collectable : MonoBehaviour
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
     public NoteTether tether;               // runtime
+    public bool showTether = false;
     private bool awaitingPulse = false;
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
@@ -71,36 +72,6 @@ public class Collectable : MonoBehaviour
 
         StartCoroutine(DarkTimeoutRoutine(track));
     }
-    public void AttachTether(Transform marker, Color trackColor, LineRenderer tetherTemplate = null)
-    {
-        ribbonMarker = marker;
-        if (ribbonMarker == null) return;
-
-        // make a child gameobject to hold the tether
-        var go = new GameObject("NoteTether");
-        go.transform.SetParent(null); // world
-        tether = go.AddComponent<NoteTether>();
-        var lr = go.GetComponent<LineRenderer>();
-
-        // copy style from an optional template (so you can art-direct once in a prefab)
-        if (tetherTemplate != null)
-        {
-            lr.material       = new Material(tetherTemplate.material);
-            lr.textureMode    = tetherTemplate.textureMode;
-            tether.segments   = Mathf.Max(16, tetherTemplate.positionCount);
-            tether.baseWidth  = tetherTemplate.widthMultiplier;
-            tether.noiseAmp   = 0.15f;
-            tether.noiseSpeed = 1.5f;
-            tether.sag        = 0.6f;
-        }
-        else
-        {
-            // basic material if none provided
-            lr.material = new Material(Shader.Find("Sprites/Default"));
-        }
-
-        tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
-    }
     public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, float durSteps)
     {
         Debug.Log($"AttachingTetherAtSpawn { (marker ? marker.name : "(null)") }");
@@ -112,47 +83,13 @@ public class Collectable : MonoBehaviour
         tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
         if (TryGetComponent(out CollectableParticles cp) && tether != null)
         {
-            Debug.Log($"Has tether!");
-            // speed can be scaled by duration if you like (durSteps) to make long notes ooze slower
-            float dripSpeed = Mathf.Lerp(0.3f, 0.9f, Mathf.Clamp01(durSteps / 6f)); // longer → faster or slower, your call
             cp.RegisterTether(tether, pull: 0.7f);
-            //tether.RegisterDripEmitter(cp, dripSpeed);
         }
 
     }
     public void TravelAlongTetherAndFinalize(int durationTicks, float force, float seconds = 0.35f)
     {
         StartCoroutine(TravelRoutine(durationTicks, force, seconds));
-    }
-    public void HandleCollectedWithTether(System.Action afterPulse)
-    {
-        if (awaitingPulse || ribbonMarker == null || tether == null)
-        {
-            // No tether? just run existing completion immediately
-            afterPulse?.Invoke();
-            Destroy(gameObject);
-            return;
-        }
-
-        awaitingPulse = true;
-
-        // Hide the collectable visuals now (so it feels like energy converted)
-        var sr = GetComponentInChildren<SpriteRenderer>();
-        if (sr) sr.enabled = false;
-        var ps = GetComponentInChildren<ParticleSystem>();
-        if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-        // run pulse to marker, then light marker, then finish
-        var markerLight = ribbonMarker.GetComponent<MarkerLight>();
-        StartCoroutine(
-            tether.PulseToEnd(0.45f, () =>
-            {
-                if (markerLight != null)
-                    markerLight.LightUp(sr ? sr.color : Color.white);
-            })
-        );
-
-        StartCoroutine(FinishAfterPulse(afterPulse));
     }
 
     void Start()

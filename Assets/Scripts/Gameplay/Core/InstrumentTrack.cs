@@ -52,13 +52,11 @@ public class InstrumentTrack : MonoBehaviour
     private bool _ascendQueued;
     private readonly Dictionary<int, HashSet<int>> _burstSteps = new(); // burstId -> steps for that burst
     private int? _pendingLoopMultiplier;   // supports expand or collapse
-    private readonly List<int> _pendingAscendRemovals = new();
     public int currentBurstId;
-    public int LastExpandOldTotal { get; private set; } = 0;
+    private int LastExpandOldTotal { get; set; } = 0;
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);
     private int   MyMultiplier()     => Mathf.Max(1, loopMultiplier);
-    
     private float TimeSinceStart() =>
         drumTrack != null ? (float)(AudioSettings.dspTime - drumTrack.startDspTime) : 0f;
     private float LeaderLengthSec() =>
@@ -96,7 +94,6 @@ public class InstrumentTrack : MonoBehaviour
     target = Mathf.Min(target, Mathf.Max(1, loopMultiplier));
     return Mathf.Max(1, target);
 }
-
     private void EvaluateAndQueueCollapseIfPossible()
 {
     if (drumTrack == null) return;
@@ -106,7 +103,6 @@ public class InstrumentTrack : MonoBehaviour
     if (target < loopMultiplier)
         QueueCollapseTo(target);
 }
-
     private void QueueCollapseTo(int newMultiplier)
 {
     newMultiplier = Mathf.Clamp(newMultiplier, 1, loopMultiplier);
@@ -116,21 +112,18 @@ public class InstrumentTrack : MonoBehaviour
     _collapseTargetMultiplier = newMultiplier;
     HookCollapseBoundary();
 }
-
     private void HookCollapseBoundary()
 {
     if (_hookedBoundaryForCollapse || drumTrack == null) return;
     drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitCollapse;
     _hookedBoundaryForCollapse = true;
 }
-
     private void UnhookCollapseBoundary()
 {
     if (!_hookedBoundaryForCollapse || drumTrack == null) return;
     drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitCollapse;
     _hookedBoundaryForCollapse = false;
 }
-
     public bool TryGetSplitLayout(out int leftHalfWidth)
     {
         // Prefer the committed value; fall back to the pending snapshot.
@@ -143,27 +136,24 @@ public class InstrumentTrack : MonoBehaviour
         leftHalfWidth = 0;
         return false;
     }
+    private void OnDrumDownbeat_CommitCollapse() {
+        if (!_pendingCollapse) { UnhookCollapseBoundary(); return; }
 
-    private void OnDrumDownbeat_CommitCollapse()
-{
-    if (!_pendingCollapse) { UnhookCollapseBoundary(); return; }
+        int newMult = Mathf.Clamp(_collapseTargetMultiplier, 1, loopMultiplier);
+        if (newMult != loopMultiplier)
+        {
+            loopMultiplier = newMult;
+            _totalSteps = (drumTrack != null ? drumTrack.totalSteps : 16) * loopMultiplier;
+            persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
+            // Refresh visuals to reflect the narrower audible window
+            controller?.UpdateVisualizer();
+            controller?.noteVisualizer?.RecomputeTrackLayout(this);
+        }
 
-    int newMult = Mathf.Clamp(_collapseTargetMultiplier, 1, loopMultiplier);
-    if (newMult != loopMultiplier)
-    {
-        loopMultiplier = newMult;
-        _totalSteps = (drumTrack != null ? drumTrack.totalSteps : 16) * loopMultiplier;
-        persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
-        // Refresh visuals to reflect the narrower audible window
-        controller?.UpdateVisualizer();
-        controller?.noteVisualizer?.RecomputeTrackLayout(this);
-    }
-
-    _pendingCollapse = false;
-    UnhookCollapseBoundary();
-    _lastStep = -1;
+        _pendingCollapse = false;
+        UnhookCollapseBoundary();
+        _lastStep = -1;
 }
-
     void Start() {
         if (controller == null)
         {
@@ -210,7 +200,6 @@ public class InstrumentTrack : MonoBehaviour
         }
 
     }
-
     private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
     {
         List<int> allowedSteps = noteSet.GetStepList();
@@ -237,7 +226,6 @@ public class InstrumentTrack : MonoBehaviour
     {
         return _currentNoteSet;
     }
-
     private void RegisterBurstStep(int burstId, int step)
     {
         if (!_burstSteps.TryGetValue(burstId, out var set))
@@ -256,7 +244,6 @@ public class InstrumentTrack : MonoBehaviour
         controller?.UpdateVisualizer();
         EvaluateAndQueueCollapseIfPossible();
     }
-
     public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force)
 {
     if (collectable == null || collectable.assignedInstrumentTrack != this) return;
@@ -297,8 +284,18 @@ public class InstrumentTrack : MonoBehaviour
     if (controller?.noteVisualizer != null)
     {
         // grab the lit marker we just illuminated at (track, step)
-         if (controller.noteVisualizer.noteMarkers.TryGetValue((this, targetStep), out var t) && t != null) { 
-             controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, targetStep, t.gameObject);
+         if (controller.noteVisualizer.noteMarkers.TryGetValue((this, targetStep), out var t2) && t2 != null) { 
+             controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, targetStep, t2.gameObject);
+             Debug.Log($"[OnCollected] {name}: burstId={collectable.burstId}, targetStep={targetStep}, lighting marker");
+             if (controller.noteVisualizer.noteMarkers.TryGetValue((this, targetStep), out var t) && t != null)
+             {
+                 Debug.Log($"  → Found marker at targetStep={targetStep}, y={t.position.y:F1}");
+                 controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, targetStep, t.gameObject);
+             }
+             else
+             {
+                 Debug.Log($"  → NO marker found at targetStep={targetStep}!");
+             }
          }
     }
 
@@ -309,10 +306,10 @@ public class InstrumentTrack : MonoBehaviour
         if (rem <= 0)
         {
             _burstRemaining.Remove(collectable.burstId);
-
-            // rise takes 16 drum loops, this should vary based on track and phase
             float seconds = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds() * 16f);
-            controller?.noteVisualizer?.TriggerBurstAscend(this, collectable.burstId, seconds);
+    
+            // Delay ascend by one frame so expansion/spawn can happen first
+            StartCoroutine(DelayedBurstAscend(collectable.burstId, seconds));
         }
         else
         {
@@ -343,7 +340,11 @@ public class InstrumentTrack : MonoBehaviour
     }
 
 }
-
+    private IEnumerator DelayedBurstAscend(int burstId, float seconds)
+    {
+        yield return null; // Wait one frame
+        controller?.noteVisualizer?.TriggerBurstAscend(this, burstId, seconds);
+    }
     public void SoftReplaceLoop(IReadOnlyList<(int stepIndex, int note, int duration, float velocity)> newNotes)
     {
         // Clear data + our own spawned visuals (quietly)
@@ -363,7 +364,6 @@ public class InstrumentTrack : MonoBehaviour
 
         // IMPORTANT: do NOT call QueueCollapseTo(1) and do NOT call any blast/ascend visuals here.
     }
-
     public void SetMuted(bool muted)
     {
         // Route to your synth/MIDI/FMOD layer
@@ -726,7 +726,6 @@ public class InstrumentTrack : MonoBehaviour
         controller?.UpdateVisualizer();
         return stepIndex;
     }
-
     public float GetVelocityAtStep(int step)
     {
         float max = 0f;
@@ -737,107 +736,116 @@ public class InstrumentTrack : MonoBehaviour
         }
         return max;
     }
-    private void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1)
-{
+    private void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1) {
     
-    if (noteSet == null || collectablePrefab == null || controller?.noteVisualizer == null) return;
-    if (_currentNoteSet != noteSet)
-    {
-        SetNoteSet(noteSet);
-    }
-    int burstId = ++_nextBurstId;
-    currentBurstId = burstId;
-    int count = 0;
-
-    var nv = controller.noteVisualizer;
-    var stepList  = noteSet.GetStepList();
-    var noteList  = noteSet.GetNoteList();
-    if (stepList == null || stepList.Count == 0 || noteList == null || noteList.Count == 0) return; 
-    _currentBurstRemaining = 0; 
-    _currentBurstArmed     = true;
-    int spawned = 0;
-    foreach (int step in stepList)
-    {
-        if (maxToSpawn > 0 && spawned >= maxToSpawn) break;
-
-        // Decide note & duration like your Ghost code
-        int note = noteSet.GetNoteForPhaseAndRole(this, step);
-        int dur  = CalculateNoteDurationFromSteps(step, noteSet);
-
-        // Pick a free spawn cell for this pitch row (similar to your Ghost grid logic)
-        int pitchIndex = noteList.IndexOf(note);
-        if (pitchIndex < 0) continue;
-        bool placed = false;
-        int w = drumTrack.GetSpawnGridWidth();
-        var cols = Enumerable.Range(0, w).OrderBy(_ => UnityEngine.Random.value);  // randomize X
-
-        foreach (int x in cols)
+        if (noteSet == null || collectablePrefab == null || controller?.noteVisualizer == null) return;
+        if (_currentNoteSet != noteSet)
         {
-            Vector2Int gp = new Vector2Int(x, pitchIndex);
-            if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
-
-            Vector3 worldPos = drumTrack.GridToWorldPosition(gp);
-            var go = Instantiate(collectablePrefab, worldPos, Quaternion.identity, collectableParent);
-            var explosion = go.GetComponent<Explode>();
-            if (explosion != null)
-            {
-                explosion.Permanent(false);
-            }
-
-            if (!go) break;
-
-            if (go.TryGetComponent(out Collectable c))
-            {
-                // init like before
-                c.energySprite.color = trackColor;
-                c.Initialize(note, dur, this, noteSet, stepList);
-                c.burstId = burstId;              // <-- add this public field to Collectable (int)
-                count++;
-                c.intendedStep = step;
-                int markerStep = step;
-                // if this burst was staged to expand, place pings in the NEW half
-                if (_mapIncomingCollectionsToSecondHalf && _oldTotalAtExpand > 0 && _totalSteps == _oldTotalAtExpand * 2)
-                     markerStep = (_halfOffsetAtExpand + (step % _oldTotalAtExpand)) % _totalSteps;
-                
-                 // create a **grey** placeholder at the (possibly offset) markerStep
-                 var markerGO = nv.PlacePersistentNoteMarker(this, markerStep, lit: false, burstId);
-                 if (markerGO != null)
-                 {
-                     var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
-                     tag.track = this;
-                     tag.step = markerStep;
-                     tag.burstId = burstId;
-                     tag.isPlaceholder = true;
-
-                     var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
-                     ml.SetGrey(new Color(1f,1f,1f,0.25f));
-
-                     c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur);
-                 }
-
-                drumTrack.OccupySpawnGridCell(gp.x, gp.y, GridObjectType.Note);
-                spawnedCollectables.Add(go); 
-                var collectable = go.GetComponent<Collectable>(); 
-                if (collectable != null) { 
-                    _currentBurstRemaining++; 
-                    // subscribe once; OnDestroyed fires on OnDestroy/OnDisable (pool-safe)
-                    //collectable.OnDestroyed += HandleBurstCollectableDestroyedOnce; 
-                }
-                placed = true;
-                spawned++;
-            }
-            if (placed) break; // ✅ only break after successful placement
+            SetNoteSet(noteSet);
         }
-    } 
-    if (spawned == 0) { 
-        _currentBurstArmed = false; 
+        Debug.Log($"[SpawnBurst] {name}: burstId={_nextBurstId + 1}, " +
+                  $"_mapIncomingCollectionsToSecondHalf={_mapIncomingCollectionsToSecondHalf}, " +
+                  $"_expandCommitted={_expandCommitted}, " +
+                  $"_oldTotalAtExpand={_oldTotalAtExpand}, " +
+                  $"_totalSteps={_totalSteps}, " +
+                  $"_halfOffsetAtExpand={_halfOffsetAtExpand}, " +
+                  $"condition={((_mapIncomingCollectionsToSecondHalf && _oldTotalAtExpand > 0 && _totalSteps == _oldTotalAtExpand * 2) ? "TRUE - will remap" : "FALSE - no remap")}");
+
+        int burstId = ++_nextBurstId;
+        currentBurstId = burstId;
+        int count = 0;
+
+        var nv = controller.noteVisualizer;
+        var stepList  = noteSet.GetStepList();
+        var noteList  = noteSet.GetNoteList();
+        if (stepList == null || stepList.Count == 0 || noteList == null || noteList.Count == 0) return; 
         _currentBurstRemaining = 0; 
+        _currentBurstArmed     = true;
+        int spawned = 0;
+        foreach (int step in stepList)
+        {
+            if (maxToSpawn > 0 && spawned >= maxToSpawn) break;
+
+            // Decide note & duration like your Ghost code
+            int note = noteSet.GetNoteForPhaseAndRole(this, step);
+            int dur  = CalculateNoteDurationFromSteps(step, noteSet);
+
+            // Pick a free spawn cell for this pitch row (similar to your Ghost grid logic)
+            int pitchIndex = noteList.IndexOf(note);
+            if (pitchIndex < 0) continue;
+            bool placed = false;
+            int w = drumTrack.GetSpawnGridWidth();
+            var cols = Enumerable.Range(0, w).OrderBy(_ => UnityEngine.Random.value);  // randomize X
+
+            foreach (int x in cols)
+            {
+                Vector2Int gp = new Vector2Int(x, pitchIndex);
+                if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
+
+                Vector3 worldPos = drumTrack.GridToWorldPosition(gp);
+                var go = Instantiate(collectablePrefab, worldPos, Quaternion.identity, collectableParent);
+                var explosion = go.GetComponent<Explode>();
+                if (explosion != null)
+                {
+                    explosion.Permanent(false);
+                }
+
+                if (!go) break;
+
+                if (go.TryGetComponent(out Collectable c))
+                {
+                    // init like before
+                    c.energySprite.color = trackColor;
+                    c.Initialize(note, dur, this, noteSet, stepList);
+                    c.burstId = burstId;              // <-- add this public field to Collectable (int)
+                    count++;
+                    c.intendedStep = step;
+                    int markerStep = step;
+                    // if this burst was staged to expand, place pings in the NEW half
+                    if (_mapIncomingCollectionsToSecondHalf && _oldTotalAtExpand > 0 && _totalSteps == _oldTotalAtExpand * 2)
+                         markerStep = (_halfOffsetAtExpand + (step % _oldTotalAtExpand)) % _totalSteps;
+                    Debug.Log($"[BurstTrace] track={name} note={note} burst={burstId} originalStep={step} → markerStep={markerStep} totalSteps={_totalSteps} oldTotal={_oldTotalAtExpand} halfOffset={_halfOffsetAtExpand} mapSecondHalf={_mapIncomingCollectionsToSecondHalf}");
+
+                    // ===================================
+
+                     // create a **grey** placeholder at the (possibly offset) markerStep
+                     var markerGO = nv.PlacePersistentNoteMarker(this, markerStep, lit: false, burstId);
+                     if (markerGO != null)
+                     {
+                         var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
+                         tag.track = this;
+                         tag.step = markerStep;
+                         tag.burstId = burstId;
+                         tag.isPlaceholder = true;
+
+                         var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
+                         ml.SetGrey(new Color(1f,1f,1f,0.25f));
+
+                         c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur);
+                     }
+
+                    drumTrack.OccupySpawnGridCell(gp.x, gp.y, GridObjectType.Note);
+                    spawnedCollectables.Add(go); 
+                    var collectable = go.GetComponent<Collectable>(); 
+                    if (collectable != null) { 
+                        _currentBurstRemaining++; 
+                    }
+                    placed = true;
+                    spawned++;
+                }
+                if (placed) break; // ✅ only break after successful placement
+            }
+        } 
+        if (spawned == 0) { 
+            _currentBurstArmed = false; 
+            _currentBurstRemaining = 0; 
+        }
+        _burstRemaining[burstId] = count;
+        controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
+        controller?.noteVisualizer?.DestroyOrphanRowMarkers(this);
+        controller?.noteVisualizer?.RecomputeTrackLayout(this); 
+        controller?.noteVisualizer?.AssertNoDuplicateMarkers(this);
     }
-    _burstRemaining[burstId] = count;
-    controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-    controller?.noteVisualizer?.DestroyOrphanRowMarkers(this);
-    controller?.noteVisualizer?.RecomputeTrackLayout(this); 
-}
     public void SpawnCollectableBurstWithExpansionIfNeeded(NoteSet noteSet, int maxToSpawn = -1)
     {
         Debug.Log($"[ExpandStage] {name}: hasLoop={persistentLoopNotes.Count>0}, canExpand={loopMultiplier<maxLoopMultiplier}");
@@ -856,11 +864,12 @@ public class InstrumentTrack : MonoBehaviour
             _expandCommitted = false;
 
             HookExpandBoundary();
+
             StartCoroutine(SpawnBurstAfterExpand(noteSet, maxToSpawn));
+
         }
         else
         {
-            // No expansion needed — just spawn now
             SpawnCollectableBurst(noteSet, maxToSpawn);
         }
     }
@@ -871,28 +880,14 @@ public class InstrumentTrack : MonoBehaviour
 
         // One extra frame so visual width/step maps have updated
         yield return null;
-
         SpawnCollectableBurst(noteSet, maxToSpawn);
+
     }
     private void HookExpandBoundary()
     {
         if (_hookedBoundaryForExpand || drumTrack == null) return;
         drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitExpand;
         _hookedBoundaryForExpand = true;
-    }
-    void DumpTrackMarkers(InstrumentTrack track, string label)
-    {
-        var nv = controller.noteVisualizer;
-        Debug.Log($"--- Markers for {track.name} @ {label} ---");
-        int idx = 0;
-        foreach (var kv in nv.noteMarkers)
-        {
-            if (kv.Key.Item1 != track) continue;
-            var tf = kv.Value;
-            var tag = tf ? tf.GetComponent<MarkerTag>() : null;
-            var pos = tf ? tf.position : Vector3.zero;
-            Debug.Log($"{idx++:00}) step={kv.Key.Item2}  burstId={(tag? tag.burstId : int.MinValue)}  placeholder={(tag? tag.isPlaceholder : false)}  y={pos.y:F1}");
-        }
     }
 
     private void UnhookExpandBoundary()
@@ -964,7 +959,7 @@ public class InstrumentTrack : MonoBehaviour
               $"oldLeader={oldLeaderSteps} newLeader={newLeaderSteps} | " +
               $"mapSecondHalfFrom={_halfOffsetAtExpand}");
 #endif
-    DumpTrackMarkers(this, "Expand Burst " + currentBurstId.ToString());
+    Debug.Log($"[CommitExpand] {name}: expanded to {_totalSteps} steps, LastExpandOldTotal={LastExpandOldTotal}");
 }
 
     private void LightMarkerAt(int step)
@@ -985,8 +980,8 @@ public class InstrumentTrack : MonoBehaviour
         tag.isPlaceholder = false;
         tag.burstId = -1;
         // Ensure it is colored and emitting now
-        var vnm = t.GetComponent<VisualNoteMarker>();
-        if (vnm != null) vnm.Initialize(trackColor);
+//        var vnm = t.GetComponent<VisualNoteMarker>();
+//                if (vnm != null) vnm.Initialize(trackColor);
 
         var light = t.GetComponent<MarkerLight>();
         if (light != null) light.LightUp(trackColor);
