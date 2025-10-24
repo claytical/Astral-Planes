@@ -2600,7 +2600,7 @@ namespace MidiPlayerTK
             if (count > 0)
                 fluid_voice_effects(count, dsp_left_buf, dsp_right_buf, dsp_reverb_buf, dsp_chorus_buf);
             else
-                Debug.Log("Count <= 0 in fluid_rvoice_write");
+//                Debug.Log("Count <= 0 in fluid_rvoice_write");
             /* turn off voice if short count (sample ended and not looping) */
             if (count < synth.FLUID_BUFSIZE)
             {

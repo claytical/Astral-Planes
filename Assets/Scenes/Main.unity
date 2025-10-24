@@ -977,8 +977,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   configLibrary: {fileID: 11400000, guid: 121692e96748547a7bb04fb3c42720d1, type: 2}
-  noteSetPrefab: {fileID: 5821295020177947933, guid: 3a5602c84e7234e59b6888d137efaf66,
-    type: 3}
 --- !u!114 &1151719980
 MonoBehaviour:
   m_ObjectHideFlags: 0
