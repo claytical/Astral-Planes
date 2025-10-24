@@ -660,6 +660,25 @@ public class DrumTrack : MonoBehaviour
         if (track.GetNoteDensity() < 4)
             AddRandomNotes(track, noteSet, 4 - track.GetNoteDensity()); // Pad sparsity
     }
+// DrumTrack.cs
+    public int GetLeaderSteps()
+    {
+        var ctrl = GameFlowManager.Instance?.controller;
+        if (ctrl == null || ctrl.tracks == null || ctrl.tracks.Length == 0)
+            return totalSteps;
+
+        int maxMul = 1;
+        foreach (var t in ctrl.tracks)
+        {
+            if (t == null) continue;
+            var notes = t.GetPersistentLoopNotes();
+            if (notes != null && notes.Count > 0)
+                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
+        }
+        return totalSteps * maxMul;
+    }
+
+
     private void AddRandomNotes(InstrumentTrack track, NoteSet noteSet, int count)
     {
         var steps = noteSet.GetStepList();

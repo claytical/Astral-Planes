@@ -36,7 +36,12 @@ public class CosmicDust : MonoBehaviour
     public SpriteRenderer baseSprite;
     [SerializeField] private float fadeSeconds = 0.25f;
     [SerializeField] private Vector3 fullScale = Vector3.one; // set in Awake/Begin()
+    [SerializeField] private Collider2D hitbox;
+    
+    [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
+    [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
 
+    private bool _isDespawned;
     private bool _shrinkingFromStar;
     private Vector3 _velocity, _baseScale, _accomodationTarget;
     private Coroutine _accomodateRoutine, _regrowRoutine, _fadeRoutine, _growInRoutine;
@@ -69,6 +74,21 @@ public class CosmicDust : MonoBehaviour
         _accomodationTarget = fullScale;
 
     }
+    public void OnSpawnedFromPool(Color tint)
+    {
+        // Visual reset
+        if (baseSprite)
+        {
+            var c = tint; c.a = 1f;
+            baseSprite.color = c;
+        }
+        transform.localScale = fullScale;
+
+        // Physics reset
+        gameObject.layer = solidLayer;
+        if (hitbox) hitbox.enabled = true;
+    }
+
     public void Begin()
     {
         SetColorVariance();
@@ -541,32 +561,56 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
             Destroy(gameObject);
         }
     }
-    private void DestroyFromPhaseStar()
-{
-    DustDestroyStats.StarPrunes++;
-    StartCoroutine(FadeAndDestroy(1));
-    // free cell + remove from generator map, just like BreakHexagon
-    if (_drumTrack != null)
+
+    public void DestroyFromPhaseStar()
     {
-        Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
-        _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);                              // frees grid slot
-        GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);                              // remove map entry
-        if (!starRemovesWithoutRegrow)
-            StartCoroutine(TriggerDelayedRegrowth(gridPos));                        // only if you want regrowth
+        DustDestroyStats.StarPrunes++;
+        // One path only: fade then POOL (not Destroy)
+        StartCoroutine(FadeAndPool(strength01: 1f));
+    }
+    private IEnumerator FadeAndPool(float strength01)
+    {
+        if (_isDespawned) yield break; // guard against double calls
+        _isDespawned = true;
+
+        // 1) Immediately stop blocking
+        if (hitbox) hitbox.enabled = false;
+        gameObject.layer = nonBlockingLayer;
+
+        // 2) Free cell NOW (don’t wait until after the fade)
+        var dt = GameFlowManager.Instance?.activeDrumTrack;
+        Vector2Int gridPos = default;
+        bool hadGrid = false;
+        if (dt != null)
+        {
+            gridPos = dt.WorldToGridPosition(transform.position);
+            dt.FreeSpawnCell(gridPos.x, gridPos.y); // free occupancy immediately
+            hadGrid = true;
+        }
+
+        // 3) Visual-only fade
+        float dur = Mathf.Lerp(fadeSeconds * 0.3f, fadeSeconds, Mathf.Clamp01(strength01));
+        Color c0 = baseSprite ? baseSprite.color : Color.white;
+        Vector3 s0 = transform.localScale.sqrMagnitude < 1e-6f ? fullScale : transform.localScale;
+
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / dur);
+            if (baseSprite) { var c = c0; c.a = Mathf.Lerp(c0.a, 0f, u); baseSprite.color = c; }
+            transform.localScale = Vector3.Lerp(s0, Vector3.zero, u);
+            yield return null;
+        }
+
+        // 4) Tell generator it can forget this tile (idempotent)
+        if (hadGrid)
+            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
+
+        // 5) Return to pool
+        DespawnToPoolInstant();
     }
 
-    // let particles finish, then destroy
-    if (particleSystem != null)
-    {
-        particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-        StartCoroutine(WaitForParticlesThenDestroy());                              // graceful destroy
-    }
-    else
-    {
-        Destroy(gameObject);
-    }
-}
-    // CosmicDust.cs
     public void PrepareForReuse()
     {
         // Stop any lingering coroutines from prior life
@@ -591,8 +635,18 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
 
     public void DespawnToPoolInstant()
     {
-        // Fast visual reset; pooling system handles SetActive(false)
-        if (particleSystem != null) { particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); }
+        // Ensure non-blocking & invisible when pooled
+        if (hitbox) hitbox.enabled = false;
+        gameObject.layer = nonBlockingLayer;
+
+        if (baseSprite)
+        {
+            var c = baseSprite.color; c.a = 0f;
+            baseSprite.color = c;
+        }
+        transform.localScale = Vector3.zero;
+
+        _isDespawned = false; // reset for next lifecycle
         gameObject.SetActive(false);
     }
 

@@ -45,6 +45,65 @@ public class HarmonyDirector : MonoBehaviour
             }
         }
     }
+    public void AdvanceChordAndRetuneAll(int steps = 1)
+    {
+        if (steps == 0)
+        {
+            Debug.Log("[CHORD][HD] AdvanceChordAndRetuneAll called with steps=0; ignoring");
+            return;
+        }
+        if (profile == null)
+        {
+            Debug.LogWarning("[CHORD][HD] No ChordProgressionProfile set; cannot advance");
+            return;
+        }
+        if (profile.chordSequence == null || profile.chordSequence.Count == 0)
+        {
+            Debug.LogWarning("[CHORD][HD] Profile has empty chordSequence; cannot advance");
+            return;
+        }
+
+        int old = cursor;
+        cursor = (cursor + steps) % profile.chordSequence.Count;
+        Debug.Log($"[CHORD][HD] Advance {steps} → cursor {old} → {cursor} (seq len {profile.chordSequence.Count})");
+
+        ApplyChordToAllTracks(cursor);
+    }
+    
+    void Start() { 
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager; 
+        if (ptm != null) ptm.OnPhaseChanged += HandlePhaseChangedBridgeAware;
+    }
+    void OnDestroy() { 
+        var ptm = GameFlowManager.Instance?.phaseTransitionManager; 
+        if (ptm != null) ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
+    }
+    private void HandlePhaseChangedBridgeAware(MusicalPhase from, MusicalPhase to) { 
+        // Pick a bridge signature and honor its commit timing.
+        var sig = BridgeLibrary.For(from, to); 
+        switch (sig.commitTiming) {
+            case HarmonyCommit.AtBridgeStart: 
+                // Retune everyone to chord 0 on next downbeat
+                CommitNextChordNow(); 
+                break;
+            case HarmonyCommit.MidBridge: 
+                // Stage a one-loop delay: commit on the *following* boundary
+                StartCoroutine(CommitOnNextBoundary()); 
+                break;
+            case HarmonyCommit.AtBridgeEnd: 
+            default: 
+                // Do nothing here; your bridge coroutine should call CommitNextChordNow() at the end.
+                break;
+        }
+    }
+        private System.Collections.IEnumerator CommitOnNextBoundary() {
+            // Debounced: wait one full loop, then commit
+                var d = GameFlowManager.Instance?.activeDrumTrack;
+            if (d == null) yield break;
+            double target = AudioSettings.dspTime + d.GetLoopLengthInSeconds();
+            while (AudioSettings.dspTime < target) yield return null;
+            CommitNextChordNow();
+        }
     public void SetActiveProfile(ChordProgressionProfile profile, bool applyImmediately)
     {
         if (profile == null) return;
@@ -74,6 +133,25 @@ public class HarmonyDirector : MonoBehaviour
             // Stage for the next downbeat commit
             _pendingProfile        = profile;
             _hasPendingProfileSwap = true;
+        }
+    }
+    public bool TryGetChordAt(int index, out Chord chord)
+    {
+        chord = default;
+        if (profile == null || profile.chordSequence == null || profile.chordSequence.Count == 0)
+            return false;
+
+        int i = ((index % profile.chordSequence.Count) + profile.chordSequence.Count) % profile.chordSequence.Count;
+        chord = profile.chordSequence[i];
+        return true;
+    }
+
+    public int ProgressionLength
+    {
+        get
+        {
+            if (profile == null || profile.chordSequence == null) return 0;
+            return profile.chordSequence.Count;
         }
     }
 
@@ -151,9 +229,11 @@ public class HarmonyDirector : MonoBehaviour
         if (seq == null || seq.Count == 0) return;
 
         var chord = seq[chordIndex % seq.Count];
+        Debug.Log($"[CHORD][HD] RetuneAll → chord[{chordIndex}]={chord.rootNote}");
         foreach (var tr in GameFlowManager.Instance.controller.tracks)
         {
             Debug.Log($"Applying chord {chord.rootNote}");
+            Debug.Log($"[CHORD][HD] Retuned track={tr.name} role={tr.assignedRole}");
             tr.RetuneLoopToChord(chord); // <-- new helper on InstrumentTrack (below)
         }
     }

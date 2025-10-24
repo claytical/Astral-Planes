@@ -58,12 +58,136 @@ public class InstrumentTrackController : MonoBehaviour
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
-
+    [SerializeField] private MusicalRole cohortTriggerRole = MusicalRole.Lead;
+    [SerializeField] private float cohortWindowFraction = 0.5f; // e.g., lower half of the leader loop (0..16 when leader is 32)
+    private bool _chordEventsSubscribed;
     void Start()
     {
         if (!GameFlowManager.Instance.ReadyToPlay()) return;
         noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
         UpdateVisualizer();
+        // Subscribe to ascension-complete events
+        foreach (var t in tracks)
+            if (t != null)
+            {
+                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
+                t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
+                Debug.Log($"[CHORD][SUB] Controller subscribed to CohortCompleted for track={t.name} role={t.assignedRole} id={t.GetInstanceID()}");
+            }
+        // Subscribe to the drum’s loop boundary so we (re)arm each loop
+        var drum = GameFlowManager.Instance.activeDrumTrack;
+        TrySubscribeChordEvents(); 
+        if (drum != null)
+            drum.OnLoopBoundary += ArmCohortsOnLoopBoundary;
+        ArmCohortsOnLoopBoundary();
+    }
+    void Update()
+    {
+        // Self-heal: if something reassigns tracks later, we’ll latch subscriptions once.
+        if (!_chordEventsSubscribed)
+            TrySubscribeChordEvents();
+    }
+    void OnEnable()
+    {
+        _chordEventsSubscribed = false;
+        TrySubscribeChordEvents();   // first attempt
+    }
+    void OnDisable()
+    {
+        UnsubscribeChordEvents();
+    }
+    private void TrySubscribeChordEvents()
+    {
+        // Prefer our own tracks array; if it isn't set, try to pull from the active controller
+        var src = tracks;
+        if (src == null || src.Length == 0)
+        {
+            var ctrl = GameFlowManager.Instance ? GameFlowManager.Instance.controller : null;
+            if (ctrl != null && ctrl.tracks != null && ctrl.tracks.Length > 0)
+                src = ctrl.tracks;
+        }
+        if (src == null || src.Length == 0) return; // not ready yet
+
+        int count = 0;
+        foreach (var t in src)
+        {
+            if (!t) continue;
+            // De-dupe to avoid multiple adds if TrySubscribe runs more than once
+            t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
+            t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
+            count++;
+        }
+        if (count > 0)
+        {
+            tracks = src; // keep the exact instances we subscribed to
+            _chordEventsSubscribed = true;
+            Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
+        }
+    }
+
+    private void UnsubscribeChordEvents()
+    {
+        if (tracks == null) return;
+        foreach (var t in tracks)
+        {
+            if (!t) continue;
+            t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
+        }
+        _chordEventsSubscribed = false;
+    }
+    private void OnDestroy()
+    {
+        // tidy subscriptions
+        var drum = GameFlowManager.Instance ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (drum != null) drum.OnLoopBoundary -= ArmCohortsOnLoopBoundary;
+        foreach (var t in tracks)
+            if (t != null)
+                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
+    }
+    private void ArmCohortsOnLoopBoundary()
+    {
+        var drum = GameFlowManager.Instance.activeDrumTrack;
+        int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
+        if (leaderSteps <= 0)
+        {
+            // Fallback: use max of actual tracks if drum not ready yet
+            leaderSteps = tracks.Where(t => t != null).Select(t => t.GetTotalSteps()).DefaultIfEmpty(32).Max();
+        }
+
+        int start = 0;
+        int endLeader = Mathf.Max(1, Mathf.RoundToInt(leaderSteps * Mathf.Clamp01(cohortWindowFraction)));
+
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+
+            int trackSteps = Mathf.Max(1, t.GetTotalSteps()); // <- NO extra * loopMultiplier
+            // Map [0..endLeader) from leader-space into this track’s local modulus
+            int endTrack = Mathf.Clamp(endLeader, 1, trackSteps);
+
+            t.ArmAscensionCohort(0, endTrack);
+
+            Debug.Log($"[CHORD][ARM] {t.name} role={t.assignedRole} window=[0,{endTrack}) " +
+                      $"trackSteps={trackSteps} leaderSteps={leaderSteps} " +
+                      $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
+        }
+    }
+
+    private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
+    {
+        Debug.Log($"[CHORD][CTRLR] CohortCompleted received from track={track.name} role={track.assignedRole} window=[{start},{end})");
+
+        // If you intend to restrict to a specific role, keep this. Otherwise remove it.
+        // if (track.assignedRole != cohortTriggerRole) { Debug.Log("[CHORD][CTRLR] Ignored: not trigger role"); return; }
+
+        var h = GameFlowManager.Instance ? GameFlowManager.Instance.harmony : null;
+        if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }
+
+        // This is your “tick”: the armed cohort finished ascending on 'track'
+        // 1) Optionally: small flourish / feedback hook could go here
+        
+        // 2) Ask HarmonyDirector to advance one chord and retune everyone
+        GameFlowManager.Instance?.harmony?.AdvanceChordAndRetuneAll(1);
     }
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
     {

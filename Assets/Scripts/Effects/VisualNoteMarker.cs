@@ -15,7 +15,17 @@ public class VisualNoteMarker : MonoBehaviour
             ParticleSystem.MainModule pre = preCaptureParticles.main;
             pre.startColor = color;
         }
-   
+    }
+
+    public void ReduceStartSize(float _startSize)
+    {
+        ParticleSystem.MainModule particles = capturedParticles.main;
+        ParticleSystem.MinMaxCurve minMax = particles.startSize;
+
+        float currentSize = minMax.constantMin;
+        currentSize -= _startSize;
+        currentSize = minMax.constantMin;
+        particles.startSize = _startSize;
     }
     public void Initialize(Color color)
     {

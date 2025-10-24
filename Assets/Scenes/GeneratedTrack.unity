@@ -150,10 +150,10 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 728040985}
   - {fileID: 1373048478}
   - {fileID: 197216900}
   - {fileID: 371719000}
-  - {fileID: 728040985}
   - {fileID: 423220218}
   m_Father: {fileID: 1248605496}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -5732,9 +5732,9 @@ ParticleSystem:
   m_GameObject: {fileID: 296242524}
   serializedVersion: 8
   lengthInSec: 1
-  simulationSpeed: 1
+  simulationSpeed: 0.5
   stopAction: 0
-  cullingMode: 1
+  cullingMode: 0
   ringBufferMode: 0
   ringBufferLoopRange: {x: 0, y: 1}
   emitterVelocityMode: 1
@@ -5806,7 +5806,7 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0.5
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -5977,7 +5977,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.5
+      scalar: 0.2
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -6294,14 +6294,14 @@ ParticleSystem:
         m_RotationOrder: 4
     randomizeRotationDirection: 0
     gravitySource: 0
-    maxNumParticles: 1000
+    maxNumParticles: 10000
     customEmitterVelocity: {x: 0, y: 0, z: 0}
     size3D: 0
     rotation3D: 0
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.01
+      scalar: 0.4
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -6441,7 +6441,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 16
+      value: 5
       mode: 0
       spread: 0
       speed:
@@ -6560,7 +6560,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1000
+      scalar: 5000
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -6990,7 +6990,7 @@ ParticleSystem:
         m_RotationOrder: 4
     separateAxes: 0
   ColorModule:
-    enabled: 0
+    enabled: 1
     gradient:
       serializedVersion: 2
       minMaxState: 1
@@ -6998,34 +6998,34 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
-        key1: {r: 0.6156863, g: 0.30588236, b: 0.8666667, a: 0.4392157}
-        key2: {r: 1, g: 0.79607844, b: 0.019607844, a: 0}
+        key0: {r: 1, g: 1, b: 1, a: 0}
+        key1: {r: 1, g: 1, b: 1, a: 1}
+        key2: {r: 1, g: 0.79607844, b: 0.019607844, a: 0.93333334}
         key3: {r: 0, g: 0.8392157, b: 0.8392157, a: 0}
         key4: {r: 1, g: 1, b: 1, a: 0}
         key5: {r: 0, g: 0.8392157, b: 0.8392157, a: 0}
         key6: {r: 1, g: 0.9349057, b: 0.2783019, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 0
-        ctime1: 11733
+        ctime1: 65535
         ctime2: 24136
         ctime3: 33689
         ctime4: 65535
         ctime5: 61680
         ctime6: 58403
         ctime7: 0
-        atime0: 36539
-        atime1: 65535
-        atime2: 64957
-        atime3: 0
+        atime0: 0
+        atime1: 6704
+        atime2: 41232
+        atime3: 65535
         atime4: 0
         atime5: 0
         atime6: 0
         atime7: 0
         m_Mode: 0
         m_ColorSpace: 0
-        m_NumColorKeys: 5
-        m_NumAlphaKeys: 2
+        m_NumColorKeys: 2
+        m_NumAlphaKeys: 4
       minGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -10530,9 +10530,13 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  ascensionCohort:
+    windowStartInclusive: 0
+    windowEndExclusive: 0
+    armed: 0
   assignedRole: 0
-  lowestAllowedNote: 48
-  highestAllowedNote: 72
+  lowestAllowedNote: 36
+  highestAllowedNote: 60
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
@@ -10544,7 +10548,7 @@ MonoBehaviour:
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
 --- !u!1 &371718999
@@ -10558,7 +10562,7 @@ GameObject:
   - component: {fileID: 371719000}
   - component: {fileID: 371719002}
   m_Layer: 5
-  m_Name: Texture
+  m_Name: Groove
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10997,8 +11001,12 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  ascensionCohort:
+    windowStartInclusive: 0
+    windowEndExclusive: 0
+    armed: 0
   assignedRole: 1
-  lowestAllowedNote: 36
+  lowestAllowedNote: 48
   highestAllowedNote: 72
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
@@ -11011,7 +11019,7 @@ MonoBehaviour:
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
 --- !u!4 &627412778
@@ -11077,6 +11085,10 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  ascensionCohort:
+    windowStartInclusive: 0
+    windowEndExclusive: 0
+    armed: 0
   assignedRole: 3
   lowestAllowedNote: 48
   highestAllowedNote: 96
@@ -11091,7 +11103,7 @@ MonoBehaviour:
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
 --- !u!1 &657963290
@@ -11249,6 +11261,37 @@ MonoBehaviour:
   chorusDelay: 40
   chorusRate: 0.8
   chorusDepth: 0.03
+--- !u!1 &869126477
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 869126478}
+  m_Layer: 0
+  m_Name: DustPool
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &869126478
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 869126477}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -28.97649, y: -1.01597, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &911153256
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12080,6 +12123,8 @@ MonoBehaviour:
   - {fileID: 627412777}
   - {fileID: 652946508}
   noteVisualizer: {fileID: 45202786}
+  cohortTriggerRole: 2
+  cohortWindowFraction: 0.5
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -12314,7 +12359,7 @@ MonoBehaviour:
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   flowTilesPerFrame: 256
   poolPrewarm: 200
-  poolRoot: {fileID: 0}
+  poolRoot: {fileID: 869126478}
   maxSpawnMillisPerFrame: 1.2
   regrowCooldownSeconds: 3
   progressiveMaze: 1
@@ -13375,6 +13420,10 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 0}
+  ascensionCohort:
+    windowStartInclusive: 0
+    windowEndExclusive: 0
+    armed: 0
   assignedRole: 2
   lowestAllowedNote: 60
   highestAllowedNote: 96
@@ -13389,7 +13438,7 @@ MonoBehaviour:
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
 --- !u!4 &1690824281
@@ -14190,3 +14239,4 @@ SceneRoots:
   - {fileID: 51606787}
   - {fileID: 1041262112}
   - {fileID: 2067870202}
+  - {fileID: 869126478}
