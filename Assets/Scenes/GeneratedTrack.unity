@@ -10551,6 +10551,12 @@ MonoBehaviour:
     m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  _binCursor: 0
 --- !u!1 &371718999
 GameObject:
   m_ObjectHideFlags: 0
@@ -11022,6 +11028,12 @@ MonoBehaviour:
     m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  _binCursor: 0
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -11106,6 +11118,12 @@ MonoBehaviour:
     m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  _binCursor: 0
 --- !u!1 &657963290
 GameObject:
   m_ObjectHideFlags: 0
@@ -11286,7 +11304,7 @@ Transform:
   m_GameObject: {fileID: 869126477}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -28.97649, y: -1.01597, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -12081,11 +12099,11 @@ MonoBehaviour:
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
-  activeHexagons: []
   activeMinedObjects: []
   activeMineNodes: []
   isPhaseStarActive: 0
   currentStep: 0
+  _star: {fileID: 0}
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -12095,7 +12113,7 @@ Transform:
   m_GameObject: {fileID: 1354683681}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -8, y: 8, z: 0}
+  m_LocalPosition: {x: -8, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -12235,8 +12253,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17f0094acf2944184b8a01cb25a3e90a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridWidth: 32
-  gridHeight: 24
+  gridWidth: 18
+  gridHeight: 10
   cellSize: 1
 --- !u!114 &1354683688
 MonoBehaviour:
@@ -13441,6 +13459,12 @@ MonoBehaviour:
     m_Bits: 128
   dustCheckRadius: 0.2
   currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  _binCursor: 0
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0

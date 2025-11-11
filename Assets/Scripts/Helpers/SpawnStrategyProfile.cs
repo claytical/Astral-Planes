@@ -13,9 +13,9 @@ public class SpawnStrategyProfile : ScriptableObject
 
 
     // --- runtime (not serialized) ---
-    [NonSerialized] private int _rrCursor;                       // round-robin cursor
-    [NonSerialized] private HashSet<int> _rrUsedThisStar;        // “unique-first” set
-    [NonSerialized] private Dictionary<int,int> _quotaRemaining; // per-node quotas (by index)
+    [NonSerialized] private int _rrCursor; // round-robin cursor
+    [NonSerialized] private HashSet<int> _rrUsedThisStar; // “unique-first” set
+    [NonSerialized] private Dictionary<int, int> _quotaRemaining; // per-node quotas (by index)
     [NonSerialized] private bool _loggedNoteSpawnerWithModifier; // one-time warning
 
     #region Public API (PhaseStar should call these)
@@ -23,8 +23,8 @@ public class SpawnStrategyProfile : ScriptableObject
     /// <summary>Strict phase filter. Spawners ignore TrackModifierType.</summary>
     public IEnumerable<WeightedMineNode> GetCandidates(MusicalPhase phase) =>
         (mineNodes ?? s_empty).Where(n => n != null
-                                       && n.allowedPhases != null
-                                       && n.allowedPhases.Contains(phase));
+                                          && n.allowedPhases != null
+                                          && n.allowedPhases.Contains(phase));
 
     public IEnumerable<WeightedMineNode> GetCandidates(MusicalPhase phase, MinedObjectType type) =>
         GetCandidates(phase).Where(n => n.minedObjectType == type);
@@ -45,9 +45,11 @@ public class SpawnStrategyProfile : ScriptableObject
         {
             foreach (var c in cands)
             {
-                if (c.minedObjectType == MinedObjectType.NoteSpawner && c.trackModifierType != TrackModifierType.Clear /* any value */)
+                if (c.minedObjectType == MinedObjectType.NoteSpawner &&
+                    c.trackModifierType != TrackModifierType.Clear /* any value */)
                 {
-                    Debug.LogWarning($"[SpawnStrategyProfile] NoteSpawner entry has a TrackModifierType ({c.trackModifierType}) which will be IGNORED.");
+                    Debug.LogWarning(
+                        $"[SpawnStrategyProfile] NoteSpawner entry has a TrackModifierType ({c.trackModifierType}) which will be IGNORED.");
                     _loggedNoteSpawnerWithModifier = true;
                     break;
                 }
@@ -74,11 +76,11 @@ public class SpawnStrategyProfile : ScriptableObject
 
         var d = new MinedObjectSpawnDirective
         {
-            minedObjectType   = node.minedObjectType,
-            assignedTrack     = track,
-            displayColor      = track.trackColor, // ← always inherit from track
-            remixUtility      = null,
-            noteSet           = null
+            minedObjectType = node.minedObjectType,
+            assignedTrack = track,
+            displayColor = track.trackColor, // ← always inherit from track
+            remixUtility = null,
+            noteSet = null
         };
 
         // For utilities, carry the modifier; for spawners: ignore it.
@@ -107,12 +109,13 @@ public class SpawnStrategyProfile : ScriptableObject
             total += Mathf.Max(1, cands[i].weight);
 
         int roll = Random.Range(0, Mathf.Max(1, total));
-        int sum  = 0;
+        int sum = 0;
         for (int i = 0; i < cands.Count; i++)
         {
             sum += Mathf.Max(1, cands[i].weight);
             if (roll < sum) return cands[i];
         }
+
         return cands[cands.Count - 1];
     }
 
@@ -129,7 +132,7 @@ public class SpawnStrategyProfile : ScriptableObject
         if (cands.Count == 0) return null;
 
         // produce a stable view (index into original list)
-        var indexed = cands.Select((n, i) => (Node:n, i)).ToList();
+        var indexed = cands.Select((n, i) => (Node: n, i)).ToList();
 
         for (int k = 0; k < indexed.Count; k++)
         {
@@ -152,7 +155,7 @@ public class SpawnStrategyProfile : ScriptableObject
     private WeightedMineNode PickWithUtilityBias(List<WeightedMineNode> cands, float bias)
     {
         var spawners = cands.Where(n => n.minedObjectType == MinedObjectType.NoteSpawner).ToList();
-        var utils    = cands.Where(n => n.minedObjectType == MinedObjectType.TrackUtility).ToList();
+        var utils = cands.Where(n => n.minedObjectType == MinedObjectType.TrackUtility).ToList();
 
         if (utils.Count == 0) return PickWeightedRandom(spawners.Count > 0 ? spawners : cands);
         if (spawners.Count == 0) return PickWeightedRandom(utils);
@@ -184,6 +187,24 @@ public class SpawnStrategyProfile : ScriptableObject
         }
 
         return true;
+    }
+
+    public MinedObjectSpawnDirective PickDirectiveByRole(MusicalPhase phase, MusicalRole _role)
+    {
+        var ctrl = GameFlowManager.Instance?.controller;
+        var track = ctrl?.GetTrackByRole(_role);
+
+        var dir = new MinedObjectSpawnDirective
+        {
+            minedObjectType = MinedObjectType.NoteSpawner, // default for role-based shards
+            role = _role,
+            assignedTrack = track,
+            displayColor = track != null ? track.trackColor : Color.white,
+            prefab = null // let PhaseStar.ResolveDirectivePrefab fill this
+        };
+
+        // (Optionally: inject utility kinds, pattern hints, etc., if your authored design needs it)
+        return dir;
     }
 }
 

@@ -17,6 +17,35 @@ MonoBehaviour:
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 0.848
+  rolePattern: 03000000000000000100000002000000
+  previewPulseScale: 1.2
+  beatsPerRole: 4
+  fallbackBPM: 60
+  pulseCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1.2
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  inactiveShardTint: {r: 0.3, g: 0.3, b: 0.3, a: 0.6}
   rotationMode: 4
   minPreviewIntervalSec: 2
   personalitySpeedMul: 1
@@ -46,7 +75,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   progressionMulRange: 0
   baseCellsPerSecond: 3.8
-  starDriftSpeed: 0.6
+  starDriftSpeed: 1.5
   starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0

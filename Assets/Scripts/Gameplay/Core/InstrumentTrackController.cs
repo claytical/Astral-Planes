@@ -61,6 +61,22 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private MusicalRole cohortTriggerRole = MusicalRole.Lead;
     [SerializeField] private float cohortWindowFraction = 0.5f; // e.g., lower half of the leader loop (0..16 when leader is 32)
     private bool _chordEventsSubscribed;
+    private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
+    public void NotifyBinPossiblyExtended(InstrumentTrack leaderTrack, int binIndex)
+    {
+        if (!leaderTrack || binIndex < 0) return;
+        // Only act the FIRST time we see this (track, bin) as an extension
+        if (_binExtensionSignaled.Add((leaderTrack, binIndex)))
+            AdvanceOtherTrackCursors(leaderTrack, 1);
+    }
+// top-level field you may have added previously
+// private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
+
+    public void ResetControllerBinGuards()
+    {
+        _binExtensionSignaled?.Clear();
+    }
+
     void Start()
     {
         if (!GameFlowManager.Instance.ReadyToPlay()) return;
@@ -172,6 +188,48 @@ public class InstrumentTrackController : MonoBehaviour
                       $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
         }
     }
+// InstrumentTrackController.cs (optional, call explicitly where you finalize first pickup on a brand-new track)
+public void BackfillNewTrackAcrossLeaderSpan(InstrumentTrack t)
+{
+    var drum = GameFlowManager.Instance?.activeDrumTrack;
+    if (!t || drum == null) return;
+
+    int bin = Mathf.Max(1, drum.totalSteps);
+    int leaderBins = Mathf.Max(1, GetMaxLoopMultiplier());
+
+    // Duplicate the *just-collected* material into [0 .. leaderBins-1],
+    // or call your existing burst mapping to lay notes per bin.
+    // Minimal example: replicate rhythm for each bin using the last pickup’s baseStep%bin.
+    var notes = t.GetPersistentLoopNotes();
+    if (notes.Count == 0) return;
+    var (lastStep, lastNote, lastDur, lastVel) = notes[notes.Count - 1];
+    int inBinStep = lastStep % bin;
+
+    for (int b = 0; b < leaderBins; b++)
+    {
+        int step = b * bin + inBinStep;
+        if (!t.IsStepInFilledBin(step))   // don’t double-write if we already filled this bin
+        {
+            t.CollectNote(step, lastNote, lastDur, lastVel);
+            t.SetBinFilled(b, true);
+        }
+    }
+
+    // Align cursor to the leader (the next write will be at leaderBins)
+    t.SetBinCursor(leaderBins);
+}
+
+    public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
+    {
+        if (tracks == null) return;
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (!t || t == leaderTrack) continue;
+            t.AdvanceBinCursor(by);            // reserve a silent bin (no notes placed)
+            // No visuals: silence = absence. No MarkGhostPadding here.
+        }
+    }
 
     private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
     {
@@ -248,6 +306,13 @@ public class InstrumentTrackController : MonoBehaviour
                 ClearTrackForNewPhase(t);            // silence + clear objects so the new star can rebuild
         }
     }
+    public InstrumentTrack GetTrackByRole(MusicalRole role)
+    {
+        foreach (var t in tracks)
+            if (t.assignedRole == role) return t;
+        return null;
+    }
+
     public void UpdateVisualizer()
     {
         if (noteVisualizer == null) return;

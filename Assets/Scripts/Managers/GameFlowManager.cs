@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Gameplay.Mining;
+using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 
@@ -87,7 +89,11 @@ public class GameFlowManager : MonoBehaviour
         {
             intro.SetActive(false);
             if (setup != null)
+            {
+                string title = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.InstanceID).FirstOrDefault().text = "Select your vessel...";
+                Debug.Log($"Set title to {title}");
                 setup.SetActive(true);
+            }
         }
     }
     public void RegisterPlayer(LocalPlayer player)
@@ -97,6 +103,15 @@ public class GameFlowManager : MonoBehaviour
     public bool ReadyToPlay()
     {
         return CurrentState == GameState.Playing && localPlayers.Count > 0;
+    }
+    private void SetBridgeVisualMode(bool on)
+    {
+        // When ON: hide gameplay visuals (maze + noteviz), coral is shown by PlayPhaseBridge.
+        // When OFF: show gameplay visuals again.
+        if (dustGenerator.poolRoot) dustGenerator.poolRoot.gameObject.SetActive(!on);
+
+        if (noteViz && noteViz.GetUIParent())
+            noteViz.GetUIParent().gameObject.SetActive(!on);
     }
     public void CheckAllPlayersReady()
     {
@@ -344,106 +359,127 @@ public class GameFlowManager : MonoBehaviour
         }
         return list;
     }
-IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
+// GameFlowManager.cs
+private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
 {
-    Debug.Log("[Bridge] 4→2→0 (retain-based split, stable leader-loop)");
-
+    // ===== Lock gameplay & prep =====
     GhostCycleInProgress = true;
-    FreezeGameplayForBridge();
+    FreezeGameplayForBridge();                      // despawn collectables, gate input
 
-    float drumLoopSec = activeDrumTrack ? Mathf.Max(0.05f, activeDrumTrack.GetLoopLengthInSeconds()) : 4f;
+    var drum = activeDrumTrack;
+    var viz  = noteViz;
+    var ctrl = controller;
 
-    // Stage harmony for NEXT phase (no audible retune yet)
-    ClearScreenForBridge();
+    float drumLoopSec = drum ? Mathf.Max(0.05f, drum.GetLoopLengthInSeconds()) : 4f;
+
+    // Stage harmony for NEXT phase silently (no audible retune yet)
     var nextProf = GetProfileForPhase(nextPhase);
     harmony?.SetActiveProfile(nextProf, applyImmediately: false);
-    if (sig.includeDrums && activeDrumTrack) activeDrumTrack.SetBridgeAccent(true);
 
-    // Remix NOW so the very first repeat reflects the new arrangement
-    controller?.RemixAllTracksForBridge(phaseTransitionManager.currentPhase, sig);
+    if (sig.includeDrums && drum) drum.SetBridgeAccent(true);
 
-    var tracksArray = (controller != null && controller.tracks != null) ? controller.tracks : System.Array.Empty<InstrumentTrack>();
-    var allTracks   = tracksArray.Where(t => t != null).ToList();
+    // Snapshot track list
+    var allTracks = (ctrl && ctrl.tracks != null)
+        ? ctrl.tracks.Where(t => t != null).ToList()
+        : new List<InstrumentTrack>();
 
-    // ACTIVE snapshot AFTER remix (used to decide Section B fleet)
-    List<InstrumentTrack> activeNow;
-    if (controller != null)
-    {
-        // Prefer a helper if you have one; otherwise inline:
-        activeNow = new List<InstrumentTrack>();
-        foreach (var t in allTracks)
-        {
-            var notes = t.GetPersistentLoopNotes();
-            if (notes != null && notes.Count > 0) activeNow.Add(t);
-        }
-    }
-    else activeNow = new List<InstrumentTrack>();
-
-    // Decide the RETAIN set for Section B (never over-clear)
-    var retainForB = new List<InstrumentTrack>();
-    int activeCount = activeNow.Count;
-    if (activeCount >= 3)
-        retainForB = activeNow.OrderBy(_ => UnityEngine.Random.value).Take(2).ToList();
-    else if (activeCount == 2)
-        retainForB.AddRange(activeNow);
-    else if (activeCount == 1)
-        retainForB.Add(activeNow[0]);
-    // else 0 → retain none (drums-only in Section B)
-
-    // Leader utilities
+    // Utility to compute how long "one full loop" is for a set of tracks
     int ComputeLeaderMulFor(IEnumerable<InstrumentTrack> set)
     {
-        int maxMul = 0; bool anyNotes = false;
+        int maxMul = 1;
+        bool any = false;
         foreach (var t in set)
         {
-            if (t == null) continue;
+            if (!t) continue;
             var notes = t.GetPersistentLoopNotes();
             if (notes != null && notes.Count > 0)
             {
-                anyNotes = true;
-                maxMul = Mathf.Max(maxMul, t.loopMultiplier < 1 ? 1 : t.loopMultiplier);
+                any = true;
+                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
             }
         }
-        if (anyNotes) return Mathf.Max(1, maxMul);
+        if (any) return maxMul;
 
-        // Fallback 1: any active tracks
+        // fallbacks (same as before)
         foreach (var t in allTracks)
         {
-            if (t == null) continue;
+            if (!t) continue;
             var notes = t.GetPersistentLoopNotes();
             if (notes != null && notes.Count > 0)
-                maxMul = Mathf.Max(maxMul, t.loopMultiplier < 1 ? 1 : t.loopMultiplier);
+                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
         }
-        if (maxMul > 0) return maxMul;
-
-        // Fallback 2: max among all tracks (even if empty)
-        foreach (var t in allTracks)
-            if (t != null) maxMul = Mathf.Max(maxMul, t.loopMultiplier < 1 ? 1 : t.loopMultiplier);
         return Mathf.Max(1, maxMul);
     }
     float LeaderLoopSecondsFor(IEnumerable<InstrumentTrack> set) => drumLoopSec * ComputeLeaderMulFor(set);
 
-    // ===== SECTION A: ALL tracks, 2× leader loop (do NOT clear yet) =====
-    float leaderA = LeaderLoopSecondsFor(allTracks);
-    Debug.Log($"[Bridge] A: active={activeCount}, leaderA={leaderA:0.00}s, retainB={retainForB.Count}");
-    yield return new WaitForSeconds(leaderA);
-    yield return new WaitForSeconds(leaderA);
+    // ----------------------------------------------------------------------
+    // A) Play the completed 4-track loop ONCE (no remix, no clearing)
+    // ----------------------------------------------------------------------
+    var activeNow = allTracks.Where(t => t.GetPersistentLoopNotes()?.Count > 0).ToList();
+    float leaderA = LeaderLoopSecondsFor(activeNow.Count > 0 ? activeNow : allTracks);
+    yield return new WaitForSeconds(leaderA);       // exactly one tour of what the player built
 
-    // ===== SPLIT: now clear everything EXCEPT retainForB =====
-    foreach (var t in allTracks)
+    // ----------------------------------------------------------------------
+    // B) Drop 1–3 tracks, remix remaining into the bridge signature
+    //    (Audio: clear dropped tracks + remix retained. Visuals: align grid)
+    // ----------------------------------------------------------------------
+    // Decide retain vs drop
+    activeNow = allTracks.Where(t => t.GetPersistentLoopNotes()?.Count > 0).ToList();
+    int mustRetainAtLeast = 1;                      // always leave something to remix
+    int canDrop = Mathf.Clamp(activeNow.Count - mustRetainAtLeast, 0, 2);
+    int dropCount = (canDrop > 0) ? UnityEngine.Random.Range(1, canDrop + 1) : 0;
+
+    var shuffled = activeNow.OrderBy(_ => UnityEngine.Random.value).ToList();
+    var toDrop   = shuffled.Take(dropCount).ToList();
+    var retain   = shuffled.Skip(dropCount).ToList();
+
+    // Remix retained set
+    ctrl?.RemixAllTracksForBridge(phaseTransitionManager.currentPhase, sig);
+
+    // Drop (audio + immediate visual cleanup)
+    foreach (var t in toDrop)
     {
-        if (t == null) continue;
-        if (retainForB.Contains(t)) continue;                 // keep for Section B
-        t.ClearLoopedNotes(TrackClearType.Remix);             // drop for Section B
+        // Visual flourish (optional)
+        viz?.TriggerNoteBlastOff(t);
+        // Audio/model clear
+        t.ClearLoopedNotes(TrackClearType.Remix);
+        t.ResetBinStateForNewPhase();
     }
 
-    // ===== SECTION B: retained set only, 2× leader loop =====
-    float leaderB = LeaderLoopSecondsFor(retainForB);
-    Debug.Log($"[Bridge] B: retainB={retainForB.Count}, leaderB={leaderB:0.00}s");
-    yield return new WaitForSeconds(leaderB);
-    yield return new WaitForSeconds(leaderB);
+    // Snap visual grid to retained leader so X positions match what you hear
+    if (viz && drum)
+    {
+        int leaderMulRetained = ComputeLeaderMulFor(retain.Count > 0 ? retain : Enumerable.Empty<InstrumentTrack>());
+        int leaderStepsRetained = Mathf.Max(1, leaderMulRetained) * Mathf.Max(1, drum.totalSteps);
+        viz.RequestLeaderGridChange(leaderStepsRetained);
+        // Note: NoteVisualizer applies pending grid changes on its next loop boundary.
+    }
+    SetBridgeVisualMode(true);
+    // ----------------------------------------------------------------------
+    // C) Play the REMIXED bridge ONCE while showing only CORAL (placeholder)
+    // ----------------------------------------------------------------------
+    // Hide visualizer rows, show coral placeholder
+    if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
 
-    // Final clear → land clean into next phase
+    var coral = EnsureCoral();
+    if (coral != null)
+    {
+        coral.gameObject.SetActive(true);
+        // Drive a simple placeholder "growth" animation over the bridge duration
+        float bridgeOnceSec = LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        StartCoroutine(GrowCoralPlaceholder(coral, bridgeOnceSec, retain));
+        yield return new WaitForSeconds(bridgeOnceSec); // play remixed bridge once
+    }
+    else
+    {
+        // No coral prefab? Still wait one retained loop with visuals hidden.
+        float bridgeOnceSec = LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        yield return new WaitForSeconds(bridgeOnceSec);
+    }
+
+    // ----------------------------------------------------------------------
+    // D) Clear all tracks, change drum loop & maze, spawn the next Phase Star
+    // ----------------------------------------------------------------------
     var stillActive = new List<InstrumentTrack>();
     foreach (var t in allTracks)
     {
@@ -452,34 +488,90 @@ IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
     }
     foreach (var t in stillActive) t.ClearLoopedNotes(TrackClearType.Remix);
 
-    // Seed / visibility, phase swap, drum schedule, next star
+    // Optionally fade coral back out fast
+    if (coral != null) { StartCoroutine(FadeCoralAlpha(coral, 0f, 0.35f)); }
+
+    // Re-enable visualizer for next phase
+    if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
+
+    // Seeds / visibility for the next phase
     var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
     controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
     controller?.ApplySeedVisibility(seeds);
 
     if (phaseTransitionManager.currentPhase != nextPhase)
         phaseTransitionManager.HandlePhaseTransition(nextPhase, "GFM/BridgeEnd");
-
+    SetBridgeVisualMode(false);
+    ResetPhaseBinStateAndGrid();
+    // Schedule drums & boot next phase’s maze/star
     activeDrumTrack?.SchedulePhaseAndLoopChange(nextPhase);
+    dustGenerator.ClearMaze();
     progressionManager.BootFirstPhaseStar(nextPhase, regenerateMaze: true);
 
-    if (sig.includeDrums && activeDrumTrack) activeDrumTrack.SetBridgeAccent(false);
+    if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
     GhostCycleInProgress = false;
 }
+public float GetBeatInterval()
+{
+    var drums = activeDrumTrack;
+    return drums != null ? drums.drumLoopBPM : 0.5f;
+}
 
-    private void ClearScreenForBridge()
+private void ResetPhaseBinStateAndGrid()
+{
+    // 1) Tracks: cursors & per-burst guards
+    if (controller?.tracks != null)
+        foreach (var t in controller.tracks)
+            if (t) t.ResetBinStateForNewPhase();
+
+    controller?.ResetControllerBinGuards();
+
+    // 2) Visual grid: snap back to one-bin leader (drum bin size)
+    if (activeDrumTrack && noteViz)
     {
-        // 1) Despawn lingering mined objects
-        if (activeDrumTrack != null)
-        {
-            activeDrumTrack.ClearAllActiveMinedObjects();
-            activeDrumTrack.ClearAllActiveMineNodes();            
-        }
-
-        // 2) Clear the maze immediately (or start a quick fade-out if you prefer)
-        if (activeDrumTrack != null && dustGenerator != null)
-            dustGenerator.ClearMaze();
+        int leaderSteps = Mathf.Max(1, activeDrumTrack.totalSteps); // 1 bin
+        noteViz.RequestLeaderGridChange(leaderSteps);
+        // Let NoteVisualizer apply on its next loop boundary; grid is clean.
     }
+}
+
+// Placeholder growth: very safe (no dependency on a specific CoralVisualizer API)
+private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List<InstrumentTrack> retained)
+{
+    if (cv == null) yield break;
+
+    // Color hint: blend retained track colors, fallback to white
+    Color tint = Color.white;
+    if (retained != null && retained.Count > 0)
+    {
+        float r = 0, g = 0, b = 0;
+        foreach (var t in retained) { r += t.trackColor.r; g += t.trackColor.g; b += t.trackColor.b; }
+        tint = new Color(r / retained.Count, g / retained.Count, b / retained.Count, 1f);
+    }
+
+    // Try to color sprites/meshes if available
+    foreach (var sr in cv.GetComponentsInChildren<SpriteRenderer>(true)) if (sr) sr.color = tint;
+    foreach (var mr in cv.GetComponentsInChildren<MeshRenderer>(true))
+    {
+        if (!mr) continue;
+        var mat = mr.material; if (mat && mat.HasProperty("_Color")) { var c = mat.color; c = Color.Lerp(c, tint, 0.8f); mat.color = c; }
+    }
+
+    // Simple scale-up over the bridge duration
+    var root = cv.transform;
+    Vector3 start = Vector3.zero;
+    Vector3 end   = Vector3.one;
+    float t2 = 0f, dur = Mathf.Max(0.05f, seconds);
+    while (t2 < 1f && cv)
+    {
+        t2 += Time.deltaTime / dur;
+        float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t2));
+        root.localScale = Vector3.LerpUnclamped(start, end, u);
+        yield return null;
+    }
+    if (cv) root.localScale = end;
+}
+
     private CoralVisualizer EnsureCoral()
     {
         if (_coralInstance != null) return _coralInstance;

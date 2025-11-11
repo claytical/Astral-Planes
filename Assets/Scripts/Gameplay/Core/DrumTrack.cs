@@ -39,12 +39,11 @@ public class DrumTrack : MonoBehaviour
     public MusicalPhase? QueuedPhase;
     public float drumLoopBPM = 120f;
     public float gridPadding = 1f;
-    public int totalSteps = 32;
+    public int totalSteps = 16;
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
     public double startDspTime;
     public List<PhaseSnapshot> SessionPhases = new();
-    public List<GameObject> activeHexagons = new List<GameObject>();
     public List<MinedObject> activeMinedObjects = new List<MinedObject>();
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
@@ -56,9 +55,9 @@ public class DrumTrack : MonoBehaviour
  
     private PhaseTransitionManager _phaseTransitionManager;
     private bool _started;
-    private int _lastLoopCount, _phaseStartLoop, _phaseCount;
+    private int _lastLoopCount, _tLoop, _phaseCount;
     private AudioClip _pendingDrumLoop;
-    private PhaseStar _star;
+    public PhaseStar _star;
     private int _binIdx = -1;
     private int _binCount = 4;                   // default; PhaseStar can override per-spawn
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
@@ -417,6 +416,28 @@ public class DrumTrack : MonoBehaviour
             }
         }
     }
+    // DrumTrack.cs — add near other public helpers
+    public float GetScreenWorldWidth()
+    {
+        float z = -Camera.main.transform.position.z;
+        Vector3 bottomLeft  = Camera.main.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+        Vector3 topRight    = Camera.main.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        // match GridToWorldPosition’s horizontal padding
+        return (topRight.x - gridPadding) - (bottomLeft.x + gridPadding);
+    }
+    public float GetScreenWorldHeight()
+    {
+        float z = -Camera.main.transform.position.z;
+        Vector3 topRight    = Camera.main.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        float bottomY       = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY(); // same bottom as GridToWorldPosition
+        // match GridToWorldPosition’s vertical padding (bottom+gridPadding → top-gridPadding)
+        return (topRight.y - gridPadding) - (bottomY + gridPadding);
+    }
+    public float GetNoteVisualizerTopY()
+    {
+        return GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
+    }
+
     public int GetSpawnGridWidth()
     {
         return GameFlowManager.Instance.spawnGrid.gridWidth;
@@ -538,6 +559,8 @@ public class DrumTrack : MonoBehaviour
     }
     private void LoopRoutines()
     {
+        if (isPhaseStarActive &&  _star.gameObject != null)
+            _star.OnLoopBoundary_RearmIfNeeded();
         // Only breathe the maze between stars (or when you explicitly want a reset)
         if (GameFlowManager.Instance.dustGenerator != null 
             && !GameFlowManager.Instance.GhostCycleInProgress 

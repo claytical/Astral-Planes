@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 [System.Serializable]
 public class PhaseStarEmotion {
@@ -19,8 +20,17 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public Color mazeColor = Color.white;
     [Range(0.25f,3f)] public float particlePulseSpeed = 1f;
     [Range(0f,1f)] public float starAlphaMin = 0.1f, starAlphaMax = 1f;
-// PhaseStarBehaviorProfile.cs
-
+    [Tooltip("Roles that this star will spawn, in order. If empty, generated dynamically.")]
+    public List<MusicalRole> rolePattern = new();
+    [Header("Preview Ring Settings")]
+    [Range(0.1f, 2f)] public float previewPulseScale = 1.2f;
+    [Header("Tempo / Advance Settings")]
+    [Tooltip("How many beats before the preview advances to the next role/petal.")]
+    [Range(1, 8)] public int beatsPerRole = 4;   // beginner-friendly default
+    [Tooltip("Fallback BPM when no DrumTrack is active.")]
+    [Range(30, 180)] public float fallbackBPM = 60f; // slower, readable default
+    public AnimationCurve pulseCurve = AnimationCurve.EaseInOut(0, 0.8f, 1, 1.2f);
+    public Color inactiveShardTint = new(0.3f, 0.3f, 0.3f, 0.6f);
     [Header("Preview Rotation (color wheel)")]
     public RotationMode rotationMode = RotationMode.PerBin;
     [Range(0.25f, 2f)] public float minPreviewIntervalSec = 0.5f;
@@ -87,6 +97,7 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public MineRoleTuning groove;
     public float starHoleRadius;
     public float darkCleanupMaxLoops;
+    public float previewSpinDps { get; set; }
 
     // Resolve phase speed multiplier (for MineNodeLocomotion)
 

@@ -8,7 +8,9 @@ public class NoteTether : MonoBehaviour
     [Header("Endpoints")]
     public Transform start; // usually the Collectable transform
     public Transform end;   // the ribbon marker transform
-
+    public InstrumentTrack boundTrack;
+    public int boundStep = -1;
+    public NoteVisualizer boundVisualizer;
     [Header("Curve")]
     [Range(8,128)] public int segments = 32;
     public float sag = 0.6f;          // how much the curve dips
@@ -35,8 +37,111 @@ public class NoteTether : MonoBehaviour
     private CollectableParticles _dripEmitter;
     [SerializeField] private float dripBaseSpeed = 0.6f;
     [SerializeField] private float dripGravity   = 0.0f;
-    private float _endpointNullGrace = 0.1f;
+    [SerializeField] private float _endpointNullGrace = 0.6f;  // was 0.1f — allow layout/marker creation
     private float _endpointNullTimer = 0f;
+    private float _rebindPollInterval = 0.05f;
+    private float _rebindTimer = 0f;
+    [SerializeField] private Camera worldCamera;   // optional override; falls back to Camera.main
+    [SerializeField] private Camera uiCamera;      // optional override for Screen Space - Camera canvas
+    [SerializeField] private float worldZOverride = float.NaN; // if set, force the tether's Z
+    private Vector3 _lastEndWorld;
+void Update()
+{
+    // If either endpoint is missing, try to (re)acquire before destroying
+    if (!start || !end)
+    {
+        // Try to resolve 'end' from the visualizer’s marker table every few frames
+        if (!end && boundVisualizer && boundTrack && boundStep >= 0)
+        {
+            _rebindTimer -= Time.deltaTime;
+            if (_rebindTimer <= 0f)
+            {
+                _rebindTimer = _rebindPollInterval;
+                if (boundVisualizer.noteMarkers != null &&
+                    boundVisualizer.noteMarkers.TryGetValue((boundTrack, boundStep), out var t) &&
+                    t)
+                {
+                    end = t;
+                    // Immediately rebuild once the anchor appears
+                    _endpointNullTimer = 0f;
+                }
+            }
+        }
+
+        _endpointNullTimer += Time.deltaTime;
+        if (_endpointNullTimer > _endpointNullGrace)
+        {
+            // If we still have a visualizer + binding info, don’t destroy yet—keep trying.
+            // Only self-destruct if we truly have no way to resolve the anchor anymore.
+            bool hopeless = (!boundVisualizer || !boundTrack || boundStep < 0);
+            if (hopeless)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            // Otherwise, keep waiting; just skip rendering this frame.
+            return;
+        }
+
+        // Skip rendering this frame but keep the tether alive while we wait.
+        return;
+    }
+
+    // endpoints present — render normally
+    _endpointNullTimer = 0f;
+
+    RebuildCurve();
+    _curveLength = ComputeCurveLength();
+
+    if (_dripEmitter != null)
+    {
+        Vector3 dir = (end.position - start.position).normalized;
+        _dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
+    }
+
+    EmitShimmer(Time.deltaTime);
+}
+private Vector3 ResolveEndWorldPosition()
+{
+    if (end == null) return _lastEndWorld;
+
+    // If the end lives under a Canvas (UI), convert to world space
+    RectTransform rt = end as RectTransform ?? end.GetComponent<RectTransform>();
+    if (rt != null)
+    {
+        var canvas = rt.GetComponentInParent<Canvas>();
+        // UI camera: for Screen Space - Camera use canvas.worldCamera; for Overlay pass null
+        var uiCam = this.uiCamera != null ? this.uiCamera : (canvas ? canvas.worldCamera : null);
+        Vector2 screen = RectTransformUtility.WorldToScreenPoint(uiCam, rt.position);
+
+        var wcam = this.worldCamera != null ? this.worldCamera : Camera.main;
+        if (wcam == null) return _lastEndWorld;
+
+        // Depth: for orthographic cams the z arg is ignored; for perspective pick depth near start
+        float depth;
+        if (wcam.orthographic)
+        {
+            depth = 0f; // ignored
+        }
+        else
+        {
+            // distance from camera to the plane of the start point if available
+            var planeZ = (start ? start.position.z : 0f);
+            depth = Mathf.Abs(planeZ - wcam.transform.position.z);
+            if (depth < 0.001f) depth = 10f;
+        }
+
+        var wp = wcam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
+        // Force Z onto our tether plane
+        if (!float.IsNaN(worldZOverride)) wp.z = worldZOverride;
+        else if (start) wp.z = start.position.z;
+        return _lastEndWorld = wp;
+    }
+
+    // Non-UI object: just use its world position
+    return _lastEndWorld = end.position;
+}
+
     void Awake()
     {
         _lr = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();
@@ -61,29 +166,11 @@ public class NoteTether : MonoBehaviour
         EnsureShimmer();
     }
 
-    void Update()
-    {
-        if (!start || !end)
-        {
-            _endpointNullTimer += Time.deltaTime;
-            if (_endpointNullTimer > _endpointNullGrace) { Destroy(gameObject); }
-            return;
-        }
-        _endpointNullTimer = 0f;
-        
-        if (start == null || end == null) { Destroy(gameObject); return; }
 
-        RebuildCurve();                 // make sure `points` and LR positions are set
-        _curveLength = ComputeCurveLength();
-        if (_dripEmitter != null)
-        {
-            Vector3 dir = (end.position - start.position).normalized;
-            // Drip goes from collectable toward marker; flip if you want reverse
-            _dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
-        }
-
-        // ✅ Emit every frame, scaled by Time.deltaTime and the current curve length
-        EmitShimmer(Time.deltaTime);
+    public void BindByStep(InstrumentTrack track, int step, NoteVisualizer viz) {
+        boundTrack = track; 
+        boundStep  = step;
+        boundVisualizer = viz;
     }
     public IEnumerator PulseToEnd(float seconds = 0.45f, System.Action onArrive = null)
     {
@@ -104,7 +191,6 @@ public class NoteTether : MonoBehaviour
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
     {
         start = a; end = b; baseColor = c;
-
         if (_lr)
         {
             // “electric filament” gradient
@@ -213,8 +299,8 @@ public class NoteTether : MonoBehaviour
     private void RebuildCurve()
     {
         Vector3 a = start.position;
-        Vector3 d = end.position;
-
+ //       Vector3 d = end.position;
+        Vector3 d = ResolveEndWorldPosition();
         // control points: a slight dip + forward pull toward end
         Vector3 dir   = (d - a);
         Vector3 right = Vector3.Cross(dir.normalized, Vector3.forward);

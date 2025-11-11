@@ -43,7 +43,7 @@ public class MainMenuCoralLoader : MonoBehaviour
             CoralVisualizer visualizer = coralObj.GetComponent<CoralVisualizer>();
             if (visualizer != null)
             {
-                visualizer.GenerateCoralFromSnapshots(session);
+//                visualizer.GenerateCoralFromSnapshots(session);
             }
         }
 

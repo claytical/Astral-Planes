@@ -73,27 +73,26 @@ public class MinedObject : MonoBehaviour
     }
     public void Initialize(MinedObjectType type, InstrumentTrack track, NoteSet noteSet = null, TrackModifierType? modifier = null)
     {
-        Debug.Log($"Initializing mined object of type {type} on {track} with note set {noteSet}");
-        minedObjectType = type;
+        Debug.Log($"Initializing mined object of type {type} on {track} with note set {(noteSet == null ? "null" : noteSet.ToString())}");        minedObjectType = type;
         assignedTrack = track;
         this.trackModifierType = modifier;
         currentNoteSet = noteSet;
-        Debug.Log($"Note set track: {noteSet.assignedInstrumentTrack}");
+        if (noteSet != null) 
+            Debug.Log($"Note set track: {noteSet.assignedInstrumentTrack}");        
         var explode = GetComponent<Explode>();
         if (explode != null)
         {
-            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(MinedObjectType.TrackUtility));
+            explode.ApplyLifetimeProfile(LifetimeProfile.GetProfile(type));
         }
 
         TrackUtilityMinedObject trackUtilityMinedObject = GetComponent<TrackUtilityMinedObject>();
         NoteSpawnerMinedObject noteSpawnerMinedObject = GetComponent<NoteSpawnerMinedObject>();
 
-        if (noteSpawnerMinedObject != null)
-        {
-            Debug.Log($"Initializing mined object of type {noteSpawnerMinedObject.GetType()} on {track}");
+        if (noteSpawnerMinedObject != null) {
+            Debug.Log($"Initializing {nameof(NoteSpawnerMinedObject)} on {track}"); 
+            // Configure spawner even if noteSet is currently null; burst happens later.
             noteSpawnerMinedObject.Initialize(assignedTrack, noteSet);
         }
-
         AssignVisuals();
     }
 
