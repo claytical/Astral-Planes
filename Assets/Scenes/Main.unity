@@ -797,7 +797,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Begin Restoration
+  m_text: Press anything to phase in...
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
@@ -1144,7 +1144,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1491357363}
-  - component: {fileID: 1491357362}
+  - component: {fileID: 1491357364}
   m_Layer: 0
   m_Name: Coral Loader
   m_TagString: Untagged
@@ -1152,22 +1152,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1491357362
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1491357361}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 72152bb7aa58b44b7bd38d02bcb36948, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  coralVisualizerPrefab: {fileID: 3306639670150737611, guid: 8d387e67775794007ba96dfadbea003d,
-    type: 3}
-  container: {fileID: 63749558}
-  spacing: {x: 3, y: 0, z: 0}
 --- !u!4 &1491357363
 Transform:
   m_ObjectHideFlags: 0
@@ -1183,6 +1167,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1491357364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1491357361}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86b3208712f34e0c87057c95e9c9a571, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CoralGardenRenderer
+  columnsPerRow: 8
+  cellSize: {x: 4, y: 3}
+  patchGap: {x: 2, y: 3}
+  coralPrefab: {fileID: -4676709209624449764, guid: 8d387e67775794007ba96dfadbea003d,
+    type: 3}
+  defaultState: 1
 --- !u!1 &1657299815
 GameObject:
   m_ObjectHideFlags: 0

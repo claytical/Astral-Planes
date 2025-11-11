@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phase: 0
   drumClips:
-  - {fileID: 8300000, guid: 89c1b3c8cdbd9472bb7a3e837ced4564, type: 3}
+  - {fileID: 8300000, guid: 175fd8ab0cfb442dd8441257c13d2429, type: 3}
   defaultRemixStrategy: {fileID: 0}
   shortLabel: Establish
   roleStrategies:

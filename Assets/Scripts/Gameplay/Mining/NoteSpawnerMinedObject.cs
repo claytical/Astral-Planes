@@ -13,6 +13,10 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     public void BindPhaseStar(PhaseStar star) => _ownerStar = star;
     public void Initialize(InstrumentTrack track, NoteSet noteSet)
     {
+        if (track == null) { Debug.LogWarning("NoteSpawnerMinedObject: track NULL"); return; }
+        if (noteSet == null) noteSet = track.GetActiveNoteSet();
+        if (noteSet == null) { Debug.LogWarning("NoteSpawnerMinedObject: no NoteSet available"); return; }
+
         Debug.Log($"Initializing Spawner Mined Object");
         assignedTrack = track;
         musicalRole = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
@@ -41,18 +45,6 @@ public class NoteSpawnerMinedObject : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-        if (assignedTrack != null && selectedNoteSet != null)
-        {
-            assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(selectedNoteSet, maxToSpawn: 8);
-
-        }
-        else
-        {
-            Debug.LogWarning("[NoteSpawner] Missing track or noteset on enable; no burst.");
-        }
-    }
 
     void OnCollisionEnter2D(Collision2D coll)
     {

@@ -174,54 +174,12 @@ public class HarmonyDirector : MonoBehaviour
 
         GameFlowManager.Instance.arp.Begin(profile.chordSequence[_previewChordIdx], Mathf.Max(0.05f, secondsRemaining));
     }
-    public void AddRemixRings(int count = 1) {
-        remixRings = Mathf.Clamp(remixRings + count, 0, MaxRings);
-    }
-    public void UseRemixRings(int count = 1)
-    {
-        if (count <= 0 || remixRings <= 0) return;
-        int take = Mathf.Min(count, remixRings);
-        _ringsArmedThisLoop = Mathf.Clamp(_ringsArmedThisLoop + take, 0, MaxRings);
-        // Do NOT consume immediately; we decide at boundary whether to burn or commit
-    }
-
-    // Request from PhaseStar (or anything system-driven)
-    public void RequestSystemChordAdvance(int steps = 1)
-    {
-        Mathf.Max(1, steps);
-    }
+   
     public void CommitNextChordNow() {
         Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
         _forceCommitNextBoundary = true;
     }
     public void CancelBoostArp() => GameFlowManager.Instance.arp?.Cancel();
-    private IEnumerable<InstrumentTrack> SelectTracksByPolicy()
-    {
-        if (GameFlowManager.Instance.controller?.tracks == null) yield break;
-
-        var list = GameFlowManager.Instance.controller.tracks.Where(t => t != null && t.assignedRole != MusicalRole.Groove).ToList();
-
-        switch (retunePolicy)
-        {
-            case TrackRetunePolicy.BassHarmonyLead:
-                var order = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead };
-                foreach (var role in order)
-                    foreach (var t in list.Where(x => x.assignedRole == role))
-                        yield return t;
-                break;
-
-            case TrackRetunePolicy.DensestFirst:
-                foreach (var t in list.OrderByDescending(t => t.GetNoteDensity()))
-                    yield return t;
-                break;
-
-            case TrackRetunePolicy.Manual:
-                // For manual selection, you’d push chosen tracks into a queue from UI.
-                // Fall back to BassHarmonyLead if queue empty.
-                foreach (var t in SelectTracksByPolicy()) yield return t;
-                break;
-        }
-    }
     private void ApplyChordToAllTracks(int chordIndex)
     {
         if (profile == null || GameFlowManager.Instance.controller == null || GameFlowManager.Instance.controller.tracks == null) return;
@@ -237,47 +195,7 @@ public class HarmonyDirector : MonoBehaviour
             tr.RetuneLoopToChord(chord); // <-- new helper on InstrumentTrack (below)
         }
     }
-    private void ApplyToAllTracksWithOffset(int offset)
-    {
-        Debug.Log($"[HD] ApplyToAllTracksWithOffset offset={offset}");
-        if (profile == null || GameFlowManager.Instance.controller.tracks == null || GameFlowManager.Instance.controller.tracks == null) return;
-
-        // Rotate a transient profile for Option C
-        var rotated = ScriptableObject.CreateInstance<ChordProgressionProfile>();
-        rotated.beatsPerChord  = profile.beatsPerChord;
-        rotated.chordSequence  = new List<Chord>(profile.chordSequence.Count);
-        int n = profile.chordSequence.Count;
-        for (int i = 0; i < n; i++)
-            rotated.chordSequence.Add(profile.chordSequence[(i + offset) % n]);
-
-        foreach (var tr in GameFlowManager.Instance.controller.tracks)
-        {
-            EnsureTrackHasNoteSet(tr);
-            tr.ApplyChordProgression(rotated);
-        }
-
-        // Clean up the transient asset
-        Destroy(rotated);
-    }
-
-    private void EnsureTrackHasNoteSet(InstrumentTrack tr)
-    {
-        if (tr == null || tr.HasNoteSet()) return;
-
-        var factory = GameFlowManager.Instance != null ? GameFlowManager.Instance.noteSetFactory : null;
-        var phase   = GameFlowManager.Instance.activeDrumTrack != null ? GameFlowManager.Instance.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
-
-        if (factory != null)
-        {
-            var ns = factory.Generate(tr, phase);
-            tr.SetNoteSet(ns);
-            Debug.Log($"[HarmonyDirector] Created NoteSet for {tr.name} (phase {phase}).");
-        }
-        else
-        {
-            Debug.LogWarning("[HarmonyDirector] NoteSetFactory not available; durations may fallback.");
-        }
-    }
+    
     private void ResetLoopFlags()
     {
         _previewActiveThisLoop     = false;
@@ -331,7 +249,7 @@ public class HarmonyDirector : MonoBehaviour
         }
     }
 
-    private void OnPreviewHeldThroughBoundary() { _heldThroughBoundary = true; }
+
 
 
 

@@ -40,7 +40,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private Vector2 _lastPhaseBias;
     private int _lastPulseId = -1;
     [SerializeField] private int poolPrewarm = 200;             // tune to your grid size
-    [SerializeField] private Transform poolRoot;                 // optional, to keep Hierarchy tidy
+    [SerializeField] public Transform poolRoot;                 // optional, to keep Hierarchy tidy
     private readonly Stack<GameObject> _dustPool = new();
     [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
@@ -166,9 +166,9 @@ public class CosmicDustGenerator : MonoBehaviour
 
             // fade out & free the cell — reuse your existing helpers
             if (go.TryGetComponent<CosmicDust>(out var dust))
-                dust.StartFadeAndScaleDown(0.20f);
-            else
-                Destroy(go);
+            {
+                if (dust != null && dust.isActiveAndEnabled)
+                    dust.StartFadeAndScaleDown(.5f);            }
 
             dt.FreeSpawnCell(x, y);
             DespawnDustAt(gp);
@@ -353,12 +353,10 @@ public class CosmicDustGenerator : MonoBehaviour
         world = dt.GridToWorldPosition(bestCell);
         return true;
     }
-    public void RetintExisting(float seconds = 0.35f)
-    {
-        foreach (var go in hexagons) // your existing collection of spawned tiles
-        {
-            if (!go) continue;
-            var d = go.GetComponent<CosmicDust>();
+    public void RetintExisting(float seconds = 0.35f) {
+        foreach (var go in hexagons) { 
+            if (!go) continue; 
+            var d = go.GetComponent<CosmicDust>(); 
             if (d != null) StartCoroutine(d.RetintOver(seconds, _mazeTint));
         }
     }
@@ -369,23 +367,17 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     public void RemoveHex(Vector2Int gridPos) {
         _hexMap.Remove(gridPos);
-    }
-    public void ClearMaze()
-    {
-        foreach (var t in hexagons)
-        {
-            if(t == null) continue;
-            Explode explode = t.GetComponent<Explode>();
-            if (explode != null)
-            {
-                explode.Permanent();
-            }
-            Vector2Int gridPos = GameFlowManager.Instance.activeDrumTrack.WorldToGridPosition(t.transform.position);
-            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+    } 
+    public void ClearMaze() {
+        // Snapshot because RemoveActiveAt mutates _hexMap
+        var snapshot = new List<KeyValuePair<Vector2Int, GameObject>>(_hexMap); 
+        foreach (var kv in snapshot) { 
+            // If you want a micro “poof”, replace ReturnDustToPool with a short fade.
+            RemoveActiveAt(kv.Key, kv.Value, toPool: true);
         }
-        GameFlowManager.Instance.activeDrumTrack.activeHexagons.Clear();
-
+        hexagons.Clear(); // visual list only
     }
+
     private IEnumerator RunLoopAlignedMazeCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float regrowOffsetFrac, float destroySpanFrac)  {
         if (Time.time < _commitCooldownUntil)
             yield break; // skip this loop’s global destroy/regrow
@@ -420,8 +412,7 @@ public class CosmicDustGenerator : MonoBehaviour
         float regrowBudget = Mathf.Clamp(loopSeconds * 0.20f, 0.08f, loopSeconds * 0.45f);
         yield return StartCoroutine(StaggeredGrowthFitDuration(cells, regrowBudget));
     }
-    private int GetCurrentEpoch() => _currentEpoch;
-    public float GetEpochAge() => Time.time - _epochStartTime;
+
     public List<(Vector2Int, Vector3)> CalculateMazeGrowth(Vector2Int center, MusicalPhase phase, float hollowRadius = 0f, bool avoidStarHole = false)
     {
         switch (phase) {
@@ -565,7 +556,6 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (hex.TryGetComponent<CosmicDust>(out var dust))
                 {
                     dust.PrepareForReuse();
-                    dust.SetEpoch(GetCurrentEpoch());
                     dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack);
                     dust.SetGrowInDuration(hexGrowInSeconds);
                     dust.SetTint(_mazeTint);
@@ -613,6 +603,15 @@ public class CosmicDustGenerator : MonoBehaviour
         _cellToFeature.Clear();
         _progressivePhase = phase;
         _progressiveLoop = 0;
+    }
+    private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
+        // Free grid cell by key (authoritative)
+        GameFlowManager.Instance?.activeDrumTrack?.FreeSpawnCell(grid.x, grid.y); 
+        // Drop from registries
+        _hexMap.Remove(grid); 
+        if (go) hexagons.Remove(go);
+        // Pool the object
+        if (toPool && go) ReturnDustToPool(go);
     }
     private IEnumerator ProgressiveLoopTick(MusicalPhase phase, Vector2Int centerCell, float loopSeconds) {
         ResetProgressiveIfPhaseChanged(phase);
@@ -939,6 +938,7 @@ public class CosmicDustGenerator : MonoBehaviour
             go.transform.SetParent(transform, worldPositionStays:false);
             go.transform.SetPositionAndRotation(world, Quaternion.identity);
             _hexMap[grid] = go; 
+            hexagons.Add(go);
             GameFlowManager.Instance.activeDrumTrack.OccupySpawnGridCell(grid.x, grid.y, GridObjectType.Dust); // ✅ DUST, not Node
             if (go.TryGetComponent<CosmicDust>(out var dust)) {
                 dust.SetDrumTrack(GameFlowManager.Instance.activeDrumTrack);
@@ -948,15 +948,10 @@ public class CosmicDustGenerator : MonoBehaviour
             _regrowthCoroutines.Remove(freedCell);
             yield break;
         }
-    }
-    public void DespawnDustAt(Vector2Int gridPos)
-    {
-        if (_hexMap.TryGetValue(gridPos, out var go) && go != null)
-        {
-            _hexMap.Remove(gridPos);
-            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-            ReturnDustToPool(go);
-        }
+    } 
+    public void DespawnDustAt(Vector2Int gridPos) { 
+        if (_hexMap.TryGetValue(gridPos, out var go)) 
+            RemoveActiveAt(gridPos, go, toPool: true);
     }
     private int CountFilledNeighbors(Vector2Int cell)
     {

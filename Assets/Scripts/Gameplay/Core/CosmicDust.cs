@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 public enum DustBehaviorType { PushThrough, Stop, Repel }
 public class CosmicDust : MonoBehaviour
@@ -33,11 +32,10 @@ public class CosmicDust : MonoBehaviour
     [Range(0f,2f)]   public float slowDuration = 0.35f;       // NEW (seconds)
     [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
-    public SpriteRenderer baseSprite;
     [SerializeField] private float fadeSeconds = 0.25f;
     [SerializeField] private Vector3 fullScale = Vector3.one; // set in Awake/Begin()
     [SerializeField] private Collider2D hitbox;
-    
+    private float _uiBottomY = float.NaN;
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
     [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
 
@@ -45,10 +43,9 @@ public class CosmicDust : MonoBehaviour
     private bool _shrinkingFromStar;
     private Vector3 _velocity, _baseScale, _accomodationTarget;
     private Coroutine _accomodateRoutine, _regrowRoutine, _fadeRoutine, _growInRoutine;
-    private SpriteRenderer _sr, _cachedSr;
-    private List<SpriteRenderer> _childSRs;
     private DrumTrack _drumTrack;
-    private float _originalAlpha, _growInOverride = -1f;
+    private float _growInOverride = -1f;
+    private Color _currentTint = Color.white;
     [SerializeField] private int epochId;
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
@@ -61,11 +58,25 @@ public class CosmicDust : MonoBehaviour
     {
         this.particleSystem = particleSystem;
     }
-    void Awake() {
-        if (_cachedSr == null) _cachedSr = GetComponent<SpriteRenderer>();
-        if (_childSRs == null)
-            _childSRs = new List<SpriteRenderer>(GetComponentsInChildren<SpriteRenderer>(includeInactive: true));
+    private float UiBottomY()
+    {
+        if (!float.IsNaN(_uiBottomY)) return _uiBottomY;
+        var gfm = GameFlowManager.Instance;
+        if (gfm && gfm.controller && gfm.controller.noteVisualizer != null)
+        {
+            _uiBottomY = gfm.controller.noteVisualizer.GetTopWorldY();
+            Debug.Log($"Defaulting UI Bottom to 0,0");
+        }
+        else
+        { 
+            _uiBottomY = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, -Camera.main.transform.position.z)).y; // fallback
+            Debug.Log($"[CosmicDust] UI Bottom {_uiBottomY}");
+            
+        }
+        return _uiBottomY;
+    }
 
+    void Awake() {
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         if (transform.localScale.sqrMagnitude < 1e-6f)
             transform.localScale = referenceScale;
@@ -73,17 +84,16 @@ public class CosmicDust : MonoBehaviour
         fullScale = transform.localScale * 2f; // your intended “final size”
         _accomodationTarget = fullScale;
 
+        // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
+        var psr = GetComponent<ParticleSystemRenderer>();
+        if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
+        if (psr) psr.sortingFudge = 0f;
     }
     public void OnSpawnedFromPool(Color tint)
     {
         // Visual reset
-        if (baseSprite)
-        {
-            var c = tint; c.a = 1f;
-            baseSprite.color = c;
-        }
+        SetTint(tint);
         transform.localScale = fullScale;
-
         // Physics reset
         gameObject.layer = solidLayer;
         if (hitbox) hitbox.enabled = true;
@@ -92,18 +102,16 @@ public class CosmicDust : MonoBehaviour
     public void Begin()
     {
         SetColorVariance();
-        // ✅ Start alpha fade-in
-        if (baseSprite != null)
-        {
-            Color c = baseSprite.color;
-            _originalAlpha = c.a;
-            c.a = 0f;
-            baseSprite.color = c;
-        }
         transform.localScale = Vector3.zero;
         _growInRoutine = StartCoroutine(GrowIn());
-        StartCoroutine(FadeInAlpha(targetAlpha: _originalAlpha));
+        if (particleSystem)
+        {
+            StartCoroutine(ParticleAlphaFadeIn(0.5f));
+            particleSystem.Clear(true);
+            particleSystem.Play(true);
+        }
     }
+
     private void LateUpdate()
     {
         // Gentle drift along the hive flow
@@ -111,8 +119,22 @@ public class CosmicDust : MonoBehaviour
         if (gen == null) return;
 
         Vector2 flow = gen.SampleFlowAtWorld(transform.position);
+        flow.y = 0f;
         if (flow.sqrMagnitude > 0.00001f)
             transform.position += (Vector3)(flow * Time.deltaTime);
+        var t = transform;
+        var cam = Camera.main;
+        if (!cam) return;
+
+        float z = -cam.transform.position.z;
+        var topRight = cam.ViewportToWorldPoint(new Vector3(1, 1, z));
+        var bottomLimit = UiBottomY();
+        var pos = t.position;
+
+        // Add a small padding that matches DrumTrack.gridPadding
+        float pad = GameFlowManager.Instance?.activeDrumTrack?.gridPadding ?? 1f;
+        pos.y = Mathf.Clamp(pos.y, bottomLimit + pad, topRight.y - pad);
+//        t.position = pos;
     }
 
     private IEnumerator GrowIn() {
@@ -243,17 +265,14 @@ public class CosmicDust : MonoBehaviour
         }
     }
 
-    public void SetEpoch(int id) => epochId = id;
     void SetColorVariance()
     {
-        Color color = baseSprite.color;
-        float variation = Random.Range(-0.02f, 0.02f);
-        color.r += variation;
-        color.g += variation;
-        color.b += variation;
-        baseSprite.color = color;
-
-        // Optional: Apply glow material tweaks here
+        var c = _currentTint;
+        float variation = Random.Range(-.02f, .02f);
+        c.r = Mathf.Clamp01(c.r + variation);
+        c.g = Mathf.Clamp01(c.g + variation);
+        c.b = Mathf.Clamp01(c.b + variation);
+        SetTint(c);
     }
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
     public void SetDrumTrack(DrumTrack track)
@@ -261,52 +280,40 @@ public class CosmicDust : MonoBehaviour
         _drumTrack = track;
     }
 
-/// <summary>Set the ParticleSystem tint immediately for new and existing particles.</summary>
-public void SetTint(Color tint)
-{
-    if (particleSystem == null) return;
-
-    // Main.startColor drives the base tint for NEW particles
-    var main = particleSystem.main;
-    // Preserve alpha behavior if you rely on it elsewhere
-    var target = tint;
-    if (main.startColor.mode == ParticleSystemGradientMode.Color)
+    public void SetTint(Color tint)
     {
-        var cur = main.startColor.color;
-        target.a = cur.a; // keep existing alpha
-    }
-    main.startColor = target;
+        if (!particleSystem) return;
 
-    // ColorOverLifetime multiplies the base tint over the particle’s lifetime.
-    // We update (or create) a simple flat gradient multiplied by 'tint' so
-    // existing particles also shift color smoothly going forward.
-    var col = particleSystem.colorOverLifetime;
-    col.enabled = true;
+        // Keep the caller's alpha; ParticleAlphaFadeIn will animate it when needed.
+        _currentTint = tint;
 
-    Gradient grad = new Gradient();
-    // If there is already a gradient, multiply its color keys by the new tint;
-    // otherwise use a flat gradient at the target tint.
-    if (col.color.mode == ParticleSystemGradientMode.Gradient)
-    {
-        grad = MultiplyGradient(col.color.gradient, target);
-    }
-    else
-    {
+        var main = particleSystem.main;
+        main.startColor = tint;
+
+        // If you want a subtle lifetime fade, set it once; otherwise disable it for solid visibility
+        var col = particleSystem.colorOverLifetime;
+        col.enabled = true;
+
+        // Build a *visible* gradient (soft in/out), not near-zero most of the time.
+        var grad = new Gradient();
         grad.SetKeys(
-            new GradientColorKey[] {
-                new GradientColorKey(target, 0f),
-                new GradientColorKey(target, 1f)
+            new[]
+            {
+                new GradientColorKey(new Color(tint.r, tint.g, tint.b), 0f),
+                new GradientColorKey(new Color(tint.r, tint.g, tint.b), 1f),
             },
-            new GradientAlphaKey[] {
-                new GradientAlphaKey(target.a, 0f),
-                new GradientAlphaKey(target.a, 1f)
+            new[]
+            {
+                new GradientAlphaKey(0f,   0f),   // quick fade-on
+                new GradientAlphaKey(tint.a, 0.1f),
+                new GradientAlphaKey(tint.a, 0.9f),
+                new GradientAlphaKey(0f,   1f),   // quick fade-off
             }
         );
+        col.color = new ParticleSystem.MinMaxGradient(grad);
     }
-    col.color = new ParticleSystem.MinMaxGradient(grad);
-}
 
-/// <summary>Smoothly lerp the ParticleSystem tint over time.</summary>
+
 public IEnumerator RetintOver(float seconds, Color toTint)
 {
     if (particleSystem == null) yield break;
@@ -331,43 +338,11 @@ public IEnumerator RetintOver(float seconds, Color toTint)
 
 // --- Utilities ---
 
-private static Gradient MultiplyGradient(Gradient g, Color mul)
-{
-    var srcC = g.colorKeys;
-    var srcA = g.alphaKeys;
-    var dstC = new GradientColorKey[srcC.Length];
-    var dstA = new GradientAlphaKey[srcA.Length];
 
-    for (int i = 0; i < srcC.Length; i++)
-    {
-        var c = srcC[i].color;
-        dstC[i] = new GradientColorKey(new Color(c.r * mul.r, c.g * mul.g, c.b * mul.b, 1f), srcC[i].time);
-    }
-    for (int i = 0; i < srcA.Length; i++)
-    {
-        var a = srcA[i].alpha * mul.a;
-        dstA[i] = new GradientAlphaKey(a, srcA[i].time);
-    }
-
-    Gradient outG = new Gradient();
-    outG.SetKeys(dstC, dstA);
-    return outG;
-}
-
-    public void ShrinkByPhaseStar(float unitsPerSecond)
-    {
-        if (_shrinkingFromStar) { DoShrink(unitsPerSecond); return; }
-
-        // first entry: cancel any ongoing grow-in so it doesn't fight the shrink
-        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-        _shrinkingFromStar = true;
-
-        DoShrink(unitsPerSecond);
-    }
     public void StartFadeAndScaleDown(float duration)
     {
         if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
-        _fadeRoutine = StartCoroutine(FadeAndScaleDown(duration));
+        _fadeRoutine = StartCoroutine(ParticleFadeAndScaleDown(duration));
     }
 
     private void SetParticleColor(Color c)
@@ -397,99 +372,45 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         // Schedule a smooth regrow after a delay
         _regrowRoutine = StartCoroutine(RegrowAfterDelay());
     }
-    private IEnumerator FadeInAlpha(float targetAlpha)
-    {
-        if (baseSprite == null) yield break;
-        float duration = 0.5f;
-        float t = 0f;
-
-        Color color = baseSprite.color;
-        _originalAlpha = targetAlpha;
-        float finalAlpha = _originalAlpha;// store the intended final alpha
-        color.a = 0f;
-        baseSprite.color = color;
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float a = Mathf.Lerp(0f, finalAlpha, t / duration);
-            color.a = a;
-            baseSprite.color = color;
+    private IEnumerator ParticleAlphaFadeIn(float duration) { 
+        if (particleSystem == null) yield break; 
+        // fade alpha from 0 → 1 by rebuilding startColor each step
+        float t = 0f; 
+        Color from = _currentTint; from.a = 0f; 
+        Color to   = _currentTint; to.a = .2f; 
+        while (t < duration) { 
+            t += Time.deltaTime; 
+            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration)); 
+            var now = Color.Lerp(from, to, u); 
+            SetTint(now); 
             yield return null;
-        }
-
-        color.a = finalAlpha;
-        baseSprite.color = color;
+        } 
+        SetTint(to);
     }
-    private IEnumerator FadeAndScaleDown(float duration)
-    {
-        // Cancel any ongoing growth/shrink coroutines here if you keep handles to them.
-        // e.g., if (growRoutine != null) { StopCoroutine(growRoutine); growRoutine = null; }
-
-        float t = 0f;
-        Vector3 startScale = transform.localScale;
-        Color[] startColors = null;
-
-        // Collect all renderers to fade (self + children)
-        var renderers = new List<SpriteRenderer>();
-        if (_cachedSr != null) renderers.Add(_cachedSr);
-        if (_childSRs != null) renderers.AddRange(_childSRs);
-
-        if (renderers.Count > 0)
-        {
-            startColors = new Color[renderers.Count];
-            for (int i = 0; i < renderers.Count; i++)
-                if (renderers[i] != null) startColors[i] = renderers[i].color;
-        }
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
+    private IEnumerator ParticleFadeAndScaleDown(float duration) { 
+        float t = 0f; 
+        Vector3 startScale = transform.localScale; 
+        Color from = _currentTint; Color to = _currentTint; to.a = 0f; 
+        while (t < duration) { 
+            t += Time.deltaTime; 
             float u = Mathf.SmoothStep(0f, 1f, t / duration);
-
-            // Scale down to zero
-            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, u);
-
-            // Fade alpha
-            if (renderers.Count > 0)
-            {
-                for (int i = 0; i < renderers.Count; i++)
-                {
-                    var sr = renderers[i];
-                    if (sr == null) continue;
-                    if (startColors != null)
-                    {
-                        Color c = startColors[i];
-                        c.a = Mathf.Lerp(startColors[i].a, 0f, u);
-                        sr.color = c;
-                    }
-                }
-            }
-
-            yield return null;
-        }
-
-        // Ensure we end invisible and tiny
-        transform.localScale = Vector3.zero;
-        if (renderers.Count > 0)
-        {
-            for (int i = 0; i < renderers.Count; i++)
-            {
-                var sr = renderers[i];
-                if (sr == null) continue;
-                var c = sr.color; c.a = 0f; sr.color = c;
-            }
-        }
-
-        // Remove the object
+            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, u); 
+            // fade particle tint alpha
+            SetTint(Color.Lerp(from, to, u)); 
+            yield return null; 
+        } 
+        // ensure invisible & tiny
+        transform.localScale = Vector3.zero; 
+        SetTint(to); 
         // hand off to generator to return to pool
         var dt = GameFlowManager.Instance?.activeDrumTrack; 
         if (dt != null) { 
             var gridPos = dt.WorldToGridPosition(transform.position); 
-            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
+            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos); 
         }
-        else { gameObject.SetActive(false); }
+        else { gameObject.SetActive(false); } 
     }
+
     private IEnumerator ScaleTo(Vector3 target, float duration)
     {
         Vector3 start = transform.localScale;
@@ -499,48 +420,11 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
             t += Time.deltaTime;
             float e = Mathf.SmoothStep(0f, 1f, t / duration);
             transform.localScale = Vector3.Lerp(start, target, e);
-            UpdateSpriteAlphaByScale();
             yield return null;
         }
         transform.localScale = target;
-        UpdateSpriteAlphaByScale();
-    }
-    private void UpdateSpriteAlphaByScale()
-    {
-        if (baseSprite == null || fullScale.x <= 0.0001f) return;
-        float t = Mathf.Clamp01(transform.localScale.x / fullScale.x);
-        // Match the PhaseStar fade logic feel, but keep a small floor so it’s visible.
-        Color c = baseSprite.color;
-        c.a = Mathf.Lerp(0.1f, _originalAlpha, t); // 0.1 floor prevents “invisible walls”
-        baseSprite.color = c;
-    }
-    private void DoShrink(float unitsPerSecond) {
-    Vector3 s = transform.localScale;
-    float step = unitsPerSecond * Time.deltaTime;
-    float nx = Mathf.Max(0f, s.x - step);
-    float ny = Mathf.Max(0f, s.y - step);
-    transform.localScale = new Vector3(nx, ny, s.z);
-
-    // fade sprite proportional to remaining size
-    if (baseSprite != null && fullScale.x > 0.0001f)
-    {
-        float t = Mathf.Clamp01(nx / fullScale.x);
-        Color c = baseSprite.color;
-        c.a = Mathf.Lerp(0f, _originalAlpha * starAlphaFadeBias, t);
-        baseSprite.color = c;
     }
 
-    // optional: dim particles as it shrinks
-    if (particleSystem != null)
-    {
-        var main = particleSystem.main;
-        main.startSizeMultiplier = Mathf.Max(0.05f, main.startSizeMultiplier * (nx + 0.001f) / (s.x + 0.001f));
-    }
-
-    // reached ~zero? remove cleanly (with or without regrow)
-    if (nx <= 0.01f || ny <= 0.01f)
-        DestroyFromPhaseStar();
-    }
     private void BreakHexagon()
     {
         CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Dust);
@@ -590,15 +474,12 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
 
         // 3) Visual-only fade
         float dur = Mathf.Lerp(fadeSeconds * 0.3f, fadeSeconds, Mathf.Clamp01(strength01));
-        Color c0 = baseSprite ? baseSprite.color : Color.white;
         Vector3 s0 = transform.localScale.sqrMagnitude < 1e-6f ? fullScale : transform.localScale;
-
         float t = 0f;
         while (t < dur)
         {
             t += Time.deltaTime;
             float u = Mathf.Clamp01(t / dur);
-            if (baseSprite) { var c = c0; c.a = Mathf.Lerp(c0.a, 0f, u); baseSprite.color = c; }
             transform.localScale = Vector3.Lerp(s0, Vector3.zero, u);
             yield return null;
         }
@@ -622,15 +503,19 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         _shrinkingFromStar = false;
         _accomodationTarget = fullScale = referenceScale;
         transform.localScale = referenceScale;
-        if (baseSprite) {
-            var c = baseSprite.color; c.a = 1f; baseSprite.color = c;
-        }
-        // Reset particles cheaply
+
         if (particleSystem != null)
         {
             particleSystem.Clear(true);
             particleSystem.Play(true);
         }
+        _currentTint.a = .5f;
+        SetTint(_currentTint);
+        var col = GetComponent<Collider2D>();
+        if (col) col.enabled = true;
+
+        // reset any per-dust flags your logic uses
+        dissipateOnExit = false;
     }
 
     public void DespawnToPoolInstant()
@@ -638,45 +523,14 @@ private static Gradient MultiplyGradient(Gradient g, Color mul)
         // Ensure non-blocking & invisible when pooled
         if (hitbox) hitbox.enabled = false;
         gameObject.layer = nonBlockingLayer;
-
-        if (baseSprite)
-        {
-            var c = baseSprite.color; c.a = 0f;
-            baseSprite.color = c;
-        }
+        var cHide = _currentTint; cHide.a = 0f;
+        SetTint(cHide);
         transform.localScale = Vector3.zero;
 
         _isDespawned = false; // reset for next lifecycle
         gameObject.SetActive(false);
     }
 
-    private IEnumerator FadeAndDestroy(float strength01)
-    {
-        // strength01 lets closer tiles fade faster (optional)
-        float dur = Mathf.Lerp(fadeSeconds * 0.3f, fadeSeconds, Mathf.Clamp01(strength01));
-
-        // snapshot start
-        Color c0 = baseSprite ? baseSprite.color : Color.white;
-        Vector3 s0 = transform.localScale;
-        if (s0.sqrMagnitude < 1e-6f) s0 = fullScale; // safety if spawned at 0
-
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.Clamp01(t / dur);
-
-            if (baseSprite)
-            {
-                var c = c0; c.a = Mathf.Lerp(c0.a, 0f, u);
-                baseSprite.color = c;
-            }
-            transform.localScale = Vector3.Lerp(s0, Vector3.zero, u);
-            yield return null;
-        }
-
-        Destroy(gameObject);
-    }
     private IEnumerator WaitForParticlesThenDestroy()
     {
         particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);

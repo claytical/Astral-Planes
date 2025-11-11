@@ -10,7 +10,7 @@ public class EndSceneManager : MonoBehaviour
         Debug.Log($"{data.Count} data points");
         if (data != null && data.Count > 0)
         {
-            coralVisualizer.GenerateCoralFromSnapshots(data);
+//            coralVisualizer.Gener
             // ✅ Save the session to disk
             ConstellationMemoryStore.SaveSessionToDisk(data);
         }

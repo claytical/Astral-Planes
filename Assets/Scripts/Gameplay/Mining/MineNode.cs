@@ -36,7 +36,7 @@ public class MineNode : MonoBehaviour
         _minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
         coreSprite.color = directive.assignedTrack.trackColor;
         _minedObject.assignedTrack.drumTrack.RegisterMinedObject(_minedObject);
-        _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
+//        _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
         // NoteSpawn carries a Ghost trigger
 //        NoteSpawnerMinedObject spawner = obj.GetComponent<NoteSpawnerMinedObject>();
         _minedObject.assignedTrack.drumTrack.activeMineNodes.Add(this);
@@ -85,12 +85,6 @@ public class MineNode : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D coll)
     { 
-        Debug.Log($"Hit MineNode: {coll.gameObject.name} object revealed? {_objectRevealed}");
-        if (_objectRevealed)
-        {
-            Debug.Log($"Mine Node Object Already Revealed");
-            return;
-        }
         if(_rail != null) _rail.ReplanToFarthest();
         if (_minedObject != null)
         {
@@ -145,7 +139,12 @@ public class MineNode : MonoBehaviour
 
                         // Emit notes BEFORE we reveal/destroy anything
                         Debug.Log($"Bursting Collectables");
-                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8); 
+                        if (spawner == null || spawner.assignedTrack == null || spawner.selectedNoteSet == null) { 
+                            Debug.LogWarning("[MineNode] Note burst aborted: missing spawner/track/noteSet."); 
+                            return;
+                        } 
+                        Debug.Log("Bursting Collectables"); 
+                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8);
                         var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
                         float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 
                         CollectionSoundManager.Instance?.PlayBurstLeadIn(spawner.assignedTrack, set, Mathf.Max(0.05f, remain));
@@ -169,6 +168,10 @@ public class MineNode : MonoBehaviour
 
                     // Now run your existing VFX/cleanup
                     TriggerExplosion(); // destroy self, fade sprite, etc.
+                }
+                else
+                {
+                    TriggerPreExplosion();
                 }
             }
         }
@@ -195,6 +198,11 @@ public class MineNode : MonoBehaviour
 
         Destroy(gameObject);
     }
+    private void TriggerPreExplosion()
+    {
+        var explosion = GetComponent<Explode>();
+        if(explosion != null) explosion.PreExplosion();
+    }
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
@@ -203,7 +211,7 @@ public class MineNode : MonoBehaviour
         
         // 🔔 Notify listeners (PhaseStar) of the outcome kind and payload
         FireResolvedOnce(_directive.minedObjectType, _directive);
-        RevealPreloadedObject();
+//        RevealPreloadedObject();
         StartCoroutine(CleanupAndDestroy());
     }
     private void FireResolvedOnce(MinedObjectType kind, MinedObjectSpawnDirective dir)

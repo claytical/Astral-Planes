@@ -8,6 +8,7 @@ using Random = UnityEngine.Random;
 public class Explode : MonoBehaviour
 {
     public GameObject explosion;
+    public GameObject preExplosion;
     public float lifetime;
     public bool randomizeLifetimer = false;
     private float explosionTimer;
@@ -56,6 +57,14 @@ public class Explode : MonoBehaviour
     public void DelayedExplosion(float delay = 0.1f)
     {
         Invoke(nameof(Permanent), delay);
+    }
+
+    public void PreExplosion()
+    {
+        if (preExplosion != null)
+        {
+            Instantiate(preExplosion, transform.position, Quaternion.identity);
+        }
     }
     public void Permanent(bool permanent = true)
     {
