@@ -8,66 +8,107 @@ public class Boundaries : MonoBehaviour
     public BoxCollider2D rightBoundary;
     public Camera mainCamera;
     public DrumTrack track;
+    void Awake()
+    {
+        Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
+    }
+
+    void OnEnable()
+    {
+        Debug.Log($"[BOUNDARIES] OnEnable on {gameObject.name}");
+    }
+
     void Start()
     {
         if (mainCamera == null)
-        {
             mainCamera = Camera.main;
-        }
 
-        AdjustBoundaries();
-    }
-
-    void AdjustBoundaries()
-    {
-        if (mainCamera == null)
-        {
-            Debug.LogError("No camera assigned to BoundaryAdjuster.");
-            return;
-        }
-
+        // --- existing camera-based setup (safe at Start) ---
         float screenHalfHeight = mainCamera.orthographicSize;
-        float screenHalfWidth = screenHalfHeight * mainCamera.aspect;
+        float screenHalfWidth  = screenHalfHeight * mainCamera.aspect;
 
-        // 🔹 Force the scale of colliders to (1,1,1) to prevent unintended stretching
-        if (topBoundary != null) topBoundary.transform.localScale = Vector3.one;
-        if (bottomBoundary != null) bottomBoundary.transform.localScale = Vector3.one;
-        if (leftBoundary != null) leftBoundary.transform.localScale = Vector3.one;
-        if (rightBoundary != null) rightBoundary.transform.localScale = Vector3.one;
+        // You probably already have something like this in your file;
+        // leave your top/left/right logic as-is.
 
-        float boundaryThickness = 1f; // Keep it small so it's not huge
-
-        // ✅ Adjust Top Boundary
         if (topBoundary != null)
         {
-            topBoundary.transform.position = new Vector3(0, screenHalfHeight + (boundaryThickness / 2), 0);
-            topBoundary.size = new Vector2(screenHalfWidth * 2, boundaryThickness);
+            topBoundary.transform.position =
+                new Vector3(0f, screenHalfHeight + (topBoundary.size.y * 0.5f), 0f);
+            topBoundary.size =
+                new Vector2(screenHalfWidth * 2f, topBoundary.size.y);
         }
 
-        // ✅ Adjust Bottom Boundary
-        if (bottomBoundary != null)
-        {
-            if (track != null && GameFlowManager.Instance.controller != null && GameFlowManager.Instance.controller.noteVisualizer != null)
-            {
-                float bottomY = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
-                bottomBoundary.transform.position = new Vector3(0, bottomY, 0);
-            }
-            bottomBoundary.size = new Vector2(screenHalfWidth * 2, boundaryThickness);
-        }
-
-        // ✅ Adjust Left Boundary
         if (leftBoundary != null)
         {
-            leftBoundary.transform.position = new Vector3(-screenHalfWidth - (boundaryThickness / 2), 0, 0);
-            leftBoundary.size = new Vector2(boundaryThickness, screenHalfHeight * 2);
+            leftBoundary.transform.position =
+                new Vector3(-screenHalfWidth - (leftBoundary.size.x * 0.5f), 0f, 0f);
+            leftBoundary.size =
+                new Vector2(leftBoundary.size.x, screenHalfHeight * 2f);
         }
 
-        // ✅ Adjust Right Boundary
         if (rightBoundary != null)
         {
-            rightBoundary.transform.position = new Vector3(screenHalfWidth + (boundaryThickness / 2), 0, 0);
-            rightBoundary.size = new Vector2(boundaryThickness, screenHalfHeight * 2);
+            rightBoundary.transform.position =
+                new Vector3(screenHalfWidth + (rightBoundary.size.x * 0.5f), 0f, 0f);
+            rightBoundary.size =
+                new Vector2(rightBoundary.size.x, screenHalfHeight * 2f);
         }
+
+        // Bottom: temporary camera-based placement so we have *something*
+        if (bottomBoundary != null)
+        {
+            bottomBoundary.transform.position =
+                new Vector3(0f, -screenHalfHeight - (bottomBoundary.size.y * 0.5f), 0f);
+            bottomBoundary.size =
+                new Vector2(screenHalfWidth * 2f, bottomBoundary.size.y);
+        }
+        Debug.Log($"[BOUNDARIES] Boundaries constructed");
+        // ✅ Defer precise alignment to when NoteVisualizer is ready
+        StartCoroutine(AlignBottomToNoteVisualizerWhenReady());
     }
 
+    private System.Collections.IEnumerator AlignBottomToNoteVisualizerWhenReady()
+    {
+        Debug.Log("[BOUNDARIES] Align bottom to note visualizer");
+        // Wait until we have a GameFlowManager and a NoteVisualizer
+        while (GameFlowManager.Instance == null ||
+               GameFlowManager.Instance.noteViz == null)
+        {
+            yield return null;
+        }
+        Debug.Log("[BOUNDARIES] NoteViz present");
+
+        // Give layout a frame to settle after noteViz.Initialize()
+        yield return null;
+        Debug.Log("[BOUNDARIES] Aligning to NoteViz");
+
+        AlignBottomToVisualizer(GameFlowManager.Instance.noteViz);
+    }
+
+    private void AlignBottomToVisualizer(NoteVisualizer viz)
+    {
+        if (!bottomBoundary || viz == null || mainCamera == null)
+            return;
+
+        // Recompute camera extents here so we don’t depend on Start() locals
+        float screenHalfHeight = mainCamera.orthographicSize;
+        float screenHalfWidth  = screenHalfHeight * mainCamera.aspect;
+
+        // Use the *current* thickness of the collider as the vertical size
+        float thickness = bottomBoundary.size.y;
+        if (thickness <= 0f) thickness = 1f;
+
+        // NoteVisualizer gives us the *top edge* Y in world space
+        float topY = viz.GetTopWorldY();
+        Debug.Log($"[BOUNDARIES] NoteViz at {topY}");
+
+        // BoxCollider2D.position is its CENTER, so:
+        //   centerY = topY - (thickness / 2)
+        float centerY = topY - (thickness * 0.5f);
+
+        bottomBoundary.transform.position =
+            new Vector3(0f, centerY, 0f);
+        bottomBoundary.size =
+            new Vector2(screenHalfWidth * 2f, thickness);
+    }
 }

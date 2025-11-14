@@ -19,7 +19,8 @@ MonoBehaviour:
   starAlphaMax: 0.774
   rolePattern: 03000000010000000000000002000000000000000200000003000000
   previewPulseScale: 1.2
-  previewSpinSpeed: 1
+  beatsPerRole: 4
+  fallbackBPM: 60
   pulseCurve:
     serializedVersion: 2
     m_Curve:
@@ -109,7 +110,7 @@ MonoBehaviour:
   ejectionStyle: 1
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
-  nodesPerStar: 3
+  nodesPerStar: 4
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6
   nodeFlightEase:

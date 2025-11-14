@@ -19,12 +19,10 @@ MonoBehaviour:
   shortLabel: Pop
   roleStrategies:
   - role: 0
-    strategy: 2
-  - role: 0
-    strategy: 1
+    strategy: 6
   - role: 2
-    strategy: 3
+    strategy: 10
   - role: 3
-    strategy: 4
+    strategy: 3
   - role: 1
-    strategy: 0
+    strategy: 12

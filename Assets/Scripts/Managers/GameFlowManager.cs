@@ -5,7 +5,6 @@ using System.Linq;
 using Gameplay.Mining;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 
@@ -39,7 +38,6 @@ public class GameFlowManager : MonoBehaviour
     public InstrumentTrackController controller;
     public ChordChangeArpeggiator arp;
     public DrumTrack activeDrumTrack;
-    public MineNodeProgressionManager progressionManager;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
     public NoteSetFactory noteSetFactory;
@@ -67,7 +65,6 @@ public class GameFlowManager : MonoBehaviour
     public bool IsBridgeActive => GhostCycleInProgress;
     public bool GhostCycleInProgress { get; private set; }
     public event Action<MusicalPhaseProfile> OnRemixCommitted;
-    public event System.Action OnGeneratedTrackReady;
 
     private struct SavedTrackState {
     public InstrumentTrack track;
@@ -95,6 +92,17 @@ public class GameFlowManager : MonoBehaviour
                 setup.SetActive(true);
             }
         }
+    }
+
+    void Start()
+    {
+        sceneHandlers = new()
+        {
+            // { "GeneratedTrack", HandleTrackSceneSetup },  // remove this
+            { "TrackFinished", HandleTrackFinishedSceneSetup },
+            { "TrackSelection", HandleTrackSelectionSceneSetup },
+        };
+
     }
     public void RegisterPlayer(LocalPlayer player)
     {
@@ -166,76 +174,134 @@ public class GameFlowManager : MonoBehaviour
             Debug.Log("[GFM] PlayerStatsGrid unregistered (scene unload?).");
         }
     }
-    private void HandleTrackSceneSetup()
-    {
-        if (_setupDone || _setupInFlight) return;
-        StartCoroutine(HandleTrackSceneSetupAsync());
-    }
-
-    private IEnumerator HandleTrackSceneSetupAsync()
+private IEnumerator HandleTrackSceneSetupAsync()
 {
     _setupInFlight = true;
     vehicles.Clear();
-//MusicalPhaseLibrary.i
-    // Wait until the Generated Track scene is actually loaded AND
-    // either (a) anchors registered, or (b) the objects exist to be found.
-    float hardTimeout = 8f; // seconds
-    float start = Time.time;
 
-    // First, opportunistically fill refs if anchors weren’t used yet
+    var activeScene = SceneManager.GetActiveScene().name;
+    if (activeScene != "GeneratedTrack")
+    {
+        Debug.LogWarning($"[GFM] HandleTrackSceneSetupAsync invoked but active scene is '{activeScene}'. Aborting.");
+        _setupInFlight = false;
+        yield break;
+    }
+
+    // Filter out destroyed players
+    localPlayers = localPlayers.Where(p => p != null).ToList();
+    if (localPlayers.Count == 0)
+    {
+        Debug.LogError("[GFM] No local players available during GeneratedTrack setup.");
+        _setupInFlight = false;
+        yield break;
+    }
+
+    // --- GATING / CORE REFS ---
+
+    float hardTimeout = 8f;
+    float startTime = Time.time;
+
+    Debug.Log("[GFM] [SETUP] Begin. Trying initial TryFillTracksBundleIfMissing.");
     TryFillTracksBundleIfMissing();
 
-    // Gate until everything we need is present (anchors OR finds)
     yield return new WaitUntil(() =>
-        HaveAllCoreRefs() || Time.time - start > hardTimeout
+        HaveAllCoreRefs() || Time.time - startTime > hardTimeout
     );
 
-    // Final safety net: one last try to fill any missing refs
+    // final attempt
     TryFillTracksBundleIfMissing();
 
     if (!HaveAllCoreRefs())
     {
         Debug.LogError("[GFM] Track setup timed out — missing core refs." +
-                       $"\nDrum:{activeDrumTrack} Ctrl:{controller} Prog:{progressionManager}" +
+                       $"\nDrum:{activeDrumTrack} Ctrl:{controller} " +
                        $"\nDust:{dustGenerator} Viz:{noteViz} Harm:{harmony} PTM:{phaseTransitionManager}" +
                        $"\nARP:{arp} Grid:{spawnGrid} UIGrid:{playerStatsGrid}");
         _setupInFlight = false;
         yield break;
     }
 
+    Debug.Log("[GFM] [SETUP] Core refs present." +
+              $"\n  Drum: {activeDrumTrack}" +
+              $"\n  Ctrl: {controller}" +
+              $"\n  Viz : {noteViz}" +
+              $"\n  Harm: {harmony}" +
+              $"\n  ARP : {arp}" +
+              $"\n  PTM : {phaseTransitionManager}" +
+              $"\n  Grid: {spawnGrid}" +
+              $"\n  UI  : {playerStatsGrid}");
+
     currentState = GameState.Playing;
 
-    // 1) Configure tracks FIRST
-    controller.ConfigureTracksFromShips(
-        localPlayers.Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName())).ToList());
+    // Precompute ship profiles for logging
+    var shipProfiles = localPlayers
+        .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
+        .ToList();
 
-    // 2) Bind graph + init viz/harmony (no audio yet)
+    Debug.Log("[GFM] [SETUP] Ship profiles resolved: " +
+              string.Join(", ", shipProfiles.Select(sp => sp ? sp.name : "<null>")));
+
+    // --------------------
+    // STEP 1: Configure tracks
+    // --------------------
+    Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips BEGIN");
+    controller.ConfigureTracksFromShips(shipProfiles);
+    Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips END");
+
+    // --------------------
+    // STEP 2: Bind graph + init viz/harmony
+    // --------------------
+    Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony BEGIN");
     arp.Bind(activeDrumTrack, controller);
     noteViz.Initialize();
     harmony.Initialize(activeDrumTrack, controller, arp);
+    Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END");
 
-    // 3) Launch players (their Launch() already waits for UI grid)
-    foreach (var p in localPlayers)
+    // --------------------
+    // STEP 3: Launch players
+    // --------------------
+    Debug.Log("[GFM] [STEP 3] Launch players BEGIN");
+    foreach (var lp in localPlayers)
     {
-//        p.OnLaunched += v => { if (v) vehicles.Add(v); };
-        p.Launch(); // parameterless, self-synchronizing
+        if (lp == null)
+        {
+            Debug.LogWarning("[GFM] [STEP 3] Skipping null LocalPlayer.");
+            continue;
+        }
+
+        Debug.Log($"[GFM] [STEP 3] Launching player: {lp.name}");
+        lp.Launch();
     }
+    Debug.Log("[GFM] [STEP 3] Launch players END");
 
-    // 4) Start drums AFTER wiring
+    // --------------------
+    // STEP 4: Start drums
+    // --------------------
+    Debug.Log("[GFM] [STEP 4] activeDrumTrack.ManualStart BEGIN");
     activeDrumTrack.ManualStart();
+    Debug.Log("[GFM] [STEP 4] activeDrumTrack.ManualStart END");
 
-    // 5) Apply profile + announce ready
-    var prof = GetProfileForPhase(phaseTransitionManager.currentPhase);
+    // --------------------
+    // STEP 5: Apply harmony profile
+    // --------------------
+    Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile BEGIN");
+    var phase = phaseTransitionManager.currentPhase;
+
+    Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
+    var prof = GetProfileForPhase(phase);
     harmony.SetActiveProfile(prof, applyImmediately: true);
-
-    OnGeneratedTrackReady?.Invoke();
+    Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
 
     _setupDone = true;
     _setupInFlight = false;
+    Debug.Log("[GFM] [SETUP] Completed successfully.");
+
+    yield break;
 }
+
     private bool HaveAllCoreRefs()
 {
-    return activeDrumTrack && controller && progressionManager &&
+    return activeDrumTrack && controller &&
            dustGenerator && noteViz && harmony && phaseTransitionManager &&
            arp && spawnGrid && playerStatsGrid;
 }
@@ -244,7 +310,6 @@ public class GameFlowManager : MonoBehaviour
     // If anchors already set these, these lines do nothing.
     activeDrumTrack      = activeDrumTrack      ? activeDrumTrack      : FindFirstObjectByType<DrumTrack>(FindObjectsInactive.Include);
     controller           = controller           ? controller           : FindFirstObjectByType<InstrumentTrackController>(FindObjectsInactive.Include);
-    progressionManager   = progressionManager   ? progressionManager   : FindFirstObjectByType<MineNodeProgressionManager>(FindObjectsInactive.Include);
     dustGenerator        = dustGenerator        ? dustGenerator        : FindFirstObjectByType<CosmicDustGenerator>(FindObjectsInactive.Include);
     noteViz              = noteViz              ? noteViz              : FindFirstObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
     harmony              = harmony              ? harmony              : FindFirstObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
@@ -317,22 +382,26 @@ public class GameFlowManager : MonoBehaviour
 
     private IEnumerator TransitionToScene(string sceneName)
     {
-        AsyncOperation load = SceneManager.LoadSceneAsync(sceneName);
-        if (load != null)
+        // Synchronous scene swap
+        SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+
+        // Let the new scene's Awake/Start run
+        yield return null;
+
+
+        if (sceneHandlers != null && sceneHandlers.TryGetValue(sceneName, out var handler))
         {
-            load.allowSceneActivation = false;
-
-            yield return new WaitUntil(() => load.progress >= 0.9f);
-            load.allowSceneActivation = true;
-
-            yield return new WaitUntil(() => load.isDone);
-        }
-
-        if (sceneHandlers.TryGetValue(sceneName, out var handler))
-        {
+            // Now ALWAYS call the handler, including for GeneratedTrack
             handler?.Invoke();
         }
+  
     }
+    public void BeginGeneratedTrackSetup()
+    {
+        if (_setupDone || _setupInFlight) return;
+        StartCoroutine(HandleTrackSceneSetupAsync());
+    }
+
     private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
     {
         for (int i = 0; i < chordMaps.Count; i++) if (chordMaps[i].phase == phase) return chordMaps[i].progression;
@@ -412,12 +481,8 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     }
     float LeaderLoopSecondsFor(IEnumerable<InstrumentTrack> set) => drumLoopSec * ComputeLeaderMulFor(set);
 
-    // ----------------------------------------------------------------------
-    // A) Play the completed 4-track loop ONCE (no remix, no clearing)
-    // ----------------------------------------------------------------------
+    // A) Start bridge immediately on the long-loop boundary (no extra lap).
     var activeNow = allTracks.Where(t => t.GetPersistentLoopNotes()?.Count > 0).ToList();
-    float leaderA = LeaderLoopSecondsFor(activeNow.Count > 0 ? activeNow : allTracks);
-    yield return new WaitForSeconds(leaderA);       // exactly one tour of what the player built
 
     // ----------------------------------------------------------------------
     // B) Drop 1–3 tracks, remix remaining into the bridge signature
@@ -461,19 +526,19 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     // Hide visualizer rows, show coral placeholder
     if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
 
-    var coral = EnsureCoral();
-    if (coral != null)
-    {
-        coral.gameObject.SetActive(true);
-        // Drive a simple placeholder "growth" animation over the bridge duration
-        float bridgeOnceSec = LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
-        StartCoroutine(GrowCoralPlaceholder(coral, bridgeOnceSec, retain));
-        yield return new WaitForSeconds(bridgeOnceSec); // play remixed bridge once
+    var coral = EnsureCoral(); 
+    if (coral != null) {
+        coral.gameObject.SetActive(true); 
+        // Use the controller's effective loop length so the bridge lasts one full visual sweep.
+        float bridgeOnceSec = controller != null ? controller.GetEffectiveLoopLengthInSeconds() : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        var snapshot = BuildPhaseSnapshotForBridge(retain, activeDrumTrack); 
+        // Animate holds for the duration; no extra WaitForSeconds afterward
+        yield return StartCoroutine(AnimateCoralBridge(coral, snapshot, bridgeOnceSec));
     }
     else
     {
         // No coral prefab? Still wait one retained loop with visuals hidden.
-        float bridgeOnceSec = LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        float bridgeOnceSec = controller != null ? controller.GetEffectiveLoopLengthInSeconds() : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
         yield return new WaitForSeconds(bridgeOnceSec);
     }
 
@@ -489,8 +554,8 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     foreach (var t in stillActive) t.ClearLoopedNotes(TrackClearType.Remix);
 
     // Optionally fade coral back out fast
-    if (coral != null) { StartCoroutine(FadeCoralAlpha(coral, 0f, 0.35f)); }
-
+    if (coral != null) coral.gameObject.SetActive(false);
+        SetBridgeVisualMode(false); // (use your existing UI toggle; if not present, keeping the coral off is sufficient
     // Re-enable visualizer for next phase
     if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
 
@@ -498,25 +563,84 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
     controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
     controller?.ApplySeedVisibility(seeds);
-
-    if (phaseTransitionManager.currentPhase != nextPhase)
-        phaseTransitionManager.HandlePhaseTransition(nextPhase, "GFM/BridgeEnd");
-    SetBridgeVisualMode(false);
     ResetPhaseBinStateAndGrid();
     // Schedule drums & boot next phase’s maze/star
-    activeDrumTrack?.SchedulePhaseAndLoopChange(nextPhase);
-    dustGenerator.ClearMaze();
-    progressionManager.BootFirstPhaseStar(nextPhase, regenerateMaze: true);
+    var drums = activeDrumTrack;
+    drums?.SchedulePhaseAndLoopChange(nextPhase);
+
+    if (dustGenerator != null && drums != null)
+    {
+        // Grow the maze for the new phase; when growth completes,
+        // CosmicDustGenerator will request the PhaseStar from the DrumTrack.
+        StartCoroutine(dustGenerator.GenerateMazeThenPlacePhaseStar(nextPhase));
+    }
+    else if (drums != null)
+    {
+        Debug.LogWarning("[BRIDGE] No CosmicDustGenerator; spawning PhaseStar without maze.");
+        var cell = drums.GetRandomAvailableCell();
+        drums.RequestPhaseStar(nextPhase, cell);
+    }
+    else
+    {
+        Debug.LogWarning("[BRIDGE] No DrumTrack available after bridge; cannot start next phase star.");
+    }
 
     if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
     GhostCycleInProgress = false;
+    SetBridgeVisualMode(false);
+
 }
 public float GetBeatInterval()
 {
     var drums = activeDrumTrack;
     return drums != null ? drums.drumLoopBPM : 0.5f;
 }
+    private PhaseSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum){
+        var snapshot = new PhaseSnapshot { Timestamp = Time.time };
 
+       if (retained == null || retained.Count == 0) return snapshot;
+
+        // Build CollectedNotes, ordered by musical step so kinks occur in musical order.
+        foreach (var track in retained) {
+            if (!track) continue;
+            var notes = track.GetPersistentLoopNotes();
+            if (notes == null || notes.Count == 0) continue;
+            var c = ResolveTrackColor(track);
+            // notes: List<(int stepIndex, int note, int duration, float velocity)>
+            foreach (var n in notes.OrderBy(n => n.stepIndex)) {
+                // Map directly to PhaseSnapshot.NoteEntry
+                snapshot.CollectedNotes.Add(new PhaseSnapshot.NoteEntry(step:     n.stepIndex, note:     n.note, velocity: n.velocity, trackColor: c)); 
+            } 
+        }
+        return snapshot;
+    }
+
+    private IEnumerator AnimateCoralBridge(CoralVisualizer coral, PhaseSnapshot snapshot, float bridgeDurationSec) {
+        if (!coral || snapshot == null || snapshot.CollectedNotes == null || snapshot.CollectedNotes.Count == 0) {
+            // Nothing to render; still hold timing so audio/visual windows match.
+            yield return new WaitForSeconds(bridgeDurationSec);
+            yield break;
+        }
+
+        // Fire-and-forget animation; CoralVisualizer handles growth internally.
+        coral.RenderPhaseCoral(snapshot, CoralState.Drawing);
+
+        // Hold visual focus for exactly one leader loop while bridge plays.
+        float t = 0f;
+        while (t < bridgeDurationSec) {
+            t += Time.deltaTime;
+            yield return null; 
+        }
+    }
+
+/// <summary>
+/// Adapter to obtain the per-track color for snapshot entries.
+/// </summary>
+private Color ResolveTrackColor(InstrumentTrack t)
+{
+    // Per your API: InstrumentTrack.trackColor
+    return (t != null) ? t.trackColor : Color.white;
+}
 private void ResetPhaseBinStateAndGrid()
 {
     // 1) Tracks: cursors & per-burst guards
@@ -722,12 +846,6 @@ private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List
             Instance = this;
             DontDestroyOnLoad(gameObject);
             vehicles = new List<Vehicle>();
-            sceneHandlers = new()
-            {
-                { "GeneratedTrack", HandleTrackSceneSetup },
-                { "TrackFinished", HandleTrackFinishedSceneSetup },
-                { "TrackSelection", HandleTrackSelectionSceneSetup },
-            };
             // Ensure noteSetFactory is found
             if (noteSetFactory == null)
             {
@@ -765,7 +883,6 @@ private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List
         activeDrumTrack        = a.drumTrack;
         controller             = a.controller;
         dustGenerator          = a.dustGenerator;
-        progressionManager     = a.progressionManager;
         spawnGrid              = a.spawnGrid;          // <- now reliably assigned
         glitch                 = a.glitchManager;      // <- now reliably assigned
         arp                    = a.arp;
@@ -780,7 +897,6 @@ private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List
         if (activeDrumTrack        == a.drumTrack)              activeDrumTrack        = null;
         if (controller             == a.controller)             controller             = null;
         if (dustGenerator          == a.dustGenerator)          dustGenerator          = null;
-        if (progressionManager     == a.progressionManager)     progressionManager     = null;
         if (spawnGrid              == a.spawnGrid)              spawnGrid              = null;
         if (glitch                 == a.glitchManager)          glitch                 = null;
         if (arp                    == a.arp)                    arp                    = null;

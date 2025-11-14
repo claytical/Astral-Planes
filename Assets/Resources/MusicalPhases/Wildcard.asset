@@ -19,10 +19,10 @@ MonoBehaviour:
   shortLabel: Wildcard
   roleStrategies:
   - role: 0
-    strategy: 6
+    strategy: 10
   - role: 1
-    strategy: 6
+    strategy: 5
   - role: 2
     strategy: 6
   - role: 3
-    strategy: 6
+    strategy: 16

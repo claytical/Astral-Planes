@@ -1,4 +1,4 @@
-// TracksBundleAnchor.cs
+using System.Collections;
 using UnityEngine;
 
 public sealed class TracksBundleAnchor : MonoBehaviour
@@ -7,18 +7,36 @@ public sealed class TracksBundleAnchor : MonoBehaviour
     public DrumTrack drumTrack;
     public InstrumentTrackController controller;
     public CosmicDustGenerator dustGenerator;
-    public MineNodeProgressionManager progressionManager;
     public SpawnGrid spawnGrid;
     public GlitchManager glitchManager;
     public ChordChangeArpeggiator arp;
 
-    void Reset() => Cache();
-    void Awake() { if (!IsCached()) Cache(); }
+    bool _cached;
+    bool _setupRequested;
 
-    void OnEnable()
+    void Reset() => Cache();
+
+    void Awake()
     {
+        if (!_cached) Cache();
+    }
+
+    IEnumerator Start()
+    {
+        // Let other scene objects (e.g. PlayerStatsGridAnchor) run Awake/Start first
+        yield return null;
+
         var gfm = GameFlowManager.Instance;
-        if (gfm) gfm.RegisterTracksBundle(this);
+        if (!gfm) yield break;
+
+        // Ensure bundle is registered once per scene load
+        gfm.RegisterTracksBundle(this);
+
+        if (!_setupRequested)
+        {
+            _setupRequested = true;
+            gfm.BeginGeneratedTrackSetup();   // new method in GameFlowManager
+        }
     }
 
     void OnDisable()
@@ -29,18 +47,16 @@ public sealed class TracksBundleAnchor : MonoBehaviour
 
     void Cache()
     {
-        // Cache from self or children; includes inactive objects
         phaseTransitionManager = phaseTransitionManager ?? GetComponentInChildren<PhaseTransitionManager>(true);
         drumTrack              = drumTrack              ?? GetComponentInChildren<DrumTrack>(true);
         controller             = controller             ?? GetComponentInChildren<InstrumentTrackController>(true);
         dustGenerator          = dustGenerator          ?? GetComponentInChildren<CosmicDustGenerator>(true);
-        progressionManager     = progressionManager     ?? GetComponentInChildren<MineNodeProgressionManager>(true);
         spawnGrid              = spawnGrid              ?? GetComponentInChildren<SpawnGrid>(true);
         glitchManager          = glitchManager          ?? GetComponentInChildren<GlitchManager>(true);
         arp                    = arp                    ?? GetComponentInChildren<ChordChangeArpeggiator>(true);
-    }
 
-    bool IsCached() =>
-        phaseTransitionManager && drumTrack && controller && dustGenerator &&
-        progressionManager && spawnGrid && glitchManager && arp;
+        _cached = phaseTransitionManager && drumTrack && controller && dustGenerator &&
+        spawnGrid && glitchManager && arp;
+    }
+    
 }

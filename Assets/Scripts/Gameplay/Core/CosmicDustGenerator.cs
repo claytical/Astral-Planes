@@ -103,8 +103,7 @@ public class CosmicDustGenerator : MonoBehaviour
         TryEnsureFlowField();
         PrewarmPool();
     }
-
-// CosmicDustGenerator.cs
+    
     private GameObject GetDustFromPool()
     {
         // Pop until we find a live object
@@ -365,9 +364,6 @@ public class CosmicDustGenerator : MonoBehaviour
         
         _regrowthCoroutines[freedCell] = StartCoroutine(RegrowElsewhere(freedCell, phase)); 
     }
-    public void RemoveHex(Vector2Int gridPos) {
-        _hexMap.Remove(gridPos);
-    } 
     public void ClearMaze() {
         // Snapshot because RemoveActiveAt mutates _hexMap
         var snapshot = new List<KeyValuePair<Vector2Int, GameObject>>(_hexMap); 
@@ -483,19 +479,32 @@ public class CosmicDustGenerator : MonoBehaviour
          // Secondary guard (just in case)
          _isSpawningMaze = false;
         yield return null;
-        
         Vector2Int cell = _drums.GetRandomAvailableCell();
         Debug.Log($"[MAZE] OnMazeReady firing cell={cell}");
         if (cell.x == -1) cell = ForceReserveCellNearCenter(); // will bulldoze a dust hex if needed
-        // (after you pick 'cell')
-// PICK ONE PLACE to invoke, not two:
+
         int buildId = ++_mazeBuildId;
 
-        if (_lastPulseId != buildId) {
+        if (_lastPulseId != buildId)
+        {
             _lastPulseId = buildId;
             Debug.Log($"[MAZE] OnMazeReady firing cell={cell} (buildId={buildId})");
+
+            // Notify any listeners (analytics, etc.)
             OnMazeReady?.Invoke(cell);
-        } else {
+
+            // NEW: directly request the PhaseStar from the DrumTrack.
+            if (_drums != null)
+            {
+                _drums.RequestPhaseStar(phase, cell);
+            }
+            else
+            {
+                Debug.LogWarning("[MAZE] No DrumTrack available to RequestPhaseStar.");
+            }
+        }
+        else
+        {
             Debug.LogWarning($"[MAZE] Duplicate OnMazeReady suppressed (buildId={buildId})");
         }
     }

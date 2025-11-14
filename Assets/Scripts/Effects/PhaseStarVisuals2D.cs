@@ -1,13 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using UnityEditor.ShaderKeywordFilter;
 using UnityEngine;
+using Quaternion = UnityEngine.Quaternion;
+using Vector2 = UnityEngine.Vector2;
+using Vector3 = UnityEngine.Vector3;
 
 [DisallowMultipleComponent]
 public sealed class PhaseStarVisuals2D : MonoBehaviour
 {
     [Header("Sprite pivots")]
     public Sprite diamond;
-    [SerializeField] Transform[] spritePivots;
+    public Sprite activeDiamond;
+    private static float pulseAlphaMax = 1f;
+    private static float pulseAlphaMin = .5f;
+    private float currentAlpha = pulseAlphaMax - pulseAlphaMin;
+    private float alphaDirection = 1f;
+    private SpriteRenderer activeSprite;
+    public ParticleSystem particles;
     [SerializeField] float maxFaceTurnDegPerSec = 12f;
     [SerializeField] float wobbleDeg = 3f;
     [SerializeField] float wobbleHz  = 0.12f;
@@ -55,19 +66,39 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         SetTintWithParticles(c);
         ToggleRenderers(true);
         ApplyParticleAlpha(.4f);
+        particles.Play();
     }
     public void ShowDim(Color _ignored)
     {
         ToggleRenderers(true);                      // keep visible while dim
         ApplyParticleAlpha(0.3f);
     }
+
+    private void Update()
+    {
+        if (activeSprite != null)
+        {
+            Color currentColor = activeSprite.color;
+            currentColor.a = Mathf.Lerp(currentColor.a, pulseAlphaMax, Time.deltaTime * alphaDirection);
+            activeSprite.color = currentColor;
+            if (currentColor.a <= pulseAlphaMin || currentColor.a >= pulseAlphaMax)
+            {
+                alphaDirection *= -1;
+            }
+        }
+    }
+
     public void HighlightActive(Transform active, Color c, float alpha = 0.95f) { 
         if (!active) return; 
-        var sr = active.GetComponent<SpriteRenderer>(); 
-        if (!sr) return; 
+        var sr = active.GetComponent<SpriteRenderer>();
+        activeSprite = sr;
+        if (!sr) return;
+        sr.sprite = activeDiamond;
         c.a = alpha; 
         sr.color = c;
-        active.localScale *= .5f;
+        Vector3 scale = active.localScale;
+        scale.x = scale.y = scale.z = .5f;
+        active.localScale = scale;
     }
     void SetTintWithParticles(Color c)
     {
@@ -127,6 +158,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             for (int i = 0; i < srs.Length; i++)
             {
                 var sr = srs[i];
+                sr.sprite = diamond;
                 if (!sr) continue;
                 if (active != null && sr.transform == active) continue; // skip active
                 var c = sr.color; c.a = veil.a; sr.color = c;
@@ -150,23 +182,11 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
-    void ApplySpriteAlpha(float a)
-    {
-        var srs = GetComponentsInChildren<SpriteRenderer>(true);
-        foreach (var t in srs)
-            if (t) { var col = t.color; col.a = a; t.color = col; }
-    }
-
-    public Color GetLastTint() => _lastTint;
-
     void HandleVelocity(Vector2 v)
     {
         _lastVel = v;
 //        OrientToVelocity(v);
     }
-
-    public void Show() { _visible = true;  ToggleRenderers(true); }
-    public void Hide() { _visible = false; ToggleRenderers(false); }
 
     void ToggleRenderers(bool on)
     {

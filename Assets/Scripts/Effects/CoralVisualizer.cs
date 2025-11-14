@@ -76,16 +76,13 @@ public class CoralVisualizer : MonoBehaviour
         }
     }
 
-    public void Clear()
+    private void Clear()
     {
         foreach (var lr in _lines) if (lr) { lr.positionCount = 0; }
         foreach (var t in _tendrils) if (t) Destroy(t);
         _tendrils.Clear();
     }
 
-    /// <summary>
-    /// Entry point. Renders a single phase’s coral.
-    /// </summary>
     public void RenderPhaseCoral(PhaseSnapshot snapshot, CoralState state)
     {
         Clear();
@@ -192,34 +189,35 @@ public class CoralVisualizer : MonoBehaviour
 }
 
     private Vector3[] BuildTrackCurve(PhaseSnapshot snapshot, List<PhaseSnapshot.NoteEntry> notes, int trackIndex)
-    {
-        // base direction fan
-        float baseAngle = -trackAngularSpread*1.5f + trackIndex * trackAngularSpread;
-        var dir = Quaternion.Euler(0,0, baseAngle) * Vector3.up;
-
-        // length scales with note count + summed velocity
-        float velSum = notes?.Sum(n => n.Velocity) ?? 0f;
-        int   nCount = notes?.Count ?? 0;
-
-        float length = style.baseBranchLength
-                       + velSum * style.velocityToLength
-                       + Mathf.Max(0, nCount-1) * 0.12f;
-
-        // curve resolution
-        int segments = Mathf.Max(2, (notes?.Count ?? 0) * style.pointsPerNote);
-        var pts = new Vector3[segments];
-
-        // small arcing + jitter based on density
-        float arc = (notes?.Count ?? 0) * style.arcBendPerNote;
-
-        Vector3 p = origin + dir * radialSpacing;
-        for (int i = 0; i < segments; i++)
-        {
-            float t = i / Mathf.Max(1f, (segments-1));
-            float bend = Mathf.Lerp(0f, arc, t);
-            float jitter = Random.Range(-style.jitterAngleDeg, style.jitterAngleDeg) * (1f/Mathf.Sqrt(segments));
-            var d = Quaternion.Euler(0,0, bend + jitter + baseAngle) * Vector3.up;
-            pts[i] = p + d * (t * length);
+    { 
+        int nCount = notes?.Count ?? 0; 
+        if (nCount == 0) {
+            // Keep an empty line if this track has no notes.
+            return new Vector3[0];
+        }
+        // Deterministic order: turn at each collected-note boundary.
+        var ordered = notes.OrderBy(n => n.Step).ToList();
+        // One straight segment per note (plus the starting point).
+        // Total length scales with note count; per-segment length is uniform.
+        float totalLength = Mathf.Max(0.0001f, style.baseBranchLength) * nCount;
+        float segLen      = totalLength / nCount;
+        // Initial direction is up; apply a small bend at each note.
+        // We alternate left/right using the index to produce visible “kinks”.
+        // arcBendPerNote acts as the maximum turn per segment (in degrees).
+        float currentAngleDeg = 90f; // straight up in local space
+        
+        var pts = new Vector3[nCount + 1]; Vector3 p = origin + Vector3.up * radialSpacing; 
+        pts[0] = p;
+        for (int i = 0; i < nCount; i++) {
+            // Small deterministic bend per note boundary:
+            // alternate sign to visibly differentiate segments.
+            float sign = (i % 2 == 0) ? 1f : -1f; 
+            float jitter = (style.jitterAngleDeg > 0f) ? (sign * style.jitterAngleDeg * 0.15f) : 0f;
+            currentAngleDeg += sign * style.arcBendPerNote + jitter; 
+            // Advance along the new direction by one segment length.
+            var dir = Quaternion.Euler(0f, 0f, currentAngleDeg) * Vector3.up; 
+            p += dir.normalized * segLen; 
+            pts[i + 1] = p;
         }
         return pts;
     }
