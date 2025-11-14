@@ -133,18 +133,14 @@ public class MineNode : MonoBehaviour
 
                             }
                         }
-
-                        // 🔊 (you already play SFX above; keep or remove to avoid double)
-                        // CollectionSoundManager.Instance?.PlayNoteSpawnerSound(spawner.assignedTrack, spawner.selectedNoteSet);
-
                         // Emit notes BEFORE we reveal/destroy anything
                         Debug.Log($"Bursting Collectables");
                         if (spawner == null || spawner.assignedTrack == null || spawner.selectedNoteSet == null) { 
                             Debug.LogWarning("[MineNode] Note burst aborted: missing spawner/track/noteSet."); 
                             return;
                         } 
-                        Debug.Log("Bursting Collectables"); 
-                        spawner.assignedTrack.SpawnCollectableBurstWithExpansionIfNeeded(spawner.selectedNoteSet, 8);
+                        Debug.Log($"Bursting Collectables with {spawner.selectedNoteSet} at {spawner.assignedTrack}"); 
+                        spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet, 8);
                         var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
                         float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 
                         CollectionSoundManager.Instance?.PlayBurstLeadIn(spawner.assignedTrack, set, Mathf.Max(0.05f, remain));

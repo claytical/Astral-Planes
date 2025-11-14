@@ -18,21 +18,13 @@ MonoBehaviour:
   defaultRemixStrategy: {fileID: 0}
   shortLabel: 
   roleStrategies:
-  - role: 0
-    strategy: 11
-  - role: 0
-    strategy: 4
-  - role: 0
-    strategy: 13
   - role: 2
     strategy: 15
-  - role: 2
+  - role: 0
+    strategy: 11
+  - role: 1
+    strategy: 13
+  - role: 3
     strategy: 9
   - role: 3
-    strategy: 14
-  - role: 3
     strategy: 3
-  - role: 1
-    strategy: 2
-  - role: 1
-    strategy: 12

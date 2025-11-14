@@ -3,7 +3,6 @@ using System.Text;
 
 public class PhaseDebugDisplay : MonoBehaviour
 {
-    public MineNodeProgressionManager progressionManager;
 
     private GUIStyle labelStyle;
     private bool showDebug = true;
@@ -11,7 +10,7 @@ public class PhaseDebugDisplay : MonoBehaviour
 
     void OnGUI()
     {
-        if (!showDebug || progressionManager == null || progressionManager.phaseQueue == null)
+        if (!showDebug)
             return;
 
         if (labelStyle == null)
@@ -25,15 +24,8 @@ public class PhaseDebugDisplay : MonoBehaviour
             };
         }
 
-        var phaseGroups = progressionManager.phaseQueue.phaseGroups;
-        int phaseIndex = progressionManager.GetCurrentPhaseIndex();
-        if (phaseIndex < 0 || phaseIndex >= phaseGroups.Count)
-            return;
-
-        var group = phaseGroups[phaseIndex];
-
         StringBuilder label = new StringBuilder();
-        label.AppendLine($"<b>🎼 Current Phase:</b> {group.phase}");
+        label.AppendLine($"<b>🎼 Current Phase:</b> ");
         
         GUI.Label(new Rect(20, 20, 500, 1000), label.ToString(), labelStyle);
     }

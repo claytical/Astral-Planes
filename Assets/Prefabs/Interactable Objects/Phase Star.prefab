@@ -81,7 +81,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  diamond: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701, type: 3}
+  diamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000, type: 3}
+  activeDiamond: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701,
+    type: 3}
+  particles: {fileID: 382306593780773728}
   spritePivots:
   - {fileID: 0}
   - {fileID: 0}

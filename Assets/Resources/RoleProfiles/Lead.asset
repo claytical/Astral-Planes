@@ -15,11 +15,5 @@ MonoBehaviour:
   role: 2
   defaultColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   description: Bright, aggressive lines that cut through the mix.
-  envelopeParticlePrefab: {fileID: 7704860281926021353, guid: 0a8f58ba4b35d41aa830206a1d369348,
-    type: 3}
-  sparkParticlePrefab: {fileID: 5137427580465729298, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
-    type: 3}
   defaultBehavior: 1
-  allowedMidiPresets: 0200000003000000
-  textureDescriptor: sky-cutting melody
-  samplePreview: {fileID: 0}
+  allowedMidiPresets: 03000000

@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/indexLayout.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Establish Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Establish Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Howler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Howler.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/PhaseStarVisuals2D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/PhaseStarVisuals2D.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/MineNodeProgressionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/MineNodeProgressionManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Packages/packages-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/Packages/packages-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ProjectSettings/ProjectVersion.txt" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/ProjectVersion.txt" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/Assets/Editor/ChordProgressionGenerator.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/MainMenuCoralLoader.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Effects/VisualNoteMarker.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/ChordChangeArpeggiator.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/HarmonyDirector.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeCharacterVis.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeRailAgent.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeTuning.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/TrackUtilityTrigger.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/PhaseStarDustAffect.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/BoostingInfluence.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/ChordProgressionProfile.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/DensityInfluence.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/DrumVolumeInfluence.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/LifetimeProfile.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalRoleProfile.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/PhaseInfluence.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/PlayerStatsGridAnchor.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/ShipMusicalProfileLoader.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/VehicleRemixController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/DrumVolumeMixer.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetConfigLibrary.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/PhasePersonalityRegistry.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/RemixMatrixLibrary.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/RolePhaseNoteSetConfig.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/WiggleMotion.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Visualizers/MarkerLight.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Visualizers/NoteTether.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../Tereza_Dreamer/Assets/Scripts/Nodes/DialogueNode.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$USER_HOME$/Downloads/PhaseStar (1).cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$USER_HOME$/Downloads/PhaseStar.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/571bfc603f5a49478129456da758612e28e00/88/f83d9771/ParticleSystem.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5895af2907a043a797a0fa0cc2734e491eac00/a5/c8ade933/Component.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5a41d6b7189842eca409fd0b1c3e3dcf17bf78/46/57194bb0/Action`2.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5a41d6b7189842eca409fd0b1c3e3dcf17bf78/5c/92b8ec18/Action.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5a41d6b7189842eca409fd0b1c3e3dcf17bf78/fa/2e9a26d6/Enumerable.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/d44b17e136d09081da1e8fd0e8c83fde60e11818b9f2442d7ed8cb733fae895e/System.Collections.Generic.cs" root0="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="2tMLg0EEFvRts9rRAfBildF7iEt" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;ml.llm.AIAssistantPromptsLibrary&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RiderProblemsViewState">
+    <option name="groupByToolId" value="true" />
+    <hideBySeverity>
+      <option value="11" />
+      <option value="12" />
+      <option value="13" />
+      <option value="14" />
+      <option value="15" />
+      <option value="16" />
+      <option value="20" />
+    </hideBySeverity>
+  </component>
+  <component name="RunManager" selected="Attach to Unity Editor.Attach to Unity Editor">
+    <configuration name="Standalone Player" type="RunUnityExe" factoryName="Unity Executable">
+      <option name="EXE_PATH" value="$USER_HOME$/Desktop/AstralPlanes_F.app/Contents/MacOS/AstralPlanes" />
+      <option name="PROGRAM_PARAMETERS" value="" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/Desktop/Astral.app/Contents/MacOS" />
+      <option name="PASS_PARENT_ENVS" value="1" />
+      <option name="USE_EXTERNAL_CONSOLE" value="0" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Start Unity" type="RunUnityExe" factoryName="Unity Executable">
+      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.2.12f1/Unity.app/Contents/MacOS/Unity" />
+      <option name="PROGRAM_PARAMETERS" value="-projectPath $PROJECT_DIR$ -debugCodeOptimization" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="PASS_PARENT_ENVS" value="1" />
+      <option name="USE_EXTERNAL_CONSOLE" value="0" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Unit Tests (batch mode)" type="RunUnityExe" factoryName="Unity Executable">
+      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.2.12f1/Unity.app/Contents/MacOS/Unity" />
+      <option name="PROGRAM_PARAMETERS" value="-runTests -batchmode -projectPath $PROJECT_DIR$ -testResults Logs/results.xml -logFile Logs/Editor.log -testPlatform EditMode -debugCodeOptimization" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="PASS_PARENT_ENVS" value="1" />
+      <option name="USE_EXTERNAL_CONSOLE" value="0" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Attach to Unity Editor &amp; Play" type="UNITY_DEBUG_RUN_CONFIGURATION" factoryName="UNITY_ATTACH_AND_PLAY" show_console_on_std_err="false" show_console_on_std_out="false" port="50000" address="localhost">
+      <option name="allowRunningInParallel" value="false" />
+      <option name="listenPortForConnections" value="false" />
+      <option name="pid" />
+      <option name="projectPathOnTarget" />
+      <option name="runtimes">
+        <list />
+      </option>
+      <option name="selectedOptions">
+        <list />
+      </option>
+      <method v="2" />
+    </configuration>
+    <configuration name="Attach to Unity Editor" type="UNITY_DEBUG_RUN_CONFIGURATION" factoryName="Unity Debug" show_console_on_std_err="false" show_console_on_std_out="false" port="50000" address="localhost">
+      <option name="allowRunningInParallel" value="false" />
+      <option name="listenPortForConnections" value="false" />
+      <option name="pid" />
+      <option name="projectPathOnTarget" />
+      <option name="runtimes">
+        <list />
+      </option>
+      <option name="selectedOptions">
+        <list />
+      </option>
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="" />
+      <created>1740157104271</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1740157104271</updated>
+      <workItem from="1740157105945" duration="615000" />
+      <workItem from="1740159153604" duration="21678000" />
+      <workItem from="1740422203989" duration="675000" />
+      <workItem from="1740422968585" duration="31126000" />
+      <workItem from="1740542776685" duration="1500000" />
+      <workItem from="1740676218522" duration="4095000" />
+      <workItem from="1740690180423" duration="44347000" />
+      <workItem from="1741026527671" duration="58205000" />
+      <workItem from="1741289178569" duration="76000" />
+      <workItem from="1741291441966" duration="10339000" />
+      <workItem from="1741388180101" duration="30450000" />
+      <workItem from="1741703901504" duration="63462000" />
+      <workItem from="1742049278769" duration="13619000" />
+      <workItem from="1742156915991" duration="40770000" />
+      <workItem from="1742435417289" duration="4866000" />
+      <workItem from="1742500928693" duration="9805000" />
+      <workItem from="1743263389660" duration="499000" />
+      <workItem from="1743269514694" duration="53123000" />
+      <workItem from="1743465917112" duration="9542000" />
+      <workItem from="1743614179569" duration="6872000" />
+      <workItem from="1743647278439" duration="3603000" />
+      <workItem from="1743715647613" duration="8130000" />
+      <workItem from="1743801564927" duration="56826000" />
+      <workItem from="1744141111273" duration="1394000" />
+      <workItem from="1744144097704" duration="6354000" />
+      <workItem from="1744224665738" duration="31290000" />
+      <workItem from="1744399229807" duration="9167000" />
+      <workItem from="1744472802390" duration="5340000" />
+      <workItem from="1744489688027" duration="4230000" />
+      <workItem from="1744648722250" duration="3373000" />
+      <workItem from="1744731213167" duration="12269000" />
+      <workItem from="1744923705789" duration="5147000" />
+      <workItem from="1744995089025" duration="5513000" />
+      <workItem from="1745006776767" duration="71018000" />
+      <workItem from="1745338223136" duration="17574000" />
+      <workItem from="1746123056609" duration="26776000" />
+      <workItem from="1746739961724" duration="10000" />
+      <workItem from="1746755519683" duration="5793000" />
+      <workItem from="1746806578528" duration="27395000" />
+      <workItem from="1746891518948" duration="44163000" />
+      <workItem from="1747165090102" duration="12311000" />
+      <workItem from="1747246941649" duration="14755000" />
+      <workItem from="1747412037703" duration="69928000" />
+      <workItem from="1747867495031" duration="8699000" />
+      <workItem from="1747931060191" duration="7714000" />
+      <workItem from="1748543121735" duration="2144000" />
+      <workItem from="1748900475028" duration="55984000" />
+      <workItem from="1749508534279" duration="1820000" />
+      <workItem from="1749755710960" duration="4628000" />
+      <workItem from="1749842933349" duration="5441000" />
+      <workItem from="1751926083072" duration="1571000" />
+      <workItem from="1752002452087" duration="12416000" />
+      <workItem from="1752104254185" duration="35605000" />
+      <workItem from="1752335231723" duration="41228000" />
+      <workItem from="1752533986681" duration="76451000" />
+      <workItem from="1752879874266" duration="1562000" />
+      <workItem from="1753126911450" duration="38095000" />
+      <workItem from="1753215595739" duration="94065000" />
+      <workItem from="1753732647447" duration="19728000" />
+      <workItem from="1755644354672" duration="3620000" />
+      <workItem from="1756405737882" duration="34283000" />
+      <workItem from="1756842483205" duration="658000" />
+      <workItem from="1756994969597" duration="25410000" />
+      <workItem from="1757986185618" duration="4762000" />
+      <workItem from="1758144170221" duration="60998000" />
+      <workItem from="1758591124901" duration="6130000" />
+      <workItem from="1758829869467" duration="93717000" />
+      <workItem from="1759175954032" duration="9747000" />
+      <workItem from="1759193175308" duration="9843000" />
+      <workItem from="1759255538736" duration="6678000" />
+      <workItem from="1759283161252" duration="64612000" />
+      <workItem from="1759610110489" duration="7860000" />
+      <workItem from="1759791650378" duration="9536000" />
+      <workItem from="1759963661919" duration="62601000" />
+      <workItem from="1760226371782" duration="28468000" />
+      <workItem from="1760450257601" duration="9911000" />
+      <workItem from="1760464868715" duration="62178000" />
+      <workItem from="1760798114547" duration="31982000" />
+      <workItem from="1760886486377" duration="23838000" />
+      <workItem from="1760986921883" duration="13719000" />
+      <workItem from="1761054615784" duration="42060000" />
+      <workItem from="1761235404008" duration="51336000" />
+      <workItem from="1761612172795" duration="4231000" />
+      <workItem from="1761616456514" duration="931000" />
+      <workItem from="1762374377216" duration="13168000" />
+      <workItem from="1762484241673" duration="46103000" />
+      <workItem from="1762810216214" duration="10846000" />
+      <workItem from="1762871522482" duration="1129000" />
+      <workItem from="1762881975337" duration="8125000" />
+      <workItem from="1762912932138" duration="29159000" />
+      <workItem from="1763058434550" duration="396000" />
+      <workItem from="1763059638503" duration="2760000" />
+      <workItem from="1763064733322" duration="17401000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
+  <component name="UnityProjectConfiguration" hasMinimizedUI="true" />
+  <component name="UnityProjectDiscoverer">
+    <option name="hasUnityReference" value="true" />
+    <option name="unityProject" value="true" />
+    <option name="unityProjectFolder" value="true" />
+  </component>
+  <component name="UnityUnitTestConfiguration" currentTestLauncher="Both" />
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

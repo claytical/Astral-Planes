@@ -20,19 +20,9 @@ MonoBehaviour:
   roleStrategies:
   - role: 0
     strategy: 4
-  - role: 0
-    strategy: 6
-  - role: 0
-    strategy: 13
   - role: 1
-    strategy: 12
-  - role: 2
-    strategy: 13
-  - role: 2
     strategy: 4
-  - role: 2
-    strategy: 10
   - role: 3
-    strategy: 14
-  - role: 3
-    strategy: 7
+    strategy: 4
+  - role: 0
+    strategy: 4

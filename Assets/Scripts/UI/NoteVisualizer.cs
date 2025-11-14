@@ -142,6 +142,7 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
     }
+
     void Update()
     {
         if (!isInitialized ||

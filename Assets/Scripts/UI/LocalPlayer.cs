@@ -74,7 +74,9 @@ public class LocalPlayer : MonoBehaviour
                 GameFlowManager.Instance.harmony &&                       // HarmonyDirector bound
                 GameFlowManager.Instance.arp                              // ChordChangeArpeggiator bound
         );
-
+        
+        Debug.Log("[CRASH TEST] Track Ready");
+        
         var gfm = GameFlowManager.Instance;
 
         // --- UI: player stats card under the grid
@@ -106,6 +108,7 @@ public class LocalPlayer : MonoBehaviour
         }
 
         _launched = true;
+    
     }
     public float GetVehicleEnergy()
     {
@@ -168,6 +171,7 @@ public class LocalPlayer : MonoBehaviour
 
         switch (GameFlowManager.Instance.CurrentState)
         {
+  
             case GameState.Selection:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 playerVehicle = _selection.GetChosenPlane();

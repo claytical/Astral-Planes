@@ -19,7 +19,8 @@ MonoBehaviour:
   starAlphaMax: 0.659
   rolePattern: 000000000300000000000000010000000300000002000000
   previewPulseScale: 1.2
-  previewSpinSpeed: 1
+  beatsPerRole: 4
+  fallbackBPM: 60
   pulseCurve:
     serializedVersion: 2
     m_Curve:

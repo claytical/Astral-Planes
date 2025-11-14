@@ -12,11 +12,9 @@ public class Collectable : MonoBehaviour
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
     public NoteTether tether;               // runtime
-    public bool showTether = false;
     private bool awaitingPulse = false;
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
-    private Vector3 originalScale;
     private bool isInitialized = false;
     private bool reachedDestination = false;
 
@@ -224,69 +222,61 @@ public class Collectable : MonoBehaviour
     }
     public int GetNote() => assignedNote;
     public bool IsDark { get; private set; } = false;
-
-    // 🔹 Initializes the collectable with its note data
+    
     public void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
     {
-        assignedNote        = note;
-        noteDurationTicks   = duration;
-        assignedInstrumentTrack = track;
-        sharedTargetSteps   = steps ?? new List<int>();
-        
+        assignedNote              = note;
+        noteDurationTicks         = duration;
+        assignedInstrumentTrack   = track;
+
+        // 🔒 defensive copy — do NOT keep caller's mutable list
+        sharedTargetSteps = (steps != null && steps.Count > 0)
+            ? new List<int>(steps)
+            : new List<int>();
+
         if (sharedTargetSteps.Count == 0)
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
 
         if (TryGetComponent(out CollectableParticles particleScript) && noteSet != null)
             particleScript.ConfigureByDuration(noteSet, duration, track);
+
         if (track != null)
             energySprite.color = track.trackColor;
+
         if (energySprite != null && track != null)
         {
             var c = track.trackColor;
-            c.a = Mathf.Clamp01(maxAlpha);     // start semi-transparent
+            c.a = Mathf.Clamp01(maxAlpha);
             energySprite.color = c;
 
             if (_pulseRoutine != null) StopCoroutine(_pulseRoutine);
             _pulseRoutine = StartCoroutine(PulseEnergySprite());
         }
 
-
         if (assignedInstrumentTrack == null)
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
 
         StartCoroutine(DarkTimeoutRoutine(track));
-        if (_rb == null) TryGetComponent(out _rb); 
+        if (_rb == null) TryGetComponent(out _rb);
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
     }
-    // In Collectable.cs
-public void AttachTetherAtSpawn(
-    Transform marker,
-    GameObject tetherPrefabGO,
-    Color trackColor,
-    int durationTicksOrSteps,
-    int anchorStep // 🔑 the *visualizer* step this tether should bind to
-)
-{
-    var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
-    if (!assignedInstrumentTrack)
-    {
-        Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: assignedInstrumentTrack is null.");
-        return;
-    }
-    if (!viz)
-    {
-        Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: NoteVisualizer is null.");
-        return;
-    }
-    if (!tetherPrefabGO)
-    {
-        Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: tether prefab is null.");
-        return;
-    }
-
-    ribbonMarker = marker;
-    Debug.Log($"[Collectable] AttachTetherAtSpawn track={assignedInstrumentTrack.name} " +
+    public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, int durationTicksOrSteps, int anchorStep) {
+        var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
+        if (!assignedInstrumentTrack) {
+            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: assignedInstrumentTrack is null.");
+            return;
+        }
+        if (!viz) {
+            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: NoteVisualizer is null.");
+            return;
+        }
+        if (!tetherPrefabGO) {
+            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: tether prefab is null.");
+            return;
+        }
+        ribbonMarker = marker;
+        Debug.Log($"[Collectable] AttachTetherAtSpawn track={assignedInstrumentTrack.name} " +
               $"baseStep={intendedStep} anchorStep={anchorStep} " +
               $"marker={(marker ? marker.name : "(null)")}");
     // --- Resolve anchorStep to an ABSOLUTE track step for expanded tracks ---
@@ -311,15 +301,13 @@ public void AttachTetherAtSpawn(
                 int abs = b * binSize + local;
                 if (abs < 0 || abs >= total) continue;
                 if (viz.noteMarkers != null &&
-                    viz.noteMarkers.TryGetValue((assignedInstrumentTrack, abs), out var tr) && tr)
-                {
+                    viz.noteMarkers.TryGetValue((assignedInstrumentTrack, abs), out var tr) && tr) {
                     resolvedStep = abs;
                     found = true;
-break;
+                    break;
                 }
             }
-            if (!found)
-            {
+            if (!found) {
                 // Last resort: if anchorStep already lies in absolute range, keep it; else map to bin 0
                 if (anchorStep < 0 || anchorStep >= total) resolvedStep = local; // bin 0
                 Debug.LogWarning($"[Collectable] Anchor rebind fallback: track={assignedInstrumentTrack.name} " +
@@ -327,10 +315,10 @@ break;
             }
         } 
     } 
-catch (System.Exception ex)    { 
-    Debug.LogWarning($"[Collectable] Anchor step resolution failed; using anchorStep={anchorStep}. {ex.Message}");
-        resolvedStep = anchorStep;     
-} 
+    catch (System.Exception ex)    { 
+        Debug.LogWarning($"[Collectable] Anchor step resolution failed; using anchorStep={anchorStep}. {ex.Message}");
+            resolvedStep = anchorStep;     
+    } 
     if (tether != null)
     {
         // already attached; refresh binding
@@ -361,10 +349,8 @@ catch (System.Exception ex)    {
     {
         StartCoroutine(TravelRoutine(durationTicks, force, seconds));
     }
-
     void Start()
     {
-        originalScale = transform.localScale;
         isInitialized = true;
     }
     private IEnumerator DarkTimeoutRoutine(InstrumentTrack track)
@@ -394,7 +380,6 @@ catch (System.Exception ex)    {
             ml.SetGrey(new Color(1f, 1f, 1f, 0.18f));
         }
     }
-
     private IEnumerator TravelRoutine(int durationTicks, float force, float seconds)
     {
         if (TryGetComponent(out Collider2D col)) col.enabled = false;
@@ -435,20 +420,12 @@ catch (System.Exception ex)    {
             yield return null;
         }
     }
-    private IEnumerator FinishAfterPulse(System.Action afterPulse)
-    {
-        // tiny delay allows PulseToEnd to schedule fade
-        yield return new WaitForSeconds(0.05f);
-        afterPulse?.Invoke();
-        Destroy(gameObject);
-    }
     private void NotifyDestroyedOnce()
     {
         if (_destroyNotified) return;
         _destroyNotified = true;
         OnDestroyed?.Invoke();
     }
-    
     private void OnEnable()
     {
         _handled = false;
@@ -495,12 +472,11 @@ catch (System.Exception ex)    {
             // success path
             float force = vehicle.GetForceAsMidiVelocity();
             vehicle.CollectEnergy(amount);
+            Debug.Log("[COLLECT] Collectable Triggered");
             assignedInstrumentTrack.OnCollectableCollected(this, intendedStep >= 0 ? intendedStep : matchedStep, noteDurationTicks, force);
             if (TryGetComponent(out Collider2D col)) col.enabled = false;
             var explode = GetComponent<Explode>();
             if(explode != null) explode.Permanent(false);
 
     }
-    
- 
 }

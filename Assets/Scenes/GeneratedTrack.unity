@@ -181,10 +181,10 @@ MonoBehaviour:
   noteTetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
   trackRows:
+  - {fileID: 728040985}
   - {fileID: 1373048478}
   - {fileID: 197216900}
   - {fileID: 371719000}
-  - {fileID: 728040985}
 --- !u!114 &45202787
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -332,7 +332,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d966e93db66a49938f11f061d1d1d85, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  progressionManager: {fileID: 1354683688}
 --- !u!4 &51606787
 Transform:
   m_ObjectHideFlags: 0
@@ -10914,7 +10913,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.8
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -11366,7 +11365,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 0, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1461708764}
@@ -12059,7 +12058,6 @@ GameObject:
   - component: {fileID: 1354683682}
   - component: {fileID: 1354683684}
   - component: {fileID: 1354683695}
-  - component: {fileID: 1354683688}
   - component: {fileID: 1354683687}
   - component: {fileID: 1354683690}
   - component: {fileID: 1354683697}
@@ -12157,7 +12155,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.314
+  m_Volume: 0.6
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -12253,37 +12251,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17f0094acf2944184b8a01cb25a3e90a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridWidth: 18
-  gridHeight: 10
-  cellSize: 1
---- !u!114 &1354683688
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1354683681}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 36dd79ade9e1040efa29d9ec25d71669, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  phaseQueue: {fileID: 11400000, guid: ed3423cbfd67c4c9f84bb9b41e8bd80f, type: 2}
-  establishUtilityBias: 0.1
-  evolveUtilityBias: 0.2
-  intensifyUtilityBias: 0.3
-  releaseUtilityBias: 0.45
-  wildcardUtilityBias: 0.6
-  popUtilityBias: 0.7
-  establishRingMul: 1
-  evolveRingMul: 1.1
-  intensifyRingMul: 1.2
-  releaseRingMul: 1.3
-  wildcardRingMul: 1.4
-  popRingMul: 1.5
-  minNodesToAdvance: 3
-  dustGen: {fileID: 0}
-  drum: {fileID: 0}
+  gridWidth: 36
+  gridHeight: 20
+  cellSize: 0.5
 --- !u!114 &1354683690
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12426,7 +12396,6 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   controller: {fileID: 1354683684}
   dustGenerator: {fileID: 1354683695}
-  progressionManager: {fileID: 1354683688}
   spawnGrid: {fileID: 1354683687}
   glitchManager: {fileID: 1354683690}
   arp: {fileID: 1354683697}
@@ -12728,7 +12697,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 0, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1461708764}
@@ -12948,7 +12917,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 0, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1461708764}
@@ -13114,7 +13083,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1461708764}
@@ -13327,7 +13296,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.4
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -13449,7 +13418,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 2
+  preset: 3
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -13718,7 +13687,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.5
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -13829,7 +13798,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.5
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}

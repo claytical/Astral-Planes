@@ -52,56 +52,77 @@ public class DrumTrack : MonoBehaviour
     private float _loopLengthInSeconds, _phaseStartTime;
     private float _gridCheckTimer;
     private readonly float _gridCheckInterval = 10f;
- 
+    private float _clipLengthSec;
+    private const float kMinLen = 1e-4f; // guard for zero/denorm lengths
+    private bool HasValidClipLen => _clipLengthSec > kMinLen;
+
     private PhaseTransitionManager _phaseTransitionManager;
     private bool _started;
     private int _lastLoopCount, _tLoop, _phaseCount;
     private AudioClip _pendingDrumLoop;
     public PhaseStar _star;
+    private InstrumentTrackController _trackController;
     private int _binIdx = -1;
     private int _binCount = 4;                   // default; PhaseStar can override per-spawn
+    private GameFlowManager GFM => GameFlowManager.Instance;
+
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
     public event System.Action<MusicalPhase, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int,int> OnBinChanged; // (idx, binCount)
+    private float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
+    public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
+    public float GetClipLengthInSeconds() => _clipLengthSec; // new helper for audio-bound code
     public void SetBinCount(int bins) => _binCount = Mathf.Max(1, bins);
 
     void Start()
     {
         _phaseTransitionManager = GetComponent<PhaseTransitionManager>();
+        _trackController = GameFlowManager.Instance.controller;
+        if (drumAudioSource && drumAudioSource.clip) {
+            _clipLengthSec = Mathf.Max(drumAudioSource.clip.length, 0f);
+        }
     }
     private void Update()
     {
-        if (!GameFlowManager.Instance.ReadyToPlay())
+        // 0) Manager may exist but not be ready (or still wiring scenes)
+        var gfm = GFM;
+        if (gfm == null || !gfm.ReadyToPlay())
         {
             return;
         }
+
+        // 1) Watchdog timer for the spawn grid
+        _gridCheckTimer += Time.deltaTime;
         if (_gridCheckTimer >= _gridCheckInterval)
         {
             ValidateSpawnGrid();
             _gridCheckTimer = 0f;
         }
-        float currentTime = drumAudioSource.time;
-        float stepDuration = _loopLengthInSeconds / totalSteps;
-        if (stepDuration <= 0)
-        {
+
+        // 2) Transport/clip guards
+        if (drumAudioSource == null || !HasValidClipLen || totalSteps <= 0)
             return;
-        }
+
+        float currentTime  = drumAudioSource.time;
+        float stepDuration = _clipLengthSec / totalSteps;
+        if (stepDuration <= 0f || float.IsInfinity(stepDuration))
+            return;
 
         int absoluteStep = Mathf.FloorToInt(currentTime / stepDuration);
         currentStep = absoluteStep % totalSteps;
 
-        // ✅ Use DSP time to track loops properly
-        float elapsedTime = (float)(AudioSettings.dspTime - startDspTime);
-        int currentLoop = Mathf.FloorToInt(elapsedTime / _loopLengthInSeconds);
-        if (_loopLengthInSeconds > 0f)
-        {
-            int bins = Mathf.Max(1, _binCount);
-            double dsp   = AudioSettings.dspTime;
-            double pos   = (dsp - startDspTime) % _loopLengthInSeconds;
-            if (pos < 0) pos += _loopLengthInSeconds;
-            double binDur = _loopLengthInSeconds / bins;
+        // 3) Loop/bins driven by EFFECTIVE loop length
+        float elapsedTime  = (float)(AudioSettings.dspTime - startDspTime);
+        float effectiveLen = EffectiveLoopLengthSec;
 
-            // small hysteresis avoids double-trigger near boundaries
+        if (effectiveLen > kMinLen)
+        {
+            int   bins = Mathf.Max(1, _binCount);
+            double dsp = AudioSettings.dspTime;
+            double pos = (dsp - startDspTime) % effectiveLen;
+            if (pos < 0) pos += effectiveLen;
+            double binDur = effectiveLen / bins;
+
             const double Eps = 1e-5;
             int idx = (int)((pos + Eps) / binDur);
             if (idx >= bins) idx -= bins;
@@ -111,78 +132,98 @@ public class DrumTrack : MonoBehaviour
                 _binIdx = idx;
                 OnBinChanged?.Invoke(_binIdx, bins);
             }
-        }
 
-        // ✅ Ensure this only runs once per loop restart
-        if (currentLoop > _lastLoopCount)
-        {
-            _lastLoopCount = currentLoop;
-            LoopRoutines();
-        }
-        if (activeMineNodes != null)
-            activeMineNodes.RemoveAll(n => n == null);
-
-    }
-    public void ManualStart()
-    {
-        isPhaseStarActive = false;
-        if (_started) return;
-        _started = true;
-
-        if (drumAudioSource == null)
-        {
-            Debug.LogError("DrumTrack: No AudioSource assigned!");
-            return;
-        }
-
-        // --- A) START THE CURRENT PHASE CLIP *NOW* (no queued change) ---
-        // Establish is the first phase; play its loop immediately so timing is correct.
-        var boot = MusicalPhase.Establish;
-
-        if (_phaseTransitionManager != null)
-        {
-            if (_phaseTransitionManager.currentPhase != boot)
+            int extendedLoop = Mathf.FloorToInt(elapsedTime / effectiveLen);
+            if (extendedLoop > _lastLoopCount)
             {
-                _phaseTransitionManager.HandlePhaseTransition(boot, "DrumTrack/ManualStart");
+                _lastLoopCount = extendedLoop;
+                Debug.Log($"[LOOP] Extended loop {extendedLoop} (effectiveLen={effectiveLen:F2})");
+                LoopRoutines();
             }
         }
-        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null; 
-        if (GameFlowManager.Instance.dustGenerator != null && bootProfile != null) { 
-            GameFlowManager.Instance.dustGenerator.ApplyProfile(bootProfile); 
-            GameFlowManager.Instance.dustGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.Progressive;
-            GameFlowManager.Instance.dustGenerator.progressiveMaze = true;
-        }
-        var initialClip = MusicalPhaseLibrary.GetRandomClip(boot);
-        if (initialClip == null)
-        {
-            Debug.LogError("DrumTrack.ManualStart: No Establish clip found.");
-            return;
-        }
 
-        // Clear any queued/scheduled transitions; we're booting the clock cleanly.
-        QueuedPhase = null;
-        _pendingDrumLoop = null;
-
-        drumAudioSource.Stop();
-        drumAudioSource.clip = initialClip;
-        drumAudioSource.loop = true;
-
-        // Align to DSP so the transport is stable from frame 0.
-        double dspStart = AudioSettings.dspTime + 0.05;
-        drumAudioSource.PlayScheduled(dspStart);
-        startDspTime = dspStart;
-        // If InitializeDrumLoop only sets counters/grid, keep it. If it also calls PlayScheduled, remove the call below.
-        StartCoroutine(InitializeDrumLoop());
-        isPhaseStarActive = false;
-
-        var mpm = GameFlowManager.Instance?.progressionManager;
-        if (mpm != null) {
-            mpm.BootFirstPhaseStar(MusicalPhase.Establish, regenerateMaze: true);
-        } else {
-            UnityEngine.Debug.LogError("[DrumTrack] No MineNodeProgressionManager; cannot boot PhaseStar.");
-        }
-        
+        // 4) Housekeeping
+        if (activeMineNodes != null)
+            activeMineNodes.RemoveAll(n => n == null);
     }
+
+public void ManualStart()
+{
+    isPhaseStarActive = false;
+    if (_started) return;
+    _started = true;
+
+    if (drumAudioSource == null)
+    {
+        Debug.LogError("DrumTrack: No AudioSource assigned!");
+        return;
+    }
+
+    // --- A) START THE CURRENT PHASE CLIP *NOW* (no queued change) ---
+    // Establish is the first phase; play its loop immediately so timing is correct.
+    var boot = MusicalPhase.Establish;
+
+    if (_phaseTransitionManager != null)
+    {
+        if (_phaseTransitionManager.currentPhase != boot)
+        {
+            _phaseTransitionManager.HandlePhaseTransition(boot, "DrumTrack/ManualStart");
+        }
+    }
+
+    var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
+    if (GameFlowManager.Instance.dustGenerator != null && bootProfile != null)
+    {
+        GameFlowManager.Instance.dustGenerator.ApplyProfile(bootProfile);
+        GameFlowManager.Instance.dustGenerator.cycleMode     = CosmicDustGenerator.MazeCycleMode.Progressive;
+        GameFlowManager.Instance.dustGenerator.progressiveMaze = true;
+    }
+
+    var initialClip = MusicalPhaseLibrary.GetRandomClip(boot);
+    if (initialClip == null)
+    {
+        Debug.LogError("DrumTrack.ManualStart: No Establish clip found.");
+        return;
+    }
+
+    // Clear any queued/scheduled transitions; we're booting the clock cleanly.
+    QueuedPhase      = null;
+    _pendingDrumLoop = null;
+
+    drumAudioSource.Stop();
+    drumAudioSource.clip = initialClip;
+    drumAudioSource.loop = true;
+    _trackController     = GameFlowManager.Instance.controller;
+    _clipLengthSec       = Mathf.Max(initialClip.length, 0f);
+
+    // Align to DSP so the transport is stable from frame 0.
+    double dspStart = AudioSettings.dspTime + 0.05;
+    drumAudioSource.PlayScheduled(dspStart);
+    startDspTime = dspStart;
+
+    // If InitializeDrumLoop only sets counters/grid, keep it. If it also calls PlayScheduled, remove the call below.
+    StartCoroutine(InitializeDrumLoop());
+    isPhaseStarActive = false;
+
+    var dustGen = GameFlowManager.Instance?.dustGenerator;
+    if (dustGen != null)
+    {
+        boot = MusicalPhase.Establish;
+        StartCoroutine(dustGen.GenerateMazeThenPlacePhaseStar(boot));
+    }
+    else
+    {
+        // Fallback: if there is no dust generator, at least spawn a PhaseStar so progression can start.
+        Debug.LogWarning("[DrumTrack] No CosmicDustGenerator; spawning Establish PhaseStar directly.");
+        Vector2Int? cellHint = null;
+        if (HasSpawnGrid())
+        {
+            cellHint = GetRandomAvailableCell();
+        }
+        RequestPhaseStar(boot, cellHint);
+    }
+}
+
 
     public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
     {
@@ -388,11 +429,17 @@ public class DrumTrack : MonoBehaviour
     }
     private void ValidateSpawnGrid()
     {
-        for (int x = 0; x < GameFlowManager.Instance.spawnGrid.gridWidth; x++)
+        var gfm = GFM;
+        if (gfm == null || gfm.spawnGrid == null)
+            return;
+
+        var grid = gfm.spawnGrid;
+
+        for (int x = 0; x < grid.gridWidth; x++)
         {
-            for (int y = 0; y < GameFlowManager.Instance.spawnGrid.gridHeight; y++)
+            for (int y = 0; y < grid.gridHeight; y++)
             {
-                if (!GameFlowManager.Instance.spawnGrid.IsCellAvailable(x, y))
+                if (!grid.IsCellAvailable(x, y))
                 {
                     Vector3 worldPos = GridToWorldPosition(new Vector2Int(x, y));
                     Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, 0.25f);
@@ -410,29 +457,45 @@ public class DrumTrack : MonoBehaviour
                     if (!objectPresent)
                     {
                         Debug.LogWarning($"Watchdog freed orphaned cell at {x},{y}");
-                        GameFlowManager.Instance.spawnGrid.FreeCell(x, y);
+                        grid.FreeCell(x, y);
                     }
                 }
             }
         }
     }
-    // DrumTrack.cs — add near other public helpers
+
     public float GetScreenWorldWidth()
     {
-        float z = -Camera.main.transform.position.z;
-        Vector3 bottomLeft  = Camera.main.ViewportToWorldPoint(new Vector3(0f, 0f, z));
-        Vector3 topRight    = Camera.main.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-        // match GridToWorldPosition’s horizontal padding
+        var cam = Camera.main;
+        if (!cam)
+        {
+            Debug.LogWarning("[DrumTrack] GetScreenWorldWidth: Camera.main is null.");
+            return 0f;
+        }
+
+        float z          = -cam.transform.position.z;
+        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
         return (topRight.x - gridPadding) - (bottomLeft.x + gridPadding);
     }
+
     public float GetScreenWorldHeight()
     {
-        float z = -Camera.main.transform.position.z;
-        Vector3 topRight    = Camera.main.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-        float bottomY       = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY(); // same bottom as GridToWorldPosition
-        // match GridToWorldPosition’s vertical padding (bottom+gridPadding → top-gridPadding)
+        var cam = Camera.main;
+        var gfm = GFM;
+        if (!cam || gfm == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+        {
+            Debug.LogWarning("[DrumTrack] GetScreenWorldHeight: missing Camera or controller/noteVisualizer.");
+            return 0f;
+        }
+
+        float z        = -cam.transform.position.z;
+        Vector3 topRight = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        float bottomY = gfm.controller.noteVisualizer.GetTopWorldY();
+
         return (topRight.y - gridPadding) - (bottomY + gridPadding);
     }
+
     public float GetNoteVisualizerTopY()
     {
         return GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
@@ -468,46 +531,62 @@ public class DrumTrack : MonoBehaviour
     }
     public Vector3 GridToWorldPosition(Vector2Int gridPos)
     {
-        float cameraDistance = -Camera.main.transform.position.z;
+        var cam = Camera.main;
+        var gfm = GFM;
+        if (!cam || gfm == null || gfm.spawnGrid == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+        {
+            Debug.LogWarning("[DrumTrack] GridToWorldPosition: missing Camera, spawnGrid, or controller.");
+            return Vector3.zero;
+        }
 
-        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+        float cameraDistance = -cam.transform.position.z;
 
-        float normalizedX = gridPos.x / (float)(GameFlowManager.Instance.spawnGrid.gridWidth - 1);
-        float normalizedY = gridPos.y / (float)(GameFlowManager.Instance.spawnGrid.gridHeight - 1);
+        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
 
-        // 👇 Define how much vertical space (in world units) to reserve for the UI at the bottom
-         // Adjust this to match your UI overlay height in world space
+        float normalizedX = gridPos.x / (float)(gfm.spawnGrid.gridWidth  - 1);
+        float normalizedY = gridPos.y / (float)(gfm.spawnGrid.gridHeight - 1);
 
-        float worldX = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
-        float bottomY = GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
-        float worldY = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
+        float worldX  = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
+        float bottomY = gfm.controller.noteVisualizer.GetTopWorldY();
+        float worldY  = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
 
         return new Vector3(worldX, worldY, 0f);
     }
+
     public Vector2Int WorldToGridPosition(Vector3 worldPos)
     {
-        float cameraDistance = -Camera.main.transform.position.z;
+        var cam = Camera.main;
+        var gfm = GFM;
+        if (!cam || gfm == null || gfm.spawnGrid == null)
+        {
+            Debug.LogWarning("[DrumTrack] WorldToGridPosition: missing Camera or spawnGrid.");
+            return Vector2Int.zero;
+        }
 
-        Vector3 bottomLeft = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight = Camera.main.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+        float cameraDistance = -cam.transform.position.z;
 
-        float normalizedX = Mathf.InverseLerp(bottomLeft.x, topRight.x, worldPos.x);
-        float normalizedY = Mathf.InverseLerp(bottomLeft.y, topRight.y, worldPos.y);
+        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
 
-        int gridX = Mathf.Clamp(Mathf.RoundToInt(normalizedX * (GameFlowManager.Instance.spawnGrid.gridWidth - 1)), 0, GameFlowManager.Instance.spawnGrid.gridWidth - 1);
-        int gridY = Mathf.Clamp(Mathf.RoundToInt(normalizedY * (GameFlowManager.Instance.spawnGrid.gridHeight - 1)), 0, GameFlowManager.Instance.spawnGrid.gridHeight - 1);
+        float normalizedX = Mathf.InverseLerp(bottomLeft.x, bottomLeft.x + (topRight.x - bottomLeft.x), worldPos.x);
+        float normalizedY = Mathf.InverseLerp(bottomLeft.y, bottomLeft.y + (topRight.y - bottomLeft.y), worldPos.y);
+
+        int gridX = Mathf.Clamp(
+            Mathf.RoundToInt(normalizedX * (gfm.spawnGrid.gridWidth  - 1)),
+            0, gfm.spawnGrid.gridWidth  - 1);
+        int gridY = Mathf.Clamp(
+            Mathf.RoundToInt(normalizedY * (gfm.spawnGrid.gridHeight - 1)),
+            0, gfm.spawnGrid.gridHeight - 1);
 
         return new Vector2Int(gridX, gridY);
-    }    
-    public float GetLoopLengthInSeconds()
-    {
-        return _loopLengthInSeconds;
     }
-    public float GetTimeToLoopEnd()
-    {
-        float elapsed = (float)((AudioSettings.dspTime - startDspTime) % _loopLengthInSeconds);
-        return Mathf.Max(0f, _loopLengthInSeconds - elapsed);
+
+    public float GetTimeToLoopEnd(bool effective = true) { 
+        float L = effective ? EffectiveLoopLengthSec : _clipLengthSec; 
+        if (L <= 0f) return 0f; 
+        float elapsed = (float)((AudioSettings.dspTime - startDspTime) % L); 
+        return Mathf.Max(0f, L - elapsed);
     }
     public int GetSpawnGridHeight()
     {
@@ -549,24 +628,25 @@ public class DrumTrack : MonoBehaviour
         {
             yield return null; // Wait until the next frame
         }
-
-        _loopLengthInSeconds = drumAudioSource.clip.length;
-        if (_loopLengthInSeconds <= 0)
-        {
-            Debug.LogError(("DrumTrack: Loop length in seconds is invalid."));
+        _clipLengthSec = Mathf.Max(drumAudioSource.clip.length, 0f); 
+        if (!HasValidClipLen)
+        { 
+            Debug.LogError("DrumTrack: Clip length is zero/invalid; aborting loop init."); 
+            yield break;
         }
         drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
     }
     private void LoopRoutines()
-    {
-        if (isPhaseStarActive &&  _star.gameObject != null)
+    { if (isPhaseStarActive &&  _star.gameObject != null && !GameFlowManager.Instance.controller.AnyCollectablesInFlight())
             _star.OnLoopBoundary_RearmIfNeeded();
+        Debug.Log($"Loop Routine Running: {GetLoopLengthInSeconds()}");
+
         // Only breathe the maze between stars (or when you explicitly want a reset)
-        if (GameFlowManager.Instance.dustGenerator != null 
-            && !GameFlowManager.Instance.GhostCycleInProgress 
+        if (GameFlowManager.Instance.dustGenerator != null
+            && !GameFlowManager.Instance.GhostCycleInProgress
             && !isPhaseStarActive)  // 👈 add this guard
         {
-            float loopSeconds = GetLoopLengthInSeconds();
+            float loopSeconds = _trackController.GetEffectiveLoopLengthInSeconds();
             Vector2Int centerCell = WorldToGridPosition(transform.position);
             GameFlowManager.Instance.dustGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
         }
@@ -599,61 +679,84 @@ public class DrumTrack : MonoBehaviour
     {
         // Store the new loop clip.
         _pendingDrumLoop = newLoop;
-       
+
         // Start waiting for the current loop to finish.
 
         StartCoroutine(WaitAndChangeDrumLoop());
     }
-    private IEnumerator WaitAndChangeDrumLoop()
+private IEnumerator WaitAndChangeDrumLoop()
+{
+    if (drumAudioSource == null || drumAudioSource.clip == null)
     {
-        if (drumAudioSource == null || drumAudioSource.clip == null)
-        {
-            Debug.LogError("WaitAndChangeDrumLoop: drumAudioSource or its clip is null!");
-            yield break;
-        }
-
-        while (drumAudioSource.time < _loopLengthInSeconds - 0.05f)
-        {
-            yield return null;
-        }
-
-        if (_pendingDrumLoop == null)
-        {
-            Debug.LogWarning("WaitAndChangeDrumLoop: No new drum loop was assigned!");
-            yield break;
-        }
-
-        drumAudioSource.clip = _pendingDrumLoop;
-        _loopLengthInSeconds = drumAudioSource.clip.length;
-
-        double dspNow = AudioSettings.dspTime;
-        double nextStart = Mathf.CeilToInt((float)(dspNow / _loopLengthInSeconds)) * _loopLengthInSeconds;
-
-        drumAudioSource.PlayScheduled(nextStart);
-        Debug.Log("🎶 New drum loop scheduled"); // 👈 Add this
-        if (startDspTime == 0)
-        {
-            startDspTime = nextStart;
-            _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _loopLengthInSeconds); 
-
-        }
-        
-        _pendingDrumLoop = null;
-        QueuedPhase = null;
-
-// ✅ Slow maze growth instead of instant; use queued or current phase
-            if (GameFlowManager.Instance.dustGenerator != null && !GameFlowManager.Instance.GhostCycleInProgress)
-            {
-                var phaseForRegrowth = QueuedPhase ?? GameFlowManager.Instance.phaseTransitionManager.currentPhase;
-                Vector2Int centerCell = WorldToGridPosition(transform.position);
-                float radius = GameFlowManager.Instance.progressionManager.GetHollowRadiusForCurrentPhase(phaseForRegrowth);
-                var growthCells = GameFlowManager.Instance.dustGenerator.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);
-                GameFlowManager.Instance.dustGenerator.BeginStaggeredMazeRegrowth(growthCells);
-            }
-
-
-        _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _loopLengthInSeconds);
+        Debug.LogError("WaitAndChangeDrumLoop: drumAudioSource or its clip is null!");
+        yield break;
     }
+
+    float oldLen = drumAudioSource.clip ? drumAudioSource.clip.length : 0f;
+    if (oldLen <= kMinLen)
+    {
+        Debug.LogError("WaitAndChangeDrumLoop: current clip length is zero/invalid.");
+        yield break;
+    }
+
+    while (drumAudioSource.time < oldLen - 0.05f)
+    {
+        yield return null;
+    }
+
+    if (_pendingDrumLoop == null)
+    {
+        Debug.LogWarning("WaitAndChangeDrumLoop: No new drum loop was assigned!");
+        yield break;
+    }
+
+    drumAudioSource.clip = _pendingDrumLoop;
+    float newLen = drumAudioSource.clip ? drumAudioSource.clip.length : 0f;
+    if (newLen <= kMinLen)
+    {
+        Debug.LogError("WaitAndChangeDrumLoop: new clip length is zero/invalid.");
+        yield break;
+    }
+
+    _clipLengthSec = newLen;
+    double dspNow  = AudioSettings.dspTime; // schedule on a multiple of the NEW clip length (validated above)
+    double cycles  = dspNow / newLen;
+    double nextStart = Mathf.CeilToInt((float)cycles) * newLen;
+    drumAudioSource.PlayScheduled(nextStart);
+    Debug.Log("🎶 New drum loop scheduled");
+
+    if (startDspTime == 0)
+    {
+        startDspTime   = nextStart;
+        _lastLoopCount = 0; // reset; we’re starting a new transport reference
+    }
+
+    _pendingDrumLoop = null;
+    QueuedPhase      = null;
+
+    // ✅ Slow maze growth instead of instant; use queued or current phase
+    var gfm = GameFlowManager.Instance;
+    if (gfm != null && gfm.dustGenerator != null && !gfm.GhostCycleInProgress)
+    {
+        var phaseForRegrowth = QueuedPhase ?? gfm.phaseTransitionManager.currentPhase;
+        Vector2Int centerCell = WorldToGridPosition(transform.position);
+
+        // Inline what MineNodeProgressionManager.GetHollowRadiusForCurrentPhase() did:
+        float radius = 0f;
+        if (phasePersonalityRegistry != null)
+        {
+            var persona = phasePersonalityRegistry.Get(phaseForRegrowth);
+            if (persona != null)
+                radius = Mathf.Max(0f, persona.starHoleRadius);
+        }
+
+        var growthCells = gfm.dustGenerator.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);
+        gfm.dustGenerator.BeginStaggeredMazeRegrowth(growthCells);
+    }
+
+    _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _clipLengthSec);
+}
+
     private void RemixTrack(InstrumentTrack track)
     {
         track.ClearLoopedNotes(TrackClearType.Remix);
@@ -662,19 +765,19 @@ public class DrumTrack : MonoBehaviour
 
         var profile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         noteSet.noteBehavior = profile.defaultBehavior;
-        switch (profile.role) { 
-            case MusicalRole.Bass: 
+        switch (profile.role) {
+            case MusicalRole.Bass:
                 noteSet.rhythmStyle = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Pop) ? RhythmStyle.FourOnTheFloor : RhythmStyle.Sparse;
-                break; 
-            case MusicalRole.Lead: 
+                break;
+            case MusicalRole.Lead:
                 noteSet.rhythmStyle = RhythmStyle.Syncopated;
-                break; 
-            case MusicalRole.Harmony: 
-                noteSet.chordPattern = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad; 
-                break; 
-            case MusicalRole.Groove: 
+                break;
+            case MusicalRole.Harmony:
+                noteSet.chordPattern = (GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Intensify) ? ChordPattern.Arpeggiated : ChordPattern.RootTriad;
+                break;
+            case MusicalRole.Groove:
                 noteSet.rhythmStyle = RhythmStyle.Dense;
-                break; 
+                break;
         }
 
         noteSet.Initialize(track, track.GetTotalSteps());
@@ -683,7 +786,6 @@ public class DrumTrack : MonoBehaviour
         if (track.GetNoteDensity() < 4)
             AddRandomNotes(track, noteSet, 4 - track.GetNoteDensity()); // Pad sparsity
     }
-// DrumTrack.cs
     public int GetLeaderSteps()
     {
         var ctrl = GameFlowManager.Instance?.controller;
