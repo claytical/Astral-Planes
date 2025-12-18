@@ -155,6 +155,7 @@ RectTransform:
   - {fileID: 197216900}
   - {fileID: 371719000}
   - {fileID: 423220218}
+  - {fileID: 150479618}
   m_Father: {fileID: 1248605496}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
@@ -176,6 +177,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playheadLine: {fileID: 657963291}
   playheadParticles: {fileID: 264452581}
+  _playheadEnergy01: 0
+  _playheadEnergyLerpSpeed: 4
+  _lineCharge01: 0
+  _lineChargeDecaySpeed: 0.5
   notePrefab: {fileID: 4452279037497567512, guid: ece60c6a349a846e085a4f328163340b,
     type: 3}
   noteTetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
@@ -185,6 +190,11 @@ MonoBehaviour:
   - {fileID: 1373048478}
   - {fileID: 197216900}
   - {fileID: 371719000}
+  binStripParent: {fileID: 150479618}
+  binIndicatorPrefab: {fileID: 3671981459538206729, guid: c13c9053efb984a11b0e57af226016ac,
+    type: 3}
+  binInactiveColor: {r: 1, g: 1, b: 1, a: 0.2}
+  binActiveColor: {r: 1, g: 1, b: 1, a: 0.9}
 --- !u!114 &45202787
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -374,6 +384,41 @@ MonoBehaviour:
   sfChorusSpeed: 0.2
   sfChorusDepth: 4.25
   sfChorusWidth: 10
+--- !u!1 &150479617
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 150479618}
+  m_Layer: 5
+  m_Name: Bin Strip
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &150479618
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 150479617}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 45202785}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &182043767
 GameObject:
   m_ObjectHideFlags: 0
@@ -675,7 +720,7 @@ ParticleSystemRenderer:
   m_MeshDistribution: 0
   m_SortMode: 0
   m_MinParticleSize: 0
-  m_MaxParticleSize: 0.5
+  m_MaxParticleSize: 1
   m_CameraVelocityScale: 0
   m_VelocityScale: 0
   m_LengthScale: 2
@@ -711,7 +756,7 @@ ParticleSystem:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 264452578}
   serializedVersion: 8
-  lengthInSec: 4
+  lengthInSec: 1
   simulationSpeed: 1
   stopAction: 0
   cullingMode: 0
@@ -893,7 +938,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 1}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.3529412}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -957,7 +1002,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.63
+      scalar: 1
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -1281,7 +1326,7 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
+      scalar: 0.1
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -1334,7 +1379,7 @@ ParticleSystem:
   ShapeModule:
     serializedVersion: 6
     enabled: 1
-    type: 5
+    type: 18
     angle: 25
     length: 5
     boxThickness: {x: 0, y: 0, z: 0}
@@ -1342,7 +1387,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 0.1, y: 1, z: 1}
+    m_Scale: {x: 0.1, y: 0.52, z: 1}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
@@ -1418,11 +1463,11 @@ ParticleSystem:
     m_TextureAlphaAffectsParticles: 1
     m_TextureBilinearFiltering: 0
     randomDirectionAmount: 0
-    sphericalDirectionAmount: 0
-    randomPositionAmount: 0
+    sphericalDirectionAmount: 0.33
+    randomPositionAmount: 0.14
     radius:
       value: 1
-      mode: 0
+      mode: 1
       spread: 0
       speed:
         serializedVersion: 2
@@ -1970,7 +2015,7 @@ ParticleSystem:
         m_RotationOrder: 4
     separateAxes: 0
   ColorModule:
-    enabled: 0
+    enabled: 1
     gradient:
       serializedVersion: 2
       minMaxState: 1
@@ -1979,7 +2024,7 @@ ParticleSystem:
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
-        key1: {r: 1, g: 1, b: 1, a: 1}
+        key1: {r: 1, g: 1, b: 1, a: 0}
         key2: {r: 0, g: 0, b: 0, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -2003,7 +2048,7 @@ ParticleSystem:
         atime6: 0
         atime7: 0
         m_Mode: 0
-        m_ColorSpace: -1
+        m_ColorSpace: 0
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       minGradient:
@@ -2161,11 +2206,11 @@ ParticleSystem:
     flipU: 0
     flipV: 0
   VelocityModule:
-    enabled: 0
+    enabled: 1
     x:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
+      scalar: -2
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -4605,7 +4650,7 @@ ParticleSystem:
     maxLights: 20
   TrailModule:
     enabled: 0
-    mode: 0
+    mode: 1
     ratio: 1
     lifetime:
       serializedVersion: 2
@@ -4662,7 +4707,7 @@ ParticleSystem:
         m_RotationOrder: 4
     minVertexDistance: 0
     textureMode: 4
-    textureScale: {x: 1, y: 1}
+    textureScale: {x: 1, y: -2.62}
     ribbonCount: 63
     shadowBias: 3.15
     worldSpace: 1
@@ -10544,6 +10589,7 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  ascendLoopCount: 1
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
@@ -10635,7 +10681,7 @@ RectTransform:
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!1001 &480221059
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11021,6 +11067,7 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  ascendLoopCount: 1
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
@@ -11111,6 +11158,7 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  ascendLoopCount: 1
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2
@@ -12102,6 +12150,14 @@ MonoBehaviour:
   isPhaseStarActive: 0
   currentStep: 0
   _star: {fileID: 0}
+  beatMoodLibrary: {fileID: 11400000, guid: 9d93d03e5cfdb4717bb2c8809701b3c3, type: 2}
+  lowIntensityThreshold: 0.25
+  mediumIntensityThreshold: 0.5
+  highIntensityThreshold: 0.75
+  lowIntensityMood: 0
+  mediumIntensityMood: 1
+  highIntensityMood: 2
+  extremeIntensityMood: 3
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -12252,7 +12308,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gridWidth: 36
-  gridHeight: 20
+  gridHeight: 18
   cellSize: 0.5
 --- !u!114 &1354683690
 MonoBehaviour:
@@ -12326,7 +12382,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   previousPhase: 0
   currentPhase: 0
-  noteSetFactory: {fileID: 0}
+  noteSetFactory: {fileID: -4105871785280924453, guid: c4eb69c1639e44822871748faa6b2751,
+    type: 3}
+  motifQueue: {fileID: 11400000, guid: 266e8ac30daaa4002b473d9de45ffea5, type: 2}
+  motifLibrary: {fileID: 11400000, guid: 442706371a61147f0b0ad47d1691b5a1, type: 2}
 --- !u!114 &1354683695
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12343,6 +12402,9 @@ MonoBehaviour:
   iterations: 1
   cycleMode: 1
   minClassicCycleInterval: 0.25
+  vehicleErodeRadius: 1
+  vehicleErodePerTick: 2
+  tileDiameterWorld: 0.5
   hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   flowTilesPerFrame: 256
@@ -12355,7 +12417,7 @@ MonoBehaviour:
   addPerLoop: 1
   featureSpawnBudgetFrac: 0.12
   featureFadeDurationFrac: 0.25
-  hexGrowInSeconds: 0.45
+  hexGrowInSeconds: 0.001
   globalTurbulence: 0.5
   hiveShiftInterval: 4
   hiveShiftBlend: 0.4
@@ -13422,6 +13484,7 @@ MonoBehaviour:
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
+  ascendLoopCount: 1
   spawnedCollectables: []
   cosmicDustLayer:
     serializedVersion: 2

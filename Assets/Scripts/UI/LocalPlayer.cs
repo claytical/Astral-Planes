@@ -63,53 +63,68 @@ public class LocalPlayer : MonoBehaviour
         StartCoroutine(LaunchWhenReady());
     }
 
-    private IEnumerator LaunchWhenReady()
+private IEnumerator LaunchWhenReady()
+{
+    // Wait for authoritative deps from GameFlowManager
+    yield return new WaitUntil(() =>
+            GameFlowManager.Instance &&
+            GameFlowManager.Instance.PlayerStatsGrid &&               // UI parent exists
+            GameFlowManager.Instance.activeDrumTrack &&               // drums ready
+            GameFlowManager.Instance.controller &&                    // tracks configured
+            GameFlowManager.Instance.harmony &&                       // HarmonyDirector bound
+            GameFlowManager.Instance.arp                              // ChordChangeArpeggiator bound
+    );
+        
+    Debug.Log("[CRASH TEST] Track Ready");
+        
+    var gfm = GameFlowManager.Instance;
+
+    // --- UI: player stats card under the grid
+    var grid = gfm.PlayerStatsGrid;
+    var statsUI = Instantiate(playerStatsUI, grid);
+    _ui = statsUI.GetComponent<PlayerStats>();
+    int w = gfm.spawnGrid.gridWidth;
+    int h = gfm.spawnGrid.gridHeight;
+
+// pick a row near the bottom; tweak as you want
+    int spawnY = 1;
+    int spawnX = Random.Range(0, w);
+    var spawnCell = new Vector2Int(spawnX, spawnY);
+    // 🔹 NEW: place the vehicle at a random grid cell
+    var drums = gfm.activeDrumTrack;
+    var spawnGrid = gfm.spawnGrid;
+
+    if (drums != null && spawnGrid != null)
     {
-        // Wait for authoritative deps from GameFlowManager
-        yield return new WaitUntil(() =>
-                GameFlowManager.Instance &&
-                GameFlowManager.Instance.PlayerStatsGrid &&               // UI parent exists
-                GameFlowManager.Instance.activeDrumTrack &&               // drums ready
-                GameFlowManager.Instance.controller &&                    // tracks configured
-                GameFlowManager.Instance.harmony &&                       // HarmonyDirector bound
-                GameFlowManager.Instance.arp                              // ChordChangeArpeggiator bound
-        );
-        
-        Debug.Log("[CRASH TEST] Track Ready");
-        
-        var gfm = GameFlowManager.Instance;
+// Snap LocalPlayer to that grid cell in world space
+        Vector3 spawnWorld = drums.GridToWorldPosition(spawnCell);
+        transform.position = spawnWorld;
 
-        // --- UI: player stats card under the grid
-        var grid = gfm.PlayerStatsGrid;
-        var statsUI = Instantiate(playerStatsUI, grid);
-        _ui = statsUI.GetComponent<PlayerStats>();
-
+// Optionally mark the cell as occupied so dust never spawns here
+        gfm.spawnGrid.OccupyCell(spawnCell.x, spawnCell.y, GridObjectType.Node);
         // --- Vehicle
         var vehicleGO = Instantiate(playerVehicle, transform);
         plane = vehicleGO.GetComponent<Vehicle>();
-
-        // Use authoritative references from GameFlowManager
-        plane.SetDrumTrack(gfm.activeDrumTrack);
-        plane.SetHarmony(gfm.harmony);                 // Vehicle keeps a ref; DO NOT re-initialize harmony here
-
-        // Player stats plumbing
-        _playerStats = GetComponent<PlayerStatsTracking>();
-        if (plane)
-        {
-            plane.playerStats   = _playerStats;
-            plane.playerStatsUI = _ui;
-            plane.SyncEnergyUI();
-
-            var sr = plane.GetComponent<SpriteRenderer>();
-            if (sr) sr.color = _color;
-            SetStats();
-            _ui.SetColor(_color);
-            _playerInput.SwitchCurrentActionMap("Play");
-        }
-
-        _launched = true;
-    
     }
+
+    // Player stats plumbing
+    _playerStats = GetComponent<PlayerStatsTracking>();
+    if (plane)
+    {
+        plane.playerStats   = _playerStats;
+        plane.playerStatsUI = _ui;
+        plane.SyncEnergyUI();
+
+        var sr = plane.GetComponent<SpriteRenderer>();
+        if (sr) sr.color = _color;
+        SetStats();
+        _ui.SetColor(_color);
+        _playerInput.SwitchCurrentActionMap("Play");
+    }
+
+    _launched = true;
+}
+
     public float GetVehicleEnergy()
     {
         return plane?.energyLevel ?? 0f;

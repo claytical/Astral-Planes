@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
+  m_Name: Groove Sync Ticks
+  m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
+  id: Groove Sync Ticks
+  role: 3
+  scales:
+  - item: 2
+    weight: 0.5
+  - item: 0
+    weight: 0.3
+  - item: 3
+    weight: 0.2
+  patterns:
+  - item: 14
+    weight: 0.6
+  - item: 10
+    weight: 0.3
+  - item: 15
+    weight: 0.1
+  rhythms:
+  - item: 1
+    weight: 0.6
+  - item: 10
+    weight: 0.3
+  - item: 5
+    weight: 0.1
+  chordFunctions:
+  - item: I
+    weight: 0.5
+  - item: V
+    weight: 0.5
+  chordsPerRegion: 2
+  behaviors:
+  - item: 9
+    weight: 0.4
+  - item: 11
+    weight: 0.4
+  - item: 13
+    weight: 0.2
+  maxBehaviorsStack: 3
+  variation:
+    extensionBias: 0.25
+    passingToneProb: 0.18
+    neighborOrnProb: 0.18
+    minMidi: 55
+    maxMidi: 82
+    leapProb: 0.2
+    octaveMoveProb: 0.1
+    restProb: 0.16
+    humanizeMs: 0.022
+    durJitter: 1.1
+    mutatePitch: 0.16
+    mutateVelocity: 0.22
+    mutateDuration: 0.18

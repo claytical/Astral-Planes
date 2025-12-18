@@ -39,7 +39,7 @@ public enum PatternStrategy {
     ChordalStab, Drone, PercussiveLoop, SyncopatedHook, HemiolaFigure, Randomized
 }
 [CreateAssetMenu(fileName = "NoteSetConfig", menuName = "Astral Planes/NoteSet Config")]
-public class RolePhaseNoteSetConfig : ScriptableObject {
+public class RolePhaseNoteSetConfig :  ScriptableObject {
     public MusicalPhase phase;
     public MusicalRole role;
 

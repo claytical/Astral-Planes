@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Fracture Drive
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: Fracture Drive
+  displayName: Fracture Drive
+  beatMood: 0
+  keyRootMidi: 59
+  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
+  phaseProfile: {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 701f9af54f3184d73be39ee952867643, type: 2}
+  - {fileID: 11400000, guid: f5f7e5f768a034bc4aa6e98eab5d2ae0, type: 2}
+  - {fileID: 11400000, guid: 7272346a169de42e4988ee6a31f096b8, type: 2}
+  - {fileID: 11400000, guid: fbaecb3a73f2340088bcb59c12124440, type: 2}
+  selectionWeight: 1

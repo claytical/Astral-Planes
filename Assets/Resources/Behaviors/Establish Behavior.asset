@@ -48,7 +48,7 @@ MonoBehaviour:
   inactiveShardTint: {r: 0.3, g: 0.3, b: 0.3, a: 0.6}
   rotationMode: 4
   minPreviewIntervalSec: 2
-  personalitySpeedMul: 1
+  personalitySpeedMul: 0.25
   bpmToSpeedMul:
     serializedVersion: 2
     m_Curve:
@@ -74,13 +74,13 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   progressionMulRange: 0
-  baseCellsPerSecond: 3.8
-  starDriftSpeed: 1.5
+  baseCellsPerSecond: 2
+  starDriftSpeed: 1
   starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 6
-  dustShrinkUnitsPerSec: 4
+  dustShrinkRadius: 3
+  dustShrinkUnitsPerSec: 1
   dustFalloff:
     serializedVersion: 2
     m_Curve:
@@ -106,11 +106,11 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   feedsDust: 0
-  dustRegrowDelayMul: 0.84
+  dustRegrowDelayMul: 2
   ejectionStyle: 0
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
-  nodesPerStar: 4
+  nodesPerStar: 8
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6
   nodeFlightEase:

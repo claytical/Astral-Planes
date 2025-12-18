@@ -26,7 +26,7 @@ public enum GameState { Begin, Selection, Playing, GameOver }
 public class GameFlowManager : MonoBehaviour
 {
     public static GameFlowManager Instance { get; private set; }
-
+    public bool demoMode = true;
     private struct PhaseChordMap { public MusicalPhase phase; public ChordProgressionProfile progression; }
 
     private List<PhaseChordMap> chordMaps = new();
@@ -40,7 +40,6 @@ public class GameFlowManager : MonoBehaviour
     public DrumTrack activeDrumTrack;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
-    public NoteSetFactory noteSetFactory;
     public GameObject coralPrefab;  
     public bool disableCoralDuringBridge = true;
     public NoteVisualizer noteViz;    // assign in scene
@@ -94,6 +93,11 @@ public class GameFlowManager : MonoBehaviour
         }
     }
 
+    public NoteSet GenerateNotes(InstrumentTrack track)
+    {
+        var ns = phaseTransitionManager.noteSetFactory.Generate(track, phaseTransitionManager.currentMotif);
+        return ns;
+    }
     void Start()
     {
         sceneHandlers = new()
@@ -155,10 +159,47 @@ public class GameFlowManager : MonoBehaviour
     }
     public void QuitToSelection()
     {
-        localPlayers.Clear();
+        Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={demoMode})");
+
+        // 1) Destroy all LocalPlayer instances so input & state are fully reset.
+        if (localPlayers != null && localPlayers.Count > 0)
+        {
+            foreach (var lp in localPlayers)
+            {
+                if (lp == null) continue;
+
+                var go = lp.gameObject;
+                Debug.Log($"[GFM] Destroying LocalPlayer GameObject '{go.name}'");
+                Destroy(go);
+            }
+            localPlayers.Clear();
+        }
+
+        // 2) Clear any per-run collections.
+        vehicles?.Clear();
+        _activeTracks?.Clear();
+
+        // 3) Reset run-specific flags / state so next run starts clean.
+        hasGameOverStarted   = false;
+        GhostCycleInProgress = false;
+        _setupDone           = false;
+        _setupInFlight       = false;
+        currentState         = GameState.Begin;
+
+        // 4) Drop scene-local references so the next GeneratedTrack must re-register.
+        phaseTransitionManager = null;
+        activeDrumTrack        = null;
+        controller             = null;
+        dustGenerator          = null;
+        spawnGrid              = null;
+        glitch                 = null;
+        arp                    = null;
+        playerStatsGrid        = null;
+
+        // 5) Load Main (Intro/Selection) scene.
         StartCoroutine(TransitionToScene("Main"));
     }
-    
+
     public void RegisterPlayerStatsGrid(Transform grid)
     {
         if (!grid) return;
@@ -291,7 +332,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
     var prof = GetProfileForPhase(phase);
     harmony.SetActiveProfile(prof, applyImmediately: true);
     Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
-
+    StartMazeAndStarForPhase(phase);
     _setupDone = true;
     _setupInFlight = false;
     Debug.Log("[GFM] [SETUP] Completed successfully.");
@@ -428,7 +469,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
         }
         return list;
     }
-// GameFlowManager.cs
+
 private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
 {
     // ===== Lock gameplay & prep =====
@@ -486,9 +527,7 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
 
     // ----------------------------------------------------------------------
     // B) Drop 1–3 tracks, remix remaining into the bridge signature
-    //    (Audio: clear dropped tracks + remix retained. Visuals: align grid)
     // ----------------------------------------------------------------------
-    // Decide retain vs drop
     activeNow = allTracks.Where(t => t.GetPersistentLoopNotes()?.Count > 0).ToList();
     int mustRetainAtLeast = 1;                      // always leave something to remix
     int canDrop = Mathf.Clamp(activeNow.Count - mustRetainAtLeast, 0, 2);
@@ -504,9 +543,7 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     // Drop (audio + immediate visual cleanup)
     foreach (var t in toDrop)
     {
-        // Visual flourish (optional)
         viz?.TriggerNoteBlastOff(t);
-        // Audio/model clear
         t.ClearLoopedNotes(TrackClearType.Remix);
         t.ResetBinStateForNewPhase();
     }
@@ -517,33 +554,38 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
         int leaderMulRetained = ComputeLeaderMulFor(retain.Count > 0 ? retain : Enumerable.Empty<InstrumentTrack>());
         int leaderStepsRetained = Mathf.Max(1, leaderMulRetained) * Mathf.Max(1, drum.totalSteps);
         viz.RequestLeaderGridChange(leaderStepsRetained);
-        // Note: NoteVisualizer applies pending grid changes on its next loop boundary.
+        // NoteVisualizer applies pending grid changes on its next loop boundary.
     }
     SetBridgeVisualMode(true);
+
     // ----------------------------------------------------------------------
-    // C) Play the REMIXED bridge ONCE while showing only CORAL (placeholder)
+    // C) Play the REMIXED bridge ONCE while showing only CORAL
     // ----------------------------------------------------------------------
-    // Hide visualizer rows, show coral placeholder
     if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
 
     var coral = EnsureCoral(); 
     if (coral != null) {
         coral.gameObject.SetActive(true); 
-        // Use the controller's effective loop length so the bridge lasts one full visual sweep.
-        float bridgeOnceSec = controller != null ? controller.GetEffectiveLoopLengthInSeconds() : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        float bridgeOnceSec = controller != null
+            ? controller.GetEffectiveLoopLengthInSeconds()
+            : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+
         var snapshot = BuildPhaseSnapshotForBridge(retain, activeDrumTrack); 
-        // Animate holds for the duration; no extra WaitForSeconds afterward
         yield return StartCoroutine(AnimateCoralBridge(coral, snapshot, bridgeOnceSec));
     }
     else
     {
-        // No coral prefab? Still wait one retained loop with visuals hidden.
-        float bridgeOnceSec = controller != null ? controller.GetEffectiveLoopLengthInSeconds() : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+        float bridgeOnceSec = controller != null
+            ? controller.GetEffectiveLoopLengthInSeconds()
+            : LeaderLoopSecondsFor(retain.Count > 0 ? retain : allTracks);
+
         yield return new WaitForSeconds(bridgeOnceSec);
     }
 
     // ----------------------------------------------------------------------
-    // D) Clear all tracks, change drum loop & maze, spawn the next Phase Star
+    // D) Clear all tracks, then EITHER:
+    //    - In demoMode: return to Main (no next phase),
+    //    - Or in full game: seed & start next phase as before.
     // ----------------------------------------------------------------------
     var stillActive = new List<InstrumentTrack>();
     foreach (var t in allTracks)
@@ -551,34 +593,39 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
         var notes = t.GetPersistentLoopNotes();
         if (notes != null && notes.Count > 0) stillActive.Add(t);
     }
-    foreach (var t in stillActive) t.ClearLoopedNotes(TrackClearType.Remix);
+    foreach (var t in stillActive)
+        t.ClearLoopedNotes(TrackClearType.Remix);
 
-    // Optionally fade coral back out fast
     if (coral != null) coral.gameObject.SetActive(false);
-        SetBridgeVisualMode(false); // (use your existing UI toggle; if not present, keeping the coral off is sufficient
-    // Re-enable visualizer for next phase
+    SetBridgeVisualMode(false);
     if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
 
-    // Seeds / visibility for the next phase
+    // ========= DEMO SHORT-CIRCUIT =========
+    if (demoMode)
+    {
+        // tidy up bridge accent / flags
+        if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
+        GhostCycleInProgress = false;
+        SetBridgeVisualMode(false);
+
+        // Go back to the starting screen (Main) and clear players.
+        // This uses your existing path.
+        QuitToSelection();
+        yield break;
+    }
+    // ========= END DEMO SHORT-CIRCUIT =========
+
+    // Seeds / visibility for the next phase (full game path)
     var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
     controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
     controller?.ApplySeedVisibility(seeds);
     ResetPhaseBinStateAndGrid();
-    // Schedule drums & boot next phase’s maze/star
-    var drums = activeDrumTrack;
-    drums?.SchedulePhaseAndLoopChange(nextPhase);
 
-    if (dustGenerator != null && drums != null)
+    if (activeDrumTrack != null)
     {
-        // Grow the maze for the new phase; when growth completes,
-        // CosmicDustGenerator will request the PhaseStar from the DrumTrack.
-        StartCoroutine(dustGenerator.GenerateMazeThenPlacePhaseStar(nextPhase));
-    }
-    else if (drums != null)
-    {
-        Debug.LogWarning("[BRIDGE] No CosmicDustGenerator; spawning PhaseStar without maze.");
-        var cell = drums.GetRandomAvailableCell();
-        drums.RequestPhaseStar(nextPhase, cell);
+        // New path: start next phase maze & PhaseStar, carving corridors from
+        // the current Vehicle positions to the star cell.
+        StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
     }
     else
     {
@@ -588,8 +635,92 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
     GhostCycleInProgress = false;
     SetBridgeVisualMode(false);
-
 }
+
+private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
+{
+    var drums = activeDrumTrack;
+    var dust  = dustGenerator;
+
+    if (drums == null)
+    {
+        Debug.LogWarning("[GFM] Cannot start next phase maze: no DrumTrack.");
+        yield break;
+    }
+    // ---- 1) Wait for players to actually spawn their Vehicles / lanes ----
+    float waitStart   = Time.time;
+    const float maxWait = 5f; // safety
+    while (localPlayers != null &&
+           localPlayers.Any(lp => lp && lp.plane == null) &&
+           Time.time - waitStart < maxWait)
+    {
+        yield return null;
+    }
+
+    // Filter to only live players
+    var livePlayers = (localPlayers ?? new List<LocalPlayer>())
+        .Where(lp => lp != null && lp.plane != null)
+        .ToList();
+
+    // ---- 2) Build vehicleCells from actual spawned positions ----
+    var vehicleCells = new List<Vector2Int>();
+
+    if (livePlayers.Count > 0)
+    {
+        foreach (var lp in livePlayers)
+        {
+            // You can use either lp.transform.position (lane anchor)
+            // or lp.plane.transform.position (actual ship position).
+            // Using the lane anchor keeps corridors stable.
+            Vector3 worldPos = lp.transform.position;
+            Vector2Int cell  = drums.WorldToGridPosition(worldPos);
+            vehicleCells.Add(cell);
+        }
+    }
+    else if (vehicles != null && vehicles.Count > 0)
+    {
+        foreach (var v in vehicles)
+        {
+            if (!v) continue;
+            Vector2Int cell = drums.WorldToGridPosition(v.transform.position);
+            vehicleCells.Add(cell);
+        }
+    }
+
+    // ---- 3) Choose ONE starCell and keep it consistent ----
+    // Pick a random star cell that is not already occupied by a vehicle cell.
+    Vector2Int starCell = drums.GetRandomAvailableCell();
+    int safety = 32;
+    while (vehicleCells.Contains(starCell) && safety-- > 0)
+    {
+        starCell = drums.GetRandomAvailableCell();
+    }
+
+    // ---- 4) Handle "no dust" fallback cleanly ----
+    if (dust == null)
+    {
+        Debug.LogWarning("[GFM] No CosmicDustGenerator; spawning PhaseStar without maze.");
+        drums.RequestPhaseStar(nextPhase, starCell);
+        yield break;
+    }
+
+    // ---- 5) Normal path: spawn star + build maze using the SAME starCell ----
+    drums.RequestPhaseStar(nextPhase, starCell);
+
+    Debug.Log(
+        $"[GFM] StartNextPhaseMazeAndStar: phase={nextPhase}, " +
+        $"starCell={starCell}, vehicles={vehicleCells.Count}"
+    );
+
+    yield return StartCoroutine(
+        dust.GenerateMazeForPhaseWithPaths(
+            nextPhase,
+            starCell,
+            vehicleCells
+        )
+    );
+}
+
 public float GetBeatInterval()
 {
     var drums = activeDrumTrack;
@@ -696,6 +827,10 @@ private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List
     if (cv) root.localScale = end;
 }
 
+public void StartMazeAndStarForPhase(MusicalPhase phase)
+{
+    StartCoroutine(StartNextPhaseMazeAndStar(phase));
+}
     private CoralVisualizer EnsureCoral()
     {
         if (_coralInstance != null) return _coralInstance;
@@ -846,13 +981,6 @@ private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List
             Instance = this;
             DontDestroyOnLoad(gameObject);
             vehicles = new List<Vehicle>();
-            // Ensure noteSetFactory is found
-            if (noteSetFactory == null)
-            {
-                noteSetFactory = FindAnyObjectByType<NoteSetFactory>();
-                if (noteSetFactory == null)
-                    Debug.LogError("❌ NoteSetFactory could not be found in scene!");
-            }
 
         }
         else

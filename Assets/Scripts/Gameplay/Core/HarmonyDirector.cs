@@ -17,17 +17,24 @@ public class HarmonyDirector : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, List<int>> _trackSeq = new();
     private readonly Dictionary<InstrumentTrack, int> _trackPos = new();
     private ChordProgressionProfile _pendingProfile;
-
+    [Tooltip("If true, on Start() we snap immediately to the current motif's profile, if any.")]
     [SerializeField] private int remixRings = 0;
     [SerializeField, Range(0f, 4f)] private float commitWindowBeats = 1f; // last N beats before downbeat
     [SerializeField] private bool burnIfOutsideWindow;            // consume rings even if mistimed (no chord change)
     [SerializeField] private bool spreadOverLoops = true;                 // retune 1 track per loop if true
     [SerializeField] private TrackRetunePolicy retunePolicy = TrackRetunePolicy.BassHarmonyLead;
     [SerializeField] private bool seedFromProfileOnPhaseStart;    // leave false for Option C
-    
+
+    [Header("Motif Integration")]
+    [SerializeField] private bool useMotifChordProfiles = true;
+
+    [Tooltip("If true, on Start() we snap immediately to the current motif's profile, if any.")]
+    [SerializeField] private bool applyInitialMotifProfileImmediately = true;
+
     private enum ConflictPolicy { DeferPlayerToNextLoop, LetPlayerOvertake }
     [SerializeField] private ConflictPolicy conflictPolicy = ConflictPolicy.DeferPlayerToNextLoop;
     private bool _forceCommitNextBoundary;
+
     void OnEnable()  { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary += OnLoopBoundary; }
     void OnDisable() { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary -= OnLoopBoundary; }
     public void Initialize(DrumTrack d, InstrumentTrackController t, ChordChangeArpeggiator a = null) {
@@ -69,41 +76,91 @@ public class HarmonyDirector : MonoBehaviour
 
         ApplyChordToAllTracks(cursor);
     }
-    
-    void Start() { 
-        var ptm = GameFlowManager.Instance?.phaseTransitionManager; 
-        if (ptm != null) ptm.OnPhaseChanged += HandlePhaseChangedBridgeAware;
-    }
-    void OnDestroy() { 
-        var ptm = GameFlowManager.Instance?.phaseTransitionManager; 
-        if (ptm != null) ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
-    }
-    private void HandlePhaseChangedBridgeAware(MusicalPhase from, MusicalPhase to) { 
-        // Pick a bridge signature and honor its commit timing.
-        var sig = BridgeLibrary.For(from, to); 
-        switch (sig.commitTiming) {
-            case HarmonyCommit.AtBridgeStart: 
-                // Retune everyone to chord 0 on next downbeat
-                CommitNextChordNow(); 
-                break;
-            case HarmonyCommit.MidBridge: 
-                // Stage a one-loop delay: commit on the *following* boundary
-                StartCoroutine(CommitOnNextBoundary()); 
-                break;
-            case HarmonyCommit.AtBridgeEnd: 
-            default: 
-                // Do nothing here; your bridge coroutine should call CommitNextChordNow() at the end.
-                break;
+    void Start()
+{
+    var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+    if (ptm != null)
+    {
+        ptm.OnPhaseChanged += HandlePhaseChangedBridgeAware;
+
+        // Optionally snap to the current motif's chord profile at startup.
+        if (useMotifChordProfiles &&
+            applyInitialMotifProfileImmediately &&
+            ptm.currentMotif != null &&
+            ptm.currentMotif.chordProgression != null)
+        {
+            Debug.Log($"[CHORD][HD] Initializing from motif '{ptm.currentMotif.name}' profile '{ptm.currentMotif.chordProgression.name}'.");
+            SetActiveProfile(ptm.currentMotif.chordProgression, applyImmediately: true);
         }
     }
-        private System.Collections.IEnumerator CommitOnNextBoundary() {
-            // Debounced: wait one full loop, then commit
-                var d = GameFlowManager.Instance?.activeDrumTrack;
-            if (d == null) yield break;
-            double target = AudioSettings.dspTime + d.GetLoopLengthInSeconds();
-            while (AudioSettings.dspTime < target) yield return null;
+}
+
+void OnDestroy()
+{
+    var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+    if (ptm != null)
+        ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
+}
+
+private void HandlePhaseChangedBridgeAware(MusicalPhase from, MusicalPhase to)
+{
+    // 1) If enabled, stage the motif's chord progression as the next profile.
+    MotifProfile motif = null;
+    var ptm = GameFlowManager.Instance?.phaseTransitionManager;
+
+    if (useMotifChordProfiles && ptm != null)
+    {
+        motif = ptm.currentMotif;
+        if (motif != null && motif.chordProgression != null)
+        {
+            // Stage for swap at the next commit (do not apply immediately here).
+            SetActiveProfile(motif.chordProgression, applyImmediately: false);
+            Debug.Log($"[CHORD][HD] Staged motif chord profile '{motif.chordProgression.name}' for phase transition {from} → {to}.");
+        }
+        else
+        {
+            if (motif == null)
+                Debug.Log($"[CHORD][HD] Phase {from} → {to}: no current motif; keeping existing chord profile.");
+            else
+                Debug.Log($"[CHORD][HD] Phase {from} → {to}: motif '{motif.name}' has no chordProgression; keeping existing chord profile.");
+        }
+    }
+
+    // 2) Preserve existing bridge timing behavior.
+    var sig = BridgeLibrary.For(from, to);
+    switch (sig.commitTiming)
+    {
+        case HarmonyCommit.AtBridgeStart:
+            // Retune everyone to chord 0 on next downbeat
             CommitNextChordNow();
-        }
+            break;
+
+        case HarmonyCommit.MidBridge:
+            // Stage a one-loop delay: commit on the *following* boundary
+            StartCoroutine(CommitOnNextBoundary());
+            break;
+
+        case HarmonyCommit.AtBridgeEnd:
+        default:
+            // Do nothing here; your bridge coroutine should call CommitNextChordNow() at the end.
+            break;
+    }
+}
+
+private System.Collections.IEnumerator CommitOnNextBoundary()
+{
+    // Debounced: wait one full loop, then commit
+    var d = GameFlowManager.Instance?.activeDrumTrack;
+    if (d == null) yield break;
+
+    double target = AudioSettings.dspTime + d.GetLoopLengthInSeconds();
+    while (AudioSettings.dspTime < target)
+        yield return null;
+
+    CommitNextChordNow();
+}
+
+
     public void SetActiveProfile(ChordProgressionProfile profile, bool applyImmediately)
     {
         if (profile == null) return;

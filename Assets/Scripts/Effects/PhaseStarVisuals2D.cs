@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
-using UnityEditor.ShaderKeywordFilter;
 using UnityEngine;
 using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
@@ -97,7 +95,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         c.a = alpha; 
         sr.color = c;
         Vector3 scale = active.localScale;
-        scale.x = scale.y = scale.z = .5f;
+        //scale.x = scale.y = scale.z = .5f;
         active.localScale = scale;
     }
     void SetTintWithParticles(Color c)

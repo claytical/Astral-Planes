@@ -4,19 +4,47 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using MidiPlayerTK;
+using UnityEngine.UI;
 
 public class NoteVisualizer : MonoBehaviour
 {
     [Header("Playhead")]
     public RectTransform playheadLine;
     public ParticleSystem playheadParticles;
+    // --- Playhead / line-of-ascension visual state ---
+    [Range(0f, 1f)]
+    [SerializeField] private float _playheadEnergy01 = 0f;       // what we actually render
+    private float _playheadEnergyTarget01 = 0f;                  // what game logic asks for
+    [SerializeField] private float _playheadEnergyLerpSpeed = 4f;
 
+    // Each ascended note bumps this; decays over time. Drives extra particle activity.
+    [Range(0f, 1f)]
+    [SerializeField] private float _lineCharge01 = 0f;
+    [SerializeField] private float _lineChargeDecaySpeed = 0.5f;
+
+    // Flag to fire a short "release" burst when drums change / burst completes.
+    private bool _pendingReleasePulse = false;
+
+    private Image _playheadImage;
+    private float _playheadBaseHeight;
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
 
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
+    [Header("Bin Visualization")]
+    [Tooltip("Parent RectTransform where bin indicators will be instantiated.")]
+    public RectTransform binStripParent;
+
+    [Tooltip("Prefab with an Image component used for each bin indicator.")]
+    public GameObject binIndicatorPrefab;
+
+    [Tooltip("Color for inactive bins.")]
+    public Color binInactiveColor = new Color(1f, 1f, 1f, 0.2f);
+
+    [Tooltip("Color for the currently active target bin.")]
+    public Color binActiveColor = new Color(1f, 1f, 1f, 0.9f);
 
     private Canvas _worldSpaceCanvas;
     private Transform _uiParent;
@@ -24,7 +52,9 @@ public class NoteVisualizer : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
     private readonly Dictionary<InstrumentTrack, Dictionary<int, Vector3>> _trackStepWorldPositions = new();
-    
+    private readonly List<Image> _binIndicators = new List<Image>();
+    private int _activeBinCount = 0;      // How many bins are currently in use (post-contraction)
+    private int _currentTargetBin = -1;  
     class AscendTask
     {
         public InstrumentTrack track;
@@ -141,6 +171,30 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMin = new Vector2(0f, row.offsetMin.y);
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
+        // Cache playhead visuals (optional if you want to scale/alpha it with energy)
+        if (playheadLine != null)
+        {
+            _playheadImage = playheadLine.GetComponent<Image>();
+            _playheadBaseHeight = playheadLine.sizeDelta.y;
+            if (_playheadBaseHeight <= 0f)
+                _playheadBaseHeight = 100f; // defensive default
+        }
+    }
+    /// <summary>
+    /// Set how "charged" the playhead is [0..1] based on how many notes in the
+    /// current burst have been collected. This will be smoothed visually.
+    /// </summary>
+    public void SetPlayheadEnergy01(float value)
+    {
+        _playheadEnergyTarget01 = Mathf.Clamp01(value);
+    }
+
+    /// <summary>
+    /// Called when a burst completes & drums change to trigger a short visual pulse.
+    /// </summary>
+    public void TriggerPlayheadReleasePulse()
+    {
+        _pendingReleasePulse = true;
     }
 
     void Update()
@@ -150,6 +204,18 @@ public class NoteVisualizer : MonoBehaviour
             GameFlowManager.Instance.activeDrumTrack == null ||
             GameFlowManager.Instance.controller.tracks == null)
             return;
+        // Smooth playhead energy & line charge toward their targets
+        _playheadEnergy01 = Mathf.MoveTowards(
+            _playheadEnergy01,
+            _playheadEnergyTarget01,
+            _playheadEnergyLerpSpeed * Time.deltaTime
+        );
+
+        _lineCharge01 = Mathf.MoveTowards(
+            _lineCharge01,
+            0f,
+            _lineChargeDecaySpeed * Time.deltaTime
+        );
 
         // --- Playhead position across the "leader" loop (max loop multiplier) ---
         float baseLoopLength = GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds();
@@ -182,21 +248,52 @@ public class NoteVisualizer : MonoBehaviour
 
         if (playheadParticles != null)
         {
-            var main = playheadParticles.main;
-            main.startSize = Mathf.Lerp(0.3f, 1.2f, maxVelocity);
+            var main     = playheadParticles.main;
             var emission = playheadParticles.emission;
-            emission.rateOverTime = Mathf.Lerp(10f, 50f, maxVelocity);
-            emission.enabled = shimmer;
+
+            // Base factors from music (velocity) plus collection/ascension state
+            float velFactor    = Mathf.Clamp01(maxVelocity);
+            float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);   // fills as burst is collected
+            float chargeFactor = 1.0f + 1.5f * _lineCharge01;                 // extra particles as notes hit the top
+
+            main.startSize = Mathf.Lerp(0.3f, 1.2f, velFactor) * energyFactor;
+            emission.rateOverTime = Mathf.Lerp(10f, 50f, velFactor) * energyFactor * chargeFactor;
+            emission.enabled = shimmer || _lineCharge01 > 0.05f || _playheadEnergy01 > 0.05f;
 
             var col = playheadParticles.colorOverLifetime;
             if (col.enabled)
             {
+                // Slightly more opaque when highly charged
+                float baseAlpha = 0.4f + velFactor * 0.5f;
+                float topAlpha  = 0.1f;
+                float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01); 
+
                 Gradient g = new Gradient();
                 g.SetKeys(
-                    new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.cyan, 1f) },
-                    new[] { new GradientAlphaKey(0.4f + maxVelocity * 0.5f, 0f), new GradientAlphaKey(0.1f, 1f) }
+                    new[]
+                    {
+                        new GradientColorKey(Color.white, 0f),
+                        new GradientColorKey(Color.cyan, 1f)
+                    },
+                    new[]
+                    {
+                        new GradientAlphaKey(Mathf.Clamp01(baseAlpha + alphaBoost), 0f),
+                        new GradientAlphaKey(topAlpha, 1f)
+                    }
                 );
                 col.color = g;
+            }
+
+            // Fire a short extra burst when a burst completes / drums change
+            if (_pendingReleasePulse)
+            {
+                _pendingReleasePulse = false;
+
+                // Emit a short pop; you can tune this count
+                playheadParticles.Emit(30);
+
+                // Reset energy target so the bar "empties" after release
+                _playheadEnergyTarget01 = 0f;
             }
         }
 
@@ -348,6 +445,9 @@ private void OnLoopBoundary()
 
             if (ms.loopsRemaining <= 0)
             {
+                // Each arrival at the line gives the "line" a bit more charge.
+                _lineCharge01 = Mathf.Clamp01(_lineCharge01 + 0.2f);
+
                 // Per-marker finish (what the coroutine tail used to do)
                 _animatingSteps.Remove(ms.key);
                 if (ms.go) Destroy(ms.go);
@@ -358,6 +458,7 @@ private void OnLoopBoundary()
                 task.markers[i] = ms;
                 // don’t set anyAlive here; marker is done
             }
+
             else
             {
                 // Still moving next loop
@@ -970,6 +1071,128 @@ public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds
                 }))
             }
         );
+    }
+}
+/// <summary>
+/// Configures the bin strip to show a certain number of active bins.
+/// This should be called whenever the loop layout (bin contraction/expansion)
+/// changes for the current cut.
+/// </summary>
+public void ConfigureBinStrip(int activeBinCount)
+{
+    if (binStripParent == null || binIndicatorPrefab == null)
+    {
+        Debug.LogWarning("[NoteVisualizer] ConfigureBinStrip called but binStripParent or binIndicatorPrefab is not assigned.");
+        return;
+    }
+
+    activeBinCount = Mathf.Max(0, activeBinCount);
+
+    // If the count is unchanged, do nothing.
+    if (activeBinCount == _activeBinCount && _binIndicators.Count == activeBinCount)
+        return;
+
+    _activeBinCount = activeBinCount;
+
+    // Clear existing indicators
+    foreach (var img in _binIndicators)
+    {
+        if (img != null)
+            Destroy(img.gameObject);
+    }
+    _binIndicators.Clear();
+
+    if (_activeBinCount == 0)
+        return;
+
+    // Instantiate new indicators and lay them out horizontally
+    for (int i = 0; i < _activeBinCount; i++)
+    {
+        var go = Instantiate(binIndicatorPrefab, binStripParent);
+        go.name = $"BinIndicator_{i}";
+        var img = go.GetComponent<Image>();
+        if (img == null)
+        {
+            img = go.AddComponent<Image>();
+            img.color = binInactiveColor;
+        }
+
+        _binIndicators.Add(img);
+    }
+
+    // Simple layout: distribute evenly across the parent width
+    LayoutBinStrip();
+
+    // Default target bin to the first one if out of range
+    if (_currentTargetBin < 0 || _currentTargetBin >= _activeBinCount)
+    {
+        _currentTargetBin = 0;
+    }
+
+    RefreshBinHighlight();
+}
+/// <summary>
+/// Positions bin indicators evenly within the binStripParent.
+/// </summary>
+private void LayoutBinStrip()
+{
+    if (binStripParent == null || _binIndicators.Count == 0)
+        return;
+
+    float width = binStripParent.rect.width;
+    float height = binStripParent.rect.height;
+
+    int count = _binIndicators.Count;
+    if (count == 0) return;
+
+    float slotWidth = width / count;
+
+    for (int i = 0; i < count; i++)
+    {
+        var img = _binIndicators[i];
+        if (img == null) continue;
+
+        var rt = img.rectTransform;
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(0f, 0f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+
+        float centerX = (i + 0.5f) * slotWidth;
+        float centerY = height * 0.5f;
+
+        rt.anchoredPosition = new Vector2(centerX, centerY);
+        rt.sizeDelta        = new Vector2(slotWidth * 0.8f, height * 0.8f);
+    }
+}
+/// <summary>
+/// Highlights which bin new collected notes will be spawned into.
+/// binIndex is 0-based in the current active bin layout.
+/// </summary>
+public void SetCurrentTargetBin(int binIndex)
+{
+    if (_activeBinCount == 0 || _binIndicators.Count == 0)
+        return;
+
+    if (binIndex < 0 || binIndex >= _activeBinCount)
+    {
+        Debug.LogWarning($"[NoteVisualizer] SetCurrentTargetBin called with out-of-range index {binIndex} (activeBinCount={_activeBinCount}).");
+        return;
+    }
+
+    _currentTargetBin = binIndex;
+    RefreshBinHighlight();
+}
+/// <summary>
+/// Applies colors to bin indicators according to _currentTargetBin.
+/// </summary>
+private void RefreshBinHighlight()
+{
+    for (int i = 0; i < _binIndicators.Count; i++)
+    {
+        var img = _binIndicators[i];
+        if (img == null) continue;
+
+        img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor;
     }
 }
 

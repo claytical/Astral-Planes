@@ -12,6 +12,8 @@ public class Vehicle : MonoBehaviour
     private float _dustSfxCooldown = 0f;
     private const float DustSfxInterval = 0.10f; // at most 10 Hz when really grinding dust
     private bool _inDust = false;
+    private float _lastDustContactTime = -999f;
+    [SerializeField] private float dustExitGraceSeconds = 0.20f;    
     // === Arcade RB2D tuning ===
     [Header("Arcade Movement")]
     [SerializeField] private float arcadeMaxSpeed = 14f;
@@ -30,6 +32,8 @@ public class Vehicle : MonoBehaviour
     [Header("Input Filtering")]
     [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
     [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
+    private float _lastEnergyDrainLogTime = -999f;
+
     float   _lastMoveStamp;
     private Vector2 _moveInput;
 
@@ -108,6 +112,10 @@ public class Vehicle : MonoBehaviour
 
 void FixedUpdate()
 {
+
+    if (_inDust && (Time.time - _lastDustContactTime) > dustExitGraceSeconds) { 
+        ExitDustField();
+    }
     if (incapacitated) return;
 
     float dt = Time.fixedDeltaTime;
@@ -206,11 +214,33 @@ void FixedUpdate()
                 if (_dustSfxCooldown <= 0f) {
                     CollectionSoundManager.Instance?.PlayDustInteraction(ctrl, force01, behavior); _dustSfxCooldown = 0.10f; // simple throttle
                 }
+                if (boosting)
+                {
+                    if (gfm.dustGenerator != null)
+                    {
+                        // Appetite scaled by speed so faster boosts chew more dust
+                        float appetite = Mathf.Lerp(0.7f, 1.2f, force01);
+                        gfm.dustGenerator.ErodeDustDiskFromVehicle(transform.position, appetite);
+                    }
+                }
             }
     // Stats + audio
     UpdateDistanceCovered();
     ClampAngularVelocity();
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
+}
+public void DrainEnergy(float amount, string source = "Unknown")
+{
+    if (amount <= 0f) return;
+
+    // Calls your existing clamp/UI logic
+    ConsumeEnergy(amount); // ConsumeEnergy is currently private :contentReference[oaicite:8]{index=8}
+
+    // Throttle logs so you actually see them without spamming
+    if (Time.time - _lastEnergyDrainLogTime > 0.75f)
+    {
+        _lastEnergyDrainLogTime = Time.time;
+    }
 }
 
     public void EnterDustField(float speedScale, float accelScale)
@@ -218,9 +248,12 @@ void FixedUpdate()
         float incoming = Mathf.Min(speedScale, accelScale);
         float floor    = shipProfile ? shipProfile.envScaleFloor : 0.60f;
         envScale = Mathf.Max(floor, incoming);
-        
+        _inDust = true;
+        _lastDustContactTime = Time.time;
     }
-    
+    public void NotifyDustContact() { 
+        _lastDustContactTime = Time.time;
+    }
     public void ExitDustField()
     {
         envScale = 1f;
@@ -453,17 +486,10 @@ void FixedUpdate()
         if (energyLevel > 0 && !boosting)
         {
             boosting = true;
-
-            // seconds remaining in the current drum loop (with a small safety pad)
-            float remain = drumTrack.GetTimeToLoopEnd();   // <- use the helper
-            harmony?.BeginBoostArp(Mathf.Max(0.05f, remain)); // start arp toward the loop end
-
             if (audioManager != null && thrustClip != null)
                 audioManager.PlayLoopingSound(thrustClip, .5f);
-
             Fly();
         }
-
         _burnRateMultiplier = Mathf.Max(0.2f, triggerValue);
     }
 
@@ -474,8 +500,7 @@ void FixedUpdate()
             audioManager.StopSound();
         }
         boosting = false;
-        harmony?.CancelBoostArp();
-        _remixController.ResetRemixVisuals();
+//        _remixController.ResetRemixVisuals();
         _burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
         // Disable the trail's emission when boosting stops

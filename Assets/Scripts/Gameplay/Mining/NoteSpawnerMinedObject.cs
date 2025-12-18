@@ -49,7 +49,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"NoteSpawnerMinedObject.OnCollisionEnter2D: {coll.gameObject.name}");
-        CollectionSoundManager.Instance?.PlayNoteSpawnerSound(assignedTrack, selectedNoteSet);
+//        CollectionSoundManager.Instance?.PlayNoteSpawnerSound(assignedTrack, selectedNoteSet);
     }
     public void SetDarkMode(bool detune, bool bitcrush, float gainDb)
             {

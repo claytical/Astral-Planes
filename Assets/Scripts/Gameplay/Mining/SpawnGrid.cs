@@ -5,9 +5,9 @@ public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
     public int gridHeight = 12;
-    private GridCell[,] GridCells;
+    public GridCell[,] GridCells;
     public float cellSize = 1f; // Adjust to match the world space size
-
+    private DrumTrack _drums;
     
     private void Awake()
     {
@@ -32,37 +32,57 @@ public class SpawnGrid : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        // Draw the grid structure
-        Gizmos.color = Color.white;
-        for (int x = 0; x <= gridWidth; x++)
+        // Only draw the runtime-accurate grid when the game is running,
+        // because DrumTrack / dust sizing are only valid then.
+        if (!Application.isPlaying)
+            return;
+
+        if (_drums == null)
         {
-            Gizmos.DrawLine(new Vector3(x * cellSize - (gridWidth * cellSize / 2), -gridHeight * cellSize / 2, 0),
-                new Vector3(x * cellSize - (gridWidth * cellSize / 2), gridHeight * cellSize / 2, 0));
-        }
-        for (int y = 0; y <= gridHeight; y++)
-        {
-            Gizmos.DrawLine(new Vector3(-gridWidth * cellSize / 2, y * cellSize - (gridHeight * cellSize / 2), 0),
-                new Vector3(gridWidth * cellSize / 2, y * cellSize - (gridHeight * cellSize / 2), 0));
+            // Prefer the active drum track from the GameFlowManager
+            var gfm = GameFlowManager.Instance;
+            if (gfm != null && gfm.activeDrumTrack != null)
+                _drums = gfm.activeDrumTrack;
+            else
+                _drums = FindObjectOfType<DrumTrack>();
         }
 
-        // Draw occupied cells
-        if (GridCells != null)
+        if (_drums == null)
+            return;
+
+        // Use the authoritative grid dimensions from DrumTrack / SpawnGrid
+        int w = _drums.GetSpawnGridWidth();
+        int h = _drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        float runtimeCellSize = _drums.GetCellWorldSize();
+
+        // Optionally sync our local cellSize field so any other code using it
+        // isn't wildly wrong during play.
+        cellSize = runtimeCellSize;
+
+        // Draw per-cell boxes at the *runtime* positions
+        for (int x = 0; x < w; x++)
         {
-            for (int x = 0; x < gridWidth; x++)
+            for (int y = 0; y < h; y++)
             {
-                for (int y = 0; y < gridHeight; y++)
-                {
-                    if (GridCells[x, y].IsOccupied)
-                    {
-                        Gizmos.color = Color.red; // Highlight occupied cells
-                        Vector3 cellCenter = new Vector3(x * cellSize - (gridWidth * cellSize / 2) + cellSize / 2,
-                            y * cellSize - (gridHeight * cellSize / 2) + cellSize / 2, 0);
-                        Gizmos.DrawCube(cellCenter, new Vector3(cellSize * 0.9f, cellSize * 0.9f, 0.1f));
-                    }
-                }
+                var gp    = new Vector2Int(x, y);
+                var world = _drums.GridToWorldPosition(gp);
+
+                bool occupied = GridCells != null &&
+                                GridCells[x, y] != null &&
+                                GridCells[x, y].IsOccupied;
+
+                Gizmos.color = occupied
+                    ? Color.red                         // occupied cell
+                    : new Color(1f, 1f, 1f, 0.25f);     // empty grid cell
+
+                Gizmos.DrawWireCube(world,
+                    Vector3.one * runtimeCellSize * 0.9f);
             }
         }
     }
+
     public void PrintGridDebug()
     {
         Debug.Log("---- Grid Debug Map ----");

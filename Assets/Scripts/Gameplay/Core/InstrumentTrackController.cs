@@ -134,6 +134,9 @@ public class InstrumentTrackController : MonoBehaviour
             // De-dupe to avoid multiple adds if TrySubscribe runs more than once
             t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
             t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
+            t.OnCollectableBurstCleared -= HandleCollectableBurstCleared;
+            t.OnCollectableBurstCleared += HandleCollectableBurstCleared;
+
             count++;
         }
         if (count > 0)
@@ -142,6 +145,17 @@ public class InstrumentTrackController : MonoBehaviour
             _chordEventsSubscribed = true;
             Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
         }
+    }
+    private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId)
+    {
+        // We only want to advance when ALL collectables are gone (across tracks).
+        if (AnyCollectablesInFlight()) return;
+
+        // At this moment, the last collectable note has been collected across the whole system.
+        // Notify the PhaseStar (or the PhaseTransitionManager, depending on your architecture).
+        var gfm = GameFlowManager.Instance;
+        if (gfm != null && gfm.activeDrumTrack._star != null) // or however you access the active PhaseStar
+            gfm.activeDrumTrack._star.NotifyCollectableBurstCleared();
     }
 
     private void UnsubscribeChordEvents()
@@ -214,6 +228,54 @@ public class InstrumentTrackController : MonoBehaviour
                       $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
         }
     }
+public int GetBinForNextSpawn(InstrumentTrack track)
+{
+    if (track == null)
+        return 0;
+
+    // 1) Compute globalMaxFilledBin across all configured tracks
+    int globalMaxFilledBin = -1;
+    if (tracks != null)
+    {
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (!t) continue;
+
+            int h = t.GetHighestFilledBin();
+            if (h > globalMaxFilledBin)
+                globalMaxFilledBin = h;
+        }
+    }
+
+    // No one has any notes yet → first burst always goes to bin 0.
+    if (globalMaxFilledBin < 0)
+        return 0;
+
+    // 2) Track-local filled extent
+    int trackHighest = track.GetHighestFilledBin();
+
+    if (trackHighest < globalMaxFilledBin)
+    {
+        // This track is "behind" the frontier → catch up by filling holes
+        // in bins [0 .. globalMaxFilledBin] where it has no notes yet.
+        for (int b = 0; b <= globalMaxFilledBin; b++)
+        {
+            if (!track.IsBinFilled(b))
+                return b;
+        }
+
+        // Defensive fallback: if somehow all bins up to globalMaxFilledBin are filled
+        // on this track too, treat it as caught up and advance the frontier.
+        return globalMaxFilledBin + 1;
+    }
+    else
+    {
+        // This track has caught up with the current frontier (or defines it).
+        // Allow it to push the frontier forward into the next bin.
+        return globalMaxFilledBin + 1;
+    }
+}
 
 private void ResetAllCursorsAndGuards(bool clearLoops=false)
     {

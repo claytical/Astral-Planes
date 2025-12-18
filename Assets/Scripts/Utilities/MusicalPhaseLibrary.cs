@@ -54,10 +54,9 @@ public static class MusicalPhaseLibrary
 // Example public API stays the same, but now works with injected profiles:
     public static AudioClip GetRandomClip(MusicalPhase phase)
     {
+Debug.LogError($"Get Random Clip for phase has been deprecated");
         var prof = Get(phase);
-        var list = prof?.drumClips;
-        if (list == null || list.Length == 0) return null;
-        return list[UnityEngine.Random.Range(0, list.Length)];
+        return null;
     }
 
     public static PatternStrategy GetPatternStrategyForRole(MusicalPhase phase, MusicalRole role)

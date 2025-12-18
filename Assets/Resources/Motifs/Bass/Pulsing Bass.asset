@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
+  m_Name: Pulsing Bass
+  m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
+  id: Deep Pulsing Bass
+  role: 0
+  scales:
+  - item: 0
+    weight: 0.6
+  - item: 3
+    weight: 0.3
+  - item: 2
+    weight: 0.1
+  patterns:
+  - item: 4
+    weight: 0.5
+  - item: 6
+    weight: 0.3
+  - item: 5
+    weight: 0.2
+  rhythms:
+  - item: 0
+    weight: 0.6
+  - item: 5
+    weight: 0.6
+  chordFunctions:
+  - item: I
+    weight: 0.5
+  - item: V
+    weight: 0.3
+  - item: vi
+    weight: 0.2
+  chordsPerRegion: 2
+  behaviors:
+  - item: 1
+    weight: 0.4
+  - item: 11
+    weight: 0.3
+  - item: 13
+    weight: 0.3
+  maxBehaviorsStack: 2
+  variation:
+    extensionBias: 0.2
+    passingToneProb: 0.1
+    neighborOrnProb: 0.05
+    minMidi: 36
+    maxMidi: 55
+    leapProb: 0.1
+    octaveMoveProb: 0.15
+    restProb: 0.05
+    humanizeMs: 0.06
+    durJitter: 1
+    mutatePitch: 0.06
+    mutateVelocity: 0.1
+    mutateDuration: 0.08

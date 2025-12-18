@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Happy
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: Happy
+  displayName: Happy
+  beatMood: 0
+  keyRootMidi: 60
+  chordProgression: {fileID: 11400000, guid: 3b08b1427933f408caee72367cb76486, type: 2}
+  phaseProfile: {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 2575404e30b9d4faea6701f1e09b273d, type: 2}
+  - {fileID: 11400000, guid: d19a70b25bf994732a4b4a38ccfb16c8, type: 2}
+  - {fileID: 11400000, guid: a99429e884ac149a38988e6a411305f7, type: 2}
+  - {fileID: 11400000, guid: e9c12e69c3ae246babbf2c11d17b50c1, type: 2}
+  selectionWeight: 1

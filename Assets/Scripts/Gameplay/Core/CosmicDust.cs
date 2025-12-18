@@ -18,7 +18,11 @@ public class CosmicDust : MonoBehaviour
     [Range(0.4f, 1f)] public float accelScale = 0.8f;   // thrust scale
     public enum DustBehavior { ViscousSlow, SiltDissipate, StaticCling, CrossCurrent, Turbulent }
     public bool dissipateOnExit;
-
+    [Header("Energy Drain (Deterrent)")] 
+    [Tooltip("Energy drained per second while the vehicle remains inside this dust (when not boosting).")] 
+    [Min(0f)] public float energyDrainPerSecond = .25f;
+    [Tooltip("If true, boosting will NOT drain energy (boosting is the 'broom' mechanic).")] 
+    public bool noDrainWhileBoosting = true;
     [Header("Accommodation (vehicle)")]
     [Range(0.3f, 1f)] public float minScaleFactor = 0.55f;   // never shrink below 55% of full
     [Range(0f, 0.5f)] public float shrinkStep = 0.12f;        // how much each ENTRY tries to shave off
@@ -49,6 +53,8 @@ public class CosmicDust : MonoBehaviour
     [SerializeField] private int epochId;
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
+    private float _phaseDrainPerSecond = 1f;
+
     private static class DustDestroyStats
     {
         public static int ManualBreaks, StarPrunes, VehicleEats, Lifetimes, Debugs;
@@ -64,13 +70,13 @@ public class CosmicDust : MonoBehaviour
         var gfm = GameFlowManager.Instance;
         if (gfm && gfm.controller && gfm.controller.noteVisualizer != null)
         {
-            _uiBottomY = gfm.controller.noteVisualizer.GetTopWorldY();
-            Debug.Log($"Defaulting UI Bottom to 0,0");
+            _uiBottomY = gfm.activeDrumTrack.GetDustBandBottomCenterY();
+            Debug.Log($"[GRID DUST] UI bottom using top Y: {_uiBottomY}");
         }
         else
         { 
             _uiBottomY = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, -Camera.main.transform.position.z)).y; // fallback
-            Debug.Log($"[CosmicDust] UI Bottom {_uiBottomY}");
+            Debug.Log($"[GRID DUST] UI bottom using z Y: {_uiBottomY}");
             
         }
         return _uiBottomY;
@@ -81,14 +87,37 @@ public class CosmicDust : MonoBehaviour
         if (transform.localScale.sqrMagnitude < 1e-6f)
             transform.localScale = referenceScale;
 
-        fullScale = transform.localScale * 2f; // your intended “final size”
-        _accomodationTarget = fullScale;
+        // OLD (causes overlap):
+        // fullScale = transform.localScale * 2f; // your intended “final size”
 
+        // NEW: keep dust at the same scale the grid used to compute tileDiameterWorld
+        fullScale = transform.localScale;
+        _accomodationTarget = fullScale;
+        _phaseDrainPerSecond = energyDrainPerSecond;
         // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
         var psr = GetComponent<ParticleSystemRenderer>();
         if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
         if (psr) psr.sortingFudge = 0f;
     }
+
+    public float GetWorldRadius()
+    {
+        if (!hitbox)
+            return 0.5f; // sane fallback
+
+        // Prefer CircleCollider2D if that’s what hitbox actually is.
+        if (hitbox is CircleCollider2D circle)
+        {
+            // Assume uniform scale on X/Y; lossyScale.x is fine.
+            return circle.radius * Mathf.Abs(transform.lossyScale.x);
+        }
+
+        // Fallback for non-circle colliders: approximate from bounds.
+        var bounds = hitbox.bounds;
+        // Use the larger extent to be safe.
+        return Mathf.Max(bounds.extents.x, bounds.extents.y);
+    }
+
     public void OnSpawnedFromPool(Color tint)
     {
         // Visual reset
@@ -112,9 +141,8 @@ public class CosmicDust : MonoBehaviour
         }
     }
 
-    private void LateUpdate()
+    void LateUpdate()
     {
-        // Gentle drift along the hive flow
         var gen = GameFlowManager.Instance?.dustGenerator;
         if (gen == null) return;
 
@@ -122,21 +150,31 @@ public class CosmicDust : MonoBehaviour
         flow.y = 0f;
         if (flow.sqrMagnitude > 0.00001f)
             transform.position += (Vector3)(flow * Time.deltaTime);
-        var t = transform;
+
+        var t   = transform;
         var cam = Camera.main;
         if (!cam) return;
 
-        float z = -cam.transform.position.z;
-        var topRight = cam.ViewportToWorldPoint(new Vector3(1, 1, z));
-        var bottomLimit = UiBottomY();
-        var pos = t.position;
+        var dt = GameFlowManager.Instance?.activeDrumTrack;
+        if (dt == null) return;
 
-        // Add a small padding that matches DrumTrack.gridPadding
-        float pad = GameFlowManager.Instance?.activeDrumTrack?.gridPadding ?? 1f;
-        pos.y = Mathf.Clamp(pos.y, bottomLimit + pad, topRight.y - pad);
-//        t.position = pos;
+        var playArea = dt.GetPlayAreaWorld();
+        var pos      = t.position;
+
+        float pad = dt.gridPadding;
+        float bottomLimit = playArea.bottom + pad;
+        float topLimit    = playArea.top    - pad;
+
+        pos.y = Mathf.Clamp(pos.y, bottomLimit, topLimit);
+        t.position = pos;
     }
-
+    private void DisableInteractionImmediately() { 
+        // Stop affecting vehicles instantly (even if particles linger)
+        if (hitbox) hitbox.enabled = false; 
+        var col = GetComponent<Collider2D>(); 
+        if (col) col.enabled = false; 
+        gameObject.layer = nonBlockingLayer;
+    }
     private IEnumerator GrowIn() {
         float duration = (_growInOverride > 0f)
             ? _growInOverride
@@ -168,59 +206,126 @@ public class CosmicDust : MonoBehaviour
         _regrowRoutine = null;
     }
 
-    public void ConfigureForPhase(MusicalPhase phase)
+public void ConfigureForPhase(MusicalPhase phase)
+{
+    // One switch → one config object → one assignment block.
+    var cfg = phase switch
     {
-        float s = phase switch {
-            MusicalPhase.Establish  => 0.85f,
-            MusicalPhase.Evolve     => 1.00f,
-            MusicalPhase.Intensify  => 1.20f,
-            MusicalPhase.Release    => 1.00f,
-            MusicalPhase.Wildcard   => 1.10f,
-            MusicalPhase.Pop        => 0.95f,
-            _ => 1.0f
-        };
-        fullScale = referenceScale * s; // existing field
-        switch (phase)
-        {
-            case MusicalPhase.Establish:
-                //behavior = DustBehavior.ViscousSlow;
-                behavior = DustBehavior.SiltDissipate;
-                slowFactor = 0.8f; slowDuration = 0.25f;
-                lateralForce = 0f; turbulence = 0f;
-                
-                break;
-            case MusicalPhase.Evolve:
-                behavior = DustBehavior.CrossCurrent;
-                slowFactor = 0.9f; slowDuration = 0.2f;
-                lateralForce = 2.5f; turbulence = 0.25f; 
-                
-                break;
-            case MusicalPhase.Intensify:
-                behavior = DustBehavior.StaticCling;
-                slowFactor = 0.5f; slowDuration = 0.5f;
-                lateralForce = 0.5f; turbulence = 0.4f; 
-                
-                break;
-            case MusicalPhase.Release:
-                behavior = DustBehavior.SiltDissipate;
-                slowFactor = 0.85f; slowDuration = 0.2f;
-                lateralForce = 0f; turbulence = 0f; 
-                
-                break;
-            case MusicalPhase.Wildcard:
-                behavior = DustBehavior.Turbulent;
-                slowFactor = 0.7f; slowDuration = 0.4f;
-                lateralForce = 1.2f; turbulence = 2.0f;
-                
-                break;
-            case MusicalPhase.Pop:
-                behavior = DustBehavior.ViscousSlow;
-                slowFactor = 0.6f; slowDuration = 0.3f;
-                lateralForce = 0f; turbulence = 0.2f;
-                
-                break;
-        }
+        MusicalPhase.Establish => new PhaseDustConfig(
+            scaleMul:   0.25f,
+            drainMul:   0.50f,
+            behavior:   DustBehavior.SiltDissipate,
+            slowFactor: 0.8f,
+            slowDur:    0.25f,
+            lateral:    0f,
+            turb:       0f
+        ),
+
+        MusicalPhase.Evolve => new PhaseDustConfig(
+            scaleMul:   1.00f,
+            drainMul:   1.00f,
+            behavior:   DustBehavior.CrossCurrent,
+            slowFactor: 0.9f,
+            slowDur:    0.2f,
+            lateral:    2.5f,
+            turb:       0.25f
+        ),
+
+        MusicalPhase.Intensify => new PhaseDustConfig(
+            scaleMul:   1.20f,
+            drainMul:   1.60f,
+            behavior:   DustBehavior.StaticCling,
+            slowFactor: 0.5f,
+            slowDur:    0.5f,
+            lateral:    0.5f,
+            turb:       0.4f
+        ),
+
+        MusicalPhase.Release => new PhaseDustConfig(
+            scaleMul:   1.00f,
+            drainMul:   0.90f,
+            behavior:   DustBehavior.SiltDissipate,
+            slowFactor: 0.85f,
+            slowDur:    0.2f,
+            lateral:    0f,
+            turb:       0f
+        ),
+
+        MusicalPhase.Wildcard => new PhaseDustConfig(
+            scaleMul:   1.10f,
+            drainMul:   1.25f,
+            behavior:   DustBehavior.Turbulent,
+            slowFactor: 0.7f,
+            slowDur:    0.4f,
+            lateral:    1.2f,
+            turb:       2.0f
+        ),
+
+        MusicalPhase.Pop => new PhaseDustConfig(
+            scaleMul:   0.95f,
+            drainMul:   0.75f,
+            behavior:   DustBehavior.ViscousSlow,
+            slowFactor: 0.6f,
+            slowDur:    0.3f,
+            lateral:    0f,
+            turb:       0.2f
+        ),
+
+        _ => new PhaseDustConfig(
+            scaleMul:   1.0f,
+            drainMul:   1.0f,
+            behavior:   DustBehavior.SiltDissipate,
+            slowFactor: 0.85f,
+            slowDur:    0.2f,
+            lateral:    0f,
+            turb:       0f
+        )
+    };
+
+    // Scale
+    fullScale = referenceScale * cfg.scaleMul;
+
+    // Drain (per-phase)
+    _phaseDrainPerSecond = energyDrainPerSecond * cfg.drainMul;
+
+    // Motion / feel
+    behavior       = cfg.behavior;
+    slowFactor     = cfg.slowFactor;
+    slowDuration   = cfg.slowDur;
+    lateralForce   = cfg.lateral;
+    turbulence     = cfg.turb;
+}
+
+// Keep this inside CosmicDust (e.g., near ConfigureForPhase).
+private readonly struct PhaseDustConfig
+{
+    public readonly float scaleMul;
+    public readonly float drainMul;
+    public readonly DustBehavior behavior;
+    public readonly float slowFactor;
+    public readonly float slowDur;
+    public readonly float lateral;
+    public readonly float turb;
+
+    public PhaseDustConfig(
+        float scaleMul,
+        float drainMul,
+        DustBehavior behavior,
+        float slowFactor,
+        float slowDur,
+        float lateral,
+        float turb)
+    {
+        this.scaleMul   = scaleMul;
+        this.drainMul   = drainMul;
+        this.behavior   = behavior;
+        this.slowFactor = slowFactor;
+        this.slowDur    = slowDur;
+        this.lateral    = lateral;
+        this.turb       = turb;
     }
+}
+
     private IEnumerator ApplyDustEffect(Vehicle vehicle, Vector2 impactDir)
     {
         // Grab RB directly so we don't need Vehicle changes
@@ -456,11 +561,7 @@ public IEnumerator RetintOver(float seconds, Color toTint)
     {
         if (_isDespawned) yield break; // guard against double calls
         _isDespawned = true;
-
-        // 1) Immediately stop blocking
-        if (hitbox) hitbox.enabled = false;
-        gameObject.layer = nonBlockingLayer;
-
+        DisableInteractionImmediately();
         // 2) Free cell NOW (don’t wait until after the fade)
         var dt = GameFlowManager.Instance?.activeDrumTrack;
         Vector2Int gridPos = default;
@@ -468,7 +569,7 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         if (dt != null)
         {
             gridPos = dt.WorldToGridPosition(transform.position);
-            dt.FreeSpawnCell(gridPos.x, gridPos.y); // free occupancy immediately
+            //dt.FreeSpawnCell(gridPos.x, gridPos.y); // free occupancy immediately
             hadGrid = true;
         }
 
@@ -519,20 +620,24 @@ public IEnumerator RetintOver(float seconds, Color toTint)
     }
 
     public void DespawnToPoolInstant()
-    {
-        // Ensure non-blocking & invisible when pooled
-        if (hitbox) hitbox.enabled = false;
-        gameObject.layer = nonBlockingLayer;
+    { 
+        DisableInteractionImmediately();
+        // If you do NOT want lingering particles when pooled:
+        if (particleSystem != null) { 
+            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
+            particleSystem.Clear(true);
+        }
         var cHide = _currentTint; cHide.a = 0f;
         SetTint(cHide);
         transform.localScale = Vector3.zero;
 
-        _isDespawned = false; // reset for next lifecycle
+        _isDespawned = true;
         gameObject.SetActive(false);
     }
 
     private IEnumerator WaitForParticlesThenDestroy()
     {
+        DisableInteractionImmediately();
         particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
         // Wait until all particles have disappeared
@@ -549,7 +654,7 @@ public IEnumerator RetintOver(float seconds, Color toTint)
     }
     private void OnTriggerEnter2D(Collider2D other) {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
-        v.EnterDustField(speedScale, accelScale);  // new in Vehicle.cs (next section)
+        v.EnterDustField(speedScale, accelScale);  
 
         // drive the per-behavior feel (lateral nudge, turbulence, cling)
         if (v.TryGetComponent<Rigidbody2D>(out var rb))
@@ -565,19 +670,34 @@ public IEnumerator RetintOver(float seconds, Color toTint)
     }
     private void OnTriggerStay2D(Collider2D other)
     {
+        if (!other.TryGetComponent<Vehicle>(out var v)) return;
+
+        // 1. ENERGY DRAIN — every physics step
+
+        float drain = energyDrainPerSecond * Time.deltaTime;
+        if (drain > 0f)
+        {
+            v.DrainEnergy(drain, $"CosmicDust/{behavior}");
+        }
+
+        // 2. BOOST CLEAR (optional)
+        if (v.boosting)
+        {
+            BreakHexagon();
+            return;
+        }
+
+        // 3. THROTTLED PHYSICS EFFECTS
         if (Time.time < _stayForceUntil) return;
         _stayForceUntil = Time.time + stayForceEvery;
 
-        if (!other.TryGetComponent<Vehicle>(out var v)) return;
         if (!other.TryGetComponent<Rigidbody2D>(out var rb)) return;
 
         float max = v.GetMaxSpeed() * speedScale;
-        Vector2 vel = rb.linearVelocity;
-        if (vel.magnitude > max)
-            rb.linearVelocity = vel.normalized * max;
-
-        rb.AddForce(-vel.normalized * slowBrake, ForceMode2D.Force);
+        if (rb.linearVelocity.magnitude > max)
+            rb.linearVelocity = rb.linearVelocity.normalized * max;
     }
+
     private void OnTriggerExit2D(Collider2D other)
     {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;

@@ -27,9 +27,6 @@ public class Boundaries : MonoBehaviour
         float screenHalfHeight = mainCamera.orthographicSize;
         float screenHalfWidth  = screenHalfHeight * mainCamera.aspect;
 
-        // You probably already have something like this in your file;
-        // leave your top/left/right logic as-is.
-
         if (topBoundary != null)
         {
             topBoundary.transform.position =
@@ -69,19 +66,14 @@ public class Boundaries : MonoBehaviour
 
     private System.Collections.IEnumerator AlignBottomToNoteVisualizerWhenReady()
     {
-        Debug.Log("[BOUNDARIES] Align bottom to note visualizer");
         // Wait until we have a GameFlowManager and a NoteVisualizer
         while (GameFlowManager.Instance == null ||
                GameFlowManager.Instance.noteViz == null)
         {
             yield return null;
         }
-        Debug.Log("[BOUNDARIES] NoteViz present");
-
-        // Give layout a frame to settle after noteViz.Initialize()
         yield return null;
         Debug.Log("[BOUNDARIES] Aligning to NoteViz");
-
         AlignBottomToVisualizer(GameFlowManager.Instance.noteViz);
     }
 

@@ -79,7 +79,7 @@ MonoBehaviour:
   starDriftJitter: 1
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 6
+  dustShrinkRadius: 8
   dustShrinkUnitsPerSec: 5
   dustFalloff:
     serializedVersion: 2
