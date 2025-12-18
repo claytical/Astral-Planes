@@ -37,8 +37,9 @@ public class DrumTrack : MonoBehaviour
     public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
     public PhasePersonalityRegistry phasePersonalityRegistry; 
     public MusicalPhase? QueuedPhase;
+    
     public float drumLoopBPM = 120f;
-    public float gridPadding = 1f;
+    public float gridPadding = 0f;
     public int totalSteps = 16;
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
@@ -48,6 +49,7 @@ public class DrumTrack : MonoBehaviour
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
+    
     public int completedLoops { get; private set; } = 0;
     private float _loopLengthInSeconds, _phaseStartTime;
     private float _gridCheckTimer;
@@ -65,23 +67,118 @@ public class DrumTrack : MonoBehaviour
     private int _binIdx = -1;
     private int _binCount = 4;                   // default; PhaseStar can override per-spawn
     private GameFlowManager GFM => GameFlowManager.Instance;
+    public BeatMoodLibrary beatMoodLibrary;
+    public BeatMood? QueuedBeatMood;
+    private BeatMoodProfile _activeBeatProfile;
+    public BeatMoodProfile ActiveBeatMoodProfile => _activeBeatProfile;
+    [Header("Beat Mood Intensity Mapping")]
+    [Tooltip("Intensity < lowThreshold uses lowIntensityMood.")]
+    [Range(0f, 1f)] public float lowIntensityThreshold    = 0.25f;
 
+    [Tooltip("Intensity < mediumThreshold uses mediumIntensityMood.")]
+    [Range(0f, 1f)] public float mediumIntensityThreshold = 0.5f;
+
+    [Tooltip("Intensity < highThreshold uses highIntensityMood.")]
+    [Range(0f, 1f)] public float highIntensityThreshold   = 0.75f;
+
+    [Tooltip("Beat mood used for very low intensity.")]
+    public BeatMood lowIntensityMood;
+
+    [Tooltip("Beat mood used for low–medium intensity.")]
+    public BeatMood mediumIntensityMood;
+
+    [Tooltip("Beat mood used for medium–high intensity.")]
+    public BeatMood highIntensityMood;
+
+    [Tooltip("Beat mood used for very high intensity.")]
+    public BeatMood extremeIntensityMood;
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
     public event System.Action<MusicalPhase, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int,int> OnBinChanged; // (idx, binCount)
     private float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
     public float GetClipLengthInSeconds() => _clipLengthSec; // new helper for audio-bound code
-    public void SetBinCount(int bins) => _binCount = Mathf.Max(1, bins);
+    public struct PlayArea
+    {
+        public float left;
+        public float right;
+        public float bottom;
+        public float top;
+        public float width  => right - left;
+        public float height => top - bottom;
+    }
 
+    public PlayArea GetPlayAreaWorld()
+    {
+        var cam = Camera.main;
+        var gfm = GFM;
+
+        if (!cam || gfm == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+            return default;
+
+        float z = -cam.transform.position.z;
+        Vector3 bl = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+        Vector3 tr = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+
+        float nvTop = gfm.controller.noteVisualizer.GetTopWorldY();
+
+        PlayArea area;
+        area.left   = bl.x;
+        area.right  = tr.x;
+        area.bottom = nvTop;     // exact top of NV
+        area.top    = tr.y;
+
+        return area;
+    }
+
+    public void SetBinCount(int bins)
+    {
+        // Always clamp the requested value to something sane.
+        int requested = Mathf.Max(1, bins);
+
+        int final = requested;
+
+        // If we have a track controller, treat it as authority for bin count:
+        // transport bins == placement bins == leader loopMultiplier.
+        if (_trackController != null)
+        {
+            int leaderBins = Mathf.Max(1, _trackController.GetMaxLoopMultiplier());
+
+            if (leaderBins != requested)
+            {
+                Debug.LogWarning(
+                    $"[DrumTrack] SetBinCount request={requested}, " +
+                    $"but leader loopMultiplier={leaderBins}. " +
+                    $"Using leaderBins as transport bin count.");
+            }
+
+            final = leaderBins;
+        }
+
+        _binCount = final;
+    }
     void Start()
     {
         _phaseTransitionManager = GetComponent<PhaseTransitionManager>();
-        _trackController = GameFlowManager.Instance.controller;
+        _trackController        = GameFlowManager.Instance.controller;
         if (drumAudioSource && drumAudioSource.clip) {
             _clipLengthSec = Mathf.Max(drumAudioSource.clip.length, 0f);
         }
+
+        // 🔍 Debug grid scale vs screen
+        var gfm  = GFM;
+        var dust = gfm != null ? gfm.dustGenerator : null;
+        if (gfm != null && gfm.spawnGrid != null && dust != null)
+        {
+            float tile   = GetTileDiameterWorld();
+            int   w      = gfm.spawnGrid.gridWidth;
+            float worldW = tile * (w - 1);
+            float scrW   = GetScreenWorldWidth();
+
+            Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW/scrW:F3}");
+        }
     }
+
     private void Update()
     {
         // 0) Manager may exist but not be ready (or still wiring scenes)
@@ -165,23 +262,35 @@ public void ManualStart()
 
     if (_phaseTransitionManager != null)
     {
-        if (_phaseTransitionManager.currentPhase != boot)
-        {
-            _phaseTransitionManager.HandlePhaseTransition(boot, "DrumTrack/ManualStart");
-        }
+        Debug.Log($"[BOOT] Handling phase {_phaseTransitionManager.currentPhase}"); 
+        _phaseTransitionManager.HandlePhaseTransition(boot, "DrumTrack/ManualStart");
     }
-
+    else
+    {
+        Debug.Log($"[BOOT] no phase transition manager found! {_phaseTransitionManager}");
+    }
     var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
     if (GameFlowManager.Instance.dustGenerator != null && bootProfile != null)
     {
         GameFlowManager.Instance.dustGenerator.ApplyProfile(bootProfile);
+        SyncTileWithScreen();
         GameFlowManager.Instance.dustGenerator.cycleMode     = CosmicDustGenerator.MazeCycleMode.Progressive;
         GameFlowManager.Instance.dustGenerator.progressiveMaze = true;
     }
 
-    var initialClip = MusicalPhaseLibrary.GetRandomClip(boot);
+    AudioClip initialClip = null;
+    if (_phaseTransitionManager != null &&
+        _phaseTransitionManager.currentMotif != null &&
+        beatMoodLibrary != null)
+    {
+        var mood = _phaseTransitionManager.currentMotif.beatMood;
+        initialClip = beatMoodLibrary.GetRandomClip(mood);
+        Debug.Log($"[BOOT] Using motif '{_phaseTransitionManager.currentMotif.motifId}' beat mood '{mood}' for initial drum loop: '{(initialClip != null ? initialClip.name : "null")}'.");
+    }
+
     if (initialClip == null)
     {
+        initialClip = MusicalPhaseLibrary.GetRandomClip(boot);
         Debug.LogError("DrumTrack.ManualStart: No Establish clip found.");
         return;
     }
@@ -200,87 +309,73 @@ public void ManualStart()
     double dspStart = AudioSettings.dspTime + 0.05;
     drumAudioSource.PlayScheduled(dspStart);
     startDspTime = dspStart;
-
-    // If InitializeDrumLoop only sets counters/grid, keep it. If it also calls PlayScheduled, remove the call below.
     StartCoroutine(InitializeDrumLoop());
     isPhaseStarActive = false;
 
-    var dustGen = GameFlowManager.Instance?.dustGenerator;
-    if (dustGen != null)
-    {
-        boot = MusicalPhase.Establish;
-        StartCoroutine(dustGen.GenerateMazeThenPlacePhaseStar(boot));
-    }
-    else
-    {
-        // Fallback: if there is no dust generator, at least spawn a PhaseStar so progression can start.
-        Debug.LogWarning("[DrumTrack] No CosmicDustGenerator; spawning Establish PhaseStar directly.");
-        Vector2Int? cellHint = null;
-        if (HasSpawnGrid())
-        {
-            cellHint = GetRandomAvailableCell();
-        }
-        RequestPhaseStar(boot, cellHint);
-    }
+
 }
 
 
-    public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
+public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
+{
+    Debug.Log($"[Spawn] RequestPhaseStar phase={phase} active={isPhaseStarActive} " +
+              $"hint={(cellHint.HasValue ? cellHint.Value.ToString() : "<none>")} " +
+              $"tracks={(GameFlowManager.Instance?.controller?.tracks?.Length ?? 0)} " +
+              $"prefab={(phaseStarPrefab ? "ok" : "NULL")}");
+
+    if (isPhaseStarActive)
     {
-        Debug.Log($"[Spawn] RequestPhaseStar phase={phase} active={isPhaseStarActive} " +
-                  $"hint={(cellHint.HasValue ? cellHint.Value.ToString() : "<none>")} " +
-                  $"tracks={(GameFlowManager.Instance?.controller?.tracks?.Length ?? 0)} " +
-                  $"prefab={(phaseStarPrefab ? "ok":"NULL")}");
-        if (isPhaseStarActive)
-        {
-            Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
-            return;
-        }
+        Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
+        return;
+    }
 
-        if (!phaseStarPrefab)
-        {
-            Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
-            return;
-        }
+    if (!phaseStarPrefab)
+    {
+        Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
+        return;
+    }
 
-        // Resolve dependencies up-front so we can error loudly instead of NRE
-        var gfm = GameFlowManager.Instance;
-        var grid = gfm ? gfm.spawnGrid : null;
-        var ctrl = gfm ? gfm.controller : null;
-        if (!ctrl || ctrl.tracks == null || ctrl.tracks.Length == 0)
-        {
-            Debug.LogError("[Spawn] No instrument tracks available.");
-            return;
-        }
+    // Resolve dependencies up-front so we can error loudly instead of NRE
+    var gfm  = GameFlowManager.Instance;
+    var grid = gfm ? gfm.spawnGrid : null;
+    var ctrl = gfm ? gfm.controller : null;
+    if (!ctrl || ctrl.tracks == null || ctrl.tracks.Length == 0)
+    {
+        Debug.LogError("[Spawn] No instrument tracks available.");
+        return;
+    }
 
-        // Pick a cell (prefer hint)
-        Vector2Int cell = cellHint ?? (grid != null ? grid.GetRandomAvailableCell() : GetRandomAvailableCell());
-        if (cell.x < 0)
-        {
-            Debug.LogWarning("[Spawn] 🚫 No available cell for PhaseStar.");
-            return;
-        }
+    // Pick a cell (prefer hint)
+    Vector2Int cell = cellHint ?? (grid != null ? grid.GetRandomAvailableCell() : GetRandomAvailableCell());
+    if (cell.x < 0)
+    {
+        Debug.LogWarning("[Spawn] 🚫 No available cell for PhaseStar.");
+        return;
+    }
 
+    var pos = GridToWorldPosition(cell);
+    Debug.Log($"[Spawn] 🌠 Spawning PhaseStar at {cell} (world {pos}) for phase {phase}");
 
-        var pos = GridToWorldPosition(cell);
-        Debug.Log($"[Spawn] 🌠 Spawning PhaseStar at {cell} (world {pos}) for phase {phase}");
+    // Instantiate
+    var go = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
+    _star = go.GetComponent<PhaseStar>();
+    if (!_star)
+    {
+        Debug.LogError("[Spawn] Prefab missing PhaseStar");
+        Destroy(go);
+        return;
+    }
 
-        // Instantiate
-        var go = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
-        _star = go.GetComponent<PhaseStar>();
-        if (!_star)
-        {
-            Debug.LogError("[Spawn] Prefab missing PhaseStar");
-            Destroy(go);
-            return;
-        }
+    isPhaseStarActive = true;
 
-        isPhaseStarActive = true;
-        
     // Simple hook – PhaseStar exposes OnDestroyed? If not, use a helper component:
     var killer = go.AddComponent<OnDestroyRelay>();
-    killer.onDestroyed += () => isPhaseStarActive = false;
-    killer.onDestroyed += () => { isPhaseStarActive = false; if (grid != null) grid.FreeCell(cell.x, cell.y); };
+    killer.onDestroyed += () =>
+    {
+        isPhaseStarActive = false;
+        if (grid != null) grid.FreeCell(cell.x, cell.y);
+    };
+
     // Behavior profile + dust
     var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
     if (gfm && gfm.dustGenerator && profileAsset) gfm.dustGenerator.ApplyProfile(profileAsset);
@@ -293,13 +388,28 @@ public void ManualStart()
         .Take(4)
         .ToList();
 
-    // Wire star
-//    _star.SetSpawnStrategyProfile(strategy);
-    _star.Initialize(this, targets, profileAsset, phase);
+    // 🔹 Look up the motif for this spawn from the PhaseTransitionManager
+    MotifProfile motif = null;
+    var ptm = gfm ? gfm.phaseTransitionManager : null;
+    if (ptm != null && ptm.currentMotif != null)
+    {
+        motif = ptm.currentMotif;
+
+        // Optional sanity check: warn if phase/motif phase don't line up
+        Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase {phase}).");
+    }
+    else
+    {
+        Debug.Log("[Spawn] No current motif available; PhaseStar will use phase-based NoteSets.");
+    }
+
+    // Wire star (now motif-aware)
+    _star.Initialize(this, targets, profileAsset, phase, motif);
     _star.WireBinSource(this);
 
     OnPhaseStarSpawned?.Invoke(phase, profileAsset);
 }
+
     private sealed class OnDestroyRelay : MonoBehaviour
 {
     public System.Action onDestroyed;
@@ -309,6 +419,80 @@ public void ManualStart()
     {
         // return current BPM if known; otherwise <= 0 to signal "unknown"
         return drumLoopBPM > 0 ? drumLoopBPM : 0f;
+    }
+
+    public void ScheduleBeatMoodAndLoopChange(BeatMood mood)
+    {
+        QueuedBeatMood = mood;
+
+        if (beatMoodLibrary == null)
+        {
+            Debug.LogWarning($"[DrumTrack] No BeatMoodLibrary assigned; cannot schedule mood {mood}.");
+            return;
+        }
+
+        var profile = beatMoodLibrary.GetProfile(mood);
+        if (profile == null)
+        {
+            Debug.LogWarning($"[DrumTrack] No BeatMoodProfile found for mood {mood}.");
+            return;
+        }
+
+        var clip = profile.GetRandomLoopClip();
+        if (clip == null)
+        {
+            Debug.LogWarning($"[DrumTrack] BeatMoodProfile {profile.name} has no loop clips for mood {mood}.");
+            return;
+        }
+
+        _activeBeatProfile = profile;
+
+        // Apply BPM / loop length from the BeatMood profile.
+        drumLoopBPM = profile.bpm;
+        totalSteps  = profile.stepsPerLoop;
+
+        ScheduleDrumLoopChange(clip);
+
+        // Keep your dust behavior consistent with phase changes.
+        if (GameFlowManager.Instance.dustGenerator != null)
+        {
+            GameFlowManager.Instance.dustGenerator.cycleMode = CosmicDustGenerator.MazeCycleMode.Progressive;
+        }
+    }
+    /// <summary>
+    /// Apply a normalized intensity value [0..1] to the drum system by
+    /// selecting an appropriate BeatMood and scheduling a loop change.
+    /// Call this from gameplay systems that compute "how hard the player is going".
+    /// </summary>
+    public void ApplyBeatIntensity(float intensity01)
+    {
+        if (beatMoodLibrary == null)
+            return;
+
+        // Clamp to [0,1]
+        float x = Mathf.Clamp01(intensity01);
+
+        // Ensure thresholds are ordered
+        float tLow    = Mathf.Min(lowIntensityThreshold, mediumIntensityThreshold);
+        float tMed    = Mathf.Clamp(mediumIntensityThreshold, tLow, highIntensityThreshold);
+        float tHigh   = Mathf.Max(highIntensityThreshold, tMed);
+
+        // Map scalar to one of the four moods
+        BeatMood target;
+        if (x < tLow)
+            target = lowIntensityMood;
+        else if (x < tMed)
+            target = mediumIntensityMood;
+        else if (x < tHigh)
+            target = highIntensityMood;
+        else
+            target = extremeIntensityMood;
+
+        // If we already have an active profile with this mood, do nothing.
+        if (_activeBeatProfile != null && _activeBeatProfile.mood == target)
+            return;
+
+        ScheduleBeatMoodAndLoopChange(target);
     }
 
     public bool TryFindPath(Vector2Int start, Vector2Int goal, List<Vector2Int> outPath)
@@ -378,10 +562,7 @@ public void ManualStart()
     }
     public float GetCellWorldSize()
     {
-        // distance (world units) between adjacent cell centers, matching GridToWorldPosition mapping
-        var a = GridToWorldPosition(new Vector2Int(0, 0));
-        var b = GridToWorldPosition(new Vector2Int(1, 0));
-        return Vector2.Distance(a, b);
+        return GetTileDiameterWorld();
     }
     public Vector2Int FarthestReachableCellInComponent(Vector2Int start)
     {
@@ -439,26 +620,32 @@ public void ManualStart()
         {
             for (int y = 0; y < grid.gridHeight; y++)
             {
-                if (!grid.IsCellAvailable(x, y))
+                // Skip empty cells outright
+                if (grid.IsCellAvailable(x, y))
+                    continue;
+
+                // 🔐 Only validate cells that *should* belong to Collectables / notes.
+                // Do NOT touch Dust or MineNode occupancy here.
+                var cell = grid.GridCells[x, y];
+                if (cell.ObjectType != GridObjectType.Note)
+                    continue;
+
+                Vector3 worldPos = GridToWorldPosition(new Vector2Int(x, y));
+                Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, 0.25f);
+
+                bool objectPresent = false;
+                foreach (var hit in hits)
                 {
-                    Vector3 worldPos = GridToWorldPosition(new Vector2Int(x, y));
-                    Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, 0.25f);
-
-                    bool objectPresent = false;
-                    foreach (var hit in hits)
+                    if (hit.GetComponent<Collectable>())
                     {
-                        if (hit.GetComponent<Collectable>())
-                        {
-                            objectPresent = true;
-                            break;
-                        }
+                        objectPresent = true;
+                        break;
                     }
+                }
 
-                    if (!objectPresent)
-                    {
-                        Debug.LogWarning($"Watchdog freed orphaned cell at {x},{y}");
-                        grid.FreeCell(x, y);
-                    }
+                if (!objectPresent)
+                {
+                    grid.FreeCell(x, y);
                 }
             }
         }
@@ -478,29 +665,7 @@ public void ManualStart()
         Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
         return (topRight.x - gridPadding) - (bottomLeft.x + gridPadding);
     }
-
-    public float GetScreenWorldHeight()
-    {
-        var cam = Camera.main;
-        var gfm = GFM;
-        if (!cam || gfm == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
-        {
-            Debug.LogWarning("[DrumTrack] GetScreenWorldHeight: missing Camera or controller/noteVisualizer.");
-            return 0f;
-        }
-
-        float z        = -cam.transform.position.z;
-        Vector3 topRight = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-        float bottomY = gfm.controller.noteVisualizer.GetTopWorldY();
-
-        return (topRight.y - gridPadding) - (bottomY + gridPadding);
-    }
-
-    public float GetNoteVisualizerTopY()
-    {
-        return GameFlowManager.Instance.controller.noteVisualizer.GetTopWorldY();
-    }
-
+    
     public int GetSpawnGridWidth()
     {
         return GameFlowManager.Instance.spawnGrid.gridWidth;
@@ -531,55 +696,104 @@ public void ManualStart()
     }
     public Vector3 GridToWorldPosition(Vector2Int gridPos)
     {
+        var gfm = GFM;
+        if (gfm == null || gfm.spawnGrid == null) return Vector3.zero;
+
+        int w = gfm.spawnGrid.gridWidth;
+        int h = gfm.spawnGrid.gridHeight;
+        if (w <= 0 || h <= 0) return Vector3.zero;
+
+        float tile = GetCellWorldSize();
+        PlayArea area = GetPlayAreaWorld();
+
+        float x = area.left   + (gridPos.x + 0.5f) * tile;
+        float y = area.bottom + (gridPos.y + 0.5f) * tile;
+
+        return new Vector3(x, y, 0f);
+    }
+
+    public float GetDustBandHeightWorld()
+    {
         var cam = Camera.main;
         var gfm = GFM;
-        if (!cam || gfm == null || gfm.spawnGrid == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+
+        if (!cam || gfm == null || gfm.controller == null || gfm.controller.noteVisualizer == null || gfm.spawnGrid == null)
         {
-            Debug.LogWarning("[DrumTrack] GridToWorldPosition: missing Camera, spawnGrid, or controller.");
-            return Vector3.zero;
+            Debug.LogWarning("[DrumTrack] GetDustBandHeightWorld: missing Camera, controller, NoteVisualizer, or spawnGrid.");
+            return 0f;
         }
 
-        float cameraDistance = -cam.transform.position.z;
+        // Bottom of band: top of NoteVisualizer
+        float nvTop = gfm.controller.noteVisualizer.GetTopWorldY();
 
-        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+        // Top of band: top of the camera view
+        float z = -cam.transform.position.z;
+        var topRight = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        float camTopY = topRight.y;
 
-        float normalizedX = gridPos.x / (float)(gfm.spawnGrid.gridWidth  - 1);
-        float normalizedY = gridPos.y / (float)(gfm.spawnGrid.gridHeight - 1);
+        // Apply the same padding concept vertically if you want
+        float bandBottom = nvTop + gridPadding;
+        float bandTop    = camTopY - gridPadding;
 
-        float worldX  = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
-        float bottomY = gfm.controller.noteVisualizer.GetTopWorldY();
-        float worldY  = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
+        float bandHeight = bandTop - bandBottom;
+        if (bandHeight <= 0f)
+        {
+            Debug.LogWarning($"[DrumTrack] GetDustBandHeightWorld: bandHeight <= 0 (bottom={bandBottom}, top={bandTop}).");
+            return 0f;
+        }
 
-        return new Vector3(worldX, worldY, 0f);
+        return bandHeight;
+    }
+    public float GetDustBandBottomCenterY()
+    {
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+            return 0f;
+
+        float tile = GetCellWorldSize();
+        PlayArea area = GetPlayAreaWorld();
+
+        // Bottom edge + half a tile gives the center of row 0
+        return area.bottom + tile * 0.5f;
+    }
+
+    public float GetDustBandTopCenterY()
+    {
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null || gfm.spawnGrid == null)
+            return GetDustBandBottomCenterY();
+
+        int h = gfm.spawnGrid.gridHeight;
+        if (h <= 0) return GetDustBandBottomCenterY();
+
+        float tile = GetCellWorldSize();
+        float bottomCenterY = GetDustBandBottomCenterY();
+
+        return bottomCenterY + tile * (h - 1);
     }
 
     public Vector2Int WorldToGridPosition(Vector3 worldPos)
     {
-        var cam = Camera.main;
         var gfm = GFM;
-        if (!cam || gfm == null || gfm.spawnGrid == null)
-        {
-            Debug.LogWarning("[DrumTrack] WorldToGridPosition: missing Camera or spawnGrid.");
-            return Vector2Int.zero;
-        }
+        if (gfm == null || gfm.spawnGrid == null) return Vector2Int.zero;
 
-        float cameraDistance = -cam.transform.position.z;
+        int w = gfm.spawnGrid.gridWidth;
+        int h = gfm.spawnGrid.gridHeight;
+        if (w <= 0 || h <= 0) return Vector2Int.zero;
 
-        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+        float tile = GetCellWorldSize();
+        PlayArea area = GetPlayAreaWorld();
 
-        float normalizedX = Mathf.InverseLerp(bottomLeft.x, bottomLeft.x + (topRight.x - bottomLeft.x), worldPos.x);
-        float normalizedY = Mathf.InverseLerp(bottomLeft.y, bottomLeft.y + (topRight.y - bottomLeft.y), worldPos.y);
+        float gx = (worldPos.x - area.left)   / tile - 0.5f;
+        float gy = (worldPos.y - area.bottom) / tile - 0.5f;
 
-        int gridX = Mathf.Clamp(
-            Mathf.RoundToInt(normalizedX * (gfm.spawnGrid.gridWidth  - 1)),
-            0, gfm.spawnGrid.gridWidth  - 1);
-        int gridY = Mathf.Clamp(
-            Mathf.RoundToInt(normalizedY * (gfm.spawnGrid.gridHeight - 1)),
-            0, gfm.spawnGrid.gridHeight - 1);
+        int ix = Mathf.RoundToInt(gx);
+        int iy = Mathf.RoundToInt(gy);
 
-        return new Vector2Int(gridX, gridY);
+        ix = Mathf.Clamp(ix, 0, w - 1);
+        iy = Mathf.Clamp(iy, 0, h - 1);
+
+        return new Vector2Int(ix, iy);
     }
 
     public float GetTimeToLoopEnd(bool effective = true) { 
@@ -636,6 +850,17 @@ public void ManualStart()
         }
         drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
     }
+    void OnDrawGizmosSelected()
+    {
+        if (!HasSpawnGrid()) return;
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawSphere(GridToWorldPosition(new Vector2Int(0, 0)), 0.1f);                       // bottom-left grid
+        Gizmos.DrawSphere(GridToWorldPosition(new Vector2Int(GetSpawnGridWidth() - 1, 0)), 0.1f); // bottom-right
+        Gizmos.DrawSphere(GridToWorldPosition(new Vector2Int(0, GetSpawnGridHeight() - 1)), 0.1f); // top-left
+        Gizmos.DrawSphere(GridToWorldPosition(new Vector2Int(GetSpawnGridWidth() - 1, GetSpawnGridHeight() - 1)), 0.1f); // top-right
+    }
+
     private void LoopRoutines()
     { if (isPhaseStarActive &&  _star.gameObject != null && !GameFlowManager.Instance.controller.AnyCollectablesInFlight())
             _star.OnLoopBoundary_RearmIfNeeded();
@@ -651,6 +876,9 @@ public void ManualStart()
             GameFlowManager.Instance.dustGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
         }
         completedLoops++;
+        Debug.Log($"[MNDBG] LoopBoundary: completedLoops(before)={completedLoops}, " +
+                  $"activeMineNodes={activeMineNodes.Count}");
+
         OnLoopBoundary?.Invoke();
     }
     private IEnumerable<Vector2Int> HexNeighbors(Vector2Int c)
@@ -756,6 +984,45 @@ private IEnumerator WaitAndChangeDrumLoop()
 
     _lastLoopCount = Mathf.FloorToInt((float)(AudioSettings.dspTime - startDspTime) / _clipLengthSec);
 }
+private float GetTileDiameterWorld()
+{
+    var gfm  = GFM;
+    var dust = gfm != null ? gfm.dustGenerator : null;
+
+    if (dust != null && dust.TileDiameterWorld > 0f)
+        return dust.TileDiameterWorld;
+
+    // Fallback: distance between cells (0,0) and (1,0) using current mapping
+    // so we don’t blow up if dustGenerator is missing in some scenes.
+    var a = GridToWorldPosition_Legacy(new Vector2Int(0, 0));
+    var b = GridToWorldPosition_Legacy(new Vector2Int(1, 0));
+    float d = Vector2.Distance(a, b);
+    return d > 0f ? d : 1f;
+}
+// Legacy mapping used only as a fallback for deriving an approximate cell size
+private Vector3 GridToWorldPosition_Legacy(Vector2Int gridPos)
+{
+    var cam = Camera.main;
+    var gfm = GFM;
+    if (!cam || gfm == null || gfm.spawnGrid == null || gfm.controller == null || gfm.controller.noteVisualizer == null)
+    {
+        return Vector3.zero;
+    }
+
+    float cameraDistance = -cam.transform.position.z;
+
+    Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
+    Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
+
+    float normalizedX = gridPos.x / (float)(gfm.spawnGrid.gridWidth  - 1);
+    float normalizedY = gridPos.y / (float)(gfm.spawnGrid.gridHeight - 1);
+
+    float worldX  = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
+    float bottomY = GetDustBandBottomCenterY();
+    float worldY  = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
+
+    return new Vector3(worldX, worldY, 0f);
+}
 
     private void RemixTrack(InstrumentTrack track)
     {
@@ -786,6 +1053,29 @@ private IEnumerator WaitAndChangeDrumLoop()
         if (track.GetNoteDensity() < 4)
             AddRandomNotes(track, noteSet, 4 - track.GetNoteDensity()); // Pad sparsity
     }
+    public void SyncTileWithScreen()
+    {
+        var gfm  = GFM;
+        var dust = gfm != null ? gfm.dustGenerator : null;
+        if (gfm == null || gfm.spawnGrid == null || dust == null)
+            return;
+
+        int gridW = gfm.spawnGrid.gridWidth;
+        int gridH = gfm.spawnGrid.gridHeight;
+        if (gridW <= 0 || gridH <= 0) return;
+
+        PlayArea area = GetPlayAreaWorld();
+        if (area.width <= 0f || area.height <= 0f) return;
+
+        // NOTE: Dividing by gridW / gridH, NOT (gridW - 1)/(gridH - 1)
+        float tileX = area.width  / gridW;
+        float tileY = area.height / gridH;
+
+        float tile = Mathf.Min(tileX, tileY);   // square cells; in your case tileX == tileY
+
+        dust.TileDiameterWorld = tile;
+    }
+
     public int GetLeaderSteps()
     {
         var ctrl = GameFlowManager.Instance?.controller;

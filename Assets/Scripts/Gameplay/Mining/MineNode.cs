@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Gameplay.Mining;
 using UnityEngine;
 using Random = System.Random;
@@ -18,15 +19,93 @@ public class MineNode : MonoBehaviour
     private MineNodeRailAgent _rail;
     private Collider2D _col;
     private Rigidbody2D _rb;
+    
+    // --- Carving → Retired lifecycle data ---
+    private bool _isRetired = false;
+    private int _birthLoop;
+    private DrumTrack _drumTrack;
+
+    // --- Grid-based path recording (only during carving) ---
+    // Each entry is a grid cell the node occupied while carving.
+    private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
+
+    // --- Ping-pong traversal state for Retired mode ---
+    private int _pathIndex = 0;
+    private bool _pathForward = true;
+
+    // Retired steering parameters (grid patrol, modulated by vehicle hits)
+    private const float _retiredSteerForceBase        = 6f;
+    private const float _retiredSteerForceMin         = 2f;
+    private const float _retiredSteerForceMax         = 14f;
+    private const float _retiredSteerRecoverRate      = 8f;   // units/sec back toward base
+    private float       _retiredSteerForce            = _retiredSteerForceBase;
+
     public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
     private void Start()
     {
-        GetComponent<Rigidbody2D>();
+        _rb = GetComponent<Rigidbody2D>();
         _originalScale = transform.localScale;
         _strength = maxStrength;
     }
+
+    private void FixedUpdate()
+    {
+        if (!_isRetired) return;
+        if (_rb == null || _drumTrack == null || _carvedPath.Count < 2) return;
+
+        // Gradually recover steering force toward the base over time
+        _retiredSteerForce = Mathf.MoveTowards(
+            _retiredSteerForce,
+            _retiredSteerForceBase,
+            _retiredSteerRecoverRate * Time.fixedDeltaTime);
+
+        // Current patrol target: center of the current grid cell
+        Vector2Int cell  = _carvedPath[_pathIndex];
+        Vector3    target = _drumTrack.CellCenter(cell);
+
+        Vector2 toTarget = (Vector2)(target - (Vector3)_rb.position);
+        if (toTarget.sqrMagnitude > 0.0001f)
+        {
+            Vector2 dir = toTarget.normalized;
+            _rb.AddForce(dir * _retiredSteerForce, ForceMode2D.Force);
+        }
+
+        // Ping-pong index logic once we're close to the current target cell
+        if (Vector2.Distance(_rb.position, target) < 0.1f)
+        {
+            if (_pathForward)
+            {
+                if (_pathIndex < _carvedPath.Count - 1)
+                {
+                    _pathIndex++;
+                }
+                else
+                {
+                    _pathForward = false;
+                    _pathIndex--;
+                }
+            }
+            else
+            {
+                if (_pathIndex > 0)
+                {
+                    _pathIndex--;
+                }
+                else
+                {
+                    _pathForward = true;
+                    _pathIndex++;
+                }
+            }
+        }
+    }
+
     public void Initialize(MinedObjectSpawnDirective directive)
     {
+        Debug.Log($"[MNDBG] MineNode.Initialize: node={name}, role={directive.role}, " +
+                  $"type={directive.minedObjectType}, track={directive.assignedTrack?.name}, " +
+                  $"spawnCell={directive.spawnCell}");
+
         _directive    = directive;                 // ⬅ cache
         GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
         _lockedColor = directive.displayColor;
@@ -34,6 +113,34 @@ public class MineNode : MonoBehaviour
         obj.transform.SetParent(transform);
         obj.SetActive(false);
         _minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
+        var dust = GetComponent<MineNodeDustInteractor>();
+        if (dust != null)
+        {
+            Debug.Log($"[MNDBG] MineNode.Init tuning: node={name}, " +
+                      $"carveInterval={dust.carveIntervalSeconds:F3}, appetiteMul={dust.carveAppetiteMul:F2}, " +
+                      $"speedCapMul={dust.speedCapMul:F2}, extraBrake={dust.extraBrake:F2}");
+        }
+        else
+        {
+            Debug.LogWarning($"[MNDBG] MineNode.Init: node={name} has NO MineNodeDustInteractor");
+        }
+
+        // --- Capture drum track reference & birth loop index ---
+        _drumTrack = _minedObject.assignedTrack?.drumTrack;
+        if (_drumTrack != null)
+        {
+            _birthLoop = _drumTrack.completedLoops;
+            _drumTrack.OnLoopBoundary += HandleLoopBoundary;
+        }
+
+// --- Begin in Carving Mode ---
+        _isRetired = false;
+        _carvedPath.Clear();
+
+// --- Role-based carving parameters ---
+        ConfigureFromRole(directive.role);
+
+        
         coreSprite.color = directive.assignedTrack.trackColor;
         _minedObject.assignedTrack.drumTrack.RegisterMinedObject(_minedObject);
 //        _minedObject.assignedTrack.drumTrack.OccupySpawnGridCell(directive.spawnCell.x, directive.spawnCell.y, GridObjectType.Node);
@@ -63,6 +170,80 @@ public class MineNode : MonoBehaviour
         }
 
     }
+    private void HandleLoopBoundary()
+    {
+        if (_isRetired || _drumTrack == null) return;
+
+        // First loop boundary after spawn → stop carving
+        if (_drumTrack.completedLoops > _birthLoop)
+        {
+            EnterRetiredMode();
+        }
+    }
+    private void EnterRetiredMode()
+    {
+        _isRetired = true;
+        _retiredSteerForce = _retiredSteerForceBase;
+        // disable carving
+        var dust = GetComponent<MineNodeDustInteractor>();
+        if (dust != null) dust.carveMaze = false;
+
+        // ensure valid path
+        if (_carvedPath.Count < 2)
+        {
+            // nothing meaningful to ping-pong on
+            _pathIndex = 0;
+            _pathForward = true;
+            return;
+        }
+
+        _pathIndex = 0;
+        _pathForward = true;
+    }
+    // Called by MineNodeDustInteractor when erosion succeeds
+    public void NotifyDustErodedAt(Vector3 worldPos)
+    {
+        if (_isRetired) return;     // retired nodes do not record
+        if (_drumTrack == null) return;
+
+        // Project carving position into the grid
+        Vector2Int cell = _drumTrack.CellOf(worldPos);
+
+        // Avoid duplicate samples when staying in the same cell
+        if (_carvedPath.Count > 0 && _carvedPath[_carvedPath.Count - 1] == cell)
+            return;
+
+        _carvedPath.Add(cell);
+    }
+
+    void ConfigureFromRole(MusicalRole role)
+    {
+        var dust = GetComponent<MineNodeDustInteractor>();
+        if (!dust) return;
+
+        switch (role)
+        {
+            case MusicalRole.Bass:
+                // big, clear trench – more appetite, frequent carving
+                dust.ConfigureCarving(intervalSeconds: 0.05f, appetiteMul: 1.4f);
+                break;
+
+            case MusicalRole.Groove:
+                // medium appetite, slightly slower – rhythm-y “dotted” path
+                dust.ConfigureCarving(intervalSeconds: 0.09f, appetiteMul: 1.0f);
+                break;
+
+            case MusicalRole.Harmony:
+                // lighter carving, slower – subtle lace
+                dust.ConfigureCarving(intervalSeconds: 0.11f, appetiteMul: 0.8f);
+                break;
+
+            case MusicalRole.Lead:
+                // sharp, high-contrast nibble – narrow but insistent
+                dust.ConfigureCarving(intervalSeconds: 0.07f, appetiteMul: 1.1f);
+                break;
+        }
+    }
 
     private void RevealPreloadedObject()
     {
@@ -85,6 +266,7 @@ public class MineNode : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D coll)
     { 
+        
         if(_rail != null) _rail.ReplanToFarthest();
         if (_minedObject != null)
         {
@@ -102,6 +284,67 @@ public class MineNode : MonoBehaviour
             }          
             if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
             {
+                if (_isRetired && _drumTrack != null && _carvedPath.Count >= 2)
+                {
+                    int fromIdx = _pathIndex;
+                    int toIdx = _pathForward
+                        ? Mathf.Min(_pathIndex + 1, _carvedPath.Count - 1)
+                        : Mathf.Max(_pathIndex - 1, 0);
+
+                    Vector2Int fromCell = _carvedPath[fromIdx];
+                    Vector2Int toCell   = _carvedPath[toIdx];
+
+                    Vector3 fromPos = _drumTrack.CellCenter(fromCell);
+                    Vector3 toPos   = _drumTrack.CellCenter(toCell);
+
+                    Vector2 patrolDir = (Vector2)(toPos - fromPos);
+                    if (patrolDir.sqrMagnitude > 0.0001f)
+                    {
+                        patrolDir.Normalize();
+
+                        // Choose impact vector: vehicle velocity if available, else collision relative velocity
+                        Vector2 impactVel = Vector2.zero;
+                        if (vehicle.TryGetComponent<Rigidbody2D>(out var vRb) &&
+                            vRb.linearVelocity.sqrMagnitude > 0.0001f)
+                        {
+                            impactVel = vRb.linearVelocity;
+                        }
+                        else if (coll.relativeVelocity.sqrMagnitude > 0.0001f)
+                        {
+                            impactVel = coll.relativeVelocity;
+                        }
+
+                        if (impactVel.sqrMagnitude > 0.0001f)
+                        {
+                            impactVel.Normalize();
+                            float dot = Vector2.Dot(patrolDir, impactVel);
+
+                            const float alignThresh   = 0.4f;  // "hit from behind"
+                            const float reverseThresh = -0.4f; // "hit head-on"
+
+                            if (dot > alignThresh)
+                            {
+                                // Hit from behind: temporarily speed up along the patrol path
+                                _retiredSteerForce = Mathf.Min(
+                                    _retiredSteerForce * 1.5f,
+                                    _retiredSteerForceMax);
+                            }
+                            else if (dot < reverseThresh)
+                            {
+                                // Head-on: slow down, and for strong head-on hits flip patrol direction
+                                _retiredSteerForce = Mathf.Max(
+                                    _retiredSteerForce * 0.5f,
+                                    _retiredSteerForceMin);
+
+                                if (dot < -0.8f)
+                                {
+                                    _pathForward = !_pathForward;
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 _strength -= vehicle.GetForceAsDamage();
                 _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
                 float normalized = (float)_strength / maxStrength; // [0, 1]
@@ -125,12 +368,20 @@ public class MineNode : MonoBehaviour
                             var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
                             
                             if (track != null)
-                            {
-
-                                var ns = GameFlowManager.Instance.noteSetFactory.Generate(track, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+                            { 
+                                var ptm   = GameFlowManager.Instance.phaseTransitionManager;
+                                var motif = ptm.currentMotif;
+                                Debug.Log($"[MINENODE] Generating Motif Noteset");
+                                var ns = ptm.noteSetFactory.Generate(track, ptm.currentMotif);
                                 spawner.selectedNoteSet = ns;
                                 Debug.Log($"Note set: {ns}");
+                                if (motif != null)
+                                {
+                                    int fuseLoops = motif.GetLoopsToAscendFor(track.assignedRole, fallback: track.ascendLoopCount);
+                                    track.ascendLoopCount = Mathf.Max(1, fuseLoops);
+                                    Debug.Log($"[MINENODE] Set ascendLoopCount for {track.name} ({track.assignedRole}) to {track.ascendLoopCount} from motif {motif.name}");
 
+                                }
                             }
                         }
                         // Emit notes BEFORE we reveal/destroy anything
@@ -141,6 +392,7 @@ public class MineNode : MonoBehaviour
                         } 
                         Debug.Log($"Bursting Collectables with {spawner.selectedNoteSet} at {spawner.assignedTrack}"); 
                         spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet, 8);
+                        spawner.assignedTrack.DisplayNoteSet();
                         var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
                         float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 
                         CollectionSoundManager.Instance?.PlayBurstLeadIn(spawner.assignedTrack, set, Mathf.Max(0.05f, remain));

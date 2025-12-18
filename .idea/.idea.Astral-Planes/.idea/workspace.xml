@@ -5,45 +5,57 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/indexLayout.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/vcs.xml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/BeatIntensityUtility.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/BeatIntensityUtility.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifQueue.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifQueue.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Tendril Bloom.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Tendril Bloom.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Notes/NoteSet Factory.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Notes/NoteSet Factory.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Establish Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Establish Behavior.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Release Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Release Behavior.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Howler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Howler.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/NoteSetConfigLibrary.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/NoteSetConfigLibrary.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Motiffs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/PhaseStarVisuals2D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/PhaseStarVisuals2D.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/HarmonyDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/HarmonyDirector.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/NoteSpawnerMinedObject.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/NoteSpawnerMinedObject.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SpawnGrid.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SpawnGrid.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/PhaseStarDustAffect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/PhaseStarDustAffect.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseProfile.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/MineNodeProgressionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/MineNodeProgressionManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/Boundaries.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/Boundaries.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/_Recovery.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Packages/packages-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/Packages/packages-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectSettings/ProjectVersion.txt" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/ProjectVersion.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RolePhaseNoteSetConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/RolePhaseNoteSetConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Diamond Outline.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Diamond Outline.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ProjectSettings/ProjectSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/ProjectSettings.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,8 +66,9 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/../AV-Conversation/Assets/Scripts/Nodes/GateTraitsNode.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../AV-Conversation/Assets/Scripts/Nodes/ShowChoiceNode.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/ChordProgressionGenerator.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/MainMenuCoralLoader.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Effects/VisualNoteMarker.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/ChordChangeArpeggiator.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/HarmonyDirector.cs" root0="FORCE_HIGHLIGHTING" />
@@ -78,6 +91,8 @@
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/VehicleRemixController.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/DrumVolumeMixer.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifLibrary.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetConfigLibrary.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/PhasePersonalityRegistry.cs" root0="FORCE_HIGHLIGHTING" />
@@ -290,6 +305,12 @@
       <workItem from="1763058434550" duration="396000" />
       <workItem from="1763059638503" duration="2760000" />
       <workItem from="1763064733322" duration="17401000" />
+      <workItem from="1763092706401" duration="14708000" />
+      <workItem from="1763408146561" duration="19912000" />
+      <workItem from="1763486568906" duration="9044000" />
+      <workItem from="1763763039527" duration="37391000" />
+      <workItem from="1765146882181" duration="58015000" />
+      <workItem from="1766009777552" duration="15759000" />
     </task>
     <servers />
   </component>

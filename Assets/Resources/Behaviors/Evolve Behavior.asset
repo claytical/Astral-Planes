@@ -79,7 +79,7 @@ MonoBehaviour:
   starDriftJitter: 0.2
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 6
+  dustShrinkRadius: 16
   dustShrinkUnitsPerSec: 1.2
   dustFalloff:
     serializedVersion: 2
@@ -110,7 +110,7 @@ MonoBehaviour:
   ejectionStyle: 1
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
-  nodesPerStar: 3
+  nodesPerStar: 7
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6
   nodeFlightEase:

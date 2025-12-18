@@ -59,13 +59,13 @@ MonoBehaviour:
   dust: {fileID: 7465792772216044867}
   _progressionMul: 1
   _isInFocusMode: 0
-  _totalShardsPlanned: 0
   syncRotationToLoop: 1
   _tracePhaseStar: 1
   maxActiveDps: 360
   _oncePerLoop: 0
   _minPreviewIntervalSec: 0.5
   _personalityMul: 1
+  _assignedMotif: {fileID: 0}
   _perPetalLayerStep: 0
   _activeTopBoost: 0
   _spinEnvMul: 0
@@ -82,12 +82,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   diamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000, type: 3}
-  activeDiamond: {fileID: 3625043607559282579, guid: 97f6d8e57188a433bbc1a8f3e8e08701,
+  activeDiamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
   particles: {fileID: 382306593780773728}
-  spritePivots:
-  - {fileID: 0}
-  - {fileID: 0}
   maxFaceTurnDegPerSec: 12
   wobbleDeg: 3
   wobbleHz: 0.12
@@ -121,11 +118,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 546d9c7f0aaa1435894ba83077b35670, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  dustLayer:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  maxHits: 64
-  erodeTick: 0.15
+  erodeTick: 0.05
   appetiteMul: 1
 --- !u!58 &1335835332103871931
 CircleCollider2D:

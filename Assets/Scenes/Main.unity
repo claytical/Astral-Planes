@@ -903,7 +903,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1151719977}
   - component: {fileID: 1151719978}
-  - component: {fileID: 1151719979}
   - component: {fileID: 1151719980}
   m_Layer: 0
   m_Name: GameFlowManager
@@ -939,6 +938,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  demoMode: 1
   phaseProfiles:
   - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
   - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
@@ -950,10 +950,9 @@ MonoBehaviour:
   controller: {fileID: 0}
   arp: {fileID: 0}
   activeDrumTrack: {fileID: 0}
-  progressionManager: {fileID: 0}
   dustGenerator: {fileID: 0}
   spawnGrid: {fileID: 0}
-  noteSetFactory: {fileID: 1151719979}
+  noteSetFactory: {fileID: 0}
   coralPrefab: {fileID: 3306639670150737611, guid: 8d387e67775794007ba96dfadbea003d,
     type: 3}
   disableCoralDuringBridge: 1
@@ -964,19 +963,6 @@ MonoBehaviour:
   playerStatsGrid: {fileID: 0}
   _activeTracks: []
   playerProgress: 0
---- !u!114 &1151719979
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1151719976}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1bd07417d98a8445e94a6f8c2ba217fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  configLibrary: {fileID: 11400000, guid: 121692e96748547a7bb04fb3c42720d1, type: 2}
 --- !u!114 &1151719980
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -997,6 +983,8 @@ MonoBehaviour:
   spreadOverLoops: 1
   retunePolicy: 0
   seedFromProfileOnPhaseStart: 0
+  useMotifChordProfiles: 1
+  applyInitialMotifProfileImmediately: 1
   conflictPolicy: 0
 --- !u!1 &1241868050
 GameObject:

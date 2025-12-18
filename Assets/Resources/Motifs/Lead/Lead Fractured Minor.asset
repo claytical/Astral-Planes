@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
+  m_Name: Lead Fractured Minor
+  m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
+  id: Lead Fractured Minor
+  role: 2
+  scales:
+  - item: 1
+    weight: 0.5
+  - item: 4
+    weight: 0.3
+  - item: 6
+    weight: 0.2
+  patterns:
+  - item: 17
+    weight: 0.3
+  - item: 0
+    weight: 0.3
+  - item: 16
+    weight: 0.4
+  rhythms:
+  - item: 9
+    weight: 0.5
+  - item: 8
+    weight: 0.3
+  - item: 6
+    weight: 0.2
+  chordFunctions:
+  - item: i
+    weight: 0.4
+  - item: bII
+    weight: 0.3
+  - item: bVI
+    weight: 0.3
+  chordsPerRegion: 3
+  behaviors:
+  - item: 7
+    weight: 0.4
+  - item: 13
+    weight: 0.3
+  - item: 8
+    weight: 0.3
+  maxBehaviorsStack: 3
+  variation:
+    extensionBias: 0.5
+    passingToneProb: 0.3
+    neighborOrnProb: 0.2
+    minMidi: 58
+    maxMidi: 88
+    leapProb: 0.3
+    octaveMoveProb: 0.2
+    restProb: 0.18
+    humanizeMs: 0.026
+    durJitter: 1.15
+    mutatePitch: 0.2
+    mutateVelocity: 0.22
+    mutateDuration: 0.18

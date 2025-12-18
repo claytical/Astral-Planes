@@ -930,6 +930,7 @@ PlayerSettings:
   scriptingDefineSymbols:
     Android: CROSS_PLATFORM_INPUT;MOBILE_INPUT;IGNORE_ANDROID_SCREENSHOT;UseGooglePlayGamesPlugin
     Standalone: CROSS_PLATFORM_INPUT;STEAMWORKS_NET
+    WebGL: STEAMWORKS_NET
     Windows Store Apps: MOBILE_INPUT
     iPhone: CROSS_PLATFORM_INPUT;MOBILE_INPUT;IGNORE_IOS_SCREENSHOT;UseGameCenterPlugin
   additionalCompilerArguments: {}

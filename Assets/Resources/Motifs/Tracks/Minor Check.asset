@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Minor Check
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: Minor Check
+  displayName: Minor Check
+  beatMood: 0
+  keyRootMidi: 55
+  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
+  phaseProfile: {fileID: 11400000, guid: a756d4e83a53b43ed990e4579dde83e8, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 11cb3704113c845758b5967f0256a8af, type: 2}
+  - {fileID: 11400000, guid: d19a70b25bf994732a4b4a38ccfb16c8, type: 2}
+  - {fileID: 11400000, guid: 5b9c935d3689e4a129d3e3d632569110, type: 2}
+  - {fileID: 11400000, guid: 9e78967671b4d4ae08f936b848a67d14, type: 2}
+  selectionWeight: 1

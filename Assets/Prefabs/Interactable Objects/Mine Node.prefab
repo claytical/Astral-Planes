@@ -10,7 +10,6 @@ GameObject:
   m_Component:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 4180682225686574285}
-  - component: {fileID: 8337744200482214873}
   - component: {fileID: 2404411601338668691}
   - component: {fileID: 1784781495894534207}
   - component: {fileID: 8668376557347016044}
@@ -55,21 +54,6 @@ MonoBehaviour:
   maxStrength: 100
   _minedObject: {fileID: 8268204866429990808, guid: b644b7f95bb324e49bfdeafb8b28d189,
     type: 3}
---- !u!114 &8337744200482214873
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b6d5a83c4ddf54264a6b5b87661a0604, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cellsPerSecond: 1
-  replanCooldown: 0.15
-  snapAtCorners: 1
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -82,10 +66,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speedCapMul: 0.9
-  extraBrake: 0.25
+  speedCapMul: 3
+  extraBrake: 0
   lateralNudgeMul: 1
   turbulenceMul: 1
+  enableCarving: 1
+  maxDustCellsToCarve: 0
+  carveWidthCells: 1
+  carveMaze: 1
+  carveIntervalSeconds: 0.08
+  carveAppetiteMul: 1
 --- !u!114 &1784781495894534207
 MonoBehaviour:
   m_ObjectHideFlags: 0

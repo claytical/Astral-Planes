@@ -22,7 +22,7 @@ public class MusicalPhaseProfile : ScriptableObject
     public MusicalPhase phase;
     
     [Header("Audio")]
-    public AudioClip[] drumClips;
+//    public AudioClip[] drumClips;
     
     [Header("Track Utility")]
     public TrackUtilityStrategy defaultRemixStrategy;
