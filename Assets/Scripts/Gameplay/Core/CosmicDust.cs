@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
 public enum DustBehaviorType { PushThrough, Stop, Repel }
+public enum DustClearKind { Temporary, Permanent }
+
 public class CosmicDust : MonoBehaviour
 {
     [Header("Sizing (safe fallback)")]
@@ -23,6 +25,15 @@ public class CosmicDust : MonoBehaviour
     [Min(0f)] public float energyDrainPerSecond = .25f;
     [Tooltip("If true, boosting will NOT drain energy (boosting is the 'broom' mechanic).")] 
     public bool noDrainWhileBoosting = true;
+    [Header("Dust Clearing")]
+    [Tooltip("Seconds of sustained non-boost contact before this dust tile breaks (temporary clear). Higher = more wall-like.")]
+    [Min(0.05f)] public float nonBoostSecondsToBreak = 2.5f;
+
+    [Tooltip("Override delay (seconds) before temporary regrow into the SAME cell. -1 uses the phase default.")]
+    public float temporaryRegrowDelaySeconds = -1f;
+
+    private float _nonBoostClearSeconds;
+
     [Header("Accommodation (vehicle)")]
     [Range(0.3f, 1f)] public float minScaleFactor = 0.55f;   // never shrink below 55% of full
     [Range(0f, 0.5f)] public float shrinkStep = 0.12f;        // how much each ENTRY tries to shave off
@@ -54,6 +65,7 @@ public class CosmicDust : MonoBehaviour
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
     private float _phaseDrainPerSecond = 1f;
+    private bool _isBreaking;
 
     private static class DustDestroyStats
     {
@@ -190,11 +202,7 @@ public class CosmicDust : MonoBehaviour
         
         transform.localScale = fullScale;
     }
-    private IEnumerator TriggerDelayedRegrowth(Vector2Int gridPos)
-    {
-        yield return new WaitForSeconds(0.2f); // delay long enough for Explode effect
-        GameFlowManager.Instance.dustGenerator.TriggerRegrowth(gridPos, GameFlowManager.Instance.phaseTransitionManager.currentPhase);
-    }
+
     private IEnumerator RegrowAfterDelay()
     {
         yield return new WaitForSeconds(regrowDelay);
@@ -530,25 +538,37 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         transform.localScale = target;
     }
 
-    private void BreakHexagon()
+    private void BreakHexagon(DustClearKind kind)
     {
-        CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Dust);
+        if (_isBreaking) return;
+        _isBreaking = true;
+
         if (_drumTrack != null)
         {
             Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
-            _drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
-            StartCoroutine(TriggerDelayedRegrowth(gridPos));
-        }
 
-        if (particleSystem != null)
-        {
-            StartCoroutine(WaitForParticlesThenDestroy());
+            var gfm   = GameFlowManager.Instance;
+            var gen   = gfm != null ? gfm.dustGenerator : null;
+            var phase = gfm != null && gfm.phaseTransitionManager != null
+                ? gfm.phaseTransitionManager.currentPhase
+                : MusicalPhase.Establish;
+
+            if (gen != null)
+            {
+                if (kind == DustClearKind.Permanent)
+                {
+                    // Player-authored corridor: never regrow.
+                    gen.DespawnDustAtAndMarkPermanent_Public(gridPos);
+                }
+                else
+                {
+                    // Temporary clear: regrow into the SAME cell.
+                    gen.DespawnDustAt(gridPos);
+                    gen.RequestRegrowCellAt(gridPos, phase, temporaryRegrowDelaySeconds);
+                }
+            }
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+        gameObject.SetActive(false);
     }
 
     public void DestroyFromPhaseStar()
@@ -600,11 +620,14 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         if (_regrowRoutine     != null) { StopCoroutine(_regrowRoutine);     _regrowRoutine     = null; }
         if (_fadeRoutine       != null) { StopCoroutine(_fadeRoutine);       _fadeRoutine       = null; }
         if (_growInRoutine     != null) { StopCoroutine(_growInRoutine);     _growInRoutine     = null; }
-
+        _isBreaking = false;
+        _isDespawned = false;
+        _nonBoostClearSeconds = 0f;
+        _stayForceUntil = 0f;
         _shrinkingFromStar = false;
         _accomodationTarget = fullScale = referenceScale;
         transform.localScale = referenceScale;
-
+        hitbox.enabled = true;
         if (particleSystem != null)
         {
             particleSystem.Clear(true);
@@ -654,8 +677,8 @@ public IEnumerator RetintOver(float seconds, Color toTint)
     }
     private void OnTriggerEnter2D(Collider2D other) {
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
-        v.EnterDustField(speedScale, accelScale);  
-
+        v.EnterDustField(speedScale, accelScale);
+        _nonBoostClearSeconds = 0f;
         // drive the per-behavior feel (lateral nudge, turbulence, cling)
         if (v.TryGetComponent<Rigidbody2D>(out var rb))
         {
@@ -674,24 +697,44 @@ public IEnumerator RetintOver(float seconds, Color toTint)
 
         // 1. ENERGY DRAIN — every physics step
 
-        float drain = energyDrainPerSecond * Time.deltaTime;
-        if (drain > 0f)
+        if (!(noDrainWhileBoosting && v.boosting))
         {
-            v.DrainEnergy(drain, $"CosmicDust/{behavior}");
+            float drain = _phaseDrainPerSecond * Time.fixedDeltaTime;
+            if (drain > 0f) v.DrainEnergy(drain, $"CosmicDust/{behavior}");
         }
-
         // 2. BOOST CLEAR (optional)
         if (v.boosting)
         {
-            BreakHexagon();
+            BreakHexagon(DustClearKind.Permanent);
             return;
         }
+        // Sustained contact without boosting will eventually clear this hex TEMPORARILY.
+        if (!v.boosting && nonBoostSecondsToBreak > 0f)
+        {
+            _nonBoostClearSeconds += Time.fixedDeltaTime;
+            if (_nonBoostClearSeconds >= nonBoostSecondsToBreak)
+            {
+                BreakHexagon(DustClearKind.Temporary);
+                return;
+            }
+        }
+
 
         // 3. THROTTLED PHYSICS EFFECTS
         if (Time.time < _stayForceUntil) return;
         _stayForceUntil = Time.time + stayForceEvery;
 
         if (!other.TryGetComponent<Rigidbody2D>(out var rb)) return;
+        if (!v.boosting)
+        {
+            // Make dust feel like a wall: kill most of the tangential velocity each physics step.
+            // This prevents “grinding through” multiple cells before the timer can trigger.
+            rb.linearVelocity *= 0.15f;
+
+            // Optional: if you still see creeping, hard clamp tiny velocities to zero.
+            if (rb.linearVelocity.sqrMagnitude < 0.0004f) // ~0.02 units/s
+                rb.linearVelocity = Vector2.zero;
+        }
 
         float max = v.GetMaxSpeed() * speedScale;
         if (rb.linearVelocity.magnitude > max)
@@ -703,9 +746,9 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         if (!other.TryGetComponent<Vehicle>(out var v)) return;
 
         v.ExitDustField(); // <<< restore env scales
-
+        _nonBoostClearSeconds = 0f;
         if (dissipateOnExit)
-            BreakHexagon();
+            BreakHexagon(DustClearKind.Temporary);
     }
     
 }

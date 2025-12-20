@@ -12,11 +12,16 @@ public enum PhaseStarState
     CheckingCompletion,
     BridgeInProgress
 }
-struct PreviewShard {
+struct PreviewShard
+{
     public Color color;
     public bool collected;
     public Transform visual;
+
+    public WeightedMineNode plan;   // NEW: the planned node for this petal
+    public MusicalRole role;        // NEW: cached for convenience
 }
+
 public class PhaseStar : MonoBehaviour
 {
     // -------------------- Serialized config --------------------
@@ -27,6 +32,12 @@ public class PhaseStar : MonoBehaviour
     [Header("Movement & Timing")]
     [SerializeField] private float shardFlightSeconds = 0.65f; // time to fly the node to its grid cell
     private Vector2 lastImpactDirection;
+    [Header("Dust / Space")]
+    [Tooltip("If enabled, the PhaseStar force-clears a small pocket of dust around itself (temporary), ensuring maneuvering space.")]
+    [SerializeField] private bool starKeepsDustClear = true;
+
+    [Tooltip("Radius in grid cells for the PhaseStar maneuvering pocket.")]
+    [SerializeField] private int starKeepClearRadiusCells = 2;
 
     [Header("Subcomponents (optional)")]
     [SerializeField] private PhaseStarVisuals2D visuals;
@@ -49,14 +60,14 @@ public class PhaseStar : MonoBehaviour
     private Transform activeShardVisual;
     private bool buildingPreview = false;
     private int  _shardsEjectedCount;                   // how many shards have ejected so far
-    private bool _lastBurstCollected;                   // true once the most recent MineNode’s collectables are cleared
-    private bool _awaitingLoopPhaseFinish; 
+     private bool _awaitingLoopPhaseFinish; 
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
     float _lastImpactStrength = 0f;
-    private bool _awaitingFinalCollectableClear;   
+       
 // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
+    private bool _awaitingCollectableClear;
 
     public event Action<MusicalRole, int, int> OnShardEjected;
     [SerializeField] private bool syncRotationToLoop = true;
@@ -68,13 +79,29 @@ public class PhaseStar : MonoBehaviour
     private List<float> _baseAngles = new();  // 0..90° spread
     private List<float> _turns = new();       // r[i] = 1/(i+1)
     private List<float> _omega = new();       // deg/sec = 360*r/T_loop
-    private enum DisarmReason { DuringBurst, AwaitLoop, Bridge, Error }
+    public enum DisarmReason
+    {
+        None = 0,
+
+        // Star was hit; we are in the process of spawning/resolving a MineNode.
+        NodeResolving,
+
+        // There exist collectables in flight (global), so we must not allow another poke.
+        CollectablesInFlight,
+
+        // Star has no shards remaining and we’re awaiting bridge transition.
+        AwaitBridge,
+
+        // The bridge is actively running (coral/transition).
+        Bridge
+    }
+    private DisarmReason _disarmReason = DisarmReason.None;
+
     [SerializeField] private float maxActiveDps = 360f; // clamp for comfort
     // -------------------- State & caches --------------------
     private PhaseStarState _state = PhaseStarState.WaitingForPoke;
     private enum VisualMode { Bright, Dim, Hidden }
     private bool _ejectionInFlight;
-    private bool _awaitingBurstResolution;
     private bool _advanceStarted;
     private int  _spawnTicket;
     private Coroutine _retryCo;
@@ -100,16 +127,17 @@ public class PhaseStar : MonoBehaviour
     private float _tweenWindow = 2f;
     public MotifProfile AssignedMotif => _assignedMotif;
 
+    private GameFlowManager gfm;
     // -------------------- Lifecycle --------------------
     void Start()
     {
+        gfm   = GameFlowManager.Instance;
         EnsurePreviewRing();
         if (!buildingPreview)
         {
             InitializeTimingAndSpeeds();
         }    
     }
-
     public void Initialize(
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
@@ -147,23 +175,33 @@ public class PhaseStar : MonoBehaviour
 
         BuildPhasePlan(_assignedPhase);
         PrepareNextDirective();
-        ArmNext();
-        LogState("Initialized+Armed");
-        if (drum != null && !_subscribedLoopBoundary) {
-            drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded; 
-            _subscribedLoopBoundary = true;
-        }
-        // ensure subcomponents are present if assigned
+         // ensure subcomponents are present if assigned
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (!motion)  motion  = GetComponentInChildren<PhaseStarMotion2D>(true);
         if (!dust)    dust    = GetComponentInChildren<PhaseStarDustAffect>(true);
-        if (visuals) visuals.Initialize(behaviorProfile, this);   // tints, dim/bright, hooks motion vel
-        if (motion)  motion.Initialize(behaviorProfile, this);    // sets _profile and subscribes OnArmed
+        if (visuals) visuals.Initialize(behaviorProfile, this); 
+        if (motion)  motion.Initialize(behaviorProfile, this);
         if (dust)    dust.Initialize(behaviorProfile, this);
-        OnArmed?.Invoke(this);
+        if (drum != null && !_subscribedLoopBoundary) { 
+            drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded; 
+            _subscribedLoopBoundary = true;
+        }
+        ArmNext(); 
+        LogState("Initialized+Armed");
     }
     void Update()
     {
+        if (starKeepsDustClear)
+        {
+            
+
+            if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
+            {
+                var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
+                gfm.dustGenerator.SetStarKeepClear(gfm.activeDrumTrack.WorldToGridPosition(transform.position), starKeepClearRadiusCells, phase);
+            }
+        }
+
         // rotate all petals continuously with harmonic ladder speeds
         float dt = Time.deltaTime;
         for (int i = 0; i < _petals.Count; i++)
@@ -177,12 +215,6 @@ public class PhaseStar : MonoBehaviour
 
         // loop wrap → switch shard exactly at the boundary
         var drums = GameFlowManager.Instance?.activeDrumTrack;
-        if (syncRotationToLoop && drums && drums.completedLoops != _lastLoopSeen)
-        {
-            _lastLoopSeen = drums.completedLoops;
-            AdvanceActiveShard();        // your existing method
-            UpdateLayering();
-        }
     }
     private void SafeUnsubscribeAll()
     {
@@ -206,30 +238,33 @@ public class PhaseStar : MonoBehaviour
             case VisualMode.Hidden:  visuals.HideAll();        break;
         }
     } 
-    private bool NoShardsLeftVisual() { 
-        // previewRing is authoritative for visuals; _shardsEjectedCount is a defensive fallback.
-        int planned = Mathf.Max(1, behaviorProfile != null ? behaviorProfile.nodesPerStar : 1); 
-        bool petalsGone = (previewRing == null || previewRing.Count == 0); 
-        bool countGone  = (_shardsEjectedCount >= planned); 
-        return petalsGone || countGone;
-    }
     public void NotifyCollectableBurstCleared()
     {
-        // This should only be meaningful after the last shard has been ejected.
-        if (!_awaitingFinalCollectableClear) return;
+        _awaitingCollectableClear = false;
 
-        // Defensive: if somehow shards still remain visually, don't bridge yet.
-        bool noShardsRemain = (previewRing == null || previewRing.Count == 0) ||
-                              (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-        if (!noShardsRemain) return;
+        bool noShardsRemain =
+            (previewRing == null || previewRing.Count == 0) ||
+            (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
 
-        _awaitingFinalCollectableClear = false;
-        _lastBurstCollected = true;
+        // Final shard: start bridge immediately on last collected note.
+        if (noShardsRemain)
+        {
+            BeginBridgeNow();
+            return;
+        }
 
-        // Start bridge immediately (do not wait for MineNode resolution).
-        BeginBridgeNow();
+        // Shards remain: we are no longer busy, so the star should become hittable again.
+        // This must restore visuals + colliders deterministically.
+        ArmNext();
     }
 
+    private bool AnyCollectablesInFlightGlobal()
+    {
+        var gfm = GameFlowManager.Instance;
+        // If your wiring uses a different access path, swap this for whatever is correct in your project.
+        var tc = gfm != null ? gfm.controller : null; // often InstrumentTrackController lives here
+        return (tc != null && tc.AnyCollectablesInFlight());
+    }
     private void BeginBridgeNow() {
         if (_advanceStarted) return; 
         _advanceStarted = true; 
@@ -240,56 +275,39 @@ public class PhaseStar : MonoBehaviour
     }
     private void ArmNext()
     {
-        Trace("ArmNext() begin");
-        // state
-        _state = PhaseStarState.WaitingForPoke;
-        _ejectionInFlight = false;
-        _awaitingBurstResolution = false;
+        if (AnyCollectablesInFlightGlobal()) { Disarm(DisarmReason.CollectablesInFlight); return; }
+        if (!HasShardsRemaining())          { Disarm(DisarmReason.AwaitBridge); return; }
 
-        // prep next directive/preview & visuals
-        _lockPreviewTintUntilIdle = false;
-        PrepareNextDirective();
-        UpdatePreviewTint();
-        SetVisual(VisualMode.Bright, ResolvePreviewColor());
-
-        // colliders on
+        _disarmReason = DisarmReason.None;
         _isArmed = true;
-        foreach (var c in GetComponentsInChildren<Collider2D>(true)) if (c) c.enabled = true;
-        var rb = GetComponent<Rigidbody2D>();
-        if (rb) rb.constraints = RigidbodyConstraints2D.FreezeRotation;
-        LogState("ArmNext() end");
+        PrepareNextDirective();
+        EnableColliders();
+        SetVisual(VisualMode.Bright, ResolvePreviewColor());
+        OnArmed?.Invoke(this);
     }
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
     {
-        Trace($"Disarm({reason}) ");
-        // colliders off
         _isArmed = false;
-        foreach (var c in GetComponentsInChildren<Collider2D>(true)) if (c) c.enabled = false;
-        var rb = GetComponent<Rigidbody2D>();
-        if (rb) rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        _disarmReason = reason;
 
-        // visuals & state
-        Color tint = tintOverride ?? ResolvePreviewColor();
+        DisableColliders();
+
+        var tint = tintOverride ?? ResolvePreviewColor();
+
         switch (reason)
         {
-            case DisarmReason.DuringBurst:
-                _state = PhaseStarState.PursuitActive;
-                SetVisual(NoShardsLeftVisual() ? VisualMode.Hidden : VisualMode.Dim, tint);
-                break;
-            case DisarmReason.AwaitLoop:
-                _state = PhaseStarState.CheckingCompletion;
-                SetVisual(NoShardsLeftVisual() ? VisualMode.Hidden : VisualMode.Dim, tint);
-                break;
+            case DisarmReason.AwaitBridge:
             case DisarmReason.Bridge:
-                _state = PhaseStarState.BridgeInProgress;
                 SetVisual(VisualMode.Hidden, tint);
                 break;
+
+            case DisarmReason.NodeResolving:
+            case DisarmReason.CollectablesInFlight:
             default:
-                _state = PhaseStarState.CheckingCompletion;
-                SetVisual(NoShardsLeftVisual() ? VisualMode.Hidden : VisualMode.Dim, tint);
+                SetVisual(VisualMode.Dim, tint);
                 break;
         }
-        LogState($"Disarm({reason}) end");
+        OnDisarmed?.Invoke(this);
     }
     void InitializeTimingAndSpeeds()
     {
@@ -323,6 +341,17 @@ public class PhaseStar : MonoBehaviour
     public void OnLoopBoundary_RearmIfNeeded()
     {
         if (_isDisposing || this == null) return; 
+        if (_awaitingCollectableClear)
+        {
+            Disarm(DisarmReason.NodeResolving, _lockedTint); // ensure dim + colliders off
+            return;
+        }
+
+        if (AnyCollectablesInFlightGlobal())
+        {
+            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+            return;
+        }
         Trace("OnLoopBoundary_RearmIfNeeded()"); 
         LogState("LoopBoundary entry");
                 // If we already started the bridge, ignore further loop boundaries.
@@ -407,9 +436,15 @@ public class PhaseStar : MonoBehaviour
     }
     private void OnDisable()
     {
-        _isDisposing = true;
-        SafeUnsubscribeAll();
+         SafeUnsubscribeAll();
+        if (!starKeepsDustClear) return;
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        if (gen == null) return;
+
+        var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
+        gen.ClearStarKeepClear(phase);
     }
+
     private void OnDestroy()
     {
         _isDisposing = true;
@@ -423,43 +458,23 @@ public class PhaseStar : MonoBehaviour
         InitializeTimingAndSpeeds();
         BuildOrRefreshPreviewRing();
     }
-
     private void BuildPhasePlan(MusicalPhase phase)
     {
         _phasePlan = new List<WeightedMineNode>();
-        _planConsumeIdx = 0;
         if (!spawnStrategyProfile) return;
 
-        // Fill a small rolling queue (strict phase gate handled by profile.PickNext)
-        for (int i = 0; i < behaviorProfile.nodesPerStar; i++)
+        int target = Mathf.Max(1, behaviorProfile.nodesPerStar);
+        int safety = target * 10; // avoid infinite loops if PickNext can’t satisfy constraints
+
+        while (_phasePlan.Count < target && safety-- > 0)
         {
             var node = spawnStrategyProfile.PickNext(phase, -1f);
             if (node != null) _phasePlan.Add(node);
         }
-//        _totalShardsPlanned = Mathf.Max(1, _phasePlan.Count);
-        Trace($"BuildPhasePlan: planned {behaviorProfile.nodesPerStar} nodes");
+
+        Trace($"BuildPhasePlan: planned {_phasePlan.Count}/{target} nodes (phase={phase})");
     }
     private bool HasShardsRemaining() => _shardsEjectedCount < behaviorProfile.nodesPerStar;
-    private void RefillPlanIfLow()
-    {
-        if (!spawnStrategyProfile) return;
-        if (_phasePlan == null) _phasePlan = new List<WeightedMineNode>();
-        if (_phasePlan.Count >= 6) return;
-
-        int toAdd = 8 - _phasePlan.Count;
-        for (int i = 0; i < toAdd; i++)
-        {
-            var node = spawnStrategyProfile.PickNext(_assignedPhase, -1f);
-            if (node != null) _phasePlan.Add(node);
-        }
-    }
-    private void AdvanceConsumeCursor()
-    {
-        if (_phasePlan == null || _phasePlan.Count == 0) return;
-        _planConsumeIdx++;
-        if (_planConsumeIdx >= _phasePlan.Count) _planConsumeIdx = 0;
-        RefillPlanIfLow();
-    }
     private void PrepareNextDirective() {
         Trace("PrepareNextDirective() begin");
         _cachedDirective = null;
@@ -467,18 +482,13 @@ public class PhaseStar : MonoBehaviour
 
         if (_drum == null || spawnStrategyProfile == null) return;
          
-        // Prefer from rolling plan (consume cursor), else ask profile once
-        WeightedMineNode planEntry = null;
-        if (_phasePlan != null && _phasePlan.Count > 0)
-            planEntry = _phasePlan[_planConsumeIdx];
-        else
-            planEntry = spawnStrategyProfile.PickNext(_assignedPhase, -1f);
-        
+        WeightedMineNode planEntry = GetPlanEntryForHighlightedShard();
+        if (planEntry == null) return;
 
         // 1) Bin-driven preview target (WYSIWYG)
         // 2) Fallback to your existing role/legality picker
-        InstrumentTrack track = GetTargetTrackForHighlightedShard(); 
-        if (track == null) track = PickTargetTrackFor(planEntry);
+        InstrumentTrack track = FindTrackByRole(planEntry.role);
+        if (track == null) track = PickTargetTrackFor(planEntry); // defensive fallback
         if (track == null) return; // still nothing to target
 
         // --- Resolve prefabs via registries on DrumTrack ---
@@ -551,62 +561,83 @@ public class PhaseStar : MonoBehaviour
     {
         buildingPreview = true;
         previewRing.Clear();
+
+        // These angle arrays are legacy and unsafe once we shrink.
+        // If you still have them referenced elsewhere, we can keep them, but they must be resized to match previewRing.
         _petalStartAngles.Clear();
         _petalTargetAngles.Clear();
 
         if (_baseSortingOrder == 0)
         {
             var baseSr = GetComponentInChildren<SpriteRenderer>(true);
-            if (baseSr) _baseSortingOrder = baseSr.sortingOrder;
-            else _baseSortingOrder = 2000; // conservative default
+            _baseSortingOrder = baseSr ? baseSr.sortingOrder : 2000;
             if (_perPetalLayerStep <= 0) _perPetalLayerStep = 1;
         }
 
-        var profile    = behaviorProfile;
-        var controller = GameFlowManager.Instance?.controller;
-
-        // Pre-compute colors to cycle for preview only
-        List<Color> palette = new List<Color>();
-        if (controller != null && controller.tracks != null && controller.tracks.Length > 0)
+        // Ensure we have a plan to visualize.
+        if (_phasePlan == null || _phasePlan.Count != behaviorProfile.nodesPerStar)
         {
-            foreach (var t in controller.tracks)
-                palette.Add(t ? t.trackColor : Color.white);
+            // If you have _assignedPhase or equivalent, pass it; otherwise pass the active phase you already cache.
+            BuildPhasePlan(_assignedPhase);
         }
-        if (palette.Count == 0) palette.Add(Color.white);
 
-        var angles = visuals.GetPetalAngles(behaviorProfile.nodesPerStar);
-        for (int i = 0; i < behaviorProfile.nodesPerStar; i++)
+        int n = (_phasePlan != null) ? _phasePlan.Count : 0;
+        if (n <= 0)
+        {
+            currentShardIndex = 0;
+            activeShardVisual = null;
+            buildingPreview = false;
+            return;
+        }
+
+        var angles = visuals.GetPetalAngles(n);
+
+        for (int i = 0; i < n; i++)
         {
             float ang = angles[Mathf.Clamp(i, 0, angles.Length - 1)];
-            Color c   = palette[i % palette.Count];
-            float petalScale = 1f;
 
-            var shardGO = new GameObject($"PreviewShard_{i}");
+            // Plan entry for THIS petal index
+            var planEntry = _phasePlan[i];
+            var role      = planEntry.role;
+
+            // Color MUST come from the role’s track, not a cycling palette.
+            var track = FindTrackByRole(role);
+            Color c   = track != null ? track.trackColor : Color.white;
+
+            var shardGO = new GameObject($"PreviewShard_{i}_{role}");
             shardGO.transform.SetParent(transform);
             shardGO.transform.localPosition = Vector3.zero;
             shardGO.transform.localRotation = Quaternion.Euler(0f, 0f, ang);
-            shardGO.transform.localScale    = Vector3.one * petalScale;
+            shardGO.transform.localScale    = Vector3.one;
 
             var sr = shardGO.AddComponent<SpriteRenderer>();
             sr.sprite = visuals.diamond;
-            sr.color = c;
+            sr.color  = c;
             sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
 
             previewRing.Add(new PreviewShard
             {
-                // role is not required for preview visuals
                 color = c,
                 collected = false,
-                visual = shardGO.transform
+                visual = shardGO.transform,
+
+                // NEW: bind petal to plan entry
+                plan = planEntry,
+                role = role
             });
 
+            // If you still want these for smooth visual transitions, keep them sized to n.
             _petalStartAngles.Add(ang);
             _petalTargetAngles.Add(ang);
         }
 
         currentShardIndex = 0;
-        activeShardVisual = (previewRing.Count > 0) ? previewRing[0].visual : null;
+        activeShardVisual = previewRing[0].visual;
         buildingPreview = false;
+
+        // Ensure highlight + tint matches the new authoritative shard color
+        UpdatePreviewTint();
+        HighlightActive();
     }
     void UpdateLayering()
     {
@@ -627,6 +658,23 @@ public class PhaseStar : MonoBehaviour
                 sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
         }
     }
+    private InstrumentTrack FindTrackByRole(MusicalRole role)
+    {
+        var controller = GameFlowManager.Instance?.controller;
+        if (controller == null || controller.tracks == null) return null;
+
+        foreach (var t in controller.tracks)
+            if (t != null && t.assignedRole == role)
+                return t;
+
+        return null;
+    }
+    private WeightedMineNode GetPlanEntryForHighlightedShard()
+    {
+        if (previewRing == null || previewRing.Count == 0) return null;
+        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        return previewRing[idx].plan;
+    }
     void RemoveShardAt(int idx)
     {
         if (previewRing == null || previewRing.Count == 0) return;
@@ -636,10 +684,14 @@ public class PhaseStar : MonoBehaviour
         var s = previewRing[idx];
         if (s.visual) Destroy(s.visual.gameObject);
 
-        // remove from list
+        // Remove from preview ring
         previewRing.RemoveAt(idx);
 
-        // snap active index to a valid slot
+        // IMPORTANT: also remove the matching plan entry so indices remain aligned.
+        if (_phasePlan != null && idx >= 0 && idx < _phasePlan.Count)
+            _phasePlan.RemoveAt(idx);
+
+        // If empty, clear state
         if (previewRing.Count == 0)
         {
             currentShardIndex = 0;
@@ -647,11 +699,14 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
+        // Snap active index to a valid slot
         currentShardIndex = Mathf.Min(idx, previewRing.Count - 1);
         activeShardVisual = previewRing[currentShardIndex].visual;
 
-        // re-layer remaining petals
+        // Re-layer + re-highlight + re-tint
         UpdateLayering();
+        UpdatePreviewTint();
+        HighlightActive();
     }
     void AdvanceActiveShard()
 {
@@ -663,53 +718,43 @@ public class PhaseStar : MonoBehaviour
      for (int i = 0; i < previewRing.Count; i++) 
          _petalTargetAngles[i] = nextAngles[Mathf.Clamp(i, 0, nextAngles.Length - 1)];
     // Dim old
-    var prev = previewRing[currentShardIndex];
-    if (!prev.collected)
-        prev.visual.GetComponent<SpriteRenderer>().color = prev.color * 0.6f;
-
-    // Advance
-    currentShardIndex = (currentShardIndex + 1) % previewRing.Count;
-
-    // Highlight new
-    activeShardVisual = previewRing[currentShardIndex].visual;
-    var sr = activeShardVisual.GetComponent<SpriteRenderer>();
-    sr.color = previewRing[currentShardIndex].color;
     UpdateLayering();
+    UpdatePreviewTint();
+    HighlightActive();
     if (visuals) { 
         visuals.SetVeilOnNonActive(new Color(1f,1f,1f,0.20f), activeShardVisual); 
-        visuals.HighlightActive(activeShardVisual, ResolvePreviewColor(), .7f);
     }
 }
-    int RemainingShardCount() => previewRing.Count(s => !s.collected);
-    void UpdatePreviewTint()
-{
-    if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-    if (visuals == null) return;
-    var t = GetTargetTrackForHighlightedShard();
-    var color = (t != null) ? t.trackColor : Color.white;
-    visuals.SetPreviewTint(color);
-    if (activeShardVisual)
+    void UpdatePreviewTint() {
+        if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        if (visuals == null) return;
+        var color = ResolvePreviewColor();
+        visuals.SetPreviewTint(color);
+        if(activeShardVisual) HighlightActive();
+    }
+    private void HighlightActive()
     {
+        if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        if (visuals == null) return;
+
+        if (previewRing == null || previewRing.Count == 0 || activeShardVisual == null)
+        {
+            // No active shard to highlight; just clear veil state if you have a method for it.
+            return;
+        }
+
+        Color c = ResolvePreviewColor();
+
+        // “Dim means busy” is handled elsewhere; this is just the per-petal highlight.
         visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.25f), activeShardVisual);
-        visuals.HighlightActive(activeShardVisual, color, .7f);
-    }
-}
-    private InstrumentTrack GetTargetTrackForHighlightedShard() { 
-        if (_targets == null || _targets.Count == 0) return null; 
-        // The highlighted shard is what the player sees as "next".
-        // Map shard index onto available target tracks.
-        int idx = Mathf.Abs(currentShardIndex) % _targets.Count; 
-        return _targets[idx];
+        visuals.HighlightActive(activeShardVisual, c, 0.7f);
     }
     private Color ResolvePreviewColor()
     {
-        var t = GetTargetTrackForHighlightedShard(); 
-        if (t != null) return t.trackColor;
-        // 3) Fall back to any target or white
-        var any = _targets != null ? _targets.FirstOrDefault(tt => tt) : null;
-        return any ? any.trackColor : Color.white;
+        if (previewRing == null || previewRing.Count == 0) return Color.white;
+        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        return previewRing[idx].color;
     }
-
     private InstrumentTrack PickTargetTrackFor(WeightedMineNode entry)
 {
     if (_targets == null || _targets.Count == 0) return null;
@@ -723,11 +768,25 @@ public class PhaseStar : MonoBehaviour
 }
     private void OnCollisionEnter2D(Collision2D coll)
 {
+    if (AnyCollectablesInFlightGlobal())
+    {
+        // Optional: keep it disarmed while collectables exist, so we don’t accept pokes mid-burst.
+        Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+        Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
+        return;
+    }
+
     // --- Safety & gating ---
     if (!HasShardsRemaining()) return;
     if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
     if (_state != PhaseStarState.WaitingForPoke) { Trace($"OnCollision: ignored, state={_state}"); return; } 
-    if (_ejectionInFlight || _awaitingBurstResolution) { Trace("OnCollision: ignored, busy flags"); return; } 
+    if (_ejectionInFlight) { Trace("OnCollision: ignored, busy flags"); return; } 
+    if (!_isArmed)
+    {
+        Trace("OnCollisionEnter2D: ignored poke because star is not armed");
+        return;
+    }
+
     if (_activeNode != null) { Trace("OnCollision: ignored, activeNode != null"); return; } 
     if (Time.frameCount == _lastPokeFrame) { Trace("OnCollision: ignored, same frame"); return; }
     _lastPokeFrame = Time.frameCount;
@@ -737,11 +796,10 @@ public class PhaseStar : MonoBehaviour
     // --- Handle missing directive fallback ---
     if (_cachedDirective == null || _cachedTrack == null)
     {
-        Trace("OnCollision: no directive/track → AwaitLoop fallback");
-        _lastBurstCollected = true; 
-        _awaitingLoopPhaseFinish = true; 
-        Disarm(DisarmReason.AwaitLoop);
+        Trace("OnCollision: no directive/track → disarm and wait");
+        Disarm(DisarmReason.NodeResolving, _lockedTint);
         return;
+
     }
 // After the directive/track null checks succeed, just before Trace("OnCollision: spawning...")
     Debug.Log($"[MNDBG] PhaseStar hit: relVel={coll.relativeVelocity.magnitude:F2}, " +
@@ -827,98 +885,108 @@ public class PhaseStar : MonoBehaviour
         var node = DirectSpawnMineNode(contactPoint, usedDirective, usedTrack);
         if (node == null)
         {
-            Trace("SpawnNodeCommon: direct spawn returned null → retry coroutine");
-            if (_retryCo != null) StopCoroutine(_retryCo);
-            _retryCo = StartCoroutine(RetrySpawnWhenCellFrees(ticket, contactPoint));
+            _ejectionInFlight = false;
+            _activeNode = null;
+
+            var prefabName = usedDirective != null && usedDirective.prefab != null
+                ? usedDirective.prefab.name
+                : "(null prefab)";
+
+            Debug.LogError($"[PhaseStar] SpawnNodeCommon failed: could not spawn MineNode. " +
+                           $"prefab={prefabName} type={usedDirective?.minedObjectType} mod={usedDirective?.trackModifierType} role={usedDirective?.role}");
+
+            Disarm(DisarmReason.NodeResolving, _lockedTint);
             return;
         }
-    //    var rb = node.GetComponent<Rigidbody2D>();
-    //    rb.velocity = lastImpactDirection * usedDirective.roleProfile.;
+        // When a new node spawns, close the previous corridor (reverse regrowth).
+            
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        if (gen != null) {
+            var phase = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
+            gen.RegrowPreviousCorridorOnNewNodeSpawn(phase);
+        }
+        
         _activeNode = node; 
         _ejectionInFlight = false; 
         node.OnResolved += (kind, dir) => { 
             if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
             _activeNode = null;
-            _lastBurstCollected = false;
+            _awaitingCollectableClear = true;
             bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar)); 
-            if (allShardsEjected) { 
-                Disarm(DisarmReason.AwaitLoop, _lockedTint); 
+            if (allShardsEjected)
+            {
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
                 Trace("OnResolved: FINAL MineNode resolved → waiting for final collectables");
-
             }
-            else { 
-                ArmNext(); 
-                Trace("OnResolved: re-armed for next poke");
-            } 
+            else
+            {
+                // Do NOT force ArmNext here; remain disarmed until collectables clear.
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                Trace("OnResolved: MineNode resolved → waiting for collectables");
+            }
+
             LogState("OnResolved");
         };
         
         CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
-        AdvanceConsumeCursor();
         PrepareNextDirective();
         Trace("SpawnNodeCommon: end");
     }
-void EjectActivePreviewShardAndFlow(Collision2D coll)
-{
-    if (!HasShardsRemaining()) return;
-
-    // consume one shard visually (Model 1: highlighted shard is authoritative)
-    int shardIdx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
-    var shard = previewRing[shardIdx];
-
-    if (shard.visual)
+    void EjectActivePreviewShardAndFlow(Collision2D coll)
     {
-        var sr = shard.visual.GetComponent<SpriteRenderer>();
-        if (sr) sr.color = behaviorProfile.inactiveShardTint;
+        if (!HasShardsRemaining()) return;
+
+        // consume one shard visually (Model 1: highlighted shard is authoritative)
+        int shardIdx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        var shard = previewRing[shardIdx];
+
+        if (shard.visual)
+        {
+            var sr = shard.visual.GetComponent<SpriteRenderer>();
+            if (sr) sr.color = behaviorProfile.inactiveShardTint;
+        }
+
+        // Remove shard first so previewRing reflects reality immediately.
+        RemoveShardAt(shardIdx);
+        ReseedAfterRemoval();
+
+        // Count the ejection immediately (keeps "remaining shards" checks consistent downstream).
+        _shardsEjectedCount++;
+
+        // If we have no shards left, we are now in the "final collectables must clear" waiting state.
+        // The PhaseStar should NOT be visible during that final collection window.
+        bool isFinalShardEjection = (previewRing == null || previewRing.Count == 0) ||
+                                   (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+
+        if (_cachedDirective == null || _cachedTrack == null)
+            PrepareNextDirective();
+
+        if (_cachedDirective == null || _cachedTrack == null)
+        {
+            Debug.LogError("[PhaseStar] Missing directive or track at eject time.");
+            return;
+        }
+
+        var contact = coll.GetContact(0).point;
+
+        // Compute impact direction & strength for MineNode
+        var starPos    = (Vector2)transform.position;
+        var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
+
+        // From vehicle toward star; this is the "incoming" direction
+        _lastImpactDir = (starPos - vehiclePos).normalized;
+
+        // Use relative velocity magnitude as impact strength
+        _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
+
+        Disarm(isFinalShardEjection ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
+            _cachedDirective.displayColor);
+
+        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}, " +
+                  $"type={_cachedDirective.minedObjectType}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
+
+        SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
     }
-
-    // Remove shard first so previewRing reflects reality immediately.
-    RemoveShardAt(shardIdx);
-    ReseedAfterRemoval();
-
-    // Count the ejection immediately (keeps "remaining shards" checks consistent downstream).
-    _shardsEjectedCount++;
-
-    // If we have no shards left, we are now in the "final collectables must clear" waiting state.
-    // The PhaseStar should NOT be visible during that final collection window.
-    bool isFinalShardEjection = (previewRing == null || previewRing.Count == 0) ||
-                               (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-    if (isFinalShardEjection)
-    {
-        _awaitingFinalCollectableClear = true;
-        _lastBurstCollected = false; // collectables are NOT cleared yet; something else will call NotifyCollectableBurstCleared().
-    }
-
-    if (_cachedDirective == null || _cachedTrack == null)
-        PrepareNextDirective();
-
-    if (_cachedDirective == null || _cachedTrack == null)
-    {
-        Debug.LogError("[PhaseStar] Missing directive or track at eject time.");
-        return;
-    }
-
-    var contact = coll.GetContact(0).point;
-
-    // Compute impact direction & strength for MineNode
-    var starPos    = (Vector2)transform.position;
-    var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
-
-    // From vehicle toward star; this is the "incoming" direction
-    _lastImpactDir = (starPos - vehiclePos).normalized;
-
-    // Use relative velocity magnitude as impact strength
-    _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-
-    // Disarm for the burst. Your Disarm() should hide visuals if no shards remain.
-    Disarm(DisarmReason.DuringBurst, _cachedDirective.displayColor);
-
-    Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}, " +
-              $"type={_cachedDirective.minedObjectType}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
-
-    SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
-}
-
     void EjectCachedDirectiveAndFlow(Collision2D coll)
     {
         var contact = coll.GetContact(0).point;
@@ -937,59 +1005,11 @@ void EjectActivePreviewShardAndFlow(Collision2D coll)
         }
 
         _shardsEjectedCount++;
-        _lastBurstCollected = false;
-        Disarm(DisarmReason.DuringBurst, _cachedDirective.displayColor);
+
+        bool isFinal = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+        Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
+            _cachedDirective.displayColor);
         SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
-    }
-    private IEnumerator RetrySpawnWhenCellFrees(int ticket, Vector3 from)
-    {
-        if (_state != PhaseStarState.PursuitActive) yield break;
-        const float timeout = 3f;
-        const float step = 0.15f;
-        float t = 0f;
-
-        while (t < timeout)
-        {
-            if (ticket != _spawnTicket) yield break;
-            if (_activeNode != null) yield break;
-
-            var node = DirectSpawnMineNode(from, _cachedDirective, _cachedTrack);
-            if (node != null)
-            {
-                _activeNode = node;
-                _ejectionInFlight = false;
-                _retryCo = null;
-
-                node.OnResolved += (kind, dir) => { 
-                    _activeNode = null; 
-                    _lastBurstCollected = true;
-                    bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar)); 
-                    if (allShardsEjected) {
-                        _awaitingLoopPhaseFinish = true; 
-                        Disarm(DisarmReason.AwaitLoop, _lockedTint);
-                        Trace("RetrySpawn: FINAL burst collected → AwaitLoop");
-                    }
-                    else
-                    { 
-                        ArmNext();
-                        Trace("RetrySpawn: re-armed for next poke");
-                    }
-                    LogState("RetrySpawn.OnResolved");
-                };
-                yield break;
-            }
-
-            t += step;
-            yield return new WaitForSeconds(step);
-        }
-
-        _retryCo = null;
-        _ejectionInFlight = false;
-        _lastBurstCollected = true;
-        _awaitingLoopPhaseFinish = true;
-        Disarm(DisarmReason.AwaitLoop, _lockedTint);
-        Trace("RetrySpawn: timeout → AwaitLoop"); 
-        LogState("RetrySpawn timeout");
     }
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track)
     {
@@ -1092,6 +1112,26 @@ void EjectActivePreviewShardAndFlow(Collision2D coll)
         Destroy(gameObject);
         yield break;
     }
+    private void EnableColliders()
+    {
+        if (_isDisposing || this == null) return;
+        var cols = GetComponentsInChildren<Collider2D>(true);
+        foreach (var c in cols)
+        {
+            if (!c) continue;
+            c.enabled = true;
+        }
+    }
+    private void DisableColliders()
+    {
+        if (_isDisposing || this == null) return;
+        var cols = GetComponentsInChildren<Collider2D>(true);
+        foreach (var c in cols)
+        {
+            if (!c) continue;
+            c.enabled = false;
+        }
+    }
     private int CountEnabledColliders() {
         if (_isDisposing || this == null) return 0;
         int n = 0; 
@@ -1106,12 +1146,11 @@ void EjectActivePreviewShardAndFlow(Collision2D coll)
     private void LogState(string where)
     {
         if (_isDisposing || this == null || !_tracePhaseStar) return;
-        var t = GetTargetTrackForHighlightedShard(); 
-        string targRole = t != null ? t.assignedRole.ToString() : "-";
-        Debug.Log(
-                    $"[PhaseStar] {where} | state={_state} armed={_isArmed} collidersOn={CountEnabledColliders()} " +
-                    $"plan={_shardsEjectedCount}/{Mathf.Max(1,behaviorProfile.nodesPerStar)} lastBurst={_lastBurstCollected} awaitLoop={_awaitingLoopPhaseFinish} " +
-                    $"highlightShard={currentShardIndex} targetRole={targRole}");
+        string targRole =
+            (previewRing != null && previewRing.Count > 0)
+                ? previewRing[currentShardIndex].role.ToString()
+                : "-";
+
     }
 }
 

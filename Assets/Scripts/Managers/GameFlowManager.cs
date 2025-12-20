@@ -790,7 +790,6 @@ private void ResetPhaseBinStateAndGrid()
     }
 }
 
-// Placeholder growth: very safe (no dependency on a specific CoralVisualizer API)
 private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List<InstrumentTrack> retained)
 {
     if (cv == null) yield break;

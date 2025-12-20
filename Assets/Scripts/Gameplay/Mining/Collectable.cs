@@ -31,6 +31,15 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float maxAlpha = 0.65f;
     [SerializeField] private float pulseScale = 1.08f;
     private Coroutine _pulseRoutine;
+    // Collectable.cs (top-level in class)
+    static readonly Dictionary<Vector2Int, Collectable> _occupantByCell = new();
+    static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
+    static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
+
+    Vector2Int _currentCell;
+    Vector2Int _reservedCell;
+    bool _hasReservation;
+
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
@@ -52,6 +61,85 @@ public class Collectable : MonoBehaviour
     private float _speed;
     private System.Random _rng;       // deterministic per-track/per-note
 
+    static bool IsCellOccupiedByOther(Vector2Int cell, Collectable self)
+    {
+        if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null && occ != self) return true;
+        return false;
+    }
+
+    static bool IsCellReservedByOther(Vector2Int cell, Collectable self)
+    {
+        if (_reservedByCell.TryGetValue(cell, out var res) && res != null && res != self) return true;
+        return false;
+    }
+
+// Used by spawners (InstrumentTrack) to avoid overlaps at spawn time.
+    public static bool IsCellFreeStatic(Vector2Int cell)
+    {
+        lock (_lock)
+        {
+            if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null) return false;
+            if (_reservedByCell.TryGetValue(cell, out var res) && res != null) return false;
+            return true;
+        }
+    }
+
+    void RegisterOccupant(Vector2Int cell)
+    {
+        lock (_lock)
+        {
+            _occupantByCell[cell] = this;
+        }
+        _currentCell = cell;
+    }
+
+    void UnregisterOccupant()
+    {
+        lock (_lock)
+        {
+            if (_occupantByCell.TryGetValue(_currentCell, out var c) && c == this)
+                _occupantByCell.Remove(_currentCell);
+        }
+    }
+
+    void ClearReservation()
+    {
+        if (!_hasReservation) return;
+
+        lock (_lock)
+        {
+            if (_reservedByCell.TryGetValue(_reservedCell, out var c) && c == this)
+                _reservedByCell.Remove(_reservedCell);
+        }
+
+        _hasReservation = false;
+    }
+
+    bool TryReserveCell(Vector2Int cell)
+    {
+        lock (_lock)
+        {
+            if (IsCellOccupiedByOther(cell, this)) return false;
+            if (IsCellReservedByOther(cell, this)) return false;
+
+            _reservedByCell[cell] = this;
+        }
+
+        _reservedCell = cell;
+        _hasReservation = true;
+        return true;
+    }
+
+    void CommitArrival(Vector2Int arrivedCell)
+    {
+        // Move occupancy
+        UnregisterOccupant();
+        RegisterOccupant(arrivedCell);
+
+        // If we reserved this cell, release that reservation
+        if (_hasReservation && _reservedCell == arrivedCell)
+            ClearReservation();
+    }
     // Small helper: normalize duration ticks (large => slow)
     private float Duration01()
     {
@@ -59,6 +147,28 @@ public class Collectable : MonoBehaviour
         float t = Mathf.Clamp(noteDurationTicks, 1, 16);
         // map: 1  -> 0 (short/fast)   16 -> 1 (long/slow)
         return (t - 1f) / 15f;
+    }
+    
+    public static bool IsCellFree(Vector2Int cell)
+    {
+        lock (_lock)
+        {
+            if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null) return false;
+            if (_reservedByCell.TryGetValue(cell, out var res) && res != null) return false;
+            return true;
+        }
+    }
+
+    bool IsCellFreeWithBuffer(Vector2Int cell, int buffer)
+    {
+        for (int dx = -buffer; dx <= buffer; dx++)
+        for (int dy = -buffer; dy <= buffer; dy++)
+        {
+            var c = new Vector2Int(cell.x + dx, cell.y + dy);
+            if (_occupantByCell.TryGetValue(c, out var occ) && occ != this) return false;
+            if (_reservedByCell.TryGetValue(c, out var res) && res != this) return false;
+        }
+        return true;
     }
 
     private float ComputeMoveSpeed()
@@ -119,54 +229,72 @@ public class Collectable : MonoBehaviour
         yield return new Vector2Int(g.x, g.y - 1);
     }
 
-    private bool TryPickNextGridNode(out Vector3 worldCenter) {
-        worldCenter = transform.position;
-        var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
-        if (dt == null) return false;
+ bool TryPickNextGridNode(out Vector3 worldCenter)
+{
+    worldCenter = transform.position;
+    var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
+    if (dt == null) return false;
 
-        Vector2Int here = dt.WorldToGridPosition(transform.position);
+    // If we’re replanning, discard any previous reservation.
+    ClearReservation();
 
-        // Collect walkable candidates that are not inside dust but are adjacent to dust.
-        var candidates = new List<Vector3>(8);
+    Vector2Int here = dt.WorldToGridPosition(transform.position);
+
+    // Collect candidate CELLS (not world positions) so we can enforce occupancy.
+    var candidateCells = new List<Vector2Int>(8);
+    foreach (var n in FourNeighbors(here))
+    {
+        // Mode A: never move into an occupied/reserved cell
+        if (!IsCellFree(n)) continue; // your instance helper
+
+        Vector3 c = dt.GridToWorldPosition(n);
+        if (IsPositionInsideDust(c)) continue;
+        if (!IsAdjacentToDust(c)) continue;
+        candidateCells.Add(n);
+    }
+
+    // Fallback: any 4-neighbor that isn’t inside dust (still respecting IsCellFree)
+    if (candidateCells.Count == 0)
+    {
         foreach (var n in FourNeighbors(here))
         {
+            if (!IsCellFree(n)) continue;
+
             Vector3 c = dt.GridToWorldPosition(n);
-            if (IsPositionInsideDust(c)) continue;      // avoid moving *through* dust
-            if (!IsAdjacentToDust(c)) continue;         // hug the dust edges
-            candidates.Add(c);
+            if (!IsPositionInsideDust(c))
+                candidateCells.Add(n);
         }
+    }
 
-        // Fallback: if hugging produced no options, allow any 4-neighbor that isn’t inside dust.
-        if (candidates.Count == 0)
-        {
-            foreach (var n in FourNeighbors(here))
-            {
-                Vector3 c = dt.GridToWorldPosition(n);
-                if (!IsPositionInsideDust(c))
-                    candidates.Add(c);
-            }
-        }
+    if (candidateCells.Count == 0) return false;
 
-        if (candidates.Count == 0) return false;
+    _rng ??= new System.Random(StableSeed());
 
-        // Deterministic “turn bias”: prefer keeping roughly the same heading
-        // but break ties via seeded RNG to vary between tracks/notes.
-        _rng ??= new System.Random(StableSeed());
-        // score by (prefer farther from current target to avoid jitter, then random jitter)
-        Vector3 pos = transform.position;
-        float bestScore = float.NegativeInfinity;
-        Vector3 best = candidates[0];
-       for (int i = 0; i < candidates.Count; i++)
-        {
-            float dist = Vector3.SqrMagnitude(candidates[i] - pos);
-            float jitter = (float)_rng.NextDouble() * 0.2f;
-            float score = dist + jitter;
-            if (score > bestScore) { bestScore = score; best = candidates[i]; }
-        }
+    // Score and select best, but only accept if we can reserve it.
+    Vector3 pos = transform.position;
 
-        worldCenter = best;
+    // Sort candidates by score descending, then attempt to reserve in that order.
+    candidateCells.Sort((a, b) =>
+    {
+        float da = Vector3.SqrMagnitude(dt.GridToWorldPosition(a) - pos);
+        float db = Vector3.SqrMagnitude(dt.GridToWorldPosition(b) - pos);
+        // Add stable-ish jitter
+        da += (float)_rng.NextDouble() * 0.2f;
+        db += (float)_rng.NextDouble() * 0.2f;
+        return db.CompareTo(da);
+    });
+
+    for (int i = 0; i < candidateCells.Count; i++)
+    {
+        var cell = candidateCells[i];
+        if (!TryReserveCell(cell)) continue; // contention-safe
+
+        worldCenter = dt.GridToWorldPosition(cell);
         return true;
     }
+
+    return false;
+}
 
     private IEnumerator MovementRoutine()
     { 
@@ -197,10 +325,20 @@ public class Collectable : MonoBehaviour
 
             if (dist <= arriveRadius)
             {
-               // perch/linger depends on note length
-               float t = 0f; 
-               while (t < linger) { t += Time.deltaTime; yield return null; }
-               _hasTarget = false;
+                // Snap to target (optional but helps determinism)
+                _rb.MovePosition(tgt);
+
+                // Commit new occupancy at arrival
+                if (dt != null)
+                {
+                    var arrivedCell = dt.CellOf(tgt);
+                    CommitArrival(arrivedCell);
+                }
+
+                float t = 0f;
+                while (t < linger) { t += Time.deltaTime; yield return null; }
+
+                _hasTarget = false;
                 continue;
             }
 
@@ -260,6 +398,17 @@ public class Collectable : MonoBehaviour
         if (_rb == null) TryGetComponent(out _rb);
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
+        // --- Occupancy initialization (Mode A: never overlap another collectable) ---
+        ClearReservation();
+
+        var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
+        if (dt != null)
+        {
+            // Prefer CellOf if present; otherwise your existing WorldToGridPosition is fine.
+            _currentCell = dt.CellOf(transform.position);
+            RegisterOccupant(_currentCell);
+        }
+        
     }
     public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, int durationTicksOrSteps, int anchorStep) {
         var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
@@ -431,8 +580,20 @@ public class Collectable : MonoBehaviour
         _handled = false;
         _destroyNotified = false;
     }
-    private void OnDestroy()  { NotifyDestroyedOnce(); }
-    private void OnDisable()  { NotifyDestroyedOnce(); } // pooling-safe
+
+    private void OnDestroy()
+    {
+        ClearReservation();
+        UnregisterOccupant();
+        NotifyDestroyedOnce();
+    }
+
+    private void OnDisable()
+    {
+        ClearReservation();
+        UnregisterOccupant();
+        NotifyDestroyedOnce();
+    } // pooling-safe
     private void OnTriggerEnter2D(Collider2D coll)
     {
         var vehicle = coll.GetComponent<Vehicle>();

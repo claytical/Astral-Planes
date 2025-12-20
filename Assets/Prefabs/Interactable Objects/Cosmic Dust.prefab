@@ -60,11 +60,13 @@ MonoBehaviour:
   dissipateOnExit: 0
   energyDrainPerSecond: 0.25
   noDrainWhileBoosting: 0
+  nonBoostSecondsToBreak: 0.15
+  temporaryRegrowDelaySeconds: 8
   minScaleFactor: 0.3
   shrinkStep: 0.104
   shrinkEaseTime: 0.05
-  regrowDelay: 3
-  regrowTime: 0.1
+  regrowDelay: 0.32
+  regrowTime: 2.06
   behavior: 0
   slowFactor: 0.2
   slowDuration: 0.1
