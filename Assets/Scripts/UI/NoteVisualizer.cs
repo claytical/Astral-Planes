@@ -30,7 +30,8 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
-
+    private int _forcedLeaderSteps = -1;
+    private int _forcedLeaderBins = -1;
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
     [Header("Bin Visualization")]
@@ -681,6 +682,8 @@ Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId}");
 
     private int GetLeaderStepsSafe()
     {
+        if (_forcedLeaderSteps >= 1) 
+            return _forcedLeaderSteps;
         var drum = GameFlowManager.Instance?.activeDrumTrack;
         if (drum != null)
         {
@@ -892,9 +895,7 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
     }
     private float ComputeSnappedXLocalForLeader(Rect rowRect, InstrumentTrack track, int step, int snapCellSize = 0)
     {
-        // 1) Resolve a valid leaderSteps (fallback to the track’s loop span)
-        var drum = GameFlowManager.Instance.activeDrumTrack;
-        int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
+        int leaderSteps = GetLeaderStepsSafe();
 
         int trackSteps = Mathf.Max(1, track.GetTotalSteps());
 
@@ -945,7 +946,7 @@ public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds
     var drum = GameFlowManager.Instance.activeDrumTrack;
 
 // 1) Define the same window used by the controller: [0..cohortWindowFraction of leader]
-    int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
+    int leaderSteps = GetLeaderStepsSafe();
     if (leaderSteps <= 0 && ctrl != null && ctrl.tracks != null)
         leaderSteps = ctrl.tracks.Where(t => t != null).Select(t => t.GetTotalSteps()).DefaultIfEmpty(32).Max();
 
@@ -1375,30 +1376,38 @@ private void RefreshBinHighlight()
         _ascendTasks[track] = task;
     }
 
-    public void RequestLeaderGridChange(int newLeaderSteps) {
-        // Apply immediately to prevent left-half folding during growth
-        var ctrl = GameFlowManager.Instance?.controller; 
-        if (ctrl?.tracks == null) return; 
-        foreach (var t in ctrl.tracks) 
-            if (t) RecomputeTrackLayout(t);
-        
-        UpdateNoteMarkerPositions();
+    public void RequestLeaderGridChange(int newLeaderSteps) { 
+        // Apply immediately to prevent left-half folding during growth.
+        // NOTE: This method previously ignored its parameter; it now becomes the single
+        // source of truth for "snap the grid to this leader width" moments.
+        _forcedLeaderSteps = (newLeaderSteps > 0) ? Mathf.Max(1, newLeaderSteps) : -1;
+        var ctrl = GameFlowManager.Instance?.controller;
+         if (ctrl?.tracks == null) return;
+         foreach (var t in ctrl.tracks) 
+             if (t) RecomputeTrackLayout(t);
+         UpdateNoteMarkerPositions();
     }
 
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex)
     {
         int trackSteps = track.GetTotalSteps(); 
         if (trackSteps <= 0) trackSteps = 16;
-        int leaderBinsActive = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxActiveLoopMultiplier());
-            // …and declared bins (track.loopMultiplier) ignoring “active” gating
-        int leaderBinsDeclared = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxLoopMultiplier());
-
         int binSize       = Mathf.Max(1, track.BinSize());
+        int leaderBinsBase; 
+        if (_forcedLeaderSteps >= 1) { 
+            // Convert absolute leader steps → bins, respecting this track's binSize.
+            // (In your current architecture, binSize is effectively drum.totalSteps across tracks.)
+            leaderBinsBase = Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize);
+        }
+        else { 
+            leaderBinsBase = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxActiveLoopMultiplier());
+        }
+        
         // Which bin does this step belong to on THIS track?
         int binIndex = stepIndex / binSize;
         // --- Key change: placement should *at minimum* include the bin that contains this step.
         // If we’re spawning steps in bin #1 while leaderBinsNow==1, expand the *placement* grid to 2.
-        int leaderBinsForPlacement = Mathf.Max(leaderBinsDeclared, binIndex + 1);
+        int leaderBinsForPlacement = Mathf.Max(leaderBinsBase, binIndex + 1);
 
         
         // Local index inside the bin

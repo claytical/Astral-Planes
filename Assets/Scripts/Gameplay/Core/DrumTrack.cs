@@ -316,99 +316,95 @@ public void ManualStart()
 }
 
 
-public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
-{
-    Debug.Log($"[Spawn] RequestPhaseStar phase={phase} active={isPhaseStarActive} " +
-              $"hint={(cellHint.HasValue ? cellHint.Value.ToString() : "<none>")} " +
-              $"tracks={(GameFlowManager.Instance?.controller?.tracks?.Length ?? 0)} " +
-              $"prefab={(phaseStarPrefab ? "ok" : "NULL")}");
-
-    if (isPhaseStarActive)
+    public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
     {
-        Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
-        return;
+        Debug.Log($"[Spawn] RequestPhaseStar phase={phase} active={isPhaseStarActive} " +
+                  $"hint={(cellHint.HasValue ? cellHint.Value.ToString() : "<none>")} " +
+                  $"tracks={(GameFlowManager.Instance?.controller?.tracks?.Length ?? 0)} " +
+                  $"prefab={(phaseStarPrefab ? "ok" : "NULL")}");
+
+        if (isPhaseStarActive)
+        {
+            Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
+            return;
+        }
+
+        if (!phaseStarPrefab)
+        {
+            Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
+            return;
+        }
+
+        // Resolve dependencies up-front so we can error loudly instead of NRE
+        var gfm  = GameFlowManager.Instance;
+        var grid = gfm ? gfm.spawnGrid : null;
+        var ctrl = gfm ? gfm.controller : null;
+        if (!ctrl || ctrl.tracks == null || ctrl.tracks.Length == 0)
+        {
+            Debug.LogError("[Spawn] No instrument tracks available.");
+            return;
+        }
+
+        // Pick a cell (prefer hint)
+        Vector2Int cell = cellHint ?? (grid != null ? grid.GetRandomAvailableCell() : GetRandomAvailableCell());
+        if (cell.x < 0)
+        {
+            Debug.LogWarning("[Spawn] 🚫 No available cell for PhaseStar.");
+            return;
+        }
+
+        var pos = GridToWorldPosition(cell);
+        Debug.Log($"[Spawn] 🌠 Spawning PhaseStar at {cell} (world {pos}) for phase {phase}");
+
+        // Instantiate
+        var go = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
+        _star = go.GetComponent<PhaseStar>();
+        if (!_star)
+        {
+            Debug.LogError("[Spawn] Prefab missing PhaseStar");
+            Destroy(go);
+            return;
+        }
+
+        isPhaseStarActive = true;
+
+        // Simple hook – PhaseStar exposes OnDestroyed? If not, use a helper component:
+        var killer = go.AddComponent<OnDestroyRelay>();
+        killer.onDestroyed += () =>
+        {
+            isPhaseStarActive = false;
+            if (_star != null) _star = null; // important: clear stale reference
+            if (grid != null) grid.FreeCell(cell.x, cell.y);
+        };
+
+        // Behavior profile + dust
+        var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
+        if (gfm && gfm.dustGenerator && profileAsset) gfm.dustGenerator.ApplyProfile(profileAsset);
+        if (gfm && gfm.dustGenerator) gfm.dustGenerator.RetintExisting(0.4f);
+
+        // Targets
+        IEnumerable<InstrumentTrack> targets = ctrl.tracks.Where(t => t != null);
+
+
+        // 🔹 Look up the motif for this spawn from the PhaseTransitionManager
+        MotifProfile motif = null;
+        var ptm = gfm ? gfm.phaseTransitionManager : null;
+        if (ptm != null && ptm.currentMotif != null)
+        {
+            motif = ptm.currentMotif;
+
+            // Optional sanity check: warn if phase/motif phase don't line up
+            Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase {phase}).");
+        }
+        else
+        {
+            Debug.Log("[Spawn] No current motif available; PhaseStar will use phase-based NoteSets.");
+        }
+
+        // Wire star (now motif-aware)
+        _star.Initialize(this, targets, profileAsset, phase, motif);
+        OnPhaseStarSpawned?.Invoke(phase, profileAsset);
     }
-
-    if (!phaseStarPrefab)
-    {
-        Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
-        return;
-    }
-
-    // Resolve dependencies up-front so we can error loudly instead of NRE
-    var gfm  = GameFlowManager.Instance;
-    var grid = gfm ? gfm.spawnGrid : null;
-    var ctrl = gfm ? gfm.controller : null;
-    if (!ctrl || ctrl.tracks == null || ctrl.tracks.Length == 0)
-    {
-        Debug.LogError("[Spawn] No instrument tracks available.");
-        return;
-    }
-
-    // Pick a cell (prefer hint)
-    Vector2Int cell = cellHint ?? (grid != null ? grid.GetRandomAvailableCell() : GetRandomAvailableCell());
-    if (cell.x < 0)
-    {
-        Debug.LogWarning("[Spawn] 🚫 No available cell for PhaseStar.");
-        return;
-    }
-
-    var pos = GridToWorldPosition(cell);
-    Debug.Log($"[Spawn] 🌠 Spawning PhaseStar at {cell} (world {pos}) for phase {phase}");
-
-    // Instantiate
-    var go = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
-    _star = go.GetComponent<PhaseStar>();
-    if (!_star)
-    {
-        Debug.LogError("[Spawn] Prefab missing PhaseStar");
-        Destroy(go);
-        return;
-    }
-
-    isPhaseStarActive = true;
-
-    // Simple hook – PhaseStar exposes OnDestroyed? If not, use a helper component:
-    var killer = go.AddComponent<OnDestroyRelay>();
-    killer.onDestroyed += () =>
-    {
-        isPhaseStarActive = false;
-        if (grid != null) grid.FreeCell(cell.x, cell.y);
-    };
-
-    // Behavior profile + dust
-    var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
-    if (gfm && gfm.dustGenerator && profileAsset) gfm.dustGenerator.ApplyProfile(profileAsset);
-    if (gfm && gfm.dustGenerator) gfm.dustGenerator.RetintExisting(0.4f);
-
-    // Targets
-    IEnumerable<InstrumentTrack> targets = ctrl.tracks
-        .Where(t => t != null)
-        .OrderBy(_ => UnityEngine.Random.value)
-        .Take(4)
-        .ToList();
-
-    // 🔹 Look up the motif for this spawn from the PhaseTransitionManager
-    MotifProfile motif = null;
-    var ptm = gfm ? gfm.phaseTransitionManager : null;
-    if (ptm != null && ptm.currentMotif != null)
-    {
-        motif = ptm.currentMotif;
-
-        // Optional sanity check: warn if phase/motif phase don't line up
-        Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase {phase}).");
-    }
-    else
-    {
-        Debug.Log("[Spawn] No current motif available; PhaseStar will use phase-based NoteSets.");
-    }
-
-    // Wire star (now motif-aware)
-    _star.Initialize(this, targets, profileAsset, phase, motif);
-    _star.WireBinSource(this);
-
-    OnPhaseStarSpawned?.Invoke(phase, profileAsset);
-}
 
     private sealed class OnDestroyRelay : MonoBehaviour
 {
@@ -672,8 +668,28 @@ public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
     }
     public bool IsSpawnCellAvailable(int x, int y)
     {
-        return GameFlowManager.Instance.spawnGrid.IsCellAvailable(x, y);
+        var gfm = GameFlowManager.Instance;
+         if (gfm == null || gfm.spawnGrid == null) return false;
+         // 1) Spawn-grid occupancy (nodes, notes, etc.)
+         if (!gfm.spawnGrid.IsCellAvailable(x, y))
+             return false;
+         // 2) Dust blocks spawning (your decision 8A: no spawning inside dust)
+         var gen = gfm.dustGenerator; 
+         if (gen != null && gen.HasDustAt(new Vector2Int(x, y))) 
+             return false;
+         return true;        
     }
+    /// <summary>
+    /// Navigation predicate distinct from spawn availability.
+    /// Returns true if this cell is not occupied by dust. (Other objects may still exist here.)
+    /// </summary>
+    public bool IsNavCellOpen(int x, int y)
+    {
+        var gen = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+        if (gen == null) return true;
+        return !gen.HasDustAt(new Vector2Int(x, y));
+    }
+
     public bool HasSpawnGrid()
     {
         return GameFlowManager.Instance.spawnGrid != null;
@@ -873,7 +889,7 @@ public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
         {
             float loopSeconds = _trackController.GetEffectiveLoopLengthInSeconds();
             Vector2Int centerCell = WorldToGridPosition(transform.position);
-            GameFlowManager.Instance.dustGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.25f, 0.50f);
+            GameFlowManager.Instance.dustGenerator.TryRequestLoopAlignedCycle(GameFlowManager.Instance.phaseTransitionManager.currentPhase, centerCell, loopSeconds, 0.75f, 0.95f);
         }
         completedLoops++;
         Debug.Log($"[MNDBG] LoopBoundary: completedLoops(before)={completedLoops}, " +

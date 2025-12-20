@@ -62,9 +62,6 @@ MonoBehaviour:
   syncRotationToLoop: 1
   _tracePhaseStar: 1
   maxActiveDps: 360
-  _oncePerLoop: 0
-  _minPreviewIntervalSec: 0.5
-  _personalityMul: 1
   _assignedMotif: {fileID: 0}
   _perPetalLayerStep: 0
   _activeTopBoost: 0
@@ -102,10 +99,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 669d1afb2e15b46259e03b493c0ebf4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  kinematicMode: 1
+  kinematicMode: 0
   edgeBounce: 1.1
   screenPadding: 2
   focusSpeedMul: 0.5
+  avoidRadius: 3
+  avoidExponent: 2
+  avoidStrength: 1
+  edgeSampleStep: 0.35
+  edgeBand: 0.5
+  edgeStrength: 1
+  edgeGradMin: 0.02
+  maxAccel: 4
+  verbose: 0
 --- !u!114 &7465792772216044867
 MonoBehaviour:
   m_ObjectHideFlags: 0

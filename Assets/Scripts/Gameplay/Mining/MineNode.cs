@@ -19,7 +19,10 @@ public class MineNode : MonoBehaviour
     private MineNodeRailAgent _rail;
     private Collider2D _col;
     private Rigidbody2D _rb;
-    
+    private float _spawnTime;
+    [SerializeField] private float minCarveSeconds = 1.25f;
+
+    private bool _retiredUseRail;
     // --- Carving → Retired lifecycle data ---
     private bool _isRetired = false;
     private int _birthLoop;
@@ -51,6 +54,7 @@ public class MineNode : MonoBehaviour
     private void FixedUpdate()
     {
         if (!_isRetired) return;
+        if (_retiredUseRail) return;
         if (_rb == null || _drumTrack == null || _carvedPath.Count < 2) return;
 
         // Gradually recover steering force toward the base over time
@@ -105,7 +109,7 @@ public class MineNode : MonoBehaviour
         Debug.Log($"[MNDBG] MineNode.Initialize: node={name}, role={directive.role}, " +
                   $"type={directive.minedObjectType}, track={directive.assignedTrack?.name}, " +
                   $"spawnCell={directive.spawnCell}");
-
+        _spawnTime = Time.time;
         _directive    = directive;                 // ⬅ cache
         GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
         _lockedColor = directive.displayColor;
@@ -132,6 +136,13 @@ public class MineNode : MonoBehaviour
             _birthLoop = _drumTrack.completedLoops;
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
         }
+        if (_rail == null) _rail = GetComponent<MineNodeRailAgent>();
+        if (_rail != null)
+        {
+            _rail.SetDrumTrack(_drumTrack); // safe even if disabled
+            _rail.enabled = false;          // carving phase
+        }
+
 
 // --- Begin in Carving Mode ---
         _isRetired = false;
@@ -174,24 +185,62 @@ public class MineNode : MonoBehaviour
     {
         if (_isRetired || _drumTrack == null) return;
 
-        // First loop boundary after spawn → stop carving
+        // Don’t allow immediate retirement if we spawned near the end of a loop.
+        if (Time.time - _spawnTime < minCarveSeconds)
+            return;
+
         if (_drumTrack.completedLoops > _birthLoop)
-        {
             EnterRetiredMode();
-        }
     }
+
     private void EnterRetiredMode()
     {
+        // ------------------------------------------------------------
+        // 1) Flip to retired + stop carving
+        // ------------------------------------------------------------
         _isRetired = true;
         _retiredSteerForce = _retiredSteerForceBase;
-        // disable carving
+
         var dust = GetComponent<MineNodeDustInteractor>();
         if (dust != null) dust.carveMaze = false;
 
-        // ensure valid path
-        if (_carvedPath.Count < 2)
+        // Queue this corridor to close when the NEXT MineNode is spawned.
+        var gen = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+        if (gen != null && _carvedPath != null && _carvedPath.Count >= 2)
+            gen.EnqueueCorridorForNextNodeSpawn(_carvedPath);
+
+        // ------------------------------------------------------------
+        // 2) Prefer rail-based "component patrol" if available
+        // ------------------------------------------------------------
+        if (_rail == null) _rail = GetComponent<MineNodeRailAgent>();
+        _retiredUseRail = (_rail != null && _drumTrack != null && _rb != null);
+
+        if (_retiredUseRail)
         {
-            // nothing meaningful to ping-pong on
+            // IMPORTANT: rail locomotion should only run during retirement.
+            // If you disabled the rail agent during carving, re-enable it here.
+            _rail.enabled = true;
+
+            // Ensure rail agent has the track (needed for reachability + world<->grid).
+            _rail.SetDrumTrack(_drumTrack);
+
+            // Target: farthest reachable cell within our current empty-space component.
+            _rail.SetTargetProvider(() =>
+            {
+                var start = _drumTrack.CellOf(_rb.position);
+                return _drumTrack.FarthestReachableCellInComponent(start);
+            });
+
+            // Plan + start moving.
+            _rail.ReplanToFarthest();
+            return; // do NOT also set up carved-path ping-pong
+        }
+
+        // ------------------------------------------------------------
+        // 3) Fallback: ping-pong along carved path (no rail agent)
+        // ------------------------------------------------------------
+        if (_carvedPath == null || _carvedPath.Count < 2)
+        {
             _pathIndex = 0;
             _pathForward = true;
             return;
@@ -200,7 +249,7 @@ public class MineNode : MonoBehaviour
         _pathIndex = 0;
         _pathForward = true;
     }
-    // Called by MineNodeDustInteractor when erosion succeeds
+
     public void NotifyDustErodedAt(Vector3 worldPos)
     {
         if (_isRetired) return;     // retired nodes do not record
@@ -390,8 +439,32 @@ public class MineNode : MonoBehaviour
                             Debug.LogWarning("[MineNode] Note burst aborted: missing spawner/track/noteSet."); 
                             return;
                         } 
-                        Debug.Log($"Bursting Collectables with {spawner.selectedNoteSet} at {spawner.assignedTrack}"); 
-                        spawner.assignedTrack.SpawnCollectableBurst(spawner.selectedNoteSet, 8);
+                        InstrumentTrack burstTrack = spawner.assignedTrack;
+
+                        Debug.Log($"Bursting Collectables with {spawner.selectedNoteSet} at {burstTrack}");
+
+                        var ctrl = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
+                        if (ctrl != null && burstTrack != null)
+                        {
+                            // Repeat-role heuristic: if this track already has any notes (or bin 0 filled),
+                            // then catching another MineNode of this role is allowed to expand the loop.
+                            var notes = burstTrack.GetPersistentLoopNotes();
+                            bool hasAnyNotes = (notes != null && notes.Count > 0);
+                            bool bin0Filled  = burstTrack.IsBinFilled(0);
+
+                            if (hasAnyNotes || bin0Filled)
+                            {
+                                ctrl.AllowAdvanceNextBurst(burstTrack);
+                                Debug.Log($"[MineNode] AllowAdvanceNextBurst: {burstTrack.name} ({burstTrack.assignedRole})");
+                            }
+                            else
+                            {
+                                Debug.Log($"[MineNode] First notes for {burstTrack.name} ({burstTrack.assignedRole}) — no advance.");
+                            }
+                        }
+
+                        burstTrack.SpawnCollectableBurst(spawner.selectedNoteSet, 8);
+
                         spawner.assignedTrack.DisplayNoteSet();
                         var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
                         float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 

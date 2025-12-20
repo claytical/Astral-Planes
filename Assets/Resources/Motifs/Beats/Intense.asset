@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BeatMoodProfile
   mood: 3
   bpm: 137
-  stepsPerLoop: 32
+  stepsPerLoop: 16
   loopClips:
   - {fileID: 8300000, guid: f61185488bc634bcc9400c36ebe05874, type: 3}
   stepDensityMultiplier: 1

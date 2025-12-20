@@ -63,6 +63,30 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _chordEventsSubscribed;
     public float lastCollectionTime { get; private set; } = -1f;
     private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
+// Allows a specific track to advance the frontier by exactly one bin on its next burst.
+// This is set by MineNode capture logic when the player catches a MineNode for a role
+// that is already populated.
+    private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst
+        = new Dictionary<InstrumentTrack, bool>();
+
+    public void AllowAdvanceNextBurst(InstrumentTrack track)
+    {
+        if (track == null) return;
+        _allowAdvanceNextBurst[track] = true;
+    }
+
+    private bool ConsumeAllowAdvanceNextBurst(InstrumentTrack track)
+    {
+        if (track == null) return false;
+
+        if (_allowAdvanceNextBurst.TryGetValue(track, out bool allowed) && allowed)
+        {
+            _allowAdvanceNextBurst[track] = false;
+            return true;
+        }
+        return false;
+    }
+
     public void NotifyBinPossiblyExtended(InstrumentTrack leaderTrack, int binIndex)
     {
         if (!leaderTrack || binIndex < 0) return;
@@ -233,48 +257,63 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     if (track == null)
         return 0;
 
-    // 1) Compute globalMaxFilledBin across all configured tracks
-    int globalMaxFilledBin = -1;
+    // Helper: "frontier" means the furthest bin this track has allocated space for,
+    // even if it hasn't actually written notes into it yet.
+    int FrontierFor(InstrumentTrack t)
+    {
+        if (t == null) return -1;
+        int highestFilled = t.GetHighestFilledBin();       // based on binFilled[]
+        int cursorBased   = t.GetBinCursor() - 1;          // binCursor points to NEXT bin to write
+        return Mathf.Max(highestFilled, cursorBased);
+    }
+
+    // 1) Compute global frontier across all tracks
+    int globalFrontier = -1;
     if (tracks != null)
     {
         for (int i = 0; i < tracks.Length; i++)
         {
             var t = tracks[i];
             if (!t) continue;
-
-            int h = t.GetHighestFilledBin();
-            if (h > globalMaxFilledBin)
-                globalMaxFilledBin = h;
+            globalFrontier = Mathf.Max(globalFrontier, FrontierFor(t));
         }
     }
 
-    // No one has any notes yet → first burst always goes to bin 0.
-    if (globalMaxFilledBin < 0)
+    // No one has allocated anything yet → first burst goes to bin 0.
+    if (globalFrontier < 0)
         return 0;
 
-    // 2) Track-local filled extent
-    int trackHighest = track.GetHighestFilledBin();
+    // 2) Track-local frontier
+    int trackFrontier = FrontierFor(track);
 
-    if (trackHighest < globalMaxFilledBin)
+    // 3) If this track is behind the global frontier, fill holes up to the frontier
+    if (trackFrontier < globalFrontier)
     {
-        // This track is "behind" the frontier → catch up by filling holes
-        // in bins [0 .. globalMaxFilledBin] where it has no notes yet.
-        for (int b = 0; b <= globalMaxFilledBin; b++)
+        for (int b = 0; b <= globalFrontier; b++)
         {
             if (!track.IsBinFilled(b))
                 return b;
         }
 
-        // Defensive fallback: if somehow all bins up to globalMaxFilledBin are filled
-        // on this track too, treat it as caught up and advance the frontier.
-        return globalMaxFilledBin + 1;
+        // Defensive fallback
+        return globalFrontier;
     }
-    else
+
+    // 4) Track is at/leading the frontier:
+    // normally write at its cursor (next bin), unless we disallow advancing.
+    int cursorTarget = Mathf.Max(0, track.GetBinCursor());
+
+    // If you want to *prevent* frontier pushes unless explicitly allowed,
+    // clamp to globalFrontier unless ConsumeAllowAdvanceNextBurst is true.
+    if (cursorTarget > globalFrontier)
     {
-        // This track has caught up with the current frontier (or defines it).
-        // Allow it to push the frontier forward into the next bin.
-        return globalMaxFilledBin + 1;
+        // This means the cursor has already been advanced (e.g., by leader extension signaling).
+        // Let it write where it believes the next bin is; that's the whole point of cursor-based allocation.
+        return cursorTarget;
     }
+
+    // cursorTarget == globalFrontier (or less) → normal behavior
+    return ConsumeAllowAdvanceNextBurst(track) ? (globalFrontier + 1) : cursorTarget;
 }
 
 private void ResetAllCursorsAndGuards(bool clearLoops=false)
@@ -421,12 +460,16 @@ public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
         foreach (var t in tracks)
         {
             if (t == null) continue;
+
             var loopNotes = t.GetPersistentLoopNotes();
-            if (loopNotes != null && loopNotes.Count > 0)
-                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
+            if (loopNotes == null || loopNotes.Count == 0) continue;
+
+            // “Active” means “audible and committed to this loop width.”
+            maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
         }
         return maxMul;
     }
+
     public int GetMaxLoopMultiplier()
     {
         return tracks.Max(track => track.loopMultiplier);
