@@ -2,7 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+public readonly struct StepDomain
+{
+    public readonly int stepsPerBin;   // canonical, e.g. 16
+    public readonly int bins;          // how many bins you want the set to span during generation
+    public int stepsTotal => stepsPerBin * bins;
 
+    public StepDomain(int stepsPerBin, int bins)
+    {
+        this.stepsPerBin = Mathf.Max(1, stepsPerBin);
+        this.bins = Mathf.Max(1, bins);
+    }
+}
 public class NoteSetFactory : MonoBehaviour
 {
     [Header("Config Library (ScriptableObject)")]
@@ -29,8 +40,8 @@ public NoteSet Generate(InstrumentTrack track, MusicalPhase phase, int entropy =
         chordSeq = new List<Chord>{ new Chord{ rootNote = track.lowestAllowedNote, intervals = new List<int>{0,4,7} } };
 
     var rp    = RhythmPatterns.Patterns[rhythm];
-    int total = Mathf.Max(16, track.GetTotalSteps());
-    var steps = ExpandAcrossBars(rp.Offsets, rp.LoopMultiplier, total);
+    int total = GetAuthoritativeStepsPerLoop(track); 
+    var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
     if (steps.Count == 0) steps.Add(0);
 
     var v = cfg.variation;
@@ -138,40 +149,12 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
 
         // --- 2) Build base step grid from rhythm pattern and extended loop length ---
         var rp    = RhythmPatterns.Patterns[rhythm];
-        int total = Mathf.Max(16, track.GetTotalSteps());
-        var steps = ExpandAcrossBars(rp.Offsets, rp.LoopMultiplier, total);
+        int total = GetAuthoritativeStepsPerLoop(track); 
+        var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
         if (steps.Count == 0) steps.Add(0);
 
         // --- 3) Apply BeatMood-based step density scaling ---
         var moodProfile = GetActiveBeatMoodProfile();
-// NEW: BeatMood density scaling
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
-        if (moodProfile != null)
-        {
-            // Scale the step count:
-            int desiredCount = Mathf.RoundToInt(steps.Count * Mathf.Max(0.1f, moodProfile.stepDensityMultiplier));
-            desiredCount = Mathf.Clamp(desiredCount, 1, steps.Count);
-
-            // Compress or extend by selecting/subsampling from steps
-            if (desiredCount < steps.Count)
-            {
-                // Downsample
-                steps = steps
-                    .OrderBy(s => rng.Next())
-                    .Take(desiredCount)
-                    .OrderBy(s => s)
-                    .ToList();
-            }
-            else if (desiredCount > steps.Count)
-            {
-                // Upsample by repeating nearest pattern offsets
-                var extra = new List<int>();
-                while (steps.Count + extra.Count < desiredCount)
-                    extra.Add(steps[rng.Next(steps.Count)]);
-                steps = steps.Concat(extra).OrderBy(s => s).ToList();
-            }
-        }
-        
         
         steps = ApplyBeatMoodStepDensity(steps, moodProfile, rng);
 
@@ -270,8 +253,14 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
 
         ns.Initialize(track, total);
         return ns;
+    } 
+    private int GetAuthoritativeStepsPerLoop(InstrumentTrack track) { 
+        var mood = GetActiveBeatMoodProfile(); 
+        if (mood != null && mood.stepsPerLoop > 0) 
+            return mood.stepsPerLoop;
+        // Conservative fallback: preserve legacy behavior.
+        return 16;
     }
-
 
     // --- BeatMood integration helpers ---
 
@@ -307,9 +296,7 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
         // No change needed
         if (desiredCount == baseCount)
             return new List<int>(steps);
-
-        var result = new List<int>(desiredCount);
-
+        
         if (desiredCount < baseCount)
         {
             // Downsample: random subset, then sort
@@ -322,21 +309,115 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
                 .ToList();
 
             shuffled.Sort();
-            result.AddRange(shuffled);
+            return shuffled;
         }
+        // Upsample: add NEW steps by interpolating/jittering into empty positions.
+        // We need an authoritative domain length to know which step positions are "available".
+        int domain = 16;
+        // Prefer BeatMood's step grid authority.
+        if (mood.stepsPerLoop > 0) domain = mood.stepsPerLoop;
         else
         {
-            // Upsample: duplicate existing steps to reach desiredCount
-            result.AddRange(steps);
-            while (result.Count < desiredCount)
-            {
-                int pick = steps[rng.Next(steps.Count)];
-                result.Add(pick);
-            }
-            result.Sort();
+            // Fallback to active track grid if BeatMood doesn't specify it.
+            // (This preserves current runtime behavior where InstrumentTrack BinSize references drumTrack.totalSteps.)
+            domain = Mathf.Max(16, domain);
         }
 
-        return result;
+        // Normalize into domain and ensure uniqueness.
+        var used = new HashSet<int>();
+        for (int i = 0; i < steps.Count; i++)
+        {
+            int s = steps[i] % domain;
+            if (s < 0) s += domain;
+            used.Add(s);
+        }
+        if (used.Count == 0) used.Add(0);
+
+        // If the domain is small, cap at domain size (cannot exceed unique positions).
+        desiredCount = Mathf.Clamp(desiredCount, 1, domain);
+
+        // Early exit if already at/above desired unique density.
+        if (used.Count >= desiredCount)
+            return used.OrderBy(x => x).ToList();
+
+        // Helper to compute cyclic distance forward (a -> b) in [0, domain)
+        int CycDist(int a, int b)
+        {
+            int d = b - a;
+            if (d < 0) d += domain;
+            return d;
+        }
+
+        // Insert new steps into the largest gaps first.
+        // Each insertion chooses a point near the midpoint of a gap, with jitter, preferring empty slots.
+        int safety = 0;
+        while (used.Count < desiredCount && safety++ < domain * 8)
+        {
+           var ordered = used.OrderBy(x => x).ToList();
+            if (ordered.Count == 0) { used.Add(0); continue; }
+
+            // Find the largest forward gap between consecutive used points (cyclic).
+            int bestA = ordered[0];
+            int bestB = ordered[0];
+            int bestGap = -1;
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                int a = ordered[i];
+                int b = ordered[(i + 1) % ordered.Count];
+                int gap = CycDist(a, b);
+                if (gap > bestGap)
+                {
+                    bestGap = gap;
+                    bestA = a;
+                    bestB = b;
+                }
+            }
+
+            // If all positions are filled (shouldn't happen due to clamp), break.
+            if (bestGap <= 1) break;
+
+            // Midpoint inside the gap (exclusive of endpoints).
+            int half = bestGap / 2;
+            int mid = (bestA + half) % domain;
+
+            // Jitter: bias towards mid, but allow small variation.
+            // The larger the gap, the larger the permissible jitter.
+            int maxJitter = Mathf.Clamp(bestGap / 4, 1, 4);
+            int jitter = rng.Next(-maxJitter, maxJitter + 1);
+            int candidate = (mid + jitter) % domain;
+            if (candidate < 0) candidate += domain;
+
+            // If candidate occupied, walk outward from mid to find the nearest empty slot.
+            if (used.Contains(candidate))
+            {
+                bool found = false;
+                for (int r = 1; r < bestGap; r++)
+                {
+                    int c1 = (mid + r) % domain;
+                    int c2 = (mid - r) % domain;
+                    if (c2 < 0) c2 += domain;
+
+                    if (!used.Contains(c1))
+                    {
+                        candidate = c1;
+                        found = true;
+                        break;
+                    }
+                    if (!used.Contains(c2))
+                    {
+                        candidate = c2;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) break;
+            }
+
+            used.Add(candidate);
+        }
+
+        return used.OrderBy(x => x).ToList();
     }
     T PickWeighted<T>(List<Weighted<T>> list, System.Random rng)
     {
@@ -376,28 +457,56 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
         if (k == 0) return new List<NoteBehavior>();
         return PickK(list, k, rng);
     }
-
-    List<int> ExpandAcrossBars(int[] offsets, int loopMult, int baseSteps)
-    {
-        int total = baseSteps * Mathf.Max(1, loopMult);
-        int bars  = Mathf.Max(1, total / 16);
-        var steps = new List<int>(offsets.Length * bars);
-        for (int bar = 0; bar < bars; bar++)
-        {
-            int start = bar * 16;
-            for (int i = 0; i < offsets.Length; i++)
-            {
-                int s = start + offsets[i];
-                if (s < total) steps.Add(s);
-            }
-        }
-        return steps;
-    }
+    
     NoteSet TrackToNoteSetProxy(ScaleType scale, RhythmStyle rhythm) { 
         // minimal proxy NoteSet so CalculateNoteDuration can read rhythmStyle
         return new NoteSet { scale = scale, rhythmStyle = rhythm };
     }
+    /// <summary>
+    /// Expands a rhythm offset pattern authored in a 16-step reference grid into the current step domain.
+    /// - If totalSteps == 16: offsets are used directly.
+    /// - If totalSteps == 32: offsets are scaled (e.g., 4 -> 8) so musical positions remain comparable.
+    /// - loopMult repeats the pattern within the domain, but always returns steps in [0..totalSteps-1].
+    /// This prevents the "multi-bar steps >= 16 then modulo-collapse" duplication bug.
+    /// </summary>
+    List<int> ExpandWithinDomainFrom16(int[] offsets16, int loopMult, int totalSteps)
+    {
+        totalSteps = Mathf.Max(1, totalSteps);
+        int repeats = Mathf.Max(1, loopMult);
 
+        var steps = new HashSet<int>();
+        if (offsets16 == null || offsets16.Length == 0)
+        {
+            steps.Add(0);
+            return steps.OrderBy(s => s).ToList();
+        }
+
+        // Scale 16-based offsets into the active domain.
+        // We mod into domain to guarantee [0..totalSteps-1] and avoid any implicit "bar" semantics.
+        float scale = totalSteps / 16f;
+
+        // Repeat the same pattern within the domain by phase-shifting it.
+        // If repeats == 1, it's just the base pattern.
+        // If repeats > 1, we distribute repeats evenly around the loop.
+        for (int r = 0; r < repeats; r++)
+        {
+            int phaseShift = Mathf.RoundToInt((r * totalSteps) / (float)repeats);
+
+            for (int i = 0; i < offsets16.Length; i++)
+            {
+                int o16 = offsets16[i];
+                // Keep authored values stable even if they exceed 0..15 (defensive).
+                int scaled = Mathf.RoundToInt(o16 * scale);
+                int s = (phaseShift + scaled) % totalSteps;
+                if (s < 0) s += totalSteps;
+                steps.Add(s);
+            }
+        }
+
+        // Ensure non-empty and sorted
+        if (steps.Count == 0) steps.Add(0);
+        return steps.OrderBy(s => s).ToList();
+    }
     List<Chord> RealizeChordFunctions(List<string> fns, InstrumentTrack track, ScaleType scale)
     {
         // simple diatonic mapping; expand as you wish

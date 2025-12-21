@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using MidiPlayerTK;
 using UnityEngine.UI;
@@ -148,16 +149,7 @@ public class NoteVisualizer : MonoBehaviour
             else Destroy(vnm.gameObject);
         }
     }
-  private float ComputeStepX01(InstrumentTrack track, int stepIndex)
-{
-    // Uniform mapping across the FULL current loop width.
-    // Example with width 1920:
-    //  - 16 steps: x = (step / 16) * 1920  → step 0 = 0, step 4 = 480
-    //  - 32 steps: x = (step / 32) * 1920  → step 0 = 0, step 4 = 240
-    int total = Mathf.Max(1, track.GetTotalSteps());
-    float x01 = stepIndex / (float)total;     // NOTE: divide by total, not (total-1)
-    return Mathf.Clamp01(x01);
-}
+
     public void Initialize()
     {
         isInitialized = true;
@@ -814,9 +806,12 @@ public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex
     }
 
     // Positioning for creation
-    int totalSteps = Mathf.Max(1, track.GetTotalSteps());
-    float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex);
-Debug.Log($"xLocal : {xLocal} for track {track.name} stepIndex {stepIndex} lit={lit}");
+    int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
+    int binSize    = Mathf.Max(1, track.BinSize()); 
+    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
+    float xLocal   = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
+
+    Debug.Log($"xLocal : {xLocal} for track {track.name} stepIndex {stepIndex} lit={lit}");
     float bottomWorldY = GetBottomWorldY();
     float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
 
@@ -893,33 +888,6 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
         }
         foreach (var k in deadKeys) noteMarkers.Remove(k);
     }
-    private float ComputeSnappedXLocalForLeader(Rect rowRect, InstrumentTrack track, int step, int snapCellSize = 0)
-    {
-        int leaderSteps = GetLeaderStepsSafe();
-
-        int trackSteps = Mathf.Max(1, track.GetTotalSteps());
-
-        trackSteps = Mathf.Max(1, trackSteps);
-
-        // If leaderSteps is not ready yet (0/negative), fallback to trackSteps
-        if (leaderSteps <= 0) leaderSteps = trackSteps;
-
-        // 2) Map track step → leader space
-        float uTrack = (step % trackSteps) / (float)trackSteps;   // [0..1)
-        float leaderPos = uTrack * leaderSteps;                   // [0..leaderSteps)
-
-        // 3) Optional snap in leader cells (snapCellSize == 0 → no snapping)
-        if (snapCellSize > 0)
-        {
-            // Round to nearest cell (avoid bias-to-zero)
-            leaderPos = Mathf.Round(leaderPos / snapCellSize) * snapCellSize;
-            leaderPos = Mathf.Clamp(leaderPos, 0, leaderSteps);   // cap at right edge if exactly == leaderSteps
-        }
-
-        // 4) Convert back to [0..1] and then to pixel X
-        float uLeader = (leaderSteps > 0) ? Mathf.Clamp01(leaderPos / leaderSteps) : 0f;
-        return Mathf.Lerp(rowRect.xMin, rowRect.xMax, uLeader);
-    }
 
 public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds)
 {
@@ -941,6 +909,10 @@ public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds
     if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
     RectTransform row = trackRows[trackIndex];
     Rect rowRect = row.rect;
+    int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
+    int binSize    = Mathf.Max(1, track.BinSize()); 
+    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
+
 // ---- LATE-ARM COHORT IF NEEDED ----
     var ctrl = GameFlowManager.Instance.controller;
     var drum = GameFlowManager.Instance.activeDrumTrack;
@@ -988,12 +960,7 @@ public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds
 
         if (noteMarkers.TryGetValue(key, out var tr) && tr != null)
         {
-            float xLocal =
-                // Use snapped X so the burst lines up with leader grid (0,16,32,...)
-                ComputeSnappedXLocalForLeader(rowRect, track, step, SNAP_CELL);
-                // If you prefer your original behavior, use:
-                // ComputeXLocalForTrack(rowRect, track, step);
-
+            float xLocal = ComputeXLocalForTrack(rowRect, track, step, binSize, leaderBinsForPlacement);
             var lp = tr.localPosition;
             tr.localPosition = new Vector3(xLocal, lp.y, lp.z);
             toAnimate.Add((tr.gameObject, step));
@@ -1310,9 +1277,18 @@ private void RefreshBinHighlight()
         RectTransform row = trackRows[trackIndex];
         Rect rowRect      = row.rect;
 
-        int totalSteps    = Mathf.Max(1, track.GetTotalSteps());
-        int longestSteps  = Mathf.Max(1, GetDeclaredLongestSteps());
-        float localFraction = totalSteps / (float)longestSteps;
+        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
+        int binSize = Mathf.Max(1, track.BinSize()); 
+        int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
+        int leaderBinsBase; 
+        if (_forcedLeaderSteps >= 1) 
+            leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
+        else 
+            leaderBinsBase = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxActiveLoopMultiplier());
+        
+        // Ensure we include this track's current bins in placement width.
+        int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize)); 
+        leaderBinsForPlacement = Mathf.Max(leaderBinsBase, trackBins);
 
         float bottomWorldY = GetBottomWorldY();
         float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y; 
@@ -1325,14 +1301,26 @@ private void RefreshBinHighlight()
             if (key.Item1 != track || !tf) continue;
 
             int stepIndex = key.Item2;
-//            float x01 = ComputeStepX01(track, stepIndex);
-//            float xLocal = Mathf.Lerp(rowRect.xMin, rowRect.xMax, x01);
-            float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex);
+            float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
             var lp = tf.localPosition;
             float yLocal = IsAscending(tf) ? lp.y : bottomLocalY; 
             tf.localPosition = new Vector3(xLocal, yLocal, lp.z);
         }
     }
+    
+    private int GetLeaderBinsForPlacement(InstrumentTrack track, int totalSteps, int binSize) {
+        int leaderBinsBase; 
+        if (_forcedLeaderSteps >= 1) { 
+            leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
+        }
+        else { 
+            leaderBinsBase = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxActiveLoopMultiplier());
+        }
+        // Ensure placement width can represent this track's current bins.
+        int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize)); 
+        return Mathf.Max(leaderBinsBase, trackBins);
+    }
+
     private void EnqueueAscendForTrack(
         InstrumentTrack track,
         IEnumerable<(GameObject go, (InstrumentTrack,int) key, float targetY, int delayLoops, int totalLoops, System.Action onDonePerMarker)> items)
@@ -1387,30 +1375,17 @@ private void RefreshBinHighlight()
              if (t) RecomputeTrackLayout(t);
          UpdateNoteMarkerPositions();
     }
-
-    float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex)
+    private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
+        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
+        int binSize    = Mathf.Max(1, track.BinSize()); 
+        int leaderBins = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
+        return ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBins);
+    }
+    float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {
-        int trackSteps = track.GetTotalSteps(); 
-        if (trackSteps <= 0) trackSteps = 16;
-        int binSize       = Mathf.Max(1, track.BinSize());
-        int leaderBinsBase; 
-        if (_forcedLeaderSteps >= 1) { 
-            // Convert absolute leader steps → bins, respecting this track's binSize.
-            // (In your current architecture, binSize is effectively drum.totalSteps across tracks.)
-            leaderBinsBase = Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize);
-        }
-        else { 
-            leaderBinsBase = Mathf.Max(1, GameFlowManager.Instance.controller.GetMaxActiveLoopMultiplier());
-        }
         
         // Which bin does this step belong to on THIS track?
         int binIndex = stepIndex / binSize;
-        // --- Key change: placement should *at minimum* include the bin that contains this step.
-        // If we’re spawning steps in bin #1 while leaderBinsNow==1, expand the *placement* grid to 2.
-        int leaderBinsForPlacement = Mathf.Max(leaderBinsBase, binIndex + 1);
-
-        
-        // Local index inside the bin
         int localInBin = stepIndex % binSize;
         float uMin = (float)binIndex / leaderBinsForPlacement; 
         float uMax = (float)(binIndex + 1) / leaderBinsForPlacement;

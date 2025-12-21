@@ -38,7 +38,13 @@ public class PhaseStar : MonoBehaviour
 
     [Tooltip("Radius in grid cells for the PhaseStar maneuvering pocket.")]
     [SerializeField] private int starKeepClearRadiusCells = 2;
-
+    [Header("Safety / Self-heal")] 
+    [Tooltip("If a MineNode resolves but no collectable burst ever materializes (or the last burst never reports cleared), " + "PhaseStar can become stuck in a waiting state. This is a self-heal timeout (in loop boundaries).")] 
+    [SerializeField] private int collectableClearTimeoutLoops = 2;
+    [Tooltip("Secondary timeout in seconds (DSP time). Used if loop counter is unavailable. Set <= 0 to disable.")]
+    [SerializeField] private float collectableClearTimeoutSeconds = 0f;
+    private int _awaitingCollectableClearSinceLoop = -1;
+    private double _awaitingCollectableClearSinceDsp = -1.0;
     [Header("Subcomponents (optional)")]
     [SerializeField] private PhaseStarVisuals2D visuals;
     [SerializeField] private PhaseStarMotion2D motion;
@@ -88,6 +94,9 @@ public class PhaseStar : MonoBehaviour
 
         // There exist collectables in flight (global), so we must not allow another poke.
         CollectablesInFlight,
+        
+        //A track is staged to expand on the net loop boundary; don't allow another collision that could queue an additional burst/bin change in the same window
+        ExpansionPending,        
 
         // Star has no shards remaining and we’re awaiting bridge transition.
         AwaitBridge,
@@ -228,6 +237,12 @@ public class PhaseStar : MonoBehaviour
             }
         }
     }
+    bool AnyExpansionPendingGlobal() { 
+        var gfm = GameFlowManager.Instance; 
+        var tc = gfm != null ? gfm.controller : null; 
+        return (tc != null && tc.AnyExpansionPending());
+    }
+    
     private void SetVisual(VisualMode mode, Color tint) {
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (!visuals) return;
@@ -241,6 +256,8 @@ public class PhaseStar : MonoBehaviour
     public void NotifyCollectableBurstCleared()
     {
         _awaitingCollectableClear = false;
+        _awaitingCollectableClearSinceLoop = -1; 
+        _awaitingCollectableClearSinceDsp  = -1.0;
 
         bool noShardsRemain =
             (previewRing == null || previewRing.Count == 0) ||
@@ -276,6 +293,7 @@ public class PhaseStar : MonoBehaviour
     private void ArmNext()
     {
         if (AnyCollectablesInFlightGlobal()) { Disarm(DisarmReason.CollectablesInFlight); return; }
+        if (AnyExpansionPendingGlobal())    { Disarm(DisarmReason.ExpansionPending);    return; }
         if (!HasShardsRemaining())          { Disarm(DisarmReason.AwaitBridge); return; }
 
         _disarmReason = DisarmReason.None;
@@ -303,6 +321,7 @@ public class PhaseStar : MonoBehaviour
 
             case DisarmReason.NodeResolving:
             case DisarmReason.CollectablesInFlight:
+            case DisarmReason.ExpansionPending:
             default:
                 SetVisual(VisualMode.Dim, tint);
                 break;
@@ -343,7 +362,70 @@ public class PhaseStar : MonoBehaviour
         if (_isDisposing || this == null) return; 
         if (_awaitingCollectableClear)
         {
-            Disarm(DisarmReason.NodeResolving, _lockedTint); // ensure dim + colliders off
+         // If collectables exist, we're legitimately waiting.
+            if (AnyCollectablesInFlightGlobal()) {
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+            // No collectables in flight, but we're still "awaiting" → this is the deadlock case.
+            // Self-heal after a short timeout.
+            var drums = _drum != null ? _drum : (GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null);
+
+            bool timedOut = false;
+
+  /*
+   if (collectableClearTimeoutLoops > 0 && drums != null) {
+                int nowLoop = drums.completedLoops;
+                if (_awaitingCollectableClearSinceLoop < 0)
+                    _awaitingCollectableClearSinceLoop = nowLoop;
+
+                int waitedLoops = nowLoop - _awaitingCollectableClearSinceLoop;
+                if (waitedLoops >= collectableClearTimeoutLoops)
+                    timedOut = true;
+            }
+*/
+  Debug.Log($"[PhaseStar][Await] nowLoop={(drums!=null?drums.completedLoops:-1)} " +
+            $"sinceLoop={_awaitingCollectableClearSinceLoop} " +
+            $"waited={(drums!=null && _awaitingCollectableClearSinceLoop>=0 ? drums.completedLoops - _awaitingCollectableClearSinceLoop : -1)} " +
+            $"loopsTimeout={collectableClearTimeoutLoops} " +
+            $"dspNow={AudioSettings.dspTime:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={collectableClearTimeoutSeconds:F2} " +
+            $"collectablesInFlight={AnyCollectablesInFlightGlobal()} activeNode={( _activeNode!=null)}");
+
+            if (!timedOut && collectableClearTimeoutSeconds > 0f) {
+                double nowDsp = AudioSettings.dspTime;
+                if (_awaitingCollectableClearSinceDsp < 0.0)
+                    _awaitingCollectableClearSinceDsp = nowDsp;
+
+                if ((nowDsp - _awaitingCollectableClearSinceDsp) >= collectableClearTimeoutSeconds)
+                    timedOut = true;
+            }
+
+            if (!timedOut) {
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            Debug.LogWarning(
+                $"[PhaseStar][Timeout] AwaitingCollectableClear timed out but no collectables are in flight. " +
+                $"Forcing recovery. star={name} shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}");
+
+            // Force-clear waiting state.
+            _awaitingCollectableClear = false;
+            _awaitingCollectableClearSinceLoop = -1;
+            _awaitingCollectableClearSinceDsp  = -1.0;
+
+            // Decide what to do next.
+            bool noShardsRemain =
+                (previewRing == null || previewRing.Count == 0) ||
+                (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+
+            if (noShardsRemain)
+            {
+                BeginBridgeNow();
+                return;
+            }
+
+            ArmNext();
             return;
         }
 
@@ -352,6 +434,10 @@ public class PhaseStar : MonoBehaviour
             Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
             return;
         }
+        if (AnyExpansionPendingGlobal()) { 
+            Disarm(DisarmReason.ExpansionPending, _lockedTint); 
+            return;
+        }        
         Trace("OnLoopBoundary_RearmIfNeeded()"); 
         LogState("LoopBoundary entry");
                 // If we already started the bridge, ignore further loop boundaries.
@@ -775,7 +861,11 @@ public class PhaseStar : MonoBehaviour
         Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
         return;
     }
-
+    if (AnyExpansionPendingGlobal()) { 
+        Disarm(DisarmReason.ExpansionPending, _lockedTint); 
+        Trace("OnCollisionEnter2D: ignored poke because an expansion is pending"); 
+        return;
+    }
     // --- Safety & gating ---
     if (!HasShardsRemaining()) return;
     if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
@@ -912,6 +1002,9 @@ public class PhaseStar : MonoBehaviour
             if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
             _activeNode = null;
             _awaitingCollectableClear = true;
+            _awaitingCollectableClearSinceLoop = (_drum != null) ? _drum.completedLoops : -1; 
+            _awaitingCollectableClearSinceDsp  = AudioSettings.dspTime;
+            
             bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar)); 
             if (allShardsEjected)
             {
@@ -923,6 +1016,10 @@ public class PhaseStar : MonoBehaviour
                 // Do NOT force ArmNext here; remain disarmed until collectables clear.
                 Disarm(DisarmReason.NodeResolving, _lockedTint);
                 Trace("OnResolved: MineNode resolved → waiting for collectables");
+                _awaitingCollectableClear = true;
+                _awaitingCollectableClearSinceLoop = (_drum != null ? _drum.completedLoops : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1));
+                _awaitingCollectableClearSinceDsp  = AudioSettings.dspTime;
+                
             }
 
             LogState("OnResolved");
