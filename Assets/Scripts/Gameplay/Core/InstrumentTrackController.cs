@@ -189,6 +189,7 @@ public class InstrumentTrackController : MonoBehaviour
         {
             if (!t) continue;
             t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
+            t.OnCollectableBurstCleared -= HandleCollectableBurstCleared;
         }
         _chordEventsSubscribed = false;
     }
@@ -262,7 +263,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     int FrontierFor(InstrumentTrack t)
     {
         if (t == null) return -1;
-        int highestFilled = t.GetHighestFilledBin();       // based on binFilled[]
+        int highestFilled = Mathf.Max(t.GetHighestFilledBin(), t.GetHighestAllocatedBin());
         int cursorBased   = t.GetBinCursor() - 1;          // binCursor points to NEXT bin to write
         return Mathf.Max(highestFilled, cursorBased);
     }
@@ -285,18 +286,20 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
     // 2) Track-local frontier
     int trackFrontier = FrontierFor(track);
+    int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1); 
+    int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
 
     // 3) If this track is behind the global frontier, fill holes up to the frontier
-    if (trackFrontier < globalFrontier)
+    if (trackFrontier < clampedGlobalFrontier)
     {
-        for (int b = 0; b <= globalFrontier; b++)
+        for (int b = 0; b <= clampedGlobalFrontier; b++)
         {
-            if (!track.IsBinFilled(b))
+            if (!track.IsBinAllocated(b))
                 return b;
         }
 
         // Defensive fallback
-        return globalFrontier;
+        return clampedGlobalFrontier;
     }
 
     // 4) Track is at/leading the frontier:
@@ -309,11 +312,38 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     {
         // This means the cursor has already been advanced (e.g., by leader extension signaling).
         // Let it write where it believes the next bin is; that's the whole point of cursor-based allocation.
+        // But if the cursor points beyond this track's cap, treat it as density injection.
+        if (cursorTarget > trackMaxBinIndex) { 
+            int binsAllocated = Mathf.Clamp(track.GetBinCursor(), 1, track.maxLoopMultiplier);
+            // Prefer bins that are already filled to avoid repeatedly pounding a single empty bin.
+            var candidates = new List<int>(binsAllocated); 
+            for (int b = 0; b < binsAllocated; b++) 
+                if (track.IsBinFilled(b)) candidates.Add(b);
+                if (candidates.Count == 0) {
+                    for (int b = 0; b < binsAllocated; b++) 
+                        candidates.Add(b);
+                }
+                return candidates[Random.Range(0, candidates.Count)];
+        }
         return cursorTarget;
+    } 
+    int proposed = ConsumeAllowAdvanceNextBurst(track) ? (globalFrontier + 1) : cursorTarget;
+    // If advancing would exceed this track's max bins, inject density into a random already-allocated bin.
+    if (proposed > trackMaxBinIndex) { 
+        // binsAllocated: how many bins this track has currently allocated space for (cursor-based),
+        // clamped to its maximum capacity.
+        int binsAllocated = Mathf.Clamp(track.GetBinCursor(), 1, track.maxLoopMultiplier);
+        // Prefer bins that are already filled to distribute density into "real" content.
+        var candidates = new List<int>(binsAllocated); 
+        for (int b = 0; b < binsAllocated; b++) 
+            if (track.IsBinFilled(b)) candidates.Add(b);
+            if (candidates.Count == 0) { 
+                for (int b = 0; b < binsAllocated; b++) 
+                    candidates.Add(b);
+            }
+            return candidates[UnityEngine.Random.Range(0, candidates.Count)];
     }
-
-    // cursorTarget == globalFrontier (or less) → normal behavior
-    return ConsumeAllowAdvanceNextBurst(track) ? (globalFrontier + 1) : cursorTarget;
+    return proposed;
 }
 
 private void ResetAllCursorsAndGuards(bool clearLoops=false)
@@ -322,6 +352,14 @@ private void ResetAllCursorsAndGuards(bool clearLoops=false)
         if (tracks == null) return;
         foreach (var t in tracks)
             if (t) t.ResetBinsForPhase();
+    } 
+    public bool AnyExpansionPending() {
+        if (tracks == null || tracks.Length == 0) return false; 
+        foreach (var t in tracks) {
+            if (!t) continue;
+            if (t.IsExpansionPending) return true; 
+        } 
+        return false;
     }
     public bool AnyCollectablesInFlight() { 
         if (tracks == null || tracks.Length == 0) return false; 

@@ -39,7 +39,7 @@ public class Collectable : MonoBehaviour
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
     bool _hasReservation;
-
+    public bool ReportedCollected { get; private set; }
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
@@ -548,9 +548,9 @@ public class Collectable : MonoBehaviour
         var ml = ribbonMarker ? ribbonMarker.GetComponent<MarkerLight>() : null;
         if (ml) ml.LightUp(tether != null ? tether.baseColor : Color.white);
 
+        ReportedCollected = true; 
         OnCollected?.Invoke(durationTicks, force); // ✅ event raised inside Collectable
         OnDestroyed?.Invoke();
-
         if (tether) Destroy(tether.gameObject);
         Destroy(gameObject);
     }

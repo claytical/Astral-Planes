@@ -58,6 +58,7 @@ public class InstrumentTrack : MonoBehaviour
     private int  _collapseTargetMultiplier = 1;
     private bool _hookedBoundaryForCollapse;
     private bool _pendingExpandForBurst;
+    private int _overrideNextSpawnBin = -1;
     private bool _expandCommitted;    
     private int  _oldTotalAtExpand;
     private int  _halfOffsetAtExpand;
@@ -79,7 +80,8 @@ public class InstrumentTrack : MonoBehaviour
     private readonly Dictionary<int, int> _burstLeaderBinsBeforeWrite = new(); // burstId -> leaderBins
     private readonly Dictionary<int, int> _burstWroteBin             = new(); // burstId -> targetBin (cursor bin)
     private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
-
+    private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
+    [SerializeField] private bool[] binAllocated;
     [SerializeField] private int _binCursor = 0;    // counts bins allocated on this track, including silent skips
     private readonly List<int> _scratchSteps = new List<int>(1);
     private void SetBinCursor(int v) => _binCursor = Mathf.Max(0, v);
@@ -88,7 +90,9 @@ public class InstrumentTrack : MonoBehaviour
     private void ResetBinCursor()            => _binCursor = 0;
     public event Action<InstrumentTrack,int,int> OnAscensionCohortCompleted; // (track, start, end)
     public event Action<InstrumentTrack, int> OnCollectableBurstCleared; // (track, burstId)
-    
+    private void OnDisable() { UnhookExpandBoundary(); }
+    private void OnDestroy() { UnhookExpandBoundary(); }
+
     private (NoteSet noteSet, int maxToSpawn)? _pendingBurstAfterExpand;
     private readonly List<Action> _nextFrameQueue = new();
     private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
@@ -102,6 +106,8 @@ public class InstrumentTrack : MonoBehaviour
         int b = BinIndexForStep(s);
         return b >= 0 && b < _binFilled.Count && _binFilled[b];
     }
+    public bool IsExpansionPending => _pendingExpandForBurst || _expandCommitted || _pendingBurstAfterExpand.HasValue;
+
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
@@ -216,11 +222,35 @@ public class InstrumentTrack : MonoBehaviour
             _binFilled.Add(false);
 
         if (_binFilled.Count > want)
-            _binFilled.RemoveRange(want, _binFilled.Count - want);
-
+            _binFilled.RemoveRange(want, _binFilled.Count - want); 
+        if (binAllocated == null || binAllocated.Length != maxLoopMultiplier) {
+            var old = binAllocated; 
+            binAllocated = new bool[maxLoopMultiplier]; 
+            if (old != null) {
+                int n = Mathf.Min(old.Length, binAllocated.Length); 
+                for (int i = 0; i < n; i++) binAllocated[i] = old[i];
+            }
+        }
         Harmony_Bins_EnsureSize(_binFilled.Count);
     }
 
+    public bool IsBinAllocated(int bin) {
+        if (binAllocated == null) return false; 
+        if (bin < 0 || bin >= binAllocated.Length) return false;
+        return binAllocated[bin];
+    }
+    public void SetBinAllocated(int bin, bool v) { 
+        EnsureBinList(); 
+        if (bin < 0 || bin >= binAllocated.Length) return; 
+        binAllocated[bin] = v;
+    }
+    public int GetHighestAllocatedBin() { 
+        if (binAllocated == null) return -1; 
+        for (int i = binAllocated.Length - 1; i >= 0; i--) 
+            if (binAllocated[i]) return i;
+            
+        return -1;
+        }
     public void DisplayNoteSet()
     {
         Debug.Log($"[{gameObject.name} NOTESET] Root: {_currentNoteSet.GetRootNote()}, Scale: {_currentNoteSet.scale}, Behavior: {_currentNoteSet.noteBehavior}, Pattern: {_currentNoteSet.patternStrategy}, Rhythm: {_currentNoteSet.rhythmStyle}");
@@ -245,7 +275,21 @@ public class InstrumentTrack : MonoBehaviour
         }
 
         return binsFromFill;
-    }
+    } 
+    private int PickRandomExistingBinForDensity() { 
+        // Only choose among bins that currently exist on THIS track.
+        int binsAvailable = Mathf.Clamp(loopMultiplier, 1, Mathf.Max(1, maxLoopMultiplier));
+        // Prefer bins that already contain notes, so density accumulates in meaningful places.
+        // Fall back to any existing bin if none are marked filled yet.
+        List<int> candidates = new System.Collections.Generic.List<int>(binsAvailable);
+        for (int b = 0; b < binsAvailable; b++) 
+            if (IsBinFilled(b)) candidates.Add(b);
+        if (candidates.Count == 0) { 
+            for (int b = 0; b < binsAvailable; b++) 
+                candidates.Add(b); 
+        } 
+        return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+    }    
     private void SyncSpanFromBins()
     {
         loopMultiplier = EffectiveLoopBins();
@@ -1154,11 +1198,22 @@ public class InstrumentTrack : MonoBehaviour
         int targetBin = controller != null
             ? controller.GetBinForNextSpawn(this)
             : GetNextBinForSpawn();
-        
-// If this burst would target a bin we haven't committed yet,
-// DO NOT widen now. Stage an expand and spawn the burst AFTER commit.
-        if (targetBin >= loopMultiplier)
-        {
+        // One-shot override (used for density injection).
+        if (_overrideNextSpawnBin >= 0) { 
+            targetBin = _overrideNextSpawnBin; 
+            _overrideNextSpawnBin = -1;
+        }
+
+        // If this burst would target a bin we haven't committed yet,
+        // DO NOT widen now. Stage an expand and spawn the burst AFTER commit.
+        if (targetBin >= loopMultiplier) { 
+            // If we cannot widen further, convert this into density injection rather than staging a no-op expand.
+            // This prevents the "caught but nothing spawned" experience when already at max bins.
+            if (loopMultiplier >= Mathf.Max(1, maxLoopMultiplier)) {
+                _overrideNextSpawnBin = PickRandomExistingBinForDensity(); 
+                EnqueueNextFrame(() => SpawnCollectableBurst(noteSet, maxToSpawn)); 
+                return;
+            }
             // Guard: if we're already staging an expand, don't stack more.
             // Just remember the latest requested burst.
             _pendingExpandForBurst = true;
@@ -1172,6 +1227,7 @@ public class InstrumentTrack : MonoBehaviour
         }
 
         int spawned = 0, count = 0;
+        var usedAbsSteps = new HashSet<int>();
         foreach (int step in stepList)
         {
             if (maxToSpawn > 0 && spawned >= maxToSpawn) break;
@@ -1182,8 +1238,10 @@ public class InstrumentTrack : MonoBehaviour
             int pitchIndex = noteList.IndexOf(note);
             if (pitchIndex < 0) continue;
 
-            int absStep = targetBin * binSize + (step % binSize);
-
+            int absStep = targetBin * binSize + (step % binSize); 
+            if (!usedAbsSteps.Add(absStep)) { 
+                Debug.LogWarning($"[SPAWN:STEP-COLLISION] track={name} burstId={burstId} targetBin={targetBin} " + $"binSize={binSize} step={step} -> absStep={absStep} " +                    $"stepList=[{string.Join(",", stepList)}]");
+            }
         int w = drumTrack.GetSpawnGridWidth();
 
         // Prefer cells that are permanently cleared by the maze generator
@@ -1242,7 +1300,13 @@ public class InstrumentTrack : MonoBehaviour
 
                     c.burstId = burstId;
                     count++;
-
+                    if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null) { 
+                        c.OnDestroyed -= oldHandler; 
+                        _destroyHandlers.Remove(c);
+                    } 
+                    Action handler = () => OnCollectableDestroyed(c); 
+                    _destroyHandlers[c] = handler; 
+                    c.OnDestroyed += handler;
                     var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
                     if (markerGO)
                     {
@@ -1274,10 +1338,47 @@ public class InstrumentTrack : MonoBehaviour
         _burstRemaining[burstId] = count;
         _burstTotalSpawned[burstId] = count;
         _burstCollected[burstId]    = 0;
+        if (count > 0) { 
+            SetBinAllocated(targetBin, true);
+        }
         controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
         DebugBins($"AfterSpawn(bin={targetBin})");   // <- see section 6
     }
-
+    private void OnCollectableDestroyed(Collectable c) { 
+        if (c == null) return; 
+        if (c.assignedInstrumentTrack != this) return;
+        if (c.burstId == 0) return;
+        // If it already reported collection, OnCollectableCollected will handle the decrement.
+        // We only handle "lost" collectables here.
+        if (c.ReportedCollected) return;
+        if (_destroyHandlers.TryGetValue(c, out var h) && h != null)
+        {
+            c.OnDestroyed -= h;
+            _destroyHandlers.Remove(c);
+        }
+        Debug.LogWarning($"[COLLECT:LOST] {name} burstId={c.burstId} intendedStep={c.intendedStep}");
+        // Decrement remaining just like a collection would, so the burst can clear.
+        if (_burstRemaining.TryGetValue(c.burstId, out var rem)) {
+            rem--; 
+            if (rem <= 0) { // We did not write notes for this step, but we still want the burst to resolve
+                // so bin/cursor/frontier progression does not deadlock.
+                _burstRemaining.Remove(c.burstId); 
+                _burstTotalSpawned.Remove(c.burstId); 
+                _burstCollected.Remove(c.burstId);
+                
+                // IMPORTANT: do NOT call SetBinFilled here (no successful harvest),
+                // but DO allow future bursts to progress rather than deadlocking.
+                // If you want a softer rule, we can require at least one collected in the burst.
+                if (controller != null) controller.AllowAdvanceNextBurst(this);
+                // Cursor advance is safe: cursor is allocation intent, not harvest proof.
+                AdvanceBinCursor(1); 
+                OnCollectableBurstCleared?.Invoke(this, c.burstId);
+            }
+            else { 
+                _burstRemaining[c.burstId] = rem;
+            }
+        }
+    }
     private void HookExpandBoundary()
     {
         if (_hookedBoundaryForExpand || drumTrack == null) return;
@@ -1292,7 +1393,11 @@ public class InstrumentTrack : MonoBehaviour
     }
     private void OnDrumDownbeat_CommitExpand()
 {
-    if (!_pendingExpandForBurst) { UnhookExpandBoundary(); return; }
+    if (!_pendingExpandForBurst && !_pendingBurstAfterExpand.HasValue)
+    {
+        UnhookExpandBoundary();
+        return;
+    }
 
     // Case A: We already appear expanded (e.g., due to pre-widen).
     if (_expandCommitted && _totalSteps >= _oldTotalAtExpand + BinSize())
@@ -1320,17 +1425,21 @@ public class InstrumentTrack : MonoBehaviour
 
     int maxBins = Mathf.Max(1, maxLoopMultiplier);
     int newBins = Mathf.Clamp(loopMultiplier + 1, 1, maxBins);
-
-    // No-op expansion → tidy and leave
-    if (newBins == loopMultiplier)
-    {
-        _pendingExpandForBurst              = false;
-        _mapIncomingCollectionsToSecondHalf = false;
+    // No-op expansion (already at max bins) → do not silently drop the staged burst.
+    // Convert into density injection: pick a random existing bin and spawn there next frame.
+    if (newBins == loopMultiplier) {
+        _pendingExpandForBurst              = false; 
+        _mapIncomingCollectionsToSecondHalf = false; 
         _expandCommitted                    = false;
-        UnhookExpandBoundary();
-        return;
+        if (_pendingBurstAfterExpand.HasValue) { 
+            var req = _pendingBurstAfterExpand.Value; 
+            _pendingBurstAfterExpand = null; 
+            _overrideNextSpawnBin = PickRandomExistingBinForDensity(); 
+            EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn));
+        }
+        
+        UnhookExpandBoundary(); return;
     }
-
     // B) Arm mapping/expand FIRST so span sync won’t collapse
     _halfOffsetAtExpand                 = _oldTotalAtExpand; // left-half width
     _mapIncomingCollectionsToSecondHalf = true;
