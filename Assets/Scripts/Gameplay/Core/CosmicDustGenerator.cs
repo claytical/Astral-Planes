@@ -7,7 +7,7 @@ using Random = UnityEngine.Random;
 public class CosmicDustGenerator : MonoBehaviour
 {
     public GameObject dustPrefab;
-    public Transform activeDustRoot { get; set; }
+    public Transform activeDustRoot;
 
     public int iterations = 3;
     [Header("Maze Cycle Control")]
@@ -17,27 +17,40 @@ public class CosmicDustGenerator : MonoBehaviour
         Progressive,        // add/remove features over time; DON'T run classic cycle each loop
         ExternalControlled  // only run when explicitly requested by game logic
     }
+    
+    Dictionary<Vector2Int, DustImprint> _imprints;
+
+    struct DustImprint
+    {
+        public Color color;
+        public float healDelay;
+        public float hardness01;
+    }
+
     [Tooltip("Debounce: minimum seconds between classic cycles.")]
     public float minClassicCycleInterval = 0.25f;
     [Header("Vehicle erosion (temporary)")]
     [SerializeField] private float vehicleErodeRadius = 1f;   // world units
     [SerializeField] private int vehicleErodePerTick = 2;       // max cells per call
+    [Header("MineNode Erosion")]
+    [SerializeField] private float mineNodeErodeRadius = 1f;
+
+    [SerializeField] private int mineNodeErodePerTick = 10;
+    [Header("Dust Visual Footprint")]
+    [Range(0.8f, 1.6f)]
+    public float dustFootprintMul = 1.15f;
+
     [Header("Tile Sizing")]
-    [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustPrefab.hitbox
+    [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox
     HashSet<Vector2Int> _permanentlyClearedCells;
     Queue<Vector2Int>   _regrowQueue; // already implied by your staggered regrowth
     private readonly HashSet<Vector2Int> _starKeepClearCells = new HashSet<Vector2Int>();
     private readonly HashSet<Vector2Int> _starKeepClearPrev  = new HashSet<Vector2Int>();
-
-// MineNode corridor regrowth on shard ejection
+    // === Vehicle legibility keep-clear (non-destructive; prevents regrowth around vehicles) ===
+// We track per-vehicle keep-clear sets and maintain a refcount per cell so multiple vehicles can overlap safely.
+    private readonly Dictionary<int, HashSet<Vector2Int>> _vehicleKeepClearById = new Dictionary<int, HashSet<Vector2Int>>();
+    private readonly Dictionary<Vector2Int, int> _vehicleKeepClearRefCounts = new Dictionary<Vector2Int, int>();
     private readonly Queue<List<Vector2Int>> _pendingCorridorRegrowth = new Queue<List<Vector2Int>>();
-
-    public float TileDiameterWorld
-    {
-        get => tileDiameterWorld;
-        set => tileDiameterWorld = value;
-    }
-
     public List<GameObject> hexagons = new List<GameObject>();
     private readonly Dictionary<Vector2Int, GameObject> _hexMap = new(); // Position → Hex
     private Dictionary<Vector2Int, bool> _fillMap = new();
@@ -54,7 +67,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private int _currentEpoch = 0, _nextFeatureId = 1, _progressiveLoop = 0;
     double _lastClassicCycleDSP; 
     private MusicalPhase _progressivePhase = MusicalPhase.Establish;
-    private DrumTrack _drums;
+    private DrumTrack drums;
+    private PhaseTransitionManager phaseTransitionManager;
     private int _mazeBuildId = 0;
     [SerializeField] private int flowTilesPerFrame = 256;   // tune to grid size (e.g., 32x18 grid ≈ 576 → 128–256 is good)
     private int _flowUpdateCursor = 0;
@@ -87,15 +101,222 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private float starErodeRadius  = 1.2f;
     [SerializeField] private int   starErodePerTick = 6;   // how many tiles max per call
     private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
+    public float TileDiameterWorld
+    {
+        get => tileDiameterWorld;
+        set => tileDiameterWorld = value;
+    }
+    [Header("Composite Collider (Manual Generation)")]
+    [Tooltip("CompositeCollider2D that merges dust colliders. If null, we'll try activeDustRoot, then self.")]
+    [SerializeField] private CompositeCollider2D compositeCollider;
 
+    [Tooltip("Debounce interval (seconds) for composite rebuilds. 0 = once per frame.")]
+    [SerializeField] private float compositeRebuildMinInterval = 0.0f;
+
+    private bool _compositeDirty;
+    private Coroutine _compositeRebuildCo;
+    private float _nextCompositeRebuildAt;
+    [Header("Dust Terrain Query")]
+    [SerializeField] private LayerMask dustTerrainMask;
+    [SerializeField] private float dustQueryRadiusWorld = 1.25f;
+    [SerializeField] private int dustQueryMaxColliders = 16;
+    
+    private readonly Collider2D[] _dustHits = new Collider2D[16];
+
+    private void EnsureCompositeRef()
+    {
+        if (compositeCollider != null) return;
+
+        if (activeDustRoot != null)
+            compositeCollider = activeDustRoot.GetComponent<CompositeCollider2D>();
+
+        if (compositeCollider == null)
+            compositeCollider = GetComponent<CompositeCollider2D>();
+    }
+    private void EnsureImprints()
+    {
+        if (_imprints == null)
+            _imprints = new Dictionary<Vector2Int, DustImprint>();
+    }
+
+    private bool IsKeepClearCell(Vector2Int cell)
+    {
+        if (_starKeepClearCells.Contains(cell)) return true;
+        return _vehicleKeepClearRefCounts.ContainsKey(cell);
+    }
+
+/// <summary>
+    /// Keeps a non-destructive legibility pocket around a vehicle.
+    /// Unlike erosion, this does NOT mark cells as cleared; it simply prevents regrowth/spawn in the pocket,
+    /// and force-removes any existing dust tiles currently occupying those cells.
+    /// Multiple vehicles are supported via per-cell reference counting.
+    /// </summary>
+    public void SetVehicleKeepClear(int vehicleId, Vector2Int centerCell, int radiusCells, MusicalPhase phase)
+    {
+        if (drums == null) return;
+
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        // Build new set
+        var next = new HashSet<Vector2Int>();
+        int r = Mathf.Max(0, radiusCells);
+        for (int dx = -r; dx <= r; dx++)
+        for (int dy = -r; dy <= r; dy++)
+        {
+            if (dx * dx + dy * dy > r * r) continue;
+
+            var cell = new Vector2Int(centerCell.x + dx, centerCell.y + dy);
+            if (cell.x < 0 || cell.y < 0 || cell.x >= w || cell.y >= h) continue;
+            next.Add(cell);
+        }
+
+        if (!_vehicleKeepClearById.TryGetValue(vehicleId, out var prev) || prev == null)
+            prev = new HashSet<Vector2Int>();
+
+        // Cells leaving: decrement refcount; if drops to 0, schedule regrow.
+        foreach (var cell in prev)
+        {
+            if (next.Contains(cell)) continue;
+
+            if (_vehicleKeepClearRefCounts.TryGetValue(cell, out int count))
+            {
+                count--;
+                if (count <= 0)
+                {
+                    _vehicleKeepClearRefCounts.Remove(cell);
+                    RequestRegrowCellAt(cell, phase);
+                }
+                else
+                {
+                    _vehicleKeepClearRefCounts[cell] = count;
+                }
+            }
+        }
+
+        // Cells entering: increment refcount; if becomes 1, clear dust and block regrow.
+        foreach (var cell in next)
+        {
+            if (prev.Contains(cell)) continue;
+
+            int count = 0;
+            _vehicleKeepClearRefCounts.TryGetValue(cell, out count);
+            count++;
+            _vehicleKeepClearRefCounts[cell] = count;
+
+            if (count == 1)
+            {
+                // Force-remove any dust currently occupying this cell (legibility pocket).
+                if (_hexMap.TryGetValue(cell, out var go))
+                    RemoveActiveAt(cell, go, toPool: true);
+
+                _fillMap[cell] = false;
+                if (_imprints != null) _imprints.Remove(cell);
+            }
+        }
+
+        // Store new
+        if (next.Count == 0)
+            _vehicleKeepClearById.Remove(vehicleId);
+        else
+            _vehicleKeepClearById[vehicleId] = next;
+    }
+
+    public void ClearVehicleKeepClear(int vehicleId, MusicalPhase phase)
+    {
+        if (!_vehicleKeepClearById.TryGetValue(vehicleId, out var prev) || prev == null || prev.Count == 0)
+            return;
+
+        foreach (var cell in prev)
+        {
+            if (_vehicleKeepClearRefCounts.TryGetValue(cell, out int count))
+            {
+                count--;
+                if (count <= 0)
+                {
+                    _vehicleKeepClearRefCounts.Remove(cell);
+                    RequestRegrowCellAt(cell, phase);
+                }
+                else
+                {
+                    _vehicleKeepClearRefCounts[cell] = count;
+                }
+            }
+        }
+
+        _vehicleKeepClearById.Remove(vehicleId);
+    }
+
+    private void MarkCompositeDirty()
+    {
+        EnsureCompositeRef();
+        if (compositeCollider == null) return;
+
+        _compositeDirty = true;
+
+        // Hard debounce: never rebuild more often than min interval.
+        if (compositeRebuildMinInterval > 0f && Time.time < _nextCompositeRebuildAt)
+            return;
+
+        if (_compositeRebuildCo == null)
+            _compositeRebuildCo = StartCoroutine(RebuildCompositeEndOfFrame());
+    }
+    private IEnumerator RebuildCompositeEndOfFrame()
+    {
+        // Coalesce *all* add/removes this frame.
+        yield return new WaitForEndOfFrame();
+
+        _compositeRebuildCo = null;
+
+        EnsureCompositeRef();
+        if (compositeCollider == null) yield break;
+        if (!_compositeDirty) yield break;
+
+        // If you want stricter throttling than once-per-frame:
+        if (compositeRebuildMinInterval > 0f)
+            _nextCompositeRebuildAt = Time.time + compositeRebuildMinInterval;
+
+        _compositeDirty = false;
+
+        // Manual generation path
+        compositeCollider.GenerateGeometry();
+    }
     private void Start()
     {
+        // In some scenes the generator may be instantiated before the GameFlowManager
+        // is fully ready. We do a best-effort bind here, and also lazily re-bind elsewhere.
+        EnsureImprints();
+        TryEnsureRefs();
         TryEnsureFlowField();
         PrewarmPool();
+    }
+
+    private void TryEnsureRefs()
+    {
+        if (drums != null && phaseTransitionManager != null) return;
+
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) return;
+
+        if (drums == null) drums = gfm.activeDrumTrack;
+        if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
+    }
+
+    public void ManualStart()
+    {
+        var gfm = GameFlowManager.Instance;
+        drums = gfm.activeDrumTrack;
+        phaseTransitionManager = gfm.phaseTransitionManager;
+        TryEnsureFlowField();
+        PrewarmPool();
+        
     }
     void Update()
     {
         // Flow-field: incremental update each frame (prevents periodic spikes)
+        TryEnsureRefs();
+        if(drums == null) return;
         IncrementalFlowFieldUpdate();
 
         // Existing hive "intent" shift timer just changes the target bias occasionally
@@ -103,7 +324,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (hiveTimer >= hiveShiftInterval)
         {
             hiveTimer = 0f;
-            _lastPhaseBias = ComputePhaseBias(GameFlowManager.Instance.phaseTransitionManager.currentPhase);
+            _lastPhaseBias = ComputePhaseBias(phaseTransitionManager.currentPhase);
         }
     }
     private void PrewarmPool()
@@ -127,8 +348,6 @@ public class CosmicDustGenerator : MonoBehaviour
             _dustPool.Push(go);
         }
     }
-
-    
     
     public IEnumerator GenerateMazeForPhaseWithPaths(
         MusicalPhase phase,
@@ -136,9 +355,7 @@ public class CosmicDustGenerator : MonoBehaviour
         IReadOnlyList<Vector2Int> vehicleCells,
         float totalSpawnDuration = 1.0f)
     {
-        if (_drums == null)
-            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-        if (_drums == null)
+        if (drums == null)
         {
             Debug.LogError("[MAZE] No DrumTrack available; cannot build maze.");
             yield break;
@@ -148,9 +365,9 @@ public class CosmicDustGenerator : MonoBehaviour
 
         Debug.Log("[MAZE] Waiting for Spawn Grid");
         yield return new WaitUntil(() =>
-            _drums.HasSpawnGrid() &&
-            _drums.GetSpawnGridWidth()  > 0 &&
-            _drums.GetSpawnGridHeight() > 0 &&
+            drums.HasSpawnGrid() &&
+            drums.GetSpawnGridWidth()  > 0 &&
+            drums.GetSpawnGridHeight() > 0 &&
             Camera.main != null);
         Debug.Log("[MAZE] Spawn grid available.");
 
@@ -159,8 +376,8 @@ public class CosmicDustGenerator : MonoBehaviour
         ClearMaze();
         Debug.Log($"[MAZE] ClearMaze() finished; permCount AFTER ClearMaze={_permanentClearCells.Count}");
 
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
         Debug.Log($"[MAZE] Maze grid size: {w}x{h}");
 
         // Build a mask of reserved cells (star + vehicles)
@@ -188,7 +405,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 Vector2Int g = new Vector2Int(x, y);
                 if (!reserved.Contains(g))
                 {
-                    Vector3 world = _drums.GridToWorldPosition(g);
+                    Vector3 world = drums.GridToWorldPosition(g);
                     cellsToFill.Add((g, world));
                 }
             }
@@ -230,9 +447,9 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         _starClearCells.Clear();
 
-        if (_drums == null) return;
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
+        if (drums == null) return;
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
 
         for (int dx = -radiusCells; dx <= radiusCells; dx++)
         {
@@ -250,137 +467,254 @@ public class CosmicDustGenerator : MonoBehaviour
             }
         }
     }
-public bool HasDustAt(Vector2Int gridPos)
-{
-    return _hexMap.ContainsKey(gridPos);
-}
-
-/// <summary>
-/// Returns a normalized 0..1 "dust density" at the given world position.
-/// For now this is binary: 1 if a dust hex exists in the cell, otherwise 0.
-/// </summary>
-public float SampleDensity01(Vector3 worldPos)
-{
-    if (_drums == null)
-        _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-    if (_drums == null) return 0f;
-
-    Vector2Int cell = _drums.WorldToGridPosition(worldPos);
-    return HasDustAt(cell) ? 1f : 0f;
-}
-
-/// <summary>
-/// Schedule regrowth back into the same cell unless it becomes permanently cleared or blocked.
-/// This is your authoritative "TemporaryClear" state.
-/// </summary>
-public void RequestRegrowCellAt(Vector2Int gridPos, MusicalPhase phase, float delaySeconds = -1f)
-{
-    if (_permanentClearCells.Contains(gridPos)) return;
-    if (_starKeepClearCells.Contains(gridPos)) return;
-    if (_regrowthCoroutines.ContainsKey(gridPos)) return;
-
-    float delay = delaySeconds >= 0f ? delaySeconds : phase switch
+    public bool HasDustAt(Vector2Int gridPos)
     {
-        MusicalPhase.Establish  => 8f,
-        MusicalPhase.Evolve     => 6f,
-        MusicalPhase.Intensify  => 3f,
-        MusicalPhase.Release    => 5f,
-        MusicalPhase.Wildcard   => 2.5f,
-        MusicalPhase.Pop        => 2f,
-        _ => 4f
-    };
-
-    _regrowthCoroutines[gridPos] = StartCoroutine(RegrowCellAfterDelay(gridPos, delay));
-}
-
-private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float delaySeconds)
-{
-    yield return new WaitForSeconds(delaySeconds);
-    _regrowthCoroutines.Remove(gridPos);
-
-    if (_permanentClearCells.Contains(gridPos)) yield break;
-    if (_starKeepClearCells.Contains(gridPos)) yield break;
-    if (_hexMap.ContainsKey(gridPos)) yield break;
-
-    if (_drums == null)
-        _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-    if (_drums == null || dustPrefab == null) yield break;
-
-    // Avoid regrowing into occupied spawn cells (MineNodes, etc.). Vehicles do not occupy the spawn grid.
-    if (!_drums.IsSpawnCellAvailable(gridPos.x, gridPos.y)) yield break;
-
-    Vector3 world = _drums.GridToWorldPosition(gridPos);
-
-    var go = GetDustFromPool();
-    go.transform.SetPositionAndRotation(world, Quaternion.identity);
-    _hexMap[gridPos] = go;
-    hexagons.Add(go);
-    if (go.TryGetComponent<CosmicDust>(out var dust))
-    {
-        dust.SetDrumTrack(_drums);
-        dust.SetTint(_mazeTint);
-        dust.PrepareForReuse();
+        return _hexMap.ContainsKey(gridPos);
     }
 
-    _fillMap[gridPos] = true;
-}
-/// <summary>
-/// Keeps a maneuvering pocket around the PhaseStar. Cells in this set are force-cleared and excluded from regrowth.
-/// Cells leaving the pocket are scheduled to regrow in-place.
-/// </summary>
-public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, MusicalPhase phase)
-{
-    if (_drums == null)
-        _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-    if (_drums == null) return;
-
-    _starKeepClearPrev.Clear();
-    foreach (var c in _starKeepClearCells) _starKeepClearPrev.Add(c);
-    _starKeepClearCells.Clear();
-
-    int w = _drums.GetSpawnGridWidth();
-    int h = _drums.GetSpawnGridHeight();
-    if (w <= 0 || h <= 0) return;
-
-    int r = Mathf.Max(0, radiusCells);
-    for (int dx = -r; dx <= r; dx++)
-    for (int dy = -r; dy <= r; dy++)
+    /// <summary>
+    /// Returns a normalized 0..1 "dust density" at the given world position.
+    /// For now this is binary: 1 if a dust hex exists in the cell, otherwise 0.
+    /// </summary>
+    public float SampleDensity01(Vector3 worldPos)
     {
-        if (dx * dx + dy * dy > r * r) continue;
-        var cell = new Vector2Int(centerCell.x + dx, centerCell.y + dy);
-        if (cell.x < 0 || cell.y < 0 || cell.x >= w || cell.y >= h) continue;
+        if (drums == null) return 0f;
 
-        _starKeepClearCells.Add(cell);
-
-        if (_hexMap.TryGetValue(cell, out var go))
-            RemoveActiveAt(cell, go, toPool: true);
-
-        _fillMap[cell] = false;
+        Vector2Int cell = drums.WorldToGridPosition(worldPos);
+        return HasDustAt(cell) ? 1f : 0f;
     }
 
-    foreach (var prev in _starKeepClearPrev)
-        if (!_starKeepClearCells.Contains(prev))
-            RequestRegrowCellAt(prev, phase);
-}
+    /// <summary>
+    /// Schedule regrowth back into the same cell unless it becomes permanently cleared or blocked.
+    /// This is your authoritative "TemporaryClear" state.
+    /// </summary>
+    public void RequestRegrowCellAt(
+        Vector2Int gridPos,
+        MusicalPhase phase,
+        float delaySeconds = -1f,
+        bool refreshIfPending = false,
+        bool clearImprintOnRefresh = false)
+    {
+        if (_permanentClearCells.Contains(gridPos)) return;
+        if (IsKeepClearCell(gridPos)) return;
 
-public void ClearStarKeepClear(MusicalPhase phase)
-{
-    if (_starKeepClearCells.Count == 0) return;
+        if (_regrowthCoroutines.TryGetValue(gridPos, out var pending))
+        {
+            if (!refreshIfPending) return;
 
-    _starKeepClearPrev.Clear();
-    foreach (var c in _starKeepClearCells) _starKeepClearPrev.Add(c);
-    _starKeepClearCells.Clear();
+            if (pending != null) StopCoroutine(pending);
+            if (clearImprintOnRefresh) _imprints?.Remove(gridPos);
+            _regrowthCoroutines.Remove(gridPos);
+        }
 
-    foreach (var cell in _starKeepClearPrev)
-        RequestRegrowCellAt(cell, phase);
-}
+        float delay = delaySeconds >= 0f ? delaySeconds : phase switch
+        {
+            MusicalPhase.Establish  => 8f,
+            MusicalPhase.Evolve     => 6f,
+            MusicalPhase.Intensify  => 3f,
+            MusicalPhase.Release    => 5f,
+            MusicalPhase.Wildcard   => 2.5f,
+            MusicalPhase.Pop        => 2f,
+            _ => 4f
+        };
+
+        _regrowthCoroutines[gridPos] = StartCoroutine(RegrowCellAfterDelay(gridPos, delay));
+    }
+
+    public void CarveTemporaryDiskFromMineNode(
+        Vector3 centerWorld,
+        float appetite,
+        MusicalPhase phase,
+        float regrowDelaySeconds,
+        Color imprintColor,
+        float imprintHardness01)
+    {
+        if (drums == null) return;
+        EnsureImprints();
+        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+        float rWorld   = Mathf.Max(0.2f, mineNodeErodeRadius * Mathf.Max(0.1f, appetite));
+        int   rCells   = Mathf.CeilToInt(rWorld / cellSize);
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        Vector2Int c = drums.WorldToGridPosition(centerWorld);
+        int removed = 0;
+        int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f));
+
+        float hardness01 = Mathf.Clamp01(imprintHardness01);
+
+        for (int gx = c.x - rCells; gx <= c.x + rCells; gx++)
+        {
+            for (int gy = c.y - rCells; gy <= c.y + rCells; gy++)
+            {
+                if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
+                Vector2Int gp = new Vector2Int(gx, gy);
+
+                // Never touch permanent-clear cells.
+                if (_permanentClearCells.Contains(gp)) continue;
+
+                // Clear if present.
+                if (_hexMap.ContainsKey(gp))
+                {
+                    DespawnDustAt(gp);
+                    removed++;
+                }
+
+                // Record/refresh MineNode imprint for regrowth semantics.
+                _imprints[gp] = new DustImprint
+                {
+                    color = imprintColor,
+                    healDelay = regrowDelaySeconds,
+                    hardness01 = hardness01
+                };
+
+                // Always refresh the regrow timer (even if cell is already empty).
+                // This is what allows a stationary node to keep a pocket/corridor open.
+                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+
+                if (removed >= budget) return;
+            }
+        }
+    }
+
+    public void CarveTemporaryDiskFromMineNode(Vector3 centerWorld, float appetite, MusicalPhase phase, float regrowDelaySeconds) { 
+        if (drums == null) return;
+        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize()); 
+        float rWorld   = Mathf.Max(0.2f, mineNodeErodeRadius * Mathf.Max(0.1f, appetite)); 
+        int   rCells   = Mathf.CeilToInt(rWorld / cellSize);
+        int w = drums.GetSpawnGridWidth(); 
+        int h = drums.GetSpawnGridHeight();
+        Vector2Int c = drums.WorldToGridPosition(centerWorld);
+        int removed = 0; 
+        int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f));
+        
+        for (int gx = c.x - rCells; gx <= c.x + rCells; gx++) {
+            for (int gy = c.y - rCells; gy <= c.y + rCells; gy++) {
+                if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
+                Vector2Int gp = new Vector2Int(gx, gy);
+                // Never touch permanent-clear cells.
+                if (_permanentClearCells.Contains(gp)) continue;
+                // Clear if present.
+                if (_hexMap.ContainsKey(gp)) { 
+                    DespawnDustAt(gp); 
+                    removed++;
+                }
+                // Always refresh the regrow timer (even if cell is already empty).
+                // // This is what allows a stationary node to keep a pocket/corridor open.
+                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+                if (removed >= budget) return; 
+            }
+        }
+    }
+    private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float delaySeconds)
+    {
+        yield return new WaitForSeconds(delaySeconds);
+        _regrowthCoroutines.Remove(gridPos);
+
+        if (_permanentClearCells.Contains(gridPos)) yield break;
+        if (IsKeepClearCell(gridPos)) yield break;
+        if (_hexMap.ContainsKey(gridPos)) yield break;
+
+        if (drums == null || dustPrefab == null) yield break;
+
+        // Avoid regrowing into occupied spawn cells (MineNodes, etc.). Vehicles do not occupy the spawn grid.
+        if (!drums.IsSpawnCellAvailable(gridPos.x, gridPos.y)) yield break;
+
+        Vector3 world = drums.GridToWorldPosition(gridPos);
+    // Ensure tile sizing is initialized before regrow sizing.
+        drums.SyncTileWithScreen();
+        float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+
+        var go = GetDustFromPool();
+        go.transform.SetPositionAndRotation(world, Quaternion.identity);
+        _hexMap[gridPos] = go;
+        hexagons.Add(go);
+        if (go.TryGetComponent<CosmicDust>(out var dust))
+        {
+            dust.SetTrackBundle(this, drums, phaseTransitionManager.currentPhase);
+
+            // NEW: cell-size-driven scaling must happen before PrepareForReuse()
+            float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+            dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul);
+
+            // Prepare first (resets visuals/state)
+            dust.PrepareForReuse();
+
+            // Recommended: apply per-phase config on regrow too
+            dust.ConfigureForPhase(phaseTransitionManager.currentPhase);
+
+            // Then apply semantic tint/hardness
+            if (_imprints != null && _imprints.TryGetValue(gridPos, out var imp))
+            {
+                dust.ApplyImprint(imp.color, imp.hardness01);
+                _imprints.Remove(gridPos);
+            }
+            else
+            {
+                dust.SetTint(_mazeTint);
+            }
+        }
+
+        _fillMap[gridPos] = true;
+    }
+    /// <summary>
+    /// Keeps a maneuvering pocket around the PhaseStar. Cells in this set are force-cleared and excluded from regrowth.
+    /// Cells leaving the pocket are scheduled to regrow in-place.
+    /// </summary>
+    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, MusicalPhase phase)
+    {
+        if (drums == null) return;
+
+        _starKeepClearPrev.Clear();
+        foreach (var c in _starKeepClearCells) _starKeepClearPrev.Add(c);
+        _starKeepClearCells.Clear();
+
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        int r = Mathf.Max(0, radiusCells);
+        for (int dx = -r; dx <= r; dx++)
+        for (int dy = -r; dy <= r; dy++)
+        {
+            if (dx * dx + dy * dy > r * r) continue;
+            var cell = new Vector2Int(centerCell.x + dx, centerCell.y + dy);
+            if (cell.x < 0 || cell.y < 0 || cell.x >= w || cell.y >= h) continue;
+
+            _starKeepClearCells.Add(cell);
+
+            if (_hexMap.TryGetValue(cell, out var go))
+                RemoveActiveAt(cell, go, toPool: true);
+
+            _fillMap[cell] = false;
+            if (_imprints != null) _imprints.Remove(cell);
+
+        }
+
+        foreach (var prev in _starKeepClearPrev)
+            if (!IsKeepClearCell(prev))
+            {
+                RequestRegrowCellAt(prev, phase);
+            }
+    }
+
+    public void ClearStarKeepClear(MusicalPhase phase)
+    {
+        if (_starKeepClearCells.Count == 0) return;
+
+        _starKeepClearPrev.Clear();
+        foreach (var c in _starKeepClearCells) _starKeepClearPrev.Add(c);
+        _starKeepClearCells.Clear();
+
+        foreach (var cell in _starKeepClearPrev)
+            RequestRegrowCellAt(cell, phase);
+    }
 
     private void CarveProgressiveTunnelToStar(Vector2Int start, Vector2Int starCell)
     {
-        if (_drums == null) return;
+        if (drums == null) return;
 
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
 
         // Safety: prevent infinite loops if something goes wrong.
         int maxSteps = w * h;
@@ -519,6 +853,23 @@ public void ClearStarKeepClear(MusicalPhase phase)
 
         Debug.LogWarning($"[MAZE] Progressive tunnel exceeded maxSteps={maxSteps} start={start} star={starCell}. Possible loop.");
     }
+    public Color GetImprintColor(Vector2Int cell, Color fallback)
+    {
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+            return imp.color;
+        return fallback;
+    }
+
+    public float GetImprintHardness(Vector2Int cell, float fallback = 0.5f)
+    {
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+            return Mathf.Clamp01(imp.hardness01);
+        return Mathf.Clamp01(fallback);
+    }
+
+    public bool IsCellClearEnough(Vector2Int gridPos) {
+        return !HasDustAt(gridPos);
+    }
     private bool IsConnectedToStarPocket(Vector2Int cell)
     {
         // If the current cell is in the star pocket, we’re done.
@@ -538,13 +889,11 @@ public void ClearStarKeepClear(MusicalPhase phase)
     
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {
-        if (_drums == null)
-            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-        if (_drums == null)
+        if (drums == null)
             return;
 
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
 
         for (int dx = -radiusCells; dx <= radiusCells; dx++)
         {
@@ -592,53 +941,19 @@ public void ClearStarKeepClear(MusicalPhase phase)
         
         DespawnDustAt(gridPos);
     }
-
-    public void DespawnDustAtAndMarkPermanent_Public(Vector2Int gridPos)
-    {
-        DespawnDustAtAndMarkPermanent(gridPos);
-    }
     
-    /// <summary>
-    /// Called when a MineNode retires. We enqueue the corridor it carved so it can be regrown
-    /// when the next MineNode spawns.
-    /// </summary>
-    public void EnqueueCorridorForNextNodeSpawn(IReadOnlyList<Vector2Int> carvedPath)
-    {
-        if (carvedPath == null || carvedPath.Count < 2) return;
-        _pendingCorridorRegrowth.Enqueue(new List<Vector2Int>(carvedPath));
-    }
 
-    /// <summary>
-    /// Called when a new MineNode is spawned (PhaseStar shard ejection completes).
-    /// Regrows the previously-carved corridor in reverse order to create closing pockets.
-    /// </summary>
     public void RegrowPreviousCorridorOnNewNodeSpawn(MusicalPhase phase)
     {
         if (_pendingCorridorRegrowth.Count == 0) return;
         var path = _pendingCorridorRegrowth.Dequeue();
         BeginCorridorRegrowthReverse(path, phase);
     }
-
-
-    public void EnqueueCorridorForNextShard(IReadOnlyList<Vector2Int> carvedPath)
-    {
-        if (carvedPath == null || carvedPath.Count < 2) return;
-        _pendingCorridorRegrowth.Enqueue(new List<Vector2Int>(carvedPath));
-    }
-
-    public void TriggerNextCorridorRegrowthOnShard(MusicalPhase phase)
-    {
-        if (_pendingCorridorRegrowth.Count == 0) return;
-        BeginCorridorRegrowthReverse(_pendingCorridorRegrowth.Dequeue(), phase);
-    }
-    
     private void BeginCorridorRegrowthReverse(List<Vector2Int> carvedPath, MusicalPhase phase)
     {
         if (carvedPath == null || carvedPath.Count == 0) return;
-
-        if (_drums == null)
-            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-        if (_drums == null) return;
+        
+        if (drums == null) return;
 
         var cellsToGrow = new List<(Vector2Int, Vector3)>(carvedPath.Count);
 
@@ -646,11 +961,11 @@ public void ClearStarKeepClear(MusicalPhase phase)
         {
             var cell = carvedPath[i];
             if (_permanentClearCells.Contains(cell)) continue;
-            if (_starKeepClearCells.Contains(cell)) continue;
+            if (IsKeepClearCell(cell)) continue;
             if (_hexMap.ContainsKey(cell)) continue;
-            if (!_drums.IsSpawnCellAvailable(cell.x, cell.y)) continue;
+            if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) continue;
 
-            cellsToGrow.Add((cell, _drums.GridToWorldPosition(cell)));
+            cellsToGrow.Add((cell, drums.GridToWorldPosition(cell)));
         }
 
         if (cellsToGrow.Count == 0) return;
@@ -667,34 +982,22 @@ public void ClearStarKeepClear(MusicalPhase phase)
             var go = _dustPool.Pop();
             if (!go) continue; // was destroyed after being pooled
 
-            if (activeDustRoot != null)
-            {
-                go.transform.SetParent(activeDustRoot, worldPositionStays:false);
-            }
-            else
-            {
-                go.transform.SetParent(transform, false);
-            }
+            var parentRoot = (activeDustRoot != null) ? activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
+            go.transform.SetParent(parentRoot, worldPositionStays: false);
             go.SetActive(true);
 
             // Hard reset visuals + physics so it's never an invisible blocker
             var dust = go.GetComponent<CosmicDust>();
             if (dust == null) dust = go.AddComponent<CosmicDust>();
             dust.OnSpawnedFromPool(_mazeTint); // restores collider, layer, alpha=1, scale=full
-
+            MarkCompositeDirty();
             return go;
         }
 
         // None in pool: create fresh and normalize through the same path
         var created = Instantiate(dustPrefab, poolRoot);
-        if (activeDustRoot != null)
-        {
-            created.transform.SetParent(activeDustRoot, worldPositionStays:false);
-        }
-        else
-        {
-            created.transform.SetParent(transform, worldPositionStays:false);
-        }
+        var parentRoot2 = (activeDustRoot != null) ? activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
+        created.transform.SetParent(parentRoot2, worldPositionStays: false);
         created.SetActive(true);
 
         var d = created.GetComponent<CosmicDust>();
@@ -725,6 +1028,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
         var targetRoot = poolRoot != null ? poolRoot : transform;
         go.transform.SetParent(targetRoot, worldPositionStays:false);
         _dustPool.Push(go);
+        MarkCompositeDirty();
     }
   
     [ContextMenu("Audit Orphan Dust")]
@@ -745,15 +1049,13 @@ public void ClearStarKeepClear(MusicalPhase phase)
 
     public void ErodeDustDisk(Vector3 centerWorld, float appetite = 1f)
     {
-        if (GameFlowManager.Instance?.activeDrumTrack == null) return;
-        var dt = GameFlowManager.Instance.activeDrumTrack;
 
         float rWorld = Mathf.Max(0.2f, starErodeRadius * appetite);
         int removed = 0;
 
-        int W = dt.GetSpawnGridWidth(), H = dt.GetSpawnGridHeight();
-        var c = dt.WorldToGridPosition(centerWorld);
-        float cellSize = Mathf.Max(0.001f, dt.GetCellWorldSize());
+        int W = drums.GetSpawnGridWidth(), H = drums.GetSpawnGridHeight();
+        var c = drums.WorldToGridPosition(centerWorld);
+        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
         int rCells = Mathf.CeilToInt(rWorld / cellSize);
 
         for (int x = c.x - rCells; x <= c.x + rCells; x++) {
@@ -784,8 +1086,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
 }
     public void ErodeDustDiskFromVehicle(Vector3 centerWorld, float appetite = 1f)
     {
-        var gfm  = GameFlowManager.Instance;
-        var drums = gfm != null ? gfm.activeDrumTrack : null;
+        
         if (drums == null) return;
 
         int w = drums.GetSpawnGridWidth();
@@ -842,10 +1143,9 @@ public void ClearStarKeepClear(MusicalPhase phase)
     }
     private void TryEnsureFlowField()
     {
-        if (GameFlowManager.Instance?.activeDrumTrack == null) return;
 
-        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
         poolPrewarm = Mathf.Max(poolPrewarm, w, h);
 
     }
@@ -874,15 +1174,226 @@ public void ClearStarKeepClear(MusicalPhase phase)
 
     public Vector2 SampleFlowAtWorld(Vector3 worldPos)
     {
-        if (_flowField == null || GameFlowManager.Instance?.activeDrumTrack == null)
+        if (_flowField == null)
             return Vector2.zero;
 
-        var grid = GameFlowManager.Instance.activeDrumTrack.WorldToGridPosition(worldPos);
+        var grid = drums.WorldToGridPosition(worldPos);
         if ((uint)grid.x >= (uint)_ffW || (uint)grid.y >= (uint)_ffH) return Vector2.zero;
 
         return _flowField[grid.x, grid.y] * baseFlowStrength;
     }
-    public void ApplyProfile(PhaseStarBehaviorProfile profile)
+    
+// =====================================================================
+// Dust Weather Force Field (terrain maze)
+// Each active dust cell behaves like a local force field that repels vehicles
+// back toward empty space. The PhaseStar controls the global "weather" by phase.
+// =====================================================================
+
+[Tooltip("If enabled, logs dust force sampling counts occasionally for debugging.")]
+    [SerializeField] private bool dustWeatherDebug = false;
+    [SerializeField] private float dustWeatherDebugInterval = 0.5f;
+    private float _nextDustWeatherDebugAt = 0f;
+
+[Header("Dust Weather Force Field (Terrain)")]
+[Tooltip("How many dust tiles outward we sample when computing the repulsion vector.")]
+[SerializeField] private float dustInfluenceRadiusTiles = 1.75f;
+
+[Tooltip("Max force (Newtons) applied when a vehicle is deeply embedded in dust proximity.")]
+[SerializeField] private float dustMaxForce = 18f;
+
+[Tooltip("How much of the repulsion direction is rotated 90° (current-like). 0 = none.")]
+[Range(0f, 1f)]
+[SerializeField] private float dustTangentialFrac = 0.35f;
+
+[Tooltip("How much the global flow-field influences the dust force direction.")]
+[Range(0f, 1f)]
+[SerializeField] private float dustFlowFrac = 0.25f;
+
+[Tooltip("How much turbulent noise influences the dust force direction (scaled per phase).")]
+[Range(0f, 1f)]
+[SerializeField] private float dustTurbulenceFrac = 0.15f;
+
+[SerializeField] private float dustNoiseScale = 0.65f;
+[SerializeField] private float dustNoiseSpeed = 0.60f;
+
+private struct DustWeatherParams
+{
+    public float repelMul;
+    public float tangentialMul;
+    public float flowMul;
+    public float turbulenceMul;
+    public float drainPerSecond;
+}
+
+private DustWeatherParams GetDustWeatherParams(MusicalPhase phase)
+{
+    // These are intentionally simple, phase-level defaults. Later, MineNode regrowth
+    // can override at a per-cell granularity (instrument role weather).
+    return phase switch
+    {
+        MusicalPhase.Establish => new DustWeatherParams
+        {
+            repelMul = 1.0f, tangentialMul = 0.25f, flowMul = 0.35f, turbulenceMul = 0.05f, drainPerSecond = 0.015f
+        },
+        MusicalPhase.Evolve => new DustWeatherParams
+        {
+            repelMul = 0.95f, tangentialMul = 0.65f, flowMul = 0.45f, turbulenceMul = 0.20f, drainPerSecond = 0.022f
+        },
+        MusicalPhase.Intensify => new DustWeatherParams
+        {
+            repelMul = 1.35f, tangentialMul = 0.20f, flowMul = 0.25f, turbulenceMul = 0.45f, drainPerSecond = 0.040f
+        },
+        MusicalPhase.Release => new DustWeatherParams
+        {
+            repelMul = 0.85f, tangentialMul = 0.15f, flowMul = 0.25f, turbulenceMul = 0.05f, drainPerSecond = 0.018f
+        },
+        MusicalPhase.Wildcard => new DustWeatherParams
+        {
+            repelMul = 1.05f, tangentialMul = 0.55f, flowMul = 0.55f, turbulenceMul = 0.90f, drainPerSecond = 0.030f
+        },
+        MusicalPhase.Pop => new DustWeatherParams
+        {
+            repelMul = 1.10f, tangentialMul = 0.20f, flowMul = 0.15f, turbulenceMul = 0.25f, drainPerSecond = 0.016f
+        },
+        _ => new DustWeatherParams
+        {
+            repelMul = 1.0f, tangentialMul = 0.25f, flowMul = 0.25f, turbulenceMul = 0.10f, drainPerSecond = 0.020f
+        }
+    };
+}
+
+/// <summary>
+/// Computes the terrain-dust force-field vector at a vehicle position.
+/// Returns true if any active dust cells are influencing the vehicle.
+/// </summary>
+public bool TryGetDustWeatherForce(
+    Vector3 vehicleWorld,
+    MusicalPhase phase,
+    out Vector2 force,
+    out float influence01,
+    out float drainPerSecond)
+{
+    force = Vector2.zero;
+    influence01 = 0f;
+    drainPerSecond = 0f;
+    if (dustWeatherDebug)
+    {
+        Debug.Log($"[DustWeather] ENTER vehicleWorld={vehicleWorld} phase={phase}", this);
+    }
+
+    if (drums == null)
+    {
+        if (dustWeatherDebug)
+            Debug.Log("[DustWeather] EXIT drums==null (force field disabled)", this);
+        return false;
+    }
+
+    float tile = Mathf.Max(0.0001f, tileDiameterWorld);
+    float radiusWorld = dustInfluenceRadiusTiles * tile;
+    float radiusSqr = radiusWorld * radiusWorld;
+
+    // Sample neighborhood in grid-space (fast), then weight by world distance.
+    Vector2Int center = drums.WorldToGridPosition(vehicleWorld);
+    int rCells = Mathf.CeilToInt(dustInfluenceRadiusTiles) + 1;
+
+    Vector2 p = vehicleWorld;
+
+// Find dust colliders near the vehicle.
+    int hitCount = Physics2D.OverlapCircleNonAlloc(p, dustQueryRadiusWorld, _dustHits, dustTerrainMask);
+
+    if (hitCount <= 0)
+    {
+        if (dustWeatherDebug)
+            Debug.Log($"[DustWeather] EXIT noColliders p={p} r={dustQueryRadiusWorld}", this);
+        return false;
+    }
+
+    Vector2 sumAway = Vector2.zero;
+    float best = 0f;
+
+    for (int i = 0; i < hitCount; i++)
+    {
+        var col = _dustHits[i];
+        if (!col) continue;
+
+        // Closest point on dust to vehicle.
+        Vector2 cp = col.ClosestPoint(p);
+
+        Vector2 dv = p - cp;
+        float dist = dv.magnitude;
+
+        // If we're exactly on the surface, create a stable direction away from collider center.
+        if (dist < 1e-4f)
+            dv = (Vector2)(p - (Vector2)col.bounds.center);
+
+        float t = 1f - Mathf.Clamp01(dist / dustQueryRadiusWorld); // 1..0
+        float w = t * t;
+
+        if (dv.sqrMagnitude > 1e-6f)
+            sumAway += dv.normalized * w;
+
+        if (w > best) best = w;
+    }
+
+    if (sumAway.sqrMagnitude < 1e-6f)
+    {
+        if (dustWeatherDebug)
+            Debug.Log($"[DustWeather] EXIT weakSum p={p} hitCount={hitCount}", this);
+        return false;
+    }
+
+
+    if (sumAway.sqrMagnitude < 1e-6f)
+    {
+        if (dustWeatherDebug)
+        {
+            Debug.Log($"[DustWeather] EXIT noInfluence center={center} influencingCells={hitCount} radiusWorld={radiusWorld:0.00}", this);
+        }
+
+        return false;
+    }
+
+    var wp = GetDustWeatherParams(phase);
+    drainPerSecond = wp.drainPerSecond;
+
+    // Base repel direction
+    Vector2 repelDir = sumAway.normalized;
+
+    // Tangential current (rotate 90°)
+    Vector2 tangDir = new Vector2(-repelDir.y, repelDir.x);
+
+    // Global flow contribution (already scaled in SampleFlowAtWorld)
+    Vector2 flow = SampleFlowAtWorld(vehicleWorld);
+
+    // Coherent turbulence (Perlin) for non-jittery noise
+    float nx = Mathf.PerlinNoise(vehicleWorld.x * dustNoiseScale, Time.time * dustNoiseSpeed) - 0.5f;
+    float ny = Mathf.PerlinNoise(vehicleWorld.y * dustNoiseScale, Time.time * dustNoiseSpeed + 17.3f) - 0.5f;
+    Vector2 turb = new Vector2(nx, ny);
+    if (turb.sqrMagnitude > 1e-6f) turb.Normalize();
+
+    Vector2 dir =
+        (repelDir * wp.repelMul) +
+        (tangDir * (dustTangentialFrac * wp.tangentialMul)) +
+        (flow * (dustFlowFrac * wp.flowMul)) +
+        (turb * (dustTurbulenceFrac * wp.turbulenceMul));
+
+    if (dir.sqrMagnitude < 1e-6f)
+        dir = repelDir;
+
+    influence01 = Mathf.Clamp01(best);
+    force = dir.normalized * (dustMaxForce * influence01);
+    if (dustWeatherDebug)
+    {
+        Debug.Log(
+            $"[DustWeather] OK center={center} influencingCells={hitCount} " +
+            $"best={best:0.00} influence01={influence01:0.00} force={force} tileDia={tileDiameterWorld:0.00}",
+            this
+        );
+    }
+    return true;
+}
+
+public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
 
@@ -894,7 +1405,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
     {
         if (_spawnRoutine != null)
             StopCoroutine(_spawnRoutine); 
-        float fit = Mathf.Clamp(GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.25f, 0.08f, GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds()*0.5f);
+        float fit = Mathf.Clamp(drums.GetLoopLengthInSeconds()*0.25f, 0.08f, drums.GetLoopLengthInSeconds()*0.5f);
         _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToGrow, fit));
     }
 
@@ -919,41 +1430,6 @@ public void ClearStarKeepClear(MusicalPhase phase)
         _permanentClearCells.Clear();
 
         Debug.Log($"[MAZE] ClearMaze() END activeDust={_hexMap.Count} permCount(afterClear)={_permanentClearCells.Count}");
-    }
-
-    private IEnumerator RunLoopAlignedMazeCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float regrowOffsetFrac, float destroySpanFrac)  {
-        if (Time.time < _commitCooldownUntil)
-            yield break; // skip this loop’s global destroy/regrow
-        if (progressiveMaze)
-        {
-            // optional: do a tiny progressive tick here; or do nothing at all
-            // yield return StartCoroutine(ProgressiveLoopTick(...));
-            yield break; // <- prevents classic destroy→regrow
-        }
-        // Progressive for Intensify / Wildcard / Pop
-        if (phase == MusicalPhase.Intensify || phase == MusicalPhase.Wildcard || phase == MusicalPhase.Pop)
-        {
-            // Wait a short offset so new features don’t spawn right at beat 0
-            float delay = Mathf.Clamp(loopSeconds * regrowOffsetFrac, 0f, loopSeconds * 0.5f);
-            if (delay > 0f) yield return new WaitForSeconds(delay);
-
-            // Add (and possibly fade out) features incrementally
-            yield return StartCoroutine(ProgressiveLoopTick(phase, centerCell, loopSeconds));
-
-            // NO global destroy here — features stay until bumped by maxFeatures policy
-            yield break;
-        }
-
-        // --- Original non-progressive behavior for other phases ---
-        float destroyDuration = Mathf.Clamp(loopSeconds * destroySpanFrac, 0.05f, loopSeconds);
-        StartCoroutine(BreakEntireMazeSequenced(centerCell, destroyDuration));
-
-        float regrowDelay = Mathf.Clamp(loopSeconds * regrowOffsetFrac, 0f, loopSeconds * 0.9f);
-        yield return new WaitForSeconds(regrowDelay);
-
-        var cells = CalculateMazeGrowth(centerCell, phase, hollowRadius: 0f, avoidStarHole: false);
-        float regrowBudget = Mathf.Clamp(loopSeconds * 0.10f, 0.08f, loopSeconds * 0.25f);
-        yield return StartCoroutine(StaggeredGrowthFitDuration(cells, regrowBudget));
     }
 
     public List<(Vector2Int, Vector3)> CalculateMazeGrowth(
@@ -991,30 +1467,17 @@ public void ClearStarKeepClear(MusicalPhase phase)
         return FilterOutPermanent(raw);
     }
 
-    public bool TryRequestLoopAlignedCycle(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac)
-    { 
-        if (cycleMode != MazeCycleMode.ClassicLoopAligned) return false;
-        if (_cycleRunning) return false;
-        _drums = GameFlowManager.Instance.activeDrumTrack;
-        double now = AudioSettings.dspTime; 
-        if (now - _lastClassicCycleDSP < minClassicCycleInterval) return false; 
-        StartCoroutine(_RunClassicCycleGuard(phase, centerCell, loopSeconds, breakFrac, growFrac)); 
-        _lastClassicCycleDSP = now; 
-        return true;
-    }
+
     public IEnumerator GenerateMazeThenPlacePhaseStar(MusicalPhase phase) { 
-        if (_drums == null) 
-            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-        // If we *still* don't have one, bail clearly
-        if (_drums == null) {
+        if (drums == null) {
             Debug.LogError("[MAZE] No DrumTrack available; cannot build maze or place star."); yield break;
         }
         // ✅ Wait until the grid and camera are actually usable
-        yield return new WaitUntil(() => _drums.HasSpawnGrid() &&
-                                         _drums.GetSpawnGridWidth()  > 0 &&
-                                         _drums.GetSpawnGridHeight() > 0 &&
+        yield return new WaitUntil(() => drums.HasSpawnGrid() &&
+                                         drums.GetSpawnGridWidth()  > 0 &&
+                                         drums.GetSpawnGridHeight() > 0 &&
                                          Camera.main != null);
-        var center = new Vector2Int(_drums.GetSpawnGridWidth()/2, _drums.GetSpawnGridHeight()/2);
+        var center = new Vector2Int(drums.GetSpawnGridWidth()/2, drums.GetSpawnGridHeight()/2);
         // Primary layout should respect the current phase personality
          var walls = CalculateMazeGrowth(center, phase, hollowRadius: 0f, avoidStarHole: false);
          if (walls == null || walls.Count == 0) { 
@@ -1037,7 +1500,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
          // Secondary guard (just in case)
          _isSpawningMaze = false;
         yield return null;
-        Vector2Int cell = _drums.GetRandomAvailableCell();
+        Vector2Int cell = drums.GetRandomAvailableCell();
         Debug.Log($"[MAZE] OnMazeReady firing cell={cell}");
         if (cell.x == -1) cell = ForceReserveCellNearCenter(); // will bulldoze a dust hex if needed
 
@@ -1051,10 +1514,9 @@ public void ClearStarKeepClear(MusicalPhase phase)
             // Notify any listeners (analytics, etc.)
             OnMazeReady?.Invoke(cell);
 
-            // NEW: directly request the PhaseStar from the DrumTrack.
-            if (_drums != null)
+            if (drums != null)
             {
-                _drums.RequestPhaseStar(phase, cell);
+                drums.RequestPhaseStar(phase, cell);
             }
             else
             {
@@ -1074,8 +1536,8 @@ public void ClearStarKeepClear(MusicalPhase phase)
     } 
     private Vector2Int ForceReserveCellNearCenter()
     {
-        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
         var center = new Vector2Int(w/2, h/2);
 
         for (int r = 0; r < Mathf.Max(w,h); r++)
@@ -1087,7 +1549,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
                 if (_hexMap.TryGetValue(p, out var hex) && hex != null)
                 {
                     Destroy(hex);
-                    GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(p.x, p.y);
+                    drums.FreeSpawnCell(p.x, p.y);
                     DespawnDustAt(p);
                     return p;
                 }
@@ -1095,23 +1557,23 @@ public void ClearStarKeepClear(MusicalPhase phase)
         }
         return new Vector2Int(-1,-1);
     }
-   private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration)
-{
+   private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration) {
+
     // Keep pacing similar, but enforce a per-frame millisecond budget
     float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
 
     _isSpawningMaze = true;
     try
     {
-        var gfm   = GameFlowManager.Instance;
-        var drums = (_drums != null) ? _drums : (gfm != null ? gfm.activeDrumTrack : null);
+        
         if (drums == null) drums = FindObjectOfType<DrumTrack>();
-        _drums = drums;
-
         // We need phase for ConfigureForPhase; fall back safely.
-        var ptm   = (gfm != null) ? gfm.phaseTransitionManager : null;
-        var phase = (ptm != null) ? ptm.currentPhase : MusicalPhase.Establish;
+        // Ensure tile sizing is initialized before we touch any per-cell sizing logic.
+        drums.SyncTileWithScreen();
 
+        // Cache once for the whole fill pass (prevents fallback math per tile).
+        float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+        
         float lastPacedAt = Time.realtimeSinceStartup;
         int i = 0;
 
@@ -1134,7 +1596,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
                     continue;
 
                 // Never place dust into the star's keep-clear pocket (maneuvering space).
-                if (_starKeepClearCells.Contains(grid))
+                if (IsKeepClearCell(grid))
                     continue;
 
                 // Already has dust registered.
@@ -1143,11 +1605,11 @@ public void ClearStarKeepClear(MusicalPhase phase)
 
                 // Avoid object-occupied cells (MineNodes, collectables, etc.)
                 // Dust itself does NOT occupy spawnGrid in the 3-state model.
-                if (gfm != null && gfm.spawnGrid != null && !gfm.spawnGrid.IsCellAvailable(grid.x, grid.y))
+                if (!drums.IsSpawnCellAvailable(grid.x, grid.y))
                     continue;
 
                 // Must have a drum track and prefab to place dust.
-                if (_drums == null || dustPrefab == null)
+                if (drums == null || dustPrefab == null)
                     continue;
 
                 // ---------------------------
@@ -1159,11 +1621,17 @@ public void ClearStarKeepClear(MusicalPhase phase)
 
                 if (hex.TryGetComponent<CosmicDust>(out var dust))
                 {
+                    dust.SetTrackBundle(this, drums, phaseTransitionManager.currentPhase);
+
+                    // NEW: cell-size-driven scaling before PrepareForReuse()
+                    float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+                    dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul);
+
                     dust.PrepareForReuse();
-                    dust.SetDrumTrack(_drums);
+
                     dust.SetGrowInDuration(hexGrowInSeconds);
                     dust.SetTint(_mazeTint);
-                    dust.ConfigureForPhase(phase);
+                    dust.ConfigureForPhase(phaseTransitionManager.currentPhase);
                     dust.Begin();
                 }
 
@@ -1187,245 +1655,17 @@ public void ClearStarKeepClear(MusicalPhase phase)
     }
 }
 
-    IEnumerator _RunClassicCycleGuard(MusicalPhase phase, Vector2Int centerCell, float loopSeconds, float breakFrac, float growFrac) {
-        _cycleRunning = true; 
-        try { 
-            yield return StartCoroutine(RunLoopAlignedMazeCycle(phase, centerCell, loopSeconds, breakFrac, growFrac));
-        }finally
-        { _cycleRunning = false;
-        }
-    }
-    private void ResetProgressiveIfPhaseChanged(MusicalPhase phase)
-    {
-        if (_progressivePhase == phase) return;
-        // clear everything from prior phase
-        foreach (var kv in new Dictionary<Vector2Int, GameObject>(_hexMap))
-        {
-            if (kv.Value != null) Destroy(kv.Value);
-            GameFlowManager.Instance.activeDrumTrack.FreeSpawnCell(kv.Key.x, kv.Key.y);
-            DespawnDustAt(kv.Key);
-        }
-        _featureOrder.Clear();
-        _featureCells.Clear();
-        _cellToFeature.Clear();
-        _progressivePhase = phase;
-        _progressiveLoop = 0;
-    }
     private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
         // Free grid cell by key (authoritative)
-        GameFlowManager.Instance?.activeDrumTrack?.FreeSpawnCell(grid.x, grid.y); 
+        drums.FreeSpawnCell(grid.x, grid.y); 
         // Drop from registries
         _hexMap.Remove(grid); 
         if (go) hexagons.Remove(go);
         // Pool the object
         if (toPool && go) ReturnDustToPool(go);
+        MarkCompositeDirty();
     }
-    private IEnumerator ProgressiveLoopTick(MusicalPhase phase, Vector2Int centerCell, float loopSeconds) {
-        ResetProgressiveIfPhaseChanged(phase);
-        // 1) Remove oldest if adding would exceed max
-        int toAdd = Mathf.Max(1, addPerLoop);
-        int willBe = _featureOrder.Count + toAdd;
-        while (maxFeatures > 0 && willBe > maxFeatures && _featureOrder.Count > 0)
-        {
-            int oldest = _featureOrder.Dequeue();
-            float fade = Mathf.Clamp(loopSeconds * featureFadeDurationFrac, 0.1f, loopSeconds);
-            StartCoroutine(FadeOutFeature(oldest, fade));
-            willBe--;
-        }
-
-        // 2) Add new feature(s)
-        for (int i = 0; i < toAdd; i++)
-        {
-            int id = _nextFeatureId++;
-            var cells = GenerateFeatureCellsForPhase(phase, centerCell, id);
-            _featureCells[id] = new List<Vector2Int>(cells.Count);
-            foreach (var (grid, _) in cells)
-            {
-                _featureCells[id].Add(grid);
-                _cellToFeature[grid] = id;
-            }
-            _featureOrder.Enqueue(id);
-
-            float budget = Mathf.Clamp(loopSeconds * featureSpawnBudgetFrac, 0.08f, loopSeconds * 0.6f);
-            yield return StartCoroutine(StaggeredGrowthFitDuration(cells, budget));
-        }
-        _progressiveLoop++;
-    }
-    private List<(Vector2Int, Vector3)> GenerateFeatureCellsForPhase(
-        MusicalPhase phase,
-        Vector2Int center,
-        int featureId)
-    {
-        List<(Vector2Int, Vector3)> raw;
-
-        switch (phase) {
-            case MusicalPhase.Intensify:
-                int ringIndex = 2 + (_featureOrder.Count * 3); // 2,5,8,...
-                raw = Build_RingBand(center, ringIndex, thickness: 1, jitterCells: 0.25f);
-                break;
-            case MusicalPhase.Wildcard:
-                raw = Build_SingleStroke(maxLen: 12, stepJitter: 0.35f, dilate: 0.15f);
-                break;
-            case MusicalPhase.Pop:
-                int offset = (_progressiveLoop % 3);
-                raw = Build_PopDots(step: 3, phaseOffset: offset);
-                break;
-            default:
-                var ca = Build_CA(center, hollowRadius: 0f, avoidStarHole: false);
-                int count = Mathf.Min(12, Mathf.Max(0, _pendingSpawns.Count));
-                raw = (count > 0 && ca.Count >= count) ? ca.GetRange(0, count) : ca;
-                break;
-        }
-
-        return FilterOutPermanent(raw);
-    }
-
-    private List<(Vector2Int, Vector3)> Build_RingBand(Vector2Int center, int distance, int thickness, float jitterCells) {
-        var growth = new List<(Vector2Int, Vector3)>();
-        int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
-
-        // distance map via BFS (reuse your hex neighbors)
-        var dist = new Dictionary<Vector2Int, int>();
-        var q = new Queue<Vector2Int>();
-        q.Enqueue(center); dist[center] = 0;
-
-        while (q.Count > 0) {
-            var p = q.Dequeue();
-            foreach (var d in GetHexDirections(p.y)) {
-                var n = p + d;
-                if ((uint)n.x >= (uint)w || (uint)n.y >= (uint)h) continue;
-                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
-                if (dist.ContainsKey(n)) continue;
-                dist[n] = dist[p] + 1;
-                q.Enqueue(n);
-            }
-        }
-        foreach (var kv in dist) {
-            int d = kv.Value;
-            // band match with small jitter and thickness
-            bool inBand = Mathf.Abs(d - distance + Random.Range(-jitterCells, jitterCells)) <= thickness * 0.5f;
-            if (!inBand) continue;
-            var grid  = kv.Key;
-            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
-            if (!IsWorldPositionInsideScreen(world)) continue;
-            growth.Add((grid, world));
-        }
-        return growth;
-    }
-    private List<(Vector2Int, Vector3)> Build_SingleStroke(int maxLen, float stepJitter, float dilate) {
-        var pts = new HashSet<Vector2Int>();
-        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
-        // random valid start
-        Vector2Int p = new(Random.Range(0, W), Random.Range(0, H));
-        int guard = 0;
-        while (guard++ < 64 && (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(p.x, p.y) || !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(p)))) {
-            p = new(Random.Range(0, W), Random.Range(0, H));
-        }
-        if (guard >= 64) return new();
-
-        int len = Random.Range(maxLen / 2, maxLen + 1);
-        Vector2Int cur = p;
-        for (int i = 0; i < len; i++) {
-            pts.Add(cur);
-            var dirs = GetHexDirections(cur.y);
-            var nxt = dirs[Random.Range(0, dirs.Count)];
-            if (Random.value < stepJitter) nxt = dirs[Random.Range(0, dirs.Count)];
-            var n = cur + nxt;
-            if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) break;
-            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
-            if (!IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n))) break;
-            cur = n;
-        }
-
-        if (dilate > 0f) {
-            var thick = new HashSet<Vector2Int>(pts);
-            foreach (var c in pts)
-                foreach (var n in GetHexDirections(c.y))
-                    if (Random.value < dilate) thick.Add(c + n);
-            pts = thick;
-        }
-
-        var list = new List<(Vector2Int, Vector3)>();
-        foreach (var g in pts)
-            list.Add((g, GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(g)));
-        return list;
-    }
-    private IEnumerator FadeOutFeature(int featureId, float duration) {
-        if (!_featureCells.TryGetValue(featureId, out var cells)) yield break;
-        foreach (var cell in cells) {
-            if (_hexMap.TryGetValue(cell, out var go) && go != null) {
-                if (go.TryGetComponent<CosmicDust>(out var dust))
-                    dust.StartFadeAndScaleDown(duration);
-                else
-                    StartCoroutine(FadeTransformThenDestroy(go.transform, duration)); // schedule grid/map cleanup synchronized with fade
-                StartCoroutine(RemoveMappingAfter(cell, duration));
-            } 
-            _cellToFeature.Remove(cell); 
-        } 
-        _featureCells.Remove(featureId);
-    }
-    private IEnumerator BreakEntireMazeSequenced(Vector2Int origin, float totalDuration) {
-        // Snapshot the current maze tiles
-        var targets = new List<(Vector2Int pos, float dist, GameObject go)>();
-        foreach (var kv in _hexMap) {
-            var pos = kv.Key;
-            var go  = kv.Value;
-            if (go == null) continue;
-            float d = Vector2Int.Distance(origin, pos);
-            targets.Add((pos, d, go));
-        }
-        if (targets.Count == 0) yield break;
-        // Radial ordering = aesthetically pleasing wave front
-        targets.Sort((a, b) => a.dist.CompareTo(b.dist));
-
-        int count = targets.Count;
-        float perStep = totalDuration / count;        // spacing between starts
-        float fadeDuration = perStep;                 // each fade completes before next start; last ends at totalDuration
-
-        for (int i = 0; i < count; i++) {
-            var (pos, _, go) = targets[i];
-            if (go != null) {
-            // Prefer a gentle fade if this tile is a CosmicDust; otherwise scale & disable.
-                if (go.TryGetComponent<CosmicDust>(out var dust)) {
-                    dust.StartFadeAndScaleDown(fadeDuration);
-                }
-                else {
-                    // Fallback for non-dust: simple scale+fade via a temp coroutine
-                    StartCoroutine(FadeTransformThenDestroy(go.transform, fadeDuration));
-                }
-                // Schedule registry cleanup to match fade completion
-                StartCoroutine(RemoveMappingAfter(pos, fadeDuration));
-            }
-            // Evenly spaced starts; ensures the final tile finishes at exactly totalDuration.
-            if (i < count - 1) yield return new WaitForSeconds(perStep);
-        }
-    }
-    private IEnumerator RemoveMappingAfter(Vector2Int pos, float delay) {
-        yield return new WaitForSeconds(delay);
-        
-    }
-    private IEnumerator FadeTransformThenDestroy(Transform t, float duration) {
-        var s0 = t.localScale;
-        var sprites = t.GetComponentsInChildren<SpriteRenderer>(includeInactive: true);
-        var start = new Color[sprites.Length];
-        for (int i = 0; i < sprites.Length; i++) start[i] = sprites[i].color;
-
-        float tsec = 0f;
-        while (tsec < duration) {
-            tsec += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, tsec / duration);
-            t.localScale = Vector3.Lerp(s0, Vector3.zero, u);
-            for (int i = 0; i < sprites.Length; i++) {
-                if (sprites[i] == null) continue;
-                var c = start[i]; c.a = Mathf.Lerp(start[i].a, 0f, u);
-                sprites[i].color = c;
-            }
-            yield return null;
-        }
-        if (t != null) Destroy(t.gameObject);
-    }
+    
     private void RegisterHex(Vector2Int gridPos, GameObject hex) {
         if (_hexMap.TryGetValue(gridPos, out var existing) && existing != null && existing != hex) { 
             // IMPORTANT: do NOT free the SpawnGrid cell here; we’re replacing visual content only.
@@ -1434,13 +1674,14 @@ public void ClearStarKeepClear(MusicalPhase phase)
             ReturnDustToPool(existing);
         }
         _hexMap[gridPos] = hex;
+        MarkCompositeDirty();
     }
 
     private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
         var growth = new List<(Vector2Int, Vector3)>();
 
-    int w = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();   // grid size comes from SpawnGrid
-    int h = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();  // :contentReference[oaicite:3]{index=3}
+    int w = drums.GetSpawnGridWidth();   // grid size comes from SpawnGrid
+    int h = drums.GetSpawnGridHeight();  // :contentReference[oaicite:3]{index=3}
     if (w <= 0 || h <= 0) { 
         Debug.LogError($"[MAZE] Invalid grid size W={w} H={h} — grid not initialized yet."); return growth; 
     }
@@ -1449,14 +1690,14 @@ public void ClearStarKeepClear(MusicalPhase phase)
     for (int x = 0; x < w; x++)
     for (int y = 0; y < h; y++)
     {
-        if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;      // :contentReference[oaicite:4]{index=4}
+        if (!drums.IsSpawnCellAvailable(x, y)) continue;      // :contentReference[oaicite:4]{index=4}
         var c = new Vector2Int(x, y);
-        if (onScreenOnly && !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(c))) // :contentReference[oaicite:5]{index=5}
+        if (onScreenOnly && !IsWorldPositionInsideScreen(drums.GridToWorldPosition(c))) // :contentReference[oaicite:5]{index=5}
             continue;
         candidates.Add(c);
     } 
     if (candidates.Count == 0) { 
-        Debug.LogWarning($"[MAZE] No candidate cells. onScreenOnly={onScreenOnly}, W={w}, H={h}. Example avail[0,0]={GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(0,0)}"); 
+        Debug.LogWarning($"[MAZE] No candidate cells. onScreenOnly={onScreenOnly}, W={w}, H={h}. Example avail[0,0]={drums.IsSpawnCellAvailable(0,0)}"); 
         return growth;
     }
     // 2) Carve passages via randomized DFS
@@ -1528,15 +1769,15 @@ public void ClearStarKeepClear(MusicalPhase phase)
     foreach (var cell in candidates)
     {
         if (passages.Contains(cell)) continue; // leave corridor empty
-        Vector3 world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(cell);       // :contentReference[oaicite:7]{index=7}
+        Vector3 world = drums.GridToWorldPosition(cell);       // :contentReference[oaicite:7]{index=7}
         growth.Add((cell, world));
     }
     return growth;
 }
     private static Vector2Int Any(HashSet<Vector2Int> set) {
-    foreach (var v in set) return v;             // returns the first enumerated element
-    return new Vector2Int(-1, -1);
-}
+        foreach (var v in set) return v;             // returns the first enumerated element
+        return new Vector2Int(-1, -1);
+    }
     public void DespawnDustAt(Vector2Int gridPos) {
         bool isPermanent = _permanentClearCells.Contains(gridPos);
         
@@ -1585,20 +1826,20 @@ public void ClearStarKeepClear(MusicalPhase phase)
         List<(Vector2Int, Vector3)> growth = new();
         _fillMap.Clear();
 
-        Vector3 centerWorld = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(center);
+        Vector3 centerWorld = drums.GridToWorldPosition(center);
         float fillChance = GetFillProbability(MusicalPhase.Establish);
-        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        int W = drums.GetSpawnGridWidth();
+        int H = drums.GetSpawnGridHeight();
 
         for (int x = 0; x < W; x++)
         for (int y = 0; y < H; y++)
         {
             var pos = new Vector2Int(x, y);
-            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;
+            if (!drums.IsSpawnCellAvailable(x, y)) continue;
 
             if (avoidStarHole && hollowRadius > 0f)
             {
-                float d = Vector3.Distance(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(pos), centerWorld);
+                float d = Vector3.Distance(drums.GridToWorldPosition(pos), centerWorld);
                 if (d < hollowRadius) continue;
             }
 
@@ -1623,7 +1864,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
         {
             if (!kv.Value) continue;
             var grid = kv.Key;
-            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
+            var world = drums.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((grid, world));
         }
@@ -1631,9 +1872,9 @@ public void ClearStarKeepClear(MusicalPhase phase)
     }
     private List<(Vector2Int, Vector3)> Build_RingChokepoints(Vector2Int center, int ringSpacing, int ringThickness, float jitter, float hollowRadius, bool avoidStarHole) {
         var growth = new List<(Vector2Int, Vector3)>();
-        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
-        Vector3 centerW = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(center);
+        int W = drums.GetSpawnGridWidth();
+        int H = drums.GetSpawnGridHeight();
+        Vector3 centerW = drums.GridToWorldPosition(center);
 
         // BFS distance by hex steps (avoids axial conversion headaches)
         var dist = new Dictionary<Vector2Int, int>();
@@ -1649,13 +1890,13 @@ public void ClearStarKeepClear(MusicalPhase phase)
             {
                 var n = p + d;
                 if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) continue;
-                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) continue;
+                if (!drums.IsSpawnCellAvailable(n.x, n.y)) continue;
                 if (seen.Contains(n)) continue;
 
                 // optional star hole
                 if (avoidStarHole && hollowRadius > 0f)
                 {
-                    float dd = Vector3.Distance(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n), centerW);
+                    float dd = Vector3.Distance(drums.GridToWorldPosition(n), centerW);
                     if (dd < hollowRadius) continue;
                 }
 
@@ -1675,7 +1916,7 @@ public void ClearStarKeepClear(MusicalPhase phase)
             if (!onRing) continue;
 
             var grid = kv.Key;
-            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
+            var world = drums.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((grid, world));
         }
@@ -1685,8 +1926,8 @@ public void ClearStarKeepClear(MusicalPhase phase)
     private List<(Vector2Int, Vector3)> Build_DrunkenStrokes(int strokes, int maxLen, float stepJitter, float dilate)
     {
         var growth = new HashSet<Vector2Int>();
-        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        int W = drums.GetSpawnGridWidth();
+        int H = drums.GetSpawnGridHeight();
 
         for (int s = 0; s < strokes; s++)
         {
@@ -1697,8 +1938,8 @@ public void ClearStarKeepClear(MusicalPhase phase)
             );
             int safety = 0;
             while (safety++ < 100 &&
-                   (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(p.x, p.y) ||
-                    !IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(p))))
+                   (!drums.IsSpawnCellAvailable(p.x, p.y) ||
+                    !IsWorldPositionInsideScreen(drums.GridToWorldPosition(p))))
             {
                 p = new(Random.Range(0, W), Random.Range(0, H));
             }
@@ -1718,8 +1959,8 @@ public void ClearStarKeepClear(MusicalPhase phase)
                 var n = cur + nxt;
 
                 if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) break;
-                if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(n.x, n.y)) break;
-                if (!IsWorldPositionInsideScreen(GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(n))) break;
+                if (!drums.IsSpawnCellAvailable(n.x, n.y)) break;
+                if (!IsWorldPositionInsideScreen(drums.GridToWorldPosition(n))) break;
 
                 cur = n;
             }
@@ -1738,23 +1979,23 @@ public void ClearStarKeepClear(MusicalPhase phase)
         // Pack into list
         var list = new List<(Vector2Int, Vector3)>();
         foreach (var g in growth)
-            list.Add((g, GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(g)));
+            list.Add((g, drums.GridToWorldPosition(g)));
         return list;
     }
     private List<(Vector2Int, Vector3)> Build_PopDots(int step, int phaseOffset) {
         var growth = new List<(Vector2Int, Vector3)>();
-        int W = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridWidth();
-        int H = GameFlowManager.Instance.activeDrumTrack.GetSpawnGridHeight();
+        int W = drums.GetSpawnGridWidth();
+        int H = drums.GetSpawnGridHeight();
 
         for (int x = 0; x < W; x++)
         for (int y = 0; y < H; y++)
         {
-            if (!GameFlowManager.Instance.activeDrumTrack.IsSpawnCellAvailable(x, y)) continue;
+            if (!drums.IsSpawnCellAvailable(x, y)) continue;
             // simple periodic mask → polka dots
             if (((x + (y * 2) + phaseOffset) % step) != 0) continue;
 
             var grid = new Vector2Int(x, y);
-            var world = GameFlowManager.Instance.activeDrumTrack.GridToWorldPosition(grid);
+            var world = drums.GridToWorldPosition(grid);
             if (!IsWorldPositionInsideScreen(world)) continue;
 
             growth.Add((grid, world));
@@ -1766,20 +2007,18 @@ public void ClearStarKeepClear(MusicalPhase phase)
     {
         if (!Application.isPlaying) return;
 
-        if (_drums == null)
-            _drums = GameFlowManager.Instance?.activeDrumTrack ?? FindObjectOfType<DrumTrack>();
-        if (_drums == null) return;
+        if (drums == null) return;
 
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
         if (w <= 0 || h <= 0) return;
 
-        float cellSize = _drums.GetCellWorldSize(); // whatever your API is here
+        float cellSize = drums.GetCellWorldSize(); // whatever your API is here
 
         foreach (var kvp in _hexMap)
         {
             var gp = kvp.Key;
-            var world = _drums.GridToWorldPosition(gp);
+            var world = drums.GridToWorldPosition(gp);
 
             // Color by type: dust, permanent corridor, empty
             bool hasDust = kvp.Value != null && kvp.Value.activeInHierarchy;

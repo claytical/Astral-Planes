@@ -16,8 +16,8 @@ MonoBehaviour:
   displayName: Radiant Groove
   beatMood: 0
   keyRootMidi: 60
-  chordProgression: {fileID: 11400000, guid: 3b08b1427933f408caee72367cb76486, type: 2}
-  phaseProfile: {fileID: 11400000, guid: 3b11ecfad40224594908070b760c94cb, type: 2}
+  chordProgression: {fileID: 11400000, guid: 8f712aab8f8c14f04822507d0f5f1f86, type: 2}
+  phaseProfile: {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 3f9cda1515d674c82b6694c3d357feb2, type: 2}
   - {fileID: 11400000, guid: c7991c1bbc59849ff915f90c0fd706ce, type: 2}

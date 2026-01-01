@@ -11,6 +11,16 @@ public class SpawnGrid : MonoBehaviour
     
     private void Awake()
     {
+        if (_drums == null)
+        {
+            // Prefer the active drum track from the GameFlowManager
+            var gfm = GameFlowManager.Instance;
+            if (gfm != null && gfm.activeDrumTrack != null)
+                _drums = gfm.activeDrumTrack;
+            else
+                _drums = FindObjectOfType<DrumTrack>();
+        }
+
         if (GridCells == null || GridCells.Length == 0)
         {
             InitializeGrid();
@@ -37,23 +47,13 @@ public class SpawnGrid : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
-        if (_drums == null)
-        {
-            // Prefer the active drum track from the GameFlowManager
-            var gfm = GameFlowManager.Instance;
-            if (gfm != null && gfm.activeDrumTrack != null)
-                _drums = gfm.activeDrumTrack;
-            else
-                _drums = FindObjectOfType<DrumTrack>();
-        }
 
         if (_drums == null)
             return;
 
         // Use the authoritative grid dimensions from DrumTrack / SpawnGrid
-        int w = _drums.GetSpawnGridWidth();
-        int h = _drums.GetSpawnGridHeight();
-        if (w <= 0 || h <= 0) return;
+        
+        if (gridWidth <= 0 || gridHeight <= 0) return;
 
         float runtimeCellSize = _drums.GetCellWorldSize();
 
@@ -62,9 +62,9 @@ public class SpawnGrid : MonoBehaviour
         cellSize = runtimeCellSize;
 
         // Draw per-cell boxes at the *runtime* positions
-        for (int x = 0; x < w; x++)
+        for (int x = 0; x < gridWidth; x++)
         {
-            for (int y = 0; y < h; y++)
+            for (int y = 0; y < gridHeight; y++)
             {
                 var gp    = new Vector2Int(x, y);
                 var world = _drums.GridToWorldPosition(gp);

@@ -938,7 +938,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  demoMode: 1
+  demoMode: 0
   phaseProfiles:
   - {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
   - {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
@@ -952,7 +952,6 @@ MonoBehaviour:
   activeDrumTrack: {fileID: 0}
   dustGenerator: {fileID: 0}
   spawnGrid: {fileID: 0}
-  noteSetFactory: {fileID: 0}
   coralPrefab: {fileID: 3306639670150737611, guid: 8d387e67775794007ba96dfadbea003d,
     type: 3}
   disableCoralDuringBridge: 1

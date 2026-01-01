@@ -7,7 +7,7 @@ public class Vehicle : MonoBehaviour
 {
     public ShipMusicalProfile profile;
     public float capacity = 10f;
-    private float _baseBurnAmount = 5f;
+    private float _baseBurnAmount = 1f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     private float _dustSfxCooldown = 0f;
     private const float DustSfxInterval = 0.10f; // at most 10 Hz when really grinding dust
@@ -43,6 +43,8 @@ public class Vehicle : MonoBehaviour
 
     public bool boosting = false;
     private Vector2 _lastNonZeroInput; // remembers the last aim direction
+    private float _dustDebugCooldown = 0f;
+    private const float DustDebugInterval = 0.5f;
 
     public GameObject trail; // Trail prefab
     public AudioClip thrustClip;
@@ -76,8 +78,18 @@ public class Vehicle : MonoBehaviour
     private Color currentColorBlend = Color.white;
     private VehicleRemixController _remixController;
     [SerializeField] HarmonyDirector harmony;
-// Vehicle.cs
     [SerializeField] private ShipMusicalProfile shipProfile;
+    [Header("Dust Legibility Pocket")]
+    [SerializeField] private bool keepDustClearAroundVehicle = true;
+    [SerializeField] private int vehicleKeepClearRadiusCells = 1;
+    [SerializeField] private float vehicleKeepClearRefreshSeconds = 0.10f;
+    private float _nextVehicleKeepClearRefreshAt = 0f;
+
+    [Header("Dust Impact Damage (Non-Boost)")]
+    [SerializeField] private float dustImpactDrainPerSecondMax = 8f;
+    [SerializeField] private float dustImpactForceVelScale = 0.02f;
+    [Range(0f, 1f)]
+    [SerializeField] private float dustImpactOppositionWeight = 1f;
 
     public void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
@@ -204,27 +216,86 @@ void FixedUpdate()
         rb.rotation = angleDeg;
     }
 
-    var ctrl = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
-            if (ctrl != null && _inDust) // if you have a flag; otherwise gate on your current dust logic
-            { 
+// --- Dust weather force-field (terrain maze) ---
+if (gfm != null && gfm.dustGenerator != null)
+{
+    var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+    _dustDebugCooldown -= Time.fixedDeltaTime;
+    bool debugPulse = _dustDebugCooldown <= 0f;
+    Vector3 vehicleWorld = rb.position;
+    if (debugPulse) _dustDebugCooldown = DustDebugInterval;
+    if (gfm.dustGenerator.TryGetDustWeatherForce(vehicleWorld, phaseNow,
+            out Vector2 dustForce, out float influence01, out float drainPerSecond))
+    {
+        if (debugPulse)
+        {
+            Debug.Log($"[DustWeather] pulse, phase={phaseNow} pos={transform.position}", this);
+        }
+        rb.AddForce(dustForce, ForceMode2D.Force);
+
+        // Treat "near dust" like being in dust, but with a grace exit so it doesn’t flicker.
+        _inDust = true;
+        if (keepDustClearAroundVehicle && Time.time >= _nextVehicleKeepClearRefreshAt)
+        {
+            _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleKeepClearRefreshSeconds);
+            var drumsRef = gfm.activeDrumTrack;
+            if (drumsRef != null)
+            {
+                Vector2Int cell = drumsRef.WorldToGridPosition(vehicleWorld);
+                gfm.dustGenerator.SetVehicleKeepClear(GetInstanceID(), cell, vehicleKeepClearRadiusCells, phaseNow);
+            }
+        }
+        
+        _lastDustContactTime = Time.time;
+
+        // Energy drain while lingering in dust (non-boost contact), scaled by how "deep" we are.
+        if (!boosting && drainPerSecond > 0f)
+            DrainEnergy(drainPerSecond * influence01 * dt, "DustWeather");
+
+        if (!boosting && dustImpactDrainPerSecondMax > 0f && rb.linearVelocity.sqrMagnitude > 0.0001f)
+        {
+            float fMag = dustForce.magnitude;
+            float vMag = rb.linearVelocity.magnitude;
+
+            float opposition01 = 1f;
+            if (fMag > 0.0001f && vMag > 0.0001f)
+            {
+                Vector2 fDir = dustForce / fMag;
+                Vector2 vDir = rb.linearVelocity / vMag;
+                float oppose = Mathf.Clamp01(-Vector2.Dot(fDir, vDir)); // 1 when opposing
+                opposition01 = Mathf.Lerp(1f, oppose, dustImpactOppositionWeight);
+            }
+
+            float impact01 = Mathf.Clamp01(fMag * vMag * dustImpactForceVelScale) * opposition01;
+            float impactDrain = dustImpactDrainPerSecondMax * impact01 * influence01 * dt;
+            if (impactDrain > 0f)
+                DrainEnergy(impactDrain, "DustImpact");
+        }
+        
+        // SFX feedback (throttled)
+        var ctrl = gfm.controller;
+        if (ctrl != null)
+        {
+            _dustSfxCooldown -= Time.fixedDeltaTime;
+            if (_dustSfxCooldown <= 0f)
+            {
                 bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
                 var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
-                float force01 = Mathf.Clamp01(rb.linearVelocity.magnitude / Mathf.Max(1f, arcadeMaxSpeed)); 
-                _dustSfxCooldown -= Time.fixedDeltaTime; 
-                if (_dustSfxCooldown <= 0f) {
-                    CollectionSoundManager.Instance?.PlayDustInteraction(ctrl, force01, behavior); _dustSfxCooldown = 0.10f; // simple throttle
-                }
-                if (boosting)
-                {
-                    if (gfm.dustGenerator != null)
-                    {
-                        // Appetite scaled by speed so faster boosts chew more dust
-                        float appetite = Mathf.Lerp(0.7f, 1.2f, force01);
-                        gfm.dustGenerator.ErodeDustDiskFromVehicle(transform.position, appetite);
-                    }
-                }
+                CollectionSoundManager.Instance?.PlayDustInteraction(ctrl, influence01, behavior);
+                _dustSfxCooldown = DustSfxInterval;
             }
-    // Stats + audio
+        }
+
+        // Boost carving still erodes dust (temporary), preserving your "boost to carve" rule.
+        if (boosting)
+        {
+            float appetite = Mathf.Lerp(0.7f, 1.2f, influence01);
+            gfm.dustGenerator.ErodeDustDiskFromVehicle(transform.position, appetite);
+        }
+    }
+}
+// Stats + audio
+
     UpdateDistanceCovered();
     ClampAngularVelocity();
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
@@ -251,9 +322,7 @@ public void DrainEnergy(float amount, string source = "Unknown")
         _inDust = true;
         _lastDustContactTime = Time.time;
     }
-    public void NotifyDustContact() { 
-        _lastDustContactTime = Time.time;
-    }
+
     public void ExitDustField()
     {
         envScale = 1f;
@@ -286,6 +355,15 @@ public void DrainEnergy(float amount, string source = "Unknown")
         // Activate corresponding ring
         if (remixRingHolder != null)
             remixRingHolder.ActivateRing(role, roleColor);
+    }
+    void OnDisable()
+    {
+        var gfm = GameFlowManager.Instance;
+        if (gfm != null && gfm.dustGenerator != null)
+        {
+            var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+            gfm.dustGenerator.ClearVehicleKeepClear(GetInstanceID(), phaseNow);
+        }
     }
 
     public void SetColor(Color newColor)

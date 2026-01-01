@@ -16,7 +16,6 @@ GameObject:
   - component: {fileID: 2442014530722922072}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7086731306890036074}
-  - component: {fileID: 3715907604795032531}
   m_Layer: 0
   m_Name: Mine Node
   m_TagString: Untagged
@@ -55,6 +54,20 @@ MonoBehaviour:
   maxStrength: 100
   _minedObject: {fileID: 8268204866429990808, guid: b644b7f95bb324e49bfdeafb8b28d189,
     type: 3}
+  minCarveSeconds: 1.25
+  pruneCarvedPathOnLoopBoundary: 1
+  pruneMinPathCount: 8
+  driveCarvingMotionFromNoteSet: 1
+  carveSpeedMin: 1.25
+  carveSpeedMax: 8
+  steerForce: 10
+  turnAngleBass: 8
+  turnAngleGroove: 14
+  turnAngleHarmony: 22
+  turnAngleLead: 40
+  corridorHealDelaySeconds: 6
+  corridorHealMinDelaySeconds: 2
+  corridorHealTightenLoops: 4
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -260,20 +273,3 @@ PolygonCollider2D:
       - {x: 0.21, y: 0.065}
       - {x: 0.049999997, y: 0.405}
   m_UseDelaunayMesh: 0
---- !u!114 &3715907604795032531
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b6d5a83c4ddf54264a6b5b87661a0604, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MineNodeRailAgent
-  cellsPerSecond: 4
-  replanCooldown: 0.15
-  snapAtCorners: 1
-  gateByDustDensity: 1
-  maxAllowedDustDensity01: 0.35

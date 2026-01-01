@@ -63,18 +63,13 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _chordEventsSubscribed;
     public float lastCollectionTime { get; private set; } = -1f;
     private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
-// Allows a specific track to advance the frontier by exactly one bin on its next burst.
-// This is set by MineNode capture logic when the player catches a MineNode for a role
-// that is already populated.
-    private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst
-        = new Dictionary<InstrumentTrack, bool>();
+    private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
 
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
         _allowAdvanceNextBurst[track] = true;
     }
-
     private bool ConsumeAllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return false;
@@ -86,23 +81,13 @@ public class InstrumentTrackController : MonoBehaviour
         }
         return false;
     }
-
-    public void NotifyBinPossiblyExtended(InstrumentTrack leaderTrack, int binIndex)
-    {
-        if (!leaderTrack || binIndex < 0) return;
-        // Only act the FIRST time we see this (track, bin) as an extension
-        if (_binExtensionSignaled.Add((leaderTrack, binIndex)))
-            AdvanceOtherTrackCursors(leaderTrack, 1);
-    }
     public void NotifyCollected() {
         lastCollectionTime = Time.time;
     }
-    
     public void ResetControllerBinGuards()
     {
         _binExtensionSignaled?.Clear();
     }
-
     void Start()
     {
         if (!GameFlowManager.Instance.ReadyToPlay()) return;
@@ -139,6 +124,15 @@ public class InstrumentTrackController : MonoBehaviour
     {
         UnsubscribeChordEvents();
     }
+    private void OnDestroy()
+    {
+        // tidy subscriptions
+        var drum = GameFlowManager.Instance ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (drum != null) drum.OnLoopBoundary -= ArmCohortsOnLoopBoundary;
+        foreach (var t in tracks)
+            if (t != null)
+                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
+    }
     private void TrySubscribeChordEvents()
     {
         // Prefer our own tracks array; if it isn't set, try to pull from the active controller
@@ -170,18 +164,33 @@ public class InstrumentTrackController : MonoBehaviour
             Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
         }
     }
-    private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId)
-    {
-        // We only want to advance when ALL collectables are gone (across tracks).
-        if (AnyCollectablesInFlight()) return;
+   
 
-        // At this moment, the last collectable note has been collected across the whole system.
-        // Notify the PhaseStar (or the PhaseTransitionManager, depending on your architecture).
-        var gfm = GameFlowManager.Instance;
-        if (gfm != null && gfm.activeDrumTrack._star != null) // or however you access the active PhaseStar
-            gfm.activeDrumTrack._star.NotifyCollectableBurstCleared();
+    private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId)
+{
+    Debug.Log($"[CTRL:BURST_CLEARED] track={(track != null ? track.name : "null")} burstId={burstId} " +
+              $"globalCIF={AnyCollectablesInFlight()} globalEP={AnyExpansionPending()}");
+
+    // We only want to advance when ALL collectables are gone (across tracks).
+    if (AnyCollectablesInFlight()) return;
+
+    var gfm = GameFlowManager.Instance;
+    if (gfm == null || gfm.activeDrumTrack == null) return;
+
+    var star = gfm.activeDrumTrack._star;
+    if (star == null) return;
+
+    // During/after bridge start we must not re-arm or spawn new directives.
+    // PhaseStar.NotifyCollectableBurstCleared() is also bridge-safe, but keep this guard to reduce noise.
+    if (gfm.GhostCycleInProgress)
+    {
+        Debug.Log("[CTRL:BURST_CLEARED] IGNORE (GhostCycleInProgress)");
+        return;
     }
 
+    Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId}");
+    star.NotifyCollectableBurstCleared();
+}
     private void UnsubscribeChordEvents()
     {
         if (tracks == null) return;
@@ -193,16 +202,6 @@ public class InstrumentTrackController : MonoBehaviour
         }
         _chordEventsSubscribed = false;
     }
-    private void OnDestroy()
-    {
-        // tidy subscriptions
-        var drum = GameFlowManager.Instance ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drum != null) drum.OnLoopBoundary -= ArmCohortsOnLoopBoundary;
-        foreach (var t in tracks)
-            if (t != null)
-                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
-    }
-// In InstrumentTrackController.cs
     public float GetEffectiveLoopLengthInSeconds()
     {
         var gfm  = GameFlowManager.Instance;
@@ -224,7 +223,6 @@ public class InstrumentTrackController : MonoBehaviour
         float stepDuration = clipLen / totalSteps;
         return stepDuration * leaderSteps;
     }
-
     private void ArmCohortsOnLoopBoundary()
     {
         var drum = GameFlowManager.Instance.activeDrumTrack;
@@ -253,135 +251,175 @@ public class InstrumentTrackController : MonoBehaviour
                       $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
         }
     }
-public int GetBinForNextSpawn(InstrumentTrack track)
-{
-    if (track == null)
-        return 0;
-
-    // Helper: "frontier" means the furthest bin this track has allocated space for,
-    // even if it hasn't actually written notes into it yet.
-    int FrontierFor(InstrumentTrack t)
+    public int GetBinForNextSpawn(InstrumentTrack track)
     {
-        if (t == null) return -1;
-        int highestFilled = Mathf.Max(t.GetHighestFilledBin(), t.GetHighestAllocatedBin());
-        int cursorBased   = t.GetBinCursor() - 1;          // binCursor points to NEXT bin to write
-        return Mathf.Max(highestFilled, cursorBased);
-    }
+        if (track == null)
+            return 0;
 
-    // 1) Compute global frontier across all tracks
-    int globalFrontier = -1;
-    if (tracks != null)
-    {
-        for (int i = 0; i < tracks.Length; i++)
+        // Helper: "frontier" means the furthest bin this track has allocated space for,
+        // even if it hasn't actually written notes into it yet.
+        int FrontierFor(InstrumentTrack t)
         {
-            var t = tracks[i];
-            if (!t) continue;
-            globalFrontier = Mathf.Max(globalFrontier, FrontierFor(t));
-        }
-    }
-
-    // No one has allocated anything yet → first burst goes to bin 0.
-    if (globalFrontier < 0)
-        return 0;
-
-    // 2) Track-local frontier
-    int trackFrontier = FrontierFor(track);
-    int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1); 
-    int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
-
-    // 3) If this track is behind the global frontier, fill holes up to the frontier
-    if (trackFrontier < clampedGlobalFrontier)
-    {
-        for (int b = 0; b <= clampedGlobalFrontier; b++)
-        {
-            if (!track.IsBinAllocated(b))
-                return b;
+            if (t == null) return -1;
+            int highestFilled = Mathf.Max(t.GetHighestFilledBin(), t.GetHighestAllocatedBin());
+            int cursorBased   = t.GetBinCursor() - 1;          // binCursor points to NEXT bin to write
+            return Mathf.Max(highestFilled, cursorBased);
         }
 
-        // Defensive fallback
-        return clampedGlobalFrontier;
-    }
+        // 1) Compute global frontier across all tracks
+        int globalFrontier = -1;
+        if (tracks != null)
+        {
+            for (int i = 0; i < tracks.Length; i++)
+            {
+                var t = tracks[i];
+                if (!t) continue;
+                globalFrontier = Mathf.Max(globalFrontier, FrontierFor(t));
+            }
+        }
 
-    // 4) Track is at/leading the frontier:
-    // normally write at its cursor (next bin), unless we disallow advancing.
-    int cursorTarget = Mathf.Max(0, track.GetBinCursor());
+        // No one has allocated anything yet → first burst goes to bin 0.
+        if (globalFrontier < 0)
+            return 0;
 
-    // If you want to *prevent* frontier pushes unless explicitly allowed,
-    // clamp to globalFrontier unless ConsumeAllowAdvanceNextBurst is true.
-    if (cursorTarget > globalFrontier)
-    {
-        // This means the cursor has already been advanced (e.g., by leader extension signaling).
-        // Let it write where it believes the next bin is; that's the whole point of cursor-based allocation.
-        // But if the cursor points beyond this track's cap, treat it as density injection.
-        if (cursorTarget > trackMaxBinIndex) { 
+        // 2) Track-local frontier
+        int trackFrontier = FrontierFor(track);
+        int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1); 
+        int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
+
+        // 3) If this track is behind the global frontier, fill holes up to the frontier
+        if (trackFrontier < clampedGlobalFrontier)
+        {
+            for (int b = 0; b <= clampedGlobalFrontier; b++)
+            {
+                if (!track.IsBinAllocated(b))
+                    return b;
+            }
+
+            // Defensive fallback
+            return clampedGlobalFrontier;
+        }
+
+        // 4) Track is at/leading the frontier:
+        // normally write at its cursor (next bin), unless we disallow advancing.
+        int cursorTarget = Mathf.Max(0, track.GetBinCursor());
+
+        // If you want to *prevent* frontier pushes unless explicitly allowed,
+        // clamp to globalFrontier unless ConsumeAllowAdvanceNextBurst is true.
+        if (!ConsumeAllowAdvanceNextBurst(track)) return Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
+        if (cursorTarget > globalFrontier)
+        {
+            if (cursorTarget > trackMaxBinIndex) { 
+                int binsAllocated = Mathf.Clamp(track.GetBinCursor(), 1, track.maxLoopMultiplier);
+                // Prefer bins that are already filled to avoid repeatedly pounding a single empty bin.
+                var candidates = new List<int>(binsAllocated); 
+                for (int b = 0; b < binsAllocated; b++) 
+                    if (track.IsBinFilled(b)) candidates.Add(b);
+                    if (candidates.Count == 0) {
+                        for (int b = 0; b < binsAllocated; b++) 
+                            candidates.Add(b);
+                    }
+                    if (candidates.Count == 0) return 0;
+                return candidates[Random.Range(0, candidates.Count)];
+            }
+            return cursorTarget;
+        } 
+        bool allowAdvance = ConsumeAllowAdvanceNextBurst(track); 
+        bool cursorFilled = track.IsBinFilled(cursorTarget); 
+        int proposed = (allowAdvance && cursorFilled) ? (globalFrontier + 1) : cursorTarget;
+
+        // If advancing would exceed this track's max bins, inject density into a random already-allocated bin.
+        if (proposed > trackMaxBinIndex) { 
+            // binsAllocated: how many bins this track has currently allocated space for (cursor-based),
+            // clamped to its maximum capacity.
             int binsAllocated = Mathf.Clamp(track.GetBinCursor(), 1, track.maxLoopMultiplier);
-            // Prefer bins that are already filled to avoid repeatedly pounding a single empty bin.
+            // Prefer bins that are already filled to distribute density into "real" content.
             var candidates = new List<int>(binsAllocated); 
             for (int b = 0; b < binsAllocated; b++) 
                 if (track.IsBinFilled(b)) candidates.Add(b);
-                if (candidates.Count == 0) {
+                if (candidates.Count == 0) { 
                     for (int b = 0; b < binsAllocated; b++) 
                         candidates.Add(b);
                 }
-                return candidates[Random.Range(0, candidates.Count)];
+                return candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
-        return cursorTarget;
-    } 
-    int proposed = ConsumeAllowAdvanceNextBurst(track) ? (globalFrontier + 1) : cursorTarget;
-    // If advancing would exceed this track's max bins, inject density into a random already-allocated bin.
-    if (proposed > trackMaxBinIndex) { 
-        // binsAllocated: how many bins this track has currently allocated space for (cursor-based),
-        // clamped to its maximum capacity.
-        int binsAllocated = Mathf.Clamp(track.GetBinCursor(), 1, track.maxLoopMultiplier);
-        // Prefer bins that are already filled to distribute density into "real" content.
-        var candidates = new List<int>(binsAllocated); 
-        for (int b = 0; b < binsAllocated; b++) 
-            if (track.IsBinFilled(b)) candidates.Add(b);
-            if (candidates.Count == 0) { 
-                for (int b = 0; b < binsAllocated; b++) 
-                    candidates.Add(b);
-            }
-            return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        return proposed;
     }
-    return proposed;
-}
-
-private void ResetAllCursorsAndGuards(bool clearLoops=false)
-    {
-        ResetControllerBinGuards();
-        if (tracks == null) return;
-        foreach (var t in tracks)
-            if (t) t.ResetBinsForPhase();
-    } 
+    private void ResetAllCursorsAndGuards(bool clearLoops=false)
+        {
+            ResetControllerBinGuards();
+            if (tracks == null) return;
+            foreach (var t in tracks)
+                if (t) t.ResetBinsForPhase();
+        } 
     public bool AnyExpansionPending() {
+        var offenders = tracks.Where(t => t != null && t.IsExpansionPending).Select(t => t.name).ToArray();
+        Debug.Log($"[CTRLDBG] AnyExpansionPending={offenders.Length>0} offenders=[{string.Join(", ", offenders)}]");
+
         if (tracks == null || tracks.Length == 0) return false; 
         foreach (var t in tracks) {
+            if (t.IsExpansionPending) {
+                Debug.Log($"[CTRL:EP] {t.name} pendExpand={t._pendingExpandForBurst}  hooked={t._hookedBoundaryForExpand}");
+            }
             if (!t) continue;
             if (t.IsExpansionPending) return true; 
         } 
         return false;
     }
-    public bool AnyCollectablesInFlight() { 
-        if (tracks == null || tracks.Length == 0) return false; 
+    public bool AnyCollectablesInFlight()
+    {
+        if (tracks == null) return false;
+
+        bool any = false;
+
         foreach (var t in tracks)
         {
-            if (!t || t.spawnedCollectables == null) continue; 
-            // Fast path: if the list is non-empty, assume "in flight".
-            if (t.spawnedCollectables.Count > 0) return true;
-        } 
-        Debug.Log($"[COLLECTABLES] No more collectables in flight");
-        return false;
+            if (t == null) continue;
+
+            // prune stale refs (null/inactive) so we don't get stuck on ghosts
+            t.PruneSpawnedCollectables();
+
+            if (t.spawnedCollectables == null) continue;
+
+            // only count truly alive + active objects
+            for (int i = 0; i < t.spawnedCollectables.Count; i++)
+            {
+                var go = t.spawnedCollectables[i];
+                if (go != null && go.activeInHierarchy)
+                {
+                    any = true;
+                    break;
+                }
+            }
+
+            if (any) break;
+        }
+
+        return any;
     }
-public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
-{
-    if (tracks == null) return;
-    for (int i = 0; i < tracks.Length; i++)
+    public int ForceDestroyAllCollectablesInFlight(string reason)
     {
-        var t = tracks[i];
-        if (!t || t == leaderTrack) continue;
-        t.AdvanceBinCursor(by); // silent bin reserved; visuals omitted by design
+        int destroyed = 0;
+        if (tracks == null) return destroyed;
+
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+            destroyed += t.ForceDestroyCollectablesInFlight(reason);
+        }
+
+        return destroyed;
     }
-}
+    public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
+    {
+        if (tracks == null) return;
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (!t || t == leaderTrack) continue;
+            t.AdvanceBinCursor(by); // silent bin reserved; visuals omitted by design
+        }
+    }
     private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
     {
         Debug.Log($"[CHORD][CTRLR] CohortCompleted received from track={track.name} role={track.assignedRole} window=[{start},{end})");
@@ -463,7 +501,6 @@ public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
             if (t.assignedRole == role) return t;
         return null;
     }
-
     public void UpdateVisualizer()
     {
         if (noteVisualizer == null) return;
@@ -507,7 +544,6 @@ public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
         }
         return maxMul;
     }
-
     public int GetMaxLoopMultiplier()
     {
         return tracks.Max(track => track.loopMultiplier);
@@ -601,8 +637,7 @@ public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
     // Atomic swap: no blast visuals, no collapse-to-x1
     track.SoftReplaceLoop(fresh);
 }
-    private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase)
-{
+    private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase) {
 
     // Nudge its pattern/behavior so the new phase has a recognizable seed
     var ns = t.GetActiveNoteSet();
@@ -628,8 +663,7 @@ public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
         }
     }
 }
-    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MusicalPhase phase, MusicalRole role)
-{
+    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MusicalPhase phase, MusicalRole role) {
     switch (phase)
     {
         case MusicalPhase.Intensify:

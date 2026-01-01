@@ -161,22 +161,33 @@ private int PickContextualNote(NoteSet ctx, InstrumentTrack track, DustBehaviorT
         };
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
     }
+// CollectionSoundManager.cs
+
     public void PlayNoteSpawnerSound(InstrumentTrack track, NoteSet noteSet)
+    {
+        // Backward compatible fallback: use step 0 if caller doesn't know.
+        PlayNoteSpawnerSound(track, noteSet, 0);
+    }
+
+    public void PlayNoteSpawnerSound(InstrumentTrack track, NoteSet noteSet, int step)
     {
         if (track == null || noteSet == null || midiStreamPlayer == null) return;
 
-        int note = noteSet.GetNoteForPhaseAndRole(track, Random.Range(0, 16));
+        // Clamp into a sane step range. If you later expand to variable steps, pass the right modulus in.
+        int s = Mathf.Clamp(step, 0, 15);
+
+        int note = noteSet.GetNoteForPhaseAndRole(track, s);
         float velocity = Random.Range(60f, 100f);
         int duration = 240;
 
-        int preset = track.preset; // 🎹 Use the track's instrument
+        int preset = track.preset;
         midiStreamPlayer.MPTK_Channels[midiChannel].ForcedPreset = preset;
 
         var noteEvent = new MPTKEvent()
         {
-            Command = MPTKCommand.NoteOn,
-            Value = note,
-            Channel = midiChannel,
+            Command  = MPTKCommand.NoteOn,
+            Value    = note,
+            Channel  = midiChannel,
             Duration = duration,
             Velocity = Mathf.RoundToInt(velocity)
         };

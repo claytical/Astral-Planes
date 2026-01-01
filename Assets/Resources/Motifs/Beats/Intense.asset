@@ -16,6 +16,6 @@ MonoBehaviour:
   bpm: 137
   stepsPerLoop: 16
   loopClips:
-  - {fileID: 8300000, guid: f61185488bc634bcc9400c36ebe05874, type: 3}
+  - {fileID: 8300000, guid: 0b4affc580d094038ac374e8ffed4b7f, type: 3}
   stepDensityMultiplier: 1
   noteDensityMultiplier: 1

@@ -43,23 +43,29 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9719a5ef47f54f508bee99167dc603b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
-  tendrilPrefab: {fileID: 2567590292593330884, guid: 33a2b2f200d00462d98bf2d2315a21a3,
-    type: 3}
-  lineMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  minWidth: 0.02
-  maxWidth: 0.25
-  origin: {x: 0, y: 0, z: 0}
-  trackAngularSpread: 60
-  radialSpacing: 0
+  m_EditorClassIdentifier: Assembly-CSharp::CoralVisualizer
   style:
-    baseBranchLength: 1
-    velocityToLength: 0.01
-    densityToWidth: 0.004
-    pointsPerNote: 2
-    jitterAngleDeg: 10
-    arcBendPerNote: 4
-    growSecondsPerTrack: 1.25
+    coreRadius: 0.22
+    baseBranchLength: 2.2
+    velocityToLength: 0.006
+    densityToWidth: 0.0028
+    stemHeight: 0.75
+    stemBlendPortion: 0.25
+    outwardRadius: 0.55
+    outwardRadiusJitter: 0.12
+    rings: 22
+    radialSegments: 10
+    taperPower: 2.4
+    minTipRadius: 0.004
+    bendStrength: 0.35
+    twistDegPerUnit: 80
+    hueStep: 0.14
+    hueAlongLength: 0.75
+    saturation: 0.85
+    value: 1
+    fillAlpha: 0.932
+    outlineRadiusMul: 1.1
+    growSeconds: 1.35
     growCurve:
       serializedVersion: 2
       m_Curve:
@@ -114,3 +120,6 @@ MonoBehaviour:
       m_ColorSpace: -1
       m_NumColorKeys: 2
       m_NumAlphaKeys: 2
+  fillMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  outlineMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
+  origin: {x: 0, y: 0, z: 0}

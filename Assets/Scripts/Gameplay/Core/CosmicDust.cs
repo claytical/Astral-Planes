@@ -13,7 +13,10 @@ public class CosmicDust : MonoBehaviour
     [Header("PhaseStar Proximity")]
     public bool starRemovesWithoutRegrow;   // if false, it will regrow via generator
     public float starAlphaFadeBias = 0.9f;         // keep a little glow as it shrinks
-    
+    [Header("Imprint (from MineNodes)")] 
+    [Range(0f, 1f)] 
+    public float hardness01 = 0f; // 0 = soft/easy, 1 = hard/needs more boost (semantic only for now)
+
     [Header("Dust Field")]
     [Range(0f,1.5f)] public float slowBrake = 0.4f;   // extra braking force
     [Range(0.4f, 1f)] public float speedScale = 0.8f;   // cap scale
@@ -49,8 +52,7 @@ public class CosmicDust : MonoBehaviour
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
     [SerializeField] private float fadeSeconds = 0.25f;
     [SerializeField] private Vector3 fullScale = Vector3.one; // set in Awake/Begin()
-    [SerializeField] private Collider2D hitbox;
-    private float _uiBottomY = float.NaN;
+    [SerializeField] private Collider2D terrainCollider;
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
     [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
 
@@ -59,6 +61,8 @@ public class CosmicDust : MonoBehaviour
     private Vector3 _velocity, _baseScale, _accomodationTarget;
     private Coroutine _accomodateRoutine, _regrowRoutine, _fadeRoutine, _growInRoutine;
     private DrumTrack _drumTrack;
+    private CosmicDustGenerator gen;
+    private MusicalPhase phase;
     private float _growInOverride = -1f;
     private Color _currentTint = Color.white;
     [SerializeField] private int epochId;
@@ -67,42 +71,22 @@ public class CosmicDust : MonoBehaviour
     private float _phaseDrainPerSecond = 1f;
     private bool _isBreaking;
 
-    private static class DustDestroyStats
-    {
-        public static int ManualBreaks, StarPrunes, VehicleEats, Lifetimes, Debugs;
-    }
-    
+
     public CosmicDust(ParticleSystem particleSystem)
     {
         this.particleSystem = particleSystem;
     }
-    private float UiBottomY()
-    {
-        if (!float.IsNaN(_uiBottomY)) return _uiBottomY;
-        var gfm = GameFlowManager.Instance;
-        if (gfm && gfm.controller && gfm.controller.noteVisualizer != null)
-        {
-            _uiBottomY = gfm.activeDrumTrack.GetDustBandBottomCenterY();
-            Debug.Log($"[GRID DUST] UI bottom using top Y: {_uiBottomY}");
-        }
-        else
-        { 
-            _uiBottomY = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, -Camera.main.transform.position.z)).y; // fallback
-            Debug.Log($"[GRID DUST] UI bottom using z Y: {_uiBottomY}");
-            
-        }
-        return _uiBottomY;
-    }
 
     void Awake() {
+        // Terrain collider lives on this same prefab (PolygonCollider2D recommended).
+        // It contributes to the CompositeCollider2D on the DustPool root.
+        if (terrainCollider == null) terrainCollider = GetComponent<Collider2D>();
+        if (terrainCollider != null) terrainCollider.isTrigger = false;
+
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         if (transform.localScale.sqrMagnitude < 1e-6f)
             transform.localScale = referenceScale;
 
-        // OLD (causes overlap):
-        // fullScale = transform.localScale * 2f; // your intended “final size”
-
-        // NEW: keep dust at the same scale the grid used to compute tileDiameterWorld
         fullScale = transform.localScale;
         _accomodationTarget = fullScale;
         _phaseDrainPerSecond = energyDrainPerSecond;
@@ -111,21 +95,88 @@ public class CosmicDust : MonoBehaviour
         if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
         if (psr) psr.sortingFudge = 0f;
     }
+private void OnCollisionStay2D(Collision2D collision)
+{
+    if (_isDespawned || _isBreaking) return;
+    if (gen == null || _drumTrack == null) return;
+
+    var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
+    if (vehicle == null) return;
+
+    // Optional: make dust affect the ship handling when physically contacting a tile.
+    vehicle.EnterDustField(speedScale, accelScale);
+
+    // --- Clearing rules ---
+    if (vehicle.boosting)
+    {
+        // Boosting should be required to clear. Harder dust resists.
+        // Use force proxy you already authored on Vehicle.
+        float damage01 = Mathf.Clamp01(vehicle.GetForceAsDamage() / 120f);
+        float effective = damage01 * Mathf.Lerp(1.0f, 0.25f, hardness01); // hard dust reduces effect
+
+        // Require some meaningful impact to pop a tile; tune later.
+        if (effective >= 0.35f)
+        {
+            BreakTemporarily();
+        }
+
+        // While boosting, we do not accumulate “non-boost grind” time.
+        _nonBoostClearSeconds = 0f;
+        return;
+    }
+
+    // Not boosting: grind timer (wall-like behavior), scaled by hardness.
+    float hardnessMul = Mathf.Lerp(1.0f, 2.25f, hardness01); // hard dust takes longer to break
+    _nonBoostClearSeconds += Time.fixedDeltaTime / hardnessMul;
+
+    if (_nonBoostClearSeconds >= Mathf.Max(0.05f, nonBoostSecondsToBreak))
+    {
+        BreakTemporarily();
+    }
+}
+
+private void OnCollisionExit2D(Collision2D collision)
+{
+    // Reset grind timer when the vehicle stops pressing this tile.
+    var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
+    if (vehicle == null) return;
+
+    _nonBoostClearSeconds = 0f;
+}
+
+private void BreakTemporarily()
+{
+    if (_isBreaking) return;
+    _isBreaking = true;
+
+    Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
+
+    // Remove tile immediately (to pool), and schedule regrow through generator.
+    // We use existing generator scheduling; per-tile override is handled by temporaryRegrowDelaySeconds.
+    gen.DespawnDustAt(gridPos);
+
+    // If you support per-tile override, request regrow with that delay; otherwise rely on existing regrow request flow.
+    if (temporaryRegrowDelaySeconds >= 0f)
+    {
+        // This requires a generator API; if you already have RequestRegrowCellAt, call it here.
+        // gen.RequestRegrowCellAt(gridPos, phase, temporaryRegrowDelaySeconds, refreshIfPending: true);
+    }
+}
 
     public float GetWorldRadius()
     {
-        if (!hitbox)
+        if (!terrainCollider)
             return 0.5f; // sane fallback
 
-        // Prefer CircleCollider2D if that’s what hitbox actually is.
-        if (hitbox is CircleCollider2D circle)
+        // Prefer CircleCollider2D if that’s what terrainCollider actually is.
+        if (terrainCollider is CircleCollider2D circle)
         {
             // Assume uniform scale on X/Y; lossyScale.x is fine.
             return circle.radius * Mathf.Abs(transform.lossyScale.x);
         }
 
         // Fallback for non-circle colliders: approximate from bounds.
-        var bounds = hitbox.bounds;
+        var bounds = terrainCollider.bounds;
         // Use the larger extent to be safe.
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
     }
@@ -137,245 +188,198 @@ public class CosmicDust : MonoBehaviour
         transform.localScale = fullScale;
         // Physics reset
         gameObject.layer = solidLayer;
-        if (hitbox) hitbox.enabled = true;
+        if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = true;
+    }
+    public void SetFootprintFromCellSize(float cellWorldSize, float footprintMul)
+    {
+        float s = Mathf.Max(0.001f, cellWorldSize) * Mathf.Max(0.1f, footprintMul);
+        // If this is sprite-based dust, you may want non-uniform scaling; start uniform.
+        transform.localScale = new Vector3(s, s, 1f);
     }
 
     public void Begin()
     {
         SetColorVariance();
+
+        // Start invisible; GrowIn will scale up.
         transform.localScale = Vector3.zero;
-        _growInRoutine = StartCoroutine(GrowIn());
-        if (particleSystem)
+
+        if (particleSystem != null)
         {
-            StartCoroutine(ParticleAlphaFadeIn(0.5f));
-            particleSystem.Clear(true);
-            particleSystem.Play(true);
+            // Ensure no emission during grow.
+            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
+
+        _growInRoutine = StartCoroutine(GrowIn());
     }
 
-    void LateUpdate()
-    {
-        var gen = GameFlowManager.Instance?.dustGenerator;
-        if (gen == null) return;
-
-        Vector2 flow = gen.SampleFlowAtWorld(transform.position);
-        flow.y = 0f;
-        if (flow.sqrMagnitude > 0.00001f)
-            transform.position += (Vector3)(flow * Time.deltaTime);
-
-        var t   = transform;
-        var cam = Camera.main;
-        if (!cam) return;
-
-        var dt = GameFlowManager.Instance?.activeDrumTrack;
-        if (dt == null) return;
-
-        var playArea = dt.GetPlayAreaWorld();
-        var pos      = t.position;
-
-        float pad = dt.gridPadding;
-        float bottomLimit = playArea.bottom + pad;
-        float topLimit    = playArea.top    - pad;
-
-        pos.y = Mathf.Clamp(pos.y, bottomLimit, topLimit);
-        t.position = pos;
-    }
     private void DisableInteractionImmediately() { 
         // Stop affecting vehicles instantly (even if particles linger)
-        if (hitbox) hitbox.enabled = false; 
+        if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = false; 
         var col = GetComponent<Collider2D>(); 
         if (col) col.enabled = false; 
         gameObject.layer = nonBlockingLayer;
     }
-    private IEnumerator GrowIn() {
+    private IEnumerator GrowIn()
+    {
         float duration = (_growInOverride > 0f)
             ? _growInOverride
-            : Random.Range(5f, 20f); // keep your old fallback if override not set
+            : 5f;
 
         float t = 0f;
-        while (t < duration) {
+        while (t < duration)
+        {
             t += Time.deltaTime;
             float s = Mathf.SmoothStep(0f, 1f, t / duration);
             transform.localScale = fullScale * s;
             yield return null;
         }
-        
+
         transform.localScale = fullScale;
-    }
 
-    private IEnumerator RegrowAfterDelay()
-    {
-        yield return new WaitForSeconds(regrowDelay);
-        // If a later entry pushed the target even smaller, wait for that ease to finish
-        if (_accomodateRoutine != null) yield return _accomodateRoutine;
-
-        // Ease back up to full
-        yield return ScaleTo(fullScale, regrowTime);
-        _regrowRoutine = null;
-    }
-
-public void ConfigureForPhase(MusicalPhase phase)
-{
-    // One switch → one config object → one assignment block.
-    var cfg = phase switch
-    {
-        MusicalPhase.Establish => new PhaseDustConfig(
-            scaleMul:   0.25f,
-            drainMul:   0.50f,
-            behavior:   DustBehavior.SiltDissipate,
-            slowFactor: 0.8f,
-            slowDur:    0.25f,
-            lateral:    0f,
-            turb:       0f
-        ),
-
-        MusicalPhase.Evolve => new PhaseDustConfig(
-            scaleMul:   1.00f,
-            drainMul:   1.00f,
-            behavior:   DustBehavior.CrossCurrent,
-            slowFactor: 0.9f,
-            slowDur:    0.2f,
-            lateral:    2.5f,
-            turb:       0.25f
-        ),
-
-        MusicalPhase.Intensify => new PhaseDustConfig(
-            scaleMul:   1.20f,
-            drainMul:   1.60f,
-            behavior:   DustBehavior.StaticCling,
-            slowFactor: 0.5f,
-            slowDur:    0.5f,
-            lateral:    0.5f,
-            turb:       0.4f
-        ),
-
-        MusicalPhase.Release => new PhaseDustConfig(
-            scaleMul:   1.00f,
-            drainMul:   0.90f,
-            behavior:   DustBehavior.SiltDissipate,
-            slowFactor: 0.85f,
-            slowDur:    0.2f,
-            lateral:    0f,
-            turb:       0f
-        ),
-
-        MusicalPhase.Wildcard => new PhaseDustConfig(
-            scaleMul:   1.10f,
-            drainMul:   1.25f,
-            behavior:   DustBehavior.Turbulent,
-            slowFactor: 0.7f,
-            slowDur:    0.4f,
-            lateral:    1.2f,
-            turb:       2.0f
-        ),
-
-        MusicalPhase.Pop => new PhaseDustConfig(
-            scaleMul:   0.95f,
-            drainMul:   0.75f,
-            behavior:   DustBehavior.ViscousSlow,
-            slowFactor: 0.6f,
-            slowDur:    0.3f,
-            lateral:    0f,
-            turb:       0.2f
-        ),
-
-        _ => new PhaseDustConfig(
-            scaleMul:   1.0f,
-            drainMul:   1.0f,
-            behavior:   DustBehavior.SiltDissipate,
-            slowFactor: 0.85f,
-            slowDur:    0.2f,
-            lateral:    0f,
-            turb:       0f
-        )
-    };
-
-    // Scale
-    fullScale = referenceScale * cfg.scaleMul;
-
-    // Drain (per-phase)
-    _phaseDrainPerSecond = energyDrainPerSecond * cfg.drainMul;
-
-    // Motion / feel
-    behavior       = cfg.behavior;
-    slowFactor     = cfg.slowFactor;
-    slowDuration   = cfg.slowDur;
-    lateralForce   = cfg.lateral;
-    turbulence     = cfg.turb;
-}
-
-// Keep this inside CosmicDust (e.g., near ConfigureForPhase).
-private readonly struct PhaseDustConfig
-{
-    public readonly float scaleMul;
-    public readonly float drainMul;
-    public readonly DustBehavior behavior;
-    public readonly float slowFactor;
-    public readonly float slowDur;
-    public readonly float lateral;
-    public readonly float turb;
-
-    public PhaseDustConfig(
-        float scaleMul,
-        float drainMul,
-        DustBehavior behavior,
-        float slowFactor,
-        float slowDur,
-        float lateral,
-        float turb)
-    {
-        this.scaleMul   = scaleMul;
-        this.drainMul   = drainMul;
-        this.behavior   = behavior;
-        this.slowFactor = slowFactor;
-        this.slowDur    = slowDur;
-        this.lateral    = lateral;
-        this.turb       = turb;
-    }
-}
-
-    private IEnumerator ApplyDustEffect(Vehicle vehicle, Vector2 impactDir)
-    {
-        // Grab RB directly so we don't need Vehicle changes
-        if (!vehicle.TryGetComponent<Rigidbody2D>(out var rb)) yield break;
-
-        float t = 0f;
-        float dur = slowDuration;
-        float minVelFactor = Mathf.Clamp01(slowFactor);
-
-        // Cross-current lateral pulse once at entry
-        if (behavior == DustBehavior.CrossCurrent && lateralForce > 0f)
+        if (particleSystem != null)
         {
-            // perpendicular to motion
-            Vector2 v = rb.linearVelocity;
-            Vector2 side = new Vector2(-v.y, v.x).normalized;
-            rb.AddForce(side * lateralForce, ForceMode2D.Impulse);
+            // Start emission only once the dust is at full size.
+            particleSystem.Play(true);
+            StartCoroutine(ParticleAlphaFadeIn(0.5f));
         }
+    }
 
-        while (t < dur)
+    public void ConfigureForPhase(MusicalPhase phase)
+    {
+        // One switch → one config object → one assignment block.
+        var cfg = phase switch
         {
-            t += Time.deltaTime;
-            // Ease: stronger at start, fades out
-            float k = 1f - Mathf.SmoothStep(0f, 1f, t / dur);
-            float factor = Mathf.Lerp(1f, minVelFactor, k);
+            MusicalPhase.Establish => new PhaseDustConfig(
+                scaleMul:   0.25f,
+                drainMul:   0.50f,
+                behavior:   DustBehavior.SiltDissipate,
+                slowFactor: 0.8f,
+                slowDur:    0.25f,
+                lateral:    0f,
+                turb:       0f
+            ),
 
-            rb.linearVelocity *= factor;
+            MusicalPhase.Evolve => new PhaseDustConfig(
+                scaleMul:   1.00f,
+                drainMul:   1.00f,
+                behavior:   DustBehavior.CrossCurrent,
+                slowFactor: 0.9f,
+                slowDur:    0.2f,
+                lateral:    2.5f,
+                turb:       0.25f
+            ),
 
-            // Turbulence wobble
-            if (behavior == DustBehavior.Turbulent && turbulence > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
-            {
-                Vector2 noise = Random.insideUnitCircle.normalized * (turbulence * 0.05f);
-                rb.AddForce(noise, ForceMode2D.Force);
-            }
+            MusicalPhase.Intensify => new PhaseDustConfig(
+                scaleMul:   1.20f,
+                drainMul:   1.60f,
+                behavior:   DustBehavior.StaticCling,
+                slowFactor: 0.5f,
+                slowDur:    0.5f,
+                lateral:    0.5f,
+                turb:       0.4f
+            ),
 
-            // Static cling = add linear drag temporarily
-            if (behavior == DustBehavior.StaticCling)
-            {
-                rb.AddForce(-rb.linearVelocity * (0.5f * Time.deltaTime), ForceMode2D.Force);
-            }
+            MusicalPhase.Release => new PhaseDustConfig(
+                scaleMul:   1.00f,
+                drainMul:   0.90f,
+                behavior:   DustBehavior.SiltDissipate,
+                slowFactor: 0.85f,
+                slowDur:    0.2f,
+                lateral:    0f,
+                turb:       0f
+            ),
 
-            yield return null;
+            MusicalPhase.Wildcard => new PhaseDustConfig(
+                scaleMul:   1.10f,
+                drainMul:   1.25f,
+                behavior:   DustBehavior.Turbulent,
+                slowFactor: 0.7f,
+                slowDur:    0.4f,
+                lateral:    1.2f,
+                turb:       2.0f
+            ),
+
+            MusicalPhase.Pop => new PhaseDustConfig(
+                scaleMul:   0.95f,
+                drainMul:   0.75f,
+                behavior:   DustBehavior.ViscousSlow,
+                slowFactor: 0.6f,
+                slowDur:    0.3f,
+                lateral:    0f,
+                turb:       0.2f
+            ),
+
+            _ => new PhaseDustConfig(
+                scaleMul:   1.0f,
+                drainMul:   1.0f,
+                behavior:   DustBehavior.SiltDissipate,
+                slowFactor: 0.85f,
+                slowDur:    0.2f,
+                lateral:    0f,
+                turb:       0f
+            )
+        };
+
+        // Scale
+        fullScale = referenceScale * cfg.scaleMul;
+
+        // Drain (per-phase)
+        _phaseDrainPerSecond = energyDrainPerSecond * cfg.drainMul;
+
+        // Motion / feel
+        behavior       = cfg.behavior;
+        slowFactor     = cfg.slowFactor;
+        slowDuration   = cfg.slowDur;
+        lateralForce   = cfg.lateral;
+        turbulence     = cfg.turb;
+    }
+
+    private readonly struct PhaseDustConfig
+    {
+        public readonly float scaleMul;
+        public readonly float drainMul;
+        public readonly DustBehavior behavior;
+        public readonly float slowFactor;
+        public readonly float slowDur;
+        public readonly float lateral;
+        public readonly float turb;
+
+        public PhaseDustConfig(
+            float scaleMul,
+            float drainMul,
+            DustBehavior behavior,
+            float slowFactor,
+            float slowDur,
+            float lateral,
+            float turb)
+        {
+            this.scaleMul   = scaleMul;
+            this.drainMul   = drainMul;
+            this.behavior   = behavior;
+            this.slowFactor = slowFactor;
+            this.slowDur    = slowDur;
+            this.lateral    = lateral;
+            this.turb       = turb;
         }
+    }
+    public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f)
+    {
+        float s = Mathf.Max(0.001f, cellWorldSize) * Mathf.Max(0.05f, footprintMul);
+
+        // Authoritative base size for this dust tile.
+        referenceScale = new Vector3(s, s, 1f);
+
+        // In your current design, fullScale is the “settled” target size.
+        // Keep it equal to referenceScale so GrowIn lands exactly on the cell-driven footprint.
+        fullScale = referenceScale;
+
+        // Keep accommodation consistent.
+        _accomodationTarget = fullScale;
+
+        // If we’re not currently doing a GrowIn, update scale immediately so pooled regrows match.
+        if (_growInRoutine == null)
+            transform.localScale = referenceScale;
     }
 
     void SetColorVariance()
@@ -388,11 +392,17 @@ private readonly struct PhaseDustConfig
         SetTint(c);
     }
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
-    public void SetDrumTrack(DrumTrack track)
+    public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums, MusicalPhase _phase)
     {
-        _drumTrack = track;
+        gen = _dustGenerator;
+        _drumTrack = _drums;
+        phase = _phase;
     }
-
+    public void StartFadeAndScaleDown(float duration)
+    {
+        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
+        _fadeRoutine = StartCoroutine(ParticleFadeAndScaleDown(duration));
+    }
     public void SetTint(Color tint)
     {
         if (!particleSystem) return;
@@ -425,65 +435,26 @@ private readonly struct PhaseDustConfig
         );
         col.color = new ParticleSystem.MinMaxGradient(grad);
     }
-
-
-public IEnumerator RetintOver(float seconds, Color toTint)
-{
-    if (particleSystem == null) yield break;
-
-    var main = particleSystem.main;
-    Color from = (main.startColor.mode == ParticleSystemGradientMode.Color)
-        ? main.startColor.color
-        : Color.white;
-
-    float t = 0f;
-    while (t < seconds)
+    public IEnumerator RetintOver(float seconds, Color toTint)
     {
-        t += Time.deltaTime;
-        float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
-        Color now = Color.Lerp(from, toTint, u);
-        // Apply each step (affects new and in-flight particles)
-        SetTint(now);
-        yield return null;
-    }
-    SetTint(toTint);
-}
-
-// --- Utilities ---
-
-
-    public void StartFadeAndScaleDown(float duration)
-    {
-        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
-        _fadeRoutine = StartCoroutine(ParticleFadeAndScaleDown(duration));
-    }
-
-    private void SetParticleColor(Color c)
-    {
-        if (particleSystem == null) return;
+        if (particleSystem == null) yield break;
 
         var main = particleSystem.main;
-        main.startColor = new ParticleSystem.MinMaxGradient(c);
-    }
-    private void AccommodateToVehicle()
-    {
-        // If PhaseStar is actively shrinking this hex, don't fight it.
-        if (_shrinkingFromStar) return;
+        Color from = (main.startColor.mode == ParticleSystemGradientMode.Color)
+            ? main.startColor.color
+            : Color.white;
 
-        // Cancel a pending regrow so we can stack multiple entries sanely
-        if (_regrowRoutine != null) { StopCoroutine(_regrowRoutine); _regrowRoutine = null; }
-
-        // Compute a new target factor: current factor minus a step, clamped to a floor
-        float currentFactor = Mathf.Clamp01(transform.localScale.x / Mathf.Max(0.0001f, fullScale.x));
-        float targetFactor  = Mathf.Max(minScaleFactor, currentFactor - shrinkStep);
-        _accomodationTarget  = fullScale * targetFactor;
-
-        // Ease down to the new target
-        if (_accomodateRoutine != null) StopCoroutine(_accomodateRoutine);
-        _accomodateRoutine = StartCoroutine(ScaleTo(_accomodationTarget, shrinkEaseTime));
-
-        // Schedule a smooth regrow after a delay
-        _regrowRoutine = StartCoroutine(RegrowAfterDelay());
+        float t = 0f;
+        while (t < seconds)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
+            Color now = Color.Lerp(from, toTint, u);
+            // Apply each step (affects new and in-flight particles)
+            SetTint(now);
+            yield return null;
+        }
+        SetTint(toTint);
     }
     private IEnumerator ParticleAlphaFadeIn(float duration) { 
         if (particleSystem == null) yield break; 
@@ -516,103 +487,13 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         transform.localScale = Vector3.zero; 
         SetTint(to); 
         // hand off to generator to return to pool
-        var dt = GameFlowManager.Instance?.activeDrumTrack; 
-        if (dt != null) { 
-            var gridPos = dt.WorldToGridPosition(transform.position); 
-            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos); 
+         
+        if (_drumTrack != null) { 
+            var gridPos = _drumTrack.WorldToGridPosition(transform.position); 
+            gen.DespawnDustAt(gridPos); 
         }
         else { gameObject.SetActive(false); } 
     }
-
-    private IEnumerator ScaleTo(Vector3 target, float duration)
-    {
-        Vector3 start = transform.localScale;
-        float t = 0f;
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float e = Mathf.SmoothStep(0f, 1f, t / duration);
-            transform.localScale = Vector3.Lerp(start, target, e);
-            yield return null;
-        }
-        transform.localScale = target;
-    }
-
-    private void BreakHexagon(DustClearKind kind)
-    {
-        if (_isBreaking) return;
-        _isBreaking = true;
-
-        if (_drumTrack != null)
-        {
-            Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
-
-            var gfm   = GameFlowManager.Instance;
-            var gen   = gfm != null ? gfm.dustGenerator : null;
-            var phase = gfm != null && gfm.phaseTransitionManager != null
-                ? gfm.phaseTransitionManager.currentPhase
-                : MusicalPhase.Establish;
-
-            if (gen != null)
-            {
-                if (kind == DustClearKind.Permanent)
-                {
-                    // Player-authored corridor: never regrow.
-                    gen.DespawnDustAtAndMarkPermanent_Public(gridPos);
-                }
-                else
-                {
-                    // Temporary clear: regrow into the SAME cell.
-                    gen.DespawnDustAt(gridPos);
-                    gen.RequestRegrowCellAt(gridPos, phase, temporaryRegrowDelaySeconds);
-                }
-            }
-        }
-        gameObject.SetActive(false);
-    }
-
-    public void DestroyFromPhaseStar()
-    {
-        DustDestroyStats.StarPrunes++;
-        // One path only: fade then POOL (not Destroy)
-        StartCoroutine(FadeAndPool(strength01: 1f));
-    }
-    private IEnumerator FadeAndPool(float strength01)
-    {
-        if (_isDespawned) yield break; // guard against double calls
-        _isDespawned = true;
-        DisableInteractionImmediately();
-        // 2) Free cell NOW (don’t wait until after the fade)
-        var dt = GameFlowManager.Instance?.activeDrumTrack;
-        Vector2Int gridPos = default;
-        bool hadGrid = false;
-        if (dt != null)
-        {
-            gridPos = dt.WorldToGridPosition(transform.position);
-            //dt.FreeSpawnCell(gridPos.x, gridPos.y); // free occupancy immediately
-            hadGrid = true;
-        }
-
-        // 3) Visual-only fade
-        float dur = Mathf.Lerp(fadeSeconds * 0.3f, fadeSeconds, Mathf.Clamp01(strength01));
-        Vector3 s0 = transform.localScale.sqrMagnitude < 1e-6f ? fullScale : transform.localScale;
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.Clamp01(t / dur);
-            transform.localScale = Vector3.Lerp(s0, Vector3.zero, u);
-            yield return null;
-        }
-
-        // 4) Tell generator it can forget this tile (idempotent)
-        if (hadGrid)
-            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
-
-        // 5) Return to pool
-        DespawnToPoolInstant();
-    }
-
     public void PrepareForReuse()
     {
         // Stop any lingering coroutines from prior life
@@ -620,21 +501,30 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         if (_regrowRoutine     != null) { StopCoroutine(_regrowRoutine);     _regrowRoutine     = null; }
         if (_fadeRoutine       != null) { StopCoroutine(_fadeRoutine);       _fadeRoutine       = null; }
         if (_growInRoutine     != null) { StopCoroutine(_growInRoutine);     _growInRoutine     = null; }
+
         _isBreaking = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
+
         _accomodationTarget = fullScale = referenceScale;
         transform.localScale = referenceScale;
-        hitbox.enabled = true;
+
+        if (terrainCollider != null) terrainCollider.enabled = true;
+
         if (particleSystem != null)
         {
-            particleSystem.Clear(true);
-            particleSystem.Play(true);
+            // Option A: no particle emission during reuse reset.
+            // This prevents mass "popping" when pooled dust tiles are re-enabled.
+            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
-        _currentTint.a = .5f;
+
+        _currentTint.a = 0.5f;
         SetTint(_currentTint);
+
+        hardness01 = 0f;
+
         var col = GetComponent<Collider2D>();
         if (col) col.enabled = true;
 
@@ -642,6 +532,10 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         dissipateOnExit = false;
     }
 
+    public void ApplyImprint(Color tint, float hardness) {
+        SetTint(tint); 
+        hardness01 = Mathf.Clamp01(hardness);
+    }
     public void DespawnToPoolInstant()
     { 
         DisableInteractionImmediately();
@@ -657,98 +551,4 @@ public IEnumerator RetintOver(float seconds, Color toTint)
         _isDespawned = true;
         gameObject.SetActive(false);
     }
-
-    private IEnumerator WaitForParticlesThenDestroy()
-    {
-        DisableInteractionImmediately();
-        particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-        // Wait until all particles have disappeared
-        while (particleSystem.IsAlive(true))
-        {
-            yield return null;
-        }
-        var dt = GameFlowManager.Instance?.activeDrumTrack;
-        if (dt != null) { 
-            var gridPos = dt.WorldToGridPosition(transform.position); 
-            GameFlowManager.Instance.dustGenerator.DespawnDustAt(gridPos);
-        }
-        else { gameObject.SetActive(false); }
-    }
-    private void OnTriggerEnter2D(Collider2D other) {
-        if (!other.TryGetComponent<Vehicle>(out var v)) return;
-        v.EnterDustField(speedScale, accelScale);
-        _nonBoostClearSeconds = 0f;
-        // drive the per-behavior feel (lateral nudge, turbulence, cling)
-        if (v.TryGetComponent<Rigidbody2D>(out var rb))
-        {
-            Vector2 dir = rb.linearVelocity.sqrMagnitude > 0.0001f
-                ? rb.linearVelocity.normalized
-                : (v.transform.position - transform.position).normalized;
-
-            StartCoroutine(ApplyDustEffect(v, dir));  // <- uses your behavior switches
-        }
-        
-        AccommodateToVehicle();
-    }
-    private void OnTriggerStay2D(Collider2D other)
-    {
-        if (!other.TryGetComponent<Vehicle>(out var v)) return;
-
-        // 1. ENERGY DRAIN — every physics step
-
-        if (!(noDrainWhileBoosting && v.boosting))
-        {
-            float drain = _phaseDrainPerSecond * Time.fixedDeltaTime;
-            if (drain > 0f) v.DrainEnergy(drain, $"CosmicDust/{behavior}");
-        }
-        // 2. BOOST CLEAR (optional)
-        if (v.boosting)
-        {
-            BreakHexagon(DustClearKind.Permanent);
-            return;
-        }
-        // Sustained contact without boosting will eventually clear this hex TEMPORARILY.
-        if (!v.boosting && nonBoostSecondsToBreak > 0f)
-        {
-            _nonBoostClearSeconds += Time.fixedDeltaTime;
-            if (_nonBoostClearSeconds >= nonBoostSecondsToBreak)
-            {
-                BreakHexagon(DustClearKind.Temporary);
-                return;
-            }
-        }
-
-
-        // 3. THROTTLED PHYSICS EFFECTS
-        if (Time.time < _stayForceUntil) return;
-        _stayForceUntil = Time.time + stayForceEvery;
-
-        if (!other.TryGetComponent<Rigidbody2D>(out var rb)) return;
-        if (!v.boosting)
-        {
-            // Make dust feel like a wall: kill most of the tangential velocity each physics step.
-            // This prevents “grinding through” multiple cells before the timer can trigger.
-            rb.linearVelocity *= 0.15f;
-
-            // Optional: if you still see creeping, hard clamp tiny velocities to zero.
-            if (rb.linearVelocity.sqrMagnitude < 0.0004f) // ~0.02 units/s
-                rb.linearVelocity = Vector2.zero;
-        }
-
-        float max = v.GetMaxSpeed() * speedScale;
-        if (rb.linearVelocity.magnitude > max)
-            rb.linearVelocity = rb.linearVelocity.normalized * max;
-    }
-
-    private void OnTriggerExit2D(Collider2D other)
-    {
-        if (!other.TryGetComponent<Vehicle>(out var v)) return;
-
-        v.ExitDustField(); // <<< restore env scales
-        _nonBoostClearSeconds = 0f;
-        if (dissipateOnExit)
-            BreakHexagon(DustClearKind.Temporary);
-    }
-    
 }

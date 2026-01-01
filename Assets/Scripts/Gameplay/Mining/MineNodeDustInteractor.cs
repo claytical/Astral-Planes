@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEditor.Experimental.GraphView;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class MineNodeDustInteractor : MonoBehaviour
@@ -44,39 +43,56 @@ public class MineNodeDustInteractor : MonoBehaviour
     private float _carveTimer;
     private int _dustCellsCarved = 0;
     private Rigidbody2D _rb;
-
+    private DrumTrack _drumTrack;
+    private MineNode _node;
+    private float _desiredSpeed = 0f;
+    private float _desiredSpeedFloor = 0.25f; // prevents cap collapsing to ~0
     // Track which cells we've already carved so we don't burn budget twice on the same spot.
     private readonly HashSet<Vector2Int> _carvedCells = new HashSet<Vector2Int>();
 
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _node = GetComponent<MineNode>();
     }
     void FixedUpdate()
     {
         if (!carveMaze) return;
-
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null || gfm.dustGenerator == null) return;
-
-        // Only carve when actually moving a bit – keeps stationary nodes from grinding a crater.
-        if (_rb == null || _rb.linearVelocity.sqrMagnitude < 0.0001f)
-            return;
+        if (!enableCarving) return;
+        if (_rb == null) return;
+        if (_drumTrack == null) return;
 
         _carveTimer += Time.fixedDeltaTime;
-        if (_carveTimer >= carveIntervalSeconds)
-        {
-            _carveTimer = 0f;
-            // Use the node’s current world position and appetite multiplier.
-            
-            gfm.dustGenerator.ErodeDustDisk(transform.position, carveAppetiteMul);
-            // AFTER erosion succeeds:
-            var node = GetComponent<MineNode>();
+        if (_carveTimer < carveIntervalSeconds) return;
 
-            if (node != null)
-                node.NotifyDustErodedAt(transform.position);
+        _carveTimer = 0f;
 
-        }
+        // Phase comes from DrumTrack's level context (avoid GFM).
+        MusicalPhase phase = _drumTrack.GetCurrentPhaseSafe();
+
+        float healDelay = (_node != null) ? _node.GetCorridorHealDelaySeconds() : -1f;
+        Color imprintColor = _node.GetImprintColor();
+        float hardness01   = _node.GetImprintHardness();
+
+        _drumTrack.CarveTemporaryDiskFromMineNode(
+            transform.position,
+            carveAppetiteMul,
+            phase,
+            healDelay,
+            imprintColor,
+            hardness01
+        );
+        if (_node != null) _node.NotifyDustErodedAt(transform.position);
+    }
+
+    public void SetLevelAuthority(DrumTrack drumTrack)
+    {
+        _drumTrack = drumTrack;
+    }
+
+    public void SetDesiredSpeed(float desiredSpeed)
+    {
+        _desiredSpeed = Mathf.Max(0f, desiredSpeed);
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -95,16 +111,30 @@ public class MineNodeDustInteractor : MonoBehaviour
         var vel = _rb.linearVelocity;
         if (vel.sqrMagnitude > 0.0001f)
         {
-            // Cap top speed while inside (like the Vehicle handler does)
-            float cap = vel.magnitude * speedCapMul;
-            if (_rb.linearVelocity.magnitude > cap)
-                _rb.linearVelocity = vel.normalized * cap;
+// Option A: cap based on MineNode's intended speed.
+// This is a real cap, not a per-frame decay.
+            float desired = Mathf.Max(_desiredSpeed, _desiredSpeedFloor);
+            float cap = desired * Mathf.Max(0.05f, speedCapMul);
+
+            float speed = _rb.linearVelocity.magnitude;
+            if (speed > cap && speed > 0.0001f)
+            {
+                _rb.linearVelocity = _rb.linearVelocity.normalized * cap;
+            }
+
         }
 
         // Thicken the air: extra braking
         if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
         {
-            _rb.AddForce(-_rb.linearVelocity.normalized * extraBrake, ForceMode2D.Force);
+// Proportional brake: scales with current speed so it doesn't "pin" the node at low velocity.
+            float speed = _rb.linearVelocity.magnitude;
+            if (speed > 0.0001f)
+            {
+                // extraBrake is now interpreted as "fraction of speed to damp per second" style.
+                Vector2 brake = -_rb.linearVelocity * extraBrake;
+                _rb.AddForce(brake, ForceMode2D.Force);
+            }
         }
 
         // Lateral cross-current pulse (immediate nudge on enter; gentle bias while staying)
@@ -129,8 +159,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         // StaticCling -> add temporary drag feel (small, continuous)
         if (CurrentDust.behavior == CosmicDust.DustBehavior.StaticCling)
         {
-            _rb.AddForce(-_rb.linearVelocity * 0.5f * Time.fixedDeltaTime, ForceMode2D.Force);
-        }
+            _rb.AddForce(-_rb.linearVelocity * 0.5f, ForceMode2D.Force);        }
 
     }
     public void ConfigureCarving(float intervalSeconds, float appetiteMul)

@@ -6,7 +6,24 @@ public class Collectable : MonoBehaviour
 {
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
     public SpriteRenderer energySprite;
-    public int burstId; 
+    public int burstId;
+
+    // ---- Dust collision tuning ----
+    public float dustCollisionEnterImpulse = 0.85f;
+    public float dustCollisionStayForce = 2.25f;
+    public float dustEscapeCooldownSeconds = 0.35f;
+    private float _dustEscapeCooldown;
+
+    // Desired SpawnGrid target (Option A): used by DebrisRoutine to bias motion within the SpawnGrid.
+    private Vector2Int _desiredGridTarget;
+    private bool _hasDesiredGridTarget;
+
+    public void SetDesiredGridTarget(Vector2Int targetCell)
+    {
+        _desiredGridTarget = targetCell;
+        _hasDesiredGridTarget = true;
+    }
+ 
     private int amount = 1;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
@@ -73,7 +90,6 @@ public class Collectable : MonoBehaviour
         return false;
     }
 
-// Used by spawners (InstrumentTrack) to avoid overlaps at spawn time.
     public static bool IsCellFreeStatic(Vector2Int cell)
     {
         lock (_lock)
@@ -159,17 +175,6 @@ public class Collectable : MonoBehaviour
         }
     }
 
-    bool IsCellFreeWithBuffer(Vector2Int cell, int buffer)
-    {
-        for (int dx = -buffer; dx <= buffer; dx++)
-        for (int dy = -buffer; dy <= buffer; dy++)
-        {
-            var c = new Vector2Int(cell.x + dx, cell.y + dy);
-            if (_occupantByCell.TryGetValue(c, out var occ) && occ != this) return false;
-            if (_reservedByCell.TryGetValue(c, out var res) && res != this) return false;
-        }
-        return true;
-    }
 
     private float ComputeMoveSpeed()
     {
@@ -297,67 +302,195 @@ public class Collectable : MonoBehaviour
 }
 
     private IEnumerator MovementRoutine()
-    { 
-        var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null; 
-        if (!_rb && !TryGetComponent(out _rb)) yield break; 
-        _speed  = ComputeMoveSpeed(); 
-        float linger = ComputeLingerSeconds();
-        // Pick a NEIGHBOR immediately; don't snap/linger on current cell
-        _hasTarget = TryPickNextGridNode(out _targetWorld); 
-        float nextChooseAt = 0f;        
-        while (true) {
-            yield return new WaitForFixedUpdate();
-            if (!_hasTarget)
+{
+    // NOTE: This routine is intentionally "grid-intent + weather" rather than "rush to ribbon".
+    // - If a desired SpawnGrid target is set (from InstrumentTrack), we seek that cell center.
+    // - Once we reach it (within arriveRadius), we stop seeking and let weather/flow dominate.
+    // - We avoid jitter by snapping when a step would overshoot, and by latching arrival.
+
+    var gfm = GameFlowManager.Instance;
+    var dt  = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
+    if (!_rb && !TryGetComponent(out _rb)) yield break;
+
+    _speed = ComputeMoveSpeed();
+    float linger = ComputeLingerSeconds();
+
+    // Initial target:
+    if (_hasDesiredGridTarget && dt != null)
+    {
+        _targetWorld = dt.GridToWorldPosition(_desiredGridTarget);
+        _hasTarget = true;
+    }
+    else
+    {
+        _hasTarget = TryPickNextGridNode(out _targetWorld);
+    }
+
+    float nextChooseAt = 0f;
+
+    // Tiny weather coupling (keeps motion feeling "in the event" without overpowering the chase).
+    const float FLOW_STEP_SCALE = 0.22f;      // how much flow influences movement step
+    const float TURB_STEP_SCALE = 0.12f;      // low-frequency wobble
+    const float ARRIVE_LATCH_SECONDS = 0.10f; // prevents bounce by holding "arrived" briefly
+
+    // Stable turbulence seed
+    _rng ??= new System.Random(StableSeed());
+    float seedA = (float)_rng.NextDouble() * 1000f;
+    float seedB = (float)_rng.NextDouble() * 1000f;
+
+    float arrivedLatchUntil = 0f;
+
+    while (true)
+    {
+        yield return new WaitForFixedUpdate();
+
+            if (_dustEscapeCooldown > 0f) _dustEscapeCooldown -= Time.fixedDeltaTime;
+
+        if (_rb == null) continue;
+
+        var gfm2 = GameFlowManager.Instance;
+        var dustGen = gfm2 != null ? gfm2.dustGenerator : null;
+        var dt2 = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
+
+        Vector2 cur = _rb.position;
+
+        // If we are inside dust, shove toward open space aggressively.
+        // This prevents collectables from "drifting across dust" and supports the labyrinth readability.
+        if (IsPositionInsideDust(cur))
+        {
+            // Probe 8 directions and pick the first clear direction; fall back to the "least bad".
+            Vector2[] dirs = {
+                Vector2.up, Vector2.down, Vector2.left, Vector2.right,
+                (Vector2.up + Vector2.left).normalized,
+                (Vector2.up + Vector2.right).normalized,
+                (Vector2.down + Vector2.left).normalized,
+                (Vector2.down + Vector2.right).normalized
+            };
+
+            Vector2 best = Vector2.up;
+            float bestScore = float.NegativeInfinity;
+            float probe = Mathf.Max(0.12f, dustAdjacencyProbe);
+
+            for (int i = 0; i < dirs.Length; i++)
             {
-                if (!TryPickNextGridNode(out _targetWorld))
+                Vector2 p = cur + dirs[i] * probe;
+                bool inside = IsPositionInsideDust(p);
+                float score = inside ? -1f : 1f;
+                if (score > bestScore)
                 {
-                    //wait for next physics tick
-                    continue;
+                    bestScore = score;
+                    best = dirs[i];
+                    if (!inside) break; // early out: found open space
                 }
-                _hasTarget = true;
             }
 
-            // Move toward current node center
-            Vector2 cur = _rb.position;
-            Vector2 tgt = _targetWorld;
-            Vector2 delta = tgt - cur;
-            float dist = delta.magnitude;
-
-            if (dist <= arriveRadius)
+            // Impulse-like "pop" out of dust.
+            // Gate this so we do not jitter back/forth at the dust edge.
+            if (_dustEscapeCooldown <= 0f)
             {
-                // Snap to target (optional but helps determinism)
-                _rb.MovePosition(tgt);
+                _rb.MovePosition(cur + best * Mathf.Max(0.10f, _speed * Time.fixedDeltaTime));
+                _dustEscapeCooldown = dustEscapeCooldownSeconds;
+            }
+            _hasTarget = false;
+            arrivedLatchUntil = Time.time + ARRIVE_LATCH_SECONDS;
+            continue;
+        }
 
-                // Commit new occupancy at arrival
-                if (dt != null)
-                {
-                    var arrivedCell = dt.CellOf(tgt);
-                    CommitArrival(arrivedCell);
-                }
+        // Update desired target world position from SpawnGrid target (if provided).
+        if (_hasDesiredGridTarget && dt2 != null)
+        {
+            _targetWorld = dt2.GridToWorldPosition(_desiredGridTarget);
+            _hasTarget = true;
+        }
+        else if (!_hasTarget)
+        {
+            if (Time.time < arrivedLatchUntil) continue;
 
-                float t = 0f;
-                while (t < linger) { t += Time.deltaTime; yield return null; }
-
-                _hasTarget = false;
+            // Reacquire wandering target when not seeking.
+            if (!TryPickNextGridNode(out _targetWorld))
+            {
                 continue;
             }
+            _hasTarget = true;
+        }
 
-            Vector2 step = delta.normalized * _speed * Time.fixedDeltaTime;
-            _rb.MovePosition(cur + step);
-            // Periodically allow re-evaluation of neighbors to keep motion lively
-            if (Time.time >= nextChooseAt)
+        Vector2 delta = (Vector2)(_targetWorld - (Vector3)cur);
+        float dist = delta.magnitude;
+
+        // Arrival handling: snap and (if desired-target) release intent so weather can take over.
+        if (dist <= Mathf.Max(0.0001f, arriveRadius))
+        {
+            _rb.MovePosition((Vector2)_targetWorld);
+
+            if (_hasDesiredGridTarget)
             {
-                nextChooseAt = Time.time + chooseNextEvery;
-                // Occasionally re-pick mid-run for scurry feel on short notes
-                float d01 = Duration01();
-                bool allowMidcourse = _rng.NextDouble() < Mathf.Lerp(0.35f, 0.05f, d01); // short notes more midcourse changes
-                if (allowMidcourse && TryPickNextGridNode(out var mid))
-                {
-                    _targetWorld = mid;
-                }
+                // We reached the desired SpawnGrid cell. Stop "seeking" to avoid bopping.
+                _hasDesiredGridTarget = false;
+            }
+
+            _hasTarget = false;
+            arrivedLatchUntil = Time.time + Mathf.Max(ARRIVE_LATCH_SECONDS, linger);
+            continue;
+        }
+
+        // Compute baseline step toward target.
+        Vector2 stepDir = delta / Mathf.Max(0.0001f, dist);
+        Vector2 step = stepDir * (_speed * Time.fixedDeltaTime);
+
+        // Weather influence: flow + coherent turbulence.
+        if (dustGen != null)
+        {
+            Vector2 flow = dustGen.SampleFlowAtWorld((Vector3)cur);
+            if (flow.sqrMagnitude > 0.0001f)
+            {
+                step += flow.normalized * (FLOW_STEP_SCALE * _speed * Time.fixedDeltaTime);
+            }
+        }
+
+        float t = Time.time;
+        float nx = Mathf.PerlinNoise(seedA, t * 0.35f) * 2f - 1f;
+        float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
+        Vector2 turb = new Vector2(nx, ny);
+        if (turb.sqrMagnitude > 0.0001f)
+        {
+            step += turb.normalized * (TURB_STEP_SCALE * _speed * Time.fixedDeltaTime);
+        }
+
+        // Overshoot protection: if this step would pass the target, snap to target.
+        if (step.magnitude >= dist)
+        {
+            _rb.MovePosition((Vector2)_targetWorld);
+
+            if (_hasDesiredGridTarget)
+            {
+                _hasDesiredGridTarget = false;
+            }
+
+            _hasTarget = false;
+            arrivedLatchUntil = Time.time + Mathf.Max(ARRIVE_LATCH_SECONDS, linger);
+            continue;
+        }
+
+        _rb.MovePosition(cur + step);
+
+        // If we are seeking a desired cell, do NOT mid-course hop (that is the source of "jerk between 2 cells").
+        if (_hasDesiredGridTarget) continue;
+
+        // Periodically re-evaluate neighbors to keep motion lively when wandering.
+        if (Time.time >= nextChooseAt)
+        {
+            nextChooseAt = Time.time + chooseNextEvery;
+
+            float d01 = Duration01();
+            bool allowMidcourse = _rng.NextDouble() < Mathf.Lerp(0.35f, 0.05f, d01); // short notes more midcourse changes
+            if (allowMidcourse && TryPickNextGridNode(out var mid))
+            {
+                _targetWorld = mid;
+                _hasTarget = true;
             }
         }
     }
+}
     public int GetNote() => assignedNote;
     public bool IsDark { get; private set; } = false;
     
@@ -408,7 +541,7 @@ public class Collectable : MonoBehaviour
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
         }
-        
+        Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }
     public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, int durationTicksOrSteps, int anchorStep) {
         var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
@@ -594,7 +727,65 @@ public class Collectable : MonoBehaviour
         UnregisterOccupant();
         NotifyDestroyedOnce();
     } // pooling-safe
-    private void OnTriggerEnter2D(Collider2D coll)
+    
+    private void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (_rb == null && !TryGetComponent(out _rb)) return;
+
+        // Dust should be a physical obstacle for collectables.
+        // We apply a small impulse away from the dust on entry to avoid deep contact jitter.
+        if (coll.collider != null && coll.collider.GetComponent<CosmicDust>() != null)
+        {
+            Vector2 away = Vector2.zero;
+
+            // Prefer contact normal if available.
+            if (coll.contactCount > 0)
+            {
+                // Contact normal points from other collider to this collider in 2D collisions.
+                away = coll.GetContact(0).normal;
+            }
+            if (away.sqrMagnitude < 0.0001f)
+            {
+                away = (_rb.position - (Vector2)coll.collider.bounds.center);
+            }
+            if (away.sqrMagnitude < 0.0001f)
+            {
+                away = UnityEngine.Random.insideUnitCircle;
+            }
+
+            away.Normalize();
+            _rb.AddForce(away * dustCollisionEnterImpulse, ForceMode2D.Impulse);
+
+            // Prevent rapid-fire escape impulses in the movement loop.
+            _dustEscapeCooldown = dustEscapeCooldownSeconds;
+        }
+    }
+
+    private void OnCollisionStay2D(Collision2D coll)
+    {
+        if (_rb == null) return;
+        if (coll.collider == null) return;
+
+        if (coll.collider.GetComponent<CosmicDust>() == null) return;
+
+        // Continuous repulsion while in contact reduces frictiony "sticking" even with low-friction materials.
+        Vector2 n = Vector2.zero;
+        if (coll.contactCount > 0) n = coll.GetContact(0).normal;
+        if (n.sqrMagnitude < 0.0001f) n = (_rb.position - (Vector2)coll.collider.bounds.center);
+
+        if (n.sqrMagnitude > 0.0001f)
+        {
+            n.Normalize();
+
+            // Remove velocity component pushing into dust.
+            float into = Vector2.Dot(_rb.linearVelocity, -n);
+            if (into > 0f) _rb.linearVelocity += n * into;
+
+            _rb.AddForce(n * dustCollisionStayForce, ForceMode2D.Force);
+        }
+    }
+
+private void OnTriggerEnter2D(Collider2D coll)
     {
         var vehicle = coll.GetComponent<Vehicle>();
         if (vehicle == null || _handled) return;
