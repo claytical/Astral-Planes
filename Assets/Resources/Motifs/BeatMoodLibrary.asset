@@ -15,5 +15,3 @@ MonoBehaviour:
   profiles:
   - {fileID: 11400000, guid: 2640e5487e5e24a62a5b30a635f59875, type: 2}
   - {fileID: 11400000, guid: d5900a038dd4a40e790472e6d5ae86da, type: 2}
-  - {fileID: 11400000, guid: f8c4fe1ccafe14d0795eec9c276c7473, type: 2}
-  - {fileID: 11400000, guid: 5b758c1f5535948a39706dbf744600f3, type: 2}

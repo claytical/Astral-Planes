@@ -22,12 +22,12 @@ MonoBehaviour:
   - item: 2
     weight: 0.1
   patterns:
-  - item: 4
+  - item: 15
     weight: 0.5
-  - item: 6
-    weight: 0.3
-  - item: 5
-    weight: 0.2
+  - item: 11
+    weight: 0.5
+  - item: 7
+    weight: 0.5
   rhythms:
   - item: 0
     weight: 0.6
@@ -41,6 +41,7 @@ MonoBehaviour:
   - item: vi
     weight: 0.2
   chordsPerRegion: 2
+  loopsToAscend: 1
   behaviors:
   - item: 1
     weight: 0.4

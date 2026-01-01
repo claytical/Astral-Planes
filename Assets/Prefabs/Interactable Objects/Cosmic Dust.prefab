@@ -11,9 +11,8 @@ GameObject:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 1980146515134306388}
   - component: {fileID: 8747843313378906591}
-  - component: {fileID: 3706479320875781435}
-  - component: {fileID: 3358133898735144510}
-  m_Layer: 7
+  - component: {fileID: 3407942511574159063}
+  m_Layer: 0
   m_Name: Cosmic Dust
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -54,6 +53,7 @@ MonoBehaviour:
   particleSystem: {fileID: 8685539736285126848}
   starRemovesWithoutRegrow: 0
   starAlphaFadeBias: 0.9
+  hardness01: 0
   slowBrake: 0.231
   speedScale: 0.83
   accelScale: 0.662
@@ -74,7 +74,7 @@ MonoBehaviour:
   turbulence: 0.97
   fadeSeconds: 0.25
   fullScale: {x: 0.25, y: 0.25, z: 0.25}
-  hitbox: {fileID: 3358133898735144510}
+  terrainCollider: {fileID: 0}
   solidLayer: 0
   nonBlockingLayer: 0
   epochId: 0
@@ -96,34 +96,7 @@ MonoBehaviour:
   preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
---- !u!50 &3706479320875781435
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1781116594832268}
-  m_BodyType: 1
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 5
-  m_LinearDamping: 5
-  m_AngularDamping: 0
-  m_GravityScale: 0
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 1
-  m_Constraints: 4
---- !u!58 &3358133898735144510
+--- !u!58 &3407942511574159063
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -133,7 +106,7 @@ CircleCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 2fcbac7036a964d589a6612c9a0c8204, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -153,9 +126,9 @@ CircleCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_UsedByEffector: 0
-  m_CompositeOperation: 0
+  m_CompositeOperation: 1
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.5
@@ -170,8 +143,8 @@ GameObject:
   - component: {fileID: 3055904626956396221}
   - component: {fileID: 4712830482222681361}
   - component: {fileID: 8685539736285126848}
-  m_Layer: 7
-  m_Name: GameObject
+  m_Layer: 0
+  m_Name: Particles
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -408,7 +381,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.2
+      scalar: 1
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -462,7 +435,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 0, g: 1, b: 0.78431374, a: 0.05490196}
+      maxColor: {r: 0, g: 1, b: 0.78431374, a: 0.105882354}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -903,8 +876,8 @@ ParticleSystem:
   ShapeModule:
     serializedVersion: 6
     enabled: 1
-    type: 4
-    angle: 25
+    type: 8
+    angle: 0
     length: 5
     boxThickness: {x: 0, y: 0, z: 0}
     radiusThickness: 1
@@ -1109,7 +1082,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 20
+      scalar: 15.67
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -1547,24 +1520,24 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 1, g: 1, b: 1, a: 0.007843138}
-        key1: {r: 1, g: 1, b: 1, a: 0.6784314}
-        key2: {r: 0, g: 0, b: 0, a: 0}
-        key3: {r: 0, g: 0, b: 0, a: 0}
-        key4: {r: 0, g: 0, b: 0, a: 0}
-        key5: {r: 0, g: 0, b: 0, a: 0}
-        key6: {r: 0, g: 0, b: 0, a: 0}
+        key0: {r: 1, g: 1, b: 1, a: 0}
+        key1: {r: 1, g: 1, b: 1, a: 1}
+        key2: {r: 0.003921569, g: 0.47058824, b: 0.19607843, a: 0}
+        key3: {r: 0, g: 0.5019608, b: 0.5019608, a: 0}
+        key4: {r: 1, g: 0.2688679, b: 0.3290789, a: 0}
+        key5: {r: 1, g: 0.67352945, b: 0.25, a: 0}
+        key6: {r: 1, g: 0.9349057, b: 0.2783019, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 0
         ctime1: 65535
-        ctime2: 0
-        ctime3: 0
-        ctime4: 0
-        ctime5: 0
-        ctime6: 0
+        ctime2: 32768
+        ctime3: 49151
+        ctime4: 44333
+        ctime5: 50115
+        ctime6: 58403
         ctime7: 0
         atime0: 0
-        atime1: 31510
+        atime1: 10057
         atime2: 65535
         atime3: 0
         atime4: 0
@@ -5005,7 +4978,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5160715109473589012}
   - component: {fileID: 4850460592595600707}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: Circle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5096,7 +5069,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8294084348089236440}
   - component: {fileID: 6341341344399459146}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: Mask
   m_TagString: Untagged
   m_Icon: {fileID: 0}

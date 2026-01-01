@@ -23,26 +23,25 @@ MonoBehaviour:
     weight: 0.2
   patterns:
   - item: 8
+    weight: 0.419
+  - item: 15
     weight: 0.5
-  - item: 7
-    weight: 0.3
-  - item: 9
-    weight: 0.2
+  - item: 5
+    weight: 0.5
   rhythms:
   - item: 5
     weight: 0.4
-  - item: 2
+  - item: 1
     weight: 0.4
-  - item: 3
-    weight: 0.2
   chordFunctions:
   - item: I
     weight: 0.4
   - item: IV
     weight: 0.3
-  - item: vi
+  - item: V
     weight: 0.3
   chordsPerRegion: 3
+  loopsToAscend: 1
   behaviors:
   - item: 10
     weight: 0.4

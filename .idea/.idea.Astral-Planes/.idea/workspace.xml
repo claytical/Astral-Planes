@@ -6,12 +6,38 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Coral Visualizer.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Coral Visualizer.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Bass/Pulsing Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Bass/Pulsing Bass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/BeatMoodLibrary.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/BeatMoodLibrary.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Intense.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Intense.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Groove/Groove Sync Ticks.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Groove/Groove Sync Ticks.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Harmony/Harmony Warm Pads.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Harmony/Harmony Warm Pads.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Lead/Lead Smooth Glide.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Lead/Lead Smooth Glide.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Radiant Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Radiant Groove.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/CoralVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SpawnGrid.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SpawnGrid.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/RemixUtility.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/RemixUtility.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MarkerTag.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MarkerTag.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -266,7 +292,11 @@
       <workItem from="1763486568906" duration="9044000" />
       <workItem from="1763763039527" duration="37391000" />
       <workItem from="1765146882181" duration="58015000" />
-      <workItem from="1766009777552" duration="81393000" />
+      <workItem from="1766009777552" duration="104511000" />
+      <workItem from="1766430880162" duration="9519000" />
+      <workItem from="1766457909979" duration="34180000" />
+      <workItem from="1766791208870" duration="48406000" />
+      <workItem from="1767151405433" duration="23463000" />
     </task>
     <servers />
   </component>

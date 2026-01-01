@@ -94,23 +94,7 @@ public class RemixUtility : ScriptableObject
 
         return phrase;
     }
-// RemixUtility.cs  (add anywhere inside the class)
-    public static void ApplyPhase(MusicalPhaseProfile profile)
-    {
-        var gm = GameFlowManager.Instance;
-        var drums = gm != null ? gm.activeDrumTrack : null;
-        if (drums == null || profile == null) return;
 
-        // Queue the phase; DrumTrack will advance at a musical boundary
-        drums.QueuedPhase = profile.phase;
-
-        // Restructure parts for the new phase (your existing remix logic)
-        drums.RestructureTracksWithRemixLogic();
-
-        // Swap the drum loop at the end of the current loop
-        var clip = MusicalPhaseLibrary.GetRandomClip(profile.phase);
-        drums.SchedulePhaseAndLoopChange(profile.phase);
-    }
 
     private int SelectNoteFromStrategy(List<int> collected, NoteSet context, int index)
     {

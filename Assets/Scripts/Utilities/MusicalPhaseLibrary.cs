@@ -51,13 +51,6 @@ public static class MusicalPhaseLibrary
         return (_profiles != null && _profiles.TryGetValue(phase, out var prof)) ? prof : null;
     }
 
-// Example public API stays the same, but now works with injected profiles:
-    public static AudioClip GetRandomClip(MusicalPhase phase)
-    {
-Debug.LogError($"Get Random Clip for phase has been deprecated");
-        var prof = Get(phase);
-        return null;
-    }
 
     public static PatternStrategy GetPatternStrategyForRole(MusicalPhase phase, MusicalRole role)
     {

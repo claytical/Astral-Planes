@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4204267129982818}
   - component: {fileID: 212503362928707232}
+  - component: {fileID: 3946104915065642209}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Collect
@@ -91,6 +92,42 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!58 &3946104915065642209
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1282962054544746}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.81
 --- !u!1 &1316711709889716
 GameObject:
   m_ObjectHideFlags: 0
@@ -130,6 +167,7 @@ Transform:
   - {fileID: 262500733761987409}
   - {fileID: 981561846700415872}
   - {fileID: 2035895287348015832}
+  - {fileID: 728897374260791938}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8711798789080338920
@@ -144,8 +182,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 546352f171f480044b3f66cb088a55a3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  movementMode: 1
   assignedInstrumentTrack: {fileID: 0}
   energySprite: {fileID: 212503362928707232}
+  burstId: 0
   ribbonMarker: {fileID: 0}
   tether: {fileID: 0}
   intendedStep: -1
@@ -154,7 +194,22 @@ MonoBehaviour:
   minAlpha: 0.25
   maxAlpha: 0.65
   pulseScale: 1.08
+  flowCoupling: 1
+  flowMaxSpeed: 6
+  flowDrag: 1.25
+  turbulenceStrength: 0.4
+  dustEscapeImpulse: 3.5
+  stallSpeed: 0.1
+  stallNudgeImpulse: 0.75
   sharedTargetSteps: 
+  minSpeed: 0.8
+  maxSpeed: 3.5
+  arriveRadius: 0.05
+  chooseNextEvery: 0.15
+  lingerLongNote: 0.25
+  lingerShortNote: 0.02
+  dustAdjacencyProbe: 0.42
+  neighborRadiusCells: 1
 --- !u!114 &8925877091113225264
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -185,6 +240,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
     type: 3}
+  preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!114 &336917936034479529
@@ -262,6 +318,74 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.15
+--- !u!1 &325708082459754982
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 728897374260791938}
+  - component: {fileID: 7127238722224517841}
+  m_Layer: 0
+  m_Name: Trigger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &728897374260791938
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 325708082459754982}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4522237307073234}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!58 &7127238722224517841
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 325708082459754982}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.12
 --- !u!1 &4064160350664904132
 GameObject:
   m_ObjectHideFlags: 0
