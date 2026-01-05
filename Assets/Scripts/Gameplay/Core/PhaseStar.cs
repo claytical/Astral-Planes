@@ -76,12 +76,43 @@ public class PhaseStar : MonoBehaviour
 // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
     private bool _awaitingCollectableClear;
+// --- Safety Bubble (spawned on poke; persists until collectables clear) ---
+    [Header("Safety Bubble (on poke)")]
+    [SerializeField] private bool enableSafetyBubble = true;
+
+    [Tooltip("Bubble radius in grid cells. Primary difficulty lever.")]
+    [SerializeField] private int safetyBubbleRadiusCells = 4;
+
+    private bool _safetyBubbleActive;
+    private Vector2Int _safetyBubbleCenterCell;
+    private MusicalPhase _safetyBubblePhase;
+
+// Registry so Vehicles can query without hard references.
+    private static readonly HashSet<PhaseStar> _activeSafetyBubbles = new HashSet<PhaseStar>();
 
     public event Action<MusicalRole, int, int> OnShardEjected;
     [SerializeField] private bool syncRotationToLoop = true;
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration;              // seconds (time authority)
     private int   _lastLoopSeen = -1;         // loop wrap detector
+    [SerializeField] private int bubbleRadiusCells = 4;
+
+    [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f);              // fill/edge tint (alpha handled by visuals)
+    [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
+
+    private bool _bubbleActive;
+    private float _bubbleRadiusWorld;
+
+// Static “global query” (simple + reliable for Vehicle)
+    private static bool  s_bubbleActive;
+    private static Vector2 s_bubbleCenter;
+    private static float s_bubbleRadiusWorld;
+
+    public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
+    {
+        if (!s_bubbleActive) return false;
+        return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
+    }
 
     private List<Transform> _petals = new();  // visuals previewRing[i].visual
     private List<float> _baseAngles = new();  // 0..90° spread
@@ -200,16 +231,101 @@ public class PhaseStar : MonoBehaviour
         ArmNext(); 
         LogState("Initialized+Armed");
     }
+    private float ComputeCellWorldSize()
+    {
+        var drums = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
+        if (!drums) return 1f;
+
+        // Distance between neighboring grid cells in world space
+        var a = drums.GridToWorldPosition(new Vector2Int(0, 0));
+        var b = drums.GridToWorldPosition(new Vector2Int(1, 0));
+        return Mathf.Max(0.0001f, Vector3.Distance(a, b));
+    }
+
+    private void ActivateSafetyBubble()
+    {
+        if (!enableSafetyBubble) return;
+
+        float cell = ComputeCellWorldSize();
+
+        // +0.5f gives the bubble a little breathing room relative to discrete cells
+        _bubbleRadiusWorld = (bubbleRadiusCells + 0.5f) * cell;
+
+        _bubbleActive = true;
+
+        s_bubbleActive = true;
+        s_bubbleCenter = transform.position;
+        s_bubbleRadiusWorld = _bubbleRadiusWorld;
+
+        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
+    }
+
+    private void DeactivateSafetyBubble()
+    {
+        _bubbleActive = false;
+
+        s_bubbleActive = false;
+        s_bubbleCenter = Vector2.zero;
+        s_bubbleRadiusWorld = 0f;
+
+        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        visuals?.HideSafetyBubble();
+    }
+
+    private void RefreshSafetyBubbleCell()
+    {
+        var drums = GameFlowManager.Instance?.activeDrumTrack;
+        if (drums == null) return;
+        _safetyBubbleCenterCell = drums.WorldToGridPosition(transform.position);
+    }
+
+    /// <summary>
+    /// True if worldPos is inside any active PhaseStar safety bubble (Chebyshev radius in grid cells).
+    /// </summary>
+    public static bool IsWorldPosInsideAnySafetyBubble(Vector2 worldPos, MusicalPhase phase)
+    {
+        var gfm   = GameFlowManager.Instance;
+        var drums = gfm != null ? gfm.activeDrumTrack : null;
+        if (drums == null) return false;
+
+        Vector2Int cell = drums.WorldToGridPosition(worldPos);
+
+        foreach (var star in _activeSafetyBubbles)
+        {
+            if (star == null) continue;
+            if (!star._safetyBubbleActive) continue;
+
+            // If you later want phase-specific bubbles, enforce it here.
+            // For now: bubble is gameplay legibility; allow it regardless.
+            Vector2Int c = star._safetyBubbleCenterCell;
+            int dx = Mathf.Abs(cell.x - c.x);
+            int dy = Mathf.Abs(cell.y - c.y);
+
+            // Chebyshev distance: square-ish bubble aligned to your grid.
+            int d = Mathf.Max(dx, dy);
+            if (d <= Mathf.Max(0, star.safetyBubbleRadiusCells))
+                return true;
+        }
+
+        return false;
+    }
+
     void Update()
     {
         if (starKeepsDustClear)
         {
-            
-
             if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
                 var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
-                gfm.dustGenerator.SetStarKeepClear(gfm.activeDrumTrack.WorldToGridPosition(transform.position), starKeepClearRadiusCells, phase);
+
+                int radiusCells = _bubbleActive ? bubbleRadiusCells : starKeepClearRadiusCells;
+
+                gfm.dustGenerator.SetStarKeepClear(
+                    gfm.activeDrumTrack.WorldToGridPosition(transform.position),
+                    radiusCells,
+                    phase
+                );
             }
         }
 
@@ -221,11 +337,12 @@ public class PhaseStar : MonoBehaviour
             if (!t) continue;
             float dps = _omega.Count > i ? _omega[i] : 0f;
             t.Rotate(Vector3.forward, dps * dt, Space.Self);
-            // diamonds repeat visually every 180°, but you can leave wrap to Unity’s euler (harmless)
+        }
+        if (_safetyBubbleActive)
+        {
+            RefreshSafetyBubbleCell();
         }
 
-        // loop wrap → switch shard exactly at the boundary
-        var drums = GameFlowManager.Instance?.activeDrumTrack;
     }
     private void SafeUnsubscribeAll()
     {
@@ -257,6 +374,7 @@ public class PhaseStar : MonoBehaviour
     } 
     public void NotifyCollectableBurstCleared()
 {
+    DeactivateSafetyBubble();
     // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
     // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
     if (_advanceStarted || _state == PhaseStarState.BridgeInProgress)
@@ -1120,9 +1238,11 @@ public void OnLoopBoundary_RearmIfNeeded()
 
     if (previewRing != null && previewRing.Count > 0)
     {
+        RefreshSafetyBubbleCell();
         EjectActivePreviewShardAndFlow(coll);
         return;
     }
+    RefreshSafetyBubbleCell();
     EjectCachedDirectiveAndFlow(coll);
     return;
 }
@@ -1319,7 +1439,7 @@ public void OnLoopBoundary_RearmIfNeeded()
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}, " +
                   $"type={_cachedDirective.minedObjectType}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
-
+        ActivateSafetyBubble();
         SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
     }
     void EjectCachedDirectiveAndFlow(Collision2D coll)
@@ -1344,6 +1464,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         bool isFinal = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
         Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
             _cachedDirective.displayColor);
+        ActivateSafetyBubble();
         SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
     }
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track)

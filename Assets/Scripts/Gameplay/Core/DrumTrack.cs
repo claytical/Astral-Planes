@@ -33,12 +33,23 @@ public class PhaseSnapshot
 public class DrumTrack : MonoBehaviour
 {
     private int _boundarySerial = 0;
+    private PlayArea _lastPlayAreaForTileCache;
+    private bool _hasLastPlayAreaForTileCache = false;
     public GameObject phaseStarPrefab;
     public MineNodePrefabRegistry nodePrefabRegistry;
     public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
     public PhasePersonalityRegistry phasePersonalityRegistry; 
     public MusicalPhase? QueuedPhase;
-    
+    [Header("UI Safe Area (Viewport)")]
+    [Range(0f, 0.5f)]
+    [SerializeField] private float uiReserveBottomViewport = 0.14f; // reserve bottom 14% for UI
+
+    [Range(0f, 0.5f)]
+    [SerializeField] private float uiReserveTopViewport = 0.00f;    // optional top reserve
+
+    [SerializeField] private float uiReserveBottomInsetWorld = 0f;  // optional fine-tune in world units
+    [SerializeField] private float uiReserveTopInsetWorld = 0f;
+
     public float drumLoopBPM = 120f;
     public float gridPadding = 0f;
     public int totalSteps = 16;
@@ -50,7 +61,11 @@ public class DrumTrack : MonoBehaviour
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
-    
+    [Header("Dust Band Mapping (Viewport Y)")]
+    [Range(0f, 1f)] [SerializeField] private float dustBandMinY = 0.00f; // bottom of screen
+    [Range(0f, 1f)] [SerializeField] private float dustBandMaxY = 0.80f; // 80% up the screen
+    [SerializeField] private float dustBandTopInsetWorld = 0f;           // optional extra inset in world units
+
     public int completedLoops { get; private set; } = 0;
     private float _loopLengthInSeconds, _phaseStartTime;
     private float _gridCheckTimer;
@@ -150,7 +165,7 @@ public class DrumTrack : MonoBehaviour
 		// Prefer orthographic projection (your game is 2D). If not orthographic, fall back to viewport corners.
 		Vector3 camPos = cam.transform.position;
 		float left, right, bottom, top;
-
+        float z = Mathf.Abs(camPos.z);
 		if (cam.orthographic)
 		{
 			float halfH = cam.orthographicSize;
@@ -164,7 +179,7 @@ public class DrumTrack : MonoBehaviour
 		else
 		{
 			// Perspective camera safety path.
-			float z = Mathf.Abs(camPos.z);
+
 			Vector3 bl = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
 			Vector3 tr = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
 			left   = bl.x;
@@ -172,7 +187,7 @@ public class DrumTrack : MonoBehaviour
 			bottom = bl.y;
 			top    = tr.y;
 		}
-
+        z = cam.orthographic ? 0f : Mathf.Abs(cam.transform.position.z);
 		// Optional padding to keep spawns away from the very edge of the screen.
 		// This is *not* UI-aware; it's a conservative safety margin.
 		if (gridPadding > 0f)
@@ -181,7 +196,38 @@ public class DrumTrack : MonoBehaviour
 			right  -= gridPadding;
 			bottom += gridPadding;
 			top    -= gridPadding;
-		}
+		} 
+// --- UI safe area clamp (viewport -> world) ---
+// We reserve a bottom viewport band for UI so the grid never overlaps it.
+// This is independent of dust visuals and does not depend on NoteVisualizer init.
+        float uiBotV = Mathf.Clamp01(uiReserveBottomViewport);
+        float uiTopV = Mathf.Clamp01(uiReserveTopViewport);
+
+ 
+
+        if (uiBotV > 0f)
+        {
+            float uiBottomWorld = cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y;
+            bottom = Mathf.Max(bottom, uiBottomWorld + Mathf.Max(0f, uiReserveBottomInsetWorld));
+        }
+
+        if (uiTopV > 0f)
+        {
+            float uiTopWorld = cam.ViewportToWorldPoint(new Vector3(0f, 1f - uiTopV, z)).y;
+            top = Mathf.Min(top, uiTopWorld - Mathf.Max(0f, uiReserveTopInsetWorld));
+        }
+        
+// Convert viewport band (minY..maxY) into world Y limits, using camera viewport conversion.
+        float vMin = Mathf.Clamp01(dustBandMinY);
+        float vMax = Mathf.Clamp01(dustBandMaxY);
+        if (vMax < vMin) { float t = vMin; vMin = vMax; vMax = t; }
+
+// Use left edge x for conversion; only Y matters.
+        Vector3 w0 = cam.ViewportToWorldPoint(new Vector3(0f, vMin, cam.nearClipPlane));
+        Vector3 w1 = cam.ViewportToWorldPoint(new Vector3(0f, vMax, cam.nearClipPlane));
+
+        bottom = Mathf.Max(bottom, Mathf.Min(w0.y, w1.y));
+        top    = Mathf.Min(top,    Mathf.Max(w0.y, w1.y) - Mathf.Max(0f, dustBandTopInsetWorld));
 
 		// Validate.
 		if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
@@ -402,6 +448,16 @@ public class DrumTrack : MonoBehaviour
         EnsureCachedRefs();
         SyncTileWithScreen();
     }
+    public void CarveTemporaryDiskFromCollectable(
+        Vector3 worldPos,
+        float radiusWorld,
+        MusicalPhase phase,
+        float holdSeconds)
+    {
+        if (_dust == null) return;
+        _dust.CarveTemporaryDiskFromCollectable(worldPos, radiusWorld, phase, holdSeconds);
+    }
+
     public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
     {
         if (isPhaseStarActive)
@@ -797,22 +853,17 @@ public class DrumTrack : MonoBehaviour
     {
         return _spawnGrid.GetRandomAvailableCell();
     }
-    public Vector3 GridToWorldPosition(Vector2Int gridPos)
+    public Vector2 GridToWorldPosition(Vector2Int cell)
     {
-        if (_gfm == null || _gfm.spawnGrid == null) return Vector3.zero;
-
-        int w = _spawnGrid.gridWidth;
-        int h = _spawnGrid.gridHeight;
-        if (w <= 0 || h <= 0) return Vector3.zero;
+        if (!TryGetPlayAreaWorld(out var area))
+            return Vector2.zero;
 
         float tile = GetCellWorldSize();
-        PlayArea area = GetPlayAreaWorld();
-
-        float x = area.left   + (gridPos.x + 0.5f) * tile;
-        float y = area.bottom + (gridPos.y + 0.5f) * tile;
-
-        return new Vector3(x, y, 0f);
+        float x = area.left   + (cell.x + 0.5f) * tile;
+        float y = area.bottom + (cell.y + 0.5f) * tile;
+        return new Vector2(x, y);
     }
+
     public float GetDustBandBottomCenterY()
     {
         float tile = GetCellWorldSize();
@@ -1009,47 +1060,67 @@ public class DrumTrack : MonoBehaviour
     }
     private float GetTileDiameterWorld()
     {
-        // Preferred: dust generator authoritative value
-        if (_dust != null && _dust.TileDiameterWorld > 0f)
+        // If the play area changes, invalidate the cache.
+        if (TryGetPlayAreaWorld(out var area))
         {
-            _cachedTileDiameterWorld = _dust.TileDiameterWorld;
-            return _dust.TileDiameterWorld;
+            if (!_hasLastPlayAreaForTileCache || !ApproximatelyEqual(area, _lastPlayAreaForTileCache))
+            {
+                _cachedTileDiameterWorld = 0f;
+                _lastPlayAreaForTileCache = area;
+                _hasLastPlayAreaForTileCache = true;
+            }
+        }
+        else
+        {
+            // If we can't compute play area, fall back to cache if available.
+            if (_cachedTileDiameterWorld > 0f)
+                return _cachedTileDiameterWorld;
         }
 
-        // Cached fallback
         if (_cachedTileDiameterWorld > 0f)
             return _cachedTileDiameterWorld;
 
-        // Compute fallback once
+        // Compute from grid-to-world mapping (now UI-safe)
         var a = GridToWorldPosition_Legacy(new Vector2Int(0, 0));
         var b = GridToWorldPosition_Legacy(new Vector2Int(1, 0));
         float d = Vector2.Distance(a, b);
+
         _cachedTileDiameterWorld = (d > 0f) ? d : 1f;
         return _cachedTileDiameterWorld;
     }
-
-    private Vector3 GridToWorldPosition_Legacy(Vector2Int gridPos)
+    public void InvalidateGridWorldCache()
     {
-        var cam = Camera.main;
-        if (!cam || _gfm == null || _spawnGrid == null || _trackController == null || _trackController.noteVisualizer == null)
-        {
-            return Vector3.zero;
-        }
-
-        float cameraDistance = -cam.transform.position.z;
-
-        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0, 0, cameraDistance));
-        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1, 1, cameraDistance));
-
-        float normalizedX = gridPos.x / (float)(_spawnGrid.gridWidth  - 1);
-        float normalizedY = gridPos.y / (float)(_spawnGrid.gridHeight - 1);
-
-        float worldX  = Mathf.Lerp(bottomLeft.x + gridPadding, topRight.x - gridPadding, normalizedX);
-        float bottomY = GetDustBandBottomCenterY();
-        float worldY  = Mathf.Lerp(bottomY + gridPadding, topRight.y - gridPadding, normalizedY);
-
-        return new Vector3(worldX, worldY, 0f);
+        _cachedTileDiameterWorld = 0f;
+        _hasLastPlayAreaForTileCache = false;
     }
+
+    private bool ApproximatelyEqual(PlayArea a, PlayArea b)
+    {
+        // Loose epsilon; avoids thrashing cache due to float jitter.
+        const float eps = 0.0005f;
+        return Mathf.Abs(a.left - b.left) < eps &&
+               Mathf.Abs(a.right - b.right) < eps &&
+               Mathf.Abs(a.bottom - b.bottom) < eps &&
+               Mathf.Abs(a.top - b.top) < eps;
+    }
+
+    private Vector2 GridToWorldPosition_Legacy(Vector2Int cell)
+    {
+        if (!TryGetPlayAreaWorld(out var area))
+            return Vector2.zero;
+
+        int w = Mathf.Max(1, GetSpawnGridWidth());
+        int h = Mathf.Max(1, GetSpawnGridHeight());
+
+        // Endpoints should land on the rect edges.
+        float nx = (w <= 1) ? 0.5f : (cell.x / (float)(w - 1));
+        float ny = (h <= 1) ? 0.5f : (cell.y / (float)(h - 1));
+
+        float x = Mathf.Lerp(area.left, area.right, nx);
+        float y = Mathf.Lerp(area.bottom, area.top, ny);
+        return new Vector2(x, y);
+    }
+
     public void SyncTileWithScreen()
     {
         if (_gfm == null || _spawnGrid == null || _dust == null)
@@ -1069,6 +1140,7 @@ public class DrumTrack : MonoBehaviour
         float tile = Mathf.Min(tileX, tileY);   // square cells; in your case tileX == tileY
 
         _dust.TileDiameterWorld = tile;
+        _cachedTileDiameterWorld = tile;
     }
     public int GetLeaderSteps()
     {

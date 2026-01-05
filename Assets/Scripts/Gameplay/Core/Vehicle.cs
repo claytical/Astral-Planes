@@ -1,10 +1,24 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
 
 public class Vehicle : MonoBehaviour
 {
+    [SerializeField] private CosmicDustGenerator debugDustGenerator;
+    [Header("Boost Carve Tuning")]
+    [SerializeField] private float boostCarveRequiredFloor01 = 0.35f;   // cap hardness threshold while boosting
+    [SerializeField] private float boostCarveDamageFloor01   = 0.35f;   // ensure low-speed boost can carve at least 1
+    public enum DustCarveMode
+    {
+        NearestResolveDisk,   // current: contact point resolves nearest occupied within radius
+        RayMarchLine,         // straight-line tunnel (recommended for “dramatic”)
+        Wedge                 // straight line plus slight widening (optional)
+    }
+
+    [SerializeField] private DustCarveMode dustCarveMode = DustCarveMode.RayMarchLine;
+
     public ShipMusicalProfile profile;
     public float capacity = 10f;
     private float _baseBurnAmount = 1f;
@@ -33,7 +47,7 @@ public class Vehicle : MonoBehaviour
     [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
     [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
     private float _lastEnergyDrainLogTime = -999f;
-
+    private GameFlowManager gfm;
     float   _lastMoveStamp;
     private Vector2 _moveInput;
 
@@ -90,7 +104,10 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float dustImpactForceVelScale = 0.02f;
     [Range(0f, 1f)]
     [SerializeField] private float dustImpactOppositionWeight = 1f;
-
+    [Header("Scale Calibration (Debug)")] 
+    [SerializeField] private bool logScaleCalibrationOnAssign = true;
+    private bool _scaleCalibrationLogged = false;
+    
     public void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
         shipProfile = p;
@@ -121,14 +138,41 @@ public class Vehicle : MonoBehaviour
         rb.linearDamping  = arcadeLinearDamping;
         rb.angularDamping = arcadeAngularDamping;
     }
-
+    private void LogScaleCalibrationOnce() { 
+        if (_scaleCalibrationLogged || !logScaleCalibrationOnAssign) return; 
+        _scaleCalibrationLogged = true;
+        gfm = GameFlowManager.Instance; 
+        var drums = drumTrack != null ? drumTrack : (gfm != null ? gfm.activeDrumTrack : null); 
+        if (drums == null) { 
+            Debug.LogWarning($"[Scale] {name}: DrumTrack not assigned yet; cannot report vehicle↔cell scale.", this); 
+            return;
+        }
+        float cell = Mathf.Max(0.0001f, drums.GetCellWorldSize());
+        
+        // Vehicle size proxy: prefer a CircleCollider2D radius; otherwise use bounds extents.
+        float r = 0.5f; 
+        var cc = GetComponent<CircleCollider2D>();
+        if (cc != null)
+            r = cc.radius * Mathf.Abs(transform.lossyScale.x);
+        else { 
+            var col = GetComponent<Collider2D>(); 
+            if (col != null) r = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y);
+        } 
+        float diameter = r * 2f; 
+        float ratio = diameter / cell; // 1.0 means vehicle ~ 1 cell wide
+        Debug.Log($"[Scale] {name}: cellWorld={cell:F3}  vehicleDiameter≈{diameter:F3}  ratio(vehicle/cell)={ratio:F2}  " + $"keepClearRadiusCells={vehicleKeepClearRadiusCells}  dustExitGrace={dustExitGraceSeconds:F2}s", this);
+    }
 void FixedUpdate()
 {
-
     if (_inDust && (Time.time - _lastDustContactTime) > dustExitGraceSeconds) { 
         ExitDustField();
     }
     if (incapacitated) return;
+// --- PhaseStar Safety Bubble: dust has no effect inside the bubble ---
+    if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+    {
+        if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
+    }
 
     float dt = Time.fixedDeltaTime;
 
@@ -136,11 +180,9 @@ void FixedUpdate()
     if (boosting) boostTimeThisLoop += dt;
 
     // --- Loop boundary check (null-safe) ---
-    var gfm   = GameFlowManager.Instance;
-    var track = gfm != null ? gfm.activeDrumTrack : null;
-    if (track != null)
+    if (drumTrack != null)
     {
-        float  loopLen = track.GetLoopLengthInSeconds();
+        float  loopLen = drumTrack.GetLoopLengthInSeconds();
         double dspNow  = AudioSettings.dspTime;
         if (dspNow - loopStartDSPTime >= loopLen)
         {
@@ -224,9 +266,15 @@ if (gfm != null && gfm.dustGenerator != null)
     bool debugPulse = _dustDebugCooldown <= 0f;
     Vector3 vehicleWorld = rb.position;
     if (debugPulse) _dustDebugCooldown = DustDebugInterval;
+    
     if (gfm.dustGenerator.TryGetDustWeatherForce(vehicleWorld, phaseNow,
             out Vector2 dustForce, out float influence01, out float drainPerSecond))
     {
+        if (PhaseStar.IsWorldPosInsideAnySafetyBubble(vehicleWorld, phaseNow))
+        {
+            if(_inDust) ExitDustField();
+        }
+
         if (debugPulse)
         {
             Debug.Log($"[DustWeather] pulse, phase={phaseNow} pos={transform.position}", this);
@@ -242,7 +290,7 @@ if (gfm != null && gfm.dustGenerator != null)
             if (drumsRef != null)
             {
                 Vector2Int cell = drumsRef.WorldToGridPosition(vehicleWorld);
-                gfm.dustGenerator.SetVehicleKeepClear(GetInstanceID(), cell, vehicleKeepClearRadiusCells, phaseNow);
+                gfm.dustGenerator.SetVehicleKeepClear(GetInstanceID(), cell, vehicleKeepClearRadiusCells, phaseNow, forceRemoveExisting:boosting, forceRemoveFadeSeconds:.2f);
             }
         }
         
@@ -269,7 +317,15 @@ if (gfm != null && gfm.dustGenerator != null)
             float impact01 = Mathf.Clamp01(fMag * vMag * dustImpactForceVelScale) * opposition01;
             float impactDrain = dustImpactDrainPerSecondMax * impact01 * influence01 * dt;
             if (impactDrain > 0f)
-                DrainEnergy(impactDrain, "DustImpact");
+                if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+                {
+                    if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
+                }
+                else
+                {
+                    DrainEnergy(impactDrain, "DustImpact");
+                }
+
         }
         
         // SFX feedback (throttled)
@@ -281,17 +337,12 @@ if (gfm != null && gfm.dustGenerator != null)
             {
                 bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
                 var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
-                CollectionSoundManager.Instance?.PlayDustInteraction(ctrl, influence01, behavior);
+                InstrumentTrack instrument = ctrl.FindTrackByRole(MusicalRole.Harmony);
+                CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
                 _dustSfxCooldown = DustSfxInterval;
             }
         }
 
-        // Boost carving still erodes dust (temporary), preserving your "boost to carve" rule.
-        if (boosting)
-        {
-            float appetite = Mathf.Lerp(0.7f, 1.2f, influence01);
-            gfm.dustGenerator.ErodeDustDiskFromVehicle(transform.position, appetite);
-        }
     }
 }
 // Stats + audio
@@ -419,6 +470,15 @@ public void DrainEnergy(float amount, string source = "Unknown")
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
+            gfm = GameFlowManager.Instance;
+            var col = GetComponent<Collider2D>();
+            Debug.Log(
+                $"[VEHICLE:INIT] '{name}' layer={gameObject.layer} " +
+                $"col={(col ? col.GetType().Name : "NULL")} col.isTrigger={(col ? col.isTrigger : false)} " +
+                $"rb={(rb ? rb.bodyType.ToString() : "NULL")}",
+                this
+            );
+       
             baseSprite = GetComponent<SpriteRenderer>();
             profileColor = baseSprite.color;
             shipRenderer = baseSprite;
@@ -489,6 +549,7 @@ public void DrainEnergy(float amount, string source = "Unknown")
     public void SetDrumTrack(DrumTrack drums)
         {
             drumTrack = drums;
+            LogScaleCalibrationOnce();
         }
     
 
@@ -561,9 +622,11 @@ public void DrainEnergy(float amount, string source = "Unknown")
     
     public void TurnOnBoost(float triggerValue)
     {
-        if (energyLevel > 0 && !boosting)
-        {
+        
+        if (energyLevel > 0 && !boosting)        {
             boosting = true;
+            Debug.Log($"[VEHICLE] Energy available to boost");
+
             if (audioManager != null && thrustClip != null)
                 audioManager.PlayLoopingSound(thrustClip, .5f);
             Fly();
@@ -656,31 +719,240 @@ public void DrainEnergy(float amount, string source = "Unknown")
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
             }
         }
+
     void OnCollisionEnter2D(Collision2D coll)
+    {
+        Debug.Log($"[VEHICLE:COLLISION] hit '{coll.collider.name}' layer={coll.collider.gameObject.layer}", this);
+        var node = coll.gameObject.GetComponent<MineNode>();
+
+        // 🎯 Apply impact damage
+        int damage = GetForceAsDamage();
+        if (node != null)
         {
-            var node = coll.gameObject.GetComponent<MineNode>();
-
-            // 🎯 Apply impact damage
-            int damage = GetForceAsDamage();
-            if (node != null)
+            TriggerFlickerAndPulse(1.2f, node.coreSprite.color, false);
+            // 💥 Apply knockback
+            Rigidbody2D nodeRb = node.GetComponent<Rigidbody2D>();
+            if (nodeRb != null)
             {
-                TriggerFlickerAndPulse(1.2f, node.coreSprite.color, false);
-                // 💥 Apply knockback
-                Rigidbody2D nodeRb = node.GetComponent<Rigidbody2D>();
-                if (nodeRb != null)
-                {
-                    Vector2 forceDirection = rb.linearVelocity.normalized;
-                    float knockbackForce = rb.mass * rb.linearVelocity.magnitude * 0.5f; // Tunable
-                    nodeRb.AddForce(forceDirection * knockbackForce, ForceMode2D.Impulse);
-                }
-            }
-
-            if (coll.gameObject.tag == "Bump")
-            {
-//                CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Boundary);
-                TriggerThud(coll.contacts[0].point);
+                Vector2 forceDirection = rb.linearVelocity.normalized;
+                float knockbackForce = rb.mass * rb.linearVelocity.magnitude * 0.5f; // Tunable
+                nodeRb.AddForce(forceDirection * knockbackForce, ForceMode2D.Impulse);
             }
         }
+
+        if (coll.gameObject.tag == "Bump")
+        {
+            TriggerThud(coll.contacts[0].point);
+        }
+
+        // ---- Boost carving (dust maze) ----
+        // ---- Boost carving (dust maze) ----
+        if (!boosting) return;
+        if (gfm == null || gfm.dustGenerator == null) return;
+
+        if (!gfm.dustGenerator.IsDustTerrainCollider(coll.collider)) return;
+
+        // Contact point
+        Vector2 contact = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
+
+        // Always carve at the contact point (resolve nearest occupied dust cell)
+        Debug.Log($"[VEHICLE:COLLISION] contact: {contact} Carving one");
+        gfm.dustGenerator.TryCarveDustAtWorldPoint(contact, resolveRadiusCells: 2, fadeSeconds: 0.20f);
+
+
+// Forward carving budget based on speed (your existing rule)
+        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+        const float lowSpeed = 2.0f;
+        const float highSpeed = 7.0f;
+
+        int budget;
+        if (speed <= lowSpeed) budget = 1;
+        else if (speed >= highSpeed) budget = 10;
+        else budget = 2 + Mathf.FloorToInt((speed - lowSpeed) / (highSpeed - lowSpeed) * 2f); // 2..3
+
+        Vector2 v = rb != null ? rb.linearVelocity : Vector2.zero;
+        Debug.Log($"[VEHICLE:COLLISION] velocity square magnitude: {v.sqrMagnitude}");
+        if (v.sqrMagnitude < 0.0001f) return;
+
+        float cellWorld = Mathf.Max(0.01f, drumTrack.GetCellWorldSize());
+
+        switch (dustCarveMode)
+        {
+            case DustCarveMode.NearestResolveDisk:
+// Carve additional “ahead” bites in world space (more robust with composite collision)
+                for (int i = 1; i < budget; i++)
+                {
+                    Vector2 probe = contact + v.normalized * (cellWorld * 0.95f * i);
+                    gfm.dustGenerator.TryCarveDustAtWorldPoint(probe, resolveRadiusCells: 1, fadeSeconds: 0.20f);
+                }
+                break;
+
+            case DustCarveMode.RayMarchLine:
+                Debug.Log($"[VEHICLE:COLLISION] raymarch line budget={budget}");
+                CarveForward_RayMarch(contact, v, budget, cellWorld);
+                break;
+
+            case DustCarveMode.Wedge:
+                CarveForward_Wedge(contact, v, budget, cellWorld);
+                break;
+        }
+
+
+    }
+    
+    private void CarveForward_RayMarch(Vector2 contact, Vector2 vel, int budget, float cellWorld)
+    {
+        if (vel.sqrMagnitude < 0.0001f) return;
+
+        var gen = gfm.dustGenerator;
+        var dt  = drumTrack; // or gfm.activeDrumTrack if you prefer
+
+        Vector2 dir = vel.normalized;
+
+        // March increment: smaller than a cell reduces aliasing and keeps it straight.
+        float step = cellWorld * 0.75f;
+
+        // Track last cell to avoid re-carving same cell on adjacent samples.
+        Vector2Int lastCell = new Vector2Int(int.MinValue, int.MinValue);
+
+        for (int i = 1; i <= budget; i++)
+        {
+            Vector2 p = contact + dir * (step * i);
+            Vector2Int cell = dt.WorldToGridPosition(p);
+
+            if (cell == lastCell) continue;
+            lastCell = cell;
+
+            // IMPORTANT: no neighbor resolution here.
+            if (gen.TryGetDustAt(cell, out _))
+                gen.CarveDustAt(cell, 0.20f);
+        }
+    }
+    private void CarveForward_Wedge(Vector2 contact, Vector2 vel, int budget, float cellWorld)
+    {
+        if (vel.sqrMagnitude < 0.0001f) return;
+
+        var gen = gfm.dustGenerator;
+        var dt  = drumTrack;
+
+        Vector2 dir  = vel.normalized;
+        Vector2 side = new Vector2(-dir.y, dir.x);
+
+        float step = cellWorld * 0.75f;
+        float half = cellWorld * 0.45f; // small tube radius
+
+        Vector2Int lastC = new Vector2Int(int.MinValue, int.MinValue);
+        Vector2Int lastL = lastC;
+        Vector2Int lastR = lastC;
+
+        for (int i = 1; i <= budget; i++)
+        {
+            Vector2 pC = contact + dir * (step * i);
+            Vector2 pL = pC + side * half;
+            Vector2 pR = pC - side * half;
+
+            CarveCellOnce(dt.WorldToGridPosition(pC), ref lastC);
+            CarveCellOnce(dt.WorldToGridPosition(pL), ref lastL);
+            CarveCellOnce(dt.WorldToGridPosition(pR), ref lastR);
+        }
+
+        void CarveCellOnce(Vector2Int cell, ref Vector2Int last)
+        {
+            if (cell == last) return;
+            last = cell;
+            if (gen.TryGetDustAt(cell, out _))
+                gen.CarveDustAt(cell, 0.20f);
+        }
+    }
+
+  /*
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        if (!boosting) return;
+        
+
+        if (drumTrack == null) return;
+
+        var col = collision.collider;
+        if (col == null) return;
+        if (!gfm.dustGenerator.IsDustTerrainCollider(col)) return;
+
+        // Contact point
+        Vector2 p = (collision.contactCount > 0)
+            ? collision.GetContact(0).point
+            : (Vector2)transform.position;
+
+        // Base cell
+        Vector2Int baseCell = drumTrack.WorldToGridPosition(p);
+
+        // Forward-biased cell(s) based on velocity
+        Vector2 vel = rb != null ? rb.linearVelocity : Vector2.zero;
+        Vector2Int forwardDelta = Vector2Int.zero;
+        if (vel.sqrMagnitude > 0.0001f)
+        {
+            float cellWorld = Mathf.Max(0.01f, drumTrack.GetCellWorldSize());
+            Vector2 probe = p + vel.normalized * (cellWorld * 0.95f);
+            Vector2Int probeCell = drumTrack.WorldToGridPosition(probe);
+            forwardDelta = probeCell - baseCell;
+        }
+
+        // Boost strength -> hardness threshold gating should occur before carve.
+        // (You said boost strength affects hardness threshold.)
+        float boostDamage01 = Mathf.Clamp01(GetForceAsDamage() / 120f);
+
+        // Carve contacted cell + up to 2 forward cells (if delta valid).
+        TryCarveCell(gfm.dustGenerator, baseCell, boostDamage01, fadeSeconds: 0.20f);
+        if (forwardDelta != Vector2Int.zero)
+        {
+            TryCarveCell(gfm.dustGenerator, baseCell + forwardDelta, boostDamage01, 0.20f);
+            TryCarveCell(gfm.dustGenerator, baseCell + forwardDelta * 2, boostDamage01, 0.20f);
+        }
+    }
+*/
+    private void CarveIfBeatsHardness(Vector2Int gp, float boostDamage01)
+    {
+        Debug.Log($"[VEHICLE:DUST] Contact {gp} boost01={boostDamage01}", this);
+
+        if (gfm == null || gfm.dustGenerator == null)
+        {
+            Debug.LogError("[VEHICLE:DUST] gfm/dustGenerator null", this);
+            return;
+        }
+
+        if (!gfm.dustGenerator.TryGetDustAt(gp, out var dust) || dust == null)
+        {
+            Debug.Log($"[VEHICLE:DUST] No dust at {gp}", this);
+            return;
+        }
+
+        float required = Mathf.Lerp(0.25f, 0.75f, dust.hardness01);
+        required = Mathf.Min(required, boostCarveRequiredFloor01);
+
+        float effectiveBoost = Mathf.Max(boostDamage01, boostCarveDamageFloor01);
+
+        Debug.Log($"[VEHICLE:DUST] effectiveBoost={effectiveBoost:F3} required={required:F3} hardness={dust.hardness01:F3}", this);
+
+        if (effectiveBoost < required) return;
+
+        Debug.Log($"[VEHICLE:DUST] Carving {gp}", this);
+        gfm.dustGenerator.CarveDustAt(gp, fadeSeconds: 0.20f);
+    }
+
+  
+    private void TryCarveCell(CosmicDustGenerator gen, Vector2Int cell, float boostDamage01, float fadeSeconds)
+    {
+        if (!gen.TryGetDustAt(cell, out var dust) || dust == null) return;
+
+        float required = Mathf.Lerp(0.25f, 0.75f, dust.hardness01);
+        required = Mathf.Min(required, boostCarveRequiredFloor01);
+
+        float effectiveBoost = Mathf.Max(boostDamage01, boostCarveDamageFloor01);
+
+        if (effectiveBoost < required) return;
+
+        gen.CarveDustAt(cell, fadeSeconds);
+    }
+
     private void TriggerThud(Vector2 collisionPoint)
         {
             if (baseSprite == null || isFlickering) return;

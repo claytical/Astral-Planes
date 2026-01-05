@@ -403,8 +403,8 @@ private void FixedUpdate()
 
             else {
                 // Utility payload (remix ring etc.) — use a generic pickup cue
-                Debug.Log($"Playing default sound");
-                CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
+                Debug.Log($"not Playing default sound");
+//                CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
             }          
             if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
             {

@@ -13,17 +13,24 @@ public class Collectable : MonoBehaviour
     public float dustCollisionStayForce = 2.25f;
     public float dustEscapeCooldownSeconds = 0.35f;
     private float _dustEscapeCooldown;
-
+    private bool _hasDesiredGridTarget; 
     // Desired SpawnGrid target (Option A): used by DebrisRoutine to bias motion within the SpawnGrid.
     private Vector2Int _desiredGridTarget;
-    private bool _hasDesiredGridTarget;
+// ---- Dust pocket (collectable visibility) ----
+    [Header("Dust Pocket (Visibility)")]
+    [SerializeField] private bool keepDustPocketOpen = true;
 
-    public void SetDesiredGridTarget(Vector2Int targetCell)
-    {
-        _desiredGridTarget = targetCell;
-        _hasDesiredGridTarget = true;
-    }
- 
+// World radius of the pocket around the collectable (tune per phase later if desired)
+    [SerializeField] private float dustPocketRadiusWorld = 0.55f;
+
+// How often we refresh the pocket hold (seconds)
+    [SerializeField] private float dustPocketTickSeconds = 0.15f;
+
+// How long each refresh holds regrowth back (seconds)
+// (Must be >= dustPocketTickSeconds to be effective.)
+    [SerializeField] private float dustPocketHoldSeconds = 0.45f;
+
+    private Coroutine _dustPocketRoutine;
     private int amount = 1;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
@@ -73,8 +80,6 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float dustAdjacencyProbe = 0.42f; // radius used to detect nearby dust
     [SerializeField] private int   neighborRadiusCells = 1;    // how far from current cell to consider neighbors (4-neighbors)
     private Rigidbody2D _rb;
-    private Vector3 _targetWorld;     // current node center to walk to
-    private bool _hasTarget;
     private float _speed;
     private System.Random _rng;       // deterministic per-track/per-note
 
@@ -82,6 +87,80 @@ public class Collectable : MonoBehaviour
     {
         if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null && occ != self) return true;
         return false;
+    }
+    private void StartDustPocket()
+    {
+        if (!keepDustPocketOpen) return;
+        if (_dustPocketRoutine != null) StopCoroutine(_dustPocketRoutine);
+        _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
+    }
+
+    private void StopDustPocket()
+    {
+        if (_dustPocketRoutine != null)
+        {
+            StopCoroutine(_dustPocketRoutine);
+            _dustPocketRoutine = null;
+        }
+    }
+    public void SetDesiredGridTarget(Vector2Int gridPos) {
+        _desiredGridTarget = gridPos; 
+        _hasDesiredGridTarget = true;
+    }
+    private bool IsInsideDustStable(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen)
+    {
+        if (dt == null || dustGen == null) return IsPositionInsideDust(worldPos); // fallback if you must
+        Vector2Int gp = dt.WorldToGridPosition(worldPos);
+        return dustGen.HasDustAt(gp);
+    }
+
+
+    private void StartDustPocketRoutineIfNeeded()
+    {
+        if (!keepDustPocketOpen) return;
+        if (_dustPocketRoutine != null) return;
+        _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
+    }
+
+    private void StopDustPocketRoutineIfRunning()
+    {
+        if (_dustPocketRoutine == null) return;
+        StopCoroutine(_dustPocketRoutine);
+        _dustPocketRoutine = null;
+    }
+
+    private IEnumerator DustPocketRoutine()
+    {
+        // Uses DrumTrack as the level authority.
+        while (true)
+        {
+            yield return new WaitForSeconds(Mathf.Max(0.02f, dustPocketTickSeconds));
+
+            if (!keepDustPocketOpen) continue;
+            if (assignedInstrumentTrack == null) continue;
+            var dt = assignedInstrumentTrack.drumTrack;
+            if (dt == null) continue;
+
+            // Get dust generator through DrumTrack if you expose it, otherwise GameFlowManager.
+            // Prefer DrumTrack authority if you have it.
+            var gfm = GameFlowManager.Instance;
+            var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+            if (dustGen == null) continue;
+
+            Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
+
+            if (!IsInsideDustStable(cur, dt, dustGen))
+                continue;
+
+            // Hold seconds must be >= tick to be effective.
+            float hold = Mathf.Max(dustPocketTickSeconds, dustPocketHoldSeconds);
+
+            MusicalPhase phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
+                ? gfm.phaseTransitionManager.currentPhase
+                : MusicalPhase.Establish;
+
+            dustGen.CarveTemporaryDiskFromCollectable(cur, dustPocketRadiusWorld, phaseNow, hold);
+        }
     }
 
     static bool IsCellReservedByOther(Vector2Int cell, Collectable self)
@@ -233,218 +312,73 @@ public class Collectable : MonoBehaviour
         yield return new Vector2Int(g.x, g.y + 1);
         yield return new Vector2Int(g.x, g.y - 1);
     }
-
- bool TryPickNextGridNode(out Vector3 worldCenter)
+    
+private IEnumerator MovementRoutine()
 {
-    worldCenter = transform.position;
-    var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
-    if (dt == null) return false;
-
-    // If we’re replanning, discard any previous reservation.
-    ClearReservation();
-
-    Vector2Int here = dt.WorldToGridPosition(transform.position);
-
-    // Collect candidate CELLS (not world positions) so we can enforce occupancy.
-    var candidateCells = new List<Vector2Int>(8);
-    foreach (var n in FourNeighbors(here))
-    {
-        // Mode A: never move into an occupied/reserved cell
-        if (!IsCellFree(n)) continue; // your instance helper
-
-        Vector3 c = dt.GridToWorldPosition(n);
-        if (IsPositionInsideDust(c)) continue;
-        if (!IsAdjacentToDust(c)) continue;
-        candidateCells.Add(n);
-    }
-
-    // Fallback: any 4-neighbor that isn’t inside dust (still respecting IsCellFree)
-    if (candidateCells.Count == 0)
-    {
-        foreach (var n in FourNeighbors(here))
-        {
-            if (!IsCellFree(n)) continue;
-
-            Vector3 c = dt.GridToWorldPosition(n);
-            if (!IsPositionInsideDust(c))
-                candidateCells.Add(n);
-        }
-    }
-
-    if (candidateCells.Count == 0) return false;
-
-    _rng ??= new System.Random(StableSeed());
-
-    // Score and select best, but only accept if we can reserve it.
-    Vector3 pos = transform.position;
-
-    // Sort candidates by score descending, then attempt to reserve in that order.
-    candidateCells.Sort((a, b) =>
-    {
-        float da = Vector3.SqrMagnitude(dt.GridToWorldPosition(a) - pos);
-        float db = Vector3.SqrMagnitude(dt.GridToWorldPosition(b) - pos);
-        // Add stable-ish jitter
-        da += (float)_rng.NextDouble() * 0.2f;
-        db += (float)_rng.NextDouble() * 0.2f;
-        return db.CompareTo(da);
-    });
-
-    for (int i = 0; i < candidateCells.Count; i++)
-    {
-        var cell = candidateCells[i];
-        if (!TryReserveCell(cell)) continue; // contention-safe
-
-        worldCenter = dt.GridToWorldPosition(cell);
-        return true;
-    }
-
-    return false;
-}
-
-    private IEnumerator MovementRoutine()
-{
-    // NOTE: This routine is intentionally "grid-intent + weather" rather than "rush to ribbon".
-    // - If a desired SpawnGrid target is set (from InstrumentTrack), we seek that cell center.
-    // - Once we reach it (within arriveRadius), we stop seeking and let weather/flow dominate.
-    // - We avoid jitter by snapping when a step would overshoot, and by latching arrival.
-
-    var gfm = GameFlowManager.Instance;
-    var dt  = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
     if (!_rb && !TryGetComponent(out _rb)) yield break;
 
     _speed = ComputeMoveSpeed();
     float linger = ComputeLingerSeconds();
+    // Weather is now the primary (and only) driver.
+    const float FLOW_STEP_SCALE = 1.0f;   // tune
+    const float TURB_STEP_SCALE = 0.35f;  // tune
 
-    // Initial target:
-    if (_hasDesiredGridTarget && dt != null)
-    {
-        _targetWorld = dt.GridToWorldPosition(_desiredGridTarget);
-        _hasTarget = true;
-    }
-    else
-    {
-        _hasTarget = TryPickNextGridNode(out _targetWorld);
-    }
+    // Optional: trapped drift damping so notes don't "skate through dust"
+    const float TRAPPED_DRIFT_MUL = 0.35f; // could be a serialized field if desired
 
-    float nextChooseAt = 0f;
-
-    // Tiny weather coupling (keeps motion feeling "in the event" without overpowering the chase).
-    const float FLOW_STEP_SCALE = 0.22f;      // how much flow influences movement step
-    const float TURB_STEP_SCALE = 0.12f;      // low-frequency wobble
-    const float ARRIVE_LATCH_SECONDS = 0.10f; // prevents bounce by holding "arrived" briefly
-
-    // Stable turbulence seed
     _rng ??= new System.Random(StableSeed());
     float seedA = (float)_rng.NextDouble() * 1000f;
     float seedB = (float)_rng.NextDouble() * 1000f;
 
-    float arrivedLatchUntil = 0f;
-
     while (true)
     {
         yield return new WaitForFixedUpdate();
-
-            if (_dustEscapeCooldown > 0f) _dustEscapeCooldown -= Time.fixedDeltaTime;
-
         if (_rb == null) continue;
 
-        var gfm2 = GameFlowManager.Instance;
-        var dustGen = gfm2 != null ? gfm2.dustGenerator : null;
-        var dt2 = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
+        var gfm = GameFlowManager.Instance;
+        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+        var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
 
         Vector2 cur = _rb.position;
 
-        // If we are inside dust, shove toward open space aggressively.
-        // This prevents collectables from "drifting across dust" and supports the labyrinth readability.
-        if (IsPositionInsideDust(cur))
-        {
-            // Probe 8 directions and pick the first clear direction; fall back to the "least bad".
-            Vector2[] dirs = {
-                Vector2.up, Vector2.down, Vector2.left, Vector2.right,
-                (Vector2.up + Vector2.left).normalized,
-                (Vector2.up + Vector2.right).normalized,
-                (Vector2.down + Vector2.left).normalized,
-                (Vector2.down + Vector2.right).normalized
-            };
+        bool insideDust = false;
+        if (dustGen != null && dt != null)
+            insideDust = IsInsideDustStable(cur, dt, dustGen);
+        else
+            insideDust = IsPositionInsideDust(cur); // fallback
 
-            Vector2 best = Vector2.up;
-            float bestScore = float.NegativeInfinity;
-            float probe = Mathf.Max(0.12f, dustAdjacencyProbe);
-
-            for (int i = 0; i < dirs.Length; i++)
-            {
-                Vector2 p = cur + dirs[i] * probe;
-                bool inside = IsPositionInsideDust(p);
-                float score = inside ? -1f : 1f;
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    best = dirs[i];
-                    if (!inside) break; // early out: found open space
+        Vector2 step = Vector2.zero; 
+        // ------------------------------------------------------------
+        // OPTION A: "grid-intent + weather"
+        // - If a desired SpawnGrid target is set (from the spawner/track), seek that cell center.
+        // - Once we reach it (within arriveRadius), stop seeking and let weather dominate.
+        // ------------------------------------------------------------
+        if (_hasDesiredGridTarget && !reachedDestination && dt != null) {
+            Vector3 tgtW3 = dt.GridToWorldPosition(_desiredGridTarget); 
+            Vector2 tgt   = (Vector2)tgtW3;
+            Vector2 to = (tgt - cur);
+            float dist = to.magnitude;
+            if (dist <= arriveRadius) {
+                reachedDestination = true; 
+                // brief linger gives "arrival" a moment of stability
+                if (linger > 0f) { 
+                    yield return new WaitForSeconds(linger);
                 }
+            } else { 
+                Vector2 dir = to / Mathf.Max(0.0001f, dist);
+                float maxStep0 = _speed * Time.fixedDeltaTime; 
+                Vector2 seek  = dir * maxStep0;
+                // Avoid overshoot jitter: clamp to exact target when we'd cross it.
+                if (seek.sqrMagnitude > to.sqrMagnitude) 
+                    seek = to;
+                step += seek;
             }
-
-            // Impulse-like "pop" out of dust.
-            // Gate this so we do not jitter back/forth at the dust edge.
-            if (_dustEscapeCooldown <= 0f)
-            {
-                _rb.MovePosition(cur + best * Mathf.Max(0.10f, _speed * Time.fixedDeltaTime));
-                _dustEscapeCooldown = dustEscapeCooldownSeconds;
-            }
-            _hasTarget = false;
-            arrivedLatchUntil = Time.time + ARRIVE_LATCH_SECONDS;
-            continue;
         }
-
-        // Update desired target world position from SpawnGrid target (if provided).
-        if (_hasDesiredGridTarget && dt2 != null)
-        {
-            _targetWorld = dt2.GridToWorldPosition(_desiredGridTarget);
-            _hasTarget = true;
-        }
-        else if (!_hasTarget)
-        {
-            if (Time.time < arrivedLatchUntil) continue;
-
-            // Reacquire wandering target when not seeking.
-            if (!TryPickNextGridNode(out _targetWorld))
-            {
-                continue;
-            }
-            _hasTarget = true;
-        }
-
-        Vector2 delta = (Vector2)(_targetWorld - (Vector3)cur);
-        float dist = delta.magnitude;
-
-        // Arrival handling: snap and (if desired-target) release intent so weather can take over.
-        if (dist <= Mathf.Max(0.0001f, arriveRadius))
-        {
-            _rb.MovePosition((Vector2)_targetWorld);
-
-            if (_hasDesiredGridTarget)
-            {
-                // We reached the desired SpawnGrid cell. Stop "seeking" to avoid bopping.
-                _hasDesiredGridTarget = false;
-            }
-
-            _hasTarget = false;
-            arrivedLatchUntil = Time.time + Mathf.Max(ARRIVE_LATCH_SECONDS, linger);
-            continue;
-        }
-
-        // Compute baseline step toward target.
-        Vector2 stepDir = delta / Mathf.Max(0.0001f, dist);
-        Vector2 step = stepDir * (_speed * Time.fixedDeltaTime);
-
-        // Weather influence: flow + coherent turbulence.
         if (dustGen != null)
         {
             Vector2 flow = dustGen.SampleFlowAtWorld((Vector3)cur);
             if (flow.sqrMagnitude > 0.0001f)
-            {
                 step += flow.normalized * (FLOW_STEP_SCALE * _speed * Time.fixedDeltaTime);
-            }
         }
 
         float t = Time.time;
@@ -452,45 +386,19 @@ public class Collectable : MonoBehaviour
         float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
         Vector2 turb = new Vector2(nx, ny);
         if (turb.sqrMagnitude > 0.0001f)
-        {
             step += turb.normalized * (TURB_STEP_SCALE * _speed * Time.fixedDeltaTime);
-        }
 
-        // Overshoot protection: if this step would pass the target, snap to target.
-        if (step.magnitude >= dist)
-        {
-            _rb.MovePosition((Vector2)_targetWorld);
+        if (insideDust)
+            step *= TRAPPED_DRIFT_MUL;
 
-            if (_hasDesiredGridTarget)
-            {
-                _hasDesiredGridTarget = false;
-            }
-
-            _hasTarget = false;
-            arrivedLatchUntil = Time.time + Mathf.Max(ARRIVE_LATCH_SECONDS, linger);
-            continue;
-        }
+        float maxStep = _speed * Time.fixedDeltaTime;
+        if (step.sqrMagnitude > maxStep * maxStep)
+            step = step.normalized * maxStep;
 
         _rb.MovePosition(cur + step);
-
-        // If we are seeking a desired cell, do NOT mid-course hop (that is the source of "jerk between 2 cells").
-        if (_hasDesiredGridTarget) continue;
-
-        // Periodically re-evaluate neighbors to keep motion lively when wandering.
-        if (Time.time >= nextChooseAt)
-        {
-            nextChooseAt = Time.time + chooseNextEvery;
-
-            float d01 = Duration01();
-            bool allowMidcourse = _rng.NextDouble() < Mathf.Lerp(0.35f, 0.05f, d01); // short notes more midcourse changes
-            if (allowMidcourse && TryPickNextGridNode(out var mid))
-            {
-                _targetWorld = mid;
-                _hasTarget = true;
-            }
-        }
     }
 }
+
     public int GetNote() => assignedNote;
     public bool IsDark { get; private set; } = false;
     
@@ -531,6 +439,8 @@ public class Collectable : MonoBehaviour
         if (_rb == null) TryGetComponent(out _rb);
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
+        StartDustPocket();
+
         // --- Occupancy initialization (Mode A: never overlap another collectable) ---
         ClearReservation();
 
@@ -712,19 +622,23 @@ public class Collectable : MonoBehaviour
     {
         _handled = false;
         _destroyNotified = false;
+        if (isInitialized) StartDustPocketRoutineIfNeeded();
     }
 
     private void OnDestroy()
     {
         ClearReservation();
         UnregisterOccupant();
+        StopDustPocket();
         NotifyDestroyedOnce();
     }
 
     private void OnDisable()
     {
         ClearReservation();
+        StopDustPocketRoutineIfRunning();
         UnregisterOccupant();
+        StopDustPocket();
         NotifyDestroyedOnce();
     } // pooling-safe
     

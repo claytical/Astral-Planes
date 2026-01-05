@@ -114,6 +114,7 @@ private IEnumerator LaunchWhenReady()
         plane.playerStats   = _playerStats;
         plane.playerStatsUI = _ui;
         plane.SyncEnergyUI();
+        plane.SetDrumTrack(drums);
 
         var sr = plane.GetComponent<SpriteRenderer>();
         if (sr) sr.color = _color;
@@ -222,6 +223,8 @@ private IEnumerator LaunchWhenReady()
         float v = value.Get<float>();
         if (v > 0) plane?.TurnOnBoost(v);
         else plane?.TurnOffBoost();
+        Debug.Log($"[VEHICLE] Thrusting stopped at {v}");
+
     }
     public void OnMove(InputValue value)
     { 
