@@ -28,6 +28,12 @@ public class ShipMusicalProfile : ScriptableObject
     [Header("Environment Bias")]
     [Range(0.5f,1f)] public float envScaleFloor = 0.60f; // dust can't slow below this
 
+    [Header("Dust Carving (Boost)")]
+    [Tooltip("Multiplier applied to CosmicDustGenerator.vehicleErodeRadius when boosting. 1 = default.")]
+    [Range(0.25f, 3f)] public float carveRadiusMul = 1.0f;
+    [Tooltip("Multiplier applied to CosmicDustGenerator.vehicleErodePerTick budget when boosting. 1 = default.")]
+    [Range(0.25f, 5f)] public float carvePowerMul = 1.0f;
+
     [Header("Physics")]
     public float mass = 1.5f;
 

@@ -39,6 +39,10 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float coastBrakeForce   = 6f;   // N per (m/s). F = -k*v (independent of mass)
     [SerializeField] private float stopSpeed         = 0.05f; // snap-to-rest threshold (m/s)
     [SerializeField] private float stopAngularSpeed  = 5f;   // deg/s
+    [SerializeField] private float carveTickHz = 20f; // 20 Hz is plenty
+    private float _nextCarveTime;
+    private Collider2D _lastDustCollider;
+    private Vector2 _lastDustContact;
 
 // Single environment scalar (0..1], replaces envSpeedScale/envAccelScale in movement
     [SerializeField] private float envScale = 1f;
@@ -718,7 +722,32 @@ public void DrainEnergy(float amount, string source = "Unknown")
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
             }
         }
+    private void DoBoostCarve(Vector2 contact)
+    {
+        var gen = gfm.dustGenerator;
+        if (gen == null) return;
 
+        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+
+        // Appetite is “how engaged” the carve is.
+        // If you want accel/force to matter, map it here later.
+        float appetite = Mathf.InverseLerp(1.5f, 8.0f, speed); // 0..1
+        appetite = Mathf.Clamp01(appetite);
+
+        // Ship identity knobs (you’ll add these to ShipMusicalProfile)
+        float radiusMul = shipProfile != null ? shipProfile.carveRadiusMul : 1f;
+        float powerMul  = shipProfile != null ? shipProfile.carvePowerMul  : 1f;
+
+        gen.ErodeDustDiskFromVehicle(contact, appetite, radiusMul, powerMul);
+    }
+    
+    void OnCollisionExit2D(Collision2D coll)
+    {
+        if (coll.collider == _lastDustCollider)
+        {
+            _lastDustCollider = null;
+        }
+    }
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"[VEHICLE:COLLISION] hit '{coll.collider.name}' layer={coll.collider.gameObject.layer}", this);
@@ -745,7 +774,6 @@ public void DrainEnergy(float amount, string source = "Unknown")
         }
 
         // ---- Boost carving (dust maze) ----
-        // ---- Boost carving (dust maze) ----
         if (!boosting) return;
         if (gfm == null || gfm.dustGenerator == null) return;
 
@@ -754,9 +782,7 @@ public void DrainEnergy(float amount, string source = "Unknown")
         // Contact point
         Vector2 contact = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
 
-        // Always carve at the contact point (resolve nearest occupied dust cell)
-        Debug.Log($"[VEHICLE:COLLISION] contact: {contact} Carving one");
-        gfm.dustGenerator.TryCarveDustAtWorldPoint(contact, resolveRadiusCells: 2, fadeSeconds: 0.20f);
+        DoBoostCarve(contact);
 
 
 // Forward carving budget based on speed (your existing rule)
@@ -795,7 +821,11 @@ public void DrainEnergy(float amount, string source = "Unknown")
                 CarveForward_Wedge(contact, v, budget, cellWorld);
                 break;
         }
-
+        if (boosting && gfm != null && gfm.dustGenerator != null && gfm.dustGenerator.IsDustTerrainCollider(coll.collider))
+        {
+            _lastDustCollider = coll.collider;
+            _lastDustContact  = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
+        }
 
     }
     
@@ -862,6 +892,21 @@ public void DrainEnergy(float amount, string source = "Unknown")
             if (gen.TryGetDustAt(cell, out _))
                 gen.CarveDustAt(cell, 0.20f);
         }
+    }
+    void OnCollisionStay2D(Collision2D coll)
+    {
+        if (!boosting) return;
+        if (gfm == null || gfm.dustGenerator == null) return;
+        if (!gfm.dustGenerator.IsDustTerrainCollider(coll.collider)) return;
+
+        _lastDustCollider = coll.collider;
+        _lastDustContact  = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
+
+        // Rate-limit carving so it’s stable and doesn’t explode CPU
+        if (Time.time < _nextCarveTime) return;
+        _nextCarveTime = Time.time + (1f / Mathf.Max(1f, carveTickHz));
+
+        DoBoostCarve(_lastDustContact);
     }
 
   /*

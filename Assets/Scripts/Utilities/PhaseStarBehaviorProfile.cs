@@ -54,7 +54,19 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 
     [Tooltip("If true (Dark Star), dust grows/lingers rather than fades.")]
     public bool feedsDust;
-    [Range(0.1f,2f)] public float dustRegrowDelayMul = 1f; // >1 = slower regrow
+    [Range(0.1f,10f)] public float dustRegrowDelayMul = 1f; // >1 = slower regrow
+
+    [Header("Star Space Control (drives CosmicDustGenerator)")]
+    [Tooltip("If true, the star maintains a cleared maneuvering pocket around itself.")]
+    public bool starKeepsDustClear = true;
+    [Min(0)] public int starKeepClearRadiusCells = 2;
+
+    [Header("Safety Bubble (on poke)")]
+    [Tooltip("If true, a larger temporary cleared bubble is spawned when the star is poked/struck.")]
+    public bool enableSafetyBubble = true;
+    [Min(0)] public int safetyBubbleRadiusCells = 4;
+    [Tooltip("Keep-clear radius (cells) while the safety bubble is active. Often matches safetyBubbleRadiusCells.")]
+    [Min(0)] public int bubbleRadiusCells = 4;
 
     [Header("MineNode Ejection")]
     public EjectionStyle ejectionStyle = EjectionStyle.Burst;

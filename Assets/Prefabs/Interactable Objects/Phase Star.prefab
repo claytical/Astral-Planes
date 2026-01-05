@@ -4924,9 +4924,9 @@ MonoBehaviour:
     type: 2}
   behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
   shardFlightSeconds: 0.6
-  starKeepsDustClear: 1
+  StarKeepsDustClear: 1
   rotateSelectionOnLoopBoundary: 1
-  starKeepClearRadiusCells: 2
+  StarKeepClearRadiusCells: 2
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
   visuals: {fileID: 6754461597857711404}
@@ -4934,11 +4934,11 @@ MonoBehaviour:
   dust: {fileID: 7465792772216044867}
   _progressionMul: 1
   _isInFocusMode: 0
-  enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 4
+  EnableSafetyBubble: 1
+  SafetyBubbleRadiusCells: 4
   syncRotationToLoop: 1
   _tracePhaseStar: 1
-  bubbleRadiusCells: 4
+  BubbleRadiusCells: 4
   bubbleTint: {r: 1, g: 1, b: 1, a: 1}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   maxActiveDps: 360
@@ -4963,8 +4963,8 @@ MonoBehaviour:
     type: 3}
   particles: {fileID: 382306593780773728}
   bubbleRoot: {fileID: 5131073904990169975}
-  bubbleSprite: {fileID: 0}
-  bubbleEdgeParticles: {fileID: 0}
+  bubbleSprite: {fileID: 2552610199592648178}
+  bubbleEdgeParticles: {fileID: 4946073270184364620}
   bubbleFillAlpha: 0.08
   bubbleEdgeAlpha: 0.35
   dimShardTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.85}
