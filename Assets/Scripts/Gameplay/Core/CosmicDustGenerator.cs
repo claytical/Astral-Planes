@@ -42,6 +42,9 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         [Header("Maze Collision Shape")]
         [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
         public float cellClearanceWorld;
+
+        [Header("Dust Visual Footprint")]
+        [Range(0.8f, 1.6f)] public float dustFootprintMul;
     }
 
     [Serializable]
@@ -70,9 +73,77 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         public int   starErodePerTick;
     }
 
+
+[Serializable]
+private struct PoolSettings
+{
+    [Header("Pooling / Spawn Budget")]
+    public int prewarm;                // tune to your grid size
+    public Transform root;             // optional, to keep Hierarchy tidy
+    public float maxSpawnMillisPerFrame; // tune for target HW
+}
+
+[Serializable]
+private struct ProgressiveMazeSettings
+{
+    [Header("Progressive Maze")]
+    public bool  enabled;
+    public float regrowCooldownSeconds;
+    public int   maxFeatures;                 // how many features we keep alive
+    public int   addPerLoop;                  // features to add each loop
+    public float featureSpawnBudgetFrac;      // of loop seconds, per new feature
+    public float featureFadeDurationFrac;     // of loop seconds, when removing oldest
+    public float hexGrowInSeconds;            // visual “grow in” time per hex
+}
+
+[Serializable]
+private struct FlowFieldSettings
+{
+    [Header("Flow Field")]
+    public int   tilesPerFrame;   // tune to grid size
+    public float hiveShiftInterval;  // how often the hive changes its mind
+    public float hiveShiftBlend;     // how strongly to blend to the new direction
+    public float baseFlowStrength;   // world units per second
+    public float phaseFlowBias;      // extra per-phase bias
+}
+
+[Serializable]
+private struct CompositeSettings
+{
+    [Header("Composite Collider (Manual Generation)")]
+    [Tooltip("CompositeCollider2D that merges dust colliders. If null, we'll try refs.activeDustRoot, then self.")]
+    public CompositeCollider2D collider;
+
+    [Tooltip("Debounce interval (seconds) for composite rebuilds. 0 = once per frame.")]
+    public float rebuildMinInterval;
+}
+
+[Serializable]
+private struct TerrainQuerySettings
+{
+    [Header("Dust Terrain Query")]
+    public LayerMask mask;
+    public float queryRadiusWorld;
+    public int maxColliders;
+}
+
+[Serializable]
+private struct DustWeatherSettings
+{
+    [Header("Dust Weather Force Field")]
+    public float influenceRadiusTiles;
+    public float maxForce;
+    public float tangentialFrac;
+    public float flowFrac;
+    public float turbulenceFrac;
+    public float noiseScale;
+    public float noiseSpeed;
+}
+
     [SerializeField] private MazeShapeSettings mazeShape = new MazeShapeSettings
     {
-        cellClearanceWorld = 0f
+        cellClearanceWorld = 0f,
+        dustFootprintMul = 1f
     };
 
     [SerializeField] private ImprintAbrasionSettings abrasion = new ImprintAbrasionSettings
@@ -130,62 +201,91 @@ Dictionary<Vector2Int, DustImprint> _imprints;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
     private int _mazeBuildId = 0;
-    [SerializeField] private int flowTilesPerFrame = 128;   // tune to grid size (e.g., 32x18 grid ≈ 576 → 128–256 is good)
-    private int _flowUpdateCursor = 0;
-    private Vector2 _lastPhaseBias;
-    private int _lastPulseId = -1;
-    [SerializeField] private int poolPrewarm = 648;             // tune to your grid size
-    [SerializeField] public Transform poolRoot;                 // optional, to keep Hierarchy tidy
-    private readonly Stack<GameObject> _dustPool = new();
-    [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
-    public event Action<Vector2Int?> OnMazeReady;
-
-    [SerializeField] private float regrowCooldownSeconds = 3.0f;
-    [SerializeField] public bool  progressiveMaze = true;
-    [SerializeField] private int   maxFeatures = 3;                 // how many features we keep alive
-    [SerializeField] private int   addPerLoop  = 1;                 // features to add each loop
-    [SerializeField] private float featureSpawnBudgetFrac = 0.12f;  // of loop seconds, per new feature
-    [SerializeField] private float featureFadeDurationFrac = 0.25f; // of loop seconds, when removing oldest
-    [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
-    private Vector2[,] flowField;
-    [SerializeField] private float globalTurbulence = 0.5f;
-    private float hiveTimer;
-    private Vector2[,] _flowField;
-    [SerializeField] private float hiveShiftInterval = 4f;  // how often the hive changes its mind
-    [SerializeField] private float hiveShiftBlend    = 0.40f; // how strongly to blend to the new direction
-    [SerializeField] private float baseFlowStrength  = 0.20f; // world units per second
-    [SerializeField] private float phaseFlowBias     = 0.15f; // extra per-phase bias
-    private int _ffW = -1, _ffH = -1;
-    [SerializeField] private float vehicleInfluenceRadius = 3.5f;
-    [SerializeField] private float vehicleNudge = 0.25f; // world units per sec
-    private int _bulkTopologyDepth = 0;
-    // Collectable “pressure pocket” hold: prevents regrow while a collectable is present nearby.
-    private readonly Dictionary<Vector2Int, float> _collectableHoldUntil = new Dictionary<Vector2Int, float>();
-
-    private bool IsBulkTopology => _bulkTopologyDepth > 0;
-    private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
-    public float TileDiameterWorld
-    {
-        get => tileDiameterWorld;
-        set => tileDiameterWorld = value;
-    }
-    [Header("Composite Collider (Manual Generation)")]
-    [Tooltip("CompositeCollider2D that merges dust colliders. If null, we'll try refs.activeDustRoot, then self.")]
-    [SerializeField] private CompositeCollider2D compositeCollider;
-
-    [Tooltip("Debounce interval (seconds) for composite rebuilds. 0 = once per frame.")]
-    [SerializeField] private float compositeRebuildMinInterval = 0.0f;
-
-    private float _nextCompositeRebuildAt;
-    [Header("Dust Terrain Query")]
-    [SerializeField] private LayerMask dustTerrainMask;
-    [SerializeField] private float dustQueryRadiusWorld = 1.25f;
-    [SerializeField] private int dustQueryMaxColliders = 16;
     
-    private readonly Collider2D[] _dustHits = new Collider2D[16];
-    private int _compositeBatchDepth = 0;
+[SerializeField] private FlowFieldSettings flow = new FlowFieldSettings
+{
+    tilesPerFrame     = 128,
+    hiveShiftInterval = 4f,
+    hiveShiftBlend = 0.40f,
+    baseFlowStrength = 0.20f,
+    phaseFlowBias = 0.15f
+};
 
-    public void BeginCompositeBatch() => _compositeBatchDepth++;
+private int _flowUpdateCursor = 0;
+private Vector2 _lastPhaseBias;
+private int _lastPulseId = -1;
+
+[SerializeField] private PoolSettings pool = new PoolSettings
+{
+    prewarm              = 648,
+    root                 = null,
+    maxSpawnMillisPerFrame = 1.2f
+};
+
+private readonly Stack<GameObject> _dustPool = new();
+
+public event Action<Vector2Int?> OnMazeReady;
+
+[SerializeField] private ProgressiveMazeSettings progressive = new ProgressiveMazeSettings
+{
+    enabled               = true,
+    regrowCooldownSeconds = 3.0f,
+    maxFeatures = 3,
+    addPerLoop = 1,
+    featureSpawnBudgetFrac = 0.12f,
+    featureFadeDurationFrac = 0.25f,
+    hexGrowInSeconds = 0.45f
+};
+
+private float hiveTimer;
+private Vector2[,] _flowField;
+private int _ffW = -1, _ffH = -1;
+
+private int _bulkTopologyDepth = 0;
+// Collectable “pressure pocket” hold: prevents regrow while a collectable is present nearby.
+private readonly Dictionary<Vector2Int, float> _collectableHoldUntil = new Dictionary<Vector2Int, float>();
+
+private bool IsBulkTopology => _bulkTopologyDepth > 0;
+private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
+
+public float TileDiameterWorld
+{
+    get => tileDiameterWorld;
+    set => tileDiameterWorld = value;
+}
+
+[SerializeField] private CompositeSettings composite = new CompositeSettings
+{
+    collider          = null,
+    rebuildMinInterval = 0.0f
+};
+
+private float _nextCompositeRebuildAt;
+
+[SerializeField] private TerrainQuerySettings terrainQuery = new TerrainQuerySettings
+{
+    mask            = default,
+    queryRadiusWorld = 1.25f,
+    maxColliders    = 16
+};
+
+// Non-serialized buffer for Physics2D.OverlapCircleNonAlloc. Sized from terrainQuery.maxColliders.
+private Collider2D[] _dustHits;
+
+private int _compositeBatchDepth = 0;
+
+[SerializeField] private DustWeatherSettings dustWeather = new DustWeatherSettings
+{
+    influenceRadiusTiles = 1.75f,
+    maxForce             = 18f,
+    tangentialFrac       = 0.35f,
+    flowFrac             = 0.25f,
+    turbulenceFrac       = 0.15f,
+    noiseScale           = 0.65f,
+    noiseSpeed           = 0.60f
+};
+
+public void BeginCompositeBatch() => _compositeBatchDepth++;
 
     public void EndCompositeBatch()
     {
@@ -265,7 +365,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
     private void MarkCompositeDirty()
     {
         EnsureCompositeRef();
-        if (compositeCollider == null) return;
+        if (composite.collider == null) return;
 
         _compositeDirty = true;
 
@@ -305,13 +405,13 @@ Dictionary<Vector2Int, DustImprint> _imprints;
 
     private void EnsureCompositeRef()
     {
-        if (compositeCollider != null) return;
+        if (composite.collider != null) return;
 
         if (refs.activeDustRoot != null)
-            compositeCollider = refs.activeDustRoot.GetComponent<CompositeCollider2D>();
+            composite.collider = refs.activeDustRoot.GetComponent<CompositeCollider2D>();
 
-        if (compositeCollider == null)
-            compositeCollider = GetComponent<CompositeCollider2D>();
+        if (composite.collider == null)
+            composite.collider = GetComponent<CompositeCollider2D>();
     }
     private void EnsureImprints()
     {
@@ -451,10 +551,10 @@ Dictionary<Vector2Int, DustImprint> _imprints;
     private void ScheduleCompositeRebuild()
     {
         EnsureCompositeRef();
-        if (compositeCollider == null) return;
+        if (composite.collider == null) return;
 
         // Throttle rebuild frequency (critical).
-        if (compositeRebuildMinInterval > 0f && Time.unscaledTime < _nextCompositeRebuildAt)
+        if (composite.rebuildMinInterval > 0f && Time.unscaledTime < _nextCompositeRebuildAt)
             return;
 
         if (_compositeRebuildCo == null)
@@ -469,21 +569,21 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         try
         {
             EnsureCompositeRef();
-            if (compositeCollider == null) yield break;
+            if (composite.collider == null) yield break;
 
             // If we are in a bulk/batch mode, let EndBulkTopology schedule the next rebuild.
             if (_bulkTopologyDepth > 0) yield break; // use your actual bulk flag/depth
 
             // Rebuild now
-            compositeCollider.GenerateGeometry();
+            composite.collider.GenerateGeometry();
 #if UNITY_EDITOR
-            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={compositeCollider.pathCount}", this);
+            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={composite.collider.pathCount}", this);
 #endif
 
             _compositeDirty = false;
 
-            _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
-                ? (Time.unscaledTime + compositeRebuildMinInterval)
+            _nextCompositeRebuildAt = (composite.rebuildMinInterval > 0f)
+                ? (Time.unscaledTime + composite.rebuildMinInterval)
                 : Time.unscaledTime;
         }
         finally
@@ -497,7 +597,19 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         // In some scenes the generator may be instantiated before the GameFlowManager
         // is fully ready. We do a best-effort bind here, and also lazily re-bind elsewhere.
         EnsureImprints();
+        TryEnsureRefs();
+        EnsureDustQueryBuffer();
+        TryEnsureFlowField();
+        PrewarmPool();
     }
+
+
+private void EnsureDustQueryBuffer()
+{
+    int n = Mathf.Clamp(terrainQuery.maxColliders, 1, 256);
+    if (_dustHits == null || _dustHits.Length != n)
+        _dustHits = new Collider2D[n];
+}
 
     private void TryEnsureRefs()
     {
@@ -508,14 +620,16 @@ Dictionary<Vector2Int, DustImprint> _imprints;
 
         if (drums == null) drums = gfm.activeDrumTrack;
         if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
-        Debug.Log($"[MAZE] Drums: {drums} GFM: {gfm} Phase Transition Manager: {phaseTransitionManager}");
     }
 
     public void ManualStart()
     {
-        TryEnsureRefs();
+        var gfm = GameFlowManager.Instance;
+        drums = gfm.activeDrumTrack;
+        phaseTransitionManager = gfm.phaseTransitionManager;
         TryEnsureFlowField();
         PrewarmPool();
+        
     }
     void Update()
     {
@@ -526,7 +640,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
 
         // Existing hive "intent" shift timer just changes the target bias occasionally
         hiveTimer += Time.deltaTime;
-        if (hiveTimer >= hiveShiftInterval)
+        if (hiveTimer >= flow.hiveShiftInterval)
         {
             hiveTimer = 0f;
             _lastPhaseBias = ComputePhaseBias(phaseTransitionManager.currentPhase);
@@ -535,10 +649,10 @@ Dictionary<Vector2Int, DustImprint> _imprints;
     private void PrewarmPool()
     {
         if (!refs.dustPrefab) return;
-        for (int i = 0; i < poolPrewarm; i++)
+        for (int i = 0; i < pool.prewarm; i++)
         {
             
-            var go = Instantiate(refs.dustPrefab, new Vector3(9999,9999,0), Quaternion.identity, poolRoot);
+            var go = Instantiate(refs.dustPrefab, new Vector3(9999,9999,0), Quaternion.identity, pool.root);
             if (i == 0)
             {
                 var dust = go.GetComponent<CosmicDust>();
@@ -850,7 +964,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
             // 1) Hard reset state (stops particles, enables colliders, clears coroutines)
             dust.PrepareForReuse();
             float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-            dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, mazeShape.cellClearanceWorld);
+            dust.SetCellSizeDrivenScale(cellWorldSize, mazeShape.dustFootprintMul, mazeShape.cellClearanceWorld);
             // 2) Bind and configure phase-dependent scale/behavior BEFORE Begin()
             var phaseNow = (phaseTransitionManager != null)
                 ? phaseTransitionManager.currentPhase
@@ -860,7 +974,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
             dust.ConfigureForPhase(phaseNow);
 
             // Optional: set regrow grow-in duration if you want consistency
-            dust.SetGrowInDuration(hexGrowInSeconds);
+            dust.SetGrowInDuration(progressive.hexGrowInSeconds);
 
             // 3) Apply semantic tint/hardness AFTER PrepareForReuse (it overwrites tint)
             if (_imprints != null && _imprints.TryGetValue(gridPos, out var imp))
@@ -1260,7 +1374,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
             var go = _dustPool.Pop();
             if (!go) continue; // was destroyed after being pooled
 
-            var parentRoot = (refs.activeDustRoot != null) ? refs.activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
+            var parentRoot = (refs.activeDustRoot != null) ? refs.activeDustRoot : transform; // never parent ACTIVE dust to pool.root
             go.transform.SetParent(parentRoot, worldPositionStays: false);
             go.SetActive(true);
 
@@ -1277,8 +1391,8 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         }
 
         // None in pool: create fresh and normalize through the same path
-        var created = Instantiate(refs.dustPrefab, poolRoot);
-        var parentRoot2 = (refs.activeDustRoot != null) ? refs.activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
+        var created = Instantiate(refs.dustPrefab, pool.root);
+        var parentRoot2 = (refs.activeDustRoot != null) ? refs.activeDustRoot : transform; // never parent ACTIVE dust to pool.root
         created.transform.SetParent(parentRoot2, worldPositionStays: false);
         created.SetActive(true);
 
@@ -1311,9 +1425,10 @@ Dictionary<Vector2Int, DustImprint> _imprints;
                 ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
                 ps.Clear(true);
             } 
+//            dust.PrepareForPool();
             go.SetActive(false); 
         }
-        var targetRoot = poolRoot != null ? poolRoot : transform;
+        var targetRoot = pool.root != null ? pool.root : transform;
         go.transform.SetParent(targetRoot, worldPositionStays:false);
 
         _dustPool.Push(go);
@@ -1428,14 +1543,14 @@ Dictionary<Vector2Int, DustImprint> _imprints;
             phase == MusicalPhase.Release    ? new Vector2(-0.6f, 0f) :
             phase == MusicalPhase.Wildcard  ? Random.insideUnitCircle.normalized :
             /* Pop */                          new Vector2( 0f, -0.4f);
-        return bias.normalized * phaseFlowBias;
+        return bias.normalized * flow.phaseFlowBias;
     }
     private void TryEnsureFlowField()
     {
 
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
-        poolPrewarm = Mathf.Max(poolPrewarm, w, h);
+        pool.prewarm = Mathf.Max(pool.prewarm, w, h);
 
     }
     
@@ -1445,7 +1560,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         int total = _ffW * _ffH;
         if (total == 0) return;
 
-        int steps = Mathf.Clamp(flowTilesPerFrame, 1, total);
+        int steps = Mathf.Clamp(flow.tilesPerFrame, 1, total);
         for (int n = 0; n < steps; n++)
         {
             int idx = _flowUpdateCursor++;
@@ -1456,7 +1571,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
 
             // compute target with a little noise + last bias
             Vector2 target = (Random.insideUnitCircle.normalized * 0.7f + _lastPhaseBias).normalized;
-            _flowField[x, y] = Vector2.Lerp(_flowField[x, y], target, hiveShiftBlend);
+            _flowField[x, y] = Vector2.Lerp(_flowField[x, y], target, flow.hiveShiftBlend);
             if (_flowField[x, y].sqrMagnitude < 1e-4f) _flowField[x, y] = Vector2.up;
         }
     }
@@ -1469,7 +1584,7 @@ Dictionary<Vector2Int, DustImprint> _imprints;
         var grid = drums.WorldToGridPosition(worldPos);
         if ((uint)grid.x >= (uint)_ffW || (uint)grid.y >= (uint)_ffH) return Vector2.zero;
 
-        return _flowField[grid.x, grid.y] * baseFlowStrength;
+        return _flowField[grid.x, grid.y] * flow.baseFlowStrength;
     }
     
 // =====================================================================
@@ -1482,29 +1597,6 @@ Dictionary<Vector2Int, DustImprint> _imprints;
     [SerializeField] private bool dustWeatherDebug = false;
     [SerializeField] private float dustWeatherDebugInterval = 0.5f;
     private float _nextDustWeatherDebugAt = 0f;
-
-[Header("Dust Weather Force Field (Terrain)")]
-[Tooltip("How many dust tiles outward we sample when computing the repulsion vector.")]
-[SerializeField] private float dustInfluenceRadiusTiles = 1.75f;
-
-[Tooltip("Max force (Newtons) applied when a vehicle is deeply embedded in dust proximity.")]
-[SerializeField] private float dustMaxForce = 18f;
-
-[Tooltip("How much of the repulsion direction is rotated 90° (current-like). 0 = none.")]
-[Range(0f, 1f)]
-[SerializeField] private float dustTangentialFrac = 0.35f;
-
-[Tooltip("How much the global flow-field influences the dust force direction.")]
-[Range(0f, 1f)]
-[SerializeField] private float dustFlowFrac = 0.25f;
-
-[Tooltip("How much turbulent noise influences the dust force direction (scaled per phase).")]
-[Range(0f, 1f)]
-[SerializeField] private float dustTurbulenceFrac = 0.15f;
-
-[SerializeField] private float dustNoiseScale = 0.65f;
-[SerializeField] private float dustNoiseSpeed = 0.60f;
-[SerializeField] private float dustFootprintMul = 1f;
 
 private struct DustWeatherParams
 {
@@ -1563,6 +1655,7 @@ public bool TryGetDustWeatherForce(
     out float influence01,
     out float drainPerSecond)
 {
+        if (_dustHits == null) EnsureDustQueryBuffer();
     force = Vector2.zero;
     influence01 = 0f;
     drainPerSecond = 0f;
@@ -1579,22 +1672,22 @@ public bool TryGetDustWeatherForce(
     }
 
     float tile = Mathf.Max(0.0001f, tileDiameterWorld);
-    float radiusWorld = dustInfluenceRadiusTiles * tile;
+    float radiusWorld = dustWeather.influenceRadiusTiles * tile;
     float radiusSqr = radiusWorld * radiusWorld;
 
     // Sample neighborhood in grid-space (fast), then weight by world distance.
     Vector2Int center = drums.WorldToGridPosition(vehicleWorld);
-    int rCells = Mathf.CeilToInt(dustInfluenceRadiusTiles) + 1;
+    int rCells = Mathf.CeilToInt(dustWeather.influenceRadiusTiles) + 1;
 
     Vector2 p = vehicleWorld;
 
 // Find dust colliders near the vehicle.
-    int hitCount = Physics2D.OverlapCircleNonAlloc(p, dustQueryRadiusWorld, _dustHits, dustTerrainMask);
+    int hitCount = Physics2D.OverlapCircleNonAlloc(p, terrainQuery.queryRadiusWorld, _dustHits, terrainQuery.mask);
 
     if (hitCount <= 0)
     {
         if (dustWeatherDebug)
-            Debug.Log($"[DustWeather] EXIT noColliders p={p} r={dustQueryRadiusWorld}", this);
+            Debug.Log($"[DustWeather] EXIT noColliders p={p} r={terrainQuery.queryRadiusWorld}", this);
         return false;
     }
 
@@ -1616,7 +1709,7 @@ public bool TryGetDustWeatherForce(
         if (dist < 1e-4f)
             dv = (Vector2)(p - (Vector2)col.bounds.center);
 
-        float t = 1f - Mathf.Clamp01(dist / dustQueryRadiusWorld); // 1..0
+        float t = 1f - Mathf.Clamp01(dist / terrainQuery.queryRadiusWorld); // 1..0
         float w = t * t;
 
         if (dv.sqrMagnitude > 1e-6f)
@@ -1656,22 +1749,22 @@ public bool TryGetDustWeatherForce(
     Vector2 flow = SampleFlowAtWorld(vehicleWorld);
 
     // Coherent turbulence (Perlin) for non-jittery noise
-    float nx = Mathf.PerlinNoise(vehicleWorld.x * dustNoiseScale, Time.time * dustNoiseSpeed) - 0.5f;
-    float ny = Mathf.PerlinNoise(vehicleWorld.y * dustNoiseScale, Time.time * dustNoiseSpeed + 17.3f) - 0.5f;
+    float nx = Mathf.PerlinNoise(vehicleWorld.x * dustWeather.noiseScale, Time.time * dustWeather.noiseSpeed) - 0.5f;
+    float ny = Mathf.PerlinNoise(vehicleWorld.y * dustWeather.noiseScale, Time.time * dustWeather.noiseSpeed + 17.3f) - 0.5f;
     Vector2 turb = new Vector2(nx, ny);
     if (turb.sqrMagnitude > 1e-6f) turb.Normalize();
 
     Vector2 dir =
         (repelDir * wp.repelMul) +
-        (tangDir * (dustTangentialFrac * wp.tangentialMul)) +
-        (flow * (dustFlowFrac * wp.flowMul)) +
-        (turb * (dustTurbulenceFrac * wp.turbulenceMul));
+        (tangDir * (dustWeather.tangentialFrac * wp.tangentialMul)) +
+        (flow * (dustWeather.flowFrac * wp.flowMul)) +
+        (turb * (dustWeather.turbulenceFrac * wp.turbulenceMul));
 
     if (dir.sqrMagnitude < 1e-6f)
         dir = repelDir;
 
     influence01 = Mathf.Clamp01(best);
-    force = dir.normalized * (dustMaxForce * influence01);
+    force = dir.normalized * (dustWeather.maxForce * influence01);
     if (dustWeatherDebug)
     {
         Debug.Log(
@@ -1766,7 +1859,7 @@ public void ApplyProfile(PhaseStarBehaviorProfile profile)
         if (col == null) return false;
         // Primary: layer mask
         int bit = 1 << col.gameObject.layer; 
-        if ((dustTerrainMask.value & bit) != 0) return true;
+        if ((terrainQuery.mask.value & bit) != 0) return true;
         // Fallback: collider belongs under THIS generator (composite + children)
         var owner = col.GetComponentInParent<CosmicDustGenerator>(); 
         return owner == this;
@@ -1907,7 +2000,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
         while (i < cells.Count)
         {
             float frameStart  = Time.realtimeSinceStartup;
-            float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+            float frameBudget = Mathf.Max(0f, pool.maxSpawnMillisPerFrame) / 1000f;
 
             while (i < cells.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
             {
@@ -1931,10 +2024,10 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
                 if (hex.TryGetComponent<CosmicDust>(out var dust))
                 {
                     dust.SetTrackBundle(this, drums, phaseNow);
-                    dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, mazeShape.cellClearanceWorld);
+                    dust.SetCellSizeDrivenScale(cellWorldSize, mazeShape.dustFootprintMul, mazeShape.cellClearanceWorld);
 
                     dust.PrepareForReuse();
-                    dust.SetGrowInDuration(hexGrowInSeconds);
+                    dust.SetGrowInDuration(progressive.hexGrowInSeconds);
                     dust.SetTint(_mazeTint);
                     dust.ConfigureForPhase(phaseNow);
                     dust.Begin();
@@ -1965,7 +2058,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
         while (j < spawnedDust.Count)
         {
             float frameStart  = Time.realtimeSinceStartup;
-            float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+            float frameBudget = Mathf.Max(0f, pool.maxSpawnMillisPerFrame) / 1000f;
 
             while (j < spawnedDust.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
             {
@@ -1979,16 +2072,16 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
 
         // Now rebuild composite once after colliders are in their final state.
         EnsureCompositeRef();
-        if (compositeCollider != null)
+        if (composite.collider != null)
         {
-            compositeCollider.GenerateGeometry();
+            composite.collider.GenerateGeometry();
 #if UNITY_EDITOR
-            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={compositeCollider.pathCount}", this);
+            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={composite.collider.pathCount}", this);
 #endif
 
             _compositeDirty = false;
-            _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
-                ? (Time.unscaledTime + compositeRebuildMinInterval)
+            _nextCompositeRebuildAt = (composite.rebuildMinInterval > 0f)
+                ? (Time.unscaledTime + composite.rebuildMinInterval)
                 : Time.unscaledTime;
         }
     }
@@ -2286,16 +2379,18 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
 
             _fillMap[pos] = Random.value < fillChance;
         }
+
         var next = new Dictionary<Vector2Int, bool>();
-        foreach (var cell in _fillMap.Keys) {
-            int n = CountFilledNeighbors(cell); 
-            bool cur = _fillMap[cell]; 
+        foreach (var cell in _fillMap.Keys)
+        {
+            int n = CountFilledNeighbors(cell);
+            bool cur = _fillMap[cell];
             if (cur && (n < 2 || n > 4)) next[cell] = false;
             else if (!cur && n == 3)     next[cell] = true;
             else                         next[cell] = cur;
-        } 
+        }
         _fillMap = next;
-        
+
         foreach (var kv in _fillMap)
         {
             if (!kv.Value) continue;
@@ -2477,7 +2572,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
     public void DEBUG_DumpCompositeState()
     {
         EnsureCompositeRef();
-        var cc = compositeCollider;
+        var cc = composite.collider;
 
         var rb = cc != null ? cc.attachedRigidbody : GetComponent<Rigidbody2D>();
         Debug.Log(

@@ -411,7 +411,6 @@ public class DrumTrack : MonoBehaviour
         {
             _dust.ApplyProfile(bootProfile);
             SyncTileWithScreen();
-            _dust.progressiveMaze = true;
         }
 
         AudioClip initialClip = null;
