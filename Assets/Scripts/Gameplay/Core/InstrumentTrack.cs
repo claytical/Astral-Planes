@@ -1552,6 +1552,15 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             originX = og.x; 
             if (originX < 0 || originX >= gridW) originX = -1; 
         }
+        int imprintX = -1;
+        if (repelFromWorld.HasValue && drumTrack != null)
+        {
+            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
+            imprintX = ig.x;
+            if (imprintX < 0 || imprintX >= gridW)
+                imprintX = -1;
+        }
+
         foreach (int step in localSteps)
         {
             if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
@@ -1582,16 +1591,19 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                 for (int x = 0; x < gridW; x++)
                 {
                     var gp = new Vector2Int(x, pitchIndex);
-                    if (!dustGen.IsPermanentlyClearCell(gp)) continue;
-                    if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
+                    if (dustGen.HasDustAt(gp) && !dustGen.IsPermanentlyClearCell(gp) && Collectable.IsCellFreeStatic(gp))
+                        preferredXs.Add(x);
+                    
+                    //if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
                     if (!Collectable.IsCellFreeStatic(gp)) continue;
                     preferredXs.Add(x);
                 }
                 List<int> candidates = (preferredXs.Count > 0) ? preferredXs : Enumerable.Range(0, gridW).ToList();
                 // If originX is valid, this will fan out from the void origin.
                 // Otherwise it falls back to random order (preserving prior behavior).
-                xSequence = BuildBiasedXSequence(candidates, originX, gridW);
-                
+//                xSequence = BuildBiasedXSequence(candidates, imprintX, gridW);
+                xSequence = BuildBiasedXSequence(
+                    candidates.OrderByDescending(x => Mathf.Abs(x - imprintX)).ToList(), -1, gridW);              
             }
             else
             {
@@ -1605,7 +1617,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             {
                 var gp = new Vector2Int(x, pitchIndex);
 
-                if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
+                //if (drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
                 if (!Collectable.IsCellFreeStatic(gp)) continue;
                 Vector3 spawnPos = drumTrack.GridToWorldPosition(gp); 
                 if (originWorld.HasValue && spawnJitterRadius > 0f) { 

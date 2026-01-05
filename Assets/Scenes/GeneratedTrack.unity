@@ -11500,13 +11500,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
+  visualBottomExcludeViewport: 0.1
+  visualFadeBandViewport: 0.05
   iterations: 3
   cycleMode: 1
+  cellClearanceWorld: 0
+  edgeRadiusFrac: 0.08
+  abrasionWearPerSecondAtFullImpact: 0.65
+  abrasionDissipateFadeSeconds: 0.2
+  abrasionTint: {r: 0.95, g: 0.25, b: 0.15, a: 0.35}
+  abrasionHardnessAtFullWear: 0.9
   minClassicCycleInterval: 0.25
   vehicleErodeRadius: 1
   vehicleErodePerTick: 2
   mineNodeErodeRadius: 1
-  mineNodeErodePerTick: 10
+  mineNodeErodePerTick: 1
+  vwhidustFootprintMul: 0.85
   tileDiameterWorld: 1
   hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
@@ -11530,7 +11539,7 @@ MonoBehaviour:
   vehicleNudge: 0.25
   starErodeRadius: 1.2
   starErodePerTick: 6
-  compositeCollider: {fileID: 0}
+  compositeCollider: {fileID: 869126479}
   compositeRebuildMinInterval: 0.1
   dustTerrainMask:
     serializedVersion: 2
@@ -11539,13 +11548,14 @@ MonoBehaviour:
   dustQueryMaxColliders: 16
   dustWeatherDebug: 0
   dustWeatherDebugInterval: 0.5
-  dustInfluenceRadiusTiles: 1.75
-  dustMaxForce: 30
+  dustInfluenceRadiusTiles: 1
+  dustMaxForce: 0
   dustTangentialFrac: 0.35
   dustFlowFrac: 0.25
   dustTurbulenceFrac: 0.15
   dustNoiseScale: 0.65
   dustNoiseSpeed: 0.6
+  dustFootprintMul: 1
 --- !u!114 &911153256
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12368,6 +12378,9 @@ MonoBehaviour:
   activeMineNodes: []
   isPhaseStarActive: 0
   currentStep: 0
+  dustBandMinY: 0.1
+  dustBandMaxY: 1
+  dustBandTopInsetWorld: 0
   _star: {fileID: 0}
   beatMoodLibrary: {fileID: 11400000, guid: 9d93d03e5cfdb4717bb2c8809701b3c3, type: 2}
   lowIntensityThreshold: 0.25
@@ -12528,7 +12541,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridWidth: 36
   gridHeight: 18
-  cellSize: 0.5
+  cellSize: 1
 --- !u!114 &1354683690
 MonoBehaviour:
   m_ObjectHideFlags: 0

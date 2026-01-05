@@ -53,8 +53,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  debugDustGenerator: {fileID: 0}
   profile: {fileID: 11400000, guid: 7fedc7c34ab9f4494a7087dc7aefa55e, type: 2}
   capacity: 1200
+  dustExitGraceSeconds: 0.2
   arcadeMaxSpeed: 14
   arcadeAccel: 10
   arcadeBoostAccel: 80
@@ -83,6 +85,13 @@ MonoBehaviour:
   remixRingHolder: {fileID: 7343128530655426899}
   harmony: {fileID: 0}
   shipProfile: {fileID: 0}
+  keepDustClearAroundVehicle: 1
+  vehicleKeepClearRadiusCells: 1
+  vehicleKeepClearRefreshSeconds: 0.1
+  dustImpactDrainPerSecondMax: 8
+  dustImpactForceVelScale: 0.02
+  dustImpactOppositionWeight: 1
+  logScaleCalibrationOnAssign: 1
 --- !u!114 &-1083081321893026294
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -112,6 +121,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
     type: 3}
+  preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!212 &1970310610805977373
@@ -158,8 +168,8 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: -98977089
-  m_SortingLayer: -1
+  m_SortingLayerID: 263648039
+  m_SortingLayer: 1
   m_SortingOrder: 0
   m_Sprite: {fileID: -7208588322343283277, guid: c762d6baab2ed4782a9e8baa77882665,
     type: 3}

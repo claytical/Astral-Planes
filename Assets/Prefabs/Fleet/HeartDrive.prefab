@@ -138,8 +138,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  debugDustGenerator: {fileID: 0}
   profile: {fileID: 11400000, guid: 95b113260e35b48afbf6575191140b15, type: 2}
   capacity: 90
+  dustExitGraceSeconds: 0.2
   arcadeMaxSpeed: 14
   arcadeAccel: 40
   arcadeBoostAccel: 80
@@ -168,6 +170,13 @@ MonoBehaviour:
   remixRingHolder: {fileID: 0}
   harmony: {fileID: 0}
   shipProfile: {fileID: 0}
+  keepDustClearAroundVehicle: 1
+  vehicleKeepClearRadiusCells: 1
+  vehicleKeepClearRefreshSeconds: 0.1
+  dustImpactDrainPerSecondMax: 8
+  dustImpactForceVelScale: 0.02
+  dustImpactOppositionWeight: 1
+  logScaleCalibrationOnAssign: 1
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -182,6 +191,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
     type: 3}
+  preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
 --- !u!82 &-6477047892044132563

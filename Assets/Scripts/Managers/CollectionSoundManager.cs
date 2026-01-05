@@ -49,28 +49,143 @@ private int PickContextualNote(NoteSet ctx, InstrumentTrack track, DustBehaviorT
     }
 }
 
-
-    // Controller-routed dust interaction (vehicles do NOT own tracks)
-    public void PlayDustInteraction(InstrumentTrackController controller, float force01, DustBehaviorType behavior)
-    {
-        if (controller == null || midiStreamPlayer == null) return;
-        var track = controller.GetAmbientContextTrack();
-        var set   = controller.GetGlobalContextNoteSet();
-        if (track == null) return;
-        PlayDustInteraction(track, set, force01, behavior);
-    }
-
-    // Track+NoteSet-routed dust sound
     public void PlayDustInteraction(InstrumentTrack track, NoteSet ambientContext, float force01, DustBehaviorType behavior)
     {
         if (track == null || midiStreamPlayer == null) return;
+
+        // Boosting branch is already encoded by behavior at call site.
+        if (behavior == DustBehaviorType.PushThrough)
+        {
+            PlayDustPushThroughResolve(track, ambientContext, force01);
+            return;
+        }
+
+        // Default = treacherous / nervous / "you shouldn't be here"
         int note = PickContextualNote(track, ambientContext, behavior);
         int vel  = Mathf.RoundToInt(Mathf.Lerp(50, 115, Mathf.Clamp01(force01)));
         int dur  = behavior == DustBehaviorType.Stop ? 120 : 80;
+
+        // Existing behavior (or your current dissonant dyad version)
         SendNote(track, note, vel, dur);
     }
+private void PlayDustPushThroughResolve(InstrumentTrack track, NoteSet ambientContext, float force01)
+{
+    // Anchor in the current musical context.
+    int baseNote = PickContextualNote(track, ambientContext, DustBehaviorType.PushThrough);
 
-    // Star impact preview (use upcoming NoteSet if available)
+    // Put the anchor into a lower heroic band (weight), but not sub-bass.
+    // This is purely register shaping; it does not assume NoteSet APIs.
+    int root = FitToMidiBand(baseNote, 45, 57); // A2..A3-ish region
+
+    // "Danger" grace: a very short dissonance that resolves.
+    // Minor 2nd above root is the clearest "friction" that resolves cleanly.
+    int grit = root + 1;
+
+    // Hero sonority: power chord (+ optional octave).
+    int fifth  = root + 7;
+    int octave = root + 12;
+
+    // Dynamics: triumphant = louder + slightly longer than the “nervous” hit.
+    float t = Mathf.Clamp01(force01);
+
+    int velMain  = Mathf.RoundToInt(Mathf.Lerp(85, 127, t));
+    int velGrit  = Mathf.RoundToInt(Mathf.Lerp(45, 80,  t));   // audible but subordinate
+    int durGrit  = Mathf.RoundToInt(Mathf.Lerp(35, 60,  t));   // very short
+    int durChord = Mathf.RoundToInt(Mathf.Lerp(110, 170, t));  // punch + sustain
+
+    root   = Mathf.Clamp(root,   0, 127);
+    grit   = Mathf.Clamp(grit,   0, 127);
+    fifth  = Mathf.Clamp(fifth,  0, 127);
+    octave = Mathf.Clamp(octave, 0, 127);
+
+    // 1) tiny “friction”
+    SendNote(track, grit, velGrit, durGrit);
+
+    // 2) resolution into courage/power, slightly delayed so the ear perceives “turning danger into harmony”
+    StartCoroutine(PlayDelayedChord(track, root, fifth, octave, velMain, durChord, 0.05f));
+}
+
+private IEnumerator PlayDelayedChord(InstrumentTrack track, int root, int fifth, int octave, int vel, int dur, float delaySeconds)
+{
+    if (delaySeconds > 0f) yield return new WaitForSeconds(delaySeconds);
+
+    // Wide spacing reads as “heroic” (weight + clarity)
+    SendNote(track, root,  vel, dur);
+    SendNote(track, fifth, vel, dur);
+
+    // Optional octave: keep it, unless you find it too thick on certain instruments.
+    SendNote(track, octave, Mathf.Clamp(Mathf.RoundToInt(vel * 0.9f), 1, 127), dur);
+}
+
+private int FitToMidiBand(int note, int minInclusive, int maxInclusive)
+{
+    // Transpose by octaves to land in a preferred register band.
+    int n = note;
+    while (n < minInclusive) n += 12;
+    while (n > maxInclusive) n -= 12;
+    return n;
+}
+
+private int MakeDissonantNeighbor(int baseNote, DustBehaviorType behavior, float force01)
+{
+    // Dissonant intervals in semitones relative to base
+    // m2(1), TT(6), m7(10), M7(11), tritone-ish + cluster options.
+    // Add/remove to taste.
+    int[] intervals = GetDissonantIntervalsForBehavior(behavior);
+
+    // Bias: stronger collisions trend toward harsher intervals (TT/M7),
+    // weaker collisions toward m2/m7.
+    float t = Mathf.Clamp01(force01);
+
+    // Pick an interval index with a simple force-weighted skew.
+    // (No allocations, stable enough, still "alive".)
+    int idx;
+    if (intervals.Length == 1)
+    {
+        idx = 0;
+    }
+    else if (t < 0.33f)
+    {
+        idx = UnityEngine.Random.Range(0, Mathf.Min(2, intervals.Length));
+    }
+    else if (t < 0.66f)
+    {
+        idx = UnityEngine.Random.Range(0, intervals.Length);
+    }
+    else
+    {
+        idx = UnityEngine.Random.Range(Mathf.Max(0, intervals.Length - 2), intervals.Length);
+    }
+
+    int interval = intervals[idx];
+
+    // Randomly go above or below (prevents constant upward drift)
+    int dir = (UnityEngine.Random.value < 0.5f) ? -1 : 1;
+
+    // If we’d fall out of range, flip direction.
+    int candidate = baseNote + (dir * interval);
+    if (candidate < 0 || candidate > 127)
+        candidate = baseNote - (dir * interval);
+
+    return candidate;
+}
+
+private int[] GetDissonantIntervalsForBehavior(DustBehaviorType behavior)
+{
+    // If you want behavior-specific “flavors,” tune here.
+    // Keeping defaults conservative: always dissonant, but "Stop" is harsher.
+    switch (behavior)
+    {
+        case DustBehaviorType.Stop:
+            // More abrasive when dust stops the player: TT, M7, m2
+            return new[] { 6, 11, 1, 10 };
+
+        default:
+            // General dust: m2 / m7 / TT / M7
+            return new[] { 1, 10, 6, 11 };
+    }
+}
+
     public void PlayPhaseStarImpact(InstrumentTrack track, NoteSet previewSet, float forceVel01 = .75f)
     {
         if (track == null || midiStreamPlayer == null) return;

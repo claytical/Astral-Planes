@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Establish Behavior
   m_EditorClassIdentifier: 
   personality: 0
-  mazeColor: {r: 1, g: 0.5490196, b: 0, a: 1}
+  mazeColor: {r: 1, g: 0.5490196, b: 0, a: 0.33333334}
   particlePulseSpeed: 1
   starAlphaMin: 0.1
-  starAlphaMax: 0.848
+  starAlphaMax: 1
   rolePattern: 03000000000000000100000002000000
   previewPulseScale: 1.2
   beatsPerRole: 4
@@ -79,7 +79,7 @@ MonoBehaviour:
   starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 3
+  dustShrinkRadius: 2
   dustShrinkUnitsPerSec: 1
   dustFalloff:
     serializedVersion: 2

@@ -11,65 +11,162 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [Header("Sprite pivots")]
     public Sprite diamond;
     public Sprite activeDiamond;
+
     private static float pulseAlphaMax = 1f;
     private static float pulseAlphaMin = .5f;
-    private float currentAlpha = pulseAlphaMax - pulseAlphaMin;
     private float alphaDirection = 1f;
     private SpriteRenderer activeSprite;
+
     public ParticleSystem particles;
-    [SerializeField] float maxFaceTurnDegPerSec = 12f;
-    [SerializeField] float wobbleDeg = 3f;
-    [SerializeField] float wobbleHz  = 0.12f;
-    [SerializeField] float[] spriteAngleOffsets; 
-        // layering
-    const int _baseSortingOrder = 2000;
-    int _activeTopBoost = 50;
-    int _perPetalLayerStep = 1; 
-        // spin speed control
-    float _spinEnvMul = 0.25f;   // environment-derived multiplier (slows things down by default)
+
+    [Header("Bubble (Safe Space)")]
+    [SerializeField] private Transform bubbleRoot;               // child: "Bubble Root"
+    [SerializeField] private SpriteRenderer bubbleSprite;        // circle sprite on Bubble Root
+    [SerializeField] private ParticleSystem bubbleEdgeParticles; // shimmer particles on Bubble Root
+    [SerializeField, Range(0f, 1f)] private float bubbleFillAlpha = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha = 0.35f;
+
+    [Header("Dim / Hidden Shard Tint")]
+    [SerializeField] private Color dimShardTint = new Color(0.05f, 0.05f, 0.05f, 0.85f);
 
     PhaseStarBehaviorProfile _profile;
-    Vector2 _lastVel;
     private Color _lastTint = Color.white;
-    bool _visible = true;
-    Vector3[] _baseLocalPos;
-    public float rotationSpeed = .01f;
-    float _lastAngle;
+
+    // Cache shard renderers (exclude bubble visuals)
+    private SpriteRenderer[] _shardSpriteRenderers;
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
         _profile = profile;
 
-        // Default event hookups you already had:
-        star.OnArmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true;  };
+        // Existing event hookups
+        star.OnArmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true; };
         star.OnDisarmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = false; };
 
-        // Bind to motion if present
-        var motion = GetComponent<PhaseStarMotion2D>();
-        if (motion != null) motion.OnVelocityChanged += HandleVelocity;
+        // Resolve bubble refs if not wired
+        if (!bubbleRoot)
+        {
+            var t = transform.Find("Bubble Root");
+            if (t) bubbleRoot = t;
+        }
+        if (bubbleRoot)
+        {
+            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
+            if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
+        }
 
+        CacheShardRenderers();
+        HideSafetyBubble();
     }
-    
-    
+
+    private void CacheShardRenderers()
+    {
+        var srs = GetComponentsInChildren<SpriteRenderer>(true);
+
+        // Exclude bubble sprite, if any
+        if (bubbleSprite)
+        {
+            var list = new System.Collections.Generic.List<SpriteRenderer>(srs.Length);
+            for (int i = 0; i < srs.Length; i++)
+            {
+                var sr = srs[i];
+                if (!sr) continue;
+                if (sr == bubbleSprite) continue;
+                list.Add(sr);
+            }
+            _shardSpriteRenderers = list.ToArray();
+        }
+        else
+        {
+            _shardSpriteRenderers = srs;
+        }
+    }
+
     public void EjectParticles()
     {
-        Instantiate(_profile.ejectionPrefab, transform.position, Quaternion.identity);
+        if (_profile != null && _profile.ejectionPrefab != null)
+            Instantiate(_profile.ejectionPrefab, transform.position, Quaternion.identity);
     }
-    public void SetPreviewTint(Color c)
-    {
-        _lastTint = c;
-    }
+
+    public void SetPreviewTint(Color c) => _lastTint = c;
+
     public void ShowBright(Color c)
     {
         SetTintWithParticles(c);
-        ToggleRenderers(true);
+        ToggleShardRenderers(true);
         ApplyParticleAlpha(.4f);
-        particles.Play();
+
+        if (particles) particles.Play();
+
+        // In bright mode, bubble is not implied; PhaseStar controls it explicitly.
+        // (No-op here.)
     }
+
     public void ShowDim(Color _ignored)
     {
-        ToggleRenderers(true);                      // keep visible while dim
-        ApplyParticleAlpha(0.3f);
+        // FIX: Dim should still be visible.
+        ToggleShardRenderers(true);
+
+        // Make shards feel “nearly black”
+        SetShardTint(dimShardTint);
+
+        // Keep some subtle particle presence (optional)
+        ApplyParticleAlpha(0.25f);
+        if (particles && !particles.isPlaying) particles.Play();
+    }
+
+    public void HideAll()
+    {
+        ToggleShardRenderers(false);
+        // Bubble should be hidden when the star is truly hidden
+        HideSafetyBubble();
+    }
+    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint)
+    {
+        if (!bubbleRoot) return;
+        bubbleRoot.gameObject.SetActive(true);
+
+        // Scale ONLY the fill sprite (not the whole bubbleRoot)
+        if (bubbleSprite)
+        {
+            float diameter = Mathf.Max(0.01f, radiusWorld * 2f);
+            bubbleSprite.transform.localScale = new Vector3(diameter, diameter, 1f);
+
+            var c = bubbleTint;
+            c.a = bubbleFillAlpha;
+            bubbleSprite.color = c;
+        }
+
+        // Keep the particle system transform at identity scale so it doesn't drift
+        if (bubbleEdgeParticles)
+        {
+            bubbleEdgeParticles.transform.localScale = Vector3.one;
+
+            var shape = bubbleEdgeParticles.shape;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = radiusWorld;              // THIS is the actual edge size
+            shape.radiusThickness = 0f;              // if present; keeps it a ring
+
+            var main = bubbleEdgeParticles.main;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+
+            var ec = bubbleTint; ec.a = bubbleEdgeAlpha;
+            main.startColor = new ParticleSystem.MinMaxGradient(ec);
+
+            if (!bubbleEdgeParticles.isPlaying) bubbleEdgeParticles.Play();
+        }
+
+        SetShardTint(shardInnerTint);
+        ToggleShardRenderers(true);
+    }
+
+    public void HideSafetyBubble()
+    {
+        if (!bubbleRoot) return;
+        bubbleRoot.gameObject.SetActive(false);
+
+        if (bubbleEdgeParticles && bubbleEdgeParticles.isPlaying)
+            bubbleEdgeParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
     private void Update()
@@ -79,49 +176,85 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             Color currentColor = activeSprite.color;
             currentColor.a = Mathf.Lerp(currentColor.a, pulseAlphaMax, Time.deltaTime * alphaDirection);
             activeSprite.color = currentColor;
+
             if (currentColor.a <= pulseAlphaMin || currentColor.a >= pulseAlphaMax)
-            {
                 alphaDirection *= -1;
-            }
         }
     }
 
-    public void HighlightActive(Transform active, Color c, float alpha = 0.95f) { 
-        if (!active) return; 
+    public void HighlightActive(Transform active, Color c, float alpha = 0.95f)
+    {
+        if (!active) return;
         var sr = active.GetComponent<SpriteRenderer>();
         activeSprite = sr;
         if (!sr) return;
+
         sr.sprite = activeDiamond;
-        c.a = alpha; 
+        c.a = alpha;
         sr.color = c;
-        Vector3 scale = active.localScale;
-        //scale.x = scale.y = scale.z = .5f;
-        active.localScale = scale;
+        active.localScale = active.localScale; // leaving your scale logic intact
     }
-    void SetTintWithParticles(Color c)
+
+    public void SetVeilOnNonActive(Color veil, Transform active)
+    {
+        var srs = GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < srs.Length; i++)
+        {
+            var sr = srs[i];
+            if (!sr) continue;
+
+            // keep bubble alone
+            if (bubbleSprite && sr == bubbleSprite) continue;
+
+            sr.sprite = diamond;
+
+            if (active != null && sr.transform == active) continue;
+
+            var c = sr.color;
+            c.a = veil.a;
+            sr.color = c;
+            srs[i].transform.localScale = Vector3.one;
+        }
+    }
+
+    private void SetShardTint(Color c)
+    {
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0)
+            CacheShardRenderers();
+
+        for (int i = 0; i < _shardSpriteRenderers.Length; i++)
+        {
+            var sr = _shardSpriteRenderers[i];
+            if (!sr) continue;
+
+            // Don’t stomp the currently “active” sprite’s alpha pulsing too harshly
+            // unless you want that. For now: apply tint uniformly.
+            sr.color = c;
+        }
+    }
+
+    private void SetTintWithParticles(Color c)
     {
         c.a = .2f;
-        // Particles (new + in-flight)
+
         var pss = GetComponentsInChildren<ParticleSystem>(true);
         for (int i = 0; i < pss.Length; i++)
         {
-            var ps = pss[i]; if (!ps) continue;
+            var ps = pss[i];
+            if (!ps) continue;
 
-            // New particles
             var main = ps.main;
             var keepA = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : c.a;
             var start = c; start.a = keepA;
             main.startColor = new ParticleSystem.MinMaxGradient(start);
 
-            // In-flight particles
             var col = ps.colorOverLifetime;
             col.enabled = true;
 
-            // Flatten to a constant gradient at 'start'
             var grad = new Gradient();
             grad.SetKeys(
-                new [] { new GradientColorKey(start, 0f), new GradientColorKey(start, 1f) },
-                new []
+                new[] { new GradientColorKey(start, 0f), new GradientColorKey(start, 1f) },
+                new[]
                 {
                     new GradientAlphaKey(0, 0f), new GradientAlphaKey(.5f, .5f),
                     new GradientAlphaKey(0f, 1f)
@@ -131,44 +264,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
-        // Map "count → angles" for the stacked-star look Clay described.
-    static readonly Dictionary<int, float[]> kPetalAngles = new Dictionary<int, float[]> {
-                { 1, new[]{   0f } },
-                { 2, new[]{   0f,  90f } },          // 4-point star (diamonds)
-                { 3, new[]{   0f,  45f,  90f } },    // layered fan: 0/45/90
-                { 4, new[]{   0f,  30f,  60f,  90f } },
-                { 5, new[]{   0f,  22.5f, 45f, 67.5f, 90f } },
-            };
-
-        public float[] GetPetalAngles(int count)
-        {
-            if (count <= 0) return Array.Empty<float>();
-            if (kPetalAngles.TryGetValue(count, out var preset)) return preset;
-            // fallback: evenly subdivide 0..90 degrees
-                var arr = new float[count];
-            float step = 90f / Mathf.Max(1, count - 1);
-            for (int i = 0; i < count; i++) arr[i] = step * i;
-            return arr;
-        }
-        public void SetVeilOnNonActive(Color veil, Transform active)
-        {
-            var srs = GetComponentsInChildren<SpriteRenderer>(true);
-            for (int i = 0; i < srs.Length; i++)
-            {
-                var sr = srs[i];
-                sr.sprite = diamond;
-                if (!sr) continue;
-                if (active != null && sr.transform == active) continue; // skip active
-                var c = sr.color; c.a = veil.a; sr.color = c;
-                srs[i].transform.localScale = Vector3.one;
-            }
-        }
-
-    public void HideAll()
-    {
-        ToggleRenderers(false);
-    }
-    void ApplyParticleAlpha(float a)
+    private void ApplyParticleAlpha(float a)
     {
         var pss = GetComponentsInChildren<ParticleSystem>(true);
         foreach (var ps in pss)
@@ -180,17 +276,26 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
-    void HandleVelocity(Vector2 v)
+    private void ToggleShardRenderers(bool on)
     {
-        _lastVel = v;
-//        OrientToVelocity(v);
-    }
+        // Do NOT use Renderer[] anymore; we only want to affect shards.
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0)
+            CacheShardRenderers();
 
-    void ToggleRenderers(bool on)
+        for (int i = 0; i < _shardSpriteRenderers.Length; i++)
+            if (_shardSpriteRenderers[i]) _shardSpriteRenderers[i].enabled = on;
+    }
+    public float[] GetPetalAngles(int count, float rotationOffsetDeg = 0f)
     {
-        var rends = GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < rends.Length; i++)
-            if (rends[i]) rends[i].enabled = on;
+        if (count <= 0) return Array.Empty<float>();
+
+        float[] angles = new float[count];
+        float step = 360f / count;
+
+        for (int i = 0; i < count; i++)
+            angles[i] = rotationOffsetDeg + (step * i);
+
+        return angles;
     }
 
 }
