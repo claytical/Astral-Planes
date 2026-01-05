@@ -411,7 +411,6 @@ public class DrumTrack : MonoBehaviour
         {
             _dust.ApplyProfile(bootProfile);
             SyncTileWithScreen();
-            _dust.cycleMode     = CosmicDustGenerator.MazeCycleMode.Progressive;
             _dust.progressiveMaze = true;
         }
 
@@ -575,11 +574,6 @@ public class DrumTrack : MonoBehaviour
 
         ScheduleDrumLoopChange(clip);
 
-        // Keep your dust behavior consistent with phase changes.
-        if (_dust != null)
-        {
-            _dust.cycleMode = CosmicDustGenerator.MazeCycleMode.Progressive;
-        }
     }
     /// <summary>
     /// Apply a normalized intensity value [0..1] to the drum system by

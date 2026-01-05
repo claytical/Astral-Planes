@@ -49,32 +49,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  prefabReferenceScale: {x: 1, y: 1, z: 1}
-  particleSystem: {fileID: 8685539736285126848}
-  particleFootprintMul: 0.5
-  starRemovesWithoutRegrow: 0
-  starAlphaFadeBias: 0.9
-  hardness01: 0
-  slowBrake: 0.231
-  speedScale: 0.83
-  accelScale: 0.662
-  dissipateOnExit: 0
-  energyDrainPerSecond: 0.25
-  noDrainWhileBoosting: 0
-  nonBoostSecondsToBreak: 0.15
-  temporaryRegrowDelaySeconds: 8
-  minScaleFactor: 0.3
-  shrinkStep: 0.104
-  shrinkEaseTime: 0.05
-  regrowDelay: 0.32
-  regrowTime: 2.06
+  visual:
+    prefabReferenceScale: {x: 0.25, y: 0.25, z: 0.25}
+    particleSystem: {fileID: 8685539736285126848}
+    particleFootprintMul: 0.5
+    starRemovesWithoutRegrow: 0
+    starAlphaFadeBias: 0
+    fadeSeconds: 0
+  interaction:
+    speedScale: 0
+    accelScale: 0
+    energyDrainPerSecond: 0
+    noDrainWhileBoosting: 0
+  clearing:
+    hardness01: 0
+    nonBoostSecondsToBreak: 0
+    temporaryRegrowDelaySeconds: 0
   behavior: 0
   slowFactor: 0.2
   slowDuration: 0.1
   lateralForce: 1.59
   turbulence: 0.97
-  fadeSeconds: 0.25
-  fullScale: {x: 1, y: 1, z: 1}
   terrainCollider: {fileID: 0}
   solidLayer: 0
   nonBlockingLayer: 0
