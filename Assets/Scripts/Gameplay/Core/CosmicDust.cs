@@ -175,8 +175,8 @@ public class CosmicDust : MonoBehaviour {
     }
     public void SetVisualAlpha(float a)
     {
-        if (GetComponent<ParticleSystem>() == null) return;
-        var main = GetComponent<ParticleSystem>().main;
+        if (visual.particleSystem == null) return;
+        var main = visual.particleSystem.main;
 
         // Preserve tint but adjust alpha
         Color c = _currentTint; // however you store tint; otherwise keep a cached tint
@@ -184,7 +184,7 @@ public class CosmicDust : MonoBehaviour {
         main.startColor = c;
 
         // Optionally, stop emission entirely below cutoff
-        var emission = GetComponent<ParticleSystem>().emission;
+        var emission = visual.particleSystem.emission;
         emission.enabled = a > 0.001f;
     }
     public void ConfigureForPhase(MusicalPhase phase)
@@ -299,16 +299,16 @@ public class CosmicDust : MonoBehaviour {
     }
     public void SetTint(Color tint)
     {
-        if (!GetComponent<ParticleSystem>()) return;
+        if (!visual.particleSystem) return;
 
         // Keep the caller's alpha; ParticleAlphaFadeIn will animate it when needed.
         _currentTint = tint;
 
-        var main = GetComponent<ParticleSystem>().main;
+        var main = visual.particleSystem.main;
         main.startColor = tint;
 
         // If you want a subtle lifetime fade, set it once; otherwise disable it for solid visibility
-        var col = GetComponent<ParticleSystem>().colorOverLifetime;
+        var col = visual.particleSystem.colorOverLifetime;
         col.enabled = true;
 
         // Build a *visible* gradient (soft in/out), not near-zero most of the time.
@@ -376,12 +376,12 @@ public class CosmicDust : MonoBehaviour {
         transform.localScale = fullScale;
         if (terrainCollider != null) terrainCollider.enabled = true;
 
-        if (GetComponent<ParticleSystem>() != null)
+        if (visual.particleSystem != null)
         {
-            var emission = GetComponent<ParticleSystem>().emission;
+            var emission = visual.particleSystem.emission;
             emission.enabled = false;
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            GetComponent<ParticleSystem>().Clear(true);
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            visual.particleSystem.Clear(true);
         }
 
 
@@ -400,9 +400,9 @@ public class CosmicDust : MonoBehaviour {
     }
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
-        if (GetComponent<ParticleSystem>() == null) yield break;
+        if (visual.particleSystem == null) yield break;
 
-        var main = GetComponent<ParticleSystem>().main;
+        var main = visual.particleSystem.main;
         Color from = (main.startColor.mode == ParticleSystemGradientMode.Color)
             ? main.startColor.color
             : Color.white;
@@ -423,9 +423,9 @@ public class CosmicDust : MonoBehaviour {
     { 
         DisableInteractionImmediately();
         // If you do NOT want lingering particles when pooled:
-        if (GetComponent<ParticleSystem>() != null) { 
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
-            GetComponent<ParticleSystem>().Clear(true);
+        if (visual.particleSystem != null) { 
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
+            visual.particleSystem.Clear(true);
         }
         var cHide = _currentTint; cHide.a = 0f;
         SetTint(cHide);
@@ -455,7 +455,7 @@ public class CosmicDust : MonoBehaviour {
     private void SyncParticlesToCollider()
     {
         if (visual.particleSystem == null || _box == null) return;
-
+        Debug.Log($"[DUST:VISUAL] Particle System and Box2D Collider Assigned");
         // World size of the box collider:
         // WorldSize = localSize * lossyScale
         Vector2 world = new Vector2(
@@ -474,12 +474,12 @@ public class CosmicDust : MonoBehaviour {
         // This prevents an authored "10" from dwarfing a 1-unit cell.
         var main = visual.particleSystem.main;
         main.startSize = Mathf.Min(main.startSize.constant, Mathf.Min(world.x, world.y) *.5f);
-        Debug.Log($"[DUST:SYNC] boxWorld=({world.x:F3},{world.y:F3}) psScale={GetComponent<ParticleSystem>().transform.localScale} mode={GetComponent<ParticleSystem>().main.scalingMode} shapeScale={GetComponent<ParticleSystem>().shape.scale}", this);
 
     }
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
+        Debug.Log($"[DUST:VISUAL] Particle System Assigned, Applying Particle Footprint");
 
         // Ensure PS scales with parent, but then we shrink the PS itself to create margin.
         var main = visual.particleSystem.main;
@@ -497,13 +497,14 @@ public class CosmicDust : MonoBehaviour {
     }
     private IEnumerator GrowIn()
     {
+
         float duration = (_growInOverride > 0f)
             ? _growInOverride
             : 5f;
 
-        if (GetComponent<ParticleSystem>() == null || duration <= 0f) yield break;
+        if (visual.particleSystem == null || duration <= 0f) yield break;
         
-        var main = GetComponent<ParticleSystem>().main; 
+        var main = visual.particleSystem.main; 
         Color baseCol = _currentTint;
         float t = 0f; 
         while (t < duration) { 
@@ -515,11 +516,12 @@ public class CosmicDust : MonoBehaviour {
         }
         // Ensure fully visible at end
         main.startColor = new Color(baseCol.r, baseCol.g, baseCol.b, 1f);
+
     }
 
     private IEnumerator FadeOutThenPoolVisualOnly(float duration) {
-        if (GetComponent<ParticleSystem>() != null) 
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmitting); 
+        if (visual.particleSystem!= null) 
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting); 
         float t = 0f;
         Color from = _currentTint;
         Color to = _currentTint; to.a = 0f;
@@ -534,8 +536,8 @@ public class CosmicDust : MonoBehaviour {
         }
             
         SetTint(to);
-        if (GetComponent<ParticleSystem>() != null) 
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
+        if (visual.particleSystem != null) 
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
         if (gen != null) gen.ReturnDustToPoolPublic(gameObject);
         else gameObject.SetActive(false);
     }
@@ -666,8 +668,8 @@ public class CosmicDust : MonoBehaviour {
     private IEnumerator FadeOutThenPool(float duration)
     {
         // Let already-emitted particles remain; stop emission only.
-        if (GetComponent<ParticleSystem>() != null)
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
         float t = 0f;
         Color from = _currentTint;
@@ -689,8 +691,8 @@ public class CosmicDust : MonoBehaviour {
 
         SetTint(to);
 
-        if (GetComponent<ParticleSystem>() != null)
-            GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         // Hand back to generator/pool via your existing path.
         if (_drumTrack != null && gen != null)
@@ -705,17 +707,17 @@ public class CosmicDust : MonoBehaviour {
     }
     private void ResetAndPlayParticles()
     {
-        if (GetComponent<ParticleSystem>() == null) return;
+        if (visual.particleSystem == null) return;
 
-        var r = GetComponent<ParticleSystem>().GetComponent<ParticleSystemRenderer>();
+        var r = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
         if (r != null) r.enabled = true;
 
-        var emission = GetComponent<ParticleSystem>().emission;
+        var emission = visual.particleSystem.emission;
         emission.enabled = true;
 
-        GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        GetComponent<ParticleSystem>().Simulate(0f, true, true, true);
-        GetComponent<ParticleSystem>().Play(true);
+        visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        visual.particleSystem.Simulate(0f, true, true, true);
+        visual.particleSystem.Play(true);
     }
 
 }
