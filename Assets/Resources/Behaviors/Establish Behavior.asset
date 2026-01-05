@@ -13,14 +13,12 @@ MonoBehaviour:
   m_Name: Establish Behavior
   m_EditorClassIdentifier: 
   personality: 0
-  mazeColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  mazeColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.5372549}
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 1
   rolePattern: 03000000000000000100000002000000
   previewPulseScale: 1.2
-  beatsPerRole: 4
-  fallbackBPM: 60
   pulseCurve:
     serializedVersion: 2
     m_Curve:
@@ -46,6 +44,8 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   inactiveShardTint: {r: 0.3, g: 0.3, b: 0.3, a: 0.6}
+  beatsPerRole: 4
+  fallbackBPM: 60
   rotationMode: 4
   minPreviewIntervalSec: 2
   personalitySpeedMul: 0.25
@@ -74,14 +74,19 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   progressionMulRange: 0
-  baseCellsPerSecond: 2
   starDriftSpeed: 1
   starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 2
-  dustShrinkUnitsPerSec: 1
-  dustFalloff:
+  dustRegrowDelayMul: 8
+  starKeepsDustClear: 1
+  starKeepClearRadiusCells: 10
+  enableSafetyBubble: 1
+  safetyBubbleRadiusCells: 4
+  bubbleRadiusCells: 5
+  dustErodeRadiusWorld: 2
+  dustErodeUnitsPerSecond: 1
+  dustErodeFalloff:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
@@ -105,13 +110,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  feedsDust: 0
-  dustRegrowDelayMul: 8
-  starKeepsDustClear: 1
-  starKeepClearRadiusCells: 3
-  enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 4
-  bubbleRadiusCells: 5
   ejectionStyle: 0
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
