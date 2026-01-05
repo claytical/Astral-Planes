@@ -72,26 +72,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Dictionary<Vector2Int, GameObject> _hexMap = new(); // Position → Hex
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
+    private Dictionary<MusicalPhase, float> _regrowDelayMulByPhase = new();
 
-    // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MusicalPhase).
-    private readonly Dictionary<MusicalPhase, float> _regrowDelayMulByPhase = new();
-
-    public void ApplyDifficultyProfile(PhaseStarBehaviorProfile profile, MusicalPhase phase)
-    {
-        if (profile == null) return;
-        // Only apply what the profile currently expresses explicitly.
-        // Additional mappings (weather/erosion/progressive) can be layered in later without widening the public surface area.
-        SetRegrowDelayMultiplierForPhase(phase, profile.dustRegrowDelayMul);
-    }
-
-    public void SetRegrowDelayMultiplierForPhase(MusicalPhase phase, float mul)
-    {
-        mul = Mathf.Max(0.05f, mul);
-        _regrowDelayMulByPhase[phase] = mul;
-    }
-
-    private float GetRegrowDelayMul(MusicalPhase phase)
-        => _regrowDelayMulByPhase.TryGetValue(phase, out var m) ? m : 1f;
     private Dictionary<int, List<Vector2Int>> _featureCells = new(); // featureId -> cells
     private Dictionary<Vector2Int, int> _cellToFeature = new();     // grid -> featureId
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, 1f);
@@ -707,8 +689,10 @@ public class CosmicDustGenerator : MonoBehaviour
             _ => 32f
         };
 
-        delay *= GetRegrowDelayMul(phase);
-
+        float delayMul = 1f;
+        if (_regrowDelayMulByPhase != null && _regrowDelayMulByPhase.TryGetValue(phase, out var mul))
+            delayMul = Mathf.Max(0.05f, mul);
+        delay *= delayMul;
         _regrowthCoroutines[gridPos] = StartCoroutine(RegrowCellAfterDelay(gridPos, delay));
     }
 
@@ -919,7 +903,17 @@ public class CosmicDustGenerator : MonoBehaviour
             }
         }
     }
+    public void SetStarKeepClearWorld(
+        Vector2 worldCenter,
+        int radiusCells,
+        MusicalPhase phase
+    )
+    {
+        if (drums == null) return;
 
+        Vector2Int centerCell = drums.WorldToGridPosition(worldCenter);
+        SetStarKeepClear(centerCell, radiusCells, phase);
+    }
     /// <summary>
     /// Keeps a maneuvering pocket around the PhaseStar. Cells in this set are force-cleared and excluded from regrowth.
     /// Cells leaving the pocket are scheduled to regrow in-place.
@@ -1360,7 +1354,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
     }
 }
-    public void ErodeDustDiskFromVehicle(Vector3 centerWorld, float appetite, float radiusMul, float powerMul)
+    public void ErodeDustDiskFromVehicle(Vector3 centerWorld, float appetite = 1f, float radiusMul = 1f, float powerMul = 1f)
     {
         
         if (drums == null) return;
@@ -1370,13 +1364,13 @@ public class CosmicDustGenerator : MonoBehaviour
         if (w <= 0 || h <= 0) return;
 
         float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-        float rWorld = Mathf.Max(0.1f, vehicleErodeRadius * Mathf.Max(0.05f, radiusMul));
+        float rWorld   = Mathf.Max(0.1f, vehicleErodeRadius * Mathf.Max(0.1f, radiusMul));
         int rCells     = Mathf.CeilToInt(rWorld / cellSize);
 
         Vector2Int centerGrid = drums.WorldToGridPosition(centerWorld);
 
         int removed   = 0;
-        int budget   = Mathf.Max(1, Mathf.RoundToInt(vehicleErodePerTick * Mathf.Clamp01(appetite) * Mathf.Max(0.05f, powerMul)));
+        int budget    = Mathf.RoundToInt(vehicleErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f) * Mathf.Max(0.1f, powerMul));
 
         for (int gx = centerGrid.x - rCells; gx <= centerGrid.x + rCells; gx++)
         {
@@ -1672,6 +1666,19 @@ public bool TryGetDustWeatherForce(
         if (!_hexMap.TryGetValue(cell, out var go) || go == null) return false; 
         return go.TryGetComponent(out dust) && dust != null;
     }
+
+public void ApplyDifficultyProfile(PhaseStarBehaviorProfile profile, MusicalPhase phase)
+{
+    if (profile == null) return;
+
+    // Difficulty lever: global regrow delay multiplier per phase.
+    // >1 = slower regrow (gentler). <1 = faster regrow (more pressure).
+    _regrowDelayMulByPhase[phase] = Mathf.Max(0.05f, profile.dustRegrowDelayMul);
+
+    // Visual feedback
+    ApplyProfile(profile);
+}
+
 public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
