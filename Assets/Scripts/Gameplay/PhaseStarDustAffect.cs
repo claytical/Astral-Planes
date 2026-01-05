@@ -25,7 +25,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         // Optional: tie appetite to ONE profile scalar if you want
         // hue to also imply "hungriness". Otherwise leave it as 1
         // and just tune in the inspector.
-        appetiteMul = profile ? profile.dustShrinkUnitsPerSec : 1f;
+        appetiteMul = profile ? profile.dustErodeUnitsPerSecond : 1f;
 
         // Keep the simple drum flag wiring you already had
         star.OnArmed    += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true;  };
