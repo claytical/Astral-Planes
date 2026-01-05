@@ -252,37 +252,6 @@ public class MineNodeRailAgent : MonoBehaviour
             SetPath(path);
     }
 
-    public void ApplySpeed(PhaseStarBehaviorProfile profile, MusicalRole role, MusicalPhase phase)
-    {
-        float baseCps = (profile != null && profile.baseCellsPerSecond > 0f) ? profile.baseCellsPerSecond : 3.5f;
-
-        float roleMul = role switch
-        {
-            MusicalRole.Bass    => 0.75f,
-            MusicalRole.Harmony => 1.00f,
-            MusicalRole.Groove  => 1.10f,
-            MusicalRole.Lead    => 1.25f,
-            _                   => 1.00f
-        };
-
-        float phaseMul = 1f;
-        if (profile != null)
-        {
-            phaseMul = phase switch
-            {
-                MusicalPhase.Establish => profile.establishSpeedMul,
-                MusicalPhase.Evolve    => profile.evolveSpeedMul,
-                MusicalPhase.Intensify => profile.intensifySpeedMul,
-                MusicalPhase.Release   => profile.releaseSpeedMul,
-                MusicalPhase.Wildcard  => profile.wildcardSpeedMul,
-                MusicalPhase.Pop       => profile.popSpeedMul,
-                _ => 1f
-            };
-        }
-
-        cellsPerSecond = Mathf.Max(0.5f, baseCps * roleMul * phaseMul);
-    }
-
     IEnumerable<Vector2Int> Neighbors(Vector2Int c)
     {
         bool even = (c.y & 1) == 0;
