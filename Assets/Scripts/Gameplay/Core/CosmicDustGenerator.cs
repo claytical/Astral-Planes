@@ -13,15 +13,6 @@ public class CosmicDustGenerator : MonoBehaviour
     public float visualBottomExcludeViewport = 0.12f;  // bottom 12%: no dust particles
     [Range(0f, 0.2f)]
     public float visualFadeBandViewport = 0.05f;       // next 5%: fade in
-
-    public int iterations = 3;
-    [Header("Maze Cycle Control")]
-    public MazeCycleMode cycleMode = MazeCycleMode.Progressive;
-    public enum MazeCycleMode {
-        ClassicLoopAligned, // clear then regrow each loop (old behavior)
-        Progressive,        // add/remove features over time; DON'T run classic cycle each loop
-        ExternalControlled  // only run when explicitly requested by game logic
-    }
     
     Dictionary<Vector2Int, DustImprint> _imprints; 
     // Wear accumulation for imprint abrasion. 0..1 means “scuffed” → “dissipated”.
@@ -29,9 +20,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [Header("Maze Collision Shape")]
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
     public float cellClearanceWorld = 0f;
-
-    [Tooltip("CompositeCollider2D edge radius as a fraction of cell size (0.0–0.25 is typical).")]
-    [Range(0f, 0.25f)] public float edgeRadiusFrac = 0.08f;
     [Header("Imprint Abrasion (Non-Boost)")] 
     [SerializeField] private float abrasionWearPerSecondAtFullImpact = 0.65f;
     [SerializeField] private float abrasionDissipateFadeSeconds = 0.20f;
@@ -44,8 +32,6 @@ public class CosmicDustGenerator : MonoBehaviour
         public float hardness01;
     }
 
-    [Tooltip("Debounce: minimum seconds between classic cycles.")]
-    public float minClassicCycleInterval = 0.25f;
     [Header("Vehicle erosion (temporary)")]
     [SerializeField] private float vehicleErodeRadius = 1f;   // world units
     [SerializeField] private int vehicleErodePerTick = 2;       // max cells per call
@@ -53,10 +39,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private float mineNodeErodeRadius = 1f;
 
     [SerializeField] private int mineNodeErodePerTick = 10;
-    [Header("Dust Visual Footprint")]
-    [Range(0.8f, 1.6f)]
-    public float vwhidustFootprintMul = 1.15f;
-
     [Header("Tile Sizing")]
     [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox
     HashSet<Vector2Int> _permanentlyClearedCells;
@@ -79,11 +61,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private List<(Vector2Int grid, Vector3 pos)> _pendingSpawns = new();
     private readonly HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     private Coroutine _spawnRoutine;
-    private bool _isSpawningMaze = true, _cycleRunning = false;
-    private float _commitCooldownUntil, _epochStartTime;
-    private int _currentEpoch = 0, _nextFeatureId = 1, _progressiveLoop = 0;
-    double _lastClassicCycleDSP; 
-    private MusicalPhase _progressivePhase = MusicalPhase.Establish;
+    private bool _isSpawningMaze = true;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
     private int _mazeBuildId = 0;
@@ -98,14 +76,7 @@ public class CosmicDustGenerator : MonoBehaviour
     public event Action<Vector2Int?> OnMazeReady;
 
     [SerializeField] private float regrowCooldownSeconds = 3.0f;
-    [SerializeField] public bool  progressiveMaze = true;
-    [SerializeField] private int   maxFeatures = 3;                 // how many features we keep alive
-    [SerializeField] private int   addPerLoop  = 1;                 // features to add each loop
-    [SerializeField] private float featureSpawnBudgetFrac = 0.12f;  // of loop seconds, per new feature
-    [SerializeField] private float featureFadeDurationFrac = 0.25f; // of loop seconds, when removing oldest
     [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
-    private Vector2[,] flowField;
-    [SerializeField] private float globalTurbulence = 0.5f;
     private float hiveTimer;
     private Vector2[,] _flowField;
     [SerializeField] private float hiveShiftInterval = 4f;  // how often the hive changes its mind
@@ -113,8 +84,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private float baseFlowStrength  = 0.20f; // world units per second
     [SerializeField] private float phaseFlowBias     = 0.15f; // extra per-phase bias
     private int _ffW = -1, _ffH = -1;
-    [SerializeField] private float vehicleInfluenceRadius = 3.5f;
-    [SerializeField] private float vehicleNudge = 0.25f; // world units per sec
     [SerializeField] private float starErodeRadius  = 1.2f;
     [SerializeField] private int   starErodePerTick = 6;   // how many tiles max per call
     private int _bulkTopologyDepth = 0;
@@ -2168,7 +2137,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
             // Threshold increases with hardness:
             // - softness (0) => ~0.25 required
             // - hardness (1) => ~0.75 required
-            float required = Mathf.Lerp(0.25f, 0.75f, dust.hardness01);
+            float required = Mathf.Lerp(0.25f, 0.75f, dust.clearing.hardness01);
             if (boostDamage01 < required)
                 return;
 
@@ -2252,19 +2221,15 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
             _fillMap[pos] = Random.value < fillChance;
         }
 
-        for (int i = 0; i < iterations; i++)
-        {
-            var next = new Dictionary<Vector2Int, bool>();
-            foreach (var cell in _fillMap.Keys)
-            {
-                int n = CountFilledNeighbors(cell);
-                bool cur = _fillMap[cell];
-                if (cur && (n < 2 || n > 4)) next[cell] = false;
-                else if (!cur && n == 3)     next[cell] = true;
-                else                         next[cell] = cur;
-            }
-            _fillMap = next;
-        }
+        var next = new Dictionary<Vector2Int, bool>(); 
+        foreach (var cell in _fillMap.Keys) {
+            int n = CountFilledNeighbors(cell); 
+            bool cur = _fillMap[cell]; 
+            if (cur && (n < 2 || n > 4)) next[cell] = false;
+            else if (!cur && n == 3)     next[cell] = true;
+            else                         next[cell] = cur;
+        } 
+        _fillMap = next;
 
         foreach (var kv in _fillMap)
         {

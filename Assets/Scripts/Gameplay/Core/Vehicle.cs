@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -925,12 +924,12 @@ public void DrainEnergy(float amount, string source = "Unknown")
             return;
         }
 
-        float required = Mathf.Lerp(0.25f, 0.75f, dust.hardness01);
+        float required = Mathf.Lerp(0.25f, 0.75f, dust.clearing.hardness01);
         required = Mathf.Min(required, boostCarveRequiredFloor01);
 
         float effectiveBoost = Mathf.Max(boostDamage01, boostCarveDamageFloor01);
 
-        Debug.Log($"[VEHICLE:DUST] effectiveBoost={effectiveBoost:F3} required={required:F3} hardness={dust.hardness01:F3}", this);
+        Debug.Log($"[VEHICLE:DUST] effectiveBoost={effectiveBoost:F3} required={required:F3} hardness={dust.clearing.hardness01:F3}", this);
 
         if (effectiveBoost < required) return;
 
@@ -943,7 +942,7 @@ public void DrainEnergy(float amount, string source = "Unknown")
     {
         if (!gen.TryGetDustAt(cell, out var dust) || dust == null) return;
 
-        float required = Mathf.Lerp(0.25f, 0.75f, dust.hardness01);
+        float required = Mathf.Lerp(0.25f, 0.75f, dust.clearing.hardness01);
         required = Mathf.Min(required, boostCarveRequiredFloor01);
 
         float effectiveBoost = Mathf.Max(boostDamage01, boostCarveDamageFloor01);
