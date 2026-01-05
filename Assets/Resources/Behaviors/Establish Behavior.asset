@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Establish Behavior
   m_EditorClassIdentifier: 
   personality: 0
-  mazeColor: {r: 1, g: 0.5490196, b: 0, a: 0.33333334}
+  mazeColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 1
@@ -106,7 +106,12 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   feedsDust: 0
-  dustRegrowDelayMul: 2
+  dustRegrowDelayMul: 8
+  starKeepsDustClear: 1
+  starKeepClearRadiusCells: 3
+  enableSafetyBubble: 1
+  safetyBubbleRadiusCells: 4
+  bubbleRadiusCells: 5
   ejectionStyle: 0
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}

@@ -28,18 +28,20 @@ public class PhaseStar : MonoBehaviour
     [Header("Profiles & Prefs")]
     [SerializeField] private SpawnStrategyProfile spawnStrategyProfile;
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
+
+    // === Difficulty-profile-driven space controls ===
     private bool _previewInitialized;
     [Header("Movement & Timing")]
     [SerializeField] private float shardFlightSeconds = 0.65f; // time to fly the node to its grid cell
     private Vector2 lastImpactDirection;
     [Header("Dust / Space")]
     [Tooltip("If enabled, the PhaseStar force-clears a small pocket of dust around itself (temporary), ensuring maneuvering space.")]
-    [SerializeField] private bool starKeepsDustClear = true;
+    [SerializeField] private bool StarKeepsDustClear = true;
     [Header("Timing: Auto-rotate preview selection")] 
     [Tooltip("If true, the highlighted preview shard (and thus the next MineNode kind) rotates by 1 at each drum loop boundary while the star is idle/armed.")] 
     [SerializeField] private bool rotateSelectionOnLoopBoundary = true;
     [Tooltip("Radius in grid cells for the PhaseStar maneuvering pocket.")]
-    [SerializeField] private int starKeepClearRadiusCells = 2;
+    [SerializeField] private int StarKeepClearRadiusCells = 2;
     [Header("Safety / Self-heal")] 
     [Tooltip("If a MineNode resolves but no collectable burst ever materializes (or the last burst never reports cleared), " + "PhaseStar can become stuck in a waiting state. This is a self-heal timeout (in loop boundaries).")] 
     [SerializeField] private int collectableClearTimeoutLoops = 2;
@@ -78,10 +80,10 @@ public class PhaseStar : MonoBehaviour
     private bool _awaitingCollectableClear;
 // --- Safety Bubble (spawned on poke; persists until collectables clear) ---
     [Header("Safety Bubble (on poke)")]
-    [SerializeField] private bool enableSafetyBubble = true;
+    [SerializeField] private bool EnableSafetyBubble = true;
 
     [Tooltip("Bubble radius in grid cells. Primary difficulty lever.")]
-    [SerializeField] private int safetyBubbleRadiusCells = 4;
+    [SerializeField] private int SafetyBubbleRadiusCells = 4;
 
     private bool _safetyBubbleActive;
     private Vector2Int _safetyBubbleCenterCell;
@@ -95,7 +97,7 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration;              // seconds (time authority)
     private int   _lastLoopSeen = -1;         // loop wrap detector
-    [SerializeField] private int bubbleRadiusCells = 4;
+    [SerializeField] private int BubbleRadiusCells = 4;
 
     [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f);              // fill/edge tint (alpha handled by visuals)
     [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
@@ -204,6 +206,9 @@ public class PhaseStar : MonoBehaviour
         }
 
         behaviorProfile = profile != null ? profile : behaviorProfile;
+
+        // Let the PhaseStarBehaviorProfile drive maze regeneration pacing for this phase.
+        GameFlowManager.Instance?.dustGenerator?.ApplyDifficultyProfile(behaviorProfile, _assignedPhase);
         _targets.Clear();
         if (targets != null) _targets.AddRange(targets.Where(t => t));
         _drum = drum; 
@@ -244,12 +249,12 @@ public class PhaseStar : MonoBehaviour
 
     private void ActivateSafetyBubble()
     {
-        if (!enableSafetyBubble) return;
+        if (!EnableSafetyBubble) return;
 
         float cell = ComputeCellWorldSize();
 
         // +0.5f gives the bubble a little breathing room relative to discrete cells
-        _bubbleRadiusWorld = (bubbleRadiusCells + 0.5f) * cell;
+        _bubbleRadiusWorld = (BubbleRadiusCells + 0.5f) * cell;
 
         _bubbleActive = true;
 
@@ -304,7 +309,7 @@ public class PhaseStar : MonoBehaviour
 
             // Chebyshev distance: square-ish bubble aligned to your grid.
             int d = Mathf.Max(dx, dy);
-            if (d <= Mathf.Max(0, star.safetyBubbleRadiusCells))
+            if (d <= Mathf.Max(0, star.SafetyBubbleRadiusCells))
                 return true;
         }
 
@@ -313,13 +318,13 @@ public class PhaseStar : MonoBehaviour
 
     void Update()
     {
-        if (starKeepsDustClear)
+        if (StarKeepsDustClear)
         {
             if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
                 var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
 
-                int radiusCells = _bubbleActive ? bubbleRadiusCells : starKeepClearRadiusCells;
+                int radiusCells = _bubbleActive ? BubbleRadiusCells : StarKeepClearRadiusCells;
 
                 gfm.dustGenerator.SetStarKeepClear(
                     gfm.activeDrumTrack.WorldToGridPosition(transform.position),
@@ -863,7 +868,7 @@ public void OnLoopBoundary_RearmIfNeeded()
     private void OnDisable()
     {
          SafeUnsubscribeAll();
-        if (!starKeepsDustClear) return;
+        if (!StarKeepsDustClear) return;
         var gen = gfm != null ? gfm.dustGenerator : null;
         if (gen == null) return;
 

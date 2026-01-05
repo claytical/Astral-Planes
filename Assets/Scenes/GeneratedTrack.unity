@@ -11498,27 +11498,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10df134e68a684e7fa84763b72dde178, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
-  refs:
-    dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c,
-      type: 3}
-    activeDustRoot: {fileID: 823134540}
-  visualExclusion:
-    bottomExcludeViewport: 0.12
-    fadeBandViewport: 0.05
-  mazeShape:
-    cellClearanceWorld: 0
-  abrasion:
-    wearPerSecondAtFullImpact: 0.65
-    dissipateFadeSeconds: 0.2
-    tint: {r: 0.95, g: 0.25, b: 0.15, a: 0.35}
-    hardnessAtFullWear: 0.9
-  erosion:
-    vehicleErodeRadius: 1
-    vehicleErodePerTick: 2
-    mineNodeErodeRadius: 1
-    mineNodeErodePerTick: 10
-    starErodeRadius: 1.2
-    starErodePerTick: 6
+  dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
+  activeDustRoot: {fileID: 823134540}
+  visualBottomExcludeViewport: 0.151
+  visualFadeBandViewport: 0.0391
+  iterations: 3
+  cycleMode: 1
+  cellClearanceWorld: 0
+  edgeRadiusFrac: 0.08
+  abrasionWearPerSecondAtFullImpact: 0.65
+  abrasionDissipateFadeSeconds: 0.2
+  abrasionTint: {r: 0.95, g: 0.25, b: 0.15, a: 0.35}
+  abrasionHardnessAtFullWear: 0.9
+  minClassicCycleInterval: 0.25
+  vehicleErodeRadius: 1
+  vehicleErodePerTick: 5
+  mineNodeErodeRadius: 1
+  mineNodeErodePerTick: 10
+  vwhidustFootprintMul: 1.15
   tileDiameterWorld: 1
   hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
@@ -11540,6 +11537,8 @@ MonoBehaviour:
   phaseFlowBias: 0.15
   vehicleInfluenceRadius: 3.5
   vehicleNudge: 0.25
+  starErodeRadius: 1.2
+  starErodePerTick: 6
   compositeCollider: {fileID: 869126479}
   compositeRebuildMinInterval: 0.1
   dustTerrainMask:

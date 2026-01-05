@@ -50,9 +50,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   visual:
-    prefabReferenceScale: {x: 0.25, y: 0.25, z: 0.25}
+    prefabReferenceScale: {x: 0.35, y: 0.35, z: 0.35}
     particleSystem: {fileID: 8685539736285126848}
-    particleFootprintMul: 0.5
+    particleFootprintMul: 0.775
     starRemovesWithoutRegrow: 0
     starAlphaFadeBias: 0
     fadeSeconds: 0

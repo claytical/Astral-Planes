@@ -17,7 +17,7 @@ MonoBehaviour:
   description: Earthy and grounded. Driven by groove and plucked rhythm.
   arcadeMaxSpeed: 11
   arcadeAccel: 16
-  arcadeBoostAccel: 70
+  arcadeBoostAccel: 80
   arcadeLinearDamping: 0.25
   arcadeAngularDamping: 0.5
   requireBoostForThrust: 0
@@ -26,6 +26,8 @@ MonoBehaviour:
   stopAngularSpeed: 5
   inputDeadzone: 0.2
   envScaleFloor: 0.6
+  carveRadiusMul: 1.1
+  carvePowerMul: 3
   mass: 1
   capacity: 10
   burnEfficiency: 0.95
