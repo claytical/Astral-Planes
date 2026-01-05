@@ -202,7 +202,7 @@ public class GameFlowManager : MonoBehaviour
     {
         // When ON: hide gameplay visuals (maze + noteviz), coral is shown by PlayPhaseBridge.
         // When OFF: show gameplay visuals again.
-        if (dustGenerator.poolRoot) dustGenerator.poolRoot.gameObject.SetActive(!on);
+        if (dustGenerator) dustGenerator.gameObject.SetActive(!on);
 
         if (noteViz && noteViz.GetUIParent())
             noteViz.GetUIParent().gameObject.SetActive(!on);
