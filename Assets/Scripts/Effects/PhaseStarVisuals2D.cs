@@ -12,9 +12,10 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     public Sprite diamond;
     public Sprite activeDiamond;
 
-    private static float pulseAlphaMax = 1f;
-    private static float pulseAlphaMin = .5f;
-    private float alphaDirection = 1f;
+    private float __pulseAlphaMax = 1f;
+    private float __pulseAlphaMin = 0.5f;
+    private float _pulseSpeed = 1f;
+private float alphaDirection = 1f;
     private SpriteRenderer activeSprite;
 
     public ParticleSystem particles;
@@ -39,6 +40,19 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         _profile = profile;
 
+        // Pulse tuning (driven by profile; sensible fallbacks)
+        if (_profile != null)
+        {
+            _pulseSpeed    = Mathf.Max(0.01f, _profile.particlePulseSpeed);
+            __pulseAlphaMin = Mathf.Clamp01(_profile.starAlphaMin);
+            __pulseAlphaMax = Mathf.Clamp01(_profile.starAlphaMax);
+            if (__pulseAlphaMax < __pulseAlphaMin)
+            {
+                // Guard against inverted ranges
+                float tmp = __pulseAlphaMax; __pulseAlphaMax = __pulseAlphaMin; __pulseAlphaMin = tmp;
+            }
+        }
+
         // Existing event hookups
         star.OnArmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true; };
         star.OnDisarmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = false; };
@@ -51,14 +65,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
         if (bubbleRoot)
         {
-                        // Defensive: ensure bubbleRoot is attached to this visuals rig so it follows the star.
-            if (!bubbleRoot.IsChildOf(transform))
-            {
-                bubbleRoot.SetParent(transform, worldPositionStays: false);
-                bubbleRoot.localPosition = Vector3.zero;
-                bubbleRoot.localRotation = Quaternion.identity;
-            }
-if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
+            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
             if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
         }
 
@@ -181,10 +188,10 @@ if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRender
         if (activeSprite != null)
         {
             Color currentColor = activeSprite.color;
-            currentColor.a = Mathf.Lerp(currentColor.a, pulseAlphaMax, Time.deltaTime * alphaDirection);
+            currentColor.a = Mathf.Lerp(currentColor.a, __pulseAlphaMax, Time.deltaTime * alphaDirection * _pulseSpeed);
             activeSprite.color = currentColor;
 
-            if (currentColor.a <= pulseAlphaMin || currentColor.a >= pulseAlphaMax)
+            if (currentColor.a <= __pulseAlphaMax || currentColor.a >= __pulseAlphaMax)
                 alphaDirection *= -1;
         }
     }

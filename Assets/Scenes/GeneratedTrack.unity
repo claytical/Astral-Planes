@@ -130,7 +130,6 @@ GameObject:
   m_Component:
   - component: {fileID: 45202785}
   - component: {fileID: 45202786}
-  - component: {fileID: 45202787}
   m_Layer: 5
   m_Name: NoteRows
   m_TagString: Untagged
@@ -195,19 +194,6 @@ MonoBehaviour:
     type: 3}
   binInactiveColor: {r: 1, g: 1, b: 1, a: 0.2}
   binActiveColor: {r: 1, g: 1, b: 1, a: 0.9}
---- !u!114 &45202787
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 45202784}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1abbe192d6e264875b6a1f01dd91277d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cadenceSeconds: 0.08
 --- !u!1 &48689784
 GameObject:
   m_ObjectHideFlags: 0
@@ -419,37 +405,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &182043767
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 182043768}
-  m_Layer: 3
-  m_Name: Background
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &182043768
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 182043767}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1041262112}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &197216899
 GameObject:
   m_ObjectHideFlags: 0
@@ -11749,60 +11704,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!1 &1041262110
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1041262112}
-  - component: {fileID: 1041262113}
-  m_Layer: 0
-  m_Name: BackgroundEffects
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1041262112
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1041262110}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.2, y: 0.2, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 182043768}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1041262113
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1041262110}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38af457dd4bf843ccbf12554753ee8b6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  centralStarPrefab: {fileID: 4669415747821478303, guid: f8c3d7b5ce61f4b159dad5814cfcbd2d,
-    type: 3}
-  planetPrefab: {fileID: 4669415747821478303, guid: 2166ef6feab6b47d2a13c9baee67b909,
-    type: 3}
-  drumTrack: {fileID: 1354683682}
-  systemSpacing: 6
-  clusterScale: 1.5
-  baseOrbitSpeed: 10
-  orbitRadiusStep: 0.5
 --- !u!1 &1080859562
 GameObject:
   m_ObjectHideFlags: 0
@@ -14495,6 +14396,5 @@ SceneRoots:
   - {fileID: 318370297}
   - {fileID: 2130912947}
   - {fileID: 51606787}
-  - {fileID: 1041262112}
   - {fileID: 2067870202}
   - {fileID: 869126478}
