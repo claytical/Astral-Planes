@@ -496,7 +496,6 @@ public class CosmicDust : MonoBehaviour {
     private void SyncParticlesToCollider()
     {
         if (visual.particleSystem == null || _box == null) return;
-        Debug.Log($"[DUST:VISUAL] Particle System and Box2D Collider Assigned");
         // World size of the box collider:
         // WorldSize = localSize * lossyScale
         Vector2 world = new Vector2(
@@ -520,7 +519,6 @@ public class CosmicDust : MonoBehaviour {
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
-        Debug.Log($"[DUST:VISUAL] Particle System Assigned, Applying Particle Footprint");
 
         // Ensure PS scales with parent, but then we shrink the PS itself to create margin.
         var main = visual.particleSystem.main;

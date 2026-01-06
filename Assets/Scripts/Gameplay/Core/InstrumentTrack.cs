@@ -489,7 +489,6 @@ public class InstrumentTrack : MonoBehaviour
         // If you track remaining per-burst, clear that too.
         _burstRemaining?.Clear();
         _burstSteps?.Clear();
-        _burstSteps?.Clear();
         return destroyed;
     }
     private float RemainingActiveWindowSec() {
@@ -822,9 +821,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         // Keep allocation, but mark as not filled
         SetBinFilled(binIdx, false);
 
-        // Optional: if you maintain other per-step registries, clear them here too.
-        // e.g., chord/progression bookkeeping, burst step maps, etc.
-
+        MarkLoopCacheDirty();
         Debug.Log($"[ASCEND][CLEAR_BIN] track={name} bin={binIdx} range=[{start},{end}) keptAllocated=true");
     }
 
@@ -1415,7 +1412,8 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         }
         if (_currentNoteSet != noteSet) SetNoteSet(noteSet);
 
-        int burstId = ++_nextBurstId;
+        int burstId = (forcedBurstId > 0) ? forcedBurstId : (++_nextBurstId);
+        if (forcedBurstId > 0) _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);        
         currentBurstId = burstId;
 
         Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
@@ -1524,11 +1522,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             HookExpandBoundary();
             return;
         }
-        Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");            
-        burstId = (forcedBurstId > 0) ? forcedBurstId : (++_nextBurstId);
-        if (forcedBurstId > 0) _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);
-        currentBurstId = burstId;
-
+        Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} ...ul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
         Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={burstId} noteSet={noteSet} " +
                   $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
                   $"loopMul={loopMultiplier} pendingExpand={IsExpansionPending} MaxSpawnCount={maxToSpawn}");
@@ -1963,6 +1957,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         var tag = goObj.GetComponent<MarkerTag>() ?? goObj.gameObject.AddComponent<MarkerTag>(); 
         tag.isPlaceholder = false;
         tag.burstId = burstId;
+        tag.ascendBurstId = burstId;
         // Ensure it is colored and emitting now
 //        var vnm = t.GetComponent<VisualNoteMarker>();
 //                if (vnm != null) vnm.Initialize(trackColor);
@@ -1975,6 +1970,11 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     {
         // Placeholder logic — adapt as needed for actual behavior detection
         return persistentLoopNotes.Any(n => n.note > 127); // example threshold
+    }
+    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
+    {
+        steps = null;
+        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
     }
     private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modified, Vector3 _)
     {
