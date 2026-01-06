@@ -106,10 +106,7 @@ public class PhaseStar : MonoBehaviour
 // Static “global query” (simple + reliable for Vehicle)
     private static bool  s_bubbleActive;
     private static Vector2 s_bubbleCenter;
-        
-    // Motion suspension (safety bubble)
-    private bool _motionSuspendedByBubble;
-private static float s_bubbleRadiusWorld;
+    private static float s_bubbleRadiusWorld;
 
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
     {
@@ -262,17 +259,9 @@ private static float s_bubbleRadiusWorld;
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
-
-        // Freeze star motion while the bubble is active so the bubble reads as attached.
-        if (!_motionSuspendedByBubble)
-        {
-            if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
-            if (motion != null)
-            {
-                motion.Enable(false);
-                _motionSuspendedByBubble = true;
-            }
-        }
+        // While the safety bubble is active, the star should not drift.
+        motion?.Enable(false);
+        SetRootPhysicsFrozen(true);
     }
 
     private void DeactivateSafetyBubble()
@@ -285,16 +274,6 @@ private static float s_bubbleRadiusWorld;
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.HideSafetyBubble();
-
-        // Restore motion if we suspended it for the bubble and the star is still armed.
-        if (_motionSuspendedByBubble)
-        {
-            if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
-            if (motion != null && _isArmed)
-                motion.Enable(true);
-
-            _motionSuspendedByBubble = false;
-        }
     }
 
     private void RefreshSafetyBubbleCell()
@@ -302,7 +281,6 @@ private static float s_bubbleRadiusWorld;
         var drums = GameFlowManager.Instance?.activeDrumTrack;
         if (drums == null) return;
         _safetyBubbleCenterCell = drums.WorldToGridPosition(transform.position);
-        s_bubbleCenter = transform.position;
     }
 
     /// <summary>
@@ -506,6 +484,7 @@ private static float s_bubbleRadiusWorld;
 
         _disarmReason = DisarmReason.None;
         _isArmed = true;
+        SetRootPhysicsFrozen(false);
         PrepareNextDirective();
         EnableColliders();
         SetVisual(VisualMode.Bright, ResolvePreviewColor());
@@ -517,6 +496,7 @@ private static float s_bubbleRadiusWorld;
         _disarmReason = reason;
         Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
         DisableColliders();
+        SetRootPhysicsFrozen(true);
 
         var tint = tintOverride ?? ResolvePreviewColor();
 
@@ -1602,6 +1582,7 @@ public void OnLoopBoundary_RearmIfNeeded()
             c.enabled = true;
         }
     }
+
     private void DisableColliders()
     {
         if (_isDisposing || this == null) return;
@@ -1610,6 +1591,27 @@ public void OnLoopBoundary_RearmIfNeeded()
         {
             if (!c) continue;
             c.enabled = false;
+        }
+    }
+
+    // Freeze/unfreeze the *root* Rigidbody2D so the star always stops immediately on disarm,
+    // even if PhaseStarMotion2D is on a child object or uses a different Rigidbody2D.
+    private void SetRootPhysicsFrozen(bool frozen)
+    {
+        if (_isDisposing || this == null) return;
+
+        var rb = GetComponent<Rigidbody2D>();
+        if (!rb) return;
+
+        if (frozen)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.constraints = RigidbodyConstraints2D.FreezeAll;
+        }
+        else
+        {
+            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
     }
     private int CountEnabledColliders() {
@@ -1632,6 +1634,7 @@ public void OnLoopBoundary_RearmIfNeeded()
                 : "-";
 
     }
+    
 }
 
     

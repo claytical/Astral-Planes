@@ -80,10 +80,10 @@ MonoBehaviour:
   teleportChancePerSec: 0
   dustRegrowDelayMul: 8
   starKeepsDustClear: 1
-  starKeepClearRadiusCells: 10
+  starKeepClearRadiusCells: 5
   enableSafetyBubble: 1
   safetyBubbleRadiusCells: 4
-  bubbleRadiusCells: 5
+  bubbleRadiusCells: 3
   dustErodeRadiusWorld: 2
   dustErodeUnitsPerSecond: 1
   dustErodeFalloff:
