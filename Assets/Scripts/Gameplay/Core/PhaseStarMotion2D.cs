@@ -55,7 +55,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         if (_cam == null) return;
 
         var pos = _rb.position;
-        float z = 0f;
+        float z = Mathf.Abs(_cam.transform.position.z);
 
         var min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)) + Vector2.one * screenPadding;
         var max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z)) - Vector2.one * screenPadding;

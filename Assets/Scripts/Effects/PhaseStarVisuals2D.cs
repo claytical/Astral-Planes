@@ -51,7 +51,14 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
         if (bubbleRoot)
         {
-            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
+                        // Defensive: ensure bubbleRoot is attached to this visuals rig so it follows the star.
+            if (!bubbleRoot.IsChildOf(transform))
+            {
+                bubbleRoot.SetParent(transform, worldPositionStays: false);
+                bubbleRoot.localPosition = Vector3.zero;
+                bubbleRoot.localRotation = Quaternion.identity;
+            }
+if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
             if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
         }
 

@@ -346,6 +346,7 @@ public class CosmicDust : MonoBehaviour {
 
         _fadeRoutine = StartCoroutine(FadeOutThenPool(fadeSeconds));
     }
+    
     public void SetTerrainColliderEnabled(bool enabled)
     {
         if (terrainCollider != null)
@@ -361,6 +362,46 @@ public class CosmicDust : MonoBehaviour {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
         _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
     }
+    // CosmicDust.cs
+    public void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
+    {
+        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
+        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration, onComplete));
+    }
+
+    private IEnumerator FadeOutVisualOnly(float duration, System.Action onComplete)
+    {
+        // Stop new particles, but don’t clear until the end (your current semantics)
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
+        float t = 0f;
+        Color from = _currentTint;
+        Color to   = _currentTint; to.a = 0f;
+
+        Vector3 s0 = transform.localScale;
+        Vector3 s1 = s0 * 0.85f;
+
+        // Optional: if you want “stop blocking immediately”
+        SetTerrainColliderEnabled(false);
+
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
+            transform.localScale = Vector3.Lerp(s0, s1, u);
+            SetTint(Color.Lerp(from, to, u));
+            yield return null;
+        }
+
+        SetTint(to);
+
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        onComplete?.Invoke();
+    }
+
     public void PrepareForReuse()
     {
         // Stop any lingering coroutines from prior life
@@ -519,28 +560,64 @@ public class CosmicDust : MonoBehaviour {
 
     }
 
-    private IEnumerator FadeOutThenPoolVisualOnly(float duration) {
-        if (visual.particleSystem!= null) 
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting); 
+    /// Fade visuals out (alpha/scale/particles) but DO NOT pool.
+    /// Generator is responsible for pooling/removal after fade completes.
+    public void DissipateVisualOnly(float duration)
+    {
+        duration = Mathf.Max(0.01f, duration);
+
+        if (_fadeRoutine != null)
+            StopCoroutine(_fadeRoutine);
+
+        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration));
+    }
+
+    private IEnumerator FadeOutVisualOnly(float duration)
+    {
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
         float t = 0f;
+
         Color from = _currentTint;
-        Color to = _currentTint; to.a = 0f;
+        Color to = _currentTint;
+        to.a = 0f;
+
         Vector3 s0 = transform.localScale;
         Vector3 s1 = s0 * 0.85f;
-        while (t < duration) { 
+
+        while (t < duration)
+        {
             t += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, t / duration); 
-            transform.localScale = Vector3.Lerp(s0, s1, u); 
-            SetTint(Color.Lerp(from, to, u)); 
-            yield return null; 
+            float u = Mathf.SmoothStep(0f, 1f, t / duration);
+
+            transform.localScale = Vector3.Lerp(s0, s1, u);
+            SetTint(Color.Lerp(from, to, u));
+
+            yield return null;
         }
-            
+
         SetTint(to);
-        if (visual.particleSystem != null) 
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
-        if (gen != null) gen.ReturnDustToPoolPublic(gameObject);
-        else gameObject.SetActive(false);
+
+        if (visual.particleSystem != null)
+            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        // Intentionally do NOT pool or deactivate here.
+        // The generator will RemoveActiveAt(...) and return to pool at end-of-fade.
     }
+
+    private IEnumerator FadeOutThenPoolVisualOnly(float duration)
+    {
+        BeginFadeOutVisualOnly(duration, () =>
+        {
+            if (gen != null) gen.ReturnDustToPoolPublic(gameObject);
+            else gameObject.SetActive(false);
+        });
+
+        // Wait until the fade completes (if your calling code expects a coroutine)
+        yield return new WaitForSeconds(duration);
+    }
+
     private void OnCollisionStay2D(Collision2D collision)
     {
         if (_isDespawned || _isBreaking) return;
