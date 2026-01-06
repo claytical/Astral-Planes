@@ -4923,22 +4923,13 @@ MonoBehaviour:
   spawnStrategyProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c,
     type: 2}
   behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
-  shardFlightSeconds: 0.6
-  starKeepsDustClear: 1
-  rotateSelectionOnLoopBoundary: 1
-  starKeepClearRadiusCells: 2
-  collectableClearTimeoutLoops: 2
-  collectableClearTimeoutSeconds: 0
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
   _progressionMul: 1
   _isInFocusMode: 0
-  enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 4
   syncRotationToLoop: 1
   _tracePhaseStar: 1
-  bubbleRadiusCells: 4
   bubbleTint: {r: 1, g: 1, b: 1, a: 1}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   maxActiveDps: 360
@@ -4946,6 +4937,7 @@ MonoBehaviour:
   _perPetalLayerStep: 0
   _activeTopBoost: 0
   _spinEnvMul: 0
+  nowLoop: 0
 --- !u!114 &6754461597857711404
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4967,7 +4959,7 @@ MonoBehaviour:
   bubbleEdgeParticles: {fileID: 4946073270184364620}
   bubbleFillAlpha: 0.08
   bubbleEdgeAlpha: 0.35
-  dimShardTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.85}
+  dimShardTint: {r: 0.1792453, g: 0.1792453, b: 0.1792453, a: 0.38431373}
 --- !u!114 &4631393831486629443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4993,18 +4985,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 046395d4bfb814e78a40f94065987a0a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
-  kinematicMode: 0
-  edgeBounce: 0.9
-  screenPadding: 0.5
-  focusSpeedMul: 0.5
-  avoidRadius: 3
-  avoidExponent: 2
-  avoidStrength: 1
-  edgeSampleStep: 0.35
-  edgeBand: 0.5
-  edgeStrength: 1
-  edgeGradMin: 0.02
-  maxAccel: 4
+  bounds:
+    kinematicMode: 0
+    edgeBounce: 0.9
+    screenPadding: 0.5
+    focusSpeedMul: 0.5
+  avoidance:
+    radius: 3
+    exponent: 2
+    strength: 1
+  edgeSeek:
+    sampleStep: 0.35
+    band: 0.5
+    strength: 1
+    gradMin: 0.02
+  steering:
+    maxAccel: 4
   verbose: 0
 --- !u!58 &1335835332103871931
 CircleCollider2D:

@@ -1042,7 +1042,7 @@ public class DrumTrack : MonoBehaviour
             {
                 var persona = phasePersonalityRegistry.Get(phaseForRegrowth);
                 if (persona != null)
-                    radius = Mathf.Max(0f, persona.starHoleRadius);
+                    radius = Mathf.Max(0f, persona.starKeepClearRadiusCells);
             }
 
             var growthCells = _dust.CalculateMazeGrowth(centerCell, phaseForRegrowth, radius);

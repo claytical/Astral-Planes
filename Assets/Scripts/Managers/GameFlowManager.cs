@@ -468,17 +468,9 @@ private IEnumerator HandleTrackSceneSetupAsync()
     private IEnumerator HandleGameOverSequence()
     {
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 
-        GalaxyVisualizer galaxy = FindAnyObjectByType<GalaxyVisualizer>();
         NoteVisualizer visualizer = FindAnyObjectByType<NoteVisualizer>();
         
         itc?.BeginGameOverFade();
-        
-        foreach (var star in FindObjectsByType<StarTwinkle>(FindObjectsSortMode.None))
-        {
-            star.twinkleAmount *= 2f;
-            star.twinkleSpeed *= 1.5f;
-            star.transform.localScale *= 1.5f;
-        }
 
         yield return new WaitForSeconds(2f);
 
@@ -487,12 +479,8 @@ private IEnumerator HandleTrackSceneSetupAsync()
             visualizer.GetUIParent().gameObject.SetActive(false);
         }
 
-        if (galaxy != null && activeDrumTrack.SessionPhases != null)
-        {
-            foreach (var snapshot in activeDrumTrack.SessionPhases)
-            {
-                galaxy.AddSnapshot(snapshot);
-            }
+        foreach (var snapshot in activeDrumTrack.SessionPhases) { 
+            //                galaxy.AddSnapshot(snapshot);
         }
       
         yield return new WaitForSeconds(2f); if (_motifSnapshots != null && _motifSnapshots.Count > 0) { 

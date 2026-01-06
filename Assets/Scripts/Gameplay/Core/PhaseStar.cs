@@ -25,35 +25,52 @@ struct PreviewShard
 public class PhaseStar : MonoBehaviour
 {
     // -------------------- Serialized config --------------------
-    [Header("Profiles & Prefs")]
-    [SerializeField] private SpawnStrategyProfile spawnStrategyProfile;
+    [Header("Profiles & Prefs")] [SerializeField]
+    private SpawnStrategyProfile spawnStrategyProfile;
+
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
+
+    // -------------------- Profile-driven tuning (authoring surface) --------------------
+    // PhaseStar no longer owns duplicated serialized fields for these knobs; they come from PhaseStarBehaviorProfile.
+    // Defaults here are used only if behaviorProfile is missing.
+
+    private bool StarKeepsDustClear => !behaviorProfile || behaviorProfile.starKeepsDustClear;
+
+    private int StarKeepClearRadiusCells =>
+        behaviorProfile ? Mathf.Max(0, behaviorProfile.starKeepClearRadiusCells) : 2;
+
+    private bool SafetyBubbleEnabled => !behaviorProfile || behaviorProfile.enableSafetyBubble;
+    private int SafetyBubbleRadiusCells => behaviorProfile ? Mathf.Max(0, behaviorProfile.safetyBubbleRadiusCells) : 4;
+
+    private bool RotateSelectionOnLoopBoundary =>
+        !behaviorProfile || behaviorProfile.rotateSelectionOnLoopBoundary;
+
+    private int RotateEveryNLoops => behaviorProfile ? Mathf.Max(1, behaviorProfile.rotateEveryNLoops) : 1;
+
+    private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
+
+    private float CollectableClearTimeoutSeconds =>
+        behaviorProfile ? behaviorProfile.collectableClearTimeoutSeconds : 0f;
+
+    // Visual-only: time to fly the node/shard to its grid cell (do not use as a difficulty lever)
+    private float NodeFlightSeconds => behaviorProfile ? behaviorProfile.nodeFlightSeconds : 0.65f;
+
     private bool _previewInitialized;
-    [Header("Movement & Timing")]
-    [SerializeField] private float shardFlightSeconds = 0.65f; // time to fly the node to its grid cell
     private Vector2 lastImpactDirection;
-    [Header("Dust / Space")]
-    [Tooltip("If enabled, the PhaseStar force-clears a small pocket of dust around itself (temporary), ensuring maneuvering space.")]
-    [SerializeField] private bool starKeepsDustClear = true;
-    [Header("Timing: Auto-rotate preview selection")] 
-    [Tooltip("If true, the highlighted preview shard (and thus the next MineNode kind) rotates by 1 at each drum loop boundary while the star is idle/armed.")] 
-    [SerializeField] private bool rotateSelectionOnLoopBoundary = true;
-    [Tooltip("Radius in grid cells for the PhaseStar maneuvering pocket.")]
-    [SerializeField] private int starKeepClearRadiusCells = 2;
-    [Header("Safety / Self-heal")] 
-    [Tooltip("If a MineNode resolves but no collectable burst ever materializes (or the last burst never reports cleared), " + "PhaseStar can become stuck in a waiting state. This is a self-heal timeout (in loop boundaries).")] 
-    [SerializeField] private int collectableClearTimeoutLoops = 2;
-    [Tooltip("Secondary timeout in seconds (DSP time). Used if loop counter is unavailable. Set <= 0 to disable.")]
-    [SerializeField] private float collectableClearTimeoutSeconds = 0f;
+
+    [Header("Safety / Self-heal")]
     private int _awaitingCollectableClearSinceLoop = -1;
+
     private double _awaitingCollectableClearSinceDsp = -1.0;
-    [Header("Subcomponents (optional)")]
-    [SerializeField] private PhaseStarVisuals2D visuals;
+
+    [Header("Subcomponents (optional)")] [SerializeField]
+    private PhaseStarVisuals2D visuals;
+
     [SerializeField] private PhaseStarMotion2D motion;
     [SerializeField] private PhaseStarDustAffect dust;
-    [SerializeField] private float _progressionMul = 1f; 
+    [SerializeField] private float _progressionMul = 1f;
     private List<float> _petalStartAngles = new();
-    private List<float> _petalTargetAngles = new(); 
+    private List<float> _petalTargetAngles = new();
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
     private MusicalPhase _assignedPhase;
@@ -64,47 +81,38 @@ public class PhaseStar : MonoBehaviour
     private int currentShardIndex;
     private float beatInterval;
     private float _roleAdvanceInterval;
-    private bool _isDisposing; 
+    private bool _isDisposing;
     private Transform activeShardVisual;
     private bool buildingPreview = false;
-    private int  _shardsEjectedCount;                   // how many shards have ejected so far
-     private bool _awaitingLoopPhaseFinish; 
+    private int _shardsEjectedCount; // how many shards have ejected so far
+
+    private bool _awaitingLoopPhaseFinish;
+
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
     float _lastImpactStrength = 0f;
-       
+
 // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
     private bool _awaitingCollectableClear;
 // --- Safety Bubble (spawned on poke; persists until collectables clear) ---
-    [Header("Safety Bubble (on poke)")]
-    [SerializeField] private bool enableSafetyBubble = true;
-
-    [Tooltip("Bubble radius in grid cells. Primary difficulty lever.")]
-    [SerializeField] private int safetyBubbleRadiusCells = 4;
-
-    private bool _safetyBubbleActive;
-    private Vector2Int _safetyBubbleCenterCell;
-    private MusicalPhase _safetyBubblePhase;
 
 // Registry so Vehicles can query without hard references.
-    private static readonly HashSet<PhaseStar> _activeSafetyBubbles = new HashSet<PhaseStar>();
 
     public event Action<MusicalRole, int, int> OnShardEjected;
     [SerializeField] private bool syncRotationToLoop = true;
     [SerializeField] private bool _tracePhaseStar = true;
-    private float _loopDuration;              // seconds (time authority)
-    private int   _lastLoopSeen = -1;         // loop wrap detector
-    [SerializeField] private int bubbleRadiusCells = 4;
+    private float _loopDuration; // seconds (time authority)
+    private int _lastLoopSeen = -1; // loop wrap detector
 
-    [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f);              // fill/edge tint (alpha handled by visuals)
+    [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f); // fill/edge tint (alpha handled by visuals)
     [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
 
     private bool _bubbleActive;
     private float _bubbleRadiusWorld;
 
 // Static “global query” (simple + reliable for Vehicle)
-    private static bool  s_bubbleActive;
+    private static bool s_bubbleActive;
     private static Vector2 s_bubbleCenter;
     private static float s_bubbleRadiusWorld;
 
@@ -114,10 +122,11 @@ public class PhaseStar : MonoBehaviour
         return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
     }
 
-    private List<Transform> _petals = new();  // visuals previewRing[i].visual
-    private List<float> _baseAngles = new();  // 0..90° spread
-    private List<float> _turns = new();       // r[i] = 1/(i+1)
-    private List<float> _omega = new();       // deg/sec = 360*r/T_loop
+    private List<Transform> _petals = new(); // visuals previewRing[i].visual
+    private List<float> _baseAngles = new(); // 0..90° spread
+    private List<float> _turns = new(); // r[i] = 1/(i+1)
+    private List<float> _omega = new(); // deg/sec = 360*r/T_loop
+
     public enum DisarmReason
     {
         None = 0,
@@ -127,9 +136,9 @@ public class PhaseStar : MonoBehaviour
 
         // There exist collectables in flight (global), so we must not allow another poke.
         CollectablesInFlight,
-        
+
         //A track is staged to expand on the net loop boundary; don't allow another collision that could queue an additional burst/bin change in the same window
-        ExpansionPending,        
+        ExpansionPending,
 
         // Star has no shards remaining and we’re awaiting bridge transition.
         AwaitBridge,
@@ -137,15 +146,24 @@ public class PhaseStar : MonoBehaviour
         // The bridge is actively running (coral/transition).
         Bridge
     }
+
     private DisarmReason _disarmReason = DisarmReason.None;
 
     [SerializeField] private float maxActiveDps = 360f; // clamp for comfort
+
     // -------------------- State & caches --------------------
     private PhaseStarState _state = PhaseStarState.WaitingForPoke;
-    private enum VisualMode { Bright, Dim, Hidden }
+
+    private enum VisualMode
+    {
+        Bright,
+        Dim,
+        Hidden
+    }
+
     private bool _ejectionInFlight;
     private bool _advanceStarted;
-    private int  _spawnTicket;
+    private int _spawnTicket;
     private Coroutine _retryCo;
     private int _lastPokeFrame = -999999;
     private MinedObjectSpawnDirective _cachedDirective;
@@ -156,8 +174,7 @@ public class PhaseStar : MonoBehaviour
     int NextSpawnSerial() => ++_spawnSerial;
     private List<WeightedMineNode> _phasePlan;
     private int _planConsumeIdx;
-    [SerializeField]
-    private MotifProfile _assignedMotif;   // optional: motif this star represents (motif system)
+    [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
     public event Action<PhaseStar> OnArmed;
     public event Action<PhaseStar> OnDisarmed;
@@ -170,16 +187,19 @@ public class PhaseStar : MonoBehaviour
     public MotifProfile AssignedMotif => _assignedMotif;
 
     private GameFlowManager gfm;
+    [SerializeField] private int nowLoop;
+
     // -------------------- Lifecycle --------------------
     void Start()
     {
-        gfm   = GameFlowManager.Instance;
+        gfm = GameFlowManager.Instance;
         EnsurePreviewRing();
         if (!buildingPreview)
         {
             InitializeTimingAndSpeeds();
-        }    
+        }
     }
+
     public void Initialize(
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
@@ -189,7 +209,7 @@ public class PhaseStar : MonoBehaviour
     {
 // Safe, null-tolerant log:
         var roleNames = targets?
-            .Select(t => t == null ? "null" : t.assignedRole.ToString())  // <-- note the ()
+            .Select(t => t == null ? "null" : t.assignedRole.ToString()) // <-- note the ()
             .ToArray() ?? Array.Empty<string>();
 
         Trace($"Initialize: received targets={roleNames.Length} :: {string.Join(", ", roleNames)}");
@@ -206,31 +226,36 @@ public class PhaseStar : MonoBehaviour
         behaviorProfile = profile != null ? profile : behaviorProfile;
         _targets.Clear();
         if (targets != null) _targets.AddRange(targets.Where(t => t));
-        _drum = drum; 
-        if (_drum != null) {
-            _drum.SetBinCount(1); 
+        _drum = drum;
+        if (_drum != null)
+        {
+            _drum.SetBinCount(1);
             WireBinSource(_drum);
             Debug.Log($"[PhaseStar] loop={_drum.GetLoopLengthInSeconds():0.##}s  targets={_targets?.Count ?? 0}");
-            
+
         }
+
         spawnStrategyProfile?.ResetForNewStar();
 
         BuildPhasePlan(_assignedPhase);
         PrepareNextDirective();
-         // ensure subcomponents are present if assigned
+        // ensure subcomponents are present if assigned
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        if (!motion)  motion  = GetComponentInChildren<PhaseStarMotion2D>(true);
-        if (!dust)    dust    = GetComponentInChildren<PhaseStarDustAffect>(true);
-        if (visuals) visuals.Initialize(behaviorProfile, this); 
-        if (motion)  motion.Initialize(behaviorProfile, this);
-        if (dust)    dust.Initialize(behaviorProfile, this);
-        if (drum != null && !_subscribedLoopBoundary) { 
-            drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded; 
+        if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
+        if (!dust) dust = GetComponentInChildren<PhaseStarDustAffect>(true);
+        if (visuals) visuals.Initialize(behaviorProfile, this);
+        if (motion) motion.Initialize(behaviorProfile, this);
+        if (dust) dust.Initialize(behaviorProfile, this);
+        if (drum != null && !_subscribedLoopBoundary)
+        {
+            drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded;
             _subscribedLoopBoundary = true;
         }
-        ArmNext(); 
+
+        ArmNext();
         LogState("Initialized+Armed");
     }
+
     private float ComputeCellWorldSize()
     {
         var drums = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
@@ -242,87 +267,17 @@ public class PhaseStar : MonoBehaviour
         return Mathf.Max(0.0001f, Vector3.Distance(a, b));
     }
 
-    private void ActivateSafetyBubble()
-    {
-        if (!enableSafetyBubble) return;
-
-        float cell = ComputeCellWorldSize();
-
-        // +0.5f gives the bubble a little breathing room relative to discrete cells
-        _bubbleRadiusWorld = (bubbleRadiusCells + 0.5f) * cell;
-
-        _bubbleActive = true;
-
-        s_bubbleActive = true;
-        s_bubbleCenter = transform.position;
-        s_bubbleRadiusWorld = _bubbleRadiusWorld;
-
-        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
-        // While the safety bubble is active, the star should not drift.
-        motion?.Enable(false);
-        SetRootPhysicsFrozen(true);
-    }
-
-    private void DeactivateSafetyBubble()
-    {
-        _bubbleActive = false;
-
-        s_bubbleActive = false;
-        s_bubbleCenter = Vector2.zero;
-        s_bubbleRadiusWorld = 0f;
-
-        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        visuals?.HideSafetyBubble();
-    }
-
-    private void RefreshSafetyBubbleCell()
-    {
-        var drums = GameFlowManager.Instance?.activeDrumTrack;
-        if (drums == null) return;
-        _safetyBubbleCenterCell = drums.WorldToGridPosition(transform.position);
-    }
-
-    /// <summary>
-    /// True if worldPos is inside any active PhaseStar safety bubble (Chebyshev radius in grid cells).
-    /// </summary>
-    public static bool IsWorldPosInsideAnySafetyBubble(Vector2 worldPos, MusicalPhase phase)
-    {
-        var gfm   = GameFlowManager.Instance;
-        var drums = gfm != null ? gfm.activeDrumTrack : null;
-        if (drums == null) return false;
-
-        Vector2Int cell = drums.WorldToGridPosition(worldPos);
-
-        foreach (var star in _activeSafetyBubbles)
-        {
-            if (star == null) continue;
-            if (!star._safetyBubbleActive) continue;
-
-            // If you later want phase-specific bubbles, enforce it here.
-            // For now: bubble is gameplay legibility; allow it regardless.
-            Vector2Int c = star._safetyBubbleCenterCell;
-            int dx = Mathf.Abs(cell.x - c.x);
-            int dy = Mathf.Abs(cell.y - c.y);
-
-            // Chebyshev distance: square-ish bubble aligned to your grid.
-            int d = Mathf.Max(dx, dy);
-            if (d <= Mathf.Max(0, star.safetyBubbleRadiusCells))
-                return true;
-        }
-
-        return false;
-    }
-
     void Update()
     {
-        if (starKeepsDustClear)
+        if (StarKeepsDustClear)
         {
             if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
-                var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
+                var phase = gfm.phaseTransitionManager != null
+                    ? gfm.phaseTransitionManager.currentPhase
+                    : _assignedPhase;
 
-                int radiusCells = _bubbleActive ? bubbleRadiusCells : starKeepClearRadiusCells;
+                int radiusCells = _bubbleActive ? SafetyBubbleRadiusCells : StarKeepClearRadiusCells;
 
                 gfm.dustGenerator.SetStarKeepClear(
                     gfm.activeDrumTrack.WorldToGridPosition(transform.position),
@@ -341,12 +296,8 @@ public class PhaseStar : MonoBehaviour
             float dps = _omega.Count > i ? _omega[i] : 0f;
             t.Rotate(Vector3.forward, dps * dt, Space.Self);
         }
-        if (_safetyBubbleActive)
-        {
-            RefreshSafetyBubbleCell();
-        }
-
     }
+
     private void SafeUnsubscribeAll()
     {
         // Unhook both places we subscribe OnLoopBoundary:
@@ -359,73 +310,77 @@ public class PhaseStar : MonoBehaviour
             }
         }
     }
-    bool AnyExpansionPendingGlobal() { 
-        var gfm = GameFlowManager.Instance; 
-        var tc = gfm != null ? gfm.controller : null; 
+
+    bool AnyExpansionPendingGlobal()
+    {
+        var gfm = GameFlowManager.Instance;
+        var tc = gfm != null ? gfm.controller : null;
         return (tc != null && tc.AnyExpansionPending());
     }
-    
-    private void SetVisual(VisualMode mode, Color tint) {
+
+    private void SetVisual(VisualMode mode, Color tint)
+    {
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (!visuals) return;
         switch (mode)
         {
-           case VisualMode.Bright:  visuals.ShowBright(tint); break;
-            case VisualMode.Dim:     visuals.ShowDim(tint);    break;
-            case VisualMode.Hidden:  visuals.HideAll();        break;
+            case VisualMode.Bright: visuals.ShowBright(tint); break;
+            case VisualMode.Dim: visuals.ShowDim(tint); break;
+            case VisualMode.Hidden: visuals.HideAll(); break;
         }
-    } 
+    }
+
     public void NotifyCollectableBurstCleared()
-{
-    DeactivateSafetyBubble();
-    // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
-    // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
-    if (_advanceStarted || _state == PhaseStarState.BridgeInProgress)
     {
+        DeactivateSafetyBubble();
+        // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
+        // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
+        if (_advanceStarted || _state == PhaseStarState.BridgeInProgress)
+        {
+            _awaitingCollectableClear = false;
+            _awaitingCollectableClearSinceLoop = -1;
+            _awaitingCollectableClearSinceDsp = -1.0;
+            return;
+        }
+
+        bool cif = AnyCollectablesInFlightGlobal();
+        bool ep = AnyExpansionPendingGlobal();
+
+        Debug.Log(
+            $"[PS:BURST_CLEARED] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
+            $"awaitClr(before)={_awaitingCollectableClear} shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
+            $"CIF={cif} EP={ep}"
+        );
+
         _awaitingCollectableClear = false;
         _awaitingCollectableClearSinceLoop = -1;
-        _awaitingCollectableClearSinceDsp  = -1.0;
-        return;
-    }
+        _awaitingCollectableClearSinceDsp = -1.0;
 
-    bool cif = AnyCollectablesInFlightGlobal();
-    bool ep  = AnyExpansionPendingGlobal();
+        // If we’re still not clean, do nothing (controller should not be calling us in this case, but stay defensive).
+        if (AnyCollectablesInFlightGlobal() || AnyExpansionPendingGlobal())
+        {
+            Debug.LogWarning(
+                $"[PS:BURST_CLEARED] IGNORE (still busy) star={name} CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
+            );
+            return;
+        }
 
-    Debug.Log(
-        $"[PS:BURST_CLEARED] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
-        $"awaitClr(before)={_awaitingCollectableClear} shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
-        $"CIF={cif} EP={ep}"
-    );
+        bool noShardsRemain = _shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar);
 
-    _awaitingCollectableClear = false;
-    _awaitingCollectableClearSinceLoop = -1;
-    _awaitingCollectableClearSinceDsp  = -1.0;
-
-    // If we’re still not clean, do nothing (controller should not be calling us in this case, but stay defensive).
-    if (AnyCollectablesInFlightGlobal() || AnyExpansionPendingGlobal())
-    {
-        Debug.LogWarning(
-            $"[PS:BURST_CLEARED] IGNORE (still busy) star={name} CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
+        Debug.Log(
+            $"[PS:BURST_CLEARED] awaitClr(after)={_awaitingCollectableClear} -> {(noShardsRemain ? "BeginBridgeNow" : "ArmNext")}"
         );
-        return;
+
+        // Final shard: start bridge immediately on last collected note.
+        if (noShardsRemain)
+        {
+            BeginBridgeNow();
+            return;
+        }
+
+        // Shards remain: re-arm so the star becomes hittable again.
+        ArmNext();
     }
-
-    bool noShardsRemain = _shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar);
-
-    Debug.Log(
-        $"[PS:BURST_CLEARED] awaitClr(after)={_awaitingCollectableClear} -> {(noShardsRemain ? "BeginBridgeNow" : "ArmNext")}"
-    );
-
-    // Final shard: start bridge immediately on last collected note.
-    if (noShardsRemain)
-    {
-        BeginBridgeNow();
-        return;
-    }
-
-    // Shards remain: re-arm so the star becomes hittable again.
-    ArmNext();
-}
 
     private bool AnyCollectablesInFlightGlobal()
     {
@@ -434,6 +389,7 @@ public class PhaseStar : MonoBehaviour
         var tc = gfm != null ? gfm.controller : null; // often InstrumentTrackController lives here
         return (tc != null && tc.AnyCollectablesInFlight());
     }
+
     private void BeginBridgeNow()
     {
         if (_advanceStarted) return;
@@ -441,7 +397,8 @@ public class PhaseStar : MonoBehaviour
         // HARD BLOCK: "no skip capture"
         if (_activeNode != null || _ejectionInFlight)
         {
-            DBG($"BeginBridgeNow: BLOCKED (outstanding node). activeNode={_activeNode?.name} ejectInFlight={_ejectionInFlight}");
+            DBG(
+                $"BeginBridgeNow: BLOCKED (outstanding node). activeNode={_activeNode?.name} ejectInFlight={_ejectionInFlight}");
             // Ensure we are not accidentally left in a bridge-ish state.
             _state = PhaseStarState.WaitingForPoke;
             Disarm(DisarmReason.NodeResolving, _lockedTint);
@@ -473,14 +430,29 @@ public class PhaseStar : MonoBehaviour
 
     private void ArmNext()
     {
-        DBG($"ArmNext: ENTER collectablesInFlight={AnyCollectablesInFlightGlobal()} expansionPending={AnyExpansionPendingGlobal()}");
+        DBG(
+            $"ArmNext: ENTER collectablesInFlight={AnyCollectablesInFlightGlobal()} expansionPending={AnyExpansionPendingGlobal()}");
 
-        if (AnyCollectablesInFlightGlobal()) { DBG("ArmNext: blocked by ExpansionPending -> Disarm:CollectablesInFlight");
-            Disarm(DisarmReason.CollectablesInFlight); return; }
-        if (AnyExpansionPendingGlobal())    { DBG("ArmNext: blocked by ExpansionPending -> Disarm:ExpansionPendingGlobal");
-            Disarm(DisarmReason.ExpansionPending);    return; }
-        if (!HasShardsRemaining())          { DBG("ArmNext: blocked by ExpansionPending -> Disarm:AwaitBridge");
-            Disarm(DisarmReason.AwaitBridge); return; }
+        if (AnyCollectablesInFlightGlobal())
+        {
+            DBG("ArmNext: blocked by ExpansionPending -> Disarm:CollectablesInFlight");
+            Disarm(DisarmReason.CollectablesInFlight);
+            return;
+        }
+
+        if (AnyExpansionPendingGlobal())
+        {
+            DBG("ArmNext: blocked by ExpansionPending -> Disarm:ExpansionPendingGlobal");
+            Disarm(DisarmReason.ExpansionPending);
+            return;
+        }
+
+        if (!HasShardsRemaining())
+        {
+            DBG("ArmNext: blocked by ExpansionPending -> Disarm:AwaitBridge");
+            Disarm(DisarmReason.AwaitBridge);
+            return;
+        }
 
         _disarmReason = DisarmReason.None;
         _isArmed = true;
@@ -490,6 +462,7 @@ public class PhaseStar : MonoBehaviour
         SetVisual(VisualMode.Bright, ResolvePreviewColor());
         OnArmed?.Invoke(this);
     }
+
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
@@ -514,8 +487,10 @@ public class PhaseStar : MonoBehaviour
                 SetVisual(VisualMode.Dim, tint);
                 break;
         }
+
         OnDisarmed?.Invoke(this);
     }
+
     void InitializeTimingAndSpeeds()
     {
         // Prefer the DrumTrack that actually spawned this star.
@@ -545,283 +520,314 @@ public class PhaseStar : MonoBehaviour
             _omega.Add(Mathf.Min(maxActiveDps, w));
         }
     }
+
     private bool CanAdvancePhaseNow()
     {
         // Enforce "no skip capture"
         if (_activeNode != null) return false;
-        if (_ejectionInFlight)   return false;
+        if (_ejectionInFlight) return false;
         return true;
     }
 
-public void OnLoopBoundary_RearmIfNeeded()
-{
-    bool cif = AnyCollectablesInFlightGlobal();
-    bool ep  = AnyExpansionPendingGlobal();
-
-    Debug.Log(
-        $"[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
-        $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} advStarted={_advanceStarted} " +
-        $"shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} hasRem={HasShardsRemaining()} " +
-        $"activeNode={( _activeNode ? _activeNode.name : "null")} ejectInFlight={_ejectionInFlight} " +
-        $"CIF={cif} EP={ep}"
-    );
-
-    if (_isDisposing || this == null) return;
-
-    // ------------------------------------------------------------
-    // 1) Awaiting collectable clear (post-node-resolution latch)
-    // ------------------------------------------------------------
-    if (_awaitingCollectableClear)
+    public void OnLoopBoundary_RearmIfNeeded()
     {
-        // If collectables exist, we're legitimately waiting.
+        bool cif = AnyCollectablesInFlightGlobal();
+        bool ep = AnyExpansionPendingGlobal();
+
+        Debug.Log(
+            $"[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
+            $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} advStarted={_advanceStarted} " +
+            $"shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} hasRem={HasShardsRemaining()} " +
+            $"activeNode={(_activeNode ? _activeNode.name : "null")} ejectInFlight={_ejectionInFlight} " +
+            $"CIF={cif} EP={ep}"
+        );
+
+        if (_isDisposing || this == null) return;
+
+        // ------------------------------------------------------------
+        // 1) Awaiting collectable clear (post-node-resolution latch)
+        // ------------------------------------------------------------
+        if (_awaitingCollectableClear)
+        {
+            // If collectables exist, we're legitimately waiting.
+            if (AnyCollectablesInFlightGlobal())
+            {
+                Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF)");
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            // No collectables in flight, but we're still "awaiting".
+            // We must eventually recover; otherwise the PhaseStar can deadlock (commonly on last shard).
+            var drums = _drum != null
+                ? _drum
+                : (GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null);
+
+            bool timedOut = false;
+
+            // Loop-based timeout
+            if (CollectableClearTimeoutLoops > 0 && drums != null)
+            {
+                int nowLoop = drums.completedLoops;
+                if (_awaitingCollectableClearSinceLoop < 0)
+                    _awaitingCollectableClearSinceLoop = nowLoop;
+
+                int waitedLoops = nowLoop - _awaitingCollectableClearSinceLoop;
+                if (waitedLoops >= CollectableClearTimeoutLoops)
+                    timedOut = true;
+
+                Debug.Log(
+                    $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
+
+            }
+
+            Debug.Log(
+                $"[PhaseStar][Await] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
+                $"sinceLoop={_awaitingCollectableClearSinceLoop} " +
+                $"waited={(drums != null && _awaitingCollectableClearSinceLoop >= 0 ? drums.completedLoops - _awaitingCollectableClearSinceLoop : -1)} " +
+                $"loopsTimeout={CollectableClearTimeoutLoops} " +
+                $"dspNow={AudioSettings.dspTime:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} " +
+                $"collectablesInFlight={AnyCollectablesInFlightGlobal()} activeNode={(_activeNode != null)}"
+            );
+
+            // Seconds-based timeout (optional)
+            if (!timedOut && CollectableClearTimeoutSeconds > 0f)
+            {
+                DBG("LoopBoundary: awaitingCollectableClear seconds-check running");
+                double nowDsp = AudioSettings.dspTime;
+                if (_awaitingCollectableClearSinceDsp < 0.0)
+                    _awaitingCollectableClearSinceDsp = nowDsp;
+
+                if ((nowDsp - _awaitingCollectableClearSinceDsp) >= CollectableClearTimeoutSeconds)
+                    timedOut = true;
+                Debug.Log(
+                    $"[PS:LB/AWAIT.SECS] nowDsp={nowDsp:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} -> timedOut={timedOut}");
+            }
+
+            Debug.Log(
+                $"[PS:LB/AWAIT] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
+                $"sinceLoop={_awaitingCollectableClearSinceLoop} loopsTimeout={CollectableClearTimeoutLoops} " +
+                $"sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} " +
+                $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()} activeNode={(_activeNode != null)}"
+            );
+
+            // If we have not timed out, stay disarmed and keep waiting.
+            if (!timedOut)
+            {
+                Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out) hasRem={HasShardsRemaining()}");
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            // Timeout recovery: clear latch and proceed immediately.
+            Debug.LogWarning(
+                $"[PhaseStar][Timeout] AwaitingCollectableClear timed out but no collectables are in flight. " +
+                $"Forcing recovery. star={name} shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}"
+            );
+            Debug.LogWarning(
+                $"[PS:LB/RECOVERY] clearing awaitClr latch (before) awaitClr={_awaitingCollectableClear} sinceLoop={_awaitingCollectableClearSinceLoop} sinceDsp={_awaitingCollectableClearSinceDsp:F2}");
+
+            _awaitingCollectableClear = false;
+            _awaitingCollectableClearSinceLoop = -1;
+            _awaitingCollectableClearSinceDsp = -1.0;
+
+            bool noShardsRemain =
+                (previewRing == null || previewRing.Count == 0) ||
+                (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+            int prCount = (previewRing != null ? previewRing.Count : -1);
+            int nps = Mathf.Max(1, behaviorProfile.nodesPerStar);
+
+            Debug.LogWarning(
+                $"[PS:LB/RECOVERY] timedOut={timedOut} shardsEjected={_shardsEjectedCount}/{nps} " +
+                $"previewRingCount={prCount} noShardsRemain={noShardsRemain} " +
+                $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
+            );
+            if (!CanAdvancePhaseNow())
+            {
+                DBG(
+                    $"[PS:LB/RECOVERY] block; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            if (noShardsRemain)
+            {
+                Debug.Log($"[PS:LB] Begin Bridge");
+                BeginBridgeNow();
+                return;
+            }
+
+            Debug.Log($"[PS:LB] Arm Next");
+            ArmNext();
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // 2) Global gate checks
+        // ------------------------------------------------------------
         if (AnyCollectablesInFlightGlobal())
         {
-            Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF)");
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
+            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
             return;
         }
 
-        // No collectables in flight, but we're still "awaiting".
-        // We must eventually recover; otherwise the PhaseStar can deadlock (commonly on last shard).
-        var drums = _drum != null ? _drum : (GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null);
-
-        bool timedOut = false;
-
-        // Loop-based timeout
-        if (collectableClearTimeoutLoops > 0 && drums != null)
+        if (AnyExpansionPendingGlobal())
         {
-            int nowLoop = drums.completedLoops;
-            if (_awaitingCollectableClearSinceLoop < 0)
-                _awaitingCollectableClearSinceLoop = nowLoop;
-
-            int waitedLoops = nowLoop - _awaitingCollectableClearSinceLoop;
-            if (waitedLoops >= collectableClearTimeoutLoops)
-                timedOut = true;
-
-            Debug.Log($"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={collectableClearTimeoutLoops} -> timedOut={timedOut}");
-
-        }
-
-        Debug.Log(
-            $"[PhaseStar][Await] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
-            $"sinceLoop={_awaitingCollectableClearSinceLoop} " +
-            $"waited={(drums != null && _awaitingCollectableClearSinceLoop >= 0 ? drums.completedLoops - _awaitingCollectableClearSinceLoop : -1)} " +
-            $"loopsTimeout={collectableClearTimeoutLoops} " +
-            $"dspNow={AudioSettings.dspTime:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={collectableClearTimeoutSeconds:F2} " +
-            $"collectablesInFlight={AnyCollectablesInFlightGlobal()} activeNode={(_activeNode != null)}"
-        );
-
-        // Seconds-based timeout (optional)
-        if (!timedOut && collectableClearTimeoutSeconds > 0f)
-        {
-            DBG("LoopBoundary: awaitingCollectableClear seconds-check running");
-            double nowDsp = AudioSettings.dspTime;
-            if (_awaitingCollectableClearSinceDsp < 0.0)
-                _awaitingCollectableClearSinceDsp = nowDsp;
-
-            if ((nowDsp - _awaitingCollectableClearSinceDsp) >= collectableClearTimeoutSeconds)
-                timedOut = true;
-            Debug.Log($"[PS:LB/AWAIT.SECS] nowDsp={nowDsp:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={collectableClearTimeoutSeconds:F2} -> timedOut={timedOut}");
-        }
-        Debug.Log(
-            $"[PS:LB/AWAIT] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
-            $"sinceLoop={_awaitingCollectableClearSinceLoop} loopsTimeout={collectableClearTimeoutLoops} " +
-            $"sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={collectableClearTimeoutSeconds:F2} " +
-            $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()} activeNode={(_activeNode!=null)}"
-        );
-
-        // If we have not timed out, stay disarmed and keep waiting.
-        if (!timedOut)
-        {
-            Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out) hasRem={HasShardsRemaining()}");
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            Debug.Log($"[PS:LB] Any Expanding Global True");
+            Disarm(DisarmReason.ExpansionPending, _lockedTint);
             return;
         }
 
-        // Timeout recovery: clear latch and proceed immediately.
-        Debug.LogWarning(
-            $"[PhaseStar][Timeout] AwaitingCollectableClear timed out but no collectables are in flight. " +
-            $"Forcing recovery. star={name} shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}"
-        );
-        Debug.LogWarning($"[PS:LB/RECOVERY] clearing awaitClr latch (before) awaitClr={_awaitingCollectableClear} sinceLoop={_awaitingCollectableClearSinceLoop} sinceDsp={_awaitingCollectableClearSinceDsp:F2}");
-
-        _awaitingCollectableClear = false;
-        _awaitingCollectableClearSinceLoop = -1;
-        _awaitingCollectableClearSinceDsp = -1.0;
-
-        bool noShardsRemain =
-            (previewRing == null || previewRing.Count == 0) ||
-            (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-        int prCount = (previewRing != null ? previewRing.Count : -1);
-        int nps     = Mathf.Max(1, behaviorProfile.nodesPerStar);
-
-        Debug.LogWarning(
-            $"[PS:LB/RECOVERY] timedOut={timedOut} shardsEjected={_shardsEjectedCount}/{nps} " +
-            $"previewRingCount={prCount} noShardsRemain={noShardsRemain} " +
-            $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
-        );
-        if (!CanAdvancePhaseNow())
+        // ------------------------------------------------------------
+        // 3) Deterministic bridge trigger (end-of-star)
+        // ------------------------------------------------------------
+        // If the star is complete, we should bridge on the next clean loop boundary// even if a specific latch flag was not set (prevents “stuck not bridging”).bool shardsComplete = behaviorProfile != null && behaviorProfile.nodesPerStar > 0 && _shardsEjectedCount >= behaviorProfile.nodesPerStar;
+        bool noShardsRemain0 = (previewRing == null || previewRing.Count == 0) ||
+                               (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+        // HARD BLOCK: if a MineNode is still active (not captured/resolved), we cannot advance.
+        // This enforces "no skip capture" as a player choice.
+        if (_activeNode != null || _ejectionInFlight)
         {
-            DBG($"[PS:LB/RECOVERY] block; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            DBG(
+                $"LoopBoundary: block bridge; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
             return;
         }
 
-        if (noShardsRemain)
+        if (!_advanceStarted && _state != PhaseStarState.BridgeInProgress && !HasShardsRemaining() && noShardsRemain0
+            && !_awaitingCollectableClear
+            && !AnyCollectablesInFlightGlobal()
+            && !AnyExpansionPendingGlobal())
         {
-            Debug.Log($"[PS:LB] Begin Bridge");
+            Debug.LogWarning(
+                $"[PS:LB] FORCE_BRIDGE shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
+                $"preview={(previewRing != null ? previewRing.Count : -1)} armed={_isArmed} state={_state} " +
+                $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish}"
+            );
             BeginBridgeNow();
             return;
         }
-        Debug.Log($"[PS:LB] Arm Next");
-        ArmNext();
-        return;
-    }
 
-    // ------------------------------------------------------------
-    // 2) Global gate checks
-    // ------------------------------------------------------------
-    if (AnyCollectablesInFlightGlobal())
-    {
-        Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
-        Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
-        return;
-    }
-
-    if (AnyExpansionPendingGlobal())
-    {
-        Debug.Log($"[PS:LB] Any Expanding Global True");
-        Disarm(DisarmReason.ExpansionPending, _lockedTint);
-        return;
-    } 
-    // ------------------------------------------------------------
-    // 3) Deterministic bridge trigger (end-of-star)
-    // ------------------------------------------------------------
-    // If the star is complete, we should bridge on the next clean loop boundary// even if a specific latch flag was not set (prevents “stuck not bridging”).bool shardsComplete = behaviorProfile != null && behaviorProfile.nodesPerStar > 0 && _shardsEjectedCount >= behaviorProfile.nodesPerStar;
-    bool noShardsRemain0 = (previewRing == null || previewRing.Count == 0) || (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-    // HARD BLOCK: if a MineNode is still active (not captured/resolved), we cannot advance.
-    // This enforces "no skip capture" as a player choice.
-    if (_activeNode != null || _ejectionInFlight)
-    {
-        DBG($"LoopBoundary: block bridge; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-        return;
-    }
-
-    if (!_advanceStarted && _state != PhaseStarState.BridgeInProgress && !HasShardsRemaining() && noShardsRemain0
-    && !_awaitingCollectableClear
-    && !AnyCollectablesInFlightGlobal()
-    && !AnyExpansionPendingGlobal()) { 
-        Debug.LogWarning($"[PS:LB] FORCE_BRIDGE shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
-                                $"preview={(previewRing != null ? previewRing.Count : -1)} armed={_isArmed} state={_state} " +
-                                $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish}"
-                    );
-                BeginBridgeNow();
-                return;
-        }
         LogState("LoopBoundary entry");
 
-    // ------------------------------------------------------------
-    // 3) Bridge logic (phase completion)
-    // ------------------------------------------------------------
-    if (_advanceStarted)
-    {
-        Debug.Log("[PS:LB] Advance Started"); return;
-    }
-
-    if (_state == PhaseStarState.BridgeInProgress)
-    {
-        if (!CanAdvancePhaseNow())
+        // ------------------------------------------------------------
+        // 3) Bridge logic (phase completion)
+        // ------------------------------------------------------------
+        if (_advanceStarted)
         {
-            DBG($"[PS:LB] BridgeInProgress but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-            // Stay in BridgeInProgress if you want, but DO NOT start the coroutine.
-            // I recommend reverting to WaitingForPoke to avoid a stuck bridge state:
-            _state = PhaseStarState.WaitingForPoke;
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            Debug.Log("[PS:LB] Advance Started");
             return;
         }
 
-        _advanceStarted = true;
-        _awaitingLoopPhaseFinish = false;
-        DBG("[PS:LB] Bridge In Progress");
-        StartCoroutine(CompleteAndAdvanceAsync());
-        return;
-    }
-    if (_awaitingLoopPhaseFinish)
-    {
-        if (!CanAdvancePhaseNow())
+        if (_state == PhaseStarState.BridgeInProgress)
         {
-            DBG($"[PS:LB] AwaitLoopPhaseFinish but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-            // Consume nothing; keep waiting.
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            if (!CanAdvancePhaseNow())
+            {
+                DBG(
+                    $"[PS:LB] BridgeInProgress but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
+                // Stay in BridgeInProgress if you want, but DO NOT start the coroutine.
+                // I recommend reverting to WaitingForPoke to avoid a stuck bridge state:
+                _state = PhaseStarState.WaitingForPoke;
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            _advanceStarted = true;
+            _awaitingLoopPhaseFinish = false;
+            DBG("[PS:LB] Bridge In Progress");
+            StartCoroutine(CompleteAndAdvanceAsync());
             return;
         }
 
-        DBG("[PS:LB] Await Loop Phase Finish");
-        _advanceStarted = true;
-        _awaitingLoopPhaseFinish = false;
-        _state = PhaseStarState.BridgeInProgress;
-        Disarm(DisarmReason.Bridge, _lockedTint);
-        Trace("LoopBoundary → Begin bridge");
-        StartCoroutine(CompleteAndAdvanceAsync());
-        return;
-    }
-
-    // --- Selection rotation at loop boundary (agency) ---
-    // Only rotate when we are actually waiting for the next poke, i.e. armed + idle.
-    if (rotateSelectionOnLoopBoundary && _state == PhaseStarState.WaitingForPoke && _isArmed 
-        && !_awaitingCollectableClear && !_awaitingLoopPhaseFinish && !_advanceStarted && !_ejectionInFlight &&
-        HasShardsRemaining() && !AnyCollectablesInFlightGlobal() && !AnyExpansionPendingGlobal()) {
-        RotateHighlightedShardNow(1); DBG($"[PS:LB] Rotated offered shard at boundary. currentShardIndex={currentShardIndex}");
-    }    
-    
-    // ------------------------------------------------------------
-    // 4) Normal re-arm path
-    // ------------------------------------------------------------
-    if (!_isArmed)
-    {
-        // If the plan is fully completed, stay quiet and let the bridge path take over.
-        if (_shardsEjectedCount >= behaviorProfile.nodesPerStar && behaviorProfile.nodesPerStar > 0)
+        if (_awaitingLoopPhaseFinish)
         {
-            Debug.Log($"[PS:LB] -> Not Armed, Ejected Shards ");
+            if (!CanAdvancePhaseNow())
+            {
+                DBG(
+                    $"[PS:LB] AwaitLoopPhaseFinish but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
+                // Consume nothing; keep waiting.
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            DBG("[PS:LB] Await Loop Phase Finish");
+            _advanceStarted = true;
+            _awaitingLoopPhaseFinish = false;
+            _state = PhaseStarState.BridgeInProgress;
+            Disarm(DisarmReason.Bridge, _lockedTint);
+            Trace("LoopBoundary → Begin bridge");
+            StartCoroutine(CompleteAndAdvanceAsync());
             return;
         }
-        DBG("[PS:LB] -> Armed, Ejected Shards");
-        ArmNext();
-    }
-    else
-    {
-        DBG("[PS:LB] -> No need to arm");
-    }
-    
-}
-        private void DBG(string msg) {
-            Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} advStarted={_advanceStarted} " +
-                      $"awaitCollectClear={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} " +
-                      $"shards={_shardsEjectedCount}/{behaviorProfile?.nodesPerStar} preview={(previewRing!=null?previewRing.Count:-1)} " +
-                      $"activeNode={( _activeNode!=null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
-        }
-        private static int Mod(int x, int m) { 
-            if (m <= 0) return 0;
-            int r = x % m;
-            return r < 0 ? r + m : r;
+
+        // --- Selection rotation at loop boundary (agency) ---
+        // Only rotate when we are actually waiting for the next poke, i.e. armed + idle.
+        if (RotateSelectionOnLoopBoundary && _state == PhaseStarState.WaitingForPoke && _isArmed
+            && (RotateEveryNLoops <= 1 || (nowLoop % RotateEveryNLoops) == 0)
+            && !_awaitingCollectableClear && !_awaitingLoopPhaseFinish && !_advanceStarted && !_ejectionInFlight &&
+            HasShardsRemaining() && !AnyCollectablesInFlightGlobal() && !AnyExpansionPendingGlobal())
+        {
+            RotateHighlightedShardNow(1);
+            DBG($"[PS:LB] Rotated offered shard at boundary. currentShardIndex={currentShardIndex}");
         }
 
-        private void RotateHighlightedShardNow(int steps)  {
-            if (previewRing == null || previewRing.Count == 0) return;
-            currentShardIndex = Mod(currentShardIndex + steps, previewRing.Count);
-            activeShardVisual = previewRing[currentShardIndex].visual;
-    
-            // Visual + cached directive must update together (WYSIWYG selection).
-            UpdateLayering();
-            UpdatePreviewTint();
-            HighlightActive();
-            PrepareNextDirective();
+        // ------------------------------------------------------------
+        // 4) Normal re-arm path
+        // ------------------------------------------------------------
+        if (!_isArmed)
+        {
+            // If the plan is fully completed, stay quiet and let the bridge path take over.
+            if (_shardsEjectedCount >= behaviorProfile.nodesPerStar && behaviorProfile.nodesPerStar > 0)
+            {
+                Debug.Log($"[PS:LB] -> Not Armed, Ejected Shards ");
+                return;
+            }
+
+            DBG("[PS:LB] -> Armed, Ejected Shards");
+            ArmNext();
         }
+        else
+        {
+            DBG("[PS:LB] -> No need to arm");
+        }
+
+    }
+
+    private void DBG(string msg)
+    {
+        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} advStarted={_advanceStarted} " +
+                  $"awaitCollectClear={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} " +
+                  $"shards={_shardsEjectedCount}/{behaviorProfile?.nodesPerStar} preview={(previewRing != null ? previewRing.Count : -1)} " +
+                  $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
+    }
+
+    private static int Mod(int x, int m)
+    {
+        if (m <= 0) return 0;
+        int r = x % m;
+        return r < 0 ? r + m : r;
+    }
+
+    private void RotateHighlightedShardNow(int steps)
+    {
+        if (previewRing == null || previewRing.Count == 0) return;
+        currentShardIndex = Mod(currentShardIndex + steps, previewRing.Count);
+        activeShardVisual = previewRing[currentShardIndex].visual;
+
+        // Visual + cached directive must update together (WYSIWYG selection).
+        UpdateLayering();
+        UpdatePreviewTint();
+        HighlightActive();
+        PrepareNextDirective();
+    }
+
     void BuildOrRefreshPreviewRing()
     {
         // 1) Collect petal transforms from your PreviewShard list
         _petals.Clear();
-        foreach (var shard in previewRing) if (shard.visual) _petals.Add(shard.visual);
+        foreach (var shard in previewRing)
+            if (shard.visual)
+                _petals.Add(shard.visual);
 
         int N = _petals.Count;
         if (N == 0) return;
@@ -857,18 +863,20 @@ public void OnLoopBoundary_RearmIfNeeded()
             visuals.HighlightActive(activeShardVisual, ResolvePreviewColor(), .7f);
         }
     }
+
     private void EnsurePreviewRing()
     {
         if (_previewInitialized) return;
         _previewInitialized = true;
 
-        BuildPreviewRing();             // build data-only
-        BuildOrRefreshPreviewRing();    // then apply visuals & layering exactly once
+        BuildPreviewRing(); // build data-only
+        BuildOrRefreshPreviewRing(); // then apply visuals & layering exactly once
     }
+
     private void OnDisable()
     {
-         SafeUnsubscribeAll();
-        if (!starKeepsDustClear) return;
+        SafeUnsubscribeAll();
+        if (!StarKeepsDustClear) return;
         var gen = gfm != null ? gfm.dustGenerator : null;
         if (gen == null) return;
 
@@ -881,6 +889,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         _isDisposing = true;
         SafeUnsubscribeAll();
     }
+
     public void WireBinSource(DrumTrack drum)
     {
         _drum = drum;
@@ -889,6 +898,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         InitializeTimingAndSpeeds();
         BuildOrRefreshPreviewRing();
     }
+
     private void BuildPhasePlan(MusicalPhase phase)
     {
         _phasePlan = new List<WeightedMineNode>();
@@ -905,14 +915,17 @@ public void OnLoopBoundary_RearmIfNeeded()
 
         Trace($"BuildPhasePlan: planned {_phasePlan.Count}/{target} nodes (phase={phase})");
     }
+
     private bool HasShardsRemaining() => _shardsEjectedCount < behaviorProfile.nodesPerStar;
-    private void PrepareNextDirective() {
+
+    private void PrepareNextDirective()
+    {
         Trace("PrepareNextDirective() begin");
         _cachedDirective = null;
-        _cachedTrack     = null;
+        _cachedTrack = null;
 
         if (_drum == null || spawnStrategyProfile == null) return;
-         
+
         WeightedMineNode planEntry = GetPlanEntryForHighlightedShard();
         if (planEntry == null) return;
 
@@ -923,41 +936,44 @@ public void OnLoopBoundary_RearmIfNeeded()
         if (track == null) return; // still nothing to target
 
         // --- Resolve prefabs via registries on DrumTrack ---
-        var nodePrefab    = _drum?.nodePrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
-        var payloadPrefab = _drum?.minedObjectPrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
+        var nodePrefab = _drum?.nodePrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
+        var payloadPrefab =
+            _drum?.minedObjectPrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
         if (nodePrefab == null || payloadPrefab == null)
         {
-            Trace($"PrepareNextDirective: MISSING prefab(s) for {planEntry.minedObjectType} / {planEntry.trackModifierType}");            return;
+            Trace(
+                $"PrepareNextDirective: MISSING prefab(s) for {planEntry.minedObjectType} / {planEntry.trackModifierType}");
+            return;
         }
 
         // --- Generate a NoteSet for spawners (NoteSpawner only) ---
         NoteSet noteSet = null;
         if (planEntry.minedObjectType == MinedObjectType.NoteSpawner)
         {
-            var gfm    = GameFlowManager.Instance;
-            var phase  = gfm?.phaseTransitionManager?.currentPhase ?? _assignedPhase;
+            var gfm = GameFlowManager.Instance;
+            var phase = gfm?.phaseTransitionManager?.currentPhase ?? _assignedPhase;
             int entropy = NextSpawnSerial();
-            
+
             try
             {
-                        if (_assignedMotif != null)
-                        {
-                            Debug.Log($"[NOTESET] Using {_assignedMotif}");
-                            // Motif-aware path: use motif-specific NoteSet generation
-                            noteSet = gfm.GenerateNotes(track);
-                        }
-                        else
-                        {
-                            Debug.Log($"[NOTESET] No phase to fallback on {_assignedPhase}");
+                if (_assignedMotif != null)
+                {
+                    Debug.Log($"[NOTESET] Using {_assignedMotif}");
+                    // Motif-aware path: use motif-specific NoteSet generation
+                    noteSet = gfm.GenerateNotes(track);
+                }
+                else
+                {
+                    Debug.Log($"[NOTESET] No phase to fallback on {_assignedPhase}");
 
-                        }
+                }
 
-                        if (noteSet == null)
-                        {
-                            Debug.LogWarning(
-                                $"[PhaseStar] No NoteSet generated for role {track.assignedRole}. " +
-                                "Check RoleMotifNoteSetConfig / MotifProfile or legacy RolePhaseNoteSetConfig & Library.");
-                        }
+                if (noteSet == null)
+                {
+                    Debug.LogWarning(
+                        $"[PhaseStar] No NoteSet generated for role {track.assignedRole}. " +
+                        "Check RoleMotifNoteSetConfig / MotifProfile or legacy RolePhaseNoteSetConfig & Library.");
+                }
             }
             catch (System.Exception ex)
             {
@@ -970,24 +986,25 @@ public void OnLoopBoundary_RearmIfNeeded()
         // --- Build directive (MineNode shell + payload, plus display color) ---
         var d = new MinedObjectSpawnDirective
         {
-            minedObjectType   = planEntry.minedObjectType,
-            role              = planEntry.role,
-            assignedTrack     = track,
+            minedObjectType = planEntry.minedObjectType,
+            role = planEntry.role,
+            assignedTrack = track,
             trackModifierType = planEntry.trackModifierType,
-            remixUtility      = null,          // (optional) fill from a phase recipe if/when you add it
-            noteSet           = noteSet,       // only for NoteSpawner
-            prefab            = nodePrefab,    // MineNode shell
+            remixUtility = null, // (optional) fill from a phase recipe if/when you add it
+            noteSet = noteSet, // only for NoteSpawner
+            prefab = nodePrefab, // MineNode shell
             minedObjectPrefab = payloadPrefab, // payload
-            displayColor      = track.trackColor,
-            spawnCell         = default        // filled at spawn
+            displayColor = track.trackColor,
+            spawnCell = default // filled at spawn
         };
 
         _cachedDirective = d;
-        _cachedTrack     = track;
+        _cachedTrack = track;
         // Keep the on-screen preview in sync with what will spawn next
-        if(!_lockPreviewTintUntilIdle)
+        if (!_lockPreviewTintUntilIdle)
             UpdatePreviewTint();
     }
+
     void BuildPreviewRing()
     {
         buildingPreview = true;
@@ -1029,21 +1046,21 @@ public void OnLoopBoundary_RearmIfNeeded()
 
             // Plan entry for THIS petal index
             var planEntry = _phasePlan[i];
-            var role      = planEntry.role;
+            var role = planEntry.role;
 
             // Color MUST come from the role’s track, not a cycling palette.
             var track = FindTrackByRole(role);
-            Color c   = track != null ? track.trackColor : Color.white;
+            Color c = track != null ? track.trackColor : Color.white;
 
             var shardGO = new GameObject($"PreviewShard_{i}_{role}");
             shardGO.transform.SetParent(transform);
             shardGO.transform.localPosition = Vector3.zero;
             shardGO.transform.localRotation = Quaternion.Euler(0f, 0f, ang);
-            shardGO.transform.localScale    = Vector3.one;
+            shardGO.transform.localScale = Vector3.one;
 
             var sr = shardGO.AddComponent<SpriteRenderer>();
             sr.sprite = visuals.diamond;
-            sr.color  = c;
+            sr.color = c;
             sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
 
             previewRing.Add(new PreviewShard
@@ -1070,6 +1087,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         UpdatePreviewTint();
         HighlightActive();
     }
+
     void UpdateLayering()
     {
         if ((_petals == null || _petals.Count == 0) && previewRing != null && previewRing.Count > 0)
@@ -1089,6 +1107,7 @@ public void OnLoopBoundary_RearmIfNeeded()
                 sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
         }
     }
+
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         var controller = GameFlowManager.Instance?.controller;
@@ -1100,12 +1119,14 @@ public void OnLoopBoundary_RearmIfNeeded()
 
         return null;
     }
+
     private WeightedMineNode GetPlanEntryForHighlightedShard()
     {
         if (previewRing == null || previewRing.Count == 0) return null;
         int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
         return previewRing[idx].plan;
     }
+
     void RemoveShardAt(int idx)
     {
         if (previewRing == null || previewRing.Count == 0) return;
@@ -1139,30 +1160,35 @@ public void OnLoopBoundary_RearmIfNeeded()
         UpdatePreviewTint();
         HighlightActive();
     }
+
     void AdvanceActiveShard()
-{
-    if (previewRing.Count == 0 || previewRing == null) return;
-    for (int i = 0; i < previewRing.Count; i++) 
-        _petalStartAngles[i] = previewRing[i].visual.localEulerAngles.z;
-    // compute the next target angles for the "flower" layout
-     var nextAngles = visuals.GetPetalAngles(previewRing.Count); 
-     for (int i = 0; i < previewRing.Count; i++) 
-         _petalTargetAngles[i] = nextAngles[Mathf.Clamp(i, 0, nextAngles.Length - 1)];
-    // Dim old
-    UpdateLayering();
-    UpdatePreviewTint();
-    HighlightActive();
-    if (visuals) { 
-        visuals.SetVeilOnNonActive(new Color(1f,1f,1f,0.20f), activeShardVisual); 
+    {
+        if (previewRing.Count == 0 || previewRing == null) return;
+        for (int i = 0; i < previewRing.Count; i++)
+            _petalStartAngles[i] = previewRing[i].visual.localEulerAngles.z;
+        // compute the next target angles for the "flower" layout
+        var nextAngles = visuals.GetPetalAngles(previewRing.Count);
+        for (int i = 0; i < previewRing.Count; i++)
+            _petalTargetAngles[i] = nextAngles[Mathf.Clamp(i, 0, nextAngles.Length - 1)];
+        // Dim old
+        UpdateLayering();
+        UpdatePreviewTint();
+        HighlightActive();
+        if (visuals)
+        {
+            visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.20f), activeShardVisual);
+        }
     }
-}
-    void UpdatePreviewTint() {
+
+    void UpdatePreviewTint()
+    {
         if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (visuals == null) return;
         var color = ResolvePreviewColor();
         visuals.SetPreviewTint(color);
-        if(activeShardVisual) HighlightActive();
+        if (activeShardVisual) HighlightActive();
     }
+
     private void HighlightActive()
     {
         if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
@@ -1180,82 +1206,113 @@ public void OnLoopBoundary_RearmIfNeeded()
         visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.25f), activeShardVisual);
         visuals.HighlightActive(activeShardVisual, c, 0.7f);
     }
+
     private Color ResolvePreviewColor()
     {
         if (previewRing == null || previewRing.Count == 0) return Color.white;
         int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
         return previewRing[idx].color;
     }
+
     private InstrumentTrack PickTargetTrackFor(WeightedMineNode entry)
-{
-    if (_targets == null || _targets.Count == 0) return null;
+    {
+        if (_targets == null || _targets.Count == 0) return null;
 
-    // Prefer role match if entry.role is set; else first valid target
-    var byRole = (entry.role != 0)
-        ? _targets.FirstOrDefault(t => t && t.assignedRole == entry.role)
-        : null;
+        // Prefer role match if entry.role is set; else first valid target
+        var byRole = (entry.role != 0)
+            ? _targets.FirstOrDefault(t => t && t.assignedRole == entry.role)
+            : null;
 
-    return byRole ?? _targets.FirstOrDefault(t => t);
-}
+        return byRole ?? _targets.FirstOrDefault(t => t);
+    }
+
     private void OnCollisionEnter2D(Collision2D coll)
-{
-    if (AnyCollectablesInFlightGlobal())
     {
-        // Optional: keep it disarmed while collectables exist, so we don’t accept pokes mid-burst.
-        Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
-        Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
-        return;
-    }
-    if (AnyExpansionPendingGlobal()) { 
-        Disarm(DisarmReason.ExpansionPending, _lockedTint); 
-        Trace("OnCollisionEnter2D: ignored poke because an expansion is pending"); 
-        return;
-    }
-    // --- Safety & gating ---
-    if (!HasShardsRemaining()) return;
-    if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
-    if (_state != PhaseStarState.WaitingForPoke) { Trace($"OnCollision: ignored, state={_state}"); return; } 
-    if (_ejectionInFlight) { Trace("OnCollision: ignored, busy flags"); return; } 
-    if (!_isArmed)
-    {
-        Trace("OnCollisionEnter2D: ignored poke because star is not armed");
-        return;
-    }
+        if (AnyCollectablesInFlightGlobal())
+        {
+            // Optional: keep it disarmed while collectables exist, so we don’t accept pokes mid-burst.
+            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+            Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
+            return;
+        }
 
-    if (_activeNode != null) { Trace("OnCollision: ignored, activeNode != null"); return; } 
-    if (Time.frameCount == _lastPokeFrame) { Trace("OnCollision: ignored, same frame"); return; }
-    _lastPokeFrame = Time.frameCount;
+        if (AnyExpansionPendingGlobal())
+        {
+            Disarm(DisarmReason.ExpansionPending, _lockedTint);
+            Trace("OnCollisionEnter2D: ignored poke because an expansion is pending");
+            return;
+        }
 
-    if (_cachedDirective == null || _cachedTrack == null) 
-        PrepareNextDirective();
-    // --- Handle missing directive fallback ---
-    if (_cachedDirective == null || _cachedTrack == null)
-    {
-        Trace("OnCollision: no directive/track → disarm and wait");
-        Disarm(DisarmReason.NodeResolving, _lockedTint);
-        return;
+        // --- Safety & gating ---
+        if (!HasShardsRemaining()) return;
+        if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
+        if (_state != PhaseStarState.WaitingForPoke)
+        {
+            Trace($"OnCollision: ignored, state={_state}");
+            return;
+        }
 
-    }
+        if (_ejectionInFlight)
+        {
+            Trace("OnCollision: ignored, busy flags");
+            return;
+        }
+
+        if (!_isArmed)
+        {
+            Trace("OnCollisionEnter2D: ignored poke because star is not armed");
+            return;
+        }
+
+        if (_activeNode != null)
+        {
+            Trace("OnCollision: ignored, activeNode != null");
+            return;
+        }
+
+        if (Time.frameCount == _lastPokeFrame)
+        {
+            Trace("OnCollision: ignored, same frame");
+            return;
+        }
+
+        _lastPokeFrame = Time.frameCount;
+
+        if (_cachedDirective == null || _cachedTrack == null)
+            PrepareNextDirective();
+        // --- Handle missing directive fallback ---
+        if (_cachedDirective == null || _cachedTrack == null)
+        {
+            Trace("OnCollision: no directive/track → disarm and wait");
+            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            return;
+
+        }
+
 // After the directive/track null checks succeed, just before Trace("OnCollision: spawning...")
-    Debug.Log($"[MNDBG] PhaseStar hit: relVel={coll.relativeVelocity.magnitude:F2}, " +
-              $"contact={coll.GetContact(0).point}, state={_state}, " +
-              $"cachedRole={_cachedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
+        Debug.Log($"[MNDBG] PhaseStar hit: relVel={coll.relativeVelocity.magnitude:F2}, " +
+                  $"contact={coll.GetContact(0).point}, state={_state}, " +
+                  $"cachedRole={_cachedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
 
-    if (previewRing != null && previewRing.Count > 0)
-    {
-        RefreshSafetyBubbleCell();
-        EjectActivePreviewShardAndFlow(coll);
+        if (previewRing != null && previewRing.Count > 0)
+        {
+            s_bubbleCenter = transform.position;
+            EjectActivePreviewShardAndFlow(coll);
+            return;
+        }
+
+        s_bubbleCenter = transform.position;
+        EjectCachedDirectiveAndFlow(coll);
         return;
     }
-    RefreshSafetyBubbleCell();
-    EjectCachedDirectiveAndFlow(coll);
-    return;
-}
+
     void ReseedAfterRemoval()
     {
         // 1) Re-collect petals (N changed)
         _petals.Clear();
-        foreach (var shard in previewRing) if (shard.visual) _petals.Add(shard.visual);
+        foreach (var shard in previewRing)
+            if (shard.visual)
+                _petals.Add(shard.visual);
         int N = _petals.Count;
 
         if (N == 0) return;
@@ -1274,6 +1331,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         // Minimal: keep as is, then just fix layering.
         UpdateLayering();
     }
+
     bool ResolveDirectivePrefab(ref MinedObjectSpawnDirective directive, InstrumentTrack track, out string error)
     {
         error = null;
@@ -1282,8 +1340,8 @@ public void OnLoopBoundary_RearmIfNeeded()
 
         // Choose the correct registry by type; default to NoteSpawner for roles
         var type = directive.minedObjectType == MinedObjectType.NoteSpawner
-                    ? MinedObjectType.NoteSpawner
-                    : directive.minedObjectType;
+            ? MinedObjectType.NoteSpawner
+            : directive.minedObjectType;
 
         // Try role-bound prefab first
         var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
@@ -1301,96 +1359,105 @@ public void OnLoopBoundary_RearmIfNeeded()
                 prefab = _drum.minedObjectPrefabRegistry.GetSpawnerPrefab();
                 break;
         }
+
         if (prefab == null)
         {
-            error = $"ResolveDirectivePrefab failed: no prefab for type={type}, role={track.assignedRole}, utility={directive.minedObjectType}";
+            error =
+                $"ResolveDirectivePrefab failed: no prefab for type={type}, role={track.assignedRole}, utility={directive.minedObjectType}";
             return false;
         }
 
         directive.prefab = prefab;
         return true;
     }
+
     void SpawnNodeCommon(Vector2 contactPoint, MinedObjectSpawnDirective usedDirective, InstrumentTrack usedTrack)
-{
-    Trace($"SpawnNodeCommon: begin (role={usedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(usedDirective.displayColor)})");
-
-    int ticket = ++_spawnTicket;
-    _ejectionInFlight = true;
-
-    visuals?.EjectParticles();
-
-    // Capture immutable context for this spawn
-    Color spawnTint = usedDirective.displayColor;
-    _lockedTint = spawnTint;
-    _lockPreviewTintUntilIdle = true;
-    visuals?.SetPreviewTint(spawnTint);
-
-    var node = DirectSpawnMineNode(contactPoint, usedDirective, usedTrack);
-    if (node == null)
     {
+        Trace(
+            $"SpawnNodeCommon: begin (role={usedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(usedDirective.displayColor)})");
+
+        int ticket = ++_spawnTicket;
+        _ejectionInFlight = true;
+
+        visuals?.EjectParticles();
+
+        // Capture immutable context for this spawn
+        Color spawnTint = usedDirective.displayColor;
+        _lockedTint = spawnTint;
+        _lockPreviewTintUntilIdle = true;
+        visuals?.SetPreviewTint(spawnTint);
+
+        var node = DirectSpawnMineNode(contactPoint, usedDirective, usedTrack);
+        if (node == null)
+        {
+            _ejectionInFlight = false;
+            _activeNode = null;
+
+            var prefabName = usedDirective != null && usedDirective.prefab != null
+                ? usedDirective.prefab.name
+                : "(null prefab)";
+            Debug.LogError(
+                $"[PhaseStar] SpawnNodeCommon failed: could not spawn MineNode. prefab={prefabName} type={usedDirective?.minedObjectType} mod={usedDirective?.trackModifierType} role={usedDirective?.role}");
+
+            Disarm(DisarmReason.NodeResolving, spawnTint);
+            return;
+        }
+
+        // Close previous corridor on spawn
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        if (gen != null)
+        {
+            var phase = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
+            gen.RegrowPreviousCorridorOnNewNodeSpawn(phase);
+        }
+
+        _activeNode = node;
         _ejectionInFlight = false;
-        _activeNode = null;
 
-        var prefabName = usedDirective != null && usedDirective.prefab != null ? usedDirective.prefab.name : "(null prefab)";
-        Debug.LogError($"[PhaseStar] SpawnNodeCommon failed: could not spawn MineNode. prefab={prefabName} type={usedDirective?.minedObjectType} mod={usedDirective?.trackModifierType} role={usedDirective?.role}");
+        bool handledResolve = false;
 
-        Disarm(DisarmReason.NodeResolving, spawnTint);
-        return;
+        node.OnResolved += (kind, dir) =>
+        {
+            // Stale callback guard (older node resolving after a newer spawn)
+            if (ticket != _spawnTicket) return;
+
+            // One-shot guard in case OnResolved can fire twice
+            if (handledResolve) return;
+            handledResolve = true;
+
+            Debug.Log(
+                $"[DBG] SpawnNodeCommon: {kind}, {dir}. CollectablesInFlightGlobal: {AnyCollectablesInFlightGlobal()}");
+            DBG(
+                $"OnResolved: directiveType={dir.minedObjectType} track={dir?.assignedTrack?.name} role={dir?.assignedTrack?.assignedRole} " +
+                $"nodesEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}");
+
+            // Always clear active node reference on resolve
+            _activeNode = null;
+
+            // If bridge/advance is in progress, do not start new gating logic,
+            // but keep internal cleanup above.
+            if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
+
+            _awaitingCollectableClear = true;
+            _awaitingCollectableClearSinceLoop = (_drum != null)
+                ? _drum.completedLoops
+                : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
+            _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
+
+            bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+            Disarm(DisarmReason.NodeResolving, spawnTint);
+
+            Trace(allShardsEjected
+                ? "OnResolved: FINAL MineNode resolved → waiting for final collectables"
+                : "OnResolved: MineNode resolved → waiting for collectables");
+
+            LogState("OnResolved");
+        };
+
+        CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
+        PrepareNextDirective();
+        Trace("SpawnNodeCommon: end");
     }
-
-    // Close previous corridor on spawn
-    var gen = gfm != null ? gfm.dustGenerator : null;
-    if (gen != null)
-    {
-        var phase = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
-        gen.RegrowPreviousCorridorOnNewNodeSpawn(phase);
-    }
-
-    _activeNode = node;
-    _ejectionInFlight = false;
-
-    bool handledResolve = false;
-
-    node.OnResolved += (kind, dir) =>
-    {
-        // Stale callback guard (older node resolving after a newer spawn)
-        if (ticket != _spawnTicket) return;
-
-        // One-shot guard in case OnResolved can fire twice
-        if (handledResolve) return;
-        handledResolve = true;
-
-        Debug.Log($"[DBG] SpawnNodeCommon: {kind}, {dir}. CollectablesInFlightGlobal: {AnyCollectablesInFlightGlobal()}");
-        DBG($"OnResolved: directiveType={dir.minedObjectType} track={dir?.assignedTrack?.name} role={dir?.assignedTrack?.assignedRole} " +
-            $"nodesEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}");
-
-        // Always clear active node reference on resolve
-        _activeNode = null;
-
-        // If bridge/advance is in progress, do not start new gating logic,
-        // but keep internal cleanup above.
-        if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
-
-        _awaitingCollectableClear = true;
-        _awaitingCollectableClearSinceLoop = (_drum != null)
-            ? _drum.completedLoops
-            : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
-        _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-
-        bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-        Disarm(DisarmReason.NodeResolving, spawnTint);
-
-        Trace(allShardsEjected
-            ? "OnResolved: FINAL MineNode resolved → waiting for final collectables"
-            : "OnResolved: MineNode resolved → waiting for collectables");
-
-        LogState("OnResolved");
-    };
-
-    CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
-    PrepareNextDirective();
-    Trace("SpawnNodeCommon: end");
-}
 
     void EjectActivePreviewShardAndFlow(Collision2D coll)
     {
@@ -1416,7 +1483,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         // If we have no shards left, we are now in the "final collectables must clear" waiting state.
         // The PhaseStar should NOT be visible during that final collection window.
         bool isFinalShardEjection = (previewRing == null || previewRing.Count == 0) ||
-                                   (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+                                    (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
 
         if (_cachedDirective == null || _cachedTrack == null)
             PrepareNextDirective();
@@ -1430,7 +1497,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         var contact = coll.GetContact(0).point;
 
         // Compute impact direction & strength for MineNode
-        var starPos    = (Vector2)transform.position;
+        var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
 
         // From vehicle toward star; this is the "incoming" direction
@@ -1447,11 +1514,12 @@ public void OnLoopBoundary_RearmIfNeeded()
         ActivateSafetyBubble();
         SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
     }
+
     void EjectCachedDirectiveAndFlow(Collision2D coll)
     {
         var contact = coll.GetContact(0).point;
-    // Compute impact direction & strength
-        var starPos    = (Vector2)transform.position;
+        // Compute impact direction & strength
+        var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
 
         _lastImpactDir = (starPos - vehiclePos).normalized;
@@ -1472,21 +1540,27 @@ public void OnLoopBoundary_RearmIfNeeded()
         ActivateSafetyBubble();
         SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
     }
+
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track)
     {
         if (directive == null || track == null || _drum == null) return null;
 
-        Vector2Int cell = _drum.GetRandomAvailableCell();      // ✅ DrumTrack wrapper
+        Vector2Int cell = _drum.GetRandomAvailableCell(); // ✅ DrumTrack wrapper
         if (cell.x < 0) return null;
 
-        Vector3 targetPos = _drum.GridToWorldPosition(cell);   // ✅ DrumTrack wrapper
+        Vector3 targetPos = _drum.GridToWorldPosition(cell); // ✅ DrumTrack wrapper
         directive.spawnCell = cell;
         Debug.Log($"[MNDBG] DirectSpawnMineNode: spawnFrom={spawnFrom}, gridCell={cell}, " +
                   $"role={directive.role}, track={track.name}");
 
-        var go   = Instantiate(directive.prefab, spawnFrom, Quaternion.identity);
+        var go = Instantiate(directive.prefab, spawnFrom, Quaternion.identity);
         var node = go.GetComponent<MineNode>();
-        if (!node) { Destroy(go); return null; }
+        if (!node)
+        {
+            Destroy(go);
+            return null;
+        }
+
         Debug.Log($"[MNDBG] MineNode GO instantiated: go={go.name}, node={node.name}, role={directive.role}");
         // color shell immediately so it never flashes white
         var sr = go.GetComponentInChildren<SpriteRenderer>();
@@ -1500,6 +1574,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         node.Initialize(directive); // MineNode will spawn payload and register with DrumTrack, etc.
         return node;
     }
+
     private IEnumerator CompleteAndAdvanceAsync()
     {
         Trace("Bridge: enter");
@@ -1513,7 +1588,7 @@ public void OnLoopBoundary_RearmIfNeeded()
         var next = _assignedPhase;
 
         Trace($"BeginPhaseBridge → next={next}");
-        
+
         GameFlowManager.Instance?.BeginPhaseBridge(next, null, Color.white);
 
         // --- Wait for the bridge to start (be defensive) ---
@@ -1530,12 +1605,19 @@ public void OnLoopBoundary_RearmIfNeeded()
         {
             Debug.LogWarning("[PhaseStar] Bridge never started; aborting advancement safely.");
             _state = PhaseStarState.Completed;
-            try { if (_drum) _drum._star = null; } catch {}
+            try
+            {
+                if (_drum) _drum._star = null;
+            }
+            catch
+            {
+            }
+
             Destroy(gameObject);
             yield break; // once destroyed, bail out immediately
         }
 
-      
+
         Trace("Bridge started (GhostCycleInProgress = true)");
 
         // --- Decide a safe timeout, once, using DrumTrack’s new loop helpers ---
@@ -1565,13 +1647,21 @@ public void OnLoopBoundary_RearmIfNeeded()
             // We don’t try to force the GFM flag here; we just exit gracefully.
         }
 
-        _state       = PhaseStarState.Completed;
+        _state = PhaseStarState.Completed;
         _isDisposing = true;
         SafeUnsubscribeAll();
-        try { if (_drum) _drum._star = null; } catch {}
+        try
+        {
+            if (_drum) _drum._star = null;
+        }
+        catch
+        {
+        }
+
         Destroy(gameObject);
         yield break;
     }
+
     private void EnableColliders()
     {
         if (_isDisposing || this == null) return;
@@ -1614,17 +1704,24 @@ public void OnLoopBoundary_RearmIfNeeded()
             rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
     }
-    private int CountEnabledColliders() {
+
+    private int CountEnabledColliders()
+    {
         if (_isDisposing || this == null) return 0;
-        int n = 0; 
-        var cols = GetComponentsInChildren<Collider2D>(true); 
-        foreach (var c in cols) if (c && c.enabled) n++; 
+        int n = 0;
+        var cols = GetComponentsInChildren<Collider2D>(true);
+        foreach (var c in cols)
+            if (c && c.enabled)
+                n++;
         return n;
     }
-    private void Trace(string msg) {
-        if (_tracePhaseStar) 
+
+    private void Trace(string msg)
+    {
+        if (_tracePhaseStar)
             Debug.Log($"[PhaseStar] {msg}");
     }
+
     private void LogState(string where)
     {
         if (_isDisposing || this == null || !_tracePhaseStar) return;
@@ -1634,7 +1731,53 @@ public void OnLoopBoundary_RearmIfNeeded()
                 : "-";
 
     }
-    
+
+    private void ActivateSafetyBubble()
+    {
+        if (!SafetyBubbleEnabled) return;
+
+        float cell = ComputeCellWorldSize();
+
+        // +0.5f gives the bubble a little breathing room relative to discrete cells
+        _bubbleRadiusWorld = (SafetyBubbleRadiusCells + 0.5f) * cell;
+
+        _bubbleActive = true;
+
+        s_bubbleActive = true;
+        s_bubbleCenter = transform.position;
+        s_bubbleRadiusWorld = _bubbleRadiusWorld;
+
+        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
+        // While the safety bubble is active, the star should not drift.
+        motion?.Enable(false);
+        SetRootPhysicsFrozen(true);
+    }
+
+    private void DeactivateSafetyBubble()
+    {
+        _bubbleActive = false;
+
+        s_bubbleActive = false;
+        s_bubbleCenter = Vector2.zero;
+        s_bubbleRadiusWorld = 0f;
+
+        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        visuals?.HideSafetyBubble();
+    }
+
+    /// <summary>
+    /// True if worldPos is inside any active PhaseStar safety bubble (Chebyshev radius in grid cells).
+    /// </summary>
+    public static bool IsWorldPosInsideAnySafetyBubble(Vector2 worldPos, MusicalPhase phase)
+    {
+        // Legacy compatibility shim: we now use a single static world-radius bubble.
+        return IsPointInsideSafetyBubble(worldPos);
+    }
+
 }
+    
+
+
 
     
