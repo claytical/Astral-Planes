@@ -174,6 +174,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63d0b38c6683745cb832e4f566b663d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  lineOfAscent: {fileID: 296242525}
+  ascendLoops: 8
+  ascendPaddingSeconds: 0.15
+  ascendLineWorldPadding: 0
   playheadLine: {fileID: 657963291}
   playheadParticles: {fileID: 264452581}
   _playheadEnergy01: 0
