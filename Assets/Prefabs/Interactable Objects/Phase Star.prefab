@@ -4880,8 +4880,8 @@ GameObject:
   - component: {fileID: 162112303559718899}
   - component: {fileID: 5499195754171050824}
   - component: {fileID: 6754461597857711404}
-  - component: {fileID: 1279126231376074408}
-  - component: {fileID: 7465792772216044867}
+  - component: {fileID: 4631393831486629443}
+  - component: {fileID: 6224665215610089654}
   - component: {fileID: 1335835332103871931}
   - component: {fileID: 7872104301369236207}
   m_Layer: 0
@@ -4924,21 +4924,21 @@ MonoBehaviour:
     type: 2}
   behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
   shardFlightSeconds: 0.6
-  StarKeepsDustClear: 1
+  starKeepsDustClear: 1
   rotateSelectionOnLoopBoundary: 1
-  StarKeepClearRadiusCells: 2
+  starKeepClearRadiusCells: 2
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
   visuals: {fileID: 6754461597857711404}
-  motion: {fileID: 1279126231376074408}
-  dust: {fileID: 7465792772216044867}
+  motion: {fileID: 6224665215610089654}
+  dust: {fileID: 4631393831486629443}
   _progressionMul: 1
   _isInFocusMode: 0
-  EnableSafetyBubble: 1
-  SafetyBubbleRadiusCells: 4
+  enableSafetyBubble: 1
+  safetyBubbleRadiusCells: 4
   syncRotationToLoop: 1
   _tracePhaseStar: 1
-  BubbleRadiusCells: 4
+  bubbleRadiusCells: 4
   bubbleTint: {r: 1, g: 1, b: 1, a: 1}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   maxActiveDps: 360
@@ -4968,7 +4968,7 @@ MonoBehaviour:
   bubbleFillAlpha: 0.08
   bubbleEdgeAlpha: 0.35
   dimShardTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.85}
---- !u!114 &1279126231376074408
+--- !u!114 &4631393831486629443
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -4977,12 +4977,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 2312498068821558259}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 669d1afb2e15b46259e03b493c0ebf4d, type: 3}
+  m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: '::'
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
+  keepClearTick: 0.1
+--- !u!114 &6224665215610089654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 046395d4bfb814e78a40f94065987a0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
   kinematicMode: 0
-  edgeBounce: 1.1
-  screenPadding: 2
+  edgeBounce: 0.9
+  screenPadding: 0.5
   focusSpeedMul: 0.5
   avoidRadius: 3
   avoidExponent: 2
@@ -4993,20 +5006,6 @@ MonoBehaviour:
   edgeGradMin: 0.02
   maxAccel: 4
   verbose: 0
---- !u!114 &7465792772216044867
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312498068821558259}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 546d9c7f0aaa1435894ba83077b35670, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
-  erodeTick: 0.05
-  appetiteMul: 1
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0
