@@ -255,33 +255,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
         ScheduleCompositeRebuild();
     }
-    public void ApplyVehicleAbrasion(Vector3 vehicleWorld, float impact01, float dt, MusicalPhase phase) {
-        if (drums == null) return; 
-        if (impact01 <= 0f || dt <= 0f) return;
-        // We scuff the *walls* adjacent to the vehicle’s cell, not the vehicle’s empty cell.
-        Vector2Int c = drums.WorldToGridPosition(vehicleWorld);
-        var dirs = GetHexDirections(c.y);
-        foreach (var d in dirs) {
-            var gp = c + d; 
-            if (!_hexMap.TryGetValue(gp, out var go) || go == null) continue;
-            float wear = 0f;
-            _wear01.TryGetValue(gp, out wear); 
-            wear += abrasionWearPerSecondAtFullImpact * Mathf.Clamp01(impact01) * dt;
-            wear = Mathf.Clamp01(wear); 
-            _wear01[gp] = wear;
-            float h = Mathf.Lerp(0.0f, abrasionHardnessAtFullWear, wear); 
-            var tint = abrasionTint; tint.a = Mathf.Lerp(0.15f, abrasionTint.a, wear);
-            if (go.TryGetComponent<CosmicDust>(out var dust)) { 
-                dust.ApplyImprint(tint, h);
-                // Dissipation threshold: when fully worn, open the corridor immediately.
-                if (wear >= 1f) { 
-                    _wear01.Remove(gp); 
-                    _imprints?.Remove(gp); 
-                    dust.DespawnGracefully(abrasionDissipateFadeSeconds);
-                }
-            }
-        }
-    }
 
     private void EnsureCompositeRef()
     {
@@ -961,51 +934,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 RequestRegrowCellAt(prev, phase);
             }
     }
-    public void CarveDustAt_TopologyAfterFade(Vector2Int gridPos, float fadeSeconds)
-    {
-        if (_permanentClearCells.Contains(gridPos)) return;
-        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return;
-
-        // Optional: prevent double scheduling
-        if (_pendingFadeRemovals.Contains(gridPos)) return;
-
-        if (go.TryGetComponent<CosmicDust>(out var dust))
-        {
-            float dur = Mathf.Max(0.01f, fadeSeconds);
-
-            _pendingFadeRemovals.Add(gridPos);
-
-            // Stop blocking immediately, but keep topology until fade completes.
-            dust.SetTerrainColliderEnabled(false);
-
-            // Fade visuals only (no pooling here).
-            dust.DissipateVisualOnly(dur);
-
-            // Remove topology + pool AFTER fade duration.
-            StartCoroutine(RemoveAfterFade(gridPos, go, dur));
-        }
-        else
-        {
-            RemoveActiveAt(gridPos, go, toPool: true);
-        }
-    }
-
-    private IEnumerator RemoveAfterFade(Vector2Int gridPos, GameObject go, float fadeSeconds)
-    {
-        yield return new WaitForSeconds(fadeSeconds);
-
-        // If already removed/replaced, bail.
-        if (!_hexMap.TryGetValue(gridPos, out var current) || current != go)
-        {
-            _pendingFadeRemovals.Remove(gridPos);
-            yield break;
-        }
-
-        RemoveActiveAt(gridPos, go, toPool: true);
-        _pendingFadeRemovals.Remove(gridPos);
-    }
-
-
+    
 // World-space helper for callers that don't want to manage grid conversion.
 // Radius is in WORLD units.
     public void SetStarKeepClearWorld(Vector2 starWorldPos, float radiusWorld, MusicalPhase phase)
@@ -1380,44 +1309,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
         Debug.Log($"[DUST-AUDIT] totalUnderGenerator={all.Length} tracked={tracked} orphan={orphan} hexMapCount={_hexMap.Count}");
     }
-
-    public void ErodeDustDisk(Vector3 centerWorld, float appetite = 1f)
-    {
-
-        float rWorld = Mathf.Max(0.2f, starErodeRadius * appetite);
-        int removed = 0;
-
-        int W = drums.GetSpawnGridWidth(), H = drums.GetSpawnGridHeight();
-        var c = drums.WorldToGridPosition(centerWorld);
-        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-        int rCells = Mathf.CeilToInt(rWorld / cellSize);
-
-        for (int x = c.x - rCells; x <= c.x + rCells; x++) {
-            for (int y = c.y - rCells; y <= c.y + rCells; y++) {
-                if (x < 0 || y < 0 || x >= W || y >= H)
-                    continue;
-                var gp = new Vector2Int(x, y);
-            bool isPerm = _permanentClearCells.Contains(gp);
-            bool hasHex = _hexMap.TryGetValue(gp, out var go);
-            // 1) Never touch already-permanent cells.
-            if (isPerm)
-                continue;
-            // 2) If we have dust registered here, despawn it
-            if (hasHex)
-            {
-                DespawnDustAt(gp);
-                removed++;
-                int budget = Mathf.RoundToInt(
-                    starErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f));
-
-                if (removed >= budget)
-                {
-                    return;
-                }
-            }
-        }
-    }
-}
+    
     public void ErodeDustDiskFromVehicle(Vector3 centerWorld, float appetite, float radiusMul, float powerMul)
     {
         
@@ -1825,79 +1717,6 @@ public void ApplyProfile(PhaseStarBehaviorProfile profile)
     /// </summary>
     public CompositeCollider2D DustCompositeCollider => compositeCollider;
 
-    /// <summary>
-    /// Computes the outward normal (toward empty space) from the dust terrain boundary at a given point,
-    /// along with the distance from the point to the boundary.
-    /// - If the point is outside dust, distance is positive and normal points away from dust.
-    /// - If the point is inside dust, distance is treated as 0 and normal points toward the nearest exit direction.
-    /// This is intentionally lightweight and avoids allocating colliders.
-    /// </summary>
-    public bool TryGetDustBoundaryOutwardInfo(Vector2 worldPos, float probeDist, out Vector2 outwardNormal, out float distanceToBoundary, out bool insideDust)
-    {
-        outwardNormal = Vector2.zero;
-        distanceToBoundary = 0f;
-        insideDust = false;
-
-        if (compositeCollider == null) return false;
-
-        // Fast inside test against composite if possible.
-        insideDust = compositeCollider.OverlapPoint(worldPos);
-
-        if (!insideDust)
-        {
-            Vector2 cp = compositeCollider.ClosestPoint(worldPos);
-            Vector2 v = worldPos - cp;
-            float d = v.magnitude;
-            if (d < 0.0001f) return false;
-            outwardNormal = v / d;
-            distanceToBoundary = d;
-            return true;
-        }
-
-        // Inside dust: approximate nearest exit direction by probing a few directions.
-        float step = Mathf.Max(0.02f, probeDist);
-        Vector2[] dirs =
-        {
-            Vector2.right, Vector2.left, Vector2.up, Vector2.down,
-            (Vector2.right + Vector2.up).normalized,
-            (Vector2.right + Vector2.down).normalized,
-            (Vector2.left + Vector2.up).normalized,
-            (Vector2.left + Vector2.down).normalized,
-        };
-
-        float bestD = float.PositiveInfinity;
-        Vector2 bestN = Vector2.zero;
-
-        for (int i = 0; i < dirs.Length; i++)
-        {
-            Vector2 test = worldPos + dirs[i] * step;
-            // If this probe is still inside, skip; we want the first direction that exits.
-            if (compositeCollider.OverlapPoint(test)) continue;
-
-            Vector2 cp = compositeCollider.ClosestPoint(test);
-            Vector2 v = test - cp;
-            float d = v.magnitude;
-            if (d < 0.0001f) continue;
-
-            if (d < bestD)
-            {
-                bestD = d;
-                bestN = v / d; // outward from dust at the probe
-            }
-        }
-
-        if (bestN.sqrMagnitude < 0.0001f)
-        {
-            // Fallback: no exit found at this probe distance; push in a random-ish stable direction.
-            outwardNormal = Vector2.up;
-            distanceToBoundary = 0f;
-            return true;
-        }
-
-        outwardNormal = bestN;
-        distanceToBoundary = 0f; // inside treated as 0 for steering toward target band
-        return true;
-    }
 
     /// <summary>
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
@@ -1983,7 +1802,7 @@ public void ApplyProfile(PhaseStarBehaviorProfile profile)
         Vector3 viewport = cam.WorldToViewportPoint(worldPos); 
         return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
     } 
-    private Vector2Int ForceReserveCellNearCenter()
+        private Vector2Int ForceReserveCellNearCenter()
     {
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
@@ -2006,128 +1825,127 @@ public void ApplyProfile(PhaseStarBehaviorProfile profile)
         }
         return new Vector2Int(-1,-1);
     }
-private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration)
-{
-    // Keep pacing similar, but enforce a per-frame millisecond budget
-    float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
+        private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration) {
+        // Keep pacing similar, but enforce a per-frame millisecond budget
+        float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
 
-    _isSpawningMaze = true;
-    BeginBulkTopology();
-    try
-    {
-        if (drums == null) drums = FindObjectOfType<DrumTrack>();
-        if (drums == null || dustPrefab == null) yield break;
-
-        drums.SyncTileWithScreen();
-        float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-
-        MusicalPhase phaseNow = (phaseTransitionManager != null)
-            ? phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
-
-        float lastPacedAt = Time.realtimeSinceStartup;
-        int i = 0;
-
-        // Track which dust we spawned so we can re-enable colliders in a controlled way.
-        // (Avoid scanning _hexMap; we want an explicit list.)
-        var spawnedDust = new List<CosmicDust>(cells.Count);
-
-        while (i < cells.Count)
+        _isSpawningMaze = true;
+        BeginBulkTopology();
+        try
         {
-            float frameStart  = Time.realtimeSinceStartup;
-            float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+            if (drums == null) drums = FindObjectOfType<DrumTrack>();
+            if (drums == null || dustPrefab == null) yield break;
 
-            while (i < cells.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
+            drums.SyncTileWithScreen();
+            float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+
+            MusicalPhase phaseNow = (phaseTransitionManager != null)
+                ? phaseTransitionManager.currentPhase
+                : MusicalPhase.Establish;
+
+            float lastPacedAt = Time.realtimeSinceStartup;
+            int i = 0;
+
+            // Track which dust we spawned so we can re-enable colliders in a controlled way.
+            // (Avoid scanning _hexMap; we want an explicit list.)
+            var spawnedDust = new List<CosmicDust>(cells.Count);
+
+            while (i < cells.Count)
             {
-                var (grid, pos) = cells[i++];
+                float frameStart  = Time.realtimeSinceStartup;
+                float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
 
-                // ---------------------------
-                // GATING
-                // ---------------------------
-                if (_permanentClearCells.Contains(grid)) continue;
-                if (IsKeepClearCell(grid)) continue;
-                if (_hexMap.ContainsKey(grid)) continue;
-                if (!drums.IsSpawnCellAvailable(grid.x, grid.y)) continue;
-
-                // ---------------------------
-                // SPAWN + REGISTER (VISUAL FIRST)
-                // ---------------------------
-                var hex = GetDustFromPool();
-                hex.transform.SetPositionAndRotation(pos, Quaternion.identity);
-                hexagons.Add(hex);
-
-                if (hex.TryGetComponent<CosmicDust>(out var dust))
+                while (i < cells.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
                 {
-                    dust.SetTrackBundle(this, drums, phaseNow);
-                    dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
+                    var (grid, pos) = cells[i++];
 
-                    dust.PrepareForReuse();
-                    dust.SetGrowInDuration(hexGrowInSeconds);
-                    dust.SetTint(_mazeTint);
-                    dust.ConfigureForPhase(phaseNow);
-                    dust.Begin();
+                    // ---------------------------
+                    // GATING
+                    // ---------------------------
+                    if (_permanentClearCells.Contains(grid)) continue;
+                    if (IsKeepClearCell(grid)) continue;
+                    if (_hexMap.ContainsKey(grid)) continue;
+                    if (!drums.IsSpawnCellAvailable(grid.x, grid.y)) continue;
 
-                    // Critical: keep collider OFF during bulk topology changes.
-                    dust.SetTerrainColliderEnabled(false);
-                    spawnedDust.Add(dust);
+                    // ---------------------------
+                    // SPAWN + REGISTER (VISUAL FIRST)
+                    // ---------------------------
+                    var hex = GetDustFromPool();
+                    hex.transform.SetPositionAndRotation(pos, Quaternion.identity);
+                    hexagons.Add(hex);
+
+                    if (hex.TryGetComponent<CosmicDust>(out var dust))
+                    {
+                        dust.SetTrackBundle(this, drums, phaseNow);
+                        dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
+
+                        dust.PrepareForReuse();
+                        dust.SetGrowInDuration(hexGrowInSeconds);
+                        dust.SetTint(_mazeTint);
+                        dust.ConfigureForPhase(phaseNow);
+                        dust.Begin();
+
+                        // Critical: keep collider OFF during bulk topology changes.
+                        dust.SetTerrainColliderEnabled(false);
+                        spawnedDust.Add(dust);
+                    }
+
+                    // This updates _hexMap but (during bulk) will NOT schedule composite rebuilds.
+                    RegisterHex(grid, hex);
                 }
 
-                // This updates _hexMap but (during bulk) will NOT schedule composite rebuilds.
-                RegisterHex(grid, hex);
+                // Pacing
+                float elapsedSinceLast = Time.realtimeSinceStartup - lastPacedAt;
+                if (elapsedSinceLast < deadlineStep)
+                    yield return new WaitForSeconds(deadlineStep - elapsedSinceLast);
+                else
+                    yield return null;
+
+                lastPacedAt = Time.realtimeSinceStartup;
             }
 
-            // Pacing
-            float elapsedSinceLast = Time.realtimeSinceStartup - lastPacedAt;
-            if (elapsedSinceLast < deadlineStep)
-                yield return new WaitForSeconds(deadlineStep - elapsedSinceLast);
-            else
-                yield return null;
-
-            lastPacedAt = Time.realtimeSinceStartup;
-        }
-
-        // --------------------------------------------------------------------
-        // PHYSICS PHASE: re-enable colliders gradually, then rebuild composite ONCE
-        // --------------------------------------------------------------------
-        int j = 0;
-        while (j < spawnedDust.Count)
-        {
-            float frameStart  = Time.realtimeSinceStartup;
-            float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
-
-            while (j < spawnedDust.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
+            // --------------------------------------------------------------------
+            // PHYSICS PHASE: re-enable colliders gradually, then rebuild composite ONCE
+            // --------------------------------------------------------------------
+            int j = 0;
+            while (j < spawnedDust.Count)
             {
-                var d = spawnedDust[j++];
-                if (d != null)
-                    d.SetTerrainColliderEnabled(true);
+                float frameStart  = Time.realtimeSinceStartup;
+                float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+
+                while (j < spawnedDust.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
+                {
+                    var d = spawnedDust[j++];
+                    if (d != null)
+                        d.SetTerrainColliderEnabled(true);
+                }
+
+                yield return null;
             }
 
-            yield return null;
-        }
+            // Now rebuild composite once after colliders are in their final state.
+            EnsureCompositeRef();
+            if (compositeCollider != null)
+            {
+                compositeCollider.GenerateGeometry();
+    #if UNITY_EDITOR
+                Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={compositeCollider.pathCount}", this);
+    #endif
 
-        // Now rebuild composite once after colliders are in their final state.
-        EnsureCompositeRef();
-        if (compositeCollider != null)
+                _compositeDirty = false;
+                _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
+                    ? (Time.unscaledTime + compositeRebuildMinInterval)
+                    : Time.unscaledTime;
+            }
+        }
+        finally
         {
-            compositeCollider.GenerateGeometry();
-#if UNITY_EDITOR
-            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={compositeCollider.pathCount}", this);
-#endif
-
-            _compositeDirty = false;
-            _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
-                ? (Time.unscaledTime + compositeRebuildMinInterval)
-                : Time.unscaledTime;
+            EndBulkTopology();
+            _isSpawningMaze = false;
         }
     }
-    finally
-    {
-        EndBulkTopology();
-        _isSpawningMaze = false;
-    }
-}
 
-    private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
+        private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
         // Free grid cell by key (authoritative)
         drums.FreeSpawnCell(grid.x, grid.y); 
         // Drop from registries
@@ -2138,7 +1956,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
         MarkCompositeDirty();
     }
     
-    private void RegisterHex(Vector2Int gridPos, GameObject hex)
+        private void RegisterHex(Vector2Int gridPos, GameObject hex)
     {
         if (_hexMap.TryGetValue(gridPos, out var existing) && existing != null && existing != hex)
         {
@@ -2158,7 +1976,7 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
         MarkCompositeDirty();
     }
 
-    private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
+        private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
         var growth = new List<(Vector2Int, Vector3)>();
 
     int w = drums.GetSpawnGridWidth();   // grid size comes from SpawnGrid
@@ -2255,98 +2073,11 @@ private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 po
     }
     return growth;
 }
-    private static Vector2Int Any(HashSet<Vector2Int> set) {
+        private static Vector2Int Any(HashSet<Vector2Int> set) {
         foreach (var v in set) return v;             // returns the first enumerated element
         return new Vector2Int(-1, -1);
     } 
-
-    public void ErodeDustDiskAtWorldPoint(
-        Vector2 worldPoint,
-        Vector2 velocityWorld,
-        float boostDamage01,
-        int forwardSteps = 2,
-        float fadeSeconds = 0.20f)
-    {
-        if (drums == null) return; // DrumTrack is sole authority for grid mapping.
-
-        // Determine base cell at contact point.
-        Vector2Int baseCell = drums.WorldToGridPosition(worldPoint);
-
-        // Determine a forward cell using a probe point in the direction of motion.
-        Vector2Int forwardDelta = Vector2Int.zero;
-        if (velocityWorld.sqrMagnitude > 0.0001f)
-        {
-            // Probe approximately one cell ahead in world space.
-            float cellWorld = Mathf.Max(0.01f, drums.GetCellWorldSize());
-            Vector2 probe = worldPoint + velocityWorld.normalized * (cellWorld * 0.95f);
-            Vector2Int probeCell = drums.WorldToGridPosition(probe);
-            forwardDelta = probeCell - baseCell;
-
-            // If probe landed in same cell (low speed or mapping quantization), no forward bias.
-            if (forwardDelta == Vector2Int.zero)
-                forwardSteps = 0;
-        }
-        else
-        {
-            forwardSteps = 0;
-        }
-
-        // Build the carve list: contacted cell + forward-biased cells (distinct only).
-        // Note: We keep this small & deterministic; you can expand later.
-        Span<Vector2Int> cells = stackalloc Vector2Int[4];
-        int count = 0;
-        cells[count++] = baseCell;
-
-        Vector2Int cur = baseCell;
-        for (int i = 0; i < forwardSteps && count < cells.Length; i++)
-        {
-            cur += forwardDelta;
-            if (cur == baseCell) continue;
-            bool dup = false;
-            for (int j = 0; j < count; j++)
-                if (cells[j] == cur) { dup = true; break; }
-            if (!dup) cells[count++] = cur;
-        }
-
-        // Carve each selected cell if occupied and boost beats hardness threshold.
-        for (int i = 0; i < count; i++)
-        {
-            TryCarveCell(cells[i], boostDamage01, fadeSeconds);
-        }
-    }
-
-    /// <summary>
-    /// Carves a single cell if dust exists there and boostDamage01 exceeds hardness gating.
-    /// Uses DespawnDustAt (which calls RemoveActiveAt) to keep generator topology authoritative.
-    /// </summary>
-    private void TryCarveCell(Vector2Int cell, float boostDamage01, float fadeSeconds)
-    {
-        if (_hexMap == null) return;
-        if (!_hexMap.TryGetValue(cell, out var go) || go == null) return;
-
-        // If it’s a dust tile, apply hardness gating.
-        if (go.TryGetComponent<CosmicDust>(out var dust))
-        {
-            // Harder dust requires stronger boost. Interpret hardness01 as [0..1].
-            // Threshold increases with hardness:
-            // - softness (0) => ~0.25 required
-            // - hardness (1) => ~0.75 required
-            float required = Mathf.Lerp(0.25f, 0.75f, dust.clearing.hardness01);
-            if (boostDamage01 < required)
-                return;
-
-            // If your CosmicDust already fades in DespawnGracefully, pass fadeSeconds through.
-            dust.DespawnGracefully(fadeSeconds);
-        }
-
-        // Topology removal should happen through your canonical path.
-        // If DespawnGracefully *already* calls DespawnDustAt at end-of-fade,
-        // then you’ll carve visually but NOT topologically during the fade.
-        // In that case, switch to the "Immediate topology removal" option below.
-        //
-        // For now: call DespawnDustAt immediately so the path opens now.
-        DespawnDustAt(cell);
-    }
+        
     public void DespawnDustAt(Vector2Int gridPos) {
         bool isPermanent = _permanentClearCells.Contains(gridPos);
         

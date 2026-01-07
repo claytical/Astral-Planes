@@ -352,6 +352,7 @@ public class CosmicDust : MonoBehaviour {
         if (terrainCollider != null)
             terrainCollider.enabled = enabled;
     }
+    // CosmicDust.cs
     public void DissipateAndPoolVisualOnly(float fadeSeconds = 0.20f) {
         if (_isDespawned) return;
         _isDespawned = true; 
@@ -362,8 +363,8 @@ public class CosmicDust : MonoBehaviour {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
         _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
     }
-    // CosmicDust.cs
-    public void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
+
+    private void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
     {
         if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
         _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration, onComplete));
@@ -557,9 +558,6 @@ public class CosmicDust : MonoBehaviour {
         main.startColor = new Color(baseCol.r, baseCol.g, baseCol.b, 1f);
 
     }
-
-    /// Fade visuals out (alpha/scale/particles) but DO NOT pool.
-    /// Generator is responsible for pooling/removal after fade completes.
     public void DissipateVisualOnly(float duration)
     {
         duration = Mathf.Max(0.01f, duration);
@@ -569,7 +567,6 @@ public class CosmicDust : MonoBehaviour {
 
         _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration));
     }
-
     private IEnumerator FadeOutVisualOnly(float duration)
     {
         if (visual.particleSystem != null)
@@ -603,7 +600,6 @@ public class CosmicDust : MonoBehaviour {
         // Intentionally do NOT pool or deactivate here.
         // The generator will RemoveActiveAt(...) and return to pool at end-of-fade.
     }
-
     private IEnumerator FadeOutThenPoolVisualOnly(float duration)
     {
         BeginFadeOutVisualOnly(duration, () =>
@@ -615,7 +611,6 @@ public class CosmicDust : MonoBehaviour {
         // Wait until the fade completes (if your calling code expects a coroutine)
         yield return new WaitForSeconds(duration);
     }
-
     private void OnCollisionStay2D(Collision2D collision)
     {
         if (_isDespawned || _isBreaking) return;

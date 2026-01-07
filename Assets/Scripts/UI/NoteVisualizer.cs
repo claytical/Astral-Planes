@@ -903,8 +903,8 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
         }
         foreach (var k in deadKeys) noteMarkers.Remove(k);
     }
-    public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds)
-{
+    
+    public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds) {
     if (track == null || burstId < 0) return;
 
     // Ascend BOTH lit and placeholder markers for this burst.

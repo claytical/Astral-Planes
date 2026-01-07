@@ -4930,7 +4930,7 @@ MonoBehaviour:
   _isInFocusMode: 0
   syncRotationToLoop: 1
   _tracePhaseStar: 1
-  bubbleTint: {r: 1, g: 1, b: 1, a: 1}
+  bubbleTint: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 0.3882353}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   maxActiveDps: 360
   _assignedMotif: {fileID: 0}
@@ -9983,7 +9983,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b,
     type: 3}
-  m_Color: {r: 0.21698111, g: 0.21698111, b: 0.21698111, a: 0.02745098}
+  m_Color: {r: 0.084905684, g: 0.084905684, b: 0.084905684, a: 0.02745098}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
