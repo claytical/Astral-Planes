@@ -403,27 +403,44 @@ public class InstrumentTrack : MonoBehaviour
             if (_binFilled[i]) return i;
         return -1;
     }
+
+    private int HighestAllocatedBinIndex()
+    {
+        EnsureBinList();
+        int hi = GetHighestAllocatedBin(); // already respects binAllocated[]
+        return hi;
+    }
+
+    /// <summary>
+    /// Track span should be derived from ALLOCATED bins (timeline stability),
+    /// not FILLED bins (content). Filled bins control silence vs sound.
+    /// </summary>
     private int EffectiveLoopBins()
     {
-        // IMPORTANT:
-        // The "visual/audible span" must not collapse just because a bin becomes empty.
-        // We treat allocated bins (created by expansion / placeholders) as part of the loop span,
-        // so other tracks (and the playhead) stay synchronized even during subtractive decay.
-        int binsFromFill  = Mathf.Clamp(HighestFilledBinIndex() + 1, 1, maxLoopMultiplier);
-        int binsFromAlloc = Mathf.Clamp(GetHighestAllocatedBin() + 1, 1, maxLoopMultiplier);
+        int maxBins = Mathf.Max(1, maxLoopMultiplier);
 
-        int binsBase = Mathf.Max(binsFromFill, binsFromAlloc);
+        int hiAlloc = HighestAllocatedBinIndex();
+        int binsFromAlloc = Mathf.Clamp(hiAlloc + 1, 1, maxBins);
 
-        // If we are in the middle of an expansion, hold the prior span until we hit the loop boundary.
-        // This prevents mid-loop stretching/shrinking that can cause audible/visual desync.
-        if (_pendingExpandForBurst && drumTrack != null && drumTrack.startDspTime > 0.0)
+        int hiFill = HighestFilledBinIndex();
+        int binsFromFill = Mathf.Clamp(hiFill + 1, 1, maxBins);
+
+        // While expanding/mapping, never let the span contract.
+        if ((_expandCommitted || _pendingExpandForBurst) &&
+            (_mapIncomingCollectionsToSecondHalf || _pendingMapIntoSecondHalfCount > 0))
         {
-            // Keep visuals/audio span stable until CommitExpandOnLoopBoundary (or equivalent) runs.
-            // (Do not widen to binsFromFill yet.)
-            binsBase = Mathf.Max(1, loopMultiplier);
+            return Mathf.Max(binsFromAlloc, Mathf.Max(1, loopMultiplier));
         }
-        return Mathf.Clamp(binsBase, 1, maxLoopMultiplier);
-    } 
+
+        // IMPORTANT: span = allocation (stable). Fill just makes bins audible or silent.
+        return Mathf.Max(1, binsFromAlloc);
+    }
+
+    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
+    {
+        steps = null;
+        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
+    }
     private int PickRandomExistingBinForDensity() { 
         // Only choose among bins that currently exist on THIS track.
         int binsAvailable = Mathf.Clamp(loopMultiplier, 1, Mathf.Max(1, maxLoopMultiplier));
@@ -440,9 +457,14 @@ public class InstrumentTrack : MonoBehaviour
     }    
     private void SyncSpanFromBins()
     {
-        loopMultiplier = EffectiveLoopBins();
-        _totalSteps    = loopMultiplier * BinSize();
+        // Span is allocation-driven; do not shrink here.
+        int want = EffectiveLoopBins();
+        if (want > loopMultiplier)
+            loopMultiplier = want;
+
+        _totalSteps = loopMultiplier * BinSize();
     }
+
     private void SetBinFilled(int bin, bool filled)
     {
         EnsureBinList();
@@ -453,11 +475,6 @@ public class InstrumentTrack : MonoBehaviour
 
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
-    }
-    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
-    {
-        steps = null;
-        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
     }
     private int LastExpandOldTotal { get; set; } = 0;
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
@@ -577,6 +594,15 @@ public class InstrumentTrack : MonoBehaviour
         if (newMult != loopMultiplier)
         {
             loopMultiplier = newMult;
+// Clear allocation/filled flags above the collapsed width so EffectiveLoopBins won't re-grow.
+            EnsureBinList();
+            for (int b = newMult; b < maxLoopMultiplier; b++)
+            {
+                SetBinAllocated(b, false);
+                if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
+                Harmony_OnBinEmptied(b);
+            }
+            
             _totalSteps = (drumTrack != null ? drumTrack.totalSteps : 16) * loopMultiplier;
             persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
             MarkLoopCacheDirty();
@@ -830,12 +856,19 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             if (step >= start && step < end)
                 persistentLoopNotes.RemoveAt(i);
         }
-
-        // Keep allocation, but mark as not filled
-        SetBinFilled(binIdx, false);
+// Keep allocation, mark as not filled WITHOUT changing span
+        EnsureBinList();
+        if (binIdx >= 0 && binIdx < _binFilled.Count)
+        {
+            _binFilled[binIdx] = false;
+            Harmony_OnBinEmptied(binIdx);
+        }
 
         // Optional: if you maintain other per-step registries, clear them here too.
         // e.g., chord/progression bookkeeping, burst step maps, etc.
+
+        // Ensure audio scheduling cache is rebuilt next Update()
+        MarkLoopCacheDirty();
 
         Debug.Log($"[ASCEND][CLEAR_BIN] track={name} bin={binIdx} range=[{start},{end}) keptAllocated=true");
     }
