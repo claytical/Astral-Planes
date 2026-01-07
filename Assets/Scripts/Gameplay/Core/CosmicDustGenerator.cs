@@ -35,7 +35,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [Header("Imprint Abrasion (Non-Boost)")] 
     [SerializeField] private float abrasionWearPerSecondAtFullImpact = 0.65f;
     [SerializeField] private float abrasionDissipateFadeSeconds = 0.20f;
-    [SerializeField] private Color abrasionTint = new Color(0.95f, 0.25f, 0.15f, 0.35f);
     [SerializeField] private float abrasionHardnessAtFullWear = 0.9f;
     struct DustImprint
     {
@@ -95,7 +94,7 @@ public class CosmicDustGenerator : MonoBehaviour
         => _regrowDelayMulByPhase.TryGetValue(phase, out var m) ? m : 1f;
     private Dictionary<int, List<Vector2Int>> _featureCells = new(); // featureId -> cells
     private Dictionary<Vector2Int, int> _cellToFeature = new();     // grid -> featureId
-    [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, 1f);
+    [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
     private Queue<int> _featureOrder = new();                       // FIFO for "oldest" removal
     private List<(Vector2Int grid, Vector3 pos)> _pendingSpawns = new();
     private readonly HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
@@ -429,9 +428,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
             // Rebuild now
             compositeCollider.GenerateGeometry();
-#if UNITY_EDITOR
-            Debug.Log($"[DUST:COMPOSITE] GenerateGeometry -> pathCount={compositeCollider.pathCount}", this);
-#endif
 
             _compositeDirty = false;
 
@@ -546,7 +542,6 @@ public class CosmicDustGenerator : MonoBehaviour
         // Build a mask of reserved cells (star + vehicles)
         var reserved = new HashSet<Vector2Int> { starCell };
         _permanentClearCells.Add(starCell);
-        Debug.Log($"[MAZE] Mark starCell permanent: {starCell} permCount={_permanentClearCells.Count}");
 
         if (vehicleCells != null)
         {
@@ -1048,15 +1043,11 @@ public class CosmicDustGenerator : MonoBehaviour
                 CarvePermanentDisk(bestNext, tunnelRadiusCells);
                 visited.Add(bestNext);
                 cur = bestNext;
-                Debug.Log($"[MAZE] Found Dusty Neighbor at {bestNext.x}, {bestNext.y}");
-
                 continue;
             }
             if (foundEmptyNeighbor) { 
                 visited.Add(bestEmptyNext); 
                 cur = bestEmptyNext; 
-                Debug.Log($"[MAZE] Found empty neighbor: {cur}");
-
                 continue;
             }
             // If we didn't find a dusty, unvisited neighbor, relax the "visited" constraint
@@ -1241,10 +1232,7 @@ public class CosmicDustGenerator : MonoBehaviour
             var dust = go.GetComponent<CosmicDust>();
             if (dust == null) dust = go.AddComponent<CosmicDust>();
             dust.OnSpawnedFromPool(_mazeTint); // restores collider, layer, alpha=1, scale=full
-            float a = ComputeVisualAlphaForWorldY(go.transform.position.y);
-            dust.SetVisualAlpha(a);
-
-            float cellWorldSize = (drums != null) ? Mathf.Max(0.001f, drums.GetCellWorldSize()) : 1f; 
+ 
             MarkCompositeDirty();
             return go;
         }
@@ -1340,16 +1328,34 @@ public class CosmicDustGenerator : MonoBehaviour
                 // Don’t touch permanent clear cells (star / maze corridors)
                 if (_permanentClearCells.Contains(gp))
                     continue;
-
-                // If there is dust here, despawn it without marking permanent
-                if (_hexMap.TryGetValue(gp, out var go))
+// If there is dust here, remove it from registries immediately (opens space NOW),
+// but let the visual object fade out and pool itself (charge -> collapse).
+                if (_hexMap.TryGetValue(gp, out var go) && go != null)
                 {
-                    DespawnDustAt(gp);   // ✅ TEMPORARY hole, regen can refill later
-                    removed++;
+                    if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
+                    {
+                        // Visual: fed energy -> brighten/charge (hue-preserving, not always pure white)
+                        dust.Visual_ChargeOnBoost(appetite);
 
-                    if (removed >= budget)
-                        return;
+                        // Remove from generator registries NOW; keep GO alive for fade
+                        RemoveActiveAt(gp, go, toPool: false);
+
+                        // Fade out, disable collision during fade, then return to pool
+                        dust.DissipateAndPoolVisualOnly(0.20f);
+                    }
+                    else
+                    {
+                        // No CosmicDust component; just remove/pool normally
+                        RemoveActiveAt(gp, go, toPool: true);
+                    }
+
+                    _fillMap[gp] = false;
+                    if (_imprints != null) _imprints.Remove(gp);
+
+                    removed++;
+                    if (removed >= budget) return;
                 }
+
             }
         }
     }

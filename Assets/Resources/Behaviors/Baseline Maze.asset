@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Baseline Maze
   m_EditorClassIdentifier: 
   personality: 0
-  mazeColor: {r: 0.6415094, g: 0.6415094, b: 0.6415094, a: 0.48235294}
+  mazeColor: {r: 0.4509804, g: 0.4509804, b: 0.4509804, a: 0.78431374}
   nodesPerStar: 8
-  inactiveShardTint: {r: 0.3, g: 0.3, b: 0.3, a: 0.6}
+  inactiveShardTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 5
   enableSafetyBubble: 1

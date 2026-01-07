@@ -40,7 +40,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1282962054544746}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -182,10 +182,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 546352f171f480044b3f66cb088a55a3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementMode: 1
   assignedInstrumentTrack: {fileID: 0}
   energySprite: {fileID: 212503362928707232}
   burstId: 0
+  dustCollisionEnterImpulse: 0.85
+  dustCollisionStayForce: 2.25
+  dustEscapeCooldownSeconds: 0.35
+  keepDustPocketOpen: 1
+  dustPocketRadiusWorld: 0.55
+  dustPocketTickSeconds: 0.15
+  dustPocketHoldSeconds: 0.45
   ribbonMarker: {fileID: 0}
   tether: {fileID: 0}
   intendedStep: -1
@@ -194,13 +200,6 @@ MonoBehaviour:
   minAlpha: 0.25
   maxAlpha: 0.65
   pulseScale: 1.08
-  flowCoupling: 1
-  flowMaxSpeed: 6
-  flowDrag: 1.25
-  turbulenceStrength: 0.4
-  dustEscapeImpulse: 3.5
-  stallSpeed: 0.1
-  stallNudgeImpulse: 0.75
   sharedTargetSteps: 
   minSpeed: 0.8
   maxSpeed: 3.5
@@ -5279,8 +5278,8 @@ ParticleSystemRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: 263648039
+  m_SortingLayer: 1
   m_SortingOrder: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
