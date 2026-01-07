@@ -16,7 +16,6 @@ GameObject:
   - component: {fileID: -6477047892044132563}
   - component: {fileID: -6350030188441898904}
   - component: {fileID: 5156754409828882777}
-  - component: {fileID: -5180785347366483362}
   m_Layer: 0
   m_Name: HeartDrive
   m_TagString: Vehicle
@@ -139,6 +138,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugDustGenerator: {fileID: 0}
+  boostCarveRequiredFloor01: 0.35
+  boostCarveDamageFloor01: 0.35
+  dustCarveMode: 1
   profile: {fileID: 11400000, guid: 95b113260e35b48afbf6575191140b15, type: 2}
   capacity: 90
   dustExitGraceSeconds: 0.2
@@ -151,6 +153,7 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
+  carveTickHz: 20
   envScale: 1
   inputDeadzone: 0.2
   inputTimeout: 0.15
@@ -469,21 +472,6 @@ PolygonCollider2D:
       - {x: 0.08, y: -0.085}
       - {x: 0.08, y: 0.095}
   m_UseDelaunayMesh: 0
---- !u!114 &-5180785347366483362
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vehicle: {fileID: 0}
-  trackController: {fileID: 0}
-  visualizer: {fileID: 0}
 --- !u!1001 &5126598930297591658
 PrefabInstance:
   m_ObjectHideFlags: 0

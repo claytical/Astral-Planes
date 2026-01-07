@@ -40,22 +40,6 @@ namespace Gameplay.Mining
             }
             this._directive = _directive;
         }
-        void OnTriggerEnter2D(Collider2D other)
-        {
-            CollectionSoundManager.Instance.PlayEffect(SoundEffectPreset.Aether);
-            var vehicle = other.GetComponent<Vehicle>();
-            if (vehicle != null)
-            {
-                if (_directive == null)
-                {
-                    Debug.LogError($"{name} ❌ directive is null in TrackUtilityMinedObject!");
-                    return;
-                }
-
-                vehicle.AddRemixRole(_minedObject.assignedTrack, _minedObject.musicalRole, _directive);
-                GetComponent<Explode>()?.Permanent();
-            }
-        }
 
     }
 }

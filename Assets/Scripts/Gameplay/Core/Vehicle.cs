@@ -93,7 +93,6 @@ public class Vehicle : MonoBehaviour
     private bool isFlickering = false;
     public HashSet<MusicalRole> collectedRemixRoles = new();
     private Color currentColorBlend = Color.white;
-    private VehicleRemixController _remixController;
     [SerializeField] HarmonyDirector harmony;
     [SerializeField] private ShipMusicalProfile shipProfile;
     [Header("Dust Legibility Pocket")]
@@ -190,7 +189,6 @@ void FixedUpdate()
         if (dspNow - loopStartDSPTime >= loopLen)
         {
             loopStartDSPTime = dspNow;
-            EvaluateRemixCondition();
         }
     }
 
@@ -221,14 +219,7 @@ void FixedUpdate()
             Vector2 step    = (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
             rb.linearVelocity += step;
         }
-
-        // Boost-time remix visuals (unchanged behavior)
-        if (boosting && _remixController != null && _remixController.HasRemixRoles())
-        {
-            int stepIdx = drumTrack != null ? drumTrack.currentStep : 0;
-            _remixController.FixedUpdateBoosting(dt, stepIdx);
-            UpdateRemixParticleEmission();
-        }
+        
     }
     else
     {
@@ -386,30 +377,6 @@ public void DrainEnergy(float amount, string source = "Unknown")
     {
         return arcadeMaxSpeed;
     }
-   
-    public void AddRemixRole(InstrumentTrack track, MusicalRole role, MinedObjectSpawnDirective directive)
-    {
-        if (collectedRemixRoles.Contains(role)) return;
-
-        // Store role
-        collectedRemixRoles.Add(role);
-        Debug.Log($"Remix Role {role} collected");
-
-        // Get role color from profile
-        MusicalRoleProfile profile = MusicalRoleProfileLibrary.GetProfile(role);
-        Color roleColor = profile.defaultColor;
-
-        // Let the remix controller handle visuals and logic
-        _remixController.AddRemixRole(role, roleColor, directive);
-
-        // Optional: give immediate visual feedback (e.g., pulse, swap sprite color)
-        ApplyTrackColorToShip(roleColor);
-        UpdateRemixParticles();
-
-        // Activate corresponding ring
-        if (remixRingHolder != null)
-            remixRingHolder.ActivateRing(role, roleColor);
-    }
     void OnDisable()
     {
         var gfm = GameFlowManager.Instance;
@@ -426,50 +393,7 @@ public void DrainEnergy(float amount, string source = "Unknown")
             baseSprite.color = newColor;
 
     }
-
-    private void UpdateRemixParticleEmission()
-    {
-        if (remixParticleEffect == null) return;
-        var emission = remixParticleEffect.emission;
-        emission.rateOverTime = boosting ? 50f : 5f;
-
-        if (!remixParticleEffect.isPlaying && _remixController.HasRemixRoles())
-        {
-            remixParticleEffect.Play();
-        }
-        else if (!_remixController.HasRemixRoles())
-        {
-            remixParticleEffect.Stop();
-            
-        }
-    }
-
-    private void UpdateRemixParticles()
-    {
-        if (remixParticleEffect == null) return;
-
-        // Update particle color
-        var main = remixParticleEffect.main;
-        main.startColor = currentColorBlend;
-
-        // Update emission rate based on boosting
-        var emission = remixParticleEffect.emission;
-        emission.rateOverTime = boosting ? 50f : 5f; // tweak these values as needed
-
-        if (!remixParticleEffect.isPlaying)
-            remixParticleEffect.Play();
-    }
-
-    private void ApplyTrackColorToShip(Color newColor)
-    {
-        if (currentColorBlend == profileColor)
-            currentColorBlend = newColor;
-        else
-            currentColorBlend = Color.Lerp(currentColorBlend, newColor, 0.5f);
-
-        shipRenderer.color = currentColorBlend;
-    }
-
+    
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -487,7 +411,6 @@ public void DrainEnergy(float amount, string source = "Unknown")
             shipRenderer = baseSprite;
             audioManager = GetComponent<AudioManager>();
             originalScale = transform.localScale;
-            _remixController = GetComponent<VehicleRemixController>();
             loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
             ApplyShipProfile(profile);
             if (rb == null)
@@ -554,15 +477,6 @@ public void DrainEnergy(float amount, string source = "Unknown")
             drumTrack = drums;
             LogScaleCalibrationOnce();
         }
-    
-
-    private void EvaluateRemixCondition() {
-       if(_remixController.EvaluateRemixCondition()) {
-       }
-    }
-            
-    public void SetHarmony(HarmonyDirector h) { harmony = h; }
-    
 
     public int GetForceAsDamage()
         {

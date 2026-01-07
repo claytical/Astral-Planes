@@ -405,17 +405,24 @@ public class InstrumentTrack : MonoBehaviour
     }
     private int EffectiveLoopBins()
     {
-        int hi = HighestFilledBinIndex();
-        int binsFromFill = Mathf.Clamp(hi + 1, 1, Mathf.Max(1, maxLoopMultiplier));
+        // IMPORTANT:
+        // The "visual/audible span" must not collapse just because a bin becomes empty.
+        // We treat allocated bins (created by expansion / placeholders) as part of the loop span,
+        // so other tracks (and the playhead) stay synchronized even during subtractive decay.
+        int binsFromFill  = Mathf.Clamp(HighestFilledBinIndex() + 1, 1, maxLoopMultiplier);
+        int binsFromAlloc = Mathf.Clamp(GetHighestAllocatedBin() + 1, 1, maxLoopMultiplier);
 
-        // Preserve width while an expansion is staged or active
-        if ((_expandCommitted || _pendingExpandForBurst) &&
-            (_mapIncomingCollectionsToSecondHalf || _pendingMapIntoSecondHalfCount > 0))
+        int binsBase = Mathf.Max(binsFromFill, binsFromAlloc);
+
+        // If we are in the middle of an expansion, hold the prior span until we hit the loop boundary.
+        // This prevents mid-loop stretching/shrinking that can cause audible/visual desync.
+        if (_pendingExpandForBurst && drumTrack != null && drumTrack.startDspTime > 0.0)
         {
-            return Mathf.Max(binsFromFill, Mathf.Max(1, loopMultiplier));
+            // Keep visuals/audio span stable until CommitExpandOnLoopBoundary (or equivalent) runs.
+            // (Do not widen to binsFromFill yet.)
+            binsBase = Mathf.Max(1, loopMultiplier);
         }
-
-        return binsFromFill;
+        return Mathf.Clamp(binsBase, 1, maxLoopMultiplier);
     } 
     private int PickRandomExistingBinForDensity() { 
         // Only choose among bins that currently exist on THIS track.
@@ -446,6 +453,11 @@ public class InstrumentTrack : MonoBehaviour
 
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
+    }
+    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
+    {
+        steps = null;
+        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
     }
     private int LastExpandOldTotal { get; set; } = 0;
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
@@ -488,6 +500,7 @@ public class InstrumentTrack : MonoBehaviour
         // IMPORTANT: don’t leave the controller stuck because remaining counts still think something is pending.
         // If you track remaining per-burst, clear that too.
         _burstRemaining?.Clear();
+        _burstSteps?.Clear();
         _burstSteps?.Clear();
         return destroyed;
     }
@@ -821,7 +834,9 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         // Keep allocation, but mark as not filled
         SetBinFilled(binIdx, false);
 
-        MarkLoopCacheDirty();
+        // Optional: if you maintain other per-step registries, clear them here too.
+        // e.g., chord/progression bookkeeping, burst step maps, etc.
+
         Debug.Log($"[ASCEND][CLEAR_BIN] track={name} bin={binIdx} range=[{start},{end}) keptAllocated=true");
     }
 
@@ -1412,8 +1427,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         }
         if (_currentNoteSet != noteSet) SetNoteSet(noteSet);
 
-        int burstId = (forcedBurstId > 0) ? forcedBurstId : (++_nextBurstId);
-        if (forcedBurstId > 0) _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);        
+        int burstId = ++_nextBurstId;
         currentBurstId = burstId;
 
         Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
@@ -1522,7 +1536,11 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             HookExpandBoundary();
             return;
         }
-        Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} ...ul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
+        Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");            
+        burstId = (forcedBurstId > 0) ? forcedBurstId : (++_nextBurstId);
+        if (forcedBurstId > 0) _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);
+        currentBurstId = burstId;
+
         Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={burstId} noteSet={noteSet} " +
                   $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
                   $"loopMul={loopMultiplier} pendingExpand={IsExpansionPending} MaxSpawnCount={maxToSpawn}");
@@ -1957,7 +1975,6 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         var tag = goObj.GetComponent<MarkerTag>() ?? goObj.gameObject.AddComponent<MarkerTag>(); 
         tag.isPlaceholder = false;
         tag.burstId = burstId;
-        tag.ascendBurstId = burstId;
         // Ensure it is colored and emitting now
 //        var vnm = t.GetComponent<VisualNoteMarker>();
 //                if (vnm != null) vnm.Initialize(trackColor);
@@ -1970,11 +1987,6 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     {
         // Placeholder logic — adapt as needed for actual behavior detection
         return persistentLoopNotes.Any(n => n.note > 127); // example threshold
-    }
-    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
-    {
-        steps = null;
-        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
     }
     private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modified, Vector3 _)
     {

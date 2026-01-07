@@ -1000,12 +1000,7 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
             $"noteMarkers(trackOnly)={trackOwned} stepBurstMatches={stepBurstMatch} stepBurstTotal={_stepBurst.Count}");
         return;
     }
-
-    if (cohort.Count == 0) {
-        Debug.LogWarning($"[ASCEND] track={track.name} burstId={burstId} -> no markers found. (placeholdersIncluded={includePlaceholders}) noteMarkers={noteMarkers.Count}");
-                return; 
-    }
-    // Mark ascending so orphan cleanup never kills them mid-flight
+// Mark ascending so orphan cleanup never kills them mid-flight
     foreach (var c in cohort)
     {
         c.tag.isAscending = true;

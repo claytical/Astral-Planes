@@ -10538,7 +10538,7 @@ MonoBehaviour:
     windowEndExclusive: 0
     armed: 0
   assignedRole: 0
-  lowestAllowedNote: 36
+  lowestAllowedNote: 48
   highestAllowedNote: 60
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
