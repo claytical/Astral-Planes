@@ -548,6 +548,48 @@ public class InstrumentTrackController : MonoBehaviour
     {
         return tracks.Max(track => track.loopMultiplier);
     }
+
+    /// <summary>
+    /// Returns the bin-count that the UI should use for consistent, cross-track visualization.
+    ///
+    /// <summary>
+    /// Global visual bin count used by NoteVisualizer layout.
+    ///
+    /// Rationale:
+    /// - The UI must remain phase-aligned across tracks even when a specific track is
+    ///   temporarily empty (e.g., subtractive bin expiration creating silence).
+    /// - Using only "active" loop multipliers (based on persistentLoopNotes) causes the
+    ///   visual width to collapse during those moments, which produces overlap and
+    ///   desync between tracks.
+    ///
+    /// Definition:
+    /// - The maximum number of bins any track has advanced to (binCursor), with
+    ///   fallbacks to declared total steps and loopMultiplier.
+    ///
+    /// This should be stable across subtractive changes: bins can become silent, but
+    /// the visual timebase should not shrink.
+    /// </summary>
+    public int GetGlobalVisualBins()
+    {
+        if (tracks == null || tracks.Length == 0) return 1;
+
+        int maxBins = 1;
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+
+            int binSize = Mathf.Max(1, t.BinSize());
+            int fromSteps = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(1, t.GetTotalSteps()) / (float)binSize));
+            int fromMul   = Mathf.Max(1, t.loopMultiplier);
+            int fromCursor = Mathf.Max(1, t.GetBinCursor());
+
+            maxBins = Mathf.Max(maxBins, fromSteps);
+            maxBins = Mathf.Max(maxBins, fromMul);
+            maxBins = Mathf.Max(maxBins, fromCursor);
+        }
+
+        return maxBins;
+    }
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)

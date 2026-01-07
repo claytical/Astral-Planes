@@ -1,4 +1,3 @@
-using Effects;
 using UnityEngine;
 
 public class NoteSpawnerMinedObject : MonoBehaviour
@@ -34,10 +33,7 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             selectedNoteSet.assignedInstrumentTrack = track;
             selectedNoteSet.Initialize(track, track.GetTotalSteps());
         }
-
-
-        ApplyTrackVisuals(track.trackColor);
-
+        
         Explode explode = GetComponent<Explode>();
         if (explode != null)
         {
@@ -66,12 +62,5 @@ public class NoteSpawnerMinedObject : MonoBehaviour
             // Also toggle any glow/outline to signal “collect me now”
            }
     
-    private void ApplyTrackVisuals(Color color)
-    {
-        var visual = GetComponent<TrackItemVisual>();
-        if (visual != null)
-        {
-            visual.trackColor = color;
-        }
-    }
+
 }

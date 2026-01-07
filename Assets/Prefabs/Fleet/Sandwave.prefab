@@ -16,7 +16,6 @@ GameObject:
   - component: {fileID: 7090461230668326449}
   - component: {fileID: -230908558113346295}
   - component: {fileID: 2119342064612494437}
-  - component: {fileID: 1558757855866547351}
   m_Layer: 0
   m_Name: Sandwave
   m_TagString: Vehicle
@@ -139,6 +138,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugDustGenerator: {fileID: 0}
+  boostCarveRequiredFloor01: 0.35
+  boostCarveDamageFloor01: 0.35
+  dustCarveMode: 1
   profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
   capacity: 85
   dustExitGraceSeconds: 0.2
@@ -151,6 +153,7 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
+  carveTickHz: 20
   envScale: 1
   inputDeadzone: 0.2
   inputTimeout: 0.15
@@ -446,21 +449,6 @@ PolygonCollider2D:
       - {x: 0.049999997, y: -0.07}
       - {x: 0.04, y: -0.17}
   m_UseDelaunayMesh: 0
---- !u!114 &1558757855866547351
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vehicle: {fileID: 0}
-  trackController: {fileID: 0}
-  visualizer: {fileID: 0}
 --- !u!1001 &2081744575351451928
 PrefabInstance:
   m_ObjectHideFlags: 0

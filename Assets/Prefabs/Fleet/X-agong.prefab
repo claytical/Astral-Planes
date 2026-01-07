@@ -10,13 +10,12 @@ GameObject:
   m_Component:
   - component: {fileID: 2614095863033673403}
   - component: {fileID: 1970310610805977373}
-  - component: {fileID: 3138199776794840757}
   - component: {fileID: 6267414685674281640}
   - component: {fileID: 964252887607637339}
   - component: {fileID: 7119975083311327178}
   - component: {fileID: -8058789835656915631}
   - component: {fileID: 4257441000810657983}
-  - component: {fileID: -1419297880697935352}
+  - component: {fileID: 3138199776794840757}
   m_Layer: 0
   m_Name: X-agong
   m_TagString: Vehicle
@@ -99,33 +98,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!50 &3138199776794840757
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 2
-  m_LinearDamping: 0
-  m_AngularDamping: 0
-  m_GravityScale: 0
-  m_Material: {fileID: 6200000, guid: 8a0d22cb4d4334705936f438fc6e3428, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 1
-  m_Constraints: 0
 --- !u!114 &6267414685674281640
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,6 +111,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugDustGenerator: {fileID: 0}
+  boostCarveRequiredFloor01: 0.35
+  boostCarveDamageFloor01: 0.35
+  dustCarveMode: 1
   profile: {fileID: 11400000, guid: 7343449aa16af45f0940599fa5ece9fa, type: 2}
   capacity: 80
   dustExitGraceSeconds: 0.2
@@ -151,6 +126,7 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
+  carveTickHz: 20
   envScale: 1
   inputDeadzone: 0.2
   inputTimeout: 0.15
@@ -481,21 +457,33 @@ PolygonCollider2D:
       - {x: 0.08, y: 0.24}
       - {x: 0.03, y: 0.34}
   m_UseDelaunayMesh: 0
---- !u!114 &-1419297880697935352
-MonoBehaviour:
+--- !u!50 &3138199776794840757
+Rigidbody2D:
+  serializedVersion: 5
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vehicle: {fileID: 0}
-  trackController: {fileID: 0}
-  visualizer: {fileID: 0}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 2
+  m_LinearDamping: 0
+  m_AngularDamping: 0
+  m_GravityScale: 0
+  m_Material: {fileID: 6200000, guid: 8a0d22cb4d4334705936f438fc6e3428, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 1
+  m_Constraints: 0
 --- !u!1001 &3469244476879464134
 PrefabInstance:
   m_ObjectHideFlags: 0

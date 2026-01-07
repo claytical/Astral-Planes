@@ -16,7 +16,6 @@ GameObject:
   - component: {fileID: -5305570869300527016}
   - component: {fileID: -7412268372019161615}
   - component: {fileID: 5276421355233068979}
-  - component: {fileID: 2428453799259234535}
   m_Layer: 0
   m_Name: Howler
   m_TagString: Vehicle
@@ -139,6 +138,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugDustGenerator: {fileID: 0}
+  boostCarveRequiredFloor01: 0.35
+  boostCarveDamageFloor01: 0.35
+  dustCarveMode: 1
   profile: {fileID: 0}
   capacity: 70
   dustExitGraceSeconds: 0.2
@@ -151,6 +153,7 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
+  carveTickHz: 20
   envScale: 1
   inputDeadzone: 0.2
   inputTimeout: 0.15
@@ -399,21 +402,6 @@ PolygonCollider2D:
       - {x: 0.089999996, y: -0.049999997}
       - {x: 0.099999994, y: -0.04}
   m_UseDelaunayMesh: 0
---- !u!114 &2428453799259234535
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b94a0540ea484fbf89ce337e5a83d7f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vehicle: {fileID: 0}
-  trackController: {fileID: 0}
-  visualizer: {fileID: 0}
 --- !u!1001 &4010519982627589836
 PrefabInstance:
   m_ObjectHideFlags: 0

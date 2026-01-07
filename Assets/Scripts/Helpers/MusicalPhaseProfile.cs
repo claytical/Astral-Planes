@@ -21,12 +21,6 @@ public class MusicalPhaseProfile : ScriptableObject
 {
     public MusicalPhase phase;
     
-    [Header("Audio")]
-//    public AudioClip[] drumClips;
-    
-    [Header("Track Utility")]
-    public TrackUtilityStrategy defaultRemixStrategy;
-
     [Header("Labels")]
     public string shortLabel;
     [SerializeField]
@@ -79,9 +73,3 @@ public class BridgeSignature {
     public bool growCoral = true;                // pipe bridge notes to CoralVisualizer
 }
 
-[Serializable]
-public class RemixRoleStrategy
-{
-    public MusicalRole role;
-    public TrackUtilityStrategy strategy;
-}
