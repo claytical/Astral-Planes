@@ -10529,7 +10529,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trackColor: {r: 0.6156863, g: 0.30588236, b: 0.8666667, a: 1}
+  trackColor: {r: 0.55, g: 0.4, b: 0.75, a: 1}
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 342701840}
@@ -11014,7 +11014,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trackColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
+  trackColor: {r: 0.25, g: 0.65, b: 0.7, a: 1}
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 627412778}
@@ -11112,7 +11112,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trackColor: {r: 0, g: 0.8392157, b: 0.8392157, a: 1}
+  trackColor: {r: 0.75, g: 0.55, b: 0.2, a: 1}
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 652946507}
@@ -11467,7 +11467,6 @@ MonoBehaviour:
   edgeRadiusFrac: 0.08
   abrasionWearPerSecondAtFullImpact: 0.65
   abrasionDissipateFadeSeconds: 0.2
-  abrasionTint: {r: 0.95, g: 0.25, b: 0.15, a: 0.35}
   abrasionHardnessAtFullWear: 0.9
   minClassicCycleInterval: 0.25
   vehicleErodeRadius: 1
@@ -13565,7 +13564,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trackColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
+  trackColor: {r: 0.55, g: 0.8, b: 0.2, a: 1}
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 1690824281}

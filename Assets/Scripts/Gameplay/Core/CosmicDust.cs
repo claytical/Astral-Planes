@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -13,7 +14,7 @@ public class CosmicDust : MonoBehaviour {
         public ParticleSystem particleSystem;
 
         [Header("Visual Footprint")]
-        [Range(0.5f, 1f)] public float particleFootprintMul; // % of cell; prevents edge bleed
+        [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
 
         [Header("PhaseStar Proximity")]
         public bool  starRemovesWithoutRegrow; // if false, it will regrow via generator
@@ -71,7 +72,8 @@ public class CosmicDust : MonoBehaviour {
         nonBoostSecondsToBreak    = 2.5f,
         temporaryRegrowDelaySeconds = -1f
     };    
-    
+    private float _baseDrainPerSecond;
+
     public enum DustBehavior { ViscousSlow, SiltDissipate, StaticCling, CrossCurrent, Turbulent }
     [Header("Behavior")]
     public DustBehavior behavior = DustBehavior.ViscousSlow; // NEW
@@ -92,6 +94,10 @@ public class CosmicDust : MonoBehaviour {
     private float _cellWorldSize = 1f;
     private float _cellClearanceWorld = 0f;
     private float _footprintMul = 1.15f;
+    private Color _baseColor;
+    private float _baseSize;
+    private float _baseAlpha;
+    private bool _baseCaptured;
 
     private bool _isDespawned;
     private bool _shrinkingFromStar;
@@ -140,7 +146,7 @@ public class CosmicDust : MonoBehaviour {
         fullScale = _baseLocalScale;
         float r = GetWorldRadius();
         _baseWorldDiameter = Mathf.Max(0.0001f, r * 2f);
-
+        _baseDrainPerSecond = interaction.energyDrainPerSecond;
         // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
         var psr = GetComponent<ParticleSystemRenderer>();
         if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
@@ -166,6 +172,7 @@ public class CosmicDust : MonoBehaviour {
     }
     public void OnSpawnedFromPool(Color tint)
     {
+        ResetAndPlayParticles();
         // Visual reset
         SetTint(tint);
         //transform.localScale = fullScale;
@@ -263,14 +270,17 @@ public class CosmicDust : MonoBehaviour {
             )
         };
 
-        // Scale
-        fullScale = _targetBaseScale * cfg.scaleMul;
-        transform.localScale = fullScale;
+// Root stays unit scale for collider determinism
+        transform.localScale = Vector3.one;
+
+// Apply phase scale to particle footprint only
         ApplyParticleFootprint();
+
         RebuildBoxColliderForCurrentScale();
         SyncParticlesToCollider();
-        // Drain (per-phase)
-        interaction.energyDrainPerSecond *= cfg.drainMul;
+
+// IMPORTANT: do not compound drain each time ConfigureForPhase runs
+        interaction.energyDrainPerSecond = _baseDrainPerSecond * cfg.drainMul;
 
         // Motion / feel
         behavior       = cfg.behavior;
@@ -283,11 +293,10 @@ public class CosmicDust : MonoBehaviour {
     public void Begin()
     {
         SetColorVariance();
-
-        transform.localScale = fullScale;
-
         ResetAndPlayParticles();
         ApplyParticleFootprint();
+        CaptureBaseVisual();
+
         _growInRoutine = StartCoroutine(GrowIn());
     }
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
@@ -305,12 +314,10 @@ public class CosmicDust : MonoBehaviour {
         _currentTint = tint;
 
         var main = visual.particleSystem.main;
-        main.startColor = tint;
-
         // If you want a subtle lifetime fade, set it once; otherwise disable it for solid visibility
         var col = visual.particleSystem.colorOverLifetime;
-        col.enabled = true;
-
+        col.enabled = false;
+        SetDustColorAllParticles(tint);
         // Build a *visible* gradient (soft in/out), not near-zero most of the time.
         var grad = new Gradient();
         grad.SetKeys(
@@ -332,7 +339,49 @@ public class CosmicDust : MonoBehaviour {
         col.color = new ParticleSystem.MinMaxGradient(grad);
 
     }
-    public void DespawnGracefully(float fadeSeconds = 0.25f)
+    private void SetDustColorAllParticles(Color target)
+    {
+        if (visual.particleSystem == null) return;
+
+        var ps   = visual.particleSystem;
+        var main = ps.main;
+        var col  = ps.colorOverLifetime;
+
+        // Ensure lifetime coloring is the authority (affects existing particles).
+        col.enabled = true;
+
+        // Premultiply for premultiplied-alpha material.
+        Color pm = Premultiply(target);
+
+        var g = new Gradient();
+        g.SetKeys(
+            new[] {
+                new GradientColorKey(new Color(pm.r, pm.g, pm.b, .3f), 0f),
+                new GradientColorKey(new Color(pm.r, pm.g, pm.b, .3f), 1f)
+            },
+            new[] {
+                new GradientAlphaKey(0f,    0f),   // born invisible
+                new GradientAlphaKey(pm.a,  0.35f),// quick rise
+                new GradientAlphaKey(pm.a,  0.5f),// sustain
+                new GradientAlphaKey(0f,    1f)    // soft fade out
+            }
+        );
+
+        col.color = new ParticleSystem.MinMaxGradient(g);
+
+        // Also set startColor for newly emitted particles (keeps it consistent).
+        main.startColor = pm;
+    }
+
+    private static Color Premultiply(Color c)
+    {
+        c.r *= c.a;
+        c.g *= c.a;
+        c.b *= c.a;
+        return c;
+    }
+
+    private void DespawnGracefully(float fadeSeconds = 0.25f)
     {
         if (_isDespawned) return;
         _isDespawned = true;
@@ -363,7 +412,46 @@ public class CosmicDust : MonoBehaviour {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
         _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
     }
+    public void Visual_ChargeOnBoost(float appetite01)
+    {
+        if (visual.particleSystem == null) return;
+        if (!_baseCaptured) CaptureBaseVisual();
 
+        float a = Mathf.Clamp01(appetite01);
+
+        var main = visual.particleSystem.main;
+
+        // Hue-preserving charge target
+        Color chargeCol = Color.Lerp(_baseColor, Color.white, Mathf.Lerp(0.55f, 0.85f, a));
+
+        // Make it read: spike alpha and size
+        float alpha = Mathf.Clamp01(Mathf.Max(_baseAlpha, 0.30f) + Mathf.Lerp(0.15f, 0.45f, a));
+        chargeCol.a = alpha;
+
+        float size  = _baseSize * Mathf.Lerp(1.05f, 1.25f, a);
+        SetDustColorAllParticles(chargeCol);
+        main.startSize  = size;
+        
+    }
+
+    public void Visual_DenyOnBump(float severity01)
+    {
+        if (visual.particleSystem == null) return;
+        if (!_baseCaptured) CaptureBaseVisual();
+
+        float s = Mathf.Clamp01(severity01);
+
+        var main = visual.particleSystem.main;
+
+        // Deny: deepen toward black but keep some hue
+        Color denyCol = Color.Lerp(_baseColor, Color.red, Mathf.Lerp(0.4f, 0.7f, s));
+
+
+        float size = _baseSize * Mathf.Lerp(1.00f, 1.15f, s);
+        SetDustColorAllParticles(denyCol);
+        main.startSize  = size;
+    }
+    
     private void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
     {
         if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
@@ -414,8 +502,7 @@ public class CosmicDust : MonoBehaviour {
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
-        fullScale = _targetBaseScale; 
-        transform.localScale = fullScale;
+        transform.localScale = Vector3.one;
         if (terrainCollider != null) terrainCollider.enabled = true;
 
         if (visual.particleSystem != null)
@@ -476,24 +563,6 @@ public class CosmicDust : MonoBehaviour {
         _isDespawned = true;
         DespawnGracefully();
     }    
-    private void BreakTemporarily()
-    {
-        if (_isBreaking) return;
-        _isBreaking = true;
-
-        Vector2Int gridPos = _drumTrack.WorldToGridPosition(transform.position);
-
-        // Remove tile immediately (to pool), and schedule regrow through generator.
-        // We use existing generator scheduling; per-tile override is handled by temporaryRegrowDelaySeconds.
-        gen.DespawnDustAt(gridPos);
-
-        // If you support per-tile override, request regrow with that delay; otherwise rely on existing regrow request flow.
-        if (clearing.temporaryRegrowDelaySeconds >= 0f)
-        {
-            // This requires a generator API; if you already have RequestRegrowCellAt, call it here.
-            // gen.RequestRegrowCellAt(gridPos, phase, temporaryRegrowDelaySeconds, refreshIfPending: true);
-        }
-    }
     private void SyncParticlesToCollider()
     {
         if (visual.particleSystem == null || _box == null) return;
@@ -511,22 +580,33 @@ public class CosmicDust : MonoBehaviour {
             shape.scale = new Vector3(world.x, world.y, 1f);
         }
 
-        // If Start Size is authored in big units, clamp it to something proportional.
-        // This prevents an authored "10" from dwarfing a 1-unit cell.
-        var main = visual.particleSystem.main;
-        main.startSize = Mathf.Min(main.startSize.constant, Mathf.Min(world.x, world.y) *.5f);
-
     }
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
 
-        // Ensure PS scales with parent, but then we shrink the PS itself to create margin.
-        var main = visual.particleSystem.main;
-//        main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        // Keep PS transform stable; drive footprint via startSize.
+        visual.particleSystem.transform.localScale = Vector3.one;
 
-        visual.particleSystem.transform.localScale = new Vector3(visual.particleFootprintMul*2f, visual.particleFootprintMul*2f, 1f);
+        var main = visual.particleSystem.main;
+
+        float mul = Mathf.Clamp(visual.particleFootprintMul, 0.05f, 2.0f);
+        float size = _cellWorldSize * mul;
+        main.startSize = size;
+
     }
+
+    private void CaptureBaseVisual()
+    {
+        if (visual.particleSystem == null) return;
+        var main = visual.particleSystem.main;
+
+        _baseColor = main.startColor.color;
+        _baseSize  = main.startSize.constant;
+        _baseAlpha = _baseColor.a;
+        _baseCaptured = true;
+    }
+
     private void DisableInteractionImmediately() { 
         // Stop affecting vehicles instantly (even if particles linger)
         if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = false; 
@@ -550,12 +630,12 @@ public class CosmicDust : MonoBehaviour {
         while (t < duration) { 
             t += Time.deltaTime; 
             float a = Mathf.SmoothStep(0f, 1f, t / duration); 
-            var c = new Color(baseCol.r, baseCol.g, baseCol.b, a); 
-            main.startColor = c; 
+            var c = new Color(baseCol.r, baseCol.g, baseCol.b, baseCol.a * a);
+            SetDustColorAllParticles(c);
             yield return null;
         }
         // Ensure fully visible at end
-        main.startColor = new Color(baseCol.r, baseCol.g, baseCol.b, 1f);
+        SetDustColorAllParticles(baseCol);
 
     }
     public void DissipateVisualOnly(float duration)
@@ -585,8 +665,6 @@ public class CosmicDust : MonoBehaviour {
         {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / duration);
-
-            transform.localScale = Vector3.Lerp(s0, s1, u);
             SetTint(Color.Lerp(from, to, u));
 
             yield return null;
@@ -625,30 +703,42 @@ public class CosmicDust : MonoBehaviour {
         // --- Clearing rules ---
         if (vehicle.boosting)
         {
-            // Boosting should be required to clear. Harder dust resists.
-            // Use force proxy you already authored on Vehicle.
+            // Boosting clears via generator carve. Dust tile only provides optional visual response.
             float damage01 = Mathf.Clamp01(vehicle.GetForceAsDamage() / 120f);
-            float effective = damage01 * Mathf.Lerp(1.0f, 0.25f, clearing.hardness01); // hard dust reduces effect
+            float effective = damage01 * Mathf.Lerp(1.0f, 0.25f, clearing.hardness01);
 
-            // Require some meaningful impact to pop a tile; tune later.
-            if (effective >= 0.35f)
-            {
-                BreakTemporarily();
-            }
+            // Appetite proxy: reuse effective or compute from vehicle speed if you prefer.
+            Visual_ChargeOnBoost(effective);
 
-            // While boosting, we do not accumulate “non-boost grind” time.
             _nonBoostClearSeconds = 0f;
             return;
         }
 
-        // Not boosting: grind timer (wall-like behavior), scaled by hardness.
-        float hardnessMul = Mathf.Lerp(1.0f, 2.25f, clearing.hardness01); // hard dust takes longer to break
-        _nonBoostClearSeconds += Time.fixedDeltaTime / hardnessMul;
 
-        if (_nonBoostClearSeconds >= Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak))
-        {
-            //TODO: Attack vehicle
-        }
+        // Not boosting: grind timer (wall-like behavior), scaled by hardness.
+        // Not boosting: dust denies energy.
+        // Harder dust drains more and “denies” more strongly.
+        float hardnessMul = Mathf.Lerp(1.0f, 2.25f, clearing.hardness01);
+
+        // Accumulate “grind” time for severity only (not for breaking).
+        _nonBoostClearSeconds += Time.fixedDeltaTime;
+
+        // Drain rate (energy/sec) scaled by hardness.
+        float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
+        float drain = drainPerSec * hardnessMul * Time.fixedDeltaTime;
+
+        vehicle.DrainEnergy(drain);
+
+        // Severity is based on “how long you keep denying energy” on this tile.
+        // We can normalize by your existing nonBoostSecondsToBreak as a convenient tuning knob.
+        float denom = Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak);
+        float severity01 = Mathf.Clamp01(_nonBoostClearSeconds / denom);
+
+// Visual denial shift
+        Visual_DenyOnBump(severity01);
+
+// IMPORTANT: no breaking/clearing here.
+
     }
     private void OnCollisionExit2D(Collision2D collision) {
         // Reset grind timer when the vehicle stops pressing this tile.
@@ -656,8 +746,18 @@ public class CosmicDust : MonoBehaviour {
         if (vehicle == null) return;
 
         _nonBoostClearSeconds = 0f;
+        ResetVisualToBase();
     }
     
+    public void ResetVisualToBase()
+    {
+        if (visual.particleSystem == null) return;
+        if (!_baseCaptured) return;
+
+        var main = visual.particleSystem.main;
+        SetDustColorAllParticles(_baseColor);
+        main.startSize  = _baseSize;
+    }
 
     private readonly struct PhaseDustConfig
     {
@@ -692,19 +792,7 @@ public class CosmicDust : MonoBehaviour {
         _cellWorldSize       = Mathf.Max(0.001f, cellWorldSize);
         _footprintMul        = Mathf.Max(0.05f, footprintMul);
         _cellClearanceWorld  = Mathf.Max(0f, clearanceWorld);
-
-        // This is the *authoritative* base scale for this tile (before phase mul).
-        float s = _cellWorldSize * _footprintMul;
-        visual.prefabReferenceScale = new Vector3(s, s, 1f);
-
-        // Critical: update the phase base that ConfigureForPhase multiplies.
-        _targetBaseScale = visual.prefabReferenceScale;
-
-        // Default fullScale to base (phase may modify it after).
-        fullScale = _targetBaseScale;
-
-        if (_growInRoutine == null)
-            transform.localScale = fullScale;
+        transform.localScale = Vector3.one;
         ApplyParticleFootprint();
         RebuildBoxColliderForCurrentScale();
         SyncParticlesToCollider();
@@ -713,16 +801,10 @@ public class CosmicDust : MonoBehaviour {
     {
         if (_box == null) return;
 
-        // Desired solid fill in world space inside the cell.
         float desiredWorld = Mathf.Clamp(_cellWorldSize - _cellClearanceWorld, 0.001f, _cellWorldSize);
 
-        // Our current local scale (what Unity multiplies collider size by).
-        // Use current transform localScale (not prefabReferenceScale), because phase mul may be applied.
-        float sx = Mathf.Max(0.0001f, Mathf.Abs(transform.localScale.x));
-        float sy = Mathf.Max(0.0001f, Mathf.Abs(transform.localScale.y));
-
-        // Convert world size -> local collider size per axis.
-        _box.size   = new Vector2(desiredWorld / sx, desiredWorld / sy);
+        // With transform.localScale == 1, local size == world size.
+        _box.size   = new Vector2(desiredWorld, desiredWorld);
         _box.offset = Vector2.zero;
     }
 
@@ -752,8 +834,6 @@ public class CosmicDust : MonoBehaviour {
         {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
-
-            transform.localScale = Vector3.Lerp(startScale, endScale, u);
             SetTint(Color.Lerp(from, to, u));
 
             yield return null;

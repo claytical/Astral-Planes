@@ -610,7 +610,7 @@ if (gfm != null && gfm.dustGenerator != null)
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
 }
 
-    private void DrainEnergy(float amount, string source = "Unknown")
+    public void DrainEnergy(float amount, string source = "Unknown")
 {
     if (amount <= 0f) return;
 
