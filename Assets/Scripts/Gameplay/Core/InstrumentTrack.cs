@@ -4,7 +4,6 @@ using MidiPlayerTK;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Gameplay.Mining;
 using Random = UnityEngine.Random;
 [System.Serializable]
 public struct AscensionCohort
@@ -408,10 +407,6 @@ public class InstrumentTrack : MonoBehaviour
             
         return -1;
         }
-    public void DisplayNoteSet()
-    {
-        Debug.Log($"[{gameObject.name} NOTESET] Root: {_currentNoteSet.GetRootNote()}, Scale: {_currentNoteSet.scale}, Behavior: {_currentNoteSet.noteBehavior}, Pattern: {_currentNoteSet.patternStrategy}, Rhythm: {_currentNoteSet.rhythmStyle}");
-    }
     private int HighestFilledBinIndex()
     {
         EnsureBinList();
@@ -1132,21 +1127,10 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     {
         return _totalSteps;
     }
-    public void ClearLoopedNotes(TrackClearType type = TrackClearType.Remix, Vehicle vehicle = null) {
+    public void ClearLoopedNotes(Vehicle vehicle = null) {
         if (persistentLoopNotes.Count == 0) return;
-        ResetPerfectionFlag();
-        switch (type)
-        {
-            case TrackClearType.EnergyRestore:
-                if (vehicle != null)
-                {
-                    controller?.noteVisualizer?.TriggerNoteRushToVehicle(this, vehicle);
-                }
-                break;
-            case TrackClearType.Remix:
-                controller?.noteVisualizer?.TriggerNoteBlastOff(this);
-                break;
-        }
+        ResetPerfectionFlag(); 
+        controller?.noteVisualizer?.TriggerNoteBlastOff(this);
         _spawnedNotes.Clear(); // Visuals are handled separately
         persistentLoopNotes.Clear();
         MarkLoopCacheDirty();
@@ -1191,75 +1175,6 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             Velocity = (int)velocity,
         };
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
-    }
-    public bool IsTrackUtilityRelevant(TrackModifierType modifierType)
-    {
-        // 1. Skip if there's no loop data yet
-        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0)
-            return false;
-
-        // 2. Avoid duplicate behavior modifiers — could be expanded
-        switch (modifierType)
-        {
-            case TrackModifierType.RootShift:
-                return !HasAlreadyShiftedNotes();
-            case TrackModifierType.Clear:
-                return persistentLoopNotes.Count > 0;
-            default:
-                return true; // fallback: assume useful
-        }
-    }
-    public void PerformSmartNoteModification(Vector3 sourcePosition)
-    {
-        Debug.Log($"Performing SmartNoteModification on {gameObject.name}");
-        if (drumTrack == null || !HasNoteSet())
-            return;
-
-        string[] options;
-        Debug.Log($"Assessing options for {_currentNoteSet}");
-
-        switch (GameFlowManager.Instance.phaseTransitionManager.currentPhase)
-        {
-            case MusicalPhase.Establish:
-                options = new[] { "RootShift", "ChordChange" };
-                break;
-            case MusicalPhase.Evolve:
-                options = new[] { "ChordChange", "NoteBehaviorChange" };
-                break;
-            case MusicalPhase.Intensify:
-                options = new[] { "ChordChange", "RootShift", "NoteBehaviorChange" };
-                break;
-            case MusicalPhase.Release:
-                options = new[] { "ChordChange", "RootShift" };
-                break;
-            case MusicalPhase.Wildcard:
-                options = new[] { "ChordChange", "RootShift", "NoteBehaviorChange" };
-                break;
-            case MusicalPhase.Pop:
-                options = new[] { "NoteBehaviorChange" };
-                break;
-            default:
-                options = new[] { "ChordChange" };
-                break;
-        }
-        string selected = options[Random.Range(0, options.Length)];
-        
-
-        switch (selected)
-        {
-            case "ChordChange":
-                ApplyChordChange(_currentNoteSet, sourcePosition);
-                break;
-            case "NoteBehaviorChange":
-                ApplyNoteBehaviorChange(_currentNoteSet, sourcePosition);
-                break;
-            case "RootShift":
-                ApplyRootShift(_currentNoteSet, sourcePosition);
-                break;
-        }
-
-        controller.UpdateVisualizer();
-        //controller.noteVisualizer.SyncTiledClonesForTrack(this);
     }
     public bool IsPerfectThisPhase { get; private set; }
     private void PlayDarkNote(int note, int duration, float velocity)

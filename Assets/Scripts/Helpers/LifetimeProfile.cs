@@ -3,8 +3,7 @@ using System.Collections.Generic;
 
 public enum MinedObjectType
 {
-    NoteSpawner,
-    TrackUtility
+    NoteSpawner
 }      
 [System.Serializable]
 public class LifetimeProfile
@@ -20,8 +19,7 @@ public class LifetimeProfile
 
     private static readonly Dictionary<MinedObjectType, LifetimeProfile> Profiles = new()
     {
-        { MinedObjectType.NoteSpawner, new LifetimeProfile(160f) },
-        { MinedObjectType.TrackUtility, new LifetimeProfile(8f) }
+        { MinedObjectType.NoteSpawner, new LifetimeProfile(160f) }
     };
 
     public static LifetimeProfile GetProfile(MinedObjectType type)

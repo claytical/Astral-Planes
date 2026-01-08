@@ -1,30 +1,26 @@
 using System.Collections;
 using System.Collections.Generic;
-using Gameplay.Mining;
 using UnityEngine;
 using Random = System.Random;
 
 public class MineNode : MonoBehaviour
 {
+    public event System.Action<MineNode> OnResolved;
     public SpriteRenderer coreSprite;
     public int maxStrength = 100;
+    private Vector2Int _spawnCell;
+    private bool _hasSpawnCell;
 
     private int _strength;
-    private GameObject _preloadedObject;
     private Vector3 _originalScale;
-    private Color? _lockedColor;
-    public MinedObject _minedObject;
-    private bool _objectRevealed, _depletedHandled, _resolvedFired;
-    private MinedObjectSpawnDirective _directive;
+    private Color _lockedColor;
+    private bool _depletedHandled, _resolvedFired;
     private Collider2D _col;
     private Rigidbody2D _rb;
-    private float _spawnTime;
     // Cached normalized pitch (0 = lowest note, 1 = highest note)
     private float _lastNote01 = 0.5f;
 
     [SerializeField] private float minCarveSeconds = 1.25f;
-
-    private int _birthLoop;
     private DrumTrack _drumTrack;
 
     // --- Grid-based path recording (only during carving) ---
@@ -48,7 +44,7 @@ public class MineNode : MonoBehaviour
     [SerializeField] private float turnAngleLead = 40f;
 
     private NoteSet _noteSet;
-    private InstrumentTrack _assignedTrack;
+    private InstrumentTrack _track;
     private MusicalRole _role;
 
     private int _lastProcessedStep = -1;
@@ -64,7 +60,7 @@ public class MineNode : MonoBehaviour
     private MineNodeDustInteractor _dustInteractor;
     private float _currentDesiredSpeed;
 
-    public event System.Action<MinedObjectType, MinedObjectSpawnDirective> OnResolved;
+
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -78,7 +74,7 @@ private void FixedUpdate()
         _rb == null ||
         _drumTrack == null ||
         _noteSet == null ||
-        _assignedTrack == null)
+        _track == null)
     {
         return;
     }
@@ -101,11 +97,11 @@ private void FixedUpdate()
         bool isTurnStep = (stepList != null && stepList.Contains(stepNow));
         float turnGate = isTurnStep ? 1f : microTurnGate;
 
-        int note = _noteSet.GetNoteForPhaseAndRole(_assignedTrack, stepNow);
+        int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
 
         float note01 = Mathf.InverseLerp(
-            _assignedTrack.lowestAllowedNote,
-            _assignedTrack.highestAllowedNote,
+            _track.lowestAllowedNote,
+            _track.highestAllowedNote,
             note);
 
         _lastNote01 = note01;
@@ -120,11 +116,11 @@ private void FixedUpdate()
     }
 
     // --- NOTE-DRIVEN SPEED ---
-    int currentNote = _noteSet.GetNoteForPhaseAndRole(_assignedTrack, stepNow);
+    int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
 
     float speed01 = Mathf.InverseLerp(
-        _assignedTrack.lowestAllowedNote,
-        _assignedTrack.highestAllowedNote,
+        _track.lowestAllowedNote,
+        _track.highestAllowedNote,
         currentNote);
 
     float targetSpeed = Mathf.Lerp(carveSpeedMin, carveSpeedMax, speed01);
@@ -172,28 +168,20 @@ private void FixedUpdate()
 }
 public Color GetImprintShadowColor()
 {
-    // Prefer role profile if you have it in the directive (your MinedObjectSpawnDirective already includes roleProfile)
-    if (_directive != null && _directive.roleProfile != null)
-    {
-        // Temporary placeholder until MusicalRoleProfile grows dust fields:
-        // return _directive.roleProfile.shadowColor;
-        // For now, derive shadow by darkening the base.
-        var c = GetImprintColor();
-        return new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, c.a);
-    }
+    if (_track != null)
+        return _track.TrackShadowColor;
 
-    // Fallback: darken base
-    {
-        var c = GetImprintColor();
-        return new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, c.a);
-    }
+    // hard fallback
+    Color c = _lockedColor;
+    return new Color(c.r * 0.2f, c.g * 0.2f, c.b * 0.2f, c.a);
 }
+
 
     public Color GetImprintColor()
     {
         // InstrumentTrack is the semantic source of color
-        if (_assignedTrack != null)
-            return _assignedTrack.trackColor;
+        if (_track != null)
+            return _track.trackColor;
 
         return Color.white;
     }
@@ -208,73 +196,53 @@ public Color GetImprintShadowColor()
     private int GetPreviewNoteForCurrentStep()
     {
         int step = (_drumTrack != null) ? _drumTrack.currentStep : 0;
-        return _noteSet.GetNoteForPhaseAndRole(_assignedTrack, step);
+        return _noteSet.GetNoteForPhaseAndRole(_track, step);
     }
 
-    public void Initialize(MinedObjectSpawnDirective directive)
+    public void Initialize(InstrumentTrack track, Color tint, Vector2Int spawnCell)
     {
-        Debug.Log($"[MNDBG] MineNode.Initialize: node={name}, role={directive.role}, " +
-                  $"type={directive.minedObjectType}, track={directive.assignedTrack?.name}, " +
-                  $"spawnCell={directive.spawnCell}");
-        _spawnTime = Time.time;
-        _directive    = directive;            
-        _noteSet       = directive.noteSet;
-        _assignedTrack = directive.assignedTrack;
-        _role          = directive.role;
-        GameObject obj = Instantiate(directive.minedObjectPrefab, transform.position, Quaternion.identity, transform);
-        _lockedColor = directive.displayColor;
-        _minedObject = obj.GetComponent<MinedObject>();
-        obj.transform.SetParent(transform);
-        obj.SetActive(false);
+        _track = track;
+        _spawnCell = spawnCell;
+        _role          = track != null ? track.assignedRole : default;
+        _noteSet = (track != null) ? GameFlowManager.Instance.GenerateNotes(track) : null;
+        _lockedColor   = tint;
+        // DrumTrack authority: from assigned track, not from minedObject
+        _drumTrack = (track != null) ? track.drumTrack : null;
+
+        // NoteSet authority: MineNode owns it (or you can store it on track, but currently you’re generating here)
+        
         float a = UnityEngine.Random.Range(0f, 360f);
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
         _lastProcessedStep = -1;
-        _minedObject.Initialize(directive.minedObjectType, directive.assignedTrack, directive.noteSet, directive.trackModifierType);
-        // --- Capture drum track reference & birth loop index ---
-        _drumTrack = _minedObject.assignedTrack?.drumTrack;
+
         if (_drumTrack != null)
         {
-            _birthLoop = _drumTrack.completedLoops;
+           _drumTrack.RegisterMineNode(this);
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
         }
+
         var dust = GetComponent<MineNodeDustInteractor>();
         if (dust != null)
         {
             dust.SetLevelAuthority(_drumTrack);
         }
-        else
-        {
-            Debug.LogWarning($"[MNDBG] MineNode.Init: node={name} has NO MineNodeDustInteractor");
-        }
-
         _carvedPath.Clear();
-        ConfigureFromRole(directive.role);
-        coreSprite.color = directive.assignedTrack.trackColor;
-        _drumTrack.RegisterMinedObject(_minedObject);
-        _drumTrack.RegisterMineNode(this);
-        TrackUtilityMinedObject track = obj.GetComponent<TrackUtilityMinedObject>();
-        if (track != null)
-        {
-            this._preloadedObject = obj;
-            if (directive.remixUtility != null)
-                track.Initialize(GameFlowManager.Instance.controller, directive);
-        }
+        if (track != null) ConfigureFromRole(track.assignedRole);
 
+        // Visuals
         if (coreSprite != null)
         {
-            Debug.Log($"It's not null...");
-            // prefer directive.displayColor; otherwise use the assigned track's color
-            var fallback = (_minedObject != null && _minedObject.assignedTrack != null)
-                ? (Color?)_minedObject.assignedTrack.trackColor
-                : null;
-
-            var finalColor = _lockedColor ?? fallback;
-            Debug.Log($"It's not null... fallback: {fallback}, finalColor: {finalColor}");
-
-            if (finalColor.HasValue) coreSprite.color = finalColor.Value;
+            // Prefer locked tint if you are feeding it from preview shard selection.
+            coreSprite.color = tint;
         }
 
+        // Register MineNode only
+        if (_drumTrack != null)
+        {
+            _drumTrack.RegisterMineNode(this);
+        }
     }
+
     private void HandleLoopBoundary()
     { if (_drumTrack == null) return;
         if (!pruneCarvedPathOnLoopBoundary) return; 
@@ -368,180 +336,47 @@ public Color GetImprintShadowColor()
         }
     }
 
-    private void RevealPreloadedObject()
-    {
-        if (_preloadedObject == null || _preloadedObject.gameObject == null || _objectRevealed)
-        {
-            Debug.LogWarning("⚠️ Preloaded object was destroyed before reveal.");
-            return;
-        }
-
-        Debug.Log($"Reveal Preloaded Object: {_preloadedObject.name}");
-
-        // Detach so the payload survives when the node is destroyed
-        _preloadedObject.transform.SetParent(null, true);
-
-        // Position the payload at the node and show it
-        _preloadedObject.transform.position = transform.position;
-        _preloadedObject.SetActive(true);
-        _objectRevealed = true;
-    }
 
     private void OnCollisionEnter2D(Collision2D coll)
-    { 
-        
-        if (_minedObject != null)
-        {
-            Debug.Log($"Found Object for Spawner: {_minedObject.name}");
-            var spawner = _minedObject.GetComponent<NoteSpawnerMinedObject>(); 
-            if (spawner != null)
-            {
-                int stepNow = (_drumTrack != null) ? _drumTrack.currentStep : 0;
+    {
+        if (_depletedHandled) return;
+        if (!coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
+            return;
 
-                // Prefer the NoteSpawner's selected set; fall back to the directive-provided set.
-                var ns = (spawner.selectedNoteSet != null) ? spawner.selectedNoteSet : _directive?.noteSet;
+        // Preview note (optional)
+        TryPlayPreviewNote();
 
-                // Prefer spawner track; fall back to minedObject track.
-                var tr = (spawner.assignedTrack != null) ? spawner.assignedTrack : _minedObject.assignedTrack;
+        // Apply damage
+        _strength -= vehicle.GetForceAsDamage();
+        _strength = Mathf.Max(0, _strength);
 
-                if (ns != null && tr != null)
-                {
-                    int note = ns.GetNoteForPhaseAndRole(tr, stepNow);
+        float normalized = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
+        float scaleFactor = Mathf.Lerp(0.2f, 1.1f, normalized);
+        StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
+        // Deplete -> burst -> resolve
+        if(_strength <= 0)
+            HandleDepleted(vehicle);
+    }
+    void HandleDepleted(Vehicle vehicle)
+    {
+        _depletedHandled = true;
 
-                    // InstrumentTrack signature is: PlayNote(int note, int durationTicks, float velocity)
-                    // durationTicks: 120–240 is usually a short audible preview without feeling “stuck”.
-                    tr.PlayNote(note, 180, 0.9f);
-                }
+        // burst spawn: your existing call site is good; just make it depend on (_track, _noteSet)
+        var origin = transform.position;
+        var repelFrom = vehicle != null ? vehicle.transform.position : origin;
 
-                // IMPORTANT: This currently plays a random step internally, which will conflict with the step preview.
-                // So do NOT call it here unless you update CollectionSoundManager to accept stepNow.
-                // CollectionSoundManager.Instance?.PlayNoteSpawnerSound(tr, ns);
-            }
+        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f);
 
+        TriggerExplosion();
+    }
 
-            else {
-                // Utility payload (remix ring etc.) — use a generic pickup cue
-                Debug.Log($"not Playing default sound");
-//                CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
-            }          
-            if (coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
-            {
-                _strength -= vehicle.GetForceAsDamage();
-                _strength = Mathf.Max(0, _strength); // Ensure it doesn’t go below 0
-                float normalized = (float)_strength / maxStrength; // [0, 1]
-                float scaleFactor = Mathf.Lerp(.2f, 1.1f, normalized); // Linear scale from 1 to 0
-                Debug.Log($"Strength: {_strength}, Normalized: {normalized}, Scale: {scaleFactor}");
+    void TryPlayPreviewNote()
+    {
+        if (_track == null || _noteSet == null || _drumTrack == null) return;
 
-                StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
-                if (_strength <= 0 && !_depletedHandled)
-                {
-                    Debug.Log($"No more strength...");
-                    _depletedHandled = true;
-                    // Fresh burst for this node
-                    // Try to spawn notes if this payload is a NoteSpawner
-                    if (spawner != null)
-                    {
-                        // Ensure there is a NoteSet
-                        if (spawner.selectedNoteSet == null)
-                        {
-                            Debug.Log($"No note set found, creating new one");
-                            // Prefer any directive you cached; otherwise rebuild from track/phase
-                            var track = spawner.assignedTrack ?? _minedObject.assignedTrack;
-                            
-                            if (track != null)
-                            { 
-                                var ptm   = GameFlowManager.Instance.phaseTransitionManager;
-                                var motif = ptm.currentMotif;
-                                Debug.Log($"[MINENODE] Generating Motif Noteset");
-                                var ns = ptm.noteSetFactory.Generate(track, ptm.currentMotif);
-                                spawner.selectedNoteSet = ns;
-                                Debug.Log($"Note set: {ns}");
-                                if (motif != null)
-                                {
-                                    int fuseLoops = motif.GetLoopsToAscendFor(track.assignedRole, fallback: track.ascendLoopCount);
-                                    track.ascendLoopCount = Mathf.Max(1, fuseLoops);
-                                    Debug.Log($"[MINENODE] Set ascendLoopCount for {track.name} ({track.assignedRole}) to {track.ascendLoopCount} from motif {motif.name}");
-
-                                }
-                            }
-                        }
-                        // Emit notes BEFORE we reveal/destroy anything
-                        Debug.Log($"Bursting Collectables");
-                        if (spawner == null || spawner.assignedTrack == null || spawner.selectedNoteSet == null) { 
-                            Debug.LogWarning("[MineNode] Note burst aborted: missing spawner/track/noteSet."); 
-                            return;
-                        } 
-                        InstrumentTrack burstTrack = spawner.assignedTrack;
-
-                        Debug.Log($"Bursting Collectables with {spawner.selectedNoteSet} at {burstTrack}");
-
-                        var ctrl = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
-                        if (ctrl != null && burstTrack != null)
-                        {
-                            // Repeat-role heuristic: if this track already has any notes (or bin 0 filled),
-                            // then catching another MineNode of this role is allowed to expand the loop.
-                            var notes = burstTrack.GetPersistentLoopNotes();
-                            bool hasAnyNotes = (notes != null && notes.Count > 0);
-                            bool bin0Filled  = burstTrack.IsBinFilled(0);
-
-                            if (hasAnyNotes || bin0Filled)
-                            {
-                                ctrl.AllowAdvanceNextBurst(burstTrack);
-                                Debug.Log($"[MineNode] AllowAdvanceNextBurst: {burstTrack.name} ({burstTrack.assignedRole})");
-                            }
-                            else
-                            {
-                                Debug.Log($"[MineNode] First notes for {burstTrack.name} ({burstTrack.assignedRole}) — no advance.");
-                            }
-                        }
-
-                        // Void-burst intent: originate at MineNode death position and eject away from the impacting vehicle.
-                        Vector3 origin    = transform.position; 
-                        Vector3 repelFrom = vehicle != null ? vehicle.transform.position : origin; 
-                        // Conservative defaults for playtesting; tune later.
-                        float impulse = 4.0f;     // readable ejecta push
-                        float spread  = 140f;     // mostly away from player, still organic
-                        float jitter  = 0.18f;    // avoid stacking at exact cell centers
-                        burstTrack.SpawnCollectableBurst(spawner.selectedNoteSet, 8, -1, origin, repelFrom, impulse, spread, jitter);
-                        spawner.assignedTrack.DisplayNoteSet();
-                        var set = spawner.assignedTrack != null ? spawner.assignedTrack.GetActiveNoteSet() : null; 
-                        float remain = (spawner.assignedTrack != null && spawner.assignedTrack.drumTrack != null) ? spawner.assignedTrack.drumTrack.GetTimeToLoopEnd() : 0.25f; 
-                        CollectionSoundManager.Instance?.PlayBurstLeadIn(spawner.assignedTrack, set, Mathf.Max(0.05f, remain));
-                        int chordTicks = 240;      // ~1/2 beat at 480ppq (adjust to taste)
-                        float vel = 0.95f;
-
-                        PlayExplosionChord(ctrl, spawner.selectedNoteSet, _drumTrack.currentStep, chordTicks, vel);
-                    }
-                    else
-                    {
-                        Debug.Log($"Nothing to spawn, because spawner is null...");
-                        // Utility payload path keeps your generic pickup cue
-//                        CollectionSoundManager.Instance?.PlayEffect(SoundEffectPreset.Aether);
-                    }
-
-                    // Reveal any preloaded object AFTER spawning
-                    if (_preloadedObject != null)
-                    {
-                        Debug.Log($"Revealing Preloaded object");
-                        _preloadedObject.transform.SetParent(null, true); // keep world pos
-                        _preloadedObject.transform.localScale = _originalScale;
-                        _preloadedObject.SetActive(true);
-                    }
-
-                    // Now run your existing VFX/cleanup
-                    TriggerExplosion(); // destroy self, fade sprite, etc.
-                }
-                else
-                {
-                    TriggerPreExplosion();
-                }
-            }
-        }
-        else
-        {
-            Debug.Log($"no object found for {gameObject.name}");
-
-        }
+        int stepNow = _drumTrack.currentStep;
+        int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
+        _track.PlayNote(note, 180, 0.9f);
     }
     private void PlayExplosionChord(InstrumentTrackController ctrl, NoteSet ns, int stepNow, int durationTicks, float velocity)
     {
@@ -568,29 +403,19 @@ public Color GetImprintShadowColor()
     }
     private IEnumerator CleanupAndDestroy()
     {
-        // brief frame to ensure Reveal finishes toggles
         yield return null;
 
-        var dt = _minedObject?.assignedTrack?.drumTrack;
+        var dt = _drumTrack;
         if (dt != null)
         {
             dt.OnLoopBoundary -= HandleLoopBoundary;
-            // Free the reserved grid cell for future spawns
-            dt.FreeSpawnCell(_directive.spawnCell.x, _directive.spawnCell.y);
-
-            // Remove this node from the active list
-            dt.activeMineNodes.Remove(this);
+            _drumTrack.FreeSpawnCell(_spawnCell.x, _spawnCell.y); 
+            dt.UnregisterMineNode(this); // if you have it
         }
-
         Destroy(gameObject);
     }
-    
-    
-    private void TriggerPreExplosion()
-    {
-        var explosion = GetComponent<Explode>();
-        if(explosion != null) explosion.PreExplosion();
-    }
+
+
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
@@ -598,22 +423,16 @@ public Color GetImprintShadowColor()
         if(explosion != null) explosion.Permanent(false);
         
         // 🔔 Notify listeners (PhaseStar) of the outcome kind and payload
-        FireResolvedOnce(_directive.minedObjectType, _directive);
+        FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy());
     }
-    private void FireResolvedOnce(MinedObjectType kind, MinedObjectSpawnDirective dir)
+    private void FireResolvedOnce()
     {
-        Debug.Log($"[MNDBG] FireResolvedOnce: type={kind} directiveTrack={dir?.assignedTrack?.name} directivePrefab={dir?.minedObjectPrefab?.name}");
-
         if (_resolvedFired) return;
         _resolvedFired = true;
-        try
-        {
-            Debug.Log($"Fire Resolved Once, trying to invoke resolution {kind} / {dir}...");
-            OnResolved?.Invoke(kind, dir);
-        }
-        catch (System.Exception e) { Debug.LogException(e, this); }
+        OnResolved?.Invoke(this);
     }
+
     private void OnDisable() { 
         Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); 
         // Defensive: if we're disabled without CleanupAndDestroy running, unsubscribe here.
@@ -653,18 +472,3 @@ public Color GetImprintShadowColor()
         }
 }
 
-public class MinedObjectSpawnDirective
-{
-    public MinedObjectType minedObjectType;
-    public MusicalRole role;
-    public InstrumentTrack assignedTrack;
-    public RemixUtility remixUtility;
-    public NoteSet noteSet;
-    public TrackModifierType trackModifierType;
-    public MusicalRoleProfile roleProfile;         // object (optional but preferred)
-    
-    public Color displayColor;
-    public GameObject prefab;
-    public GameObject minedObjectPrefab;
-    public Vector2Int spawnCell;
-}

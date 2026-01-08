@@ -12,36 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0181f8dfb572491aa7cfe523caf5ba9b, type: 3}
   m_Name: Spawn Strategy
   m_EditorClassIdentifier: Assembly-CSharp::SpawnStrategyProfile
-  mineNodes:
-  - label: Bass Notes
-    minedObjectType: 0
-    trackModifierType: 0
-    role: 0
-    allowedPhases: 000000000100000002000000030000000400000005000000
-    weight: 0
-    quota: 0
-    rarity: 0
-  - label: Lead Notes
-    minedObjectType: 0
-    trackModifierType: 0
-    role: 2
-    allowedPhases: 000000000100000002000000030000000400000005000000
-    weight: 0
-    quota: 0
-    rarity: 0
-  - label: Harmony Notes
-    minedObjectType: 0
-    trackModifierType: 0
-    role: 1
-    allowedPhases: 000000000100000002000000030000000400000005000000
-    weight: 0
-    quota: 0
-    rarity: 0
-  - label: Groove Notes
-    minedObjectType: 0
-    trackModifierType: 0
-    role: 3
-    allowedPhases: 000000000100000002000000030000000400000005000000
-    weight: 0
-    quota: 0
-    rarity: 0
+  roleSequence: 00000000010000000200000003000000
