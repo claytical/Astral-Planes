@@ -44,6 +44,11 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private readonly HashSet<Vector2Int> _pendingFadeRemovals = new HashSet<Vector2Int>();
 
+    // === Tint diffusion state (Option 2) ===
+    private readonly Queue<Vector2Int> _tintDirtyQueue = new Queue<Vector2Int>();
+    private readonly HashSet<Vector2Int> _tintDirtySet = new HashSet<Vector2Int>();
+    private float _tintDiffusionAccum = 0f;
+
     [Tooltip("Debounce: minimum seconds between classic cycles.")]
     public float minClassicCycleInterval = 0.25f;
     [Header("Vehicle erosion (temporary)")]
@@ -101,6 +106,31 @@ public class CosmicDustGenerator : MonoBehaviour
     [Range(0, 3)] [SerializeField] private int imprintBlendRadius = 1;
     [Tooltip("0 = no blending (pure imprint). 1 = fully neighborhood average.")]
     [Range(0f, 1f)] [SerializeField] private float imprintNeighborWeight = 0.55f;
+
+    [Header("Tint Diffusion (Option 2)")]
+    [Tooltip("If enabled, recently modified dust cells will gradually blend toward their neighbors over time (local diffusion).")]
+    [SerializeField] private bool enableTintDiffusion = true;
+
+    [Tooltip("Seconds between diffusion passes. Lower = smoother but more CPU.")]
+    [Range(0.02f, 0.5f)] [SerializeField] private float tintDiffusionInterval = 0.12f;
+
+    [Tooltip("Maximum number of dirty cells processed per diffusion pass (prevents spikes).")]
+    [Range(16, 2048)] [SerializeField] private int tintDiffusionMaxCellsPerTick = 256;
+
+    [Tooltip("Neighborhood radius used for diffusion averaging (1 = 8-neighborhood).")]
+    [Range(0, 3)] [SerializeField] private int tintDiffusionRadius = 1;
+
+    [Tooltip("How strongly each pass nudges a cell toward the neighborhood average (0–1).")]
+    [Range(0f, 1f)] [SerializeField] private float tintDiffusionStrength = 0.25f;
+
+    [Tooltip("When a cell changes materially due to diffusion, enqueue its immediate neighbors to propagate blending.")]
+    [SerializeField] private bool tintDiffusionPropagateOnChange = true;
+
+    [Tooltip("Minimum per-channel delta required to apply a diffusion step (skips tiny changes).")]
+    [Range(0f, 0.05f)] [SerializeField] private float tintDiffusionMinDelta = 0.0025f;
+
+    [Tooltip("How far out to mark cells dirty when a tint-affecting event occurs (imprint, regrow, removal).")]
+    [Range(0, 3)] [SerializeField] private int tintDirtyMarkRadius = 1;
     private Queue<int> _featureOrder = new();                       // FIFO for "oldest" removal
     private List<(Vector2Int grid, Vector3 pos)> _pendingSpawns = new();
     private readonly HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
@@ -481,6 +511,9 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         // Flow-field: incremental update each frame (prevents periodic spikes)
         TryEnsureRefs();
+        // Tint diffusion: keep visual seams soft around recent changes.
+        ProcessTintDiffusion(Time.deltaTime);
+
         if(drums == null) return;
         IncrementalFlowFieldUpdate();
 
@@ -736,6 +769,9 @@ public class CosmicDustGenerator : MonoBehaviour
                     hardness01 = hardness01
                 };
 
+                // Diffusion prep: this cell (and neighbors) will be nudged toward local averages over time.
+                MarkTintDirty(gp, tintDirtyMarkRadius);
+
                 // Always refresh the regrow timer (even if cell is already empty).
                 // This is what allows a stationary node to keep a pocket/corridor open.
                 RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
@@ -836,6 +872,9 @@ public class CosmicDustGenerator : MonoBehaviour
             {
                 dust.SetTint(_mazeTint);
             }
+
+            // Diffusion prep: regrow or tint reset can create seams; mark dirty neighborhood.
+            MarkTintDirty(gridPos, tintDirtyMarkRadius);
 
             // 4) CRITICAL: restart particles + GrowIn
             dust.Begin();
@@ -2003,7 +2042,111 @@ public bool TryGetDustWeatherForce(
         }
     }
 
-        private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
+
+    // === Tint diffusion (Option 2) ===
+    private void EnqueueTintDirty(Vector2Int cell)
+    {
+        if (_tintDirtySet.Add(cell))
+            _tintDirtyQueue.Enqueue(cell);
+    }
+
+    private void MarkTintDirty(Vector2Int center, int radius)
+    {
+        radius = Mathf.Max(0, radius);
+        EnqueueTintDirty(center);
+
+        if (radius == 0) return;
+
+        for (int dy = -radius; dy <= radius; dy++)
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            EnqueueTintDirty(new Vector2Int(center.x + dx, center.y + dy));
+        }
+    }
+
+    private float ColorMaxAbsDelta(Color a, Color b)
+    {
+        float dr = Mathf.Abs(a.r - b.r);
+        float dg = Mathf.Abs(a.g - b.g);
+        float db = Mathf.Abs(a.b - b.b);
+        float da = Mathf.Abs(a.a - b.a);
+        return Mathf.Max(Mathf.Max(dr, dg), Mathf.Max(db, da));
+    }
+
+    private Color ComputeNeighborAverageColor(Vector2Int cell, int radius, out int count)
+    {
+        radius = Mathf.Max(0, radius);
+        count = 0;
+
+        if (radius == 0)
+            return GetCellVisualColor(cell);
+
+        float r = 0f, g = 0f, b = 0f, a = 0f;
+
+        for (int dy = -radius; dy <= radius; dy++)
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            if (dx == 0 && dy == 0) continue;
+
+            Color c = GetCellVisualColor(new Vector2Int(cell.x + dx, cell.y + dy));
+            r += c.r; g += c.g; b += c.b; a += c.a;
+            count++;
+        }
+
+        if (count <= 0)
+            return GetCellVisualColor(cell);
+
+        return new Color(r / count, g / count, b / count, a / count);
+    }
+
+    private void ProcessTintDiffusion(float dt)
+    {
+        if (!enableTintDiffusion) return;
+
+        _tintDiffusionAccum += dt;
+        if (_tintDiffusionAccum < tintDiffusionInterval) return;
+        _tintDiffusionAccum = 0f;
+
+        if (_tintDirtyQueue.Count == 0) return;
+
+        int budget = Mathf.Max(1, tintDiffusionMaxCellsPerTick);
+        int radius = tintDiffusionRadius;
+
+        for (int i = 0; i < budget && _tintDirtyQueue.Count > 0; i++)
+        {
+            Vector2Int cell = _tintDirtyQueue.Dequeue();
+            _tintDirtySet.Remove(cell);
+
+            if (!TryGetDustAt(cell, out var dust) || dust == null)
+                continue;
+
+            // Compute neighborhood average (includes live dust + pending imprints + maze fallback)
+            Color avg = ComputeNeighborAverageColor(cell, radius, out int nCount);
+            if (nCount <= 0) continue;
+
+            Color cur = dust.CurrentTint;
+            Color next = Color.Lerp(cur, avg, Mathf.Clamp01(tintDiffusionStrength));
+
+            if (ColorMaxAbsDelta(cur, next) < tintDiffusionMinDelta)
+                continue;
+
+            dust.SetTint(next);
+
+            if (tintDiffusionPropagateOnChange)
+            {
+                // Propagate softly to immediate neighbors only (prevents runaway queue growth).
+                for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    EnqueueTintDirty(new Vector2Int(cell.x + dx, cell.y + dy));
+                }
+            }
+        }
+    }
+
+private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
         // Free grid cell by key (authoritative)
         drums.FreeSpawnCell(grid.x, grid.y); 
         // Drop from registries
@@ -2011,6 +2154,10 @@ public bool TryGetDustWeatherForce(
         if (go) hexagons.Remove(go);
         // Pool the object
         if (toPool && go) ReturnDustToPool(go);
+
+        // Diffusion prep: removing dust can expose the base tint and create hard seams.
+        MarkTintDirty(grid, tintDirtyMarkRadius);
+
         MarkCompositeDirty();
     }
     
