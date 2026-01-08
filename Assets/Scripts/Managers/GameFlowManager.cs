@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Gameplay.Mining;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -667,7 +666,7 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
         if (notes != null && notes.Count > 0) stillActive.Add(t);
     }
     foreach (var t in stillActive)
-        t.ClearLoopedNotes(TrackClearType.Remix);
+        t.ClearLoopedNotes();
 
 // Reset bin/loop-width state so the next motif does not inherit multi-bin UI/loop spans.
 // (We keep note content cleared above; this is strictly about loopMultiplier/bin cursors/fill flags.)

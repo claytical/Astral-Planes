@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
-using Gameplay.Mining;
 using Random = UnityEngine.Random;
 
 public class PhaseSnapshot
@@ -36,8 +35,9 @@ public class DrumTrack : MonoBehaviour
     private PlayArea _lastPlayAreaForTileCache;
     private bool _hasLastPlayAreaForTileCache = false;
     public GameObject phaseStarPrefab;
-    public MineNodePrefabRegistry nodePrefabRegistry;
-    public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
+    //public MineNodePrefabRegistry nodePrefabRegistry;
+    public GameObject mineNodePrefab;
+//    public MinedObjectPrefabRegistry minedObjectPrefabRegistry;
     public PhasePersonalityRegistry phasePersonalityRegistry; 
     public MusicalPhase? QueuedPhase;
     [Header("UI Safe Area (Viewport)")]
@@ -57,7 +57,6 @@ public class DrumTrack : MonoBehaviour
     public AudioSource drumAudioSource;
     public double startDspTime;
     public List<PhaseSnapshot> SessionPhases = new();
-    public List<MinedObject> activeMinedObjects = new List<MinedObject>();
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
@@ -697,13 +696,6 @@ public class DrumTrack : MonoBehaviour
     }
     public Vector3 CellCenter(Vector2Int c) => GridToWorldPosition(c);
     public Vector2Int CellOf(Vector3 world) => WorldToGridPosition(world);
-    public void RegisterMinedObject(MinedObject obj)
-    {
-        if (!activeMinedObjects.Contains(obj))
-        {
-            activeMinedObjects.Add(obj);
-        }
-    }
     public void RegisterMineNode(MineNode obj)
     {
         if (!activeMineNodes.Contains(obj))
@@ -711,12 +703,12 @@ public class DrumTrack : MonoBehaviour
             activeMineNodes.Add(obj);
         }
     }
-    public void UnregisterMinedObject(MinedObject obj)
+
+    public void UnregisterMineNode(MineNode obj)
     {
-        Debug.Log($"Removing MinedObject {obj}. Total Count: {activeMinedObjects.Count}");
-        activeMinedObjects.Remove(obj);
-        Debug.Log($"Mined Object Count Now: {activeMinedObjects.Count}");
+        activeMineNodes.Remove(obj);
     }
+
     public void CarveTemporaryDiskFromMineNode(Vector3 worldPos, float appetiteMul, MusicalPhase phase, float healDelaySeconds)
     {
         if (_dust == null) return;
@@ -795,6 +787,16 @@ public class DrumTrack : MonoBehaviour
             }
         }
     }
+    public void OccupySpawnCell(int x, int y, GridObjectType type)
+    {
+        if (_spawnGrid == null)
+        {
+            Debug.LogError("[DrumTrack] OccupySpawnCell: spawnGrid is null");
+            return;
+        }
+        _spawnGrid.OccupyCell(x, y, type);
+    }
+
     private float GetScreenWorldWidth()
     {
         var cam = Camera.main;

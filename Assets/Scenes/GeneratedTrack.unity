@@ -10568,6 +10568,7 @@ MonoBehaviour:
   _nextFillOrdinal: 1
   binAllocated: 
   _binCursor: 0
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
 --- !u!1 &371718999
 GameObject:
   m_ObjectHideFlags: 0
@@ -11053,6 +11054,7 @@ MonoBehaviour:
   _nextFillOrdinal: 1
   binAllocated: 
   _binCursor: 0
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -11151,6 +11153,7 @@ MonoBehaviour:
   _nextFillOrdinal: 1
   binAllocated: 
   _binCursor: 0
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
 --- !u!1 &657963290
 GameObject:
   m_ObjectHideFlags: 0
@@ -11477,6 +11480,16 @@ MonoBehaviour:
   tileDiameterWorld: 1
   hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  imprintBlendRadius: 1
+  imprintNeighborWeight: 0.55
+  enableTintDiffusion: 1
+  tintDiffusionInterval: 0.12
+  tintDiffusionMaxCellsPerTick: 256
+  tintDiffusionRadius: 1
+  tintDiffusionStrength: 0.25
+  tintDiffusionPropagateOnChange: 1
+  tintDiffusionMinDelta: 0.0025
+  tintDirtyMarkRadius: 1
   flowTilesPerFrame: 256
   poolPrewarm: 720
   poolRoot: {fileID: 1164776387}
@@ -12268,6 +12281,8 @@ MonoBehaviour:
   phaseStarPrefab: {fileID: 2312498068821558259, guid: b780336bac3ca4cd69850ea7a221d987,
     type: 3}
   nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
+  mineNodePrefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8,
+    type: 3}
   minedObjectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
     type: 2}
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
@@ -13603,6 +13618,7 @@ MonoBehaviour:
   _nextFillOrdinal: 1
   binAllocated: 
   _binCursor: 0
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0

@@ -51,13 +51,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   coreSprite: {fileID: 2442014530722922072}
-  maxStrength: 100
-  _minedObject: {fileID: 8268204866429990808, guid: b644b7f95bb324e49bfdeafb8b28d189,
+  minedObjectPrefab: {fileID: 1781116594832268, guid: b644b7f95bb324e49bfdeafb8b28d189,
     type: 3}
+  maxStrength: 100
   minCarveSeconds: 1.25
   pruneCarvedPathOnLoopBoundary: 1
   pruneMinPathCount: 8
   driveCarvingMotionFromNoteSet: 1
+  maxSteerForce: 50
   carveSpeedMin: 1.25
   carveSpeedMax: 8
   steerForce: 10

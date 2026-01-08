@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Gameplay.Mining;
 using UnityEngine;
 public enum PhaseStarState
 {
@@ -18,8 +17,6 @@ struct PreviewShard
     public Color shadowColor;
     public bool collected;
     public Transform visual;
-
-    public WeightedMineNode plan;   // NEW: the planned node for this petal
     public MusicalRole role;        // NEW: cached for convenience
 }
 
@@ -93,12 +90,9 @@ public class PhaseStar : MonoBehaviour
     Vector2 _lastImpactDir = Vector2.right;
     float _lastImpactStrength = 0f;
 
-// Optional clamp so crazy physics spikes don't blow things up
+    // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
     private bool _awaitingCollectableClear;
-// --- Safety Bubble (spawned on poke; persists until collectables clear) ---
-
-// Registry so Vehicles can query without hard references.
 
     public event Action<MusicalRole, int, int> OnShardEjected;
     [SerializeField] private bool syncRotationToLoop = true;
@@ -167,13 +161,12 @@ public class PhaseStar : MonoBehaviour
     private int _spawnTicket;
     private Coroutine _retryCo;
     private int _lastPokeFrame = -999999;
-    private MinedObjectSpawnDirective _cachedDirective;
     private InstrumentTrack _cachedTrack;
     private MineNode _activeNode;
     private readonly List<InstrumentTrack> _targets = new(4);
     private int _spawnSerial = 0;
     int NextSpawnSerial() => ++_spawnSerial;
-    private List<WeightedMineNode> _phasePlan;
+    private List<MusicalRole> _phasePlanRoles;
     private int _planConsumeIdx;
     [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
@@ -902,19 +895,19 @@ public class PhaseStar : MonoBehaviour
 
     private void BuildPhasePlan(MusicalPhase phase)
     {
-        _phasePlan = new List<WeightedMineNode>();
+        _phasePlanRoles = new List<MusicalRole>();
         if (!spawnStrategyProfile) return;
 
         int target = Mathf.Max(1, behaviorProfile.nodesPerStar);
-        int safety = target * 10; // avoid infinite loops if PickNext can’t satisfy constraints
 
-        while (_phasePlan.Count < target && safety-- > 0)
+        for (int i = 0; i < target; i++)
         {
-            var node = spawnStrategyProfile.PickNext(phase, -1f);
-            if (node != null) _phasePlan.Add(node);
+            // offset=i is the key: each shard slot in the star ring
+            MusicalRole role = spawnStrategyProfile.PeekRoleAtOffset(i, target);
+            _phasePlanRoles.Add(role);
         }
 
-        Trace($"BuildPhasePlan: planned {_phasePlan.Count}/{target} nodes (phase={phase})");
+        Trace($"BuildPhasePlan: planned {_phasePlanRoles.Count}/{target} roles (phase={phase})");
     }
 
     private bool HasShardsRemaining() => _shardsEjectedCount < behaviorProfile.nodesPerStar;
@@ -922,88 +915,20 @@ public class PhaseStar : MonoBehaviour
     private void PrepareNextDirective()
     {
         Trace("PrepareNextDirective() begin");
-        _cachedDirective = null;
+
         _cachedTrack = null;
 
         if (_drum == null || spawnStrategyProfile == null) return;
 
-        WeightedMineNode planEntry = GetPlanEntryForHighlightedShard();
-        if (planEntry == null) return;
+        MusicalRole role = GetPlannedRoleForHighlightedShard();
 
-        // 1) Bin-driven preview target (WYSIWYG)
-        // 2) Fallback to your existing role/legality picker
-        InstrumentTrack track = FindTrackByRole(planEntry.role);
-        if (track == null) track = PickTargetTrackFor(planEntry); // defensive fallback
-        if (track == null) return; // still nothing to target
+        InstrumentTrack track = FindTrackByRole(role);
+        if (track == null) return;
 
-        // --- Resolve prefabs via registries on DrumTrack ---
-        var nodePrefab = _drum?.nodePrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
-        var payloadPrefab =
-            _drum?.minedObjectPrefabRegistry?.GetPrefab(planEntry.minedObjectType, planEntry.trackModifierType);
-        if (nodePrefab == null || payloadPrefab == null)
-        {
-            Trace(
-                $"PrepareNextDirective: MISSING prefab(s) for {planEntry.minedObjectType} / {planEntry.trackModifierType}");
-            return;
-        }
-
-        // --- Generate a NoteSet for spawners (NoteSpawner only) ---
-        NoteSet noteSet = null;
-        if (planEntry.minedObjectType == MinedObjectType.NoteSpawner)
-        {
-            var gfm = GameFlowManager.Instance;
-            var phase = gfm?.phaseTransitionManager?.currentPhase ?? _assignedPhase;
-            int entropy = NextSpawnSerial();
-
-            try
-            {
-                if (_assignedMotif != null)
-                {
-                    Debug.Log($"[NOTESET] Using {_assignedMotif}");
-                    // Motif-aware path: use motif-specific NoteSet generation
-                    noteSet = gfm.GenerateNotes(track);
-                }
-                else
-                {
-                    Debug.Log($"[NOTESET] No phase to fallback on {_assignedPhase}");
-
-                }
-
-                if (noteSet == null)
-                {
-                    Debug.LogWarning(
-                        $"[PhaseStar] No NoteSet generated for role {track.assignedRole}. " +
-                        "Check RoleMotifNoteSetConfig / MotifProfile or legacy RolePhaseNoteSetConfig & Library.");
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[PhaseStar] NoteSetFactory exception: {ex.Message}");
-                noteSet = null; // fall back: spawn node without seeded phrase
-            }
-
-        }
-
-        // --- Build directive (MineNode shell + payload, plus display color) ---
-        var d = new MinedObjectSpawnDirective
-        {
-            minedObjectType = planEntry.minedObjectType,
-            role = planEntry.role,
-            assignedTrack = track,
-            trackModifierType = planEntry.trackModifierType,
-            remixUtility = null, // (optional) fill from a phase recipe if/when you add it
-            noteSet = noteSet, // only for NoteSpawner
-            prefab = nodePrefab, // MineNode shell
-            minedObjectPrefab = payloadPrefab, // payload
-            displayColor = track.trackColor,
-            spawnCell = default // filled at spawn
-        };
-
-        _cachedDirective = d;
         _cachedTrack = track;
-        // Keep the on-screen preview in sync with what will spawn next
+
         if (!_lockPreviewTintUntilIdle)
-            UpdatePreviewTint();
+            UpdatePreviewTint(); // should read from previewRing[currentShardIndex]
     }
 
     void BuildPreviewRing()
@@ -1024,13 +949,13 @@ public class PhaseStar : MonoBehaviour
         }
 
         // Ensure we have a plan to visualize.
-        if (_phasePlan == null || _phasePlan.Count != behaviorProfile.nodesPerStar)
+        if (_phasePlanRoles == null || _phasePlanRoles.Count != behaviorProfile.nodesPerStar)
         {
             // If you have _assignedPhase or equivalent, pass it; otherwise pass the active phase you already cache.
             BuildPhasePlan(_assignedPhase);
         }
 
-        int n = (_phasePlan != null) ? _phasePlan.Count : 0;
+        int n = (_phasePlanRoles != null) ? _phasePlanRoles.Count : 0;
         if (n <= 0)
         {
             currentShardIndex = 0;
@@ -1046,9 +971,7 @@ public class PhaseStar : MonoBehaviour
             float ang = angles[Mathf.Clamp(i, 0, angles.Length - 1)];
 
             // Plan entry for THIS petal index
-            var planEntry = _phasePlan[i];
-            var role = planEntry.role;
-
+            var role = _phasePlanRoles[i];
             // Color MUST come from the role’s track, not a cycling palette.
             var track = FindTrackByRole(role);
 
@@ -1076,7 +999,6 @@ public class PhaseStar : MonoBehaviour
                 shadowColor = shadow,
                 collected = false,
                 visual = shardGO.transform,
-                plan = planEntry,
                 role = role
             });
 
@@ -1125,14 +1047,14 @@ public class PhaseStar : MonoBehaviour
 
         return null;
     }
-
-    private WeightedMineNode GetPlanEntryForHighlightedShard()
+    private MusicalRole GetPlannedRoleForHighlightedShard()
     {
-        if (previewRing == null || previewRing.Count == 0) return null;
-        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
-        return previewRing[idx].plan;
-    }
+        if (_phasePlanRoles == null || _phasePlanRoles.Count == 0) return MusicalRole.Bass;
 
+        int idx = Mathf.Clamp(currentShardIndex, 0, _phasePlanRoles.Count - 1);
+        return _phasePlanRoles[idx];
+    }
+    
     void RemoveShardAt(int idx)
     {
         if (previewRing == null || previewRing.Count == 0) return;
@@ -1146,8 +1068,8 @@ public class PhaseStar : MonoBehaviour
         previewRing.RemoveAt(idx);
 
         // IMPORTANT: also remove the matching plan entry so indices remain aligned.
-        if (_phasePlan != null && idx >= 0 && idx < _phasePlan.Count)
-            _phasePlan.RemoveAt(idx);
+        if (_phasePlanRoles != null && idx >= 0 && idx < _phasePlanRoles.Count)
+            _phasePlanRoles.RemoveAt(idx);
 
         // If empty, clear state
         if (previewRing.Count == 0)
@@ -1166,26 +1088,7 @@ public class PhaseStar : MonoBehaviour
         UpdatePreviewTint();
         HighlightActive();
     }
-
-    void AdvanceActiveShard()
-    {
-        if (previewRing.Count == 0 || previewRing == null) return;
-        for (int i = 0; i < previewRing.Count; i++)
-            _petalStartAngles[i] = previewRing[i].visual.localEulerAngles.z;
-        // compute the next target angles for the "flower" layout
-        var nextAngles = visuals.GetPetalAngles(previewRing.Count);
-        for (int i = 0; i < previewRing.Count; i++)
-            _petalTargetAngles[i] = nextAngles[Mathf.Clamp(i, 0, nextAngles.Length - 1)];
-        // Dim old
-        UpdateLayering();
-        UpdatePreviewTint();
-        HighlightActive();
-        if (visuals)
-        {
-            visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.20f), activeShardVisual);
-        }
-    }
-
+    
     void UpdatePreviewTint()
     {
         if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
@@ -1228,18 +1131,7 @@ public class PhaseStar : MonoBehaviour
         return previewRing[idx].shadowColor;
     }
 
-    private InstrumentTrack PickTargetTrackFor(WeightedMineNode entry)
-    {
-        if (_targets == null || _targets.Count == 0) return null;
-
-        // Prefer role match if entry.role is set; else first valid target
-        var byRole = (entry.role != 0)
-            ? _targets.FirstOrDefault(t => t && t.assignedRole == entry.role)
-            : null;
-
-        return byRole ?? _targets.FirstOrDefault(t => t);
-    }
-
+    
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (AnyCollectablesInFlightGlobal())
@@ -1292,22 +1184,16 @@ public class PhaseStar : MonoBehaviour
 
         _lastPokeFrame = Time.frameCount;
 
-        if (_cachedDirective == null || _cachedTrack == null)
+        if (_cachedTrack == null)
             PrepareNextDirective();
         // --- Handle missing directive fallback ---
-        if (_cachedDirective == null || _cachedTrack == null)
+        if (_cachedTrack == null)
         {
             Trace("OnCollision: no directive/track → disarm and wait");
             Disarm(DisarmReason.NodeResolving, _lockedTint);
             return;
 
         }
-
-// After the directive/track null checks succeed, just before Trace("OnCollision: spawning...")
-        Debug.Log($"[MNDBG] PhaseStar hit: relVel={coll.relativeVelocity.magnitude:F2}, " +
-                  $"contact={coll.GetContact(0).point}, state={_state}, " +
-                  $"cachedRole={_cachedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
-
         if (previewRing != null && previewRing.Count > 0)
         {
             s_bubbleCenter = transform.position;
@@ -1346,85 +1232,29 @@ public class PhaseStar : MonoBehaviour
         UpdateLayering();
     }
 
-    bool ResolveDirectivePrefab(ref MinedObjectSpawnDirective directive, InstrumentTrack track, out string error)
+
+    void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
-        error = null;
-        // If your directive already has a prefab reference, we’re good
-        if (directive.prefab != null) return true;
-
-        // Choose the correct registry by type; default to NoteSpawner for roles
-        var type = directive.minedObjectType == MinedObjectType.NoteSpawner
-            ? MinedObjectType.NoteSpawner
-            : directive.minedObjectType;
-
-        // Try role-bound prefab first
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-        GameObject prefab = null;
-
-        switch (type)
-        {
-            case MinedObjectType.NoteSpawner:
-                prefab = _drum.nodePrefabRegistry.GetPrefab(MinedObjectType.NoteSpawner, TrackModifierType.Remix);
-                break;
-            case MinedObjectType.TrackUtility:
-                prefab = _drum.minedObjectPrefabRegistry.GetPrefab(directive.minedObjectType, TrackModifierType.Remix);
-                break;
-            default:
-                prefab = _drum.minedObjectPrefabRegistry.GetSpawnerPrefab();
-                break;
-        }
-
-        if (prefab == null)
-        {
-            error =
-                $"ResolveDirectivePrefab failed: no prefab for type={type}, role={track.assignedRole}, utility={directive.minedObjectType}";
-            return false;
-        }
-
-        directive.prefab = prefab;
-        return true;
-    }
-
-    void SpawnNodeCommon(Vector2 contactPoint, MinedObjectSpawnDirective usedDirective, InstrumentTrack usedTrack)
-    {
-        Trace(
-            $"SpawnNodeCommon: begin (role={usedTrack?.assignedRole}, color={ColorUtility.ToHtmlStringRGB(usedDirective.displayColor)})");
-
         int ticket = ++_spawnTicket;
         _ejectionInFlight = true;
-
         visuals?.EjectParticles();
 
-        Color spawnTint = usedDirective.displayColor;
+        var shard = (previewRing != null && previewRing.Count > 0)
+            ? previewRing[Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1)]
+            : default;
 
-// Prefer shadow cached on the track (derived from MusicalRoleProfileLibrary).
-        Color shadowTint;
-        if (usedTrack != null)
-        {
-            shadowTint = usedTrack.TrackShadowColor; // new cached field you add on InstrumentTrack
-        }
-        else
-        {
-            // Fallback if track is null or not initialized
-            shadowTint = new Color(spawnTint.r * 0.20f, spawnTint.g * 0.20f, spawnTint.b * 0.20f, spawnTint.a);
-        }
+        Color spawnTint   = shard.visual != null ? shard.color : usedTrack.trackColor;
+        Color shadowTint  = shard.visual != null ? shard.shadowColor : usedTrack.TrackShadowColor;
 
         _lockedTint = spawnTint;
         _lockPreviewTintUntilIdle = true;
         visuals?.SetPreviewTint(spawnTint, shadowTint);
 
-        var node = DirectSpawnMineNode(contactPoint, usedDirective, usedTrack);
+        var node = DirectSpawnMineNode(contactPoint, usedTrack, spawnTint);
         if (node == null)
         {
             _ejectionInFlight = false;
             _activeNode = null;
-
-            var prefabName = usedDirective != null && usedDirective.prefab != null
-                ? usedDirective.prefab.name
-                : "(null prefab)";
-            Debug.LogError(
-                $"[PhaseStar] SpawnNodeCommon failed: could not spawn MineNode. prefab={prefabName} type={usedDirective?.minedObjectType} mod={usedDirective?.trackModifierType} role={usedDirective?.role}");
-
             Disarm(DisarmReason.NodeResolving, spawnTint);
             return;
         }
@@ -1442,26 +1272,14 @@ public class PhaseStar : MonoBehaviour
 
         bool handledResolve = false;
 
-        node.OnResolved += (kind, dir) =>
+        node.OnResolved += (resolvedNode) =>
         {
-            // Stale callback guard (older node resolving after a newer spawn)
             if (ticket != _spawnTicket) return;
-
-            // One-shot guard in case OnResolved can fire twice
             if (handledResolve) return;
             handledResolve = true;
 
-            Debug.Log(
-                $"[DBG] SpawnNodeCommon: {kind}, {dir}. CollectablesInFlightGlobal: {AnyCollectablesInFlightGlobal()}");
-            DBG(
-                $"OnResolved: directiveType={dir.minedObjectType} track={dir?.assignedTrack?.name} role={dir?.assignedTrack?.assignedRole} " +
-                $"nodesEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}");
-
-            // Always clear active node reference on resolve
             _activeNode = null;
 
-            // If bridge/advance is in progress, do not start new gating logic,
-            // but keep internal cleanup above.
             if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
 
             _awaitingCollectableClear = true;
@@ -1469,14 +1287,7 @@ public class PhaseStar : MonoBehaviour
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-
-            bool allShardsEjected = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
             Disarm(DisarmReason.NodeResolving, spawnTint);
-
-            Trace(allShardsEjected
-                ? "OnResolved: FINAL MineNode resolved → waiting for final collectables"
-                : "OnResolved: MineNode resolved → waiting for collectables");
-
             LogState("OnResolved");
         };
 
@@ -1511,10 +1322,10 @@ public class PhaseStar : MonoBehaviour
         bool isFinalShardEjection = (previewRing == null || previewRing.Count == 0) ||
                                     (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
 
-        if (_cachedDirective == null || _cachedTrack == null)
+        if (_cachedTrack == null)
             PrepareNextDirective();
 
-        if (_cachedDirective == null || _cachedTrack == null)
+        if (_cachedTrack == null)
         {
             Debug.LogError("[PhaseStar] Missing directive or track at eject time.");
             return;
@@ -1533,12 +1344,11 @@ public class PhaseStar : MonoBehaviour
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
         Disarm(isFinalShardEjection ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
-            _cachedDirective.displayColor);
+            _cachedTrack.trackColor);
 
-        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}, " +
-                  $"type={_cachedDirective.minedObjectType}, color={ColorUtility.ToHtmlStringRGB(_cachedDirective.displayColor)}");
+        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}");
         ActivateSafetyBubble();
-        SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
+        SpawnNodeCommon(contact, _cachedTrack);
     }
 
     void EjectCachedDirectiveAndFlow(Collision2D coll)
@@ -1550,54 +1360,41 @@ public class PhaseStar : MonoBehaviour
 
         _lastImpactDir = (starPos - vehiclePos).normalized;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-
-        // Ensure cached directive/track has a prefab
-        if (!ResolveDirectivePrefab(ref _cachedDirective, _cachedTrack, out var err))
-        {
-            Debug.LogError($"PhaseStar: {err}");
-            return;
-        }
-
         _shardsEjectedCount++;
 
         bool isFinal = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-        Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
-            _cachedDirective.displayColor);
+        Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving, _cachedTrack.trackColor);
         ActivateSafetyBubble();
-        SpawnNodeCommon(contact, _cachedDirective, _cachedTrack);
+        SpawnNodeCommon(contact, _cachedTrack);
     }
 
-    private MineNode DirectSpawnMineNode(Vector3 spawnFrom, MinedObjectSpawnDirective directive, InstrumentTrack track)
+    private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)
     {
-        if (directive == null || track == null || _drum == null) return null;
+        if (track == null || _drum == null) return null;
 
         Vector2Int cell = _drum.GetRandomAvailableCell(); // ✅ DrumTrack wrapper
         if (cell.x < 0) return null;
-
-        Vector3 targetPos = _drum.GridToWorldPosition(cell); // ✅ DrumTrack wrapper
-        directive.spawnCell = cell;
-        Debug.Log($"[MNDBG] DirectSpawnMineNode: spawnFrom={spawnFrom}, gridCell={cell}, " +
-                  $"role={directive.role}, track={track.name}");
-
-        var go = Instantiate(directive.prefab, spawnFrom, Quaternion.identity);
+        _drum.OccupySpawnCell(cell.x, cell.y, GridObjectType.Node);
+        var worldPos = _drum.GridToWorldPosition(cell);
+        var go = Instantiate(_drum.mineNodePrefab, spawnFrom, Quaternion.identity);
         var node = go.GetComponent<MineNode>();
         if (!node)
         {
             Destroy(go);
+            _drum.FreeSpawnCell(cell.x, cell.y);            
             return null;
         }
 
-        Debug.Log($"[MNDBG] MineNode GO instantiated: go={go.name}, node={node.name}, role={directive.role}");
         // color shell immediately so it never flashes white
         var sr = go.GetComponentInChildren<SpriteRenderer>();
-        if (sr) sr.color = directive.displayColor;
+        if (sr) sr.color = track.trackColor;
         var rb = go.GetComponent<Rigidbody2D>();
         if (rb != null && _lastImpactDir.sqrMagnitude > 0.0001f && _lastImpactStrength > 0f)
         {
             rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
         }
 
-        node.Initialize(directive); // MineNode will spawn payload and register with DrumTrack, etc.
+        node.Initialize(track, color, cell); // MineNode will spawn payload and register with DrumTrack, etc.
         return node;
     }
 
