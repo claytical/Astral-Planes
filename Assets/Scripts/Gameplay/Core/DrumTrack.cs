@@ -728,11 +728,21 @@ public class DrumTrack : MonoBehaviour
         MusicalPhase phase,
         float regrowDelaySeconds,
         Color imprintColor,
+        Color imprintShadowColor,
         float imprintHardness01)
     {
         if (_dust == null) return;
-        _dust.CarveTemporaryDiskFromMineNode(worldPos, appetite, phase, regrowDelaySeconds, imprintColor, imprintHardness01);
+        _dust.CarveTemporaryDiskFromMineNode(
+            worldPos,
+            appetite,
+            phase,
+            regrowDelaySeconds,
+            imprintColor,
+            imprintShadowColor,
+            imprintHardness01
+        );
     }
+
 
     public MusicalPhase GetCurrentPhaseSafe()
     {

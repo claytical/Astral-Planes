@@ -98,6 +98,7 @@ public class InstrumentTrackController : MonoBehaviour
         foreach (var t in tracks)
             if (t != null)
             {
+                t.RefreshRoleColorsFromProfile();
                 t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
                 t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
                 Debug.Log($"[CHORD][SUB] Controller subscribed to CohortCompleted for track={t.name} role={t.assignedRole} id={t.GetInstanceID()}");

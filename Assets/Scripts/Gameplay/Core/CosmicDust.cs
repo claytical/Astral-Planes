@@ -98,6 +98,9 @@ public class CosmicDust : MonoBehaviour {
     private float _baseSize;
     private float _baseAlpha;
     private bool _baseCaptured;
+    private bool  _hasImprint;
+    private Color _imprintBaseTint;
+    private Color _imprintShadowTint;
 
     private bool _isDespawned;
     private bool _shrinkingFromStar;
@@ -111,7 +114,8 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
     private bool _isBreaking;
-    
+    [SerializeField] private float _baseEmission = 1;
+
     void Awake() {
         if (visual.particleSystem == null)
             visual.particleSystem = GetComponent<ParticleSystem>() ?? GetComponentInChildren<ParticleSystem>(true);
@@ -310,35 +314,10 @@ public class CosmicDust : MonoBehaviour {
     {
         if (!visual.particleSystem) return;
 
-        // Keep the caller's alpha; ParticleAlphaFadeIn will animate it when needed.
         _currentTint = tint;
-
-        var main = visual.particleSystem.main;
-        // If you want a subtle lifetime fade, set it once; otherwise disable it for solid visibility
-        var col = visual.particleSystem.colorOverLifetime;
-        col.enabled = false;
         SetDustColorAllParticles(tint);
-        // Build a *visible* gradient (soft in/out), not near-zero most of the time.
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[]
-            {
-                new GradientColorKey(new Color(tint.r, tint.g, tint.b), 0f),
-                new GradientColorKey(new Color(tint.r, tint.g, tint.b), 1f),
-            },
-            new[]
-            {
-                new GradientAlphaKey(0f,          0f),    // invisible at birth
-                new GradientAlphaKey(tint.a * 0.65f, 0.08f), // ramp up quickly
-                new GradientAlphaKey(tint.a * 0.65f, 0.55f), // hold most of lifetime
-                new GradientAlphaKey(tint.a * 0.35f, 0.85f), // late dissipation
-                new GradientAlphaKey(0f,          1f),    // vanish
-            }
-        );
-
-        col.color = new ParticleSystem.MinMaxGradient(grad);
-
     }
+
     private void SetDustColorAllParticles(Color target)
     {
         if (visual.particleSystem == null) return;
@@ -347,7 +326,6 @@ public class CosmicDust : MonoBehaviour {
         var main = ps.main;
         var col  = ps.colorOverLifetime;
 
-        // Ensure lifetime coloring is the authority (affects existing particles).
         col.enabled = true;
 
         // Premultiply for premultiplied-alpha material.
@@ -356,22 +334,27 @@ public class CosmicDust : MonoBehaviour {
         var g = new Gradient();
         g.SetKeys(
             new[] {
-                new GradientColorKey(new Color(pm.r, pm.g, pm.b, .3f), 0f),
-                new GradientColorKey(new Color(pm.r, pm.g, pm.b, .3f), 1f)
+                // Color keys: RGB only. Keep alpha at 1 so alpha is controlled solely by alpha keys.
+                new GradientColorKey(new Color(pm.r, pm.g, pm.b, 1f), 0f),
+                new GradientColorKey(new Color(pm.r, pm.g, pm.b, 1f), 1f)
             },
             new[] {
-                new GradientAlphaKey(0f,    0f),   // born invisible
-                new GradientAlphaKey(pm.a,  0.35f),// quick rise
-                new GradientAlphaKey(pm.a,  0.5f),// sustain
-                new GradientAlphaKey(0f,    1f)    // soft fade out
+                // Alpha curve: your shape (fast rise, sustain, fade out)
+                new GradientAlphaKey(0f,             0f),
+                new GradientAlphaKey(pm.a * 0.65f,   0.08f),
+                new GradientAlphaKey(pm.a * 0.65f,   0.55f),
+                new GradientAlphaKey(pm.a * 0.35f,   0.85f),
+                new GradientAlphaKey(0f,             1f),
+
             }
         );
 
         col.color = new ParticleSystem.MinMaxGradient(g);
 
-        // Also set startColor for newly emitted particles (keeps it consistent).
+        // Also set startColor for newly emitted particles.
         main.startColor = pm;
     }
+
 
     private static Color Premultiply(Color c)
     {
@@ -419,19 +402,28 @@ public class CosmicDust : MonoBehaviour {
 
         float a = Mathf.Clamp01(appetite01);
 
-        var main = visual.particleSystem.main;
+        var ps   = visual.particleSystem;
+        var main = ps.main;
 
-        // Hue-preserving charge target
-        Color chargeCol = Color.Lerp(_baseColor, Color.white, Mathf.Lerp(0.55f, 0.85f, a));
+        // Base hue: whatever the dust currently is (phase tint or imprint tint)
+        Color baseCol = _baseColor; // from CaptureBaseVisual
+        baseCol.a = _baseAlpha;
 
-        // Make it read: spike alpha and size
-        float alpha = Mathf.Clamp01(Mathf.Max(_baseAlpha, 0.30f) + Mathf.Lerp(0.15f, 0.45f, a));
-        chargeCol.a = alpha;
+        // Hue-preserving brighten toward white
+        Color chargeCol = Color.Lerp(baseCol, Color.white, Mathf.Lerp(0.55f, 0.85f, a));
+        chargeCol.a = _baseAlpha;
 
-        float size  = _baseSize * Mathf.Lerp(1.05f, 1.25f, a);
+        // RGB-only brightness boost (alpha unchanged)
+        chargeCol = MulRgb(chargeCol, Mathf.Lerp(1.05f, 1.25f, a));
+
+        // Optional: slight size increase
+        main.startSize = _baseSize * Mathf.Lerp(1.05f, 1.25f, a);
+
+        // Optional: emission bump (keep conservative at first)
+        var emission = ps.emission;
+        emission.rateOverTime = _baseEmission * Mathf.Lerp(1.0f, 1.15f, a);
+
         SetDustColorAllParticles(chargeCol);
-        main.startSize  = size;
-        
     }
 
     public void Visual_DenyOnBump(float severity01)
@@ -443,19 +435,34 @@ public class CosmicDust : MonoBehaviour {
 
         var main = visual.particleSystem.main;
 
-        // Deny: deepen toward black but keep some hue
-        Color denyCol = Color.Lerp(_baseColor, Color.red, Mathf.Lerp(0.4f, 0.7f, s));
+        // Deny target: role-authored shadow tint if imprinted; otherwise darken toward black.
+        Color denyTarget = _hasImprint ? _imprintShadowTint : Color.black;
+        denyTarget.a = _baseAlpha;
 
+        Color baseCol = _baseColor;
+        baseCol.a = _baseAlpha;
 
-        float size = _baseSize * Mathf.Lerp(1.00f, 1.15f, s);
+        // Blend toward deny target
+        Color denyCol = Color.Lerp(baseCol, denyTarget, s);
+        denyCol.a = _baseAlpha;
+
+        // RGB-only darken (optional; tune)
+        denyCol = MulRgb(denyCol, Mathf.Lerp(0.90f, 0.65f, s));
+
         SetDustColorAllParticles(denyCol);
-        main.startSize  = size;
+
+        // Optional: size response on deny (define it; don't use "size")
+        main.startSize = _baseSize * Mathf.Lerp(1.00f, 1.12f, s);
     }
-    
+
     private void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
     {
         if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
         _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration, onComplete));
+    }
+    private static Color MulRgb(Color c, float mul)
+    {
+        return new Color(c.r * mul, c.g * mul, c.b * mul, c.a);
     }
 
     private IEnumerator FadeOutVisualOnly(float duration, System.Action onComplete)
@@ -523,10 +530,22 @@ public class CosmicDust : MonoBehaviour {
         if (col) col.enabled = true;
 
     }
-    public void ApplyImprint(Color tint, float hardness) {
-        SetTint(tint); 
-        clearing.hardness01 = Mathf.Clamp01(hardness);
+
+    public void ApplyImprint(Color baseTint, Color shadowTint, float hardness01)
+    {
+        _hasImprint         = true;
+        _imprintBaseTint     = baseTint;
+        _imprintShadowTint   = shadowTint;
+
+        SetTint(baseTint);
+        clearing.hardness01 = Mathf.Clamp01(hardness01);
+
+        // Optional but recommended: if your charge/deny uses captured base values
+        // recapture after tint so _baseColor/_baseAlpha reflect the imprint.
+        if (_baseCaptured) CaptureBaseVisual();
     }
+
+
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
         if (visual.particleSystem == null) yield break;
