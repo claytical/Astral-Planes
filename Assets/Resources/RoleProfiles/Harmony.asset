@@ -13,13 +13,16 @@ MonoBehaviour:
   m_Name: Harmony
   m_EditorClassIdentifier: 
   role: 1
-  defaultColor: {r: 0, g: 0.78431374, b: 0.3254902, a: 1}
+  dustColors:
+    baseColor: {r: 0.193041, g: 0.801, b: 0.48576203, a: 1}
+    chargeColor: {r: 0.7176471, g: 1, b: 0.8392157, a: 0}
+    denyColor: {r: 0.18431373, g: 0.27450982, b: 0.21960784, a: 1}
+    shadowColor: {r: 0.12156863, g: 0.18039216, b: 0.14901961, a: 1}
+  baseAlpha: 0.25
+  chargeToWhite: 0.8
+  denyToShadow: 0.75
+  chargeAlphaBoost: 0.35
+  denyAlphaBoost: 0.25
   description: "\tLush chords and layered textures that fill in the soundscape."
-  envelopeParticlePrefab: {fileID: 7704860281926021353, guid: 0a8f58ba4b35d41aa830206a1d369348,
-    type: 3}
-  sparkParticlePrefab: {fileID: 5137427580465729298, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
-    type: 3}
   defaultBehavior: 2
   allowedMidiPresets: 040000000b0000000700000006000000
-  textureDescriptor: cloud breath
-  samplePreview: {fileID: 0}

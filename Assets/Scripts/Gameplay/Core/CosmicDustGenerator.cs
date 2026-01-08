@@ -39,6 +39,7 @@ public class CosmicDustGenerator : MonoBehaviour
     struct DustImprint
     {
         public Color color;
+        public Color shadowColor;
         public float healDelay;
         public float hardness01;
     }
@@ -726,7 +727,9 @@ public class CosmicDustGenerator : MonoBehaviour
         MusicalPhase phase,
         float regrowDelaySeconds,
         Color imprintColor,
+        Color imprintShadowColor,
         float imprintHardness01)
+
     {
         if (drums == null) return;
         EnsureImprints();
@@ -765,6 +768,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 _imprints[gp] = new DustImprint
                 {
                     color = blendedImprint,
+                    shadowColor =  imprintShadowColor,
                     healDelay = regrowDelaySeconds,
                     hardness01 = hardness01
                 };
@@ -865,7 +869,7 @@ public class CosmicDustGenerator : MonoBehaviour
             // 3) Apply semantic tint/hardness AFTER PrepareForReuse (it overwrites tint)
             if (_imprints != null && _imprints.TryGetValue(gridPos, out var imp))
             {
-                dust.ApplyImprint(imp.color, imp.hardness01);
+                dust.ApplyImprint(imp.color, imp.shadowColor, imp.hardness01);
                 _imprints.Remove(gridPos);
             }
             else

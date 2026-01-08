@@ -71,8 +71,9 @@ public class MineNodeDustInteractor : MonoBehaviour
         MusicalPhase phase = _drumTrack.GetCurrentPhaseSafe();
 
         float healDelay = (_node != null) ? _node.GetCorridorHealDelaySeconds() : -1f;
-        Color imprintColor = _node.GetImprintColor();
-        float hardness01   = _node.GetImprintHardness();
+        Color imprintColor       = _node.GetImprintColor();
+        Color imprintShadowColor = _node.GetImprintShadowColor();
+        float hardness01         = _node.GetImprintHardness();
 
         _drumTrack.CarveTemporaryDiskFromMineNode(
             transform.position,
@@ -80,8 +81,10 @@ public class MineNodeDustInteractor : MonoBehaviour
             phase,
             healDelay,
             imprintColor,
+            imprintShadowColor,
             hardness01
         );
+
         if (_node != null) _node.NotifyDustErodedAt(transform.position);
     }
 

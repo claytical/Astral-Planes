@@ -190,6 +190,22 @@ public class InstrumentTrack : MonoBehaviour
             }
         }
     }
+    [SerializeField] private Color trackShadowColor = new Color(0.08f,0.08f,0.08f,1f);
+    public Color TrackShadowColor => trackShadowColor;
+
+    public void RefreshRoleColorsFromProfile()
+    {
+        var prof = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        if (prof == null) return;
+
+        trackColor       = prof.GetBaseColor();
+        trackShadowColor = prof.GetShadowColor(); // new field on MusicalRoleProfile
+    }
+
+    void Awake()
+    {
+        RefreshRoleColorsFromProfile();
+    }
     void Start() {
         if (controller == null)
         {

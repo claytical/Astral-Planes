@@ -61,35 +61,7 @@ public class SpawnStrategyProfile : ScriptableObject
 
         return PickWeightedRandom(cands);
     }
-
-    /// <summary>
-    /// Build a directive shell from a chosen entry.
-    /// NOTE: This does NOT look up prefabs. PhaseStar should set:
-    /// - directive.prefab (MineNode shell from PhaseStar)
-    /// - directive.minedObjectPrefab (from DrumTrack's MinedObjectPrefabRegistry)
-    /// - directive.noteSet for NoteSpawner (via GameFlowManager.noteSetFactory)
-    /// - directive.displayColor = track.trackColor
-    /// </summary>
-    public MinedObjectSpawnDirective ToDirectiveShell(WeightedMineNode node, InstrumentTrack track)
-    {
-        if (node == null || track == null) return null;
-
-        var d = new MinedObjectSpawnDirective
-        {
-            minedObjectType = node.minedObjectType,
-            assignedTrack = track,
-            displayColor = track.trackColor, // ← always inherit from track
-            remixUtility = null,
-            noteSet = null
-        };
-
-        // For utilities, carry the modifier; for spawners: ignore it.
-        if (node.minedObjectType == MinedObjectType.TrackUtility)
-            d.trackModifierType = node.trackModifierType;
-
-        return d;
-    }
-
+    
     /// <summary>Call when a new PhaseStar is spawned to reset round-robin state.</summary>
     public void ResetForNewStar()
     {
@@ -168,44 +140,7 @@ public class SpawnStrategyProfile : ScriptableObject
     #endregion
 
     private static readonly List<WeightedMineNode> s_empty = new();
-
-    // (Optional) Keep any per-track fit checks you had:
-    public bool NodeFitsTrack(WeightedMineNode node, InstrumentTrack track)
-    {
-        if (node == null || track == null) return false;
-
-        if (node.minedObjectType == MinedObjectType.NoteSpawner)
-        {
-            // Example policy: prefer node.role == assignedRole (if you keep role on entries)
-            return node.role == track.assignedRole;
-        }
-
-        if (node.minedObjectType == MinedObjectType.TrackUtility)
-        {
-            // Utilities: ask track if this utility makes sense (your function)
-            return track.IsTrackUtilityRelevant(node.trackModifierType);
-        }
-
-        return true;
-    }
-
-    public MinedObjectSpawnDirective PickDirectiveByRole(MusicalPhase phase, MusicalRole _role)
-    {
-        var ctrl = GameFlowManager.Instance?.controller;
-        var track = ctrl?.GetTrackByRole(_role);
-
-        var dir = new MinedObjectSpawnDirective
-        {
-            minedObjectType = MinedObjectType.NoteSpawner, // default for role-based shards
-            role = _role,
-            assignedTrack = track,
-            displayColor = track != null ? track.trackColor : Color.white,
-            prefab = null // let PhaseStar.ResolveDirectivePrefab fill this
-        };
-
-        // (Optionally: inject utility kinds, pattern hints, etc., if your authored design needs it)
-        return dir;
-    }
+    
 }
 
 /// <summary>

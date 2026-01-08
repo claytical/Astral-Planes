@@ -13,13 +13,16 @@ MonoBehaviour:
   m_Name: Bass
   m_EditorClassIdentifier: 
   role: 0
-  defaultColor: {r: 0.6156863, g: 0.30588236, b: 0.8666667, a: 1}
+  dustColors:
+    baseColor: {r: 0.5244411, g: 0.14899999, b: 1, a: 1}
+    chargeColor: {r: 0.7647059, g: 0.654902, b: 1, a: 1}
+    denyColor: {r: 0.22745098, g: 0.12156863, b: 0.2901961, a: 1}
+    shadowColor: {r: 0.14117648, g: 0.08627451, b: 0.18039216, a: 1}
+  baseAlpha: 0.25
+  chargeToWhite: 0.8
+  denyToShadow: 0.75
+  chargeAlphaBoost: 0.35
+  denyAlphaBoost: 0.25
   description: Deep and grounding. Adds weight to the groove with low-end power.
-  envelopeParticlePrefab: {fileID: 7704860281926021353, guid: 0a8f58ba4b35d41aa830206a1d369348,
-    type: 3}
-  sparkParticlePrefab: {fileID: 5137427580465729298, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
-    type: 3}
   defaultBehavior: 0
   allowedMidiPresets: 000000000700000003000000
-  textureDescriptor: subterranean warmth
-  samplePreview: {fileID: 0}

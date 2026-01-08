@@ -15,6 +15,7 @@ public enum PhaseStarState
 struct PreviewShard
 {
     public Color color;
+    public Color shadowColor;
     public bool collected;
     public Transform visual;
 
@@ -1050,8 +1051,14 @@ public class PhaseStar : MonoBehaviour
 
             // Color MUST come from the role’s track, not a cycling palette.
             var track = FindTrackByRole(role);
-            Color c = track != null ? track.trackColor : Color.white;
 
+// Prefer the MusicalRoleProfile authority when available.
+// Fallback to baked trackColor to preserve legacy behavior.
+            Color c   = track != null ? track.trackColor : Color.white;
+            Color shadow = track != null ? track.TrackShadowColor : new Color(0.08f,0.08f,0.08f,1f);
+
+
+ 
             var shardGO = new GameObject($"PreviewShard_{i}_{role}");
             shardGO.transform.SetParent(transform);
             shardGO.transform.localPosition = Vector3.zero;
@@ -1066,10 +1073,9 @@ public class PhaseStar : MonoBehaviour
             previewRing.Add(new PreviewShard
             {
                 color = c,
+                shadowColor = shadow,
                 collected = false,
                 visual = shardGO.transform,
-
-                // NEW: bind petal to plan entry
                 plan = planEntry,
                 role = role
             });
@@ -1185,7 +1191,9 @@ public class PhaseStar : MonoBehaviour
         if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (visuals == null) return;
         var color = ResolvePreviewColor();
-        visuals.SetPreviewTint(color);
+        var shadow = ResolvePreviewShadowColor();
+        visuals.SetPreviewTint(color, shadow);
+        
         if (activeShardVisual) HighlightActive();
     }
 
@@ -1212,6 +1220,12 @@ public class PhaseStar : MonoBehaviour
         if (previewRing == null || previewRing.Count == 0) return Color.white;
         int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
         return previewRing[idx].color;
+    }
+    private Color ResolvePreviewShadowColor()
+    {
+        if (previewRing == null || previewRing.Count == 0) return new Color(0.08f, 0.08f, 0.08f, 1f);
+        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        return previewRing[idx].shadowColor;
     }
 
     private InstrumentTrack PickTargetTrackFor(WeightedMineNode entry)
@@ -1381,11 +1395,23 @@ public class PhaseStar : MonoBehaviour
 
         visuals?.EjectParticles();
 
-        // Capture immutable context for this spawn
         Color spawnTint = usedDirective.displayColor;
+
+// Prefer shadow cached on the track (derived from MusicalRoleProfileLibrary).
+        Color shadowTint;
+        if (usedTrack != null)
+        {
+            shadowTint = usedTrack.TrackShadowColor; // new cached field you add on InstrumentTrack
+        }
+        else
+        {
+            // Fallback if track is null or not initialized
+            shadowTint = new Color(spawnTint.r * 0.20f, spawnTint.g * 0.20f, spawnTint.b * 0.20f, spawnTint.a);
+        }
+
         _lockedTint = spawnTint;
         _lockPreviewTintUntilIdle = true;
-        visuals?.SetPreviewTint(spawnTint);
+        visuals?.SetPreviewTint(spawnTint, shadowTint);
 
         var node = DirectSpawnMineNode(contactPoint, usedDirective, usedTrack);
         if (node == null)

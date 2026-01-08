@@ -17,6 +17,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     private float _pulseSpeed = 1f;
 private float alphaDirection = 1f;
     private SpriteRenderer activeSprite;
+    private Color _lastShadowTint = new Color(0.08f, 0.08f, 0.08f, 1f);
 
     public ParticleSystem particles;
 
@@ -102,7 +103,12 @@ private float alphaDirection = 1f;
             Instantiate(_profile.ejectionPrefab, transform.position, Quaternion.identity);
     }
 
-    public void SetPreviewTint(Color c) => _lastTint = c;
+
+    public void SetPreviewTint(Color c, Color shadowC)
+    {
+        _lastTint = c;
+        _lastShadowTint = shadowC;
+    }
 
     public void ShowBright(Color c)
     {
@@ -116,18 +122,30 @@ private float alphaDirection = 1f;
         // (No-op here.)
     }
 
-    public void ShowDim(Color _ignored)
+    public void ShowDim(Color tint)
     {
-        // FIX: Dim should still be visible.
         ToggleShardRenderers(true);
 
-        // Make shards feel “nearly black”
-        SetShardTint(dimShardTint);
+        // Prefer the provided tint; if it’s default/empty, fall back to cached preview tint.
+        // (Unity Colors are structs; there isn’t a true “null”, so we treat near-black as “unset”.)
+        Color baseTint = tint;
+        if (baseTint.r <= 0.001f && baseTint.g <= 0.001f && baseTint.b <= 0.001f)
+            baseTint = _lastTint;
 
-        // Keep some subtle particle presence (optional)
+        // Role-specific shadow hue if it’s meaningfully set; otherwise derive from base.
+        Color shadow = _lastShadowTint;
+        if (shadow.r <= 0.001f && shadow.g <= 0.001f && shadow.b <= 0.001f)
+            shadow = new Color(baseTint.r * 0.20f, baseTint.g * 0.20f, baseTint.b * 0.20f, 1f);
+
+        // Keep dim readable but not “nearly black disappears”
+        shadow.a = Mathf.Clamp01(dimShardTint.a); // reuse your authored alpha knob
+
+        SetShardTint(shadow);
+
         ApplyParticleAlpha(0.25f);
         if (particles && !particles.isPlaying) particles.Play();
     }
+
 
     public void HideAll()
     {

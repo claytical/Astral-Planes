@@ -170,6 +170,24 @@ private void FixedUpdate()
         _rb.linearVelocity *= 0.5f;
     }
 }
+public Color GetImprintShadowColor()
+{
+    // Prefer role profile if you have it in the directive (your MinedObjectSpawnDirective already includes roleProfile)
+    if (_directive != null && _directive.roleProfile != null)
+    {
+        // Temporary placeholder until MusicalRoleProfile grows dust fields:
+        // return _directive.roleProfile.shadowColor;
+        // For now, derive shadow by darkening the base.
+        var c = GetImprintColor();
+        return new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, c.a);
+    }
+
+    // Fallback: darken base
+    {
+        var c = GetImprintColor();
+        return new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, c.a);
+    }
+}
 
     public Color GetImprintColor()
     {

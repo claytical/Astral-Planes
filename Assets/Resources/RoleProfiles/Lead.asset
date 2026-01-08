@@ -13,7 +13,16 @@ MonoBehaviour:
   m_Name: Lead
   m_EditorClassIdentifier: 
   role: 2
-  defaultColor: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
+  dustColors:
+    baseColor: {r: 1, g: 0.67032564, b: 0.11400002, a: 1}
+    chargeColor: {r: 1, g: 0.901886, b: 0, a: 1}
+    denyColor: {r: 0.645, g: 0.47939184, b: 0.2789189, a: 1}
+    shadowColor: {r: 0.18039216, g: 0.13725491, b: 0.08627451, a: 1}
+  baseAlpha: 0.25
+  chargeToWhite: 0.8
+  denyToShadow: 0.75
+  chargeAlphaBoost: 0.35
+  denyAlphaBoost: 0.25
   description: Bright, aggressive lines that cut through the mix.
   defaultBehavior: 1
   allowedMidiPresets: 03000000
