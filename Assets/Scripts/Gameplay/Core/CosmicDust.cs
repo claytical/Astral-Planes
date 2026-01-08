@@ -107,6 +107,10 @@ public class CosmicDust : MonoBehaviour {
     private MusicalPhase phase;
     private float _growInOverride = -1f;
     private Color _currentTint = Color.white;
+
+    // Exposed for neighborhood tint blending (CosmicDustGenerator).
+    // Keep read-only so the generator can sample without bypassing dust visual logic.
+    public Color CurrentTint => _currentTint;
     [SerializeField] private int epochId;
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;

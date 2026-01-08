@@ -95,6 +95,12 @@ public class CosmicDustGenerator : MonoBehaviour
     private Dictionary<int, List<Vector2Int>> _featureCells = new(); // featureId -> cells
     private Dictionary<Vector2Int, int> _cellToFeature = new();     // grid -> featureId
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
+
+    [Header("Tint Blending (Neighborhood)")]
+    [Tooltip("When MineNodes imprint dust colors, blend the imprint toward nearby cell tints to avoid sharp grid seams.")]
+    [Range(0, 3)] [SerializeField] private int imprintBlendRadius = 1;
+    [Tooltip("0 = no blending (pure imprint). 1 = fully neighborhood average.")]
+    [Range(0f, 1f)] [SerializeField] private float imprintNeighborWeight = 0.55f;
     private Queue<int> _featureOrder = new();                       // FIFO for "oldest" removal
     private List<(Vector2Int grid, Vector3 pos)> _pendingSpawns = new();
     private readonly HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
@@ -720,9 +726,12 @@ public class CosmicDustGenerator : MonoBehaviour
                 }
 
                 // Record/refresh MineNode imprint for regrowth semantics.
+                // Blend the imprint toward its neighborhood so MineNode color marks don't create hard seams.
+                // (This also sets us up for optional diffusion later by ensuring the initial condition is already smooth.)
+                Color blendedImprint = BlendImprintWithNeighbors(gp, imprintColor, imprintBlendRadius, imprintNeighborWeight);
                 _imprints[gp] = new DustImprint
                 {
-                    color = imprintColor,
+                    color = blendedImprint,
                     healDelay = regrowDelaySeconds,
                     hardness01 = hardness01
                 };
@@ -1623,12 +1632,55 @@ public bool TryGetDustWeatherForce(
     }
     return true;
 }
-    public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust) { 
-        dust = null; 
-        if (!_hexMap.TryGetValue(cell, out var go) || go == null) return false; 
+    private Color GetCellVisualColor(Vector2Int cell)
+    {
+        // Prefer live dust tint if the cell currently exists.
+        if (TryGetDustAt(cell, out var dust) && dust != null)
+            return dust.CurrentTint;
+
+        // Otherwise prefer a pending MineNode imprint if present.
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+            return imp.color;
+
+        // Fallback to the current maze tint.
+        return _mazeTint;
+    }
+
+    private Color BlendImprintWithNeighbors(Vector2Int cell, Color target, int radius, float neighborWeight)
+    {
+        radius = Mathf.Max(0, radius);
+        neighborWeight = Mathf.Clamp01(neighborWeight);
+        if (radius == 0 || neighborWeight <= 0f)
+            return target;
+
+        int count = 0;
+        float r = 0f, g = 0f, b = 0f, a = 0f;
+
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                if (dx == 0 && dy == 0) continue;
+                var c = GetCellVisualColor(new Vector2Int(cell.x + dx, cell.y + dy));
+                r += c.r; g += c.g; b += c.b; a += c.a;
+                count++;
+            }
+        }
+
+        if (count <= 0)
+            return target;
+
+        Color avg = new Color(r / count, g / count, b / count, a / count);
+        return Color.Lerp(target, avg, neighborWeight);
+    }
+
+    public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust) {
+        dust = null;
+        if (!_hexMap.TryGetValue(cell, out var go) || go == null) return false;
         return go.TryGetComponent(out dust) && dust != null;
     }
-public void ApplyProfile(PhaseStarBehaviorProfile profile)
+
+    public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
 
