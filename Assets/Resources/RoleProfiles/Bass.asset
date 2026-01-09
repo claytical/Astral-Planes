@@ -16,13 +16,13 @@ MonoBehaviour:
   dustColors:
     baseColor: {r: 0.5244411, g: 0.14899999, b: 1, a: 1}
     chargeColor: {r: 0.7647059, g: 0.654902, b: 1, a: 1}
-    denyColor: {r: 0.22745098, g: 0.12156863, b: 0.2901961, a: 1}
-    shadowColor: {r: 0.14117648, g: 0.08627451, b: 0.18039216, a: 1}
-  baseAlpha: 0.25
-  chargeToWhite: 0.8
+    denyColor: {r: 0.972549, g: 0.14509802, b: 0.8373217, a: 1}
+    shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
+  baseAlpha: 0.805
+  chargeToWhite: 1
   denyToShadow: 0.75
-  chargeAlphaBoost: 0.35
-  denyAlphaBoost: 0.25
+  chargeAlphaBoost: 1
+  denyAlphaBoost: 0.346
   description: Deep and grounding. Adds weight to the groove with low-end power.
   defaultBehavior: 0
   allowedMidiPresets: 000000000700000003000000

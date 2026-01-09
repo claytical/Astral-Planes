@@ -16,12 +16,12 @@ MonoBehaviour:
   dustColors:
     baseColor: {r: 0.6434783, g: 0.82608694, b: 1, a: 1}
     chargeColor: {r: 0.255, g: 0.8520218, b: 1, a: 1}
-    denyColor: {r: 0.15294118, g: 0.22352941, b: 0.2901961, a: 1}
-    shadowColor: {r: 0.09411765, g: 0.14117648, b: 0.18431373, a: 1}
-  baseAlpha: 0.25
-  chargeToWhite: 0.8
+    denyColor: {r: 0.2795924, g: 0.43175885, b: 0.5754717, a: 1}
+    shadowColor: {r: 0.2011392, g: 0.29307973, b: 0.3773585, a: 1}
+  baseAlpha: 0.846
+  chargeToWhite: 1
   denyToShadow: 0.75
-  chargeAlphaBoost: 0.35
+  chargeAlphaBoost: 1
   denyAlphaBoost: 0.25
   description: Percussive rhythms that give structure and drive.
   defaultBehavior: 3

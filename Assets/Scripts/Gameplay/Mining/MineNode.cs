@@ -366,9 +366,10 @@ public Color GetImprintShadowColor()
         if (coreSprite != null)
         {
             // Prefer locked tint if you are feeding it from preview shard selection.
+            tint.a = 1;
             coreSprite.color = tint;
+            
         }
-
         // Register MineNode only
         if (_drumTrack != null)
         {

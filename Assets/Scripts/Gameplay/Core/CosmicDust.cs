@@ -343,7 +343,7 @@ public class CosmicDust : MonoBehaviour {
                 new GradientAlphaKey(0f,             0f),
                 new GradientAlphaKey(pm.a * 0.65f,   0.08f),
                 new GradientAlphaKey(pm.a * 0.65f,   0.55f),
-                new GradientAlphaKey(pm.a * 0.35f,   0.85f),
+                new GradientAlphaKey(pm.a * 0.75f,   0.85f),
                 new GradientAlphaKey(0f,             1f),
 
             }
