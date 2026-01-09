@@ -1158,10 +1158,11 @@ private void PrepareNextDirective()
         }
 
         Color c = ResolvePreviewColor();
-
+        float highlight = _isArmed ? 0.7f : 0.25f;
+        float veilA     = _isArmed ? 0.25f : 0.55f;
         // “Dim means busy” is handled elsewhere; this is just the per-petal highlight.
-        visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.25f), activeShardVisual);
-        visuals.HighlightActive(activeShardVisual, c, 0.7f);
+        visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, veilA), activeShardVisual);
+        visuals.HighlightActive(activeShardVisual, c, highlight);
     }
 
     private Color ResolvePreviewColor()
@@ -1419,7 +1420,7 @@ private void PrepareNextDirective()
 
         // color shell immediately so it never flashes white
         var sr = go.GetComponentInChildren<SpriteRenderer>();
-        if (sr) sr.color = track.trackColor;
+        if (sr) sr.color = color;
         var rb = go.GetComponent<Rigidbody2D>();
         if (rb != null && _lastImpactDir.sqrMagnitude > 0.0001f && _lastImpactStrength > 0f)
         {
