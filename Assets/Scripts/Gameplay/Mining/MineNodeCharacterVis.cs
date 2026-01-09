@@ -25,7 +25,7 @@ public class MineNodeCharacterVis : MonoBehaviour
     [SerializeField] Transform spritePivotInner;         // optional
 
     Rigidbody2D rb;
-    MineNodeRailAgent agent;
+
 
     // state
     private bool _lockTint;
@@ -80,36 +80,20 @@ public class MineNodeCharacterVis : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        agent = GetComponent<MineNodeRailAgent>();
         if (!outerSprite) outerSprite = GetComponentInChildren<SpriteRenderer>(true);
         if (!spritePivotOuter && outerSprite) spritePivotOuter = outerSprite.transform;
         if (innerSprite && !spritePivotInner) spritePivotInner = innerSprite.transform;
     }
 
-    void OnEnable()
-    {
-        if (agent != null)
-        {
-            agent.OnPlanStart  += HandlePlanStart;
-            agent.OnPlanReady  += HandlePlanReady;
-        }
-    }
-    void OnDisable()
-    {
-        if (agent != null)
-        {
-            agent.OnPlanStart  -= HandlePlanStart;
-            agent.OnPlanReady  -= HandlePlanReady;
-        }
-    }
+
+
     void FixedUpdate()
     {
         var v = rb ? rb.linearVelocity : Vector2.zero;
         float speed = v.magnitude;
-        bool hasPath = agent ? agent.HasPath : speed > minSpeedForSwim; // fallback
-
+ 
         // Decide if we’re THINKING (spin) or SWIMMING (wobble)
-        bool thinking = (!hasPath || speed < minSpeedForSwim || thinkTimer > 0f);
+        bool thinking = (speed < minSpeedForSwim || thinkTimer > 0f);
 
         if (thinking)
         {

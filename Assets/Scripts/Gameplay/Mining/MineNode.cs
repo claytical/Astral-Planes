@@ -10,6 +10,34 @@ public class MineNode : MonoBehaviour
     public int maxStrength = 100;
     private Vector2Int _spawnCell;
     private bool _hasSpawnCell;
+// === Rhythmic steering (authored steps) ===
+    [Header("Rhythmic Steering")]
+    public bool useRhythmicKeyframes = true;
+    [Range(0f, 1f)] public float turnSmoothing = 0.25f;
+    [Range(0f, 25f)] public float headingJitterDegrees = 12f;
+// Cached authored steps for O(1) membership tests
+    private HashSet<int> _turnStepSet;
+    private NoteSet _cachedTurnSetSource;
+
+// Stuck breaker state
+    private float _nextEscapeAllowedTime = 0f;
+    private Vector2 _lastPosForStall;
+    private float _nextStallSampleTime = 0f;
+    private int _stallHits = 0;
+
+// Optional: if you want deterministic jitter per step
+    private int _rngSalt = 0;
+
+    private HashSet<int> _authoredStepSet;
+    private int _stepsPerLoop = 16;     // derived from allowed steps
+    private int _lastStepIndex = -1;
+
+    private Vector2 _desiredHeading = Vector2.right;
+    private Vector2 _smoothedHeading = Vector2.right;
+
+    private float _stuckCheckAt;
+    private Vector2 _stuckLastPos;
+    private int _stuckCount;
 
     private int _strength;
     private Vector3 _originalScale;
@@ -79,6 +107,8 @@ private void FixedUpdate()
         return;
     }
 
+    EnsureTurnStepsCached();
+
     // ---- Tunables (safe defaults) ----
     const float microTurnGate        = 0.15f; // how much we turn on non-authored steps
     const float stallSpeed           = 0.20f; // below this, consider "stalled"
@@ -86,16 +116,22 @@ private void FixedUpdate()
     const float escapeJitterDeg      = 25f;   // random jitter after an escape redirect
     const float minDesiredSpeedFloor = 0.25f; // avoid meaningless speed caps downstream
 
+    // New: stuck breaker sampling / cooldown
+    const float stallSamplePeriod    = 0.40f; // how often we evaluate true "not moving"
+    const float stallDistanceEps     = 0.12f; // moved less than this in sample window => stall hit
+    const float escapeCooldown       = 0.30f; // don't escape every frame
+
+    // STEP INDEX SOURCE
+    // If _drumTrack.currentStep is stable and DSP-based, keep using it:
     int stepNow = _drumTrack.currentStep;
 
-    // --- STEP-BASED TURNING (Option A) ---
+    // --- STEP-BASED TURNING (authored-step keyframes) ---
     if (stepNow != _lastProcessedStep)
     {
         _lastProcessedStep = stepNow;
 
-        var stepList = _noteSet.GetStepList();
-        bool isTurnStep = (stepList != null && stepList.Contains(stepNow));
-        float turnGate = isTurnStep ? 1f : microTurnGate;
+        bool isTurnStep = (_turnStepSet != null && _turnStepSet.Contains(stepNow));
+        float turnGate  = isTurnStep ? 1f : microTurnGate;
 
         int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
 
@@ -110,6 +146,8 @@ private void FixedUpdate()
 
         // Scale turn magnitude by pitch + whether this step is authored as a turn.
         float turnAngle = Mathf.Lerp(baseAngle * 0.5f, baseAngle * 1.25f, note01) * turnGate;
+
+        // If you want deterministic "jitter" per step, replace Random.Range with a hash of (stepNow, _rngSalt).
         float delta = UnityEngine.Random.Range(-turnAngle, turnAngle);
 
         _carveDir = Rotate(_carveDir, delta).normalized;
@@ -129,43 +167,128 @@ private void FixedUpdate()
     if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
     if (_dustInteractor != null) _dustInteractor.SetDesiredSpeed(targetSpeed);
 
+    // --- CONTINUOUS STEERING FORCE ---
     Vector2 desiredVelocity = _carveDir * targetSpeed;
-    Vector2 velocityDelta = desiredVelocity - _rb.linearVelocity;
+    Vector2 velocityDelta   = desiredVelocity - _rb.linearVelocity;
 
+    // Use mass-scaled force. Clamp helps avoid “solver pinning” at high deltas.
     Vector2 force = velocityDelta * steerForce * _rb.mass;
-    force = Vector2.ClampMagnitude(force, maxSteerForce); // add a maxSteerForce field
+    force = Vector2.ClampMagnitude(force, maxSteerForce);
     _rb.AddForce(force, ForceMode2D.Force);
 
     // --- BOUNDARY / STALL ESCAPE ---
-    // If we're trying to move but we're not, we are likely pressed against a boundary.
+    // Two-stage detection:
+    // A) instantaneous "pressed" signal (low speed OR poor alignment)
+    // B) confirmed stall via distance sampling, with cooldown to prevent ping-pong
     float vMag = _rb.linearVelocity.magnitude;
 
     float align = (vMag > 0.0001f)
         ? Vector2.Dot(_rb.linearVelocity.normalized, _carveDir)
         : 0f;
 
-    if (vMag < stallSpeed || align < stuckDot)
+    bool pressedNow = (vMag < stallSpeed) || (align < stuckDot);
+
+    // Confirm stall based on distance moved over time (prevents false triggers on valid turns)
+    bool confirmedStall = false;
+    if (Time.time >= _nextStallSampleTime)
     {
-        // If we have some velocity, redirect away from the "wall" by reflecting across a perpendicular.
+        Vector2 pos = _rb.position;
+        float moved = (pos - _lastPosForStall).magnitude;
+
+        if (_nextStallSampleTime > 0f) // skip the first sample
+        {
+            if (moved < stallDistanceEps && pressedNow) _stallHits++;
+            else _stallHits = Mathf.Max(0, _stallHits - 1);
+
+            confirmedStall = (_stallHits >= 2); // require persistence across samples
+        }
+
+        _lastPosForStall = pos;
+        _nextStallSampleTime = Time.time + stallSamplePeriod;
+    }
+
+    if (confirmedStall && Time.time >= _nextEscapeAllowedTime)
+    {
+        _nextEscapeAllowedTime = Time.time + escapeCooldown;
+        _stallHits = 0;
+
+        // Prefer an orthogonal “escape” turn rather than a reflect guess off velocity,
+        // because reflect can ping-pong on boundaries.
+        // Choose left vs right based on which is more different from our current motion.
+        Vector2 fwd = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
+        Vector2 left  = new Vector2(-fwd.y, fwd.x);
+        Vector2 right = new Vector2(fwd.y, -fwd.x);
+
+        // If we have velocity, choose the side that reduces alignment with the blocked motion
         if (vMag > 0.05f)
         {
-            Vector2 n = _rb.linearVelocity.normalized;
-            Vector2 approxWallNormal = new Vector2(-n.y, n.x).normalized; // perpendicular to motion
-            _carveDir = Vector2.Reflect(_carveDir, approxWallNormal).normalized;
+            Vector2 vN = _rb.linearVelocity.normalized;
+            float l = Mathf.Abs(Vector2.Dot(vN, left));
+            float r = Mathf.Abs(Vector2.Dot(vN, right));
+            _carveDir = (l < r) ? left : right; // pick more orthogonal to current velocity
         }
         else
         {
-            // If nearly stopped, force a decisive change in heading.
-            _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(120f, 240f)).normalized;
+            // Nearly stopped: pick a decisive 150–210 degree turn away from current
+            _carveDir = Rotate(fwd, UnityEngine.Random.Range(150f, 210f)).normalized;
         }
 
-        // Add jitter so it doesn't ping-pong.
+        // Add jitter so it doesn't get trapped in a repeating two-turn pattern.
         _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(-escapeJitterDeg, escapeJitterDeg)).normalized;
 
-        // Dampen velocity slightly so the solver can separate from the wall faster.
+        // Dampen velocity to help separate from the boundary in the next solver step.
         _rb.linearVelocity *= 0.5f;
     }
 }
+
+private void EnsureTurnStepsCached()
+{
+    if (_noteSet == null) return;
+    if (_turnStepSet != null && ReferenceEquals(_cachedTurnSetSource, _noteSet)) return;
+
+    var stepList = _noteSet.GetStepList();
+    _turnStepSet = (stepList != null && stepList.Count > 0) ? new HashSet<int>(stepList) : null;
+    _cachedTurnSetSource = _noteSet;
+}
+
+private void CacheAuthoredStepsFromNoteSet()
+{
+    _authoredStepSet = null;
+    _stepsPerLoop = 16;
+
+    if (_drumTrack == null || _noteSet == null) return;
+
+    var steps = _noteSet.GetStepList();
+    if (steps == null || steps.Count == 0) return;
+
+    _authoredStepSet = new HashSet<int>(steps);
+
+    int max = -1;
+    for (int i = 0; i < steps.Count; i++) max = Mathf.Max(max, steps[i]);
+    _stepsPerLoop = Mathf.Max(1, max + 1);
+
+    // Optional: round up to 16-step bars to keep indexing stable if you care about bars.
+    // This avoids weirdness if the highest authored step isn't at the end of the loop.
+    int bar = 16;
+    if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
+}
+
+private void SeedInitialHeadingFromVelocity()
+{
+    if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f)
+    {
+        _desiredHeading = _rb.linearVelocity.normalized;
+        _smoothedHeading = _desiredHeading;
+    }
+    else
+    {
+        _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized;
+        _smoothedHeading = _desiredHeading;
+    }
+}
+
+
+
 public Color GetImprintShadowColor()
 {
     if (_track != null)
@@ -208,6 +331,16 @@ public Color GetImprintShadowColor()
         _lockedColor   = tint;
         // DrumTrack authority: from assigned track, not from minedObject
         _drumTrack = (track != null) ? track.drumTrack : null;
+        if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f)
+        {
+            _desiredHeading = _rb.linearVelocity.normalized;
+            _smoothedHeading = _desiredHeading;
+        }
+        else
+        {
+            _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized;
+            _smoothedHeading = _desiredHeading;
+        }
 
         // NoteSet authority: MineNode owns it (or you can store it on track, but currently you’re generating here)
         
@@ -241,6 +374,9 @@ public Color GetImprintShadowColor()
         {
             _drumTrack.RegisterMineNode(this);
         }
+        // call both from Initialize after rb/drumTrack are ready:
+        CacheAuthoredStepsFromNoteSet();
+        SeedInitialHeadingFromVelocity();
     }
 
     private void HandleLoopBoundary()
@@ -272,6 +408,107 @@ public Color GetImprintShadowColor()
         float fast = 0.4f;  // high note
         return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
     }
+private void UpdateRhythmicKeyframes()
+{
+    if (!useRhythmicKeyframes) return;
+    if (_drumTrack == null || _noteSet == null) return;
+    if (_drumTrack.startDspTime <= 0.0) return;
+
+    // If authored set not cached (or NoteSet changed), cache lazily.
+    if (_authoredStepSet == null) CacheAuthoredStepsFromNoteSet();
+    if (_stepsPerLoop <= 0) return;
+
+    float loopLen = _drumTrack.GetLoopLengthInSeconds();
+    if (loopLen <= 0.01f) return;
+
+    double dspNow = AudioSettings.dspTime;
+    double t = (dspNow - _drumTrack.startDspTime) % loopLen;
+    if (t < 0) t += loopLen;
+
+    int stepIndex = Mathf.FloorToInt((float)(t / loopLen * _stepsPerLoop));
+    stepIndex = Mathf.Clamp(stepIndex, 0, _stepsPerLoop - 1);
+
+    if (stepIndex != _lastStepIndex)
+    {
+        _lastStepIndex = stepIndex;
+        OnStepTick(stepIndex);
+    }
+}
+
+private void OnStepTick(int stepIndex)
+{
+    // Only change direction on AUTHORED steps:
+    if (_authoredStepSet == null || !_authoredStepSet.Contains(stepIndex))
+        return;
+
+    ChooseHeadingOnAuthoredStep(stepIndex);
+}
+
+private void ChooseHeadingOnAuthoredStep(int stepIndex)
+{
+    Vector2 fwd = (_desiredHeading.sqrMagnitude > 0.001f) ? _desiredHeading.normalized : Vector2.right;
+    Vector2 left  = new Vector2(-fwd.y, fwd.x);
+    Vector2 right = new Vector2(fwd.y, -fwd.x);
+
+    // Candidate headings. Keep it small and stable.
+    Vector2[] candidates = new[]
+    {
+        fwd,
+        (fwd + left).normalized,
+        (fwd + right).normalized,
+        left,
+        right
+    };
+
+    Vector2 best = fwd;
+    float bestScore = float.NegativeInfinity;
+
+    for (int i = 0; i < candidates.Length; i++)
+    {
+        float s = ScoreHeading(candidates[i]);
+        if (s > bestScore)
+        {
+            bestScore = s;
+            best = candidates[i];
+        }
+    }
+
+    _desiredHeading = Jitter(best, headingJitterDegrees);
+}
+
+private float ScoreHeading(Vector2 dir)
+{
+    // Minimal scoring that avoids “boundary sticking”:
+    // Prefer headings that encounter dust soon (carving opportunity) and avoid immediate blockers.
+    // Replace these checks with your dust-grid query if you prefer.
+
+    Vector2 origin = _rb != null ? _rb.position : (Vector2)transform.position;
+    float probe = 0.75f;
+
+    // If you have a dust collider layer, raycast for it here.
+    // For now: default neutral score and rely on stuck breaker + carve interaction.
+    float score = 0f;
+
+    // Slight penalty for repeating the same heading too often can help prevent ping-pong:
+    score -= Vector2.Dot(dir.normalized, _smoothedHeading.normalized) > 0.95f ? 0.1f : 0f;
+
+    return score;
+}
+
+private static Vector2 Jitter(Vector2 v, float degrees)
+{
+    if (degrees <= 0.01f) return v;
+    float ang = UnityEngine.Random.Range(-degrees, degrees) * Mathf.Deg2Rad;
+    float cs = Mathf.Cos(ang);
+    float sn = Mathf.Sin(ang);
+    return new Vector2(v.x * cs - v.y * sn, v.x * sn + v.y * cs).normalized;
+}
+private void ApplyHeadingVelocity(float speed)
+{
+    _smoothedHeading = Vector2.Lerp(_smoothedHeading, _desiredHeading, 1f - Mathf.Pow(1f - turnSmoothing, Time.fixedDeltaTime * 60f));
+    if (_smoothedHeading.sqrMagnitude > 0.0001f) _smoothedHeading.Normalize();
+    _rb.linearVelocity = _smoothedHeading * speed;
+}
 
     private float GetRoleTurnAngleDeg(MusicalRole role)
     {

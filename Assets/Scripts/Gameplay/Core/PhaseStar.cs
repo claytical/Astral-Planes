@@ -231,7 +231,9 @@ public class PhaseStar : MonoBehaviour
 
         spawnStrategyProfile?.ResetForNewStar();
 
-        BuildPhasePlan(_assignedPhase);
+        _shardsEjectedCount = 0;
+
+        BuildPhasePlan(_assignedPhase, Mathf.Max(1, behaviorProfile.nodesPerStar));
         PrepareNextDirective();
         // ensure subcomponents are present if assigned
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
@@ -863,8 +865,7 @@ public class PhaseStar : MonoBehaviour
         if (_previewInitialized) return;
         _previewInitialized = true;
 
-        BuildPreviewRing(); // build data-only
-        BuildOrRefreshPreviewRing(); // then apply visuals & layering exactly once
+        RebuildPreviewRingForRemainingShards(keepCurrentIndex:false);
     }
 
     private void OnDisable()
@@ -893,16 +894,20 @@ public class PhaseStar : MonoBehaviour
         BuildOrRefreshPreviewRing();
     }
 
-    private void BuildPhasePlan(MusicalPhase phase)
+    private int _plannedShardCount = 0;
+
+    private void BuildPhasePlan(MusicalPhase phase, int shardCount)
     {
         _phasePlanRoles = new List<MusicalRole>();
         if (!spawnStrategyProfile) return;
 
-        int target = Mathf.Max(1, behaviorProfile.nodesPerStar);
+        int target = Mathf.Max(1, shardCount);
+        _plannedShardCount = target;
 
         for (int i = 0; i < target; i++)
         {
-            // offset=i is the key: each shard slot in the star ring
+            // “always balanced” model: rebuild from the authored strategy order,
+            // repeated/cropped to the CURRENT remaining shard count.
             MusicalRole role = spawnStrategyProfile.PeekRoleAtOffset(i, target);
             _phasePlanRoles.Add(role);
         }
@@ -912,7 +917,41 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasShardsRemaining() => _shardsEjectedCount < behaviorProfile.nodesPerStar;
 
-    private void PrepareNextDirective()
+    private int GetRemainingShardCount()
+    {
+        if (behaviorProfile == null) return 0;
+        int total = Mathf.Max(0, behaviorProfile.nodesPerStar);
+        int rem = total - Mathf.Max(0, _shardsEjectedCount);
+        return Mathf.Clamp(rem, 0, total);
+    }
+
+    private void RebuildPreviewRingForRemainingShards(bool keepCurrentIndex = true)
+    {
+        if (behaviorProfile == null || visuals == null) return;
+        int remaining = GetRemainingShardCount();
+
+        if (remaining <= 0)
+        {
+            for (int i = 0; i < previewRing.Count; i++)
+            {
+                var v = previewRing[i].visual;
+                if (v) Destroy(v.gameObject);
+            }
+            previewRing.Clear();
+            activeShardVisual = null;
+            return;
+        }
+
+        if (!keepCurrentIndex) currentShardIndex = 0;
+        currentShardIndex = Mathf.Clamp(currentShardIndex, 0, remaining - 1);
+
+        BuildPhasePlan(_assignedPhase, remaining);
+        BuildPreviewRing();
+        BuildOrRefreshPreviewRing();
+        UpdatePreviewTint();
+    }
+
+private void PrepareNextDirective()
     {
         Trace("PrepareNextDirective() begin");
 
@@ -934,9 +973,16 @@ public class PhaseStar : MonoBehaviour
     void BuildPreviewRing()
     {
         buildingPreview = true;
+
+        // Always-balanced model rebuilds the ring often; destroy prior visuals to avoid leaks.
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            var v = previewRing[i].visual;
+            if (v) Destroy(v.gameObject);
+        }
         previewRing.Clear();
 
-        // These angle arrays are legacy and unsafe once we shrink.
+// These angle arrays are legacy and unsafe once we shrink.
         // If you still have them referenced elsewhere, we can keep them, but they must be resized to match previewRing.
         _petalStartAngles.Clear();
         _petalTargetAngles.Clear();
@@ -952,7 +998,7 @@ public class PhaseStar : MonoBehaviour
         if (_phasePlanRoles == null || _phasePlanRoles.Count != behaviorProfile.nodesPerStar)
         {
             // If you have _assignedPhase or equivalent, pass it; otherwise pass the active phase you already cache.
-            BuildPhasePlan(_assignedPhase);
+            BuildPhasePlan(_assignedPhase, Mathf.Max(1, behaviorProfile.nodesPerStar));
         }
 
         int n = (_phasePlanRoles != null) ? _phasePlanRoles.Count : 0;
@@ -1007,8 +1053,8 @@ public class PhaseStar : MonoBehaviour
             _petalTargetAngles.Add(ang);
         }
 
-        currentShardIndex = 0;
-        activeShardVisual = previewRing[0].visual;
+        currentShardIndex = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        activeShardVisual = previewRing[currentShardIndex].visual;
         buildingPreview = false;
 
         // Ensure highlight + tint matches the new authoritative shard color
@@ -1298,57 +1344,43 @@ public class PhaseStar : MonoBehaviour
 
     void EjectActivePreviewShardAndFlow(Collision2D coll)
     {
+        if (behaviorProfile == null || visuals == null) return;
+        if (previewRing == null || previewRing.Count == 0) return;
         if (!HasShardsRemaining()) return;
 
-        // consume one shard visually (Model 1: highlighted shard is authoritative)
         int shardIdx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
         var shard = previewRing[shardIdx];
 
-        if (shard.visual)
+        MusicalRole ejectedRole = shard.role;
+        InstrumentTrack ejectedTrack = FindTrackByRole(ejectedRole);
+        if (ejectedTrack == null)
         {
-            var sr = shard.visual.GetComponent<SpriteRenderer>();
-            if (sr) sr.color = behaviorProfile.inactiveShardTint;
-        }
-
-        // Remove shard first so previewRing reflects reality immediately.
-        RemoveShardAt(shardIdx);
-        ReseedAfterRemoval();
-
-        // Count the ejection immediately (keeps "remaining shards" checks consistent downstream).
-        _shardsEjectedCount++;
-
-        // If we have no shards left, we are now in the "final collectables must clear" waiting state.
-        // The PhaseStar should NOT be visible during that final collection window.
-        bool isFinalShardEjection = (previewRing == null || previewRing.Count == 0) ||
-                                    (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
-
-        if (_cachedTrack == null)
-            PrepareNextDirective();
-
-        if (_cachedTrack == null)
-        {
-            Debug.LogError("[PhaseStar] Missing directive or track at eject time.");
+            Debug.LogError($"[PhaseStar] Missing track for ejected role={ejectedRole} (cannot spawn node).");
             return;
         }
 
         var contact = coll.GetContact(0).point;
-
-        // Compute impact direction & strength for MineNode
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
 
-        // From vehicle toward star; this is the "incoming" direction
-        _lastImpactDir = (starPos - vehiclePos).normalized;
-
-        // Use relative velocity magnitude as impact strength
+        Vector2 incoming = (starPos - vehiclePos);
+        _lastImpactDir = (incoming.sqrMagnitude > 0.0001f) ? incoming.normalized : Vector2.right;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
-        Disarm(isFinalShardEjection ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
-            _cachedTrack.trackColor);
+        _shardsEjectedCount++;
+        int remainingAfter = GetRemainingShardCount();
+        bool isFinalShardEjection = (remainingAfter <= 0);
 
-        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={_cachedTrack.assignedRole}");
+        Disarm(isFinalShardEjection ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
+            ejectedTrack.trackColor);
+
+        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         ActivateSafetyBubble();
-        SpawnNodeCommon(contact, _cachedTrack);
+        SpawnNodeCommon(contact, ejectedTrack);
+
+        currentShardIndex = Mathf.Clamp(currentShardIndex, 0, Mathf.Max(0, remainingAfter - 1));
+        RebuildPreviewRingForRemainingShards(keepCurrentIndex: true);
+        PrepareNextDirective();
     }
 
     void EjectCachedDirectiveAndFlow(Collision2D coll)
