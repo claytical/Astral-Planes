@@ -95,7 +95,8 @@ void Update()
 
     if (_dripEmitter != null)
     {
-        Vector3 dir = (end.position - start.position).normalized;
+        Vector3 endW = ResolveEndWorldPosition();
+        Vector3 dir  = (endW - start.position).normalized;
         _dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
     }
 
@@ -105,43 +106,50 @@ private Vector3 ResolveEndWorldPosition()
 {
     if (end == null) return _lastEndWorld;
 
-    // If the end lives under a Canvas (UI), convert to world space
+    // If this is a RectTransform, it *might* be UI — but it also might be World Space canvas.
     RectTransform rt = end as RectTransform ?? end.GetComponent<RectTransform>();
     if (rt != null)
     {
         var canvas = rt.GetComponentInParent<Canvas>();
-        // UI camera: for Screen Space - Camera use canvas.worldCamera; for Overlay pass null
+
+        // ✅ World Space canvas: RectTransform positions are already world-space.
+        if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+        {
+            var wp = rt.position;
+            if (!float.IsNaN(worldZOverride)) wp.z = worldZOverride;
+            else if (start) wp.z = start.position.z;
+            return _lastEndWorld = wp;
+        }
+
+        // Screen Space (Overlay/Camera): convert via screen point.
         var uiCam = this.uiCamera != null ? this.uiCamera : (canvas ? canvas.worldCamera : null);
         Vector2 screen = RectTransformUtility.WorldToScreenPoint(uiCam, rt.position);
 
         var wcam = this.worldCamera != null ? this.worldCamera : Camera.main;
         if (wcam == null) return _lastEndWorld;
 
-        // Depth: for orthographic cams the z arg is ignored; for perspective pick depth near start
         float depth;
         if (wcam.orthographic)
         {
-            depth = 0f; // ignored
+            depth = 0f; // ignored for ortho
         }
         else
         {
-            // distance from camera to the plane of the start point if available
             var planeZ = (start ? start.position.z : 0f);
             depth = Mathf.Abs(planeZ - wcam.transform.position.z);
             if (depth < 0.001f) depth = 10f;
         }
 
-        var wp = wcam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
-        // Force Z onto our tether plane
-        if (!float.IsNaN(worldZOverride)) wp.z = worldZOverride;
-        else if (start) wp.z = start.position.z;
-        return _lastEndWorld = wp;
+        var wp2 = wcam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
+        if (!float.IsNaN(worldZOverride)) wp2.z = worldZOverride;
+        else if (start) wp2.z = start.position.z;
+
+        return _lastEndWorld = wp2;
     }
 
     // Non-UI object: just use its world position
     return _lastEndWorld = end.position;
 }
-
     void Awake()
     {
         _lr = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();

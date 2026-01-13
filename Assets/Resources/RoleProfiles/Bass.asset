@@ -25,4 +25,4 @@ MonoBehaviour:
   denyAlphaBoost: 0.346
   description: Deep and grounding. Adds weight to the groove with low-end power.
   defaultBehavior: 0
-  allowedMidiPresets: 000000000700000003000000
+  allowedMidiPresets: 00000000

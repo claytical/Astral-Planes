@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 2442014530722922072}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7086731306890036074}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Mine Node
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -51,11 +51,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   coreSprite: {fileID: 2442014530722922072}
-  minedObjectPrefab: {fileID: 1781116594832268, guid: b644b7f95bb324e49bfdeafb8b28d189,
-    type: 3}
   maxStrength: 100
+  useRhythmicKeyframes: 1
+  turnSmoothing: 0.723
+  headingJitterDegrees: 18.9
   minCarveSeconds: 1.25
-  pruneCarvedPathOnLoopBoundary: 1
+  pruneCarvedPathOnLoopBoundary: 0
   pruneMinPathCount: 8
   driveCarvingMotionFromNoteSet: 1
   maxSteerForce: 50
@@ -68,7 +69,7 @@ MonoBehaviour:
   turnAngleLead: 40
   corridorHealDelaySeconds: 6
   corridorHealMinDelaySeconds: 2
-  corridorHealTightenLoops: 4
+  corridorHealTightenLoops: 3
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,7 +82,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speedCapMul: 3
+  dustPhysicsLayer: -1
+  speedCapMul: 100
   extraBrake: 0
   lateralNudgeMul: 1
   turbulenceMul: 1
@@ -91,6 +93,12 @@ MonoBehaviour:
   carveMaze: 1
   carveIntervalSeconds: 0.08
   carveAppetiteMul: 1
+  dustTerrainMask:
+    serializedVersion: 2
+    m_Bits: 128
+  dustIgnoreQueryRadiusWorld: 2
+  dustIgnoreMaxHits: 32
+  dustLayerIndex: 7
 --- !u!114 &1784781495894534207
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -235,7 +243,7 @@ PolygonCollider2D:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   m_LayerOverridePriority: 0
   m_ForceSendLayers:
     serializedVersion: 2

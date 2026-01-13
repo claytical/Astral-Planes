@@ -7,7 +7,8 @@ public class Collectable : MonoBehaviour
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
     public SpriteRenderer energySprite;
     public int burstId;
-
+    [Header("Spawn Intent")]
+    public bool isTrappedInDust = false;
     // ---- Dust collision tuning ----
     public float dustCollisionEnterImpulse = 0.85f;
     public float dustCollisionStayForce = 2.25f;
@@ -59,7 +60,7 @@ public class Collectable : MonoBehaviour
     static readonly Dictionary<Vector2Int, Collectable> _occupantByCell = new();
     static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
-
+    private int _dustClaimOwnerId;
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
     bool _hasReservation;
@@ -91,7 +92,7 @@ public class Collectable : MonoBehaviour
     private void StartDustPocket()
     {
         if (!keepDustPocketOpen) return;
-        if (_dustPocketRoutine != null) StopCoroutine(_dustPocketRoutine);
+        if (_dustPocketRoutine != null) return;
         _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
     }
 
@@ -131,38 +132,57 @@ public class Collectable : MonoBehaviour
 
     private IEnumerator DustPocketRoutine()
     {
-        // Uses DrumTrack as the level authority.
+        // Uses DrumTrack as level authority.
         while (true)
         {
             yield return new WaitForSeconds(Mathf.Max(0.02f, dustPocketTickSeconds));
 
             if (!keepDustPocketOpen) continue;
+            if (!isTrappedInDust) continue;                 // IMPORTANT: only trapped notes maintain a pocket
             if (assignedInstrumentTrack == null) continue;
+
             var dt = assignedInstrumentTrack.drumTrack;
             if (dt == null) continue;
 
-            // Get dust generator through DrumTrack if you expose it, otherwise GameFlowManager.
-            // Prefer DrumTrack authority if you have it.
             var gfm = GameFlowManager.Instance;
             var dustGen = (gfm != null) ? gfm.dustGenerator : null;
             if (dustGen == null) continue;
 
             Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
 
-            if (!IsInsideDustStable(cur, dt, dustGen))
-                continue;
-
-            // Hold seconds must be >= tick to be effective.
-            float hold = Mathf.Max(dustPocketTickSeconds, dustPocketHoldSeconds);
+            // We intentionally do NOT gate on "still inside dust".
+            // Carving makes it "not dust" — but we still need to keep the pocket held open.
+            float hold = Mathf.Max(dustPocketTickSeconds * 2f, dustPocketHoldSeconds);
 
             MusicalPhase phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
                 : MusicalPhase.Establish;
-
-            dustGen.CarveTemporaryDiskFromCollectable(cur, dustPocketRadiusWorld, phaseNow, hold);
+            dustGen.ClaimTemporaryDiskForCollectable(
+                cur,
+                dustPocketRadiusWorld,
+                phaseNow,
+                hold,
+                _dustClaimOwnerId,
+                priority: 50);
         }
     }
+    private void ReleaseDustPocket()
+    {
+        var gfm = GameFlowManager.Instance;
+        var dustGen = gfm != null ? gfm.dustGenerator : null;
+        var drumTrack = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+        if (dustGen == null || drumTrack == null) return;
 
+        var phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : drumTrack.GetCurrentPhaseSafe();
+
+        float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+        float radiusWorld = cellWorld * 0.10f;
+
+        // You implement this on the dust generator:
+       // dustGen.ReleaseTemporaryDiskHold(transform.position, radiusWorld, phaseNow);
+    }
     static bool IsCellReservedByOther(Vector2Int cell, Collectable self)
     {
         if (_reservedByCell.TryGetValue(cell, out var res) && res != null && res != self) return true;
@@ -313,7 +333,7 @@ public class Collectable : MonoBehaviour
         yield return new Vector2Int(g.x, g.y - 1);
     }
     
-private IEnumerator MovementRoutine()
+    private IEnumerator MovementRoutine()
 {
     if (!_rb && !TryGetComponent(out _rb)) yield break;
 
@@ -346,7 +366,12 @@ private IEnumerator MovementRoutine()
             insideDust = IsInsideDustStable(cur, dt, dustGen);
         else
             insideDust = IsPositionInsideDust(cur); // fallback
-
+        if (isTrappedInDust && insideDust)
+        {
+            // If trapped, do not drift; wait until the player/minenode carves a path.
+            continue;
+        }
+        
         Vector2 step = Vector2.zero; 
         // ------------------------------------------------------------
         // OPTION A: "grid-intent + weather"
@@ -437,9 +462,11 @@ private IEnumerator MovementRoutine()
 
         StartCoroutine(DarkTimeoutRoutine(track));
         if (_rb == null) TryGetComponent(out _rb);
+        _dustClaimOwnerId = GetInstanceID();
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
-        StartDustPocket();
+        if (!isTrappedInDust)
+            StartDustPocket(); 
 
         // --- Occupancy initialization (Mode A: never overlap another collectable) ---
         ClearReservation();
@@ -450,6 +477,9 @@ private IEnumerator MovementRoutine()
             // Prefer CellOf if present; otherwise your existing WorldToGridPosition is fine.
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
+            var dustClaims = FindObjectOfType<DustClaimManager>();
+            if (dustClaims != null)
+                dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
         }
         Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }
@@ -623,6 +653,7 @@ private IEnumerator MovementRoutine()
         _handled = false;
         _destroyNotified = false;
         if (isInitialized) StartDustPocketRoutineIfNeeded();
+        if(isTrappedInDust) StartDustPocket();
     }
 
     private void OnDestroy()
@@ -630,6 +661,9 @@ private IEnumerator MovementRoutine()
         ClearReservation();
         UnregisterOccupant();
         StopDustPocket();
+        var dustClaims = FindObjectOfType<DustClaimManager>();
+        if (dustClaims != null)
+            dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
         NotifyDestroyedOnce();
     }
 
@@ -639,6 +673,11 @@ private IEnumerator MovementRoutine()
         StopDustPocketRoutineIfRunning();
         UnregisterOccupant();
         StopDustPocket();
+        ReleaseDustPocket();
+        var dustClaims = FindObjectOfType<DustClaimManager>();
+        if (dustClaims != null)
+            dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
+
         NotifyDestroyedOnce();
     } // pooling-safe
     

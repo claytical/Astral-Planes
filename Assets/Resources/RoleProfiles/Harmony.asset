@@ -25,4 +25,4 @@ MonoBehaviour:
   denyAlphaBoost: 0.25
   description: "\tLush chords and layered textures that fill in the soundscape."
   defaultBehavior: 2
-  allowedMidiPresets: 040000000b0000000700000006000000
+  allowedMidiPresets: 04000000

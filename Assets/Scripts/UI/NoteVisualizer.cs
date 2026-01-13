@@ -150,6 +150,7 @@ public class NoteVisualizer : MonoBehaviour
         var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>(); 
         ml.LightUp(track.trackColor);
     }
+
     public void Initialize()
     {
         isInitialized = true;
@@ -164,6 +165,60 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMin = new Vector2(0f, row.offsetMin.y);
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
+    }
+
+    /// <summary>
+    /// Hard visual reset for motif boundaries. This should be invoked by the single
+    /// motif authority after track data has been cleared, and before the next motif
+    /// begins spawning notes.
+    /// </summary>
+    public void BeginNewMotif_ClearAll(bool destroyMarkerGameObjects = true)
+    {
+        // Stop any in-progress task state (we use Update-driven task lists; clearing is sufficient).
+        _ascendTasks.Clear();
+        _blastTasks.Clear();
+        _rushTasks.Clear();
+        _stepBurst.Clear();
+        _animatingSteps.Clear();
+        _ghostNoteSteps.Clear();
+        _trackStepWorldPositions.Clear();
+        _lastObservedCompletedLoops = -1;
+
+        // Destroy existing marker GameObjects so nothing "sticks" into the next motif.
+        if (destroyMarkerGameObjects && noteMarkers != null)
+        {
+            foreach (var kv in noteMarkers)
+            {
+                var tr = kv.Value;
+                if (tr != null)
+                    Destroy(tr.gameObject);
+            }
+        }
+
+        noteMarkers?.Clear();
+
+        // Bin strip visuals
+        if (binStripParent != null)
+        {
+            for (int i = binStripParent.childCount - 1; i >= 0; i--)
+                Destroy(binStripParent.GetChild(i).gameObject);
+        }
+        _binIndicators.Clear();
+        _activeBinCount = 0;
+        _currentTargetBin = -1;
+
+        // Force any temporarily overridden leader sizes back to default.
+        _forcedLeaderSteps = -1;
+        _forcedLeaderBins = -1;
+
+        // Particles: clear any lingering emission so nothing looks "stuck".
+        if (playheadParticles != null)
+            playheadParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        _pendingReleasePulse = false;
+        _playheadEnergy01 = 0f;
+        _playheadEnergyTarget01 = 0f;
+        _lineCharge01 = 0f;
         // Cache playhead visuals (optional if you want to scale/alpha it with energy)
         if (playheadLine != null)
         {
@@ -171,8 +226,106 @@ public class NoteVisualizer : MonoBehaviour
             _playheadBaseHeight = playheadLine.sizeDelta.y;
             if (_playheadBaseHeight <= 0f)
                 _playheadBaseHeight = 100f; // defensive default
+        }        
+    }
+   public void ForceSyncMarkersToPersistentLoop(InstrumentTrack track)
+{
+    if (track == null) return;
+    if (_ctrl == null || _ctrl.tracks == null) return;
+
+    int trackIndex = Array.IndexOf(_ctrl.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+
+    int totalSteps = Mathf.Max(1, track.GetTotalSteps());
+
+    // Build authoritative set of loop-owned steps (what should exist visually).
+    var loopNotes = track.GetPersistentLoopNotes();
+    var loopSteps = new HashSet<int>();
+    if (loopNotes != null)
+    {
+        foreach (var (step, _, _, _) in loopNotes)
+        {
+            if (step >= 0 && step < totalSteps)
+                loopSteps.Add(step);
         }
     }
+
+    // 1) Remove stale dictionary markers (steps no longer in the persistent loop OR out of range).
+    //    Do NOT destroy ascending markers mid-flight.
+    if (noteMarkers != null)
+    {
+        var keys = noteMarkers.Keys.ToList();
+        foreach (var key in keys)
+        {
+            if (key.Item1 != track) continue;
+
+            int step = key.Item2;
+
+            bool outOfRange = (step < 0 || step >= totalSteps);
+            bool notInLoop  = !loopSteps.Contains(step);
+
+            if (!outOfRange && !notInLoop) continue;
+
+            if (noteMarkers.TryGetValue(key, out var tr) && tr != null)
+            {
+                var tag = tr.GetComponent<MarkerTag>();
+                if (tag != null && tag.isAscending)
+                    continue; // keep in-flight ascension markers intact
+
+                // Safe to destroy (orphan / out-of-window)
+#if UNITY_EDITOR
+                if (!Application.isPlaying) DestroyImmediate(tr.gameObject);
+                else Destroy(tr.gameObject);
+#else
+                Destroy(tr.gameObject);
+#endif
+            }
+
+            noteMarkers.Remove(key);
+        }
+    }
+
+    // 2) Remove stale row children that are loop-owned but not present in the dictionary anymore.
+    //    This catches any UI stragglers not tracked in noteMarkers.
+    var row = trackRows[trackIndex];
+    for (int i = row.childCount - 1; i >= 0; i--)
+    {
+        var child = row.GetChild(i);
+        if (!child) continue;
+
+        var tag = child.GetComponent<MarkerTag>();
+        if (tag == null) continue;
+        if (tag.track != track) continue;
+        if (tag.isAscending) continue;
+
+        int step = tag.step;
+
+        bool outOfRange = (step < 0 || step >= totalSteps);
+        bool notInLoop  = !loopSteps.Contains(step);
+
+        // IMPORTANT: only hard-remove "loop-owned" markers here.
+        // Burst-owned markers (burstId >= 0) are governed by burst cleanup logic.
+        bool loopOwned = tag.burstId < 0;
+
+        if ((outOfRange || notInLoop) && loopOwned)
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) DestroyImmediate(child.gameObject);
+            else Destroy(child.gameObject);
+#else
+            Destroy(child.gameObject);
+#endif
+        }
+    }
+
+    // 3) Ensure every loop step has a marker (re-add missing ones).
+    foreach (int step in loopSteps)
+        PlacePersistentNoteMarker(track, step, lit: true, burstId: -1);
+
+    // 4) Relayout after removals/additions.
+    RecomputeTrackLayout(track);
+}
+ 
     /// <summary>
     /// Set how "charged" the playhead is [0..1] based on how many notes in the
     /// current burst have been collected. This will be smoothed visually.

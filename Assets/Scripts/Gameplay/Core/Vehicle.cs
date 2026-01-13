@@ -172,13 +172,69 @@ public class Vehicle : MonoBehaviour
     void OnDisable()
     {
         var gfm = GameFlowManager.Instance;
-        if (gfm != null && gfm.dustGenerator != null)
-        {
-            var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
-            gfm.dustGenerator.ClearVehicleKeepClear(GetInstanceID(), phaseNow);
-        }
+        if (gfm == null || gfm.dustGenerator == null) return;
+
+        var phaseNow = (gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : MusicalPhase.Establish;
+
+        gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
     }
 
+    private void RefreshVehicleKeepClearIfNeeded()
+    {
+        if (!keepDustClearAroundVehicle) return;
+
+        // Throttle refresh
+        if (Time.time < _nextVehicleKeepClearRefreshAt) return;
+        _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleKeepClearRefreshSeconds);
+
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) return;
+
+        var gen = gfm.dustGenerator;
+        var drum = gfm.activeDrumTrack;
+        if (gen == null || drum == null) return;
+
+        var phaseNow = (gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : MusicalPhase.Establish;
+
+        int ownerId = GetInstanceID();
+
+        // If not boosting, ensure we RELEASE any previous footprint continuously.
+        // (This prevents stale keep-clear claims that permanently veto regrowth.)
+        if (!boosting)
+        {
+            gen.ReleaseVehicleKeepClear(ownerId, phaseNow);
+            return;
+        }
+
+        // While boosting, maintain the pocket and optionally remove dust.
+        Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
+
+        gen.SetVehicleKeepClear(
+            ownerId,
+            centerCell,
+            Mathf.Max(0, vehicleKeepClearRadiusCells),
+            phaseNow,
+            forceRemoveExisting: true,
+            forceRemoveFadeSeconds: 0.20f
+        );
+    }
+
+    private void OnDestroy()
+    {
+        var gfm = GameFlowManager.Instance;
+        var gen = (gfm != null) ? gfm.dustGenerator : null;
+        if (gen == null) return;
+
+        var phaseNow = (gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : MusicalPhase.Establish;
+
+        gen.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+    }
     public void SetColor(Color newColor)
     {
         if (baseSprite != null)
@@ -334,7 +390,6 @@ public class Vehicle : MonoBehaviour
         
         if (energyLevel > 0 && !boosting)        {
             boosting = true;
-            Debug.Log($"[VEHICLE] Energy available to boost");
 
             if (audioManager != null && thrustClip != null)
                 audioManager.PlayLoopingSound(thrustClip, .5f);
@@ -428,180 +483,197 @@ public class Vehicle : MonoBehaviour
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
             }
         }
-    void FixedUpdate()
-{
-    if (_inDust && (Time.time - _lastDustContactTime) > dustExitGraceSeconds) { 
-        ExitDustField();
-    }
-    if (incapacitated) return;
-// --- PhaseStar Safety Bubble: dust has no effect inside the bubble ---
-    if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
-    {
-        if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
-    }
-
-    float dt = Time.fixedDeltaTime;
-
-    // --- Boost timer (use fixed dt in FixedUpdate) ---
-    if (boosting) boostTimeThisLoop += dt;
-
-    // --- Loop boundary check (null-safe) ---
-    if (drumTrack != null)
-    {
-        float  loopLen = drumTrack.GetLoopLengthInSeconds();
-        double dspNow  = AudioSettings.dspTime;
-        if (dspNow - loopStartDSPTime >= loopLen)
-        {
-            loopStartDSPTime = dspNow;
-        }
-    }
-
-    // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
-    if (Time.time - _lastMoveStamp > inputTimeout) _moveInput = Vector2.zero;
-
-    bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
-    bool canThrust = !requireBoostForThrust || boosting;
-
-    // ---- movement ----
-    if(canThrust && (hasInput || boosting)) {
-        // Target velocity from input (single env scalar)
-        //Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
-        Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
-        // Target velocity from steer direction (sing env scalar)
-        Vector2 desiredVel = steerDir * (arcadeMaxSpeed * envScale);
-        // Acceleration pick (handles boost-only ships with accel=0)
-        float accelUsed;
-        if (requireBoostForThrust)
-            accelUsed = boosting ? (arcadeBoostAccel * envScale) : 0f;
-        else
-            accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel) * envScale;
-
-        if (accelUsed > 0f)
-        {
-            Vector2 dv      = desiredVel - rb.linearVelocity;
-            float   maxStep = accelUsed * dt;
-            Vector2 step    = (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
-            rb.linearVelocity += step;
-        }
-        
-    }
-    else
-    {
-        // MASS-DEPENDENT COAST/BRAKE when no input OR cannot thrust
-        Vector2 v = rb.linearVelocity;
-
-        // Viscous brake: F = -k * v  → a = -(k/m) v (heavier ships coast longer)
-        if (v.sqrMagnitude > 0f && coastBrakeForce > 0f)
-            rb.AddForce(-v * coastBrakeForce, ForceMode2D.Force);
-
-        // Snap to full rest near zero to kill jitter tails
-        if (v.magnitude < stopSpeed && Mathf.Abs(rb.angularVelocity) < stopAngularSpeed)
-        {
-            rb.linearVelocity        = Vector2.zero;
-            rb.angularVelocity = 0f;
-        }
-    }
-
-    // Fuel burn only while boosting (keeps your baseBurnAmount/burnRateMultiplier economy)
-    if (boosting && energyLevel > 0f)
-    {
-        float burn = _burnRateMultiplier * _baseBurnAmount * dt * difficultyMultiplier;
-        ConsumeEnergy(burn);
-    }
-
-    // Face travel direction
-    if (rb.linearVelocity.sqrMagnitude > 0.0001f)
-    {
-        float angleDeg = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
-        rb.rotation = angleDeg;
-    }
-
-// --- Dust weather force-field (terrain maze) ---
-if (gfm != null && gfm.dustGenerator != null)
-{
-    var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
-    _dustDebugCooldown -= Time.fixedDeltaTime;
-    bool debugPulse = _dustDebugCooldown <= 0f;
-    Vector3 vehicleWorld = rb.position;
-    if (debugPulse) _dustDebugCooldown = DustDebugInterval;
     
-    if (gfm.dustGenerator.TryGetDustWeatherForce(vehicleWorld, phaseNow,
-            out Vector2 dustForce, out float influence01, out float drainPerSecond))
-    {
-        if (PhaseStar.IsWorldPosInsideAnySafetyBubble(vehicleWorld, phaseNow))
+    private void RefreshVehicleKeepClearPocket()
+    { 
+        if (!keepDustClearAroundVehicle) return;
+        if (drumTrack == null) return;
+
+        var phaseNow = (gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : MusicalPhase.Establish;
+
+        int ownerId = GetInstanceID();
+
+        if (!boosting)
         {
-            if(_inDust) ExitDustField();
+            gfm.dustGenerator.ReleaseVehicleKeepClear(ownerId, phaseNow);
+            return;
         }
 
-        if (debugPulse)
-        {
-            Debug.Log($"[DustWeather] pulse, phase={phaseNow} pos={transform.position}", this);
-        }
-        rb.AddForce(dustForce, ForceMode2D.Force);
+        if (Time.time < _nextVehicleKeepClearRefreshAt) return;
+        _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleKeepClearRefreshSeconds);
 
-        // Treat "near dust" like being in dust, but with a grace exit so it doesn’t flicker.
-        _inDust = true;
-        if (keepDustClearAroundVehicle && Time.time >= _nextVehicleKeepClearRefreshAt)
-        {
-            _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleKeepClearRefreshSeconds);
-            var drumsRef = gfm.activeDrumTrack;
-            if (drumsRef != null)
-            {
-                Vector2Int cell = drumsRef.WorldToGridPosition(vehicleWorld);
-                gfm.dustGenerator.SetVehicleKeepClear(GetInstanceID(), cell, vehicleKeepClearRadiusCells, phaseNow, forceRemoveExisting:boosting, forceRemoveFadeSeconds:.2f);
-            }
-        }
-        
-        _lastDustContactTime = Time.time;
-
-        // Energy drain while lingering in dust (non-boost contact), scaled by how "deep" we are.
-        if (!boosting && drainPerSecond > 0f)
-            DrainEnergy(drainPerSecond * influence01 * dt, "DustWeather");
-
-        if (!boosting && dustImpactDrainPerSecondMax > 0f && rb.linearVelocity.sqrMagnitude > 0.0001f)
-        {
-            float fMag = dustForce.magnitude;
-            float vMag = rb.linearVelocity.magnitude;
-
-            float opposition01 = 1f;
-            if (fMag > 0.0001f && vMag > 0.0001f)
-            {
-                Vector2 fDir = dustForce / fMag;
-                Vector2 vDir = rb.linearVelocity / vMag;
-                float oppose = Mathf.Clamp01(-Vector2.Dot(fDir, vDir)); // 1 when opposing
-                opposition01 = Mathf.Lerp(1f, oppose, dustImpactOppositionWeight);
-            }
-
-            float impact01 = Mathf.Clamp01(fMag * vMag * dustImpactForceVelScale) * opposition01;
-            float impactDrain = dustImpactDrainPerSecondMax * impact01 * influence01 * dt;
-            if (impactDrain > 0f)
-                if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
-                {
-                    if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
-                }
-                else
-                {
-                    DrainEnergy(impactDrain, "DustImpact");
-                }
-
-        }
-        
-        // SFX feedback (throttled)
-        var ctrl = gfm.controller;
-        if (ctrl != null)
-        {
-            _dustSfxCooldown -= Time.fixedDeltaTime;
-            if (_dustSfxCooldown <= 0f)
-            {
-                bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
-                var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
-                InstrumentTrack instrument = ctrl.FindTrackByRole(MusicalRole.Harmony);
-                CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
-                _dustSfxCooldown = DustSfxInterval;
-            }
-        }
-
+        Vector2 vehicleWorld = rb != null ? rb.position : (Vector2)transform.position;
+        Vector2Int cell = drumTrack.WorldToGridPosition(vehicleWorld);
+        gfm.dustGenerator.SetVehicleKeepClear(
+            ownerId,
+            cell,
+            vehicleKeepClearRadiusCells,
+            phaseNow,
+            forceRemoveExisting: true,
+            forceRemoveFadeSeconds: 0.20f
+        );
     }
+    void FixedUpdate() {
+        if (_inDust && (Time.time - _lastDustContactTime) > dustExitGraceSeconds) { 
+            ExitDustField();
+        }
+        if (incapacitated) return;
+    // --- PhaseStar Safety Bubble: dust has no effect inside the bubble ---
+        if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+        {
+            if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
+        }
+
+        float dt = Time.fixedDeltaTime;
+        RefreshVehicleKeepClearIfNeeded();
+        // --- Boost timer (use fixed dt in FixedUpdate) ---
+        if (boosting) boostTimeThisLoop += dt;
+
+        // --- Loop boundary check (null-safe) ---
+        if (drumTrack != null)
+        {
+            float  loopLen = drumTrack.GetLoopLengthInSeconds();
+            double dspNow  = AudioSettings.dspTime;
+            if (dspNow - loopStartDSPTime >= loopLen)
+            {
+                loopStartDSPTime = dspNow;
+            }
+        }
+
+        // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
+        if (Time.time - _lastMoveStamp > inputTimeout) _moveInput = Vector2.zero;
+
+        bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
+        bool canThrust = !requireBoostForThrust || boosting;
+
+        // ---- movement ----
+        if(canThrust && (hasInput || boosting)) {
+            // Target velocity from input (single env scalar)
+            //Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
+            Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
+            // Target velocity from steer direction (sing env scalar)
+            Vector2 desiredVel = steerDir * (arcadeMaxSpeed * envScale);
+            // Acceleration pick (handles boost-only ships with accel=0)
+            float accelUsed;
+            if (requireBoostForThrust)
+                accelUsed = boosting ? (arcadeBoostAccel * envScale) : 0f;
+            else
+                accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel) * envScale;
+
+            if (accelUsed > 0f)
+            {
+                Vector2 dv      = desiredVel - rb.linearVelocity;
+                float   maxStep = accelUsed * dt;
+                Vector2 step    = (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
+                rb.linearVelocity += step;
+            }
+            
+        }
+        else
+        {
+            // MASS-DEPENDENT COAST/BRAKE when no input OR cannot thrust
+            Vector2 v = rb.linearVelocity;
+
+            // Viscous brake: F = -k * v  → a = -(k/m) v (heavier ships coast longer)
+            if (v.sqrMagnitude > 0f && coastBrakeForce > 0f)
+                rb.AddForce(-v * coastBrakeForce, ForceMode2D.Force);
+
+            // Snap to full rest near zero to kill jitter tails
+            if (v.magnitude < stopSpeed && Mathf.Abs(rb.angularVelocity) < stopAngularSpeed)
+            {
+                rb.linearVelocity        = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+        }
+
+        // Fuel burn only while boosting (keeps your baseBurnAmount/burnRateMultiplier economy)
+        if (boosting && energyLevel > 0f)
+        {
+            float burn = _burnRateMultiplier * _baseBurnAmount * dt * difficultyMultiplier;
+            ConsumeEnergy(burn);
+        }
+
+        // Face travel direction
+        if (rb.linearVelocity.sqrMagnitude > 0.0001f)
+        {
+            float angleDeg = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
+            rb.rotation = angleDeg;
+        }
+
+    // --- Dust weather force-field (terrain maze) ---
+    if (gfm != null && gfm.dustGenerator != null)
+    {
+        var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+        _dustDebugCooldown -= Time.fixedDeltaTime;
+        bool debugPulse = _dustDebugCooldown <= 0f;
+        Vector3 vehicleWorld = rb.position;
+        if (debugPulse) _dustDebugCooldown = DustDebugInterval;
+        
+        if (gfm.dustGenerator.TryGetDustWeatherForce(vehicleWorld, phaseNow, out Vector2 dustForce, out float influence01, out float drainPerSecond)) {
+            if (PhaseStar.IsWorldPosInsideAnySafetyBubble(vehicleWorld, phaseNow)) {
+                if(_inDust) ExitDustField();
+            }
+            RefreshVehicleKeepClearPocket();
+            if (debugPulse)
+            {
+                Debug.Log($"[DustWeather] pulse, phase={phaseNow} pos={transform.position}", this);
+            }
+            rb.AddForce(dustForce, ForceMode2D.Force);
+
+            // Treat "near dust" like being in dust, but with a grace exit so it doesn’t flicker.
+            _inDust = true;
+            _lastDustContactTime = Time.time;
+
+            // Energy drain while lingering in dust (non-boost contact), scaled by how "deep" we are.
+            if (!boosting && drainPerSecond > 0f)
+                DrainEnergy(drainPerSecond * influence01 * dt, "DustWeather");
+
+            if (!boosting && dustImpactDrainPerSecondMax > 0f && rb.linearVelocity.sqrMagnitude > 0.0001f)
+            {
+                float fMag = dustForce.magnitude;
+                float vMag = rb.linearVelocity.magnitude;
+
+                float opposition01 = 1f;
+                if (fMag > 0.0001f && vMag > 0.0001f)
+                {
+                    Vector2 fDir = dustForce / fMag;
+                    Vector2 vDir = rb.linearVelocity / vMag;
+                    float oppose = Mathf.Clamp01(-Vector2.Dot(fDir, vDir)); // 1 when opposing
+                    opposition01 = Mathf.Lerp(1f, oppose, dustImpactOppositionWeight);
+                }
+
+                float impact01 = Mathf.Clamp01(fMag * vMag * dustImpactForceVelScale) * opposition01;
+                float impactDrain = dustImpactDrainPerSecondMax * impact01 * influence01 * dt;
+                if (impactDrain > 0f)
+                    if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+                    {
+                        if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
+                    }
+                    else
+                    {
+                        DrainEnergy(impactDrain, "DustImpact");
+                    }
+
+            }
+            
+            // SFX feedback (throttled)
+            var ctrl = gfm.controller;
+            if (ctrl != null)
+            {
+                _dustSfxCooldown -= Time.fixedDeltaTime;
+                if (_dustSfxCooldown <= 0f)
+                {
+                    bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
+                    var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
+                    InstrumentTrack instrument = ctrl.FindTrackByRole(MusicalRole.Harmony);
+                    CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
+                    _dustSfxCooldown = DustSfxInterval;
+                }
+            }
+
+        }
 }
 // Stats + audio
 
@@ -672,8 +744,7 @@ if (gfm != null && gfm.dustGenerator != null)
 
         // Contact point
         Vector2 contact = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
-
-        DoBoostCarve(contact);
+        DoBoostCarve(coll);
 
 
 // Forward carving budget based on speed (your existing rule)
@@ -732,7 +803,7 @@ if (gfm != null && gfm.dustGenerator != null)
         if (Time.time < _nextCarveTime) return;
         _nextCarveTime = Time.time + (1f / Mathf.Max(1f, carveTickHz));
 
-        DoBoostCarve(_lastDustContact);
+        DoBoostCarve(coll);
     }
     void OnCollisionExit2D(Collision2D coll)
     {
@@ -741,24 +812,23 @@ if (gfm != null && gfm.dustGenerator != null)
             _lastDustCollider = null;
         }
     }
-    private void DoBoostCarve(Vector2 contact)
+    private void DoBoostCarve(Collision2D collision)
     {
-        var gen = gfm.dustGenerator;
-        if (gen == null) return;
+        if (collision.contactCount == 0) return;
 
-        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+        Vector2 contactPoint = collision.GetContact(0).point;
 
-        // Appetite is “how engaged” the carve is.
-        // If you want accel/force to matter, map it here later.
-        float appetite = Mathf.InverseLerp(1.5f, 8.0f, speed); // 0..1
-        appetite = Mathf.Clamp01(appetite);
+        var drumTrack = GameFlowManager.Instance?.activeDrumTrack;
+        if (drumTrack == null) return;
 
-        // Ship identity knobs (you’ll add these to ShipMusicalProfile)
-        float radiusMul = shipProfile != null ? shipProfile.carveRadiusMul : 1f;
-        float powerMul  = shipProfile != null ? shipProfile.carvePowerMul  : 1f;
-
-        gen.ErodeDustDiskFromVehicle(contact, appetite, radiusMul, powerMul);
+        // Vehicle carve: 1 cell wide, temporary, normal regrow
+        drumTrack.CarveTemporaryCellFromVehicle(
+            contactPoint,
+            healDelaySeconds: 4,5   // tune as desired
+        );
     }
+
+
     private void CarveForward_RayMarch(Vector2 contact, Vector2 vel, int budget, float cellWorld)
     {
         if (vel.sqrMagnitude < 0.0001f) return;

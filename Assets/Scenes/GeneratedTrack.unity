@@ -5673,6 +5673,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -5735,7 +5736,7 @@ ParticleSystem:
   m_GameObject: {fileID: 296242524}
   serializedVersion: 8
   lengthInSec: 1
-  simulationSpeed: 0.5
+  simulationSpeed: 0.1
   stopAction: 0
   cullingMode: 0
   ringBufferMode: 0
@@ -5809,7 +5810,7 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.5
+      scalar: 0.42
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -5862,7 +5863,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.2
+      scalar: 0
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -5980,7 +5981,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.2
+      scalar: 0.5
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -6563,7 +6564,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5000
+      scalar: 1000
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -9627,9 +9628,9 @@ ParticleSystem:
         m_RotationOrder: 4
     maxLights: 20
   TrailModule:
-    enabled: 0
-    mode: 0
-    ratio: 1
+    enabled: 1
+    mode: 1
+    ratio: 0.39
     lifetime:
       serializedVersion: 2
       minMaxState: 0
@@ -9686,7 +9687,7 @@ ParticleSystem:
     minVertexDistance: 0.2
     textureMode: 0
     textureScale: {x: 1, y: 1}
-    ribbonCount: 1
+    ribbonCount: 19
     shadowBias: 0.5
     worldSpace: 0
     dieWithParticles: 1
@@ -9700,7 +9701,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 1}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.05882353}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -9818,7 +9819,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 1}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.87058824}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -11352,7 +11353,8 @@ GameObject:
   - component: {fileID: 869126481}
   - component: {fileID: 869126480}
   - component: {fileID: 869126479}
-  m_Layer: 7
+  - component: {fileID: 869126482}
+  m_Layer: 0
   m_Name: DustPool
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -11467,7 +11469,7 @@ MonoBehaviour:
   iterations: 3
   cycleMode: 1
   cellClearanceWorld: 0
-  edgeRadiusFrac: 0.08
+  edgeRadiusFrac: 0.132
   abrasionWearPerSecondAtFullImpact: 0.65
   abrasionDissipateFadeSeconds: 0.2
   abrasionHardnessAtFullWear: 0.9
@@ -11517,6 +11519,13 @@ MonoBehaviour:
     m_Bits: 128
   dustQueryRadiusWorld: 1.25
   dustQueryMaxColliders: 16
+  vehicleMask:
+    serializedVersion: 2
+    m_Bits: 0
+  regrowVetoRetryDelaySeconds: 0.08
+  regrowVetoBoxMul: 0.85
+  regrowVetoMaxHits: 8
+  dustClaims: {fileID: 869126482}
   dustWeatherDebug: 0
   dustWeatherDebugInterval: 0.5
   dustInfluenceRadiusTiles: 1
@@ -11527,6 +11536,18 @@ MonoBehaviour:
   dustNoiseScale: 0.65
   dustNoiseSpeed: 0.6
   dustFootprintMul: 1
+--- !u!114 &869126482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 869126477}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19fab392c5f848ebb45312ca1a089d51, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DustClaimManager
 --- !u!114 &911153256
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12254,7 +12275,6 @@ GameObject:
   - component: {fileID: 1354683684}
   - component: {fileID: 1354683687}
   - component: {fileID: 1354683690}
-  - component: {fileID: 1354683697}
   - component: {fileID: 1354683692}
   - component: {fileID: 1354683685}
   - component: {fileID: 1354683693}
@@ -12280,14 +12300,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   phaseStarPrefab: {fileID: 2312498068821558259, guid: b780336bac3ca4cd69850ea7a221d987,
     type: 3}
-  nodePrefabRegistry: {fileID: 11400000, guid: b8de2c7e0d9664a3dab4146280b4baf6, type: 2}
   mineNodePrefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8,
     type: 3}
-  minedObjectPrefabRegistry: {fileID: 11400000, guid: 7f6b78f5752a94cf7b2d4b687c5a6bed,
-    type: 2}
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
     type: 2}
-  uiReserveBottomViewport: 0.14
+  clampPlayAreaToDustBand: 0
+  uiReserveBottomViewport: 0
   uiReserveTopViewport: 0
   uiReserveBottomInsetWorld: 0
   uiReserveTopInsetWorld: 0
@@ -12297,13 +12315,16 @@ MonoBehaviour:
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
-  activeMinedObjects: []
   activeMineNodes: []
   isPhaseStarActive: 0
   currentStep: 0
   dustBandMinY: 0.1
   dustBandMaxY: 1
   dustBandTopInsetWorld: 0
+  referenceWidthPx: 1920
+  referenceColumns: 36
+  uiBottomPaddingPx: 160
+  autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
   beatMoodLibrary: {fileID: 11400000, guid: 9d93d03e5cfdb4717bb2c8809701b3c3, type: 2}
   lowIntensityThreshold: 0.25
@@ -12313,6 +12334,7 @@ MonoBehaviour:
   mediumIntensityMood: 1
   highIntensityMood: 2
   extremeIntensityMood: 3
+  lockPlayAreaAfterInit: 1
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -12462,8 +12484,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17f0094acf2944184b8a01cb25a3e90a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridWidth: 36
-  gridHeight: 18
+  gridWidth: 20
+  gridHeight: 10
   cellSize: 1
 --- !u!114 &1354683690
 MonoBehaviour:
@@ -12541,21 +12563,6 @@ MonoBehaviour:
     type: 3}
   motifQueue: {fileID: 11400000, guid: 266e8ac30daaa4002b473d9de45ffea5, type: 2}
   motifLibrary: {fileID: 11400000, guid: 442706371a61147f0b0ad47d1691b5a1, type: 2}
---- !u!114 &1354683697
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1354683681}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 849b3d7489faf4e5fb22a89099fe127c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  drums: {fileID: 1354683682}
-  tracks: {fileID: 1354683684}
-  commitHandledByHarmonyDirector: 1
 --- !u!114 &1354683698
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12574,7 +12581,6 @@ MonoBehaviour:
   dustGenerator: {fileID: 869126481}
   spawnGrid: {fileID: 1354683687}
   glitchManager: {fileID: 1354683690}
-  arp: {fileID: 1354683697}
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0

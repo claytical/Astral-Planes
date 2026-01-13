@@ -50,7 +50,7 @@ public class MineNode : MonoBehaviour
 
     [SerializeField] private float minCarveSeconds = 1.25f;
     private DrumTrack _drumTrack;
-
+    public DrumTrack DrumTrack => _drumTrack;
     // --- Grid-based path recording (only during carving) ---
     // Each entry is a grid cell the node occupied while carving.
     private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
@@ -96,7 +96,7 @@ public class MineNode : MonoBehaviour
         _originalScale = transform.localScale;
         _strength = maxStrength;
     }
-private void FixedUpdate()
+    private void FixedUpdate()
 {
     if (!driveCarvingMotionFromNoteSet ||
         _rb == null ||
@@ -241,7 +241,7 @@ private void FixedUpdate()
     }
 }
 
-private void EnsureTurnStepsCached()
+    private void EnsureTurnStepsCached()
 {
     if (_noteSet == null) return;
     if (_turnStepSet != null && ReferenceEquals(_cachedTurnSetSource, _noteSet)) return;
@@ -251,7 +251,7 @@ private void EnsureTurnStepsCached()
     _cachedTurnSetSource = _noteSet;
 }
 
-private void CacheAuthoredStepsFromNoteSet()
+    private void CacheAuthoredStepsFromNoteSet()
 {
     _authoredStepSet = null;
     _stepsPerLoop = 16;
@@ -273,7 +273,7 @@ private void CacheAuthoredStepsFromNoteSet()
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
 
-private void SeedInitialHeadingFromVelocity()
+    private void SeedInitialHeadingFromVelocity()
 {
     if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f)
     {
@@ -289,7 +289,7 @@ private void SeedInitialHeadingFromVelocity()
 
 
 
-public Color GetImprintShadowColor()
+    public Color GetImprintShadowColor()
 {
     if (_track != null)
         return _track.TrackShadowColor;
@@ -316,12 +316,7 @@ public Color GetImprintShadowColor()
         // high note -> soft / fast-healing
         return Mathf.Clamp01(1f - _lastNote01);
     }
-    private int GetPreviewNoteForCurrentStep()
-    {
-        int step = (_drumTrack != null) ? _drumTrack.currentStep : 0;
-        return _noteSet.GetNoteForPhaseAndRole(_track, step);
-    }
-
+ 
     public void Initialize(InstrumentTrack track, Color tint, Vector2Int spawnCell)
     {
         _track = track;
@@ -370,11 +365,6 @@ public Color GetImprintShadowColor()
             coreSprite.color = tint;
             
         }
-        // Register MineNode only
-        if (_drumTrack != null)
-        {
-            _drumTrack.RegisterMineNode(this);
-        }
         // call both from Initialize after rb/drumTrack are ready:
         CacheAuthoredStepsFromNoteSet();
         SeedInitialHeadingFromVelocity();
@@ -409,108 +399,7 @@ public Color GetImprintShadowColor()
         float fast = 0.4f;  // high note
         return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
     }
-private void UpdateRhythmicKeyframes()
-{
-    if (!useRhythmicKeyframes) return;
-    if (_drumTrack == null || _noteSet == null) return;
-    if (_drumTrack.startDspTime <= 0.0) return;
-
-    // If authored set not cached (or NoteSet changed), cache lazily.
-    if (_authoredStepSet == null) CacheAuthoredStepsFromNoteSet();
-    if (_stepsPerLoop <= 0) return;
-
-    float loopLen = _drumTrack.GetLoopLengthInSeconds();
-    if (loopLen <= 0.01f) return;
-
-    double dspNow = AudioSettings.dspTime;
-    double t = (dspNow - _drumTrack.startDspTime) % loopLen;
-    if (t < 0) t += loopLen;
-
-    int stepIndex = Mathf.FloorToInt((float)(t / loopLen * _stepsPerLoop));
-    stepIndex = Mathf.Clamp(stepIndex, 0, _stepsPerLoop - 1);
-
-    if (stepIndex != _lastStepIndex)
-    {
-        _lastStepIndex = stepIndex;
-        OnStepTick(stepIndex);
-    }
-}
-
-private void OnStepTick(int stepIndex)
-{
-    // Only change direction on AUTHORED steps:
-    if (_authoredStepSet == null || !_authoredStepSet.Contains(stepIndex))
-        return;
-
-    ChooseHeadingOnAuthoredStep(stepIndex);
-}
-
-private void ChooseHeadingOnAuthoredStep(int stepIndex)
-{
-    Vector2 fwd = (_desiredHeading.sqrMagnitude > 0.001f) ? _desiredHeading.normalized : Vector2.right;
-    Vector2 left  = new Vector2(-fwd.y, fwd.x);
-    Vector2 right = new Vector2(fwd.y, -fwd.x);
-
-    // Candidate headings. Keep it small and stable.
-    Vector2[] candidates = new[]
-    {
-        fwd,
-        (fwd + left).normalized,
-        (fwd + right).normalized,
-        left,
-        right
-    };
-
-    Vector2 best = fwd;
-    float bestScore = float.NegativeInfinity;
-
-    for (int i = 0; i < candidates.Length; i++)
-    {
-        float s = ScoreHeading(candidates[i]);
-        if (s > bestScore)
-        {
-            bestScore = s;
-            best = candidates[i];
-        }
-    }
-
-    _desiredHeading = Jitter(best, headingJitterDegrees);
-}
-
-private float ScoreHeading(Vector2 dir)
-{
-    // Minimal scoring that avoids “boundary sticking”:
-    // Prefer headings that encounter dust soon (carving opportunity) and avoid immediate blockers.
-    // Replace these checks with your dust-grid query if you prefer.
-
-    Vector2 origin = _rb != null ? _rb.position : (Vector2)transform.position;
-    float probe = 0.75f;
-
-    // If you have a dust collider layer, raycast for it here.
-    // For now: default neutral score and rely on stuck breaker + carve interaction.
-    float score = 0f;
-
-    // Slight penalty for repeating the same heading too often can help prevent ping-pong:
-    score -= Vector2.Dot(dir.normalized, _smoothedHeading.normalized) > 0.95f ? 0.1f : 0f;
-
-    return score;
-}
-
-private static Vector2 Jitter(Vector2 v, float degrees)
-{
-    if (degrees <= 0.01f) return v;
-    float ang = UnityEngine.Random.Range(-degrees, degrees) * Mathf.Deg2Rad;
-    float cs = Mathf.Cos(ang);
-    float sn = Mathf.Sin(ang);
-    return new Vector2(v.x * cs - v.y * sn, v.x * sn + v.y * cs).normalized;
-}
-private void ApplyHeadingVelocity(float speed)
-{
-    _smoothedHeading = Vector2.Lerp(_smoothedHeading, _desiredHeading, 1f - Mathf.Pow(1f - turnSmoothing, Time.fixedDeltaTime * 60f));
-    if (_smoothedHeading.sqrMagnitude > 0.0001f) _smoothedHeading.Normalize();
-    _rb.linearVelocity = _smoothedHeading * speed;
-}
-
+    
     private float GetRoleTurnAngleDeg(MusicalRole role)
     {
         switch (role)
@@ -573,8 +462,7 @@ private void ApplyHeadingVelocity(float speed)
                 break;
         }
     }
-
-
+    
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (_depletedHandled) return;
@@ -603,7 +491,7 @@ private void ApplyHeadingVelocity(float speed)
         var origin = transform.position;
         var repelFrom = vehicle != null ? vehicle.transform.position : origin;
 
-        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f);
+        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.TrappedInDustNearOrigin, 10);
 
         TriggerExplosion();
     }
@@ -615,29 +503,6 @@ private void ApplyHeadingVelocity(float speed)
         int stepNow = _drumTrack.currentStep;
         int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         _track.PlayNote(note, 180, 0.9f);
-    }
-    private void PlayExplosionChord(InstrumentTrackController ctrl, NoteSet ns, int stepNow, int durationTicks, float velocity)
-    {
-        if (ctrl == null || ns == null || ctrl.tracks == null) return;
-
-        // Keep it readable: Bass + Harmony + Lead is usually enough.
-        // Groove can be omitted or used as an octave/doubling if desired.
-        for (int i = 0; i < ctrl.tracks.Length; i++)
-        {
-            var t = ctrl.tracks[i];
-            if (t == null) continue;
-
-            // Optional: restrict which roles participate in the "chord"
-            if (t.assignedRole != MusicalRole.Bass &&
-                t.assignedRole != MusicalRole.Harmony &&
-                t.assignedRole != MusicalRole.Lead)
-            {
-                continue;
-            }
-
-            int note = ns.GetNoteForPhaseAndRole(t, stepNow);
-            t.PlayNote(note, durationTicks, velocity);
-        }
     }
     private IEnumerator CleanupAndDestroy()
     {
@@ -652,8 +517,7 @@ private void ApplyHeadingVelocity(float speed)
         }
         Destroy(gameObject);
     }
-
-
+    
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");

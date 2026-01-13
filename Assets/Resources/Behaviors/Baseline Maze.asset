@@ -13,20 +13,20 @@ MonoBehaviour:
   m_Name: Baseline Maze
   m_EditorClassIdentifier: 
   personality: 0
-  mazeColor: {r: 0.4509804, g: 0.4509804, b: 0.4509804, a: 0.59607846}
+  mazeColor: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 0.59607846}
   nodesPerStar: 8
   inactiveShardTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   starKeepsDustClear: 1
-  starKeepClearRadiusCells: 5
+  starKeepClearRadiusCells: 1
   enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 4
+  safetyBubbleRadiusCells: 2
   rotateSelectionOnLoopBoundary: 1
   rotateEveryNLoops: 1
-  collectableClearTimeoutLoops: 2
+  collectableClearTimeoutLoops: 1
   collectableClearTimeoutSeconds: 0
   particlePulseSpeed: 1
   starAlphaMin: 0.1
-  starAlphaMax: 1
+  starAlphaMax: 0.68
   rolePattern: 03000000000000000100000002000000
   previewPulseScale: 1.2
   rotationMode: 4
@@ -87,8 +87,8 @@ MonoBehaviour:
   starDriftJitter: 0
   orbitBias: 0
   teleportChancePerSec: 0
-  dustShrinkRadius: 6
-  dustShrinkUnitsPerSec: 1.2
+  dustShrinkRadius: 0.5
+  dustShrinkUnitsPerSec: 0.75
   dustFalloff:
     serializedVersion: 2
     m_Curve:
@@ -113,7 +113,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  dustRegrowDelayMul: 2
+  dustRegrowDelayMul: 0.5
   dustSpeedCapMul: 0.9
   dustExtraBrake: 0.25
   dustLateralMul: 1
@@ -122,7 +122,7 @@ MonoBehaviour:
   ejectionStyle: 0
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
-  scatterRadius: 1.6
+  scatterRadius: 3
   nodeFlightSeconds: 0.6
   nodeFlightEase:
     serializedVersion: 2
@@ -151,7 +151,7 @@ MonoBehaviour:
   ejectionStagger: 0.03
   expirePolicy: 0
   allowShardRecyclingWhenMissed: 0
-  establishSpeedMul: 0.8
+  establishSpeedMul: 2
   evolveSpeedMul: 1
   intensifySpeedMul: 1.2
   releaseSpeedMul: 0.9

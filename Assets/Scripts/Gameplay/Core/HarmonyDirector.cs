@@ -37,7 +37,7 @@ public class HarmonyDirector : MonoBehaviour
 
     void OnEnable()  { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary += OnLoopBoundary; }
     void OnDisable() { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary -= OnLoopBoundary; }
-    public void Initialize(DrumTrack d, InstrumentTrackController t, ChordChangeArpeggiator a = null) {
+    public void Initialize(DrumTrack d, InstrumentTrackController t) {
         // (your existing Initialize body)
         // After you set tracks, initialize per-track sequences:
         if (GameFlowManager.Instance.controller?.tracks != null)
@@ -211,32 +211,12 @@ private System.Collections.IEnumerator CommitOnNextBoundary()
             return profile.chordSequence.Count;
         }
     }
-
-    public void BeginBoostArp(float secondsRemaining)
-    {
-        if (profile == null || profile.chordSequence == null || profile.chordSequence.Count == 0 || GameFlowManager.Instance.arp == null || GameFlowManager.Instance.activeDrumTrack == null)
-            return;
-
-        // One preview per loop (you already debounce elsewhere; this is a cheap extra guard)
-        int loopIdx = Mathf.FloorToInt((float)((AudioSettings.dspTime - GameFlowManager.Instance.activeDrumTrack.startDspTime) / Mathf.Max(0.001f, GameFlowManager.Instance.activeDrumTrack.GetLoopLengthInSeconds())));
-        if (_previewActiveThisLoop && loopIdx == _lastPreviewLoopIdx) return;
-        _previewActiveThisLoop = true;
-        _lastPreviewLoopIdx = loopIdx;
-
-        // Next unbuilt palette chord = index _globalBuiltCount (I=0 already "built")
-        _previewChordIdx = Mathf.Clamp(_globalBuiltCount, 0, profile.chordSequence.Count - 1);
-
-        float beatsToDownbeat = secondsRemaining / Mathf.Max(0.001f, 60f / GameFlowManager.Instance.activeDrumTrack.drumLoopBPM);
-        _previewStartedInsideWindow = (beatsToDownbeat <= Mathf.Max(0f, commitWindowBeats));
-
-        GameFlowManager.Instance.arp.Begin(profile.chordSequence[_previewChordIdx], Mathf.Max(0.05f, secondsRemaining));
-    }
-   
+    
     public void CommitNextChordNow() {
         Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
         _forceCommitNextBoundary = true;
     }
-    public void CancelBoostArp() => GameFlowManager.Instance.arp?.Cancel();
+
     private void ApplyChordToAllTracks(int chordIndex)
     {
         if (profile == null || GameFlowManager.Instance.controller == null || GameFlowManager.Instance.controller.tracks == null) return;

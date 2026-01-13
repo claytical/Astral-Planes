@@ -5,16 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Assets/Materials/Ghostlike.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/Ghostlike.mat" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/PhaseStar.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Drifter.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/ShipProfiles/Drifter.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,21 +29,15 @@
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeCharacterVis.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeRailAgent.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeTuning.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/TrackUtilityTrigger.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Gameplay/PhaseStarDustAffect.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/BoostingInfluence.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/ChordProgressionProfile.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/DensityInfluence.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/DrumVolumeInfluence.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/LifetimeProfile.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalRoleProfile.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/PhaseInfluence.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/PlayerStatsGridAnchor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/ShipMusicalProfileLoader.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/VehicleRemixController.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/DrumVolumeMixer.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifLibrary.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" root0="FORCE_HIGHLIGHTING" />
@@ -276,6 +265,7 @@
       <workItem from="1767151405433" duration="24284000" />
       <workItem from="1767315856009" duration="32210000" />
       <workItem from="1767498160444" duration="130854000" />
+      <workItem from="1767979301135" duration="138000" />
     </task>
     <servers />
   </component>

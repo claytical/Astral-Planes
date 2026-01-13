@@ -278,7 +278,7 @@ public class PhaseStar : MonoBehaviour
                 gfm.dustGenerator.SetStarKeepClear(
                     gfm.activeDrumTrack.WorldToGridPosition(transform.position),
                     radiusCells,
-                    phase
+                    phase, true
                 );
             }
         }

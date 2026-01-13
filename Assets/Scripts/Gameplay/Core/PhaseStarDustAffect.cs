@@ -32,9 +32,15 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             _lastPhase = phaseMgr.currentPhase;
             _hasLastPhase = true;
         }
-
-        // Maintain a maneuvering pocket around the star without eroding the maze.
-        gen.SetStarKeepClearWorld((Vector2)transform.position, _profile.starKeepClearRadiusCells, _hasLastPhase ? _lastPhase : MusicalPhase.Establish);
+// Maintain a maneuvering pocket around the star without eroding the maze.
+// NOTE: profile value is in CELLS; SetStarKeepClearWorld expects WORLD units.
+        float cellWorld = (gfm.activeDrumTrack != null) ? Mathf.Max(0.001f, gfm.activeDrumTrack.GetCellWorldSize()) : 1f;
+        float radiusWorld = _profile.starKeepClearRadiusCells * cellWorld;
+        gen.SetStarKeepClearWorld(
+            (Vector2)transform.position,
+            radiusWorld,
+            _hasLastPhase ? _lastPhase : MusicalPhase.Establish
+        );
         
     }
 

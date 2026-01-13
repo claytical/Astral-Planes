@@ -163,8 +163,6 @@ public class InstrumentTrackController : MonoBehaviour
             Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
         }
     }
-   
-
     private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId)
 {
     Debug.Log($"[CTRL:BURST_CLEARED] track={(track != null ? track.name : "null")} burstId={burstId} " +
@@ -396,6 +394,7 @@ public class InstrumentTrackController : MonoBehaviour
 
         return any;
     }
+
     public int ForceDestroyAllCollectablesInFlight(string reason)
     {
         int destroyed = 0;
@@ -409,6 +408,40 @@ public class InstrumentTrackController : MonoBehaviour
 
         return destroyed;
     }
+
+    /// <summary>
+    /// Single authority entry point for motif boundaries.
+    /// This should be called exactly once when a new motif begins (after any bridge/ghost cycle),
+    /// and before any new note spawning occurs.
+    /// </summary>
+    public void BeginNewMotif(string reason = "BeginNewMotif") {
+        Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
+
+        // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.
+        ForceDestroyAllCollectablesInFlight(reason);
+
+        // Reset controller-level guards/caches.
+        _binExtensionSignaled.Clear();
+        _allowAdvanceNextBurst.Clear();
+        _loopHash.Clear();
+
+        ResetControllerBinGuards();
+
+        // Hard reset all tracks (loop content, bins, allocation, burst state).
+        if (tracks != null)
+        {
+            foreach (var t in tracks)
+            {
+                if (!t) continue;
+                t.BeginNewMotifHardClear(reason);
+            }
+        }
+
+        // Hard reset visuals last (they mirror track state).
+        if (noteVisualizer != null)
+            noteVisualizer.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
+    }
+
     public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
     {
         if (tracks == null) return;
@@ -502,30 +535,44 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public void UpdateVisualizer()
     {
-        if (noteVisualizer == null) return;
+        if (noteVisualizer == null || tracks == null) return;
 
         foreach (var track in tracks)
         {
+            if (track == null) continue;
+
             int h = ComputeLoopHash(track);
             if (_loopHash.TryGetValue(track, out var prev) && prev == h)
                 continue; // no loop change → no work this frame
+
             _loopHash[track] = h;
 
-            foreach (var (step, _, _, _) in track.GetPersistentLoopNotes())
-                noteVisualizer.PlacePersistentNoteMarker(track, step); // lit=true default
+            // Subtractive-safe: removes stale markers (steps no longer in persistent loop),
+            // then ensures all remaining loop steps are represented.
+            noteVisualizer.ForceSyncMarkersToPersistentLoop(track);
         }
     }
+
     private static int ComputeLoopHash(InstrumentTrack t)
     {
-        // order-independent hash of loop steps (cheap + stable)
+        if (t == null) return 0;
+
+        // Order-independent hash of loop steps (cheap + stable).
+        // This only considers (stepIndex), which is enough to detect shrink/expand membership changes.
         unchecked
         {
             int h = 17;
-            foreach (var (step, _, _, _) in t.GetPersistentLoopNotes().OrderBy(n => n.Item1))
+
+            var loop = t.GetPersistentLoopNotes();
+            if (loop == null) return h;
+
+            foreach (var (step, _, _, _) in loop.OrderBy(n => n.Item1))
                 h = h * 31 + step;
+
             return h;
         }
     }
+
     public int GetMaxActiveLoopMultiplier()
     {
         if (tracks == null || tracks.Length == 0) return 1;

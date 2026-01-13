@@ -99,9 +99,15 @@ public class InstrumentTrack : MonoBehaviour
         public Vector3? repelFromWorld;    // vehicle position at impact (for "away from vehicle")
         public float    burstImpulse;      // one-time impulse applied to each collectable
         public float    spreadAngleDeg;    // cone around away-dir (deg); 360 = radial
-        public float    spawnJitterRadius; // small jitter near spawn cell center
     }
+    public enum BurstPlacementMode
+    {
+        Free = 0,
 
+        // Prefer cells that currently have dust (and are not permanently clear),
+        // biased near originWorld.x. Falls back to any free cell.
+        TrappedInDustNearOrigin = 1
+    }
 
     private struct LoopNote
     {
@@ -163,6 +169,95 @@ public class InstrumentTrack : MonoBehaviour
     public List<(int stepIndex, int note, int duration, float velocity)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
     }    
+    private bool IsOpenOrPermanentCell(CosmicDustGenerator dustGen, Vector2Int gp)
+{
+    if (dustGen == null) return true;
+    if (dustGen.IsPermanentlyClearCell(gp)) return true;
+    return !dustGen.HasDustAt(gp);
+}
+
+private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells)
+{
+    if (bufferCells <= 0) return true;
+
+    // Treat edges as "open" so we don't place on borders of the maze.
+    for (int dx = -bufferCells; dx <= bufferCells; dx++)
+    {
+        for (int dy = -bufferCells; dy <= bufferCells; dy++)
+        {
+            int x = gp.x + dx;
+            int y = gp.y + dy;
+
+            if (x < 0 || y < 0 || x >= gridW || y >= gridH)
+                return false;
+
+            if (IsOpenOrPermanentCell(dustGen, new Vector2Int(x, y)))
+                return false;
+        }
+    }
+    return true;
+}
+
+/// <summary>
+/// Builds a near-to-far ring-ordered list of candidate cells that are:
+/// - dust present
+/// - not permanently clear
+/// - free (no collectable occupant)
+/// - not within trapBufferCells of open/permanent space
+/// </summary>
+private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
+    CosmicDustGenerator dustGen,
+    DrumTrack dt,
+    Vector3 originWorld,
+    int gridW,
+    int gridH,
+    int trapSearchRadiusCells,
+    int trapBufferCells)
+{
+    var candidates = new List<Vector2Int>(256);
+    if (dustGen == null || dt == null) return candidates;
+
+    Vector2Int oc = dt.WorldToGridPosition(originWorld);
+
+    int rMax = Mathf.Clamp(trapSearchRadiusCells, 0, Mathf.Max(gridW, gridH));
+    for (int r = 0; r <= rMax; r++)
+    {
+        int xMin = oc.x - r;
+        int xMax = oc.x + r;
+        int yMin = oc.y - r;
+        int yMax = oc.y + r;
+
+        // Perimeter only (ring)
+        for (int x = xMin; x <= xMax; x++)
+        {
+            TryAdd(x, yMin);
+            TryAdd(x, yMax);
+        }
+        for (int y = yMin + 1; y <= yMax - 1; y++)
+        {
+            TryAdd(xMin, y);
+            TryAdd(xMax, y);
+        }
+    }
+
+    return candidates;
+
+    void TryAdd(int x, int y)
+    {
+        // NOTE: This is the only local function in this helper.
+        // If you want *zero* local functions anywhere, I can rewrite this into a private static method.
+        if (x < 0 || y < 0 || x >= gridW || y >= gridH) return;
+
+        var gp = new Vector2Int(x, y);
+
+        if (dustGen.IsPermanentlyClearCell(gp)) return;
+        if (!dustGen.HasDustAt(gp)) return;
+        if (!Collectable.IsCellFreeStatic(gp)) return;
+        if (!HasTrapBuffer(dustGen, gp, gridW, gridH, trapBufferCells)) return;
+
+        candidates.Add(gp);
+    }
+}
     private IEnumerable<int> BuildBiasedXSequence(IList<int> candidates, int originX, int gridW) {
         if (candidates == null || candidates.Count == 0) yield break;
         // No origin: preserve prior behavior (random order).
@@ -598,14 +693,16 @@ public class InstrumentTrack : MonoBehaviour
         drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitCollapse;
         _hookedBoundaryForCollapse = false;
     }
-    private void OnDrumDownbeat_CommitCollapse() {
+    private void OnDrumDownbeat_CommitCollapse()
+    {
         if (!_pendingCollapse) { UnhookCollapseBoundary(); return; }
 
         int newMult = Mathf.Clamp(_collapseTargetMultiplier, 1, loopMultiplier);
         if (newMult != loopMultiplier)
         {
             loopMultiplier = newMult;
-// Clear allocation/filled flags above the collapsed width so EffectiveLoopBins won't re-grow.
+
+            // Clear allocation/filled flags above the collapsed width so EffectiveLoopBins won't re-grow.
             EnsureBinList();
             for (int b = newMult; b < maxLoopMultiplier; b++)
             {
@@ -613,14 +710,30 @@ public class InstrumentTrack : MonoBehaviour
                 if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
                 Harmony_OnBinEmptied(b);
             }
-            
+
             _totalSteps = (drumTrack != null ? drumTrack.totalSteps : 16) * loopMultiplier;
+
+            // Remove any loop notes that are now outside the audible window
             persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
+
             MarkLoopCacheDirty();
             RecomputeBinsFromLoop();
-            // Refresh visuals to reflect the narrower audible window
+
+            // ---- VISUAL AUTHORITY (subtractive-safe) ----
+            // 1) snap the grid to the new leader width immediately (prevents stale X mapping)
+            if (controller != null && controller.noteVisualizer != null && drumTrack != null)
+            {
+                int leaderSteps = drumTrack.GetLeaderSteps();
+                if (leaderSteps <= 0) leaderSteps = _totalSteps;
+
+                controller.noteVisualizer.RequestLeaderGridChange(leaderSteps);
+
+                // 2) prune any stale loop-owned markers and re-add missing ones
+                controller.noteVisualizer.ForceSyncMarkersToPersistentLoop(this);
+            }
+
+            // Let controller update other tracks if needed (hash-driven).
             controller?.UpdateVisualizer();
-            controller?.noteVisualizer?.RecomputeTrackLayout(this);
         }
 
         _pendingCollapse = false;
@@ -628,6 +741,7 @@ public class InstrumentTrack : MonoBehaviour
         _lastLocalStep = -1;
         _lastLoopSeen = -1;
     }
+
     private void Harmony_Bins_EnsureSize(int want)
 {
     if (want <= 0) want = 1;
@@ -1057,7 +1171,17 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     }
     public void ResetBinsForPhase()
     {
-        _binFilled = Enumerable.Repeat(false, Mathf.Max(1, maxLoopMultiplier)).ToList();
+        // Hard reset of bin span + allocation for a clean new phase/motif.
+        int want = Mathf.Max(1, maxLoopMultiplier);
+
+        _binFilled = Enumerable.Repeat(false, want).ToList();
+
+        // Allocation drives span (EffectiveLoopBins). Ensure we clear it too.
+        binAllocated = new bool[want];
+
+        // Harmony bookkeeping per-bin should restart clean.
+        InitializeBinChords(want);
+
         ResetBinCursor();
         loopMultiplier = 1;                    // tracks don’t pre-expand; width grows on demand
         _totalSteps    = BinSize() * loopMultiplier;
@@ -1085,6 +1209,34 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
 
         // We already clear looped notes elsewhere; no double clear here.
     }
+
+    /// <summary>
+    /// Single hard reset entry point for motif boundaries.
+    /// Clears loop content, bin allocation, burst state, and expansion/mapping flags.
+    /// Intended to be called exactly once by the motif authority (e.g., GameFlowManager).
+    /// </summary>
+    public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
+    {
+        // Loop content + caches
+        persistentLoopNotes?.Clear();
+        MarkLoopCacheDirty();
+
+        _loopNotes?.Clear();
+        _spawnedNotes?.Clear();
+
+        // Burst bookkeeping
+        _burstSteps?.Clear();
+        _burstRemaining?.Clear();
+        _burstTotalSpawned?.Clear();
+        _burstCollected?.Clear();
+
+        // Expansion/mapping state + cursors
+        ResetBinStateForNewPhase();
+
+        // Bin fill/allocation/harmony
+        ResetBinsForPhase();
+    }
+
     public void SoftReplaceLoop(IReadOnlyList<(int stepIndex, int note, int duration, float velocity)> newNotes)
     {
         // Clear data + our own spawned visuals (quietly)
@@ -1357,7 +1509,8 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         // All bins filled (should be rare); fall back to last
         return _binFilled.Count - 1;
     }
-    public void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1, int forcedBurstId = -1) {
+
+    private void SpawnCollectableBurst(NoteSet noteSet, int maxToSpawn = -1, int forcedBurstId = -1) {
 
         if (GameFlowManager.ShouldSuppressCollectableSpawns)
         {
@@ -1376,7 +1529,9 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         Vector3? repelFromWorld = null,
         float burstImpulse = 0f,
         float spreadAngleDeg = 180f,
-        float spawnJitterRadius = 0.25f){
+        float spawnJitterRadius = 0.25f,
+        BurstPlacementMode placementMode = BurstPlacementMode.Free,
+        int trapSearchRadiusCells = 10, int trapBufferCells = 1){
     // --- ENTRY / ABORT REASONS ---
         if (noteSet == null) {
             Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=noteSet_null maxToSpawn={maxToSpawn}"); return;
@@ -1491,8 +1646,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                 originWorld = originWorld, 
                 repelFromWorld = repelFromWorld, 
                 burstImpulse = burstImpulse, 
-                spreadAngleDeg = spreadAngleDeg, 
-                spawnJitterRadius = spawnJitterRadius
+                spreadAngleDeg = spreadAngleDeg 
             };
             Debug.Log(
                 $"[TRK:STAGE_EXPAND] track={name} RESERVED burstId={reservedId} targetBin={targetBin} " +
@@ -1514,14 +1668,54 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         var usedAbsSteps = new HashSet<int>();
 
         int gridW = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
+        int gridH = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
+
+        if (gridW <= 0 || gridH <= 0)
+        {
+            _currentBurstArmed = false;
+            _currentBurstRemaining = 0;
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=grid_invalid gridW={gridW} gridH={gridH}");
+            return;
+        }
         var dustGen = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+
         if (gridW <= 0) { 
             _currentBurstArmed = false; 
             _currentBurstRemaining = 0; 
             Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=gridW_invalid gridW={gridW} drumTrackNull={(drumTrack==null)}"); 
             return;
         }
-        
+        List<Vector2Int> trappedCandidates = null;
+
+        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin &&
+            dustGen != null &&
+            drumTrack != null &&
+            originWorld.HasValue)
+        {
+            trappedCandidates = BuildTrappedCandidatesNearOrigin(
+                dustGen,
+                drumTrack,
+                originWorld.Value,
+                gridW,
+                gridH,
+                trapSearchRadiusCells,
+                trapBufferCells
+            );
+
+            // Relax buffer if too strict (prevents “no spawns” deadlocks in thin mazes)
+            if ((trappedCandidates == null || trappedCandidates.Count == 0) && trapBufferCells > 0)
+            {
+                trappedCandidates = BuildTrappedCandidatesNearOrigin(
+                    dustGen,
+                    drumTrack,
+                    originWorld.Value,
+                    gridW,
+                    gridH,
+                    trapSearchRadiusCells,
+                    trapBufferCells - 1
+                );
+            }
+        }        
         int originX = -1; 
         if (originWorld.HasValue && drumTrack != null) { 
             var og = drumTrack.WorldToGridPosition(originWorld.Value); 
@@ -1537,15 +1731,27 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                 imprintX = -1;
         }
 
+        // --- choose anchor for 2D search ---
+        Vector2Int anchor = new Vector2Int(gridW / 2, gridH / 2);
+
+        if (originWorld.HasValue && drumTrack != null)
+        {
+            var og = drumTrack.WorldToGridPosition(originWorld.Value);
+            if (og.x >= 0 && og.x < gridW && og.y >= 0 && og.y < gridH) anchor = og;
+        }
+        else if (repelFromWorld.HasValue && drumTrack != null)
+        {
+            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
+            if (ig.x >= 0 && ig.x < gridW && ig.y >= 0 && ig.y < gridH) anchor = ig;
+        }
+        var usedCellsThisBurst = new HashSet<Vector2Int>();
         foreach (int step in localSteps)
         {
             if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
 
+            // --- musical semantics still drive note + duration ---
             int note = noteSet.GetNoteForPhaseAndRole(this, step);
             int dur  = CalculateNoteDurationFromSteps(step, noteSet);
-
-            int pitchIndex = noteList.IndexOf(note);
-            if (pitchIndex < 0) continue;
 
             int absStep = targetBin * binSize + step;
 
@@ -1556,130 +1762,116 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                                  $"binSize={binSize} step={step} -> absStep={absStep}");
                 continue;
             }
-            int targetY = pitchIndex;
-            // Build an x-sequence:
-            //  - permanent-clear cells first (if available)
-            //  - then fallback to any available cell
-            IEnumerable<int> xSequence;
-            if (dustGen != null && gridW > 0)
+
+            if (dustGen == null || drumTrack == null)
+                continue;
+            Vector2Int chosenCell;
+            if (!TryPickSpawnCell2D(
+                    placementMode,
+                    anchor,
+                    trapSearchRadiusCells,
+                    trapBufferCells,
+                    dustGen,
+                    drumTrack,
+                    usedCellsThisBurst,
+                    out chosenCell))
             {
-                var preferredXs = new List<int>(gridW);
-                for (int x = 0; x < gridW; x++)
-                {
-                    var gp = new Vector2Int(x, pitchIndex);
-                    if (dustGen.HasDustAt(gp) && !dustGen.IsPermanentlyClearCell(gp) && Collectable.IsCellFreeStatic(gp))
-                        preferredXs.Add(x);
-                    
-                    //if (!drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
-                    if (!Collectable.IsCellFreeStatic(gp)) continue;
-                    preferredXs.Add(x);
-                }
-                List<int> candidates = (preferredXs.Count > 0) ? preferredXs : Enumerable.Range(0, gridW).ToList();
-                // If originX is valid, this will fan out from the void origin.
-                // Otherwise it falls back to random order (preserving prior behavior).
-//                xSequence = BuildBiasedXSequence(candidates, imprintX, gridW);
-                xSequence = BuildBiasedXSequence(
-                    candidates.OrderByDescending(x => Mathf.Abs(x - imprintX)).ToList(), -1, gridW);              
-            }
-            else
-            {
-                // If we can’t reason about width, skip safely (prevents exceptions / false “armed”).
+                // No suitable cell for this step; skip this step.
                 continue;
             }
 
-            bool spawnedThisStep = false;
+            usedCellsThisBurst.Add(chosenCell);
 
-            foreach (int x in xSequence)
+            Vector3 spawnPos = drumTrack.GridToWorldPosition(chosenCell);
+
+// If trapped mode, carve peek hole BEFORE instantiate, but do NOT hold forever.
+            if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin && dustGen != null)
             {
-                var gp = new Vector2Int(x, pitchIndex);
+                float cellWorld   = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+                float radiusWorld = cellWorld * 0.15f;
 
-                //if (drumTrack.IsSpawnCellAvailable(gp.x, gp.y)) continue;
-                if (!Collectable.IsCellFreeStatic(gp)) continue;
-                Vector3 spawnPos = drumTrack.GridToWorldPosition(gp); 
-                if (originWorld.HasValue && spawnJitterRadius > 0f) { 
-                    Vector2 j = UnityEngine.Random.insideUnitCircle * spawnJitterRadius; 
-                    spawnPos += (Vector3)j;
-                }
-                var go = Instantiate(
-                    collectablePrefab,
-                    spawnPos,
-                    Quaternion.identity,
-                    collectableParent
-                );
+                var gfm = GameFlowManager.Instance;
+                MusicalPhase phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
+                    ? gfm.phaseTransitionManager.currentPhase
+                    : drumTrack.GetCurrentPhaseSafe();
 
-                if (!go) break;
-
-                if (!go.TryGetComponent(out Collectable c))
-                {
-                    Destroy(go);
-                    break;
-                }
-
-                // --- IMPORTANT: assign burstId BEFORE Initialize (fixes your burstId issue) ---
-                c.burstId = burstId;
-                c.intendedStep = absStep;
-                c.assignedInstrumentTrack = this;
-
-                _scratchSteps.Clear();
-                _scratchSteps.Add(absStep);
-
-                c.Initialize(note, dur, this, noteSet, _scratchSteps);
-                if (burstImpulse > 0f && go.TryGetComponent<Rigidbody2D>(out var crb)) { 
-                    // Use repelFromWorld (vehicle position) if provided; else origin; else self.
-                    Vector3 from = repelFromWorld ?? originWorld ?? spawnPos;
-                    Vector2 away = (Vector2)(spawnPos - from); 
-                    if (away.sqrMagnitude < 0.0001f) 
-                        away = UnityEngine.Random.insideUnitCircle;
-                    away.Normalize();
-                    
-                    float half = Mathf.Max(0f, spreadAngleDeg) * 0.5f; 
-                    float ang  = UnityEngine.Random.Range(-half, half); 
-                    Vector2 dir = (Vector2)(Quaternion.Euler(0f, 0f, ang) * (Vector3)away);
-                    crb.AddForce(dir * burstImpulse, ForceMode2D.Impulse);
-                }
-                // Ensure we aren’t double-subscribed (defensive).
-                if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
-                {
-                    c.OnDestroyed -= oldHandler;
-                    _destroyHandlers.Remove(c);
-                }
-                Action handler = () => OnCollectableDestroyed(c);
-                _destroyHandlers[c] = handler;
-                c.OnDestroyed += handler;
-
-                // Place placeholder marker + tether
-                var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
-                Debug.Log($"[TRK:SPAWN_MARKER] track={name} burstId={burstId} absStep={absStep} targetBin={targetBin} markerCreated={(markerGO!=null)} markerId={(markerGO!=null?markerGO.GetInstanceID():-1)}");
-                if (markerGO)
-                {
-                    var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
-                    tag.track = this;
-                    tag.step = absStep;
-                    tag.burstId = burstId;
-                    tag.isPlaceholder = true;
-
-                    var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
-                    ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-
-                    Debug.Log($"[TRK:SPAWN_TETHER] track={name} burstId={burstId} absStep={absStep} markerId={markerGO.GetInstanceID()} aboutToAttach=True");
-                    c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur, absStep);
-                    Debug.Log($"[TRK:SPAWN_TETHER] track={name} burstId={burstId} absStep={absStep} markerId={markerGO.GetInstanceID()} attached=True tetherPrefab={(nv.noteTetherPrefab!=null)}");
-                }
-
-                spawnedCollectables.Add(go);
-                _currentBurstRemaining++;
-                spawnedCount++;
-                spawnedThisStep = true;
-
-                break; // one collectable per step
+                // short initial hold; Collectable’s dust pocket routine maintains while alive
+                dustGen.CarveTemporaryDiskFromCollectable(spawnPos, radiusWorld, phaseNow, holdSeconds: 0.65f);
             }
 
-            // If we couldn’t spawn for this step, we simply skip it.
-            // That is intentional: we do NOT want an empty cell to deadlock a burst.
-            if (!spawnedThisStep)
+
+            // Optional spawn jitter
+            if (originWorld.HasValue && spawnJitterRadius > 0f)
             {
-                // optional: Debug.Log($"[SPAWN:MISS] track={name} burstId={burstId} absStep={absStep} pitchIndex={pitchIndex}");
+                Vector2 j = UnityEngine.Random.insideUnitCircle * spawnJitterRadius;
+                spawnPos += (Vector3)j;
             }
+
+            // Instantiate
+            var go = Instantiate(collectablePrefab, spawnPos, Quaternion.identity, collectableParent);
+            if (!go) continue;
+
+            if (!go.TryGetComponent(out Collectable c))
+            {
+                Destroy(go);
+                continue;
+            }
+
+            // --- IMPORTANT: assign burstId BEFORE Initialize ---
+            c.burstId = burstId;
+            c.intendedStep = absStep;
+            c.assignedInstrumentTrack = this;
+
+            _scratchSteps.Clear();
+            _scratchSteps.Add(absStep);
+
+            c.isTrappedInDust = (placementMode == BurstPlacementMode.TrappedInDustNearOrigin);
+            c.Initialize(note, dur, this, noteSet, _scratchSteps);
+
+            // Optional impulse
+            if (burstImpulse > 0f && go.TryGetComponent<Rigidbody2D>(out var crb))
+            {
+                Vector3 from = repelFromWorld ?? originWorld ?? spawnPos;
+                Vector2 away = (Vector2)(spawnPos - from);
+                if (away.sqrMagnitude < 0.0001f) away = UnityEngine.Random.insideUnitCircle;
+                away.Normalize();
+
+                float half = Mathf.Max(0f, spreadAngleDeg) * 0.5f;
+                float ang  = UnityEngine.Random.Range(-half, half);
+                Vector2 dir = (Vector2)(Quaternion.Euler(0f, 0f, ang) * (Vector3)away);
+                crb.AddForce(dir * burstImpulse, ForceMode2D.Impulse);
+            }
+
+            // Defensive subscription
+            if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
+            {
+                c.OnDestroyed -= oldHandler;
+                _destroyHandlers.Remove(c);
+            }
+
+            Action handler = () => OnCollectableDestroyed(c);
+            _destroyHandlers[c] = handler;
+            c.OnDestroyed += handler;
+
+            // Marker + tether
+            var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
+            if (markerGO)
+            {
+                var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
+                tag.track = this;
+                tag.step = absStep;
+                tag.burstId = burstId;
+                tag.isPlaceholder = true;
+
+                var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
+                ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
+
+                c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur, absStep);
+            }
+
+            spawnedCollectables.Add(go);
+            _currentBurstRemaining++;
+            spawnedCount++;
         }
 
         // --- Empty burst handling: clear immediately so upstream systems never hang ---
@@ -1709,6 +1901,280 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
         DebugBins($"AfterSpawn(bin={targetBin})");
     }
+    private bool IsCellTrulyTrapped(
+    Vector2Int gp,
+    int bufferCells,
+    CosmicDustGenerator dustGen,
+    int gridW,
+    int gridH)
+{
+    // Must be dust, and not permanently clear.
+    if (!dustGen.HasDustAt(gp)) return false;
+    if (dustGen.IsPermanentlyClearCell(gp)) return false;
+
+    // Buffer rule: within +/- bufferCells, ALL cells must be dust (and not permanently clear).
+    // If any neighbor is open/cleared, this location is "near a thin part of the maze".
+    for (int dx = -bufferCells; dx <= bufferCells; dx++)
+    {
+        for (int dy = -bufferCells; dy <= bufferCells; dy++)
+        {
+            int x = gp.x + dx;
+            int y = gp.y + dy;
+            if (x < 0 || y < 0 || x >= gridW || y >= gridH) return false; // treat bounds as unsafe
+
+            var n = new Vector2Int(x, y);
+
+            // If this neighbor is permanently clear, it's basically a corridor/structure → unsafe.
+            if (dustGen.IsPermanentlyClearCell(n)) return false;
+
+            // If neighbor is not dust, we’re too close to open space → unsafe.
+            if (!dustGen.HasDustAt(n)) return false;
+        }
+    }
+
+    return true;
+}
+private bool TryPickSpawnCell2D(
+    BurstPlacementMode mode,
+    Vector2Int anchor,
+    int searchRadiusCells,
+    int bufferCells,
+    CosmicDustGenerator dustGen,
+    DrumTrack drum,
+    HashSet<Vector2Int> usedCells,
+    out Vector2Int chosen)
+{
+    chosen = default;
+    if (dustGen == null || drum == null) return false;
+
+    int w = drum.GetSpawnGridWidth();
+    int h = drum.GetSpawnGridHeight();
+    if (w <= 0 || h <= 0) return false;
+
+    // Clamp anchor into bounds
+    anchor.x = Mathf.Clamp(anchor.x, 0, w - 1);
+    anchor.y = Mathf.Clamp(anchor.y, 0, h - 1);
+
+    // In trapped mode, we REQUIRE dust; no fallback to open cells.
+    bool requireDust = (mode == BurstPlacementMode.TrappedInDustNearOrigin);
+
+    // Spiral-ish search around anchor
+    int rMax = Mathf.Max(0, searchRadiusCells);
+
+    // We’ll progressively relax buffer if necessary, but still require dust in trapped mode.
+    for (int buf = Mathf.Max(0, bufferCells); buf >= 0; buf--)
+    {
+        for (int r = 0; r <= rMax; r++)
+        {
+            for (int dy = -r; dy <= r; dy++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                if (Mathf.Abs(dx) != r && Mathf.Abs(dy) != r) continue; // perimeter only
+
+                int x = anchor.x + dx;
+                int y = anchor.y + dy;
+                if (x < 0 || y < 0 || x >= w || y >= h) continue;
+
+                var gp = new Vector2Int(x, y);
+                if (usedCells != null && usedCells.Contains(gp)) continue;
+                if (!Collectable.IsCellFreeStatic(gp)) continue;
+
+                bool hasDust = dustGen.HasDustAt(gp);
+                if (requireDust && !hasDust) continue;
+
+                // Deep-dust test: must be buf cells away from any open (including out-of-bounds).
+                if (requireDust && buf > 0)
+                {
+                    if (!IsDeepDustCell(gp, buf, dustGen, w, h))
+                        continue;
+                }
+
+                chosen = gp;
+                return true;
+            }
+        }
+    }
+
+    if (requireDust)
+        return false;
+
+    // Free mode fallback: any free cell (prefer dust if you want; here we allow anything).
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        var gp = new Vector2Int(x, y);
+        if (usedCells != null && usedCells.Contains(gp)) continue;
+        if (!Collectable.IsCellFreeStatic(gp)) continue;
+        chosen = gp;
+        return true;
+    }
+
+    return false;
+}
+
+private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustGen, int w, int h)
+{
+    // Treat out-of-bounds as OPEN; this prevents “near edge” trapped placements.
+    for (int dy = -buffer; dy <= buffer; dy++)
+    for (int dx = -buffer; dx <= buffer; dx++)
+    {
+        int x = gp.x + dx;
+        int y = gp.y + dy;
+
+        if (x < 0 || y < 0 || x >= w || y >= h)
+            return false; // edge is open
+
+        var n = new Vector2Int(x, y);
+
+        // “Deep dust” means *not* adjacent to any effectively-open cell
+        if (!dustGen.IsEffectivelyDustCell(n))
+            return false;
+        
+    }
+    return true;
+}
+
+private bool TryPickSpawnCell2D(
+    BurstPlacementMode placementMode,
+    Vector2Int anchor,
+    int searchRadiusCells,
+    int trapBufferCells,
+    CosmicDustGenerator dustGen,
+    int gridW,
+    int gridH,
+    out Vector2Int chosen)
+{
+    chosen = new Vector2Int(-1, -1);
+
+    // Clamp + sanitize
+    int rMax = Mathf.Clamp(searchRadiusCells, 0, Mathf.Max(gridW, gridH));
+
+    // Expanding ring search around anchor (Chebyshev rings).
+    for (int r = 0; r <= rMax; r++)
+    {
+        for (int dx = -r; dx <= r; dx++)
+        {
+            // Only perimeter if r > 0 (otherwise we scan the same points repeatedly)
+            int dyTop = r;
+            int dyBot = -r;
+
+            // Top edge
+            {
+                int x = anchor.x + dx;
+                int y = anchor.y + dyTop;
+                if (x >= 0 && y >= 0 && x < gridW && y < gridH)
+                {
+                    var gp = new Vector2Int(x, y);
+                    if (Collectable.IsCellFreeStatic(gp))
+                    {
+                        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
+                        {
+                            if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
+                            {
+                                chosen = gp;
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            // Free mode: accept any free cell (prefer dust if you want, but keep simple).
+                            chosen = gp;
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Bottom edge (avoid double-scan when r == 0)
+            if (r > 0)
+            {
+                int x = anchor.x + dx;
+                int y = anchor.y + dyBot;
+                if (x >= 0 && y >= 0 && x < gridW && y < gridH)
+                {
+                    var gp = new Vector2Int(x, y);
+                    if (Collectable.IsCellFreeStatic(gp))
+                    {
+                        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
+                        {
+                            if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
+                            {
+                                chosen = gp;
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            chosen = gp;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Left/right edges for this ring (excluding corners already scanned above)
+        if (r > 0)
+        {
+            for (int dy = -r + 1; dy <= r - 1; dy++)
+            {
+                // Left
+                {
+                    int x = anchor.x - r;
+                    int y = anchor.y + dy;
+                    if (x >= 0 && y >= 0 && x < gridW && y < gridH)
+                    {
+                        var gp = new Vector2Int(x, y);
+                        if (Collectable.IsCellFreeStatic(gp))
+                        {
+                            if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
+                            {
+                                if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
+                                {
+                                    chosen = gp;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                chosen = gp;
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                // Right
+                {
+                    int x = anchor.x + r;
+                    int y = anchor.y + dy;
+                    if (x >= 0 && y >= 0 && x < gridW && y < gridH)
+                    {
+                        var gp = new Vector2Int(x, y);
+                        if (Collectable.IsCellFreeStatic(gp))
+                        {
+                            if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
+                            {
+                                if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
+                                {
+                                    chosen = gp;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                chosen = gp;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
     private void OnCollectableDestroyed(Collectable c) { 
         if (c == null) return; 
         if (c.assignedInstrumentTrack != this) return;
@@ -1787,7 +2253,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                   $"dsp={drumTrack.startDspTime} loopLen={drumTrack.GetLoopLengthInSeconds()}"
                     );
         _pendingExpandForBurst = false;
-
+//GRAVITY VOID?
         if (_pendingBurstAfterExpand.HasValue)
         {
             var req = _pendingBurstAfterExpand.Value;
@@ -1835,7 +2301,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             var req = _pendingBurstAfterExpand.Value; 
             _pendingBurstAfterExpand = null; 
             _overrideNextSpawnBin = PickRandomExistingBinForDensity(); 
-            EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId, req.originWorld, req.repelFromWorld, req.burstImpulse, req.spreadAngleDeg, req.spawnJitterRadius));
+            EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId, req.originWorld, req.repelFromWorld, req.burstImpulse, req.spreadAngleDeg));
         }
         else
         {
@@ -1865,7 +2331,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         var req = _pendingBurstAfterExpand.Value;
         _pendingBurstAfterExpand = null;
         Debug.Log($"[TRK:COMMIT_EXPAND] track={name} PATH=WIDEN_APPLIED ENQUEUE_SPAWN curBurstId={curBid0} " + $"req.noteSet={req.noteSet} req.max={req.maxToSpawn}"); 
-        EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId, req.originWorld, req.repelFromWorld, req.burstImpulse, req.spreadAngleDeg, req.spawnJitterRadius));
+        EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId, req.originWorld, req.repelFromWorld, req.burstImpulse, req.spreadAngleDeg));
     }
     else
     {
