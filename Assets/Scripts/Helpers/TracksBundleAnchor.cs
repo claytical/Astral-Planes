@@ -9,7 +9,6 @@ public sealed class TracksBundleAnchor : MonoBehaviour
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
     public GlitchManager glitchManager;
-    public ChordChangeArpeggiator arp;
 
     bool _cached;
     bool _setupRequested;
@@ -53,10 +52,8 @@ public sealed class TracksBundleAnchor : MonoBehaviour
         dustGenerator          = dustGenerator          ?? GetComponentInChildren<CosmicDustGenerator>(true);
         spawnGrid              = spawnGrid              ?? GetComponentInChildren<SpawnGrid>(true);
         glitchManager          = glitchManager          ?? GetComponentInChildren<GlitchManager>(true);
-        arp                    = arp                    ?? GetComponentInChildren<ChordChangeArpeggiator>(true);
-
         _cached = phaseTransitionManager && drumTrack && controller && dustGenerator &&
-        spawnGrid && glitchManager && arp;
+                  spawnGrid && glitchManager;
     }
     
 }

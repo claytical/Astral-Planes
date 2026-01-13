@@ -1,6 +1,16 @@
 using UnityEngine;
 using System.Collections.Generic;
+public class GridCell {
+    public bool IsOccupied;
+    public GridObjectType ObjectType = GridObjectType.Empty;
+}
 
+public enum GridObjectType {
+    Note,
+    Node,
+    Empty,
+    Dust
+}
 public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
@@ -82,28 +92,7 @@ public class SpawnGrid : MonoBehaviour
             }
         }
     }
-
-    public void PrintGridDebug()
-    {
-        Debug.Log("---- Grid Debug Map ----");
-        for (int y = gridHeight - 1; y >= 0; y--) // Print from top to bottom
-        {
-            string row = "";
-            for (int x = 0; x < gridWidth; x++)
-            {
-                if (GridCells[x, y].IsOccupied)
-                {
-                    row += "[X] "; // Mark occupied cells
-                }
-                else
-                {
-                    row += "[ ] "; // Mark free cells
-                }
-            }
-            Debug.Log(row);
-        }
-        Debug.Log("---- End of Grid Debug ----");
-    }
+    
     public Vector2Int GetRandomAvailableCell()
     {
         List<Vector2Int> availableCells = new List<Vector2Int>();
@@ -165,6 +154,21 @@ public class SpawnGrid : MonoBehaviour
         GridCells[x, y].IsOccupied = true;
         GridCells[x, y].ObjectType = type;
     }
+    public void ResizeGrid(int newWidth, int newHeight) {
+        newWidth  = Mathf.Max(1, newWidth); 
+        newHeight = Mathf.Max(1, newHeight);
+        // No-op if already correct and initialized
+        if (GridCells != null && GridCells.GetLength(0) == newWidth && GridCells.GetLength(1) == newHeight) {
+            gridWidth = newWidth; 
+            gridHeight = newHeight; 
+            return;
+        }
+        
+        gridWidth  = newWidth; 
+        gridHeight = newHeight;  
+        InitializeGrid();
+        
+    }
     public void FreeCell(int x, int y)
     {
         // Ensure the coordinates are within valid bounds
@@ -195,33 +199,6 @@ public class SpawnGrid : MonoBehaviour
         }
         GridCells[x, y].ObjectType = GridObjectType.Empty;
         GridCells[x, y].IsOccupied = false;
-    }    public void ClearAll()
-    {
-        for (int x = 0; x < gridWidth; x++)
-        {
-            for (int y = 0; y < gridHeight; y++)
-            {
-                GridCells[x, y].IsOccupied = false;
-                GridCells[x, y].ObjectType = GridObjectType.Empty;
-
-                // Optionally reset other cell state like visual effects, colors, or behavior
-                ResetCellBehavior(x, y); // Call this if you already use it elsewhere
-            }
-        }
-
-        Debug.Log("[SpawnGrid] Grid cleared.");
-    }
-
+    }    
 }
 
-public class GridCell {
-    public bool IsOccupied;
-    public GridObjectType ObjectType = GridObjectType.Empty;
-}
-
-public enum GridObjectType {
-    Note,
-    Node,
-    Empty,
-    Dust
-}

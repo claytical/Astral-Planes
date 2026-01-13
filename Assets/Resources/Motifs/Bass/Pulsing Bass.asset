@@ -17,21 +17,15 @@ MonoBehaviour:
   scales:
   - item: 0
     weight: 0.6
-  - item: 3
-    weight: 0.3
   - item: 2
-    weight: 0.1
+    weight: 0.23
   patterns:
   - item: 15
-    weight: 0.5
-  - item: 11
-    weight: 0.5
-  - item: 7
     weight: 0.5
   rhythms:
   - item: 0
     weight: 0.6
-  - item: 5
+  - item: 13
     weight: 0.6
   chordFunctions:
   - item: I

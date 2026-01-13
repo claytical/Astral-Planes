@@ -15,21 +15,19 @@ MonoBehaviour:
   id: Lead Smooth Glide
   role: 2
   scales:
-  - item: 0
+  - item: 4
     weight: 0.5
   - item: 5
     weight: 0.3
-  - item: 2
-    weight: 0.2
   patterns:
-  - item: 8
+  - item: 7
     weight: 0.419
   - item: 15
     weight: 0.5
   - item: 5
     weight: 0.5
   rhythms:
-  - item: 5
+  - item: 0
     weight: 0.4
   - item: 1
     weight: 0.4

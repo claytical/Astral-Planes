@@ -71,8 +71,7 @@ private IEnumerator LaunchWhenReady()
             GameFlowManager.Instance.PlayerStatsGrid &&               // UI parent exists
             GameFlowManager.Instance.activeDrumTrack &&               // drums ready
             GameFlowManager.Instance.controller &&                    // tracks configured
-            GameFlowManager.Instance.harmony &&                       // HarmonyDirector bound
-            GameFlowManager.Instance.arp                              // ChordChangeArpeggiator bound
+            GameFlowManager.Instance.harmony                          // HarmonyDirector bound
     );
         
     Debug.Log("[CRASH TEST] Track Ready");
@@ -84,7 +83,6 @@ private IEnumerator LaunchWhenReady()
     var statsUI = Instantiate(playerStatsUI, grid);
     _ui = statsUI.GetComponent<PlayerStats>();
     int w = gfm.spawnGrid.gridWidth;
-    int h = gfm.spawnGrid.gridHeight;
 
 // pick a row near the bottom; tweak as you want
     int spawnY = 1;

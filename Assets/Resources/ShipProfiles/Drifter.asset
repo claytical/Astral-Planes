@@ -26,6 +26,8 @@ MonoBehaviour:
   stopAngularSpeed: 5
   inputDeadzone: 0.2
   envScaleFloor: 0.65
+  carveRadiusMul: 1
+  carvePowerMul: 1.5
   mass: 1.6
   capacity: 100
   burnEfficiency: 1

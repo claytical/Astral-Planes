@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -73,7 +74,8 @@ public class CosmicDust : MonoBehaviour {
         temporaryRegrowDelaySeconds = -1f
     };    
     private float _baseDrainPerSecond;
-
+    private Vector3 _initialLocalScale = Vector3.one;
+    private bool _cachedInitialScale;
     public enum DustBehavior { ViscousSlow, SiltDissipate, StaticCling, CrossCurrent, Turbulent }
     [Header("Behavior")]
     public DustBehavior behavior = DustBehavior.ViscousSlow; // NEW
@@ -101,6 +103,8 @@ public class CosmicDust : MonoBehaviour {
     private bool  _hasImprint;
     private Color _imprintBaseTint;
     private Color _imprintShadowTint;
+    private int _prefabInitialLayer;
+    private bool _prefabLayerCaptured;
 
     private bool _isDespawned;
     private bool _shrinkingFromStar;
@@ -117,6 +121,12 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private float _baseEmission = 1;
 
     void Awake() {
+        if (!_cachedInitialScale)
+        {
+            _initialLocalScale = transform.localScale;
+            if (_initialLocalScale == Vector3.zero) _initialLocalScale = Vector3.one;
+            _cachedInitialScale = true;
+        }
         if (visual.particleSystem == null)
             visual.particleSystem = GetComponent<ParticleSystem>() ?? GetComponentInChildren<ParticleSystem>(true);
 
@@ -136,6 +146,12 @@ public class CosmicDust : MonoBehaviour {
             main.scalingMode = ParticleSystemScalingMode.Local;
             visual.particleSystem.transform.localScale = Vector3.one;
         }
+        if (!_prefabLayerCaptured)
+        {
+            _prefabInitialLayer = gameObject.layer;
+            _prefabLayerCaptured = true;
+        }
+
         // Terrain collider lives on this same prefab (PolygonCollider2D recommended).
         // It contributes to the CompositeCollider2D on the DustPool root.
         if (terrainCollider == null) terrainCollider = GetComponent<Collider2D>();
@@ -174,15 +190,48 @@ public class CosmicDust : MonoBehaviour {
         // Use the larger extent to be safe.
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
     }
+    private void EnsureParticleHierarchyActive()
+    {
+        if (visual.particleSystem == null) return;
+        // Ensure the particle system GO and its parents are active up to this dust root.
+        Transform t = visual.particleSystem.transform;
+        while (t != null)
+        {
+            Debug.Log($"[PS-HIER] {t.name} activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy}");
+
+            if (!t.gameObject.activeSelf)
+                t.gameObject.SetActive(true);
+
+            if (t == transform) break;
+            t = t.parent;
+        }
+        var cols = GetComponentsInChildren<Collider2D>(true);
+        Debug.Log($"[REGROWTH] colliders={cols.Length} enabled={string.Join(",", cols.Select(c=>c.enabled))}");
+    }
     public void OnSpawnedFromPool(Color tint)
     {
+        // Ensure this object is actually usable again
+        if (!_cachedInitialScale)
+        {
+            _initialLocalScale = transform.localScale;
+            if (_initialLocalScale == Vector3.zero) _initialLocalScale = Vector3.one;
+            _cachedInitialScale = true;
+        }
+
+        // CRITICAL: DespawnToPoolInstant() scales to zero; we must undo that here.
+        transform.localScale = _initialLocalScale;
+
+        EnsureParticleHierarchyActive();
         ResetAndPlayParticles();
+
         // Visual reset
         SetTint(tint);
-        //transform.localScale = fullScale;
-        // Physics reset
-        gameObject.layer = solidLayer;
-        if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = true;
+
+        // Physics reset (your existing layer safety)
+        int targetLayer = (solidLayer == 0) ? _prefabInitialLayer : solidLayer;
+        gameObject.layer = targetLayer;
+
+        if (terrainCollider != null) terrainCollider.enabled = true;
     }
     public void SetVisualAlpha(float a)
     {
@@ -500,17 +549,24 @@ public class CosmicDust : MonoBehaviour {
 
     public void PrepareForReuse()
     {
-        // Stop any lingering coroutines from prior life
-        if (_fadeRoutine       != null) { StopCoroutine(_fadeRoutine);       _fadeRoutine       = null; }
-        if (_growInRoutine     != null) { StopCoroutine(_growInRoutine);     _growInRoutine     = null; }
+        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
+        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
 
         _isBreaking = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
-        transform.localScale = Vector3.one;
+
+        // Restore captured prefab/base scale instead of Vector3.one
+        transform.localScale = (_baseLocalScale.sqrMagnitude > 0.0001f)
+            ? _baseLocalScale
+            : (visual.prefabReferenceScale.sqrMagnitude > 0.0001f ? visual.prefabReferenceScale : Vector3.one);
+
         if (terrainCollider != null) terrainCollider.enabled = true;
+
+        var col = GetComponent<Collider2D>();
+        if (col) col.enabled = true;
 
         if (visual.particleSystem != null)
         {
@@ -520,17 +576,11 @@ public class CosmicDust : MonoBehaviour {
             visual.particleSystem.Clear(true);
         }
 
-
         _currentTint.a = 0.5f;
         SetTint(_currentTint);
 
         clearing.hardness01 = 0f;
-
-        var col = GetComponent<Collider2D>();
-        if (col) col.enabled = true;
-
     }
-
     public void ApplyImprint(Color baseTint, Color shadowTint, float hardness01)
     {
         _hasImprint         = true;
@@ -759,6 +809,19 @@ public class CosmicDust : MonoBehaviour {
 // IMPORTANT: no breaking/clearing here.
 
     }
+    
+    private static void EnsureLayerRecursive(GameObject root, int layer)
+    {
+        if (root == null) return;
+        if (root.layer != layer) root.layer = layer;
+
+        for (int i = 0; i < root.transform.childCount; i++)
+        {
+            var child = root.transform.GetChild(i);
+            if (child != null) EnsureLayerRecursive(child.gameObject, layer);
+        }
+    }
+
     private void OnCollisionExit2D(Collision2D collision) {
         // Reset grind timer when the vehicle stops pressing this tile.
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
@@ -776,6 +839,7 @@ public class CosmicDust : MonoBehaviour {
         var main = visual.particleSystem.main;
         SetDustColorAllParticles(_baseColor);
         main.startSize  = _baseSize;
+        Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
 
     private readonly struct PhaseDustConfig
@@ -877,7 +941,8 @@ public class CosmicDust : MonoBehaviour {
     private void ResetAndPlayParticles()
     {
         if (visual.particleSystem == null) return;
-
+        visual.particleSystem.gameObject.SetActive(true);
+        visual.particleSystem.transform.parent.gameObject.SetActive(true);
         var r = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
         if (r != null) r.enabled = true;
 
@@ -888,5 +953,4 @@ public class CosmicDust : MonoBehaviour {
         visual.particleSystem.Simulate(0f, true, true, true);
         visual.particleSystem.Play(true);
     }
-
 }

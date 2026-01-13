@@ -25,4 +25,4 @@ MonoBehaviour:
   denyAlphaBoost: 0.25
   description: Bright, aggressive lines that cut through the mix.
   defaultBehavior: 1
-  allowedMidiPresets: 03000000
+  allowedMidiPresets: 06000000

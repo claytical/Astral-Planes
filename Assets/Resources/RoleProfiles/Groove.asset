@@ -25,4 +25,4 @@ MonoBehaviour:
   denyAlphaBoost: 0.25
   description: Percussive rhythms that give structure and drive.
   defaultBehavior: 3
-  allowedMidiPresets: 0c00000004000000
+  allowedMidiPresets: 0c000000

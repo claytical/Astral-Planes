@@ -45,7 +45,7 @@ public class GameFlowManager : MonoBehaviour
 
     public HarmonyDirector harmony;
     public InstrumentTrackController controller;
-    public ChordChangeArpeggiator arp;
+    //public ChordChangeArpeggiator arp;
     public DrumTrack activeDrumTrack;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
@@ -274,7 +274,6 @@ public class GameFlowManager : MonoBehaviour
         dustGenerator          = null;
         spawnGrid              = null;
         glitch                 = null;
-        arp                    = null;
         playerStatsGrid        = null;
 
         // 5) Load Main (Intro/Selection) scene.
@@ -338,7 +337,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
         Debug.LogError("[GFM] Track setup timed out — missing core refs." +
                        $"\nDrum:{activeDrumTrack} Ctrl:{controller} " +
                        $"\nDust:{dustGenerator} Viz:{noteViz} Harm:{harmony} PTM:{phaseTransitionManager}" +
-                       $"\nARP:{arp} Grid:{spawnGrid} UIGrid:{playerStatsGrid}");
+                       $"\nGrid:{spawnGrid} UIGrid:{playerStatsGrid}");
         _setupInFlight = false;
         yield break;
     }
@@ -348,7 +347,6 @@ private IEnumerator HandleTrackSceneSetupAsync()
               $"\n  Ctrl: {controller}" +
               $"\n  Viz : {noteViz}" +
               $"\n  Harm: {harmony}" +
-              $"\n  ARP : {arp}" +
               $"\n  PTM : {phaseTransitionManager}" +
               $"\n  Grid: {spawnGrid}" +
               $"\n  UI  : {playerStatsGrid}");
@@ -373,10 +371,9 @@ private IEnumerator HandleTrackSceneSetupAsync()
     // --------------------
     // STEP 2: Bind graph + init viz/harmony
     // --------------------
-    Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony BEGIN");
-    arp.Bind(activeDrumTrack, controller);
+
     noteViz.Initialize();
-    harmony.Initialize(activeDrumTrack, controller, arp);
+    harmony.Initialize(activeDrumTrack, controller);
     Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END");
 
 
@@ -425,7 +422,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
 }
 
     private bool HaveAllCoreRefs() { 
-        return activeDrumTrack && controller && dustGenerator && noteViz && harmony && phaseTransitionManager && arp && spawnGrid && playerStatsGrid;
+        return activeDrumTrack && controller && dustGenerator && noteViz && harmony && phaseTransitionManager && spawnGrid && playerStatsGrid;
     }
     private void TryFillTracksBundleIfMissing() {
     // If anchors already set these, these lines do nothing.
@@ -435,7 +432,6 @@ private IEnumerator HandleTrackSceneSetupAsync()
     noteViz              = noteViz              ? noteViz              : FindFirstObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
     harmony              = harmony              ? harmony              : FindFirstObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
     phaseTransitionManager = phaseTransitionManager ? phaseTransitionManager : FindFirstObjectByType<PhaseTransitionManager>(FindObjectsInactive.Include);
-    arp                  = arp                  ? arp                  : FindFirstObjectByType<ChordChangeArpeggiator>(FindObjectsInactive.Include);
     spawnGrid            = spawnGrid            ? spawnGrid            : FindFirstObjectByType<SpawnGrid>(FindObjectsInactive.Include);
 
     if (!playerStatsGrid)
@@ -448,8 +444,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
     private void HandleTrackFinishedSceneSetup()
     {
         currentState = GameState.GameOver;
-        harmony?.CancelBoostArp();
-        harmony?.Initialize(null, null, null); // drops subscriptions safely
+        harmony?.Initialize(null, null); // drops subscriptions safely
     }
     private void HandleTrackSelectionSceneSetup()
     {
@@ -643,7 +638,7 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
 
         // Ensure the coral loop completes (safe even if fadeOutSec == bridgeOnceSec)
         yield return coralAnim;
-}
+    }
     else
     {
         // No coral visualizer available; still hold for exactly one loop and fade audio.
@@ -668,70 +663,67 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     foreach (var t in stillActive)
         t.ClearLoopedNotes();
 
-// Reset bin/loop-width state so the next motif does not inherit multi-bin UI/loop spans.
-// (We keep note content cleared above; this is strictly about loopMultiplier/bin cursors/fill flags.)
-if (controller != null)
-    controller.ResetControllerBinGuards();
+        // Reset bin/loop-width state so the next motif does not inherit multi-bin UI/loop spans.
+        // (We keep note content cleared above; this is strictly about loopMultiplier/bin cursors/fill flags.)
+        if (controller != null)
+            controller.ResetControllerBinGuards(); 
+        
+        controller.BeginNewMotif();
+        
+        foreach (var t in allTracks)
+            if (t != null)
+                t.ResetBinsForPhase();
 
-foreach (var t in allTracks)
-    if (t != null)
-        t.ResetBinsForPhase();
+        if (activeDrumTrack != null)
+            activeDrumTrack.SetBinCount(1);
 
-if (activeDrumTrack != null)
-    activeDrumTrack.SetBinCount(1);
+        if (viz != null)
+            viz.ConfigureBinStrip(1);
 
-if (viz != null)
-    viz.ConfigureBinStrip(1);
+        if (coral != null) coral.gameObject.SetActive(false);
+            // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
 
-    if (coral != null) coral.gameObject.SetActive(false);
-    // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
-
-    // ========= DEMO SHORT-CIRCUIT =========
-    if (demoMode)
-    {
+            // ========= DEMO SHORT-CIRCUIT =========
+    if (demoMode) {
         // tidy up bridge accent / flags
         if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
-        GhostCycleInProgress = false;
+        GhostCycleInProgress = false; 
         SetBridgeVisualMode(false);
-
         // Go back to the starting screen (Main) and clear players.
         // This uses your existing path.
-        QuitToSelection();
+        QuitToSelection(); 
         yield break;
     }
-    // ========= END DEMO SHORT-CIRCUIT =========
+            // ========= END DEMO SHORT-CIRCUIT =========
 
-    
-    // Commit the staged harmony profile now that the outgoing motif has faded.
-    // This ensures the next phase begins with the correct progression without an audible retune mid-bridge.
-    harmony?.CommitNextChordNow(); // commit staged motif chord profile on next downbeat
-// Seeds / visibility for the next phase (full game path)
-    var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
-    controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
-    controller?.ApplySeedVisibility(seeds);
-    ResetPhaseBinStateAndGrid();
+            
+            // Commit the staged harmony profile now that the outgoing motif has faded.
+            // This ensures the next phase begins with the correct progression without an audible retune mid-bridge.
+        harmony?.CommitNextChordNow(); // commit staged motif chord profile on next downbeat
+    // Seeds / visibility for the next phase (full game path)
+        var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
+        controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
+        controller?.ApplySeedVisibility(seeds);
+        ResetPhaseBinStateAndGrid();
 
-    if (activeDrumTrack != null)
-    {
-        // New path: start next phase maze & PhaseStar, carving corridors from
-        // the current Vehicle positions to the star cell.
-        // New path: start next phase maze & PhaseStar, carving corridors from
-// the current Vehicle positions to the star cell.
-yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
+        if (activeDrumTrack != null)
+        {
+            // New path: start next phase maze & PhaseStar, carving corridors from
+            // the current Vehicle positions to the star cell.
+            // New path: start next phase maze & PhaseStar, carving corridors from
+    // the current Vehicle positions to the star cell.
+    yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
 
-// Now that the new phase geometry/star exist, we can safely restore visuals without a flash.
-SetBridgeCinematicMode(false);
-if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
-
-// Bring audio back for the new motif.
-StartCoroutine(FadeInBridgeAudio(allTracks, drum, phaseBridgeFadeInSeconds));
-}
-    else
-    {
-        Debug.LogWarning("[BRIDGE] No DrumTrack available after bridge; cannot start next phase star.");
-    }
-
-    if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
+    // Now that the new phase geometry/star exist, we can safely restore visuals without a flash.
+    SetBridgeCinematicMode(false);
+   if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
+        // Bring audio back for the new motif.
+        StartCoroutine(FadeInBridgeAudio(allTracks, drum, phaseBridgeFadeInSeconds)); 
+        }
+        else {
+                Debug.LogWarning("[BRIDGE] No DrumTrack available after bridge; cannot start next phase star."); 
+        } 
+        if (sig.includeDrums && drum) drum.SetBridgeAccent(false); 
     GhostCycleInProgress = false;
     SetBridgeVisualMode(false);
 }
@@ -1283,7 +1275,6 @@ public void StartMazeAndStarForPhase(MusicalPhase phase)
         dustGenerator          = a.dustGenerator;
         spawnGrid              = a.spawnGrid;          // <- now reliably assigned
         glitch                 = a.glitchManager;      // <- now reliably assigned
-        arp                    = a.arp;
         Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
     }
 
@@ -1297,7 +1288,6 @@ public void StartMazeAndStarForPhase(MusicalPhase phase)
         if (dustGenerator          == a.dustGenerator)          dustGenerator          = null;
         if (spawnGrid              == a.spawnGrid)              spawnGrid              = null;
         if (glitch                 == a.glitchManager)          glitch                 = null;
-        if (arp                    == a.arp)                    arp                    = null;
     }
     
 
