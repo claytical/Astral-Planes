@@ -53,6 +53,7 @@ MonoBehaviour:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
     particleFootprintMul: 0.775
+    sprite: {fileID: 8999714297043290424}
     starRemovesWithoutRegrow: 0
     starAlphaFadeBias: 0
     fadeSeconds: 0
@@ -156,7 +157,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &3055904626956396221
 Transform:
   m_ObjectHideFlags: 0
@@ -4984,14 +4985,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5160715109473589012}
-  - component: {fileID: 4850460592595600707}
+  - component: {fileID: 8999714297043290424}
   m_Layer: 7
   m_Name: Circle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &5160715109473589012
 Transform:
   m_ObjectHideFlags: 0
@@ -5007,7 +5008,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4213040972611002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &4850460592595600707
+--- !u!212 &8999714297043290424
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -5054,13 +5055,13 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b,
+  m_Sprite: {fileID: 7476157650917278790, guid: c414f77bbc0ce4375b2a81edf31f558d,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.4117647}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.4, y: 0.4}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
