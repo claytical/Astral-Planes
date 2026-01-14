@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -17,6 +16,7 @@ public class CosmicDust : MonoBehaviour {
         [Header("Visual Footprint")]
         [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
 
+        public SpriteRenderer sprite;
         [Header("PhaseStar Proximity")]
         public bool  starRemovesWithoutRegrow; // if false, it will regrow via generator
         public float starAlphaFadeBias;        // keep a little glow as it shrinks
@@ -123,6 +123,7 @@ public class CosmicDust : MonoBehaviour {
     void Awake() {
         if (!_cachedInitialScale)
         {
+            
             _initialLocalScale = transform.localScale;
             if (_initialLocalScale == Vector3.zero) _initialLocalScale = Vector3.one;
             _cachedInitialScale = true;
@@ -233,20 +234,7 @@ public class CosmicDust : MonoBehaviour {
 
         if (terrainCollider != null) terrainCollider.enabled = true;
     }
-    public void SetVisualAlpha(float a)
-    {
-        if (visual.particleSystem == null) return;
-        var main = visual.particleSystem.main;
 
-        // Preserve tint but adjust alpha
-        Color c = _currentTint; // however you store tint; otherwise keep a cached tint
-        c.a = Mathf.Clamp01(a);
-        main.startColor = c;
-
-        // Optionally, stop emission entirely below cutoff
-        var emission = visual.particleSystem.emission;
-        emission.enabled = a > 0.001f;
-    }
     public void ConfigureForPhase(MusicalPhase phase)
     {
         // One switch → one config object → one assignment block.
@@ -361,9 +349,10 @@ public class CosmicDust : MonoBehaviour {
     }
     public void SetTint(Color tint)
     {
+        _currentTint = tint;
+        visual.sprite.color = tint;
         if (!visual.particleSystem) return;
 
-        _currentTint = tint;
         SetDustColorAllParticles(tint);
     }
 
@@ -674,6 +663,7 @@ public class CosmicDust : MonoBehaviour {
         _baseSize  = main.startSize.constant;
         _baseAlpha = _baseColor.a;
         _baseCaptured = true;
+        
     }
 
     private void DisableInteractionImmediately() { 
