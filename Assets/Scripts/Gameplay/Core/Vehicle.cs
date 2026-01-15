@@ -744,6 +744,7 @@ public class Vehicle : MonoBehaviour
 
         // Contact point
         Vector2 contact = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
+        Debug.Log($"[DUST] Do Boost Carve at {contact}");
         DoBoostCarve(coll);
 
 
@@ -771,11 +772,14 @@ public class Vehicle : MonoBehaviour
                 {
                     Vector2 probe = contact + v.normalized * (cellWorld * 0.95f * i);
                     gfm.dustGenerator.TryCarveDustAtWorldPoint(probe, resolveRadiusCells: 1, fadeSeconds: 0.20f);
+                    Debug.Log($"[DUST] Biting additional {i} of {budget}");
                 }
                 break;
 
             case DustCarveMode.RayMarchLine:
                 Debug.Log($"[VEHICLE:COLLISION] raymarch line budget={budget}");
+                Debug.Log($"[DUST] Ray line march to {cellWorld} with budget {budget}");
+
                 CarveForward_RayMarch(contact, v, budget, cellWorld);
                 break;
 
@@ -802,6 +806,7 @@ public class Vehicle : MonoBehaviour
         // Rate-limit carving so it’s stable and doesn’t explode CPU
         if (Time.time < _nextCarveTime) return;
         _nextCarveTime = Time.time + (1f / Mathf.Max(1f, carveTickHz));
+        Debug.Log($"[DUST] Vehicle continuing boost carving at {coll}");
 
         DoBoostCarve(coll);
     }
@@ -818,7 +823,6 @@ public class Vehicle : MonoBehaviour
 
         Vector2 contactPoint = collision.GetContact(0).point;
 
-        var drumTrack = GameFlowManager.Instance?.activeDrumTrack;
         if (drumTrack == null) return;
 
         // Vehicle carve: 1 cell wide, temporary, normal regrow

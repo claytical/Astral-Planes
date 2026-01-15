@@ -18,7 +18,7 @@ MonoBehaviour:
     chargeColor: {r: 0.38042897, g: 0.9716981, b: 0.41427955, a: 1}
     denyColor: {r: 0.33882165, g: 0.509434, b: 0.405583, a: 1}
     shadowColor: {r: 0.22908507, g: 0.33962262, b: 0.28066927, a: 1}
-  baseAlpha: 0.797
+  baseAlpha: 1
   chargeToWhite: 1
   denyToShadow: 0.75
   chargeAlphaBoost: 1

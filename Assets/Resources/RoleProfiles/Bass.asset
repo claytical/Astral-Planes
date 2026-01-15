@@ -18,11 +18,11 @@ MonoBehaviour:
     chargeColor: {r: 0.7647059, g: 0.654902, b: 1, a: 1}
     denyColor: {r: 0.972549, g: 0.14509802, b: 0.8373217, a: 1}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
-  baseAlpha: 0.805
+  baseAlpha: 1
   chargeToWhite: 1
   denyToShadow: 0.75
   chargeAlphaBoost: 1
-  denyAlphaBoost: 0.346
+  denyAlphaBoost: 0.618
   description: Deep and grounding. Adds weight to the groove with low-end power.
   defaultBehavior: 0
   allowedMidiPresets: 00000000

@@ -388,13 +388,17 @@ public class NoteVisualizer : MonoBehaviour
         int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
         float stepDuration = clipLen / drumTotalSteps; 
         float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
-        float globalElapsed = (float)(AudioSettings.dspTime - _drum.startDspTime); 
+        double leaderStart = (_drum != null && _drum.leaderStartDspTime > 0.0) ? _drum.leaderStartDspTime : _drum.startDspTime; 
+        float globalElapsed = (float)(AudioSettings.dspTime - leaderStart); 
         float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
         float canvasWidth = GetScreenWidth();
         float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
         playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
         float drumLoopLength = clipLen; 
-        float drumElapsed    = (float)((AudioSettings.dspTime - _drum.startDspTime) % drumLoopLength);
+        // Clip time is derived from leader transport so visual bin position and step sampling share the same clock.
+        float leaderT = (float)((AudioSettings.dspTime - leaderStart) % fullVisualLoopDuration); 
+        if (leaderT < 0f) leaderT += fullVisualLoopDuration; 
+        float drumElapsed = leaderT % drumLoopLength;
         int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % Mathf.Max(1, drumTotalSteps);
 
 
@@ -876,13 +880,12 @@ public class NoteVisualizer : MonoBehaviour
             return true;
         }
     }
-    public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
+  public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
 {
     Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
     Debug.Log($"[NoteViz] Placing Persistent Note marker for {track} at {stepIndex}, lit {lit} burst id {burstId}");
     var key = (track, stepIndex);
 
-    // Resolve row (we'll need it for adoption or creation)
     int trackIndex = Array.IndexOf(_ctrl.tracks, track);
     Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name} index: {trackIndex}");
 
@@ -891,21 +894,21 @@ public class NoteVisualizer : MonoBehaviour
     Rect rowRect = row.rect;
     Debug.Log($"[PLACE] Using {row.name} on {track.name} index: {trackIndex}");
 
-    // Compute once and reuse everywhere (prevents multiple declarations)
     bool inFilledBin = SafeIsStepInFilledBin(track, stepIndex);
     bool isLoopOwned = (burstId < 0);
     bool shouldLight = isLoopOwned ? lit : (lit && inFilledBin);
+
     Debug.Log($"[PLACE] {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
-    // REUSE if we already have one in the dictionary
+
+    // REUSE
     if (noteMarkers.TryGetValue(key, out var existing) && existing && existing.gameObject.activeInHierarchy)
     {
         var existingTag0 = existing.GetComponent<MarkerTag>();
-        if (existingTag0 != null && existingTag0.isAscending) { 
-            // Do not mutate tags/lighting mid-ascent.
+        if (existingTag0 != null && existingTag0.isAscending)
             return existing.gameObject;
-        }
+
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, existing);
-        // Do NOT create a new one while animating—just keep the existing and (optionally) defer lighting
+
         if (_animatingSteps.Contains(key))
         {
             Debug.Log($"[PLACE] Animating Steps Contains {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
@@ -916,39 +919,41 @@ public class NoteVisualizer : MonoBehaviour
 
         if (shouldLight)
         {
-            // Light ONLY if actually in the loop (i.e., this step persisted)
             bool inLoop = track.GetPersistentLoopNotes().Any(n => n.Item1 == stepIndex);
             if (inLoop)
             {
                 var existingTag = existing.GetComponent<MarkerTag>() ?? existing.gameObject.AddComponent<MarkerTag>();
                 existingTag.isPlaceholder = false;
-                if (existingTag.burstId >= 0) existingTag.burstId = burstId; 
+                if (burstId >= 0) existingTag.burstId = burstId; // fix: don’t gate on existingTag.burstId
             }
         }
         else
         {
-            // Force placeholder/grey if the bin is empty or caller requested placeholder
             var tag = existing.GetComponent<MarkerTag>() ?? existing.gameObject.AddComponent<MarkerTag>();
             tag.isPlaceholder = true;
             if (burstId >= 0) tag.burstId = burstId;
+
             var ml = existing.GetComponent<MarkerLight>() ?? existing.gameObject.AddComponent<MarkerLight>();
             ml.SetGrey(track.trackColor);
+
             Debug.Log($"[NV:MARKER_PLACEHOLDER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={existing.gameObject.GetInstanceID()} placeholder=True");
         }
-        Debug.Log($"[PLACE] Returning existing object {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
 
+        Debug.Log($"[PLACE] Returning existing object {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
         return existing.gameObject;
     }
 
-    // ADOPT any existing scene marker at (track,step) to avoid dupes
+    // ADOPT
     var adopt = TryAdoptExistingAt(track, stepIndex, row);
     if (adopt)
     {
         Debug.Log($"[PLACE] Trying to adopt {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
-
         Debug.Log($"[NoteViz] Found note to adopt. This shouldn't happen.");
+
         noteMarkers[key] = adopt;
+
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, adopt);
+
         var tag = adopt.GetComponent<MarkerTag>() ?? adopt.gameObject.AddComponent<MarkerTag>();
         tag.track = track;
         tag.step = stepIndex;
@@ -956,54 +961,65 @@ public class NoteVisualizer : MonoBehaviour
         if (shouldLight)
         {
             tag.isPlaceholder = false;
-            if (burstId >= 0) tag.burstId = burstId; 
+            if (burstId >= 0) tag.burstId = burstId;
         }
         else
         {
             tag.isPlaceholder = true;
             if (burstId >= 0) tag.burstId = burstId;
+
             var ml = adopt.GetComponent<MarkerLight>() ?? adopt.gameObject.AddComponent<MarkerLight>();
             ml.SetGrey(track.trackColor);
         }
 
         Debug.Log($"[NoteViz] ADOPT marker track={track.name} step={stepIndex} lit={lit} burst={burstId} go={adopt.gameObject.GetInstanceID()}");
         Debug.Log($"[PLACE] Adopting {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
-
         return adopt.gameObject;
     }
 
     // Positioning for creation
-    int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
-    int binSize    = Mathf.Max(1, track.BinSize()); 
-    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
-    float xLocal   = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
+    int totalSteps = Mathf.Max(1, track.GetTotalSteps());
+    int binSize = Mathf.Max(1, track.BinSize());
+    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
+    float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
 
     Debug.Log($"xLocal : {xLocal} for track {track.name} stepIndex {stepIndex} lit={lit}");
+
     float bottomWorldY = GetBottomWorldY();
     float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
 
-    // CREATE (final fallback; idempotent guard just in case)
+    // Idempotent guard
     if (noteMarkers.TryGetValue(key, out var appeared) && appeared)
     {
         Debug.Log($"[PLACE] Returning Fallback {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, appeared);
         return appeared.gameObject;
     }
-        // Instantiate as a child, then set LOCAL (row-space) coordinates
-    GameObject marker = Instantiate(notePrefab, new Vector3(xLocal, bottomLocalY, 0f), Quaternion.identity, row);
+
+    // ------------------------------------------------------------
+    // CREATE: instantiate as child with worldPositionStays=false,
+    // then set LOCAL (row-space) coordinates.
+    // ------------------------------------------------------------
+    GameObject marker = Instantiate(notePrefab, row, worldPositionStays: false);
+    marker.transform.localPosition = new Vector3(xLocal, bottomLocalY, 0f);
+
     var newTag = marker.GetComponent<MarkerTag>() ?? marker.AddComponent<MarkerTag>();
     newTag.track = track;
     newTag.step = stepIndex;
     newTag.isPlaceholder = !shouldLight;
-    newTag.burstId = (newTag.isPlaceholder ? burstId : (burstId >= 0 ? burstId : newTag.burstId));
+
+    // If a burst is provided, stamp it. Otherwise leave as-is (loop-owned).
+    if (burstId >= 0) newTag.burstId = burstId;
 
     noteMarkers[key] = marker.transform;
     Debug.Log($"[NV:MARKER_REGISTER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={marker.gameObject.GetInstanceID()} lit={shouldLight}");
-Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
+    Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
+
     if (shouldLight)
     {
         var vnm = marker.GetComponent<VisualNoteMarker>();
         if (vnm != null) vnm.Initialize(track.trackColor);
+
         var light = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
         light.LightUp(track.trackColor);
     }
@@ -1011,12 +1027,13 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
     {
         var vnm = marker.GetComponent<VisualNoteMarker>();
         if (vnm != null) vnm.SetWaitingParticles(track.trackColor);
+
         var ml = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
         ml.SetGrey(track.trackColor);
         Debug.Log($"[NOTEMARKER] Setting Marker Grey... position: {ml.transform.position}");
     }
-    Debug.Log($"Returning final marker [PLACE] {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
 
+    Debug.Log($"Returning final marker [PLACE] {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
     return marker;
 }
 
@@ -1027,7 +1044,7 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
         rt.GetWorldCorners(worldCorners);
         return worldCorners[0].y; // bottom-left corner
     }
-    public void UpdateNoteMarkerPositions()
+    public void UpdateNoteMarkerPositions(bool forceXReflow = false)
     {
         var deadKeys = new List<(InstrumentTrack, int)>();
         foreach (var kvp in noteMarkers)
@@ -1035,7 +1052,7 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
             var track  = kvp.Key.Item1;
             var step   = kvp.Key.Item2;
             var marker = kvp.Value;
-            if (_animatingSteps.Contains((track, step))) 
+            if (!forceXReflow && _animatingSteps.Contains((track, step))) 
                 continue;
             if (marker == null) { deadKeys.Add(kvp.Key); continue; }
 
@@ -1435,127 +1452,285 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
             ? new Vector3(xLocal, lp.y, lp.z)      // preserve Y during ascent
             : new Vector3(xLocal, lp.y, 0f);       // preserve Y generally; row handles baseline
     }
+private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, bool dryRun = true)
+{
+    int trackIndex = Array.IndexOf(_ctrl.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
 
-    private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, bool dryRun = true)
+    var row = trackRows[trackIndex];
+
+    // Build dict-owned set for this track once (prevents O(n^2) checks)
+    var owned = new HashSet<Transform>();
+    foreach (var kv in noteMarkers)
     {
-        int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-        if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+        if (kv.Key.Item1 != track) continue;
+        if (kv.Value) owned.Add(kv.Value);
+    }
 
-        var row = trackRows[trackIndex];
+    var toDestroy = new List<GameObject>();
+    var debugNotOwned = new List<GameObject>();
+    var debugUntaggedUnowned = new List<GameObject>();
 
-        var toDestroy     = new List<GameObject>();
-        var debugNotOwned = new List<GameObject>();
+    for (int i = 0; i < row.childCount; i++)
+    {
+        var child = row.GetChild(i);
+        if (!child) continue;
 
-        for (int i = 0; i < row.childCount; i++)
+        var tag = child.GetComponent<MarkerTag>();
+
+        // NEW: if untagged and not dict-owned, it's unmanaged “mystery” content.
+        if (tag == null)
         {
-            var child = row.GetChild(i);
-            if (!child) continue;
-
-            var tag = child.GetComponent<MarkerTag>();
-            if (tag == null) continue;
-
-            // Never treat an in-flight ascent marker as an orphan.
-            if (tag.isAscending)
-                continue;
-
-            var key = (track, tag.step);
-
-            bool hasKey = noteMarkers.TryGetValue(key, out var tr) && tr;
-            bool sameObject = hasKey && tr.gameObject == child.gameObject;
-
-            bool inFilledBin = true;
-            try { inFilledBin = track.IsStepInFilledBin(tag.step); } catch {}
-
-            // Only consider destroying placeholders if their bin is filled.
-            // If bin is NOT filled, placeholders are legitimate “preview” visuals.
-            bool stalePlaceholder = tag.isPlaceholder && inFilledBin && (tag.burstId >= 0) && (tag.burstId != activeBurstId);
-
-            // Duplicate object (dict has key, but points to a different GO)
-            bool duplicateForKey = hasKey && !sameObject;
-
-            // Debug: record “not owned by dict” markers
-            if (!sameObject) debugNotOwned.Add(child.gameObject);
-
-            // Extra safety: if the dict-owned marker is ascending, do not destroy anything for this key.
-            // (Prevents killing the “wrong” marker during ascent/relayout churn.)
-            if (duplicateForKey)
+            bool isOwned = owned.Contains(child);
+            if (!isOwned)
             {
-                var dictTag = tr.GetComponent<MarkerTag>();
-                if (dictTag != null && dictTag.isAscending)
-                    duplicateForKey = false;
-            }
-
-            if (stalePlaceholder || duplicateForKey)
+                debugUntaggedUnowned.Add(child.gameObject);
+                // Treat as orphan candidate (safe because we only act within the row)
                 toDestroy.Add(child.gameObject);
-
-            Debug.Log($"[ORPHAN] considering {tag.step} ph={tag.isPlaceholder} bid={tag.burstId} " +
-                      $"hasKey={hasKey} same={sameObject} stalePH={stalePlaceholder} dup={duplicateForKey} (active={activeBurstId})");
-        }
-
-        if (debugNotOwned.Count > 0)
-        {
-            Debug.LogWarning($"[NoteViz] {(dryRun ? "FOUND" : "CLEANING")} not-owned markers track={track.name} :: " +
-                             string.Join(", ", debugNotOwned.Select(o => o ? o.GetInstanceID().ToString() : "null")));
-        }
-
-        if (!dryRun)
-        {
-            foreach (var go in toDestroy)
-            {
-    #if UNITY_EDITOR
-                if (!Application.isPlaying) DestroyImmediate(go);
-                else Destroy(go);
-    #else
-                Destroy(go);
-    #endif
             }
+            continue;
+        }
+
+        // Never treat an in-flight ascent marker as an orphan.
+        if (tag.isAscending)
+            continue;
+
+        var key = (track, tag.step);
+
+        bool hasKey = noteMarkers.TryGetValue(key, out var tr) && tr;
+        bool sameObject = hasKey && tr.gameObject == child.gameObject;
+
+        bool inFilledBin = true;
+        try { inFilledBin = track.IsStepInFilledBin(tag.step); } catch { }
+
+        // Only consider destroying placeholders if their bin is filled.
+        bool stalePlaceholder = tag.isPlaceholder && inFilledBin && (tag.burstId >= 0) && (tag.burstId != activeBurstId);
+
+        // Duplicate object (dict has key, but points to a different GO)
+        bool duplicateForKey = hasKey && !sameObject;
+
+        if (!sameObject) debugNotOwned.Add(child.gameObject);
+
+        // Extra safety: if the dict-owned marker is ascending, do not destroy anything for this key.
+        if (duplicateForKey)
+        {
+            var dictTag = tr.GetComponent<MarkerTag>();
+            if (dictTag != null && dictTag.isAscending)
+                duplicateForKey = false;
+        }
+
+        if (stalePlaceholder || duplicateForKey)
+            toDestroy.Add(child.gameObject);
+
+        Debug.Log($"[ORPHAN] considering {tag.step} ph={tag.isPlaceholder} bid={tag.burstId} " +
+                  $"hasKey={hasKey} same={sameObject} stalePH={stalePlaceholder} dup={duplicateForKey} (active={activeBurstId})");
+    }
+
+    if (debugNotOwned.Count > 0)
+    {
+        Debug.LogWarning($"[NoteViz] {(dryRun ? "FOUND" : "CLEANING")} not-owned markers track={track.name} :: " +
+                         string.Join(", ", debugNotOwned.Select(o => o ? o.GetInstanceID().ToString() : "null")));
+    }
+
+    if (debugUntaggedUnowned.Count > 0)
+    {
+        Debug.LogWarning($"[NoteViz] {(dryRun ? "FOUND" : "CLEANING")} UNTAGGED+UNOWNED markers track={track.name} :: " +
+                         string.Join(", ", debugUntaggedUnowned.Select(o => o ? o.GetInstanceID().ToString() : "null")));
+    }
+
+    if (!dryRun)
+    {
+        foreach (var go in toDestroy)
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) DestroyImmediate(go);
+            else Destroy(go);
+#else
+            Destroy(go);
+#endif
         }
     }
-    private float GetScreenWidth()
-    {
+}
+
+    private float GetScreenWidth() {
         RectTransform rt = _worldSpaceCanvas.GetComponent<RectTransform>();
         return rt.rect.width;
     }
-    public void RecomputeTrackLayout(InstrumentTrack track)
+   public void RecomputeTrackLayout(InstrumentTrack track)
+{
+    Debug.Log($"[RECOMPUTE] {track?.name ?? "NULL"} Running");
+    if (track == null) return;
+
+    int trackIndex = Array.IndexOf(_ctrl.tracks, track);
+    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+
+    RectTransform row = trackRows[trackIndex];
+    Rect rowRect = row.rect;
+
+    int totalSteps = Mathf.Max(1, track.GetTotalSteps());
+    int binSize    = Mathf.Max(1, track.BinSize());
+
+    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
+
+    int leaderBinsBase;
+    if (_forcedLeaderSteps >= 1)
+        leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
+    else
+        leaderBinsBase = Mathf.Max(1, _ctrl.GetMaxActiveLoopMultiplier());
+
+    int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize));
+
+    Debug.Log($"[RECOMPUTE] Track: {track.name} (totalSteps={totalSteps}, binSize={binSize}, leaderBinsForPlacement(pre)={leaderBinsForPlacement}, leaderBinsBase={leaderBinsBase}, trackBins={trackBins})");
+
+    leaderBinsForPlacement = Mathf.Max(leaderBinsBase, trackBins);
+    Debug.Log($"[RECOMPUTE] LeaderBinsForPlacement(final)={leaderBinsForPlacement}");
+
+    float bottomWorldY = GetBottomWorldY();
+    float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
+
+    // -----------------------------------------------------------------
+    // 1) Reconcile duplicates: choose a canonical marker per step
+    //    based on tags on row children, then force noteMarkers to match.
+    // -----------------------------------------------------------------
+    var chosenByStep = new Dictionary<int, Transform>(64);
+    var chosenTagByStep = new Dictionary<int, MarkerTag>(64);
+
+    for (int i = 0; i < row.childCount; i++)
     {
-        if (track == null) return;
+        var child = row.GetChild(i);
+        if (!child) continue;
 
-        int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-        if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
+        var tag = child.GetComponent<MarkerTag>();
+        if (tag == null) continue;
 
-        RectTransform row = trackRows[trackIndex];
-        Rect rowRect      = row.rect;
+        if (tag.track != track) continue;
 
-        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
-        int binSize = Mathf.Max(1, track.BinSize()); 
-        int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
-        int leaderBinsBase; 
-        if (_forcedLeaderSteps >= 1) 
-            leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
-        else 
-            leaderBinsBase = Mathf.Max(1, _ctrl.GetMaxActiveLoopMultiplier());
-        
-        // Ensure we include this track's current bins in placement width.
-        int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize)); 
-        leaderBinsForPlacement = Mathf.Max(leaderBinsBase, trackBins);
+        int step = tag.step;
+        if (step < 0) continue;
 
-        float bottomWorldY = GetBottomWorldY();
-        float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y; 
-
-        var kvs = noteMarkers.ToArray();
-        foreach (var kv in kvs)
+        // If multiple markers exist for this step, pick a canonical one.
+        if (!chosenByStep.TryGetValue(step, out var existingTf) || !existingTf)
         {
-            var key = kv.Key;
-            var tf  = kv.Value;
-            if (key.Item1 != track || !tf) continue;
+            chosenByStep[step] = child;
+            chosenTagByStep[step] = tag;
+            continue;
+        }
 
-            int stepIndex = key.Item2;
-            float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
-            var lp = tf.localPosition;
-            float yLocal = IsAscending(tf) ? lp.y : bottomLocalY; 
-            tf.localPosition = new Vector3(xLocal, yLocal, lp.z);
+        var existingTag = chosenTagByStep[step];
+
+        // Priority rules:
+        // 1) Prefer ascending over non-ascending (ascending is the one that should align with audio during ascent)
+        // 2) Prefer non-placeholder over placeholder
+        // 3) Prefer higher burstId (newer/explicit) when all else equal
+        bool aAsc = tag.isAscending;
+        bool bAsc = existingTag != null && existingTag.isAscending;
+
+        bool aPH = tag.isPlaceholder;
+        bool bPH = existingTag != null && existingTag.isPlaceholder;
+
+        int aBid = tag.burstId;
+        int bBid = existingTag != null ? existingTag.burstId : -999999;
+
+        bool takeA = false;
+
+        if (aAsc != bAsc) takeA = aAsc;                       // ascending wins
+        else if (aPH != bPH) takeA = !aPH;                    // non-placeholder wins
+        else if (aBid != bBid) takeA = aBid > bBid;           // higher burst id wins (heuristic)
+        else takeA = false;                                   // keep existing deterministically
+
+        if (takeA)
+        {
+            chosenByStep[step] = child;
+            chosenTagByStep[step] = tag;
         }
     }
+
+    // Force dictionary to point at the canonical marker for each discovered step.
+    foreach (var kv in chosenByStep)
+    {
+        int step = kv.Key;
+        var tf   = kv.Value;
+        if (!tf) continue;
+
+        var dictKey = (track, step);
+        if (noteMarkers.TryGetValue(dictKey, out var oldTf) && oldTf && oldTf != tf)
+        {
+            Debug.LogWarning($"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
+        }
+        noteMarkers[dictKey] = tf;
+    }
+
+    // -----------------------------------------------------------------
+    // 2) Reposition the canonical instances (dict-owned after reconciliation).
+    // -----------------------------------------------------------------
+    var kvs = noteMarkers.ToArray();
+    foreach (var kv in kvs)
+    {
+        var key = kv.Key;
+        var tf  = kv.Value;
+
+        if (key.Item1 != track || !tf) continue;
+
+        int stepIndex = key.Item2;
+
+        float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
+
+        var lp = tf.localPosition;
+
+        // Preserve Y if ascending, otherwise pin to bottom.
+        float yLocal = IsAscending(tf) ? lp.y : bottomLocalY;
+
+        tf.localPosition = new Vector3(xLocal, yLocal, lp.z);
+
+        // Optional high-signal logging (can be noisy)
+        Debug.Log($"[RECOMPUTE] APPLY track={track.name} step={stepIndex} go={tf.gameObject.GetInstanceID()} asc={IsAscending(tf)} x={xLocal} y={yLocal}");
+    }
+
+    // -----------------------------------------------------------------
+    // 3) Optional cleanup: destroy non-canonical duplicates in this row.
+    //    This is what removes the “mystery” markers during commit expand.
+    // -----------------------------------------------------------------
+    for (int i = row.childCount - 1; i >= 0; i--)
+    {
+        var child = row.GetChild(i);
+        if (!child) continue;
+
+        var tag = child.GetComponent<MarkerTag>();
+        if (tag == null) continue;
+        if (tag.track != track) continue;
+
+        int step = tag.step;
+        if (step < 0) continue;
+
+        if (!chosenByStep.TryGetValue(step, out var canonical) || !canonical) continue;
+
+        if (child == canonical) continue;
+
+        // Don’t kill things mid-animation churn.
+        bool isAnimatingNow = false;
+        if (_animatingSteps != null)
+        {
+            var animKey = (track, step);
+            isAnimatingNow = _animatingSteps.Contains(animKey);
+        }
+
+        if (isAnimatingNow)
+        {
+            Debug.LogWarning($"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
+            continue;
+        }
+
+        Debug.LogWarning($"[RECOMPUTE] DESTROY_DUP track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()} dupAsc={tag.isAscending} dupPH={tag.isPlaceholder} dupBid={tag.burstId}");
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying) DestroyImmediate(child.gameObject);
+        else Destroy(child.gameObject);
+#else
+        Destroy(child.gameObject);
+#endif
+    }
+}
+
     private int GetLeaderBinsForPlacement(InstrumentTrack track, int totalSteps, int binSize) {
         int leaderBinsBase; 
         if (_forcedLeaderSteps >= 1) { 
@@ -1568,7 +1743,6 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
         int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize)); 
         return Mathf.Max(leaderBinsBase, trackBins);
     }
-
     public void RequestLeaderGridChange(int newLeaderSteps) { 
         // Apply immediately to prevent left-half folding during growth.
         // NOTE: This method previously ignored its parameter; it now becomes the single
@@ -1578,7 +1752,7 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
          if (_ctrl?.tracks == null) return;
          foreach (var t in _ctrl.tracks) 
              if (t) RecomputeTrackLayout(t);
-         UpdateNoteMarkerPositions();
+         UpdateNoteMarkerPositions(true);
     }
     private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
         int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
@@ -1624,30 +1798,5 @@ Debug.Log($"[NOTEMARKER] Size: {noteMarkers.Count} Key: {key}");
         }
         return false;
     }
-    // Returns all (step, go, tag) markers currently drawn for a given track.
-    private IEnumerable<(int step, Transform tr, MarkerTag tag)> EnumerateTrackMarkers(InstrumentTrack track)
-    {
-        foreach (var kv in noteMarkers)
-        {
-            var (t, step) = kv.Key;
-            if (t != track) continue;
-            var tr = kv.Value;
-            if (!tr || !tr.gameObject) continue;
-
-            var tag = tr.GetComponent<MarkerTag>();
-            yield return (step, tr, tag);
-        }
-    }
-
-    private void DestroyMarkerImmediateSafe(Transform tr)
-    {
-        if (!tr) return;
-#if UNITY_EDITOR
-        if (!Application.isPlaying) UnityEngine.Object.DestroyImmediate(tr.gameObject);
-        else UnityEngine.Object.Destroy(tr.gameObject);
-#else
-    UnityEngine.Object.Destroy(tr.gameObject);
-#endif
-    }
-
+    
 }
