@@ -58,6 +58,7 @@ public class DrumTrack : MonoBehaviour
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
     public double startDspTime;
+    public double leaderStartDspTime { get; private set; }
     public List<PhaseSnapshot> SessionPhases = new();
     public List <MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
@@ -308,23 +309,37 @@ public class DrumTrack : MonoBehaviour
         // 2) Transport/clip guards
         if (drumAudioSource == null || !HasValidClipLen || totalSteps <= 0)
             return;
+        
         double elapsed = AudioSettings.dspTime - startDspTime;
 
-        double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec); // leader loop length (e.g., 6s)
-        int effectiveLoopCount = (int)System.Math.Floor(elapsed / effLen);
-
-        if (effectiveLoopCount != _lastEffectiveLoopCount)
-        {
-            _lastEffectiveLoopCount = effectiveLoopCount;
-            completedLoops = effectiveLoopCount;
-
-            // This is now a true "leader loop boundary"
+        // ---- Leader-loop transport (single source of truth) ----
+        // startDspTime is the audio clip schedule anchor; leaderStartDspTime is the leader-loop transport anchor.
+        // leaderStartDspTime may be rebased at boundaries when EffectiveLoopLengthSec changes (expand/collapse).
+        if (leaderStartDspTime <= 0.0) 
+            leaderStartDspTime = startDspTime;
+        
+        double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec); // leader loop length (seconds)
+        
+        // Advance leader-loop boundaries monotonically using the transport anchor (no floor(elapsed/len) reinterpretation).
+        // Guard against rare multi-boundary catchup (e.g., hitch) and handler-driven len changes.
+        const int kMaxBoundaryCatchup = 4;
+        int catchup = 0; 
+        while (AudioSettings.dspTime - leaderStartDspTime >= effLen && catchup < kMaxBoundaryCatchup) {
+            leaderStartDspTime += effLen; 
+            completedLoops++; 
+            _lastEffectiveLoopCount = completedLoops; // keep legacy field coherent for debugging
+            // True "leader loop boundary"
             OnLoopBoundary?.Invoke();
+            
+            // Handlers (expand/collapse) can change EffectiveLoopLengthSec. Re-snapshot for the next cycle.
+            effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec); 
+            catchup++;
         }
+
 
         int leaderSteps = GetLeaderSteps();
         // Use the EFFECTIVE loop length so step indexing stays aligned with expanded bins.
-        float elapsedTime  = (float)(AudioSettings.dspTime - startDspTime);
+        float elapsedTime  = (float)(AudioSettings.dspTime - leaderStartDspTime);
         float effectiveLen = EffectiveLoopLengthSec;
 
         float stepDuration = (leaderSteps > 0) ? (effectiveLen / leaderSteps) : 0f;
@@ -339,7 +354,7 @@ public class DrumTrack : MonoBehaviour
         {
             int   bins = Mathf.Max(1, _binCount);
             double dsp = AudioSettings.dspTime;
-            double pos = (dsp - startDspTime) % effectiveLen;
+            double pos = (dsp - leaderStartDspTime) % effectiveLen;
             if (pos < 0) pos += effectiveLen;
             double binDur = effectiveLen / bins;
 
@@ -365,10 +380,10 @@ public class DrumTrack : MonoBehaviour
                 Debug.Log(
                     $"[BOUNDARY#{_boundarySerial}] extLoop={extendedLoop} last={_lastLoopCount} " +
                     $"elapsed={elapsedTime:F3} effLen={effectiveLen:F6} prevEff={_lastEffectiveLen:F6} effChanged={effChanged} " +
-                    $"clipLen={_clipLengthSec:F6} leaderSteps={GetLeaderSteps()} totalSteps={totalSteps} " +
-                    $"completedLoops={completedLoops} bins={bins} binIdx={_binIdx} startDsp={startDspTime:F3}"
+                    $"clipLen={_clipLengthSec:F6} leaderSteps={GetLeaderSteps()} totalSteps={totalSteps} " + 
+                    $"completedLoops={completedLoops} bins={bins} binIdx={_binIdx} startDsp={startDspTime:F3} leaderStart={leaderStartDspTime:F3}"
                 );
-
+//Removing multiple calls to loop routines
                 LoopRoutines();
             }
             _lastEffectiveLen = effectiveLen;
@@ -378,6 +393,7 @@ public class DrumTrack : MonoBehaviour
         if (activeMineNodes != null)
             activeMineNodes.RemoveAll(n => n == null);
     }
+    
     public void ManualStart()
     {
         
@@ -459,6 +475,7 @@ public class DrumTrack : MonoBehaviour
         double dspStart = AudioSettings.dspTime + 0.05;
         drumAudioSource.PlayScheduled(dspStart);
         startDspTime = dspStart;
+        leaderStartDspTime = dspStart;
         StartCoroutine(DeferredInit());
         StartCoroutine(InitializeDrumLoop());
         isPhaseStarActive = false;

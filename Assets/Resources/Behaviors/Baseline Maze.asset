@@ -17,7 +17,7 @@ MonoBehaviour:
   nodesPerStar: 8
   inactiveShardTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   starKeepsDustClear: 1
-  starKeepClearRadiusCells: 1
+  starKeepClearRadiusCells: 3
   enableSafetyBubble: 1
   safetyBubbleRadiusCells: 2
   rotateSelectionOnLoopBoundary: 1

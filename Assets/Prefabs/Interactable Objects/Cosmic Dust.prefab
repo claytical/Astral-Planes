@@ -58,12 +58,12 @@ MonoBehaviour:
     starAlphaFadeBias: 0
     fadeSeconds: 0
   interaction:
-    speedScale: 0
-    accelScale: 0
+    speedScale: 0.4
+    accelScale: 0.4
     energyDrainPerSecond: 0
     noDrainWhileBoosting: 0
   clearing:
-    hardness01: 0.628
+    hardness01: 0.2
     nonBoostSecondsToBreak: 0
     temporaryRegrowDelaySeconds: 0
   behavior: 0
@@ -157,7 +157,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &3055904626956396221
 Transform:
   m_ObjectHideFlags: 0
@@ -4992,7 +4992,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5160715109473589012
 Transform:
   m_ObjectHideFlags: 0

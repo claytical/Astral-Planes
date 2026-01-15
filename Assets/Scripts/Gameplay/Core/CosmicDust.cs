@@ -754,8 +754,8 @@ public class CosmicDust : MonoBehaviour {
         if (gen == null || _drumTrack == null) return;
 
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
-        if (vehicle == null) return;
-
+        if (vehicle == null) return; 
+        Debug.Log($"[DUST] OnCollisionStay2D: {collision.gameObject.name} with hardness {clearing.hardness01}");
         // Optional: make dust affect the ship handling when physically contacting a tile.
         vehicle.EnterDustField(interaction.speedScale, interaction.accelScale);
 
@@ -767,6 +767,8 @@ public class CosmicDust : MonoBehaviour {
             float effective = damage01 * Mathf.Lerp(1.0f, 0.25f, clearing.hardness01);
 
             // Appetite proxy: reuse effective or compute from vehicle speed if you prefer.
+            Debug.Log($"[DUST] Charging {collision.gameObject.name} with effective of {effective}");
+
             Visual_ChargeOnBoost(effective);
 
             _nonBoostClearSeconds = 0f;
