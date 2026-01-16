@@ -9,12 +9,6 @@
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -272,7 +266,7 @@
       <workItem from="1767979301135" duration="138000" />
       <workItem from="1767979448363" duration="82610000" />
       <workItem from="1768415354575" duration="1434000" />
-      <workItem from="1768445105260" duration="39628000" />
+      <workItem from="1768445105260" duration="41600000" />
     </task>
     <servers />
   </component>
