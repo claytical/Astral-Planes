@@ -41,4 +41,9 @@ public class BeatMoodProfile : ScriptableObject
         int idx = Random.Range(0, loopClips.Count);
         return loopClips[idx];
     }
+
+    public AudioClip GetFirstLoopClip()
+    {
+        return loopClips[0];
+    }
 }

@@ -2076,7 +2076,7 @@ public bool TryGetDustWeatherForce(
 
                     if (hex.TryGetComponent<CosmicDust>(out var dust))
                     {
-                        dust.SetTrackBundle(this, drums, phaseNow);
+                        dust.SetTrackBundle(this, drums);
                         dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
 
                         dust.PrepareForReuse();

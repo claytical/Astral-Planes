@@ -7,19 +7,14 @@
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Ambient.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Ambient.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/InstrumentTrackController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MarkerTag.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MarkerTag.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -277,7 +272,7 @@
       <workItem from="1767979301135" duration="138000" />
       <workItem from="1767979448363" duration="82610000" />
       <workItem from="1768415354575" duration="1434000" />
-      <workItem from="1768445105260" duration="17874000" />
+      <workItem from="1768445105260" duration="39628000" />
     </task>
     <servers />
   </component>

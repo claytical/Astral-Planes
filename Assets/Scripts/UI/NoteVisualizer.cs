@@ -384,6 +384,10 @@ public class NoteVisualizer : MonoBehaviour
         );
 
         // --- Playhead position across the "leader" loop (max loop multiplier) ---
+        int audibleBin = (_gfm.controller != null)
+            ? _gfm.controller.GetTransportFrame().playheadBin
+            : 0;
+
         float clipLen = Mathf.Max(0.0001f, _drum.GetClipLengthInSeconds()); 
         int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
         float stepDuration = clipLen / drumTotalSteps; 
@@ -1183,123 +1187,177 @@ public class NoteVisualizer : MonoBehaviour
     StartCoroutine(AscendCohortCoroutine(track, burstId, cohort, durationSeconds));
 }
 
-    private IEnumerator AscendCohortCoroutine(InstrumentTrack track, int burstId, List<(int step, Transform rt, MarkerTag tag)> cohort, float durationSeconds) {
-        // Spawn stationary grey placeholders so the lit marker can rise away.
-        foreach (var c in cohort) {
-            if (!c.rt) continue; 
-            var row = c.rt.parent as RectTransform; 
-            if (!row) continue;
-            // Clone the marker as a placeholder that stays behind.
-            var phGO = Instantiate(c.rt.gameObject, row);
-            var phRT = phGO.GetComponent<Transform>(); 
-            phRT.localPosition = c.rt.localPosition;
-            phRT.localRotation = c.rt.localRotation; 
-            phRT.localScale    = c.rt.localScale;
-            var phTag = phGO.GetComponent<MarkerTag>() ?? phGO.AddComponent<MarkerTag>(); 
-            phTag.track        = track;
-            phTag.step         = c.step; 
-            phTag.burstId      = burstId;   // keep through canonicalize pass
-            phTag.isPlaceholder = true;
-            phTag.isAscending   = false;
-            var phML = phGO.GetComponent<MarkerLight>() ?? phGO.AddComponent<MarkerLight>();
-            phML.SetGrey(track.trackColor);
-            // Ensure placeholder does not run/keep particles.
-            var phVNM = phGO.GetComponent<VisualNoteMarker>();
-            if (phVNM != null) { 
-                phVNM.IsLit = false; 
-                if (phVNM.preCaptureParticles != null) 
-                    phVNM.preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
-                if (phVNM.capturedParticles != null) 
-                    phVNM.capturedParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            }
-            
-            // The visual base for this step is now the placeholder.
-            noteMarkers[(track, c.step)] = phRT;
-        }    
-        // Ascension target: 1/3 above the bottom of the screen in WORLD space,
-        // then convert to LOCAL space per row.
-        float ascendWorldY = GetAscendTargetWorldY();
-        // Cache start/end local Ys per marker (since each marker is under a row)
-        var starts = new Dictionary<int, float>(cohort.Count);
-        var ends   = new Dictionary<int, float>(cohort.Count);
+    private IEnumerator AscendCohortCoroutine(
+    InstrumentTrack track,
+    int burstId,
+    List<(int step, Transform rt, MarkerTag tag)> cohort,
+    float durationSeconds)
+{
+    // Spawn stationary grey placeholders so the lit marker can rise away.
+    foreach (var c in cohort)
+    {
+        if (!c.rt) continue;
+        var row = c.rt.parent as RectTransform;
+        if (!row) continue;
+
+        var phGO = Instantiate(c.rt.gameObject, row);
+        var phRT = phGO.GetComponent<Transform>();
+        phRT.localPosition = c.rt.localPosition;
+        phRT.localRotation = c.rt.localRotation;
+        phRT.localScale    = c.rt.localScale;
+
+        var phTag = phGO.GetComponent<MarkerTag>() ?? phGO.AddComponent<MarkerTag>();
+        phTag.track         = track;
+        phTag.step          = c.step;
+        phTag.burstId       = burstId;
+        phTag.isPlaceholder = true;
+        phTag.isAscending   = false;
+
+        var phML = phGO.GetComponent<MarkerLight>() ?? phGO.AddComponent<MarkerLight>();
+        phML.SetGrey(track.trackColor);
+
+        var phVNM = phGO.GetComponent<VisualNoteMarker>();
+        if (phVNM != null)
+        {
+            phVNM.IsLit = false;
+            if (phVNM.preCaptureParticles != null)
+                phVNM.preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            if (phVNM.capturedParticles != null)
+                phVNM.capturedParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        // The visual base for this step is now the placeholder.
+        noteMarkers[(track, c.step)] = phRT;
+    }
+
+    float ascendWorldY = GetAscendTargetWorldY();
+
+    var starts = new Dictionary<int, float>(cohort.Count);
+    var ends   = new Dictionary<int, float>(cohort.Count);
+
+    foreach (var c in cohort)
+    {
+        if (!c.rt) continue;
+        var row = c.rt.parent as RectTransform;
+        if (!row) continue;
+
+        float startY = c.rt.localPosition.y;
+
+        Vector3 markerWorld = c.rt.position;
+        float endY = row.InverseTransformPoint(new Vector3(markerWorld.x, ascendWorldY, markerWorld.z)).y;
+
+        starts[c.step] = startY;
+        ends[c.step]   = endY;
+    }
+
+    // Enforce a minimum duration that is loop-aware.
+    float loopLen = 1.0f;
+    if (_drum != null)
+    {
+        // Prefer the *bar* clock if available; fall back to loop length.
+        float clipLen = 0f;
+        try { clipLen = _drum.GetClipLengthInSeconds(); } catch {}
+        loopLen = (clipLen > 0f) ? clipLen : Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds());
+    }
+
+    float minDur = Mathf.Max(0.05f, (ascendLoops * loopLen) + ascendPaddingSeconds);
+    durationSeconds = Mathf.Max(durationSeconds, minDur);
+
+    float t = 0f;
+    while (t < durationSeconds)
+    {
+        float u = Mathf.Clamp01(t / durationSeconds);
 
         foreach (var c in cohort)
         {
             if (!c.rt) continue;
-            var row = c.rt.parent as RectTransform;
-            if (!row) continue;
-
-            float startY = c.rt.localPosition.y;
-
-            Vector3 markerWorld = c.rt.position; 
-            float endY = row.InverseTransformPoint(new Vector3(markerWorld.x, ascendWorldY, markerWorld.z)).y;
-
-            starts[c.step] = startY;
-            ends[c.step]   = endY;
-        }
-
-        float t = 0f;
-        float loopLen = (_drum != null) ? Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds()) : 1.0f;
-
-        float minDur = Mathf.Max(0.05f, (ascendLoops * loopLen) + ascendPaddingSeconds);
-
-// Ensure we never go faster than a loop-based ascent.
-// If caller passes longer, we respect it.
-        durationSeconds = Mathf.Max(durationSeconds, minDur);
-        while (t < durationSeconds)
-        {
-            float u = Mathf.Clamp01(t / durationSeconds);
-
-            foreach (var c in cohort)
-            {
-                if (!c.rt) continue;
-                if (!starts.TryGetValue(c.step, out var y0)) continue;
-                if (!ends.TryGetValue(c.step, out var y1)) continue;
-
-                var p = c.rt.localPosition;
-                p.y = Mathf.Lerp(y0, y1, u);
-                c.rt.localPosition = p;
-            }
-
-            t += Time.deltaTime;
-            yield return null;
-        }
-
-        // Snap to final position
-        foreach (var c in cohort)
-        {
-            if (!c.rt) continue;
+            if (!starts.TryGetValue(c.step, out var y0)) continue;
             if (!ends.TryGetValue(c.step, out var y1)) continue;
 
             var p = c.rt.localPosition;
-            p.y = y1;
+            p.y = Mathf.Lerp(y0, y1, u);
             c.rt.localPosition = p;
         }
 
-        // Cohort reached the ascension line:
-        // 1) Clear notes in the BIN these steps belong to (keep bin allocated)
-        // 2) Convert the visuals to placeholder/grey (or destroy them—your call)
-        int binSize = Mathf.Max(1, track.BinSize());
-        int anyStep = cohort[0].step;
-        int binIdx  = anyStep / binSize;
+        t += Time.deltaTime;
+        yield return null;
+    }
 
-        track.ClearBinNotesKeepAllocated(binIdx);
-        foreach (var c in cohort) {
-            if (!c.rt) continue;
-            // The lit marker has ascended; remove it.
-            _animatingSteps.Remove((track, c.step));
-            #if UNITY_EDITOR
-            if (!Application.isPlaying) DestroyImmediate(c.rt.gameObject);
-            else Destroy(c.rt.gameObject);
-            #else
-            Destroy(c.rt.gameObject);
-            #endif
+    // Snap to final position
+    foreach (var c in cohort)
+    {
+        if (!c.rt) continue;
+        if (!ends.TryGetValue(c.step, out var y1)) continue;
+
+        var p = c.rt.localPosition;
+        p.y = y1;
+        c.rt.localPosition = p;
+    }
+
+    // Remove ascending lit markers now that they reached the line
+    foreach (var c in cohort)
+    {
+        if (!c.rt) continue;
+
+        _animatingSteps.Remove((track, c.step));
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying) DestroyImmediate(c.rt.gameObject);
+        else Destroy(c.rt.gameObject);
+#else
+        Destroy(c.rt.gameObject);
+#endif
+    }
+
+    // IMPORTANT CHANGE:
+    // Do NOT clear the track bin immediately (mid-bar can mute the just-collected note).
+    // Defer the clear to the next drum-bar boundary so the current bar finishes coherently.
+    int binSize = Mathf.Max(1, track.BinSize());
+    int anyStep = cohort[0].step;
+    int binIdx  = anyStep / binSize;
+
+    StartCoroutine(ClearBinOnNextBarBoundary(track, binIdx, burstId));
+}
+    private IEnumerator ClearBinOnNextBarBoundary(InstrumentTrack track, int binIdx, int burstId)
+    {
+        if (track == null)
+            yield break;
+
+        // If we can’t compute a reliable boundary, fall back to immediate clear (still safe).
+        if (_drum == null || _drum.startDspTime == 0)
+        {
+            track.ClearBinNotesKeepAllocated(binIdx);
+            CanonicalizeTrackMarkers(track, burstId);
+            yield break;
         }
 
-        // You may want a canonicalize pass AFTER the cohort completes,
-        // but do it carefully to avoid killing newly-grey placeholders:
+        float loopLen = 0f;
+        try { loopLen = _drum.GetClipLengthInSeconds(); } catch {}
+        if (loopLen <= 0f)
+            loopLen = Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds());
+
+        if (loopLen <= 0.0001f)
+        {
+            track.ClearBinNotesKeepAllocated(binIdx);
+            CanonicalizeTrackMarkers(track, burstId);
+            yield break;
+        }
+
+        double dspNow   = AudioSettings.dspTime;
+        double elapsed  = dspNow - _drum.startDspTime;
+        double inBar    = elapsed % loopLen;
+        if (inBar < 0) inBar += loopLen;
+
+        float waitSec = (float)(loopLen - inBar);
+        if (waitSec < 0.001f) waitSec = 0f;
+
+        if (waitSec > 0f)
+            yield return new WaitForSeconds(waitSec);
+
+        track.ClearBinNotesKeepAllocated(binIdx);
         CanonicalizeTrackMarkers(track, burstId);
     }
+
     public void ConfigureBinStrip(int activeBinCount)
 {
     if (binStripParent == null || binIndicatorPrefab == null)

@@ -23,6 +23,12 @@ public class BeatMoodLibrary : ScriptableObject
         return null;
     }
 
+    public AudioClip GetFirstClip(BeatMood mood)
+    {
+        var profile = GetProfile(mood);
+        return profile.GetFirstLoopClip();
+    }
+
     public AudioClip GetRandomClip(BeatMood mood)
     {
         var profile = GetProfile(mood);

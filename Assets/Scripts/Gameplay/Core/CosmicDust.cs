@@ -36,7 +36,6 @@ public class CosmicDust : MonoBehaviour {
         [Min(0f)] public float energyDrainPerSecond;
         public bool noDrainWhileBoosting;
     }
-
     [Serializable]
     public struct DustClearingSettings
     {
@@ -49,7 +48,34 @@ public class CosmicDust : MonoBehaviour {
         [Tooltip("Override delay (seconds) before temporary regrow into the SAME cell. -1 uses the phase default.")]
         public float temporaryRegrowDelaySeconds;
     }
+    private readonly struct PhaseDustConfig
+    {
+        public readonly float scaleMul;
+        public readonly float drainMul;
+        public readonly DustBehavior behavior;
+        public readonly float slowFactor;
+        public readonly float slowDur;
+        public readonly float lateral;
+        public readonly float turb;
 
+        public PhaseDustConfig(
+            float scaleMul,
+            float drainMul,
+            DustBehavior behavior,
+            float slowFactor,
+            float slowDur,
+            float lateral,
+            float turb)
+        {
+            this.scaleMul   = scaleMul;
+            this.drainMul   = drainMul;
+            this.behavior   = behavior;
+            this.slowFactor = slowFactor;
+            this.slowDur    = slowDur;
+            this.lateral    = lateral;
+            this.turb       = turb;
+        }
+    }
     [SerializeField] private DustVisualSettings visual = new DustVisualSettings
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
@@ -72,7 +98,8 @@ public class CosmicDust : MonoBehaviour {
         hardness01                = 0f,
         nonBoostSecondsToBreak    = 2.5f,
         temporaryRegrowDelaySeconds = -1f
-    };    
+    };
+
     private float _baseDrainPerSecond;
     private Vector3 _initialLocalScale = Vector3.one;
     private bool _cachedInitialScale;
@@ -83,19 +110,15 @@ public class CosmicDust : MonoBehaviour {
     [Range(0f,2f)]   public float slowDuration = 0.35f;       // NEW (seconds)
     [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
-    private Vector3 fullScale = Vector3.one;
-    private Vector3 _targetBaseScale = Vector3.one;
     private Vector3 _baseLocalScale = Vector3.one;
-    private float _baseWorldDiameter = 1f;
+
     [SerializeField] private Collider2D terrainCollider;
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
     [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
     private BoxCollider2D _box;
     private float _nonBoostClearSeconds;
-// Cached cell sizing so we can rebuild collider whenever scale changes.
     private float _cellWorldSize = 1f;
     private float _cellClearanceWorld = 0f;
-    private float _footprintMul = 1.15f;
     private Color _baseColor;
     private float _baseSize;
     private float _baseAlpha;
@@ -111,7 +134,6 @@ public class CosmicDust : MonoBehaviour {
     private Coroutine  _fadeRoutine, _growInRoutine;
     private DrumTrack _drumTrack;
     private CosmicDustGenerator gen;
-    private MusicalPhase phase;
     private float _growInOverride = -1f;
     private Color _currentTint = Color.white;
     [SerializeField] private int epochId;
@@ -163,10 +185,7 @@ public class CosmicDust : MonoBehaviour {
         if (mag < 0.05f || mag > 20f) 
             transform.localScale = visual.prefabReferenceScale;
         _baseLocalScale = transform.localScale;
-        _targetBaseScale = _baseLocalScale;
-        fullScale = _baseLocalScale;
         float r = GetWorldRadius();
-        _baseWorldDiameter = Mathf.Max(0.0001f, r * 2f);
         _baseDrainPerSecond = interaction.energyDrainPerSecond;
         // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
         var psr = GetComponent<ParticleSystemRenderer>();
@@ -341,12 +360,11 @@ public class CosmicDust : MonoBehaviour {
         _growInRoutine = StartCoroutine(GrowIn());
     }
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
-    public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums, MusicalPhase _phase)
+    public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
         _drumTrack = _drums;
-        phase = _phase;
-    }
+            }
     public void SetTint(Color tint)
     {
         _currentTint = tint;
@@ -401,7 +419,6 @@ public class CosmicDust : MonoBehaviour {
         c.b *= c.a;
         return c;
     }
-
     private void DespawnGracefully(float fadeSeconds = 0.25f)
     {
         if (_isDespawned) return;
@@ -416,13 +433,11 @@ public class CosmicDust : MonoBehaviour {
 
         _fadeRoutine = StartCoroutine(FadeOutThenPool(fadeSeconds));
     }
-    
     public void SetTerrainColliderEnabled(bool enabled)
     {
         if (terrainCollider != null)
             terrainCollider.enabled = enabled;
     }
-    // CosmicDust.cs
     public void DissipateAndPoolVisualOnly(float fadeSeconds = 0.20f) {
         if (_isDespawned) return;
         _isDespawned = true; 
@@ -433,7 +448,8 @@ public class CosmicDust : MonoBehaviour {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
         _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
     }
-    public void Visual_ChargeOnBoost(float appetite01)
+
+    private void Visual_ChargeOnBoost(float appetite01)
     {
         if (visual.particleSystem == null) return;
         if (!_baseCaptured) CaptureBaseVisual();
@@ -464,7 +480,7 @@ public class CosmicDust : MonoBehaviour {
         SetDustColorAllParticles(chargeCol);
     }
 
-    public void Visual_DenyOnBump(float severity01)
+    private void Visual_DenyOnBump(float severity01)
     {
         if (visual.particleSystem == null) return;
         if (!_baseCaptured) CaptureBaseVisual();
@@ -570,20 +586,6 @@ public class CosmicDust : MonoBehaviour {
 
         clearing.hardness01 = 0f;
     }
-    public void ApplyImprint(Color baseTint, Color shadowTint, float hardness01)
-    {
-        _hasImprint         = true;
-        _imprintBaseTint     = baseTint;
-        _imprintShadowTint   = shadowTint;
-
-        SetTint(baseTint);
-        clearing.hardness01 = Mathf.Clamp01(hardness01);
-
-        // Optional but recommended: if your charge/deny uses captured base values
-        // recapture after tint so _baseColor/_baseAlpha reflect the imprint.
-        if (_baseCaptured) CaptureBaseVisual();
-    }
-
 
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
@@ -665,7 +667,6 @@ public class CosmicDust : MonoBehaviour {
         _baseCaptured = true;
         
     }
-
     private void DisableInteractionImmediately() { 
         // Stop affecting vehicles instantly (even if particles linger)
         if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = false; 
@@ -696,46 +697,6 @@ public class CosmicDust : MonoBehaviour {
         // Ensure fully visible at end
         SetDustColorAllParticles(baseCol);
 
-    }
-    public void DissipateVisualOnly(float duration)
-    {
-        duration = Mathf.Max(0.01f, duration);
-
-        if (_fadeRoutine != null)
-            StopCoroutine(_fadeRoutine);
-
-        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration));
-    }
-    private IEnumerator FadeOutVisualOnly(float duration)
-    {
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-        float t = 0f;
-
-        Color from = _currentTint;
-        Color to = _currentTint;
-        to.a = 0f;
-
-        Vector3 s0 = transform.localScale;
-        Vector3 s1 = s0 * 0.85f;
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, t / duration);
-            SetTint(Color.Lerp(from, to, u));
-
-            yield return null;
-        }
-
-        SetTint(to);
-
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        // Intentionally do NOT pool or deactivate here.
-        // The generator will RemoveActiveAt(...) and return to pool at end-of-fade.
     }
     private IEnumerator FadeOutThenPoolVisualOnly(float duration)
     {
@@ -801,19 +762,6 @@ public class CosmicDust : MonoBehaviour {
 // IMPORTANT: no breaking/clearing here.
 
     }
-    
-    private static void EnsureLayerRecursive(GameObject root, int layer)
-    {
-        if (root == null) return;
-        if (root.layer != layer) root.layer = layer;
-
-        for (int i = 0; i < root.transform.childCount; i++)
-        {
-            var child = root.transform.GetChild(i);
-            if (child != null) EnsureLayerRecursive(child.gameObject, layer);
-        }
-    }
-
     private void OnCollisionExit2D(Collision2D collision) {
         // Reset grind timer when the vehicle stops pressing this tile.
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
@@ -822,7 +770,6 @@ public class CosmicDust : MonoBehaviour {
         _nonBoostClearSeconds = 0f;
         ResetVisualToBase();
     }
-    
     public void ResetVisualToBase()
     {
         if (visual.particleSystem == null) return;
@@ -834,38 +781,9 @@ public class CosmicDust : MonoBehaviour {
         Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
 
-    private readonly struct PhaseDustConfig
-    {
-        public readonly float scaleMul;
-        public readonly float drainMul;
-        public readonly DustBehavior behavior;
-        public readonly float slowFactor;
-        public readonly float slowDur;
-        public readonly float lateral;
-        public readonly float turb;
-
-        public PhaseDustConfig(
-            float scaleMul,
-            float drainMul,
-            DustBehavior behavior,
-            float slowFactor,
-            float slowDur,
-            float lateral,
-            float turb)
-        {
-            this.scaleMul   = scaleMul;
-            this.drainMul   = drainMul;
-            this.behavior   = behavior;
-            this.slowFactor = slowFactor;
-            this.slowDur    = slowDur;
-            this.lateral    = lateral;
-            this.turb       = turb;
-        }
-    }
     public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f, float clearanceWorld = 0f)
     {
         _cellWorldSize       = Mathf.Max(0.001f, cellWorldSize);
-        _footprintMul        = Mathf.Max(0.05f, footprintMul);
         _cellClearanceWorld  = Mathf.Max(0f, clearanceWorld);
         transform.localScale = Vector3.one;
         ApplyParticleFootprint();
@@ -882,7 +800,6 @@ public class CosmicDust : MonoBehaviour {
         _box.size   = new Vector2(desiredWorld, desiredWorld);
         _box.offset = Vector2.zero;
     }
-
     private void SetColorVariance()
     {
         var c = _currentTint;
