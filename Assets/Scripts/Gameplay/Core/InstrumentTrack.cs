@@ -122,8 +122,10 @@ public class InstrumentTrack : MonoBehaviour
 
     [SerializeField]
     private List<LoopNote> _loopNotes = new();
-    private bool _loopCacheDirty = true;
-    private void MarkLoopCacheDirty() => _loopCacheDirty = true;
+    bool _loopCacheDirtyPending;   // authored changes happened
+    bool _loopCacheDirtyCommitted; // safe to rebuild
+    int  _lastCommittedBar = -1;
+
     private PendingBurst? _pendingBurstAfterExpand;
 
     private readonly List<int> _scratchSteps = new List<int>(1);
@@ -144,27 +146,72 @@ public class InstrumentTrack : MonoBehaviour
     public bool IsStepInFilledBin(int step)
     {
         EnsureBinList();
-        int total = Mathf.Max(1, _totalSteps);
-        int s = ((step % total) + total) % total; // wrap & make non-negative
-        int b = BinIndexForStep(s);
+
+        int binSize = Mathf.Max(1, BinSize());
+        int b = step / binSize; // NOTE: no modulo wrap
+
         return b >= 0 && b < _binFilled.Count && _binFilled[b];
     }
-    private void RebuildLoopCacheIfDirty() {
-        if (!_loopCacheDirty) return;
+
+    private void RebuildLoopCacheIfDirty()
+    {
+        if (!_loopCacheDirtyPending) return;
+
         _loopNotes.Clear();
-        int binSize = BinSize();
-        int total   = Mathf.Max(1, _totalSteps > 0 ? _totalSteps : binSize * Mathf.Max(1, loopMultiplier));
-        for (int i = 0; i < persistentLoopNotes.Count; i++) { 
+
+        int binSize = Mathf.Max(1, BinSize());
+
+        // Cache must be based on absolute step indices (pages/bins must not alias).
+        // Use hard cap (maxLoopMultiplier) to define validity, not _totalSteps.
+        int maxBins = Mathf.Max(1, maxLoopMultiplier);
+        int maxStepExclusive = maxBins * binSize;
+
+        for (int i = 0; i < persistentLoopNotes.Count; i++)
+        {
             var (stepIndex, note, duration, velocity) = persistentLoopNotes[i];
-            // Normalize to [0, total)
-            int s = stepIndex % total; 
-            if (s < 0) s += total;
-            int bin      = (binSize > 0) ? (s / binSize) : 0; 
-            int local    = (binSize > 0) ? (s % binSize) : 0;
-            _loopNotes.Add(new LoopNote { bin = bin, localStep = local, note = note, duration = duration, velocity = velocity }); 
+
+            // Reject invalid steps rather than wrapping them into the wrong bin.
+            if (stepIndex < 0 || stepIndex >= maxStepExclusive)
+            {
+                Debug.LogWarning(
+                    $"[TRK:LOOPCACHE] track={name} DROP step={stepIndex} maxStep={maxStepExclusive} " +
+                    $"(maxBins={maxBins} binSize={binSize})"
+                );
+                continue;
+            }
+
+            int bin   = stepIndex / binSize;
+            int local = stepIndex % binSize;
+
+            _loopNotes.Add(new LoopNote
+            {
+                bin = bin,
+                localStep = local,
+                note = note,
+                duration = duration,
+                velocity = velocity
+            });
         }
-        _loopCacheDirty = false;
+
+        // Optional but highly recommended while validating:
+        int[] binCounts = new int[maxBins];
+        for (int i = 0; i < _loopNotes.Count; i++)
+        {
+            int b = _loopNotes[i].bin;
+            if (b >= 0 && b < binCounts.Length) binCounts[b]++;
+        }
+        Debug.Log($"[TRK:LOOPCACHE] {name} bins=" + string.Join(",", binCounts));
+        if (persistentLoopNotes.Count > 0 && _loopNotes.Count == 0)
+        {
+            Debug.LogWarning(
+                $"[TRK:LOOPCACHE_EMPTY] track={name} persistentCount={persistentLoopNotes.Count} " +
+                $"maxLoopMultiplier={maxLoopMultiplier} loopMultiplier={loopMultiplier} binSize={binSize}\n" +
+                Environment.StackTrace);
+        }
+
+        _loopCacheDirtyPending = false;
     }
+
     public bool IsExpansionPending => _pendingExpandForBurst || _pendingBurstAfterExpand.HasValue || _hookedBoundaryForExpand;
     public List<(int stepIndex, int note, int duration, float velocity)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
@@ -258,32 +305,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         candidates.Add(gp);
     }
 }
-    private IEnumerable<int> BuildBiasedXSequence(IList<int> candidates, int originX, int gridW) {
-        if (candidates == null || candidates.Count == 0) yield break;
-        // No origin: preserve prior behavior (random order).
-        if (originX < 0) {
-            foreach (var x in candidates.OrderBy(_ => UnityEngine.Random.value)) 
-                yield return x;
-            yield break;
-        }
-        var set = new HashSet<int>(candidates);
-        if (set.Contains(originX)) yield return originX;
-        int maxR = Mathf.Max(originX, (gridW - 1) - originX); 
-        for (int r = 1; r <= maxR; r++) {
-            int a = originX + r; 
-            int b = originX - r;
-            bool aOk = (uint)a < (uint)gridW && set.Contains(a); 
-            bool bOk = (uint)b < (uint)gridW && set.Contains(b);
-            // Slight randomness so the fan-out isn't perfectly symmetrical every time.
-            if (UnityEngine.Random.value < 0.5f) {
-                if (aOk) yield return a; if (bOk) yield return b;
-            }
-            else {
-                if (bOk) yield return b; 
-                if (aOk) yield return a;
-            }
-        }
-    }
     [SerializeField] private Color trackShadowColor = new Color(0.08f,0.08f,0.08f,1f);
     public Color TrackShadowColor => trackShadowColor;
 
@@ -348,74 +369,70 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             }
         }
         // - Drum loop stays the bar clock (binSize steps).
-        // - Bins are "pages" indexed by drumTrack.completedLoops.
         // - We do NOT stretch bar time when bins increase.
-        float elapsed = (float)(AudioSettings.dspTime - drumTrack.startDspTime); 
-        // Use the *bar* clock (the actual drum clip length) to compute localStep timing.
-        // DrumTrack.GetLoopLengthInSeconds() returns the *effective* leader-cycle length,
-        // which grows when any track increases loopMultiplier; using it here will halve
-        // melodic note density whenever the leader widens.
-        float loopLen = 0f;
-        try { 
-            loopLen = drumTrack.GetClipLengthInSeconds();
-        }
-        catch { 
-            // If GetClipLengthInSeconds isn't available in some scene variant, fall back.
-            loopLen = (drumTrack.drumAudioSource != null && drumTrack.drumAudioSource.clip != null) ? drumTrack.drumAudioSource.clip.length : 0f; }
-        if (loopLen <= 0f) return;
-        int binSize   = BinSize();
-        int drumSteps = Mathf.Max(1, drumTrack.totalSteps);
-        float stepDur = loopLen / drumSteps;
-        // Current position within the current drum loop (bar)
-        float inLoop = elapsed % loopLen;
-        if (inLoop < 0f) inLoop += loopLen;
-        
-        int localStep = Mathf.FloorToInt(inLoop / stepDur);
-        localStep = ((localStep % binSize) + binSize) % binSize;
-        
-// Which "page/bin" is active on the leader transport this bar?
-// IMPORTANT: Use a bar-based loop counter derived from the drum CLIP length,
-// not drumTrack.completedLoops (which may represent leader-cycle loops).
-        int leaderBins = controller
-            ? Mathf.Max(1, controller.GetGlobalVisualBins())   // stable, allocation-aware
-            : Mathf.Max(1, loopMultiplier);
+// ----- TRANSPORT (single authority) -----
+        if (controller == null) return;
 
+        var tf = controller.GetTransportFrame();
+        int barIndex    = tf.barIndex;
+        int playheadBin = tf.playheadBin;
 
-// Bar clock = drum clip length (one bar / loop of the drum clip)
-        float clipLen = loopLen; // already computed above as clip length
-        int barIndex  = Mathf.FloorToInt(elapsed / clipLen);
+// ----- CLOCK (single authority: DSP) -----
+        double dspNow = AudioSettings.dspTime;
 
-// Use barIndex as the authoritative loop counter for step reset.
-        int loopCounter = barIndex;
-
-// Current playhead bin in leader-space
-        int playheadBin = ((barIndex % leaderBins) + leaderBins) % leaderBins;
-
-        RebuildLoopCacheIfDirty();
-
-// If we crossed into a new bar since last frame, reset catch-up within the bar.
-        if (_lastLoopSeen != loopCounter)
+        float clipLen;
+        try { clipLen = drumTrack.GetClipLengthInSeconds(); }
+        catch
         {
-            _lastLoopSeen  = loopCounter;
+            clipLen = (drumTrack.drumAudioSource != null && drumTrack.drumAudioSource.clip != null)
+                ? drumTrack.drumAudioSource.clip.length
+                : 0f;
+        }
+        if (clipLen <= 0f) return;
+
+        int drumSteps = Mathf.Max(1, drumTrack.totalSteps);
+        int binSize   = Mathf.Max(1, BinSize());
+
+        double start = drumTrack.startDspTime;
+        if (start <= 0.0) return;
+
+        double barStart = start + (double)barIndex * clipLen;
+
+// ----- BAR BOUNDARY COMMIT (cache + step reset) -----
+        if (barIndex != _lastCommittedBar)
+        {
+            _lastCommittedBar = barIndex;
+
+            // Commit any authored changes atomically at the boundary
+            if (_loopCacheDirtyPending)
+            {
+                // IMPORTANT: this must rebuild regardless of old _loopCacheDirty naming
+                RebuildLoopCache_FORCE();
+                _loopCacheDirtyPending = false;
+            }
+
+            // Reset step cursor so step 0 is eligible this bar
             _lastLocalStep = -1;
         }
 
-// first tick
-        if (_lastLocalStep < 0)
+// ----- STEP INDEX (DSP-derived) -----
+        int curStep = GetDspStepIndexInBar(dspNow, barStart, clipLen, drumSteps);
+        int targetCurLocal = ((curStep % binSize) + binSize) % binSize;
+
+// ----- PLAYBACK (catch-up deterministically) -----
+        int leaderBins = Mathf.Max(1, controller.GetGlobalVisualBins());
+
+// Play every missed step exactly once, in order.
+        int startStep = _lastLocalStep + 1;
+        if (startStep < 0) startStep = 0;
+
+        for (int s = startStep; s <= targetCurLocal; s++)
         {
-            PlayLoopedNotesInBin(playheadBin, localStep, leaderBins);
-            _lastLocalStep = localStep;
+            int local = ((s % binSize) + binSize) % binSize;
+            PlayLoopedNotesInBin(playheadBin, local, leaderBins);
         }
-        else if (localStep != _lastLocalStep)
-        {
-            int adv = (localStep - _lastLocalStep + binSize) % binSize;
-            for (int k = 1; k <= adv; k++)
-            {
-                int s = (_lastLocalStep + k) % binSize;
-                PlayLoopedNotesInBin(playheadBin, s, leaderBins);
-            }
-            _lastLocalStep = localStep;
-        }
+
+        _lastLocalStep = targetCurLocal;
         
         for (int i = spawnedCollectables.Count - 1; i >= 0; i--) {
             var obj = spawnedCollectables[i];
@@ -426,31 +443,77 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             }
         }
     }
+    
+    private int GetDspStepIndexInBar(double dspNow, double barStartDsp, float clipLen, int drumSteps)
+    {
+        // Clamp inputs defensively
+        if (clipLen <= 0f) return 0;
+        drumSteps = Mathf.Max(1, drumSteps);
+
+        double t = dspNow - barStartDsp;
+        // wrap into [0, clipLen)
+        t = t % clipLen;
+        if (t < 0.0) t += clipLen;
+
+        double stepDur = clipLen / drumSteps;
+        int step = (int)System.Math.Floor(t / stepDur);
+
+        // hard clamp in case of numerical edge at exact end-of-clip
+        if (step < 0) step = 0;
+        if (step >= drumSteps) step = drumSteps - 1;
+        return step;
+    }
+    private void RebuildLoopCache_FORCE()
+    {
+        _loopNotes.Clear();
+
+        int binSize = Mathf.Max(1, BinSize());
+        int maxBins = Mathf.Max(1, maxLoopMultiplier);
+        int maxStepExclusive = maxBins * binSize;
+
+        for (int i = 0; i < persistentLoopNotes.Count; i++)
+        {
+            var (stepIndex, note, duration, velocity) = persistentLoopNotes[i];
+
+            if (stepIndex < 0 || stepIndex >= maxStepExclusive)
+                continue;
+
+            int bin   = stepIndex / binSize;
+            int local = stepIndex % binSize;
+
+            _loopNotes.Add(new LoopNote
+            {
+                bin = bin,
+                localStep = local,
+                note = note,
+                duration = duration,
+                velocity = velocity
+            });
+        }
+    }
+
     private void PlayLoopedNotesInBin(int playheadBin, int localStep, int leaderBins)
     {
         RebuildLoopCacheIfDirty();
 
         int trackBins = Mathf.Max(1, loopMultiplier);
-        bool undevelopedForThisTrack = playheadBin >= trackBins;
 
-        int trackBin;
+        // Map the global playhead bin into an actual bin this track can play.
+        // Never hard-silence undeveloped bins; repeat the last real bin instead.
+        int trackBin = playheadBin;
         float gain = 1f;
 
-        if (!undevelopedForThisTrack)
+        if (playheadBin >= trackBins)
         {
-            trackBin = playheadBin; // IMPORTANT: use playheadBin, not leaderBin
-        }
-        else
-        {
-            if (!ghostUndevelopedBins) return;
-            trackBin = trackBins - 1; // ghost into last real bin
-            gain = Mathf.Clamp01(undevelopedBinGhostGain);
+            // Repeat last real bin (or 0 for single-bin tracks).
+            trackBin = Mathf.Max(0, trackBins - 1);
+
+            // Optional “ghost” behavior: reduced gain. But still audible.
+            if (ghostUndevelopedBins)
+                gain = Mathf.Clamp01(undevelopedBinGhostGain);
         }
 
-        // Compute the ABSOLUTE step in the track timeline for chord resolution.
-        // One bin is one drum loop worth of steps (same "binSize" concept you use elsewhere).
-        // leaderBins is not needed here for the step math; the playheadBin tells us where we are.
-        int absStepIndex = (playheadBin *  BinSize()) + localStep;
+        int absStepIndex = (trackBin * BinSize()) + localStep;
 
         for (int i = 0; i < _loopNotes.Count; i++)
         {
@@ -461,11 +524,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             int vel = Mathf.RoundToInt(n.velocity * gain);
             vel = Mathf.Clamp(vel, 1, 127);
 
-            // Apply chord progression at PLAYBACK time (bin-based harmony).
-            int noteToPlay = QuantizeNoteToBinChord(absStepIndex, n.note);
-
-            PlayNote(noteToPlay, n.duration, vel);
-        }
+            PlayNote(n.note, n.duration, vel);        }
     }
 
     private void InitializeBinChords(int maxBins)
@@ -505,18 +564,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         EnsureBinList(); 
         if (bin < 0 || bin >= binAllocated.Length) return; 
         binAllocated[bin] = v;
-    }
-    public int GetHighestAllocatedBin()
-    {
-        if (binAllocated == null) return -1;
-
-        int activeBins = Mathf.Max(1, loopMultiplier);
-        int maxIndex = Mathf.Min(binAllocated.Length - 1, activeBins - 1);
-
-        for (int i = maxIndex; i >= 0; i--)
-            if (binAllocated[i]) return i;
-
-        return -1;
     }
 
     private int HighestFilledBinIndex()
@@ -664,13 +711,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         int target = Mathf.Clamp(requiredBins, 1, Mathf.Max(1, loopMultiplier)); // never grow here
         return target;
     }
-    private void RemoveNotesInBin(int binIndex)
-    {
-        int start = binIndex * BinSize();
-        int endExcl = start + BinSize();
-        persistentLoopNotes.RemoveAll(n => n.stepIndex >= start && n.stepIndex < endExcl);
-        MarkLoopCacheDirty();
-    }
     private void EvaluateAndQueueCollapseIfPossible() {
         if (drumTrack == null) return;
         if (loopMultiplier <= 1) return;
@@ -719,7 +759,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             // Remove any loop notes that are now outside the audible window
             persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
 
-            MarkLoopCacheDirty();
+            _loopCacheDirtyPending = true;
             RecomputeBinsFromLoop();
 
             // ---- VISUAL AUTHORITY (subtractive-safe) ----
@@ -790,35 +830,55 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     // _nextFillOrdinal only increments on first-time fills; no rewind here.
     if (_nextFillOrdinal < 1) _nextFillOrdinal = 1;
 }
-    private void Harmony_OnBinFilled(int binIndex, int progressionLength) {
-    if (binIndex < 0) return;
-    if (_binFillOrder == null || _binChordIndex == null) return;
-    if (binIndex >= _binFillOrder.Count || binIndex >= _binChordIndex.Count) return;
-    if (progressionLength <= 0) return;
-
-    // Only assign on first transition to filled (stable label thereafter)
-    if (_binFillOrder[binIndex] == 0)
+    private void Harmony_OnBinFilled(int binIndex, int progressionLength)
     {
-        _binFillOrder[binIndex] = _nextFillOrdinal++;
-        _binChordIndex[binIndex] = (_binFillOrder[binIndex] - 1) % progressionLength; // 1st→0(C), 2nd→1(D), 3rd→2(E), wraps
-    }
-}
-    private void Harmony_OnBinEmptied(int binIndex) {
-    if (binIndex < 0) return;
-    if (_binFillOrder == null || _binChordIndex == null) return;
-    if (binIndex >= _binFillOrder.Count || binIndex >= _binChordIndex.Count) return;
+        if (binIndex < 0) return;
+        if (_binFillOrder == null) return;
+        if (binIndex >= _binFillOrder.Count) return;
 
-    _binFillOrder[binIndex] = 0;
-    _binChordIndex[binIndex] = -1;
-}
-private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
+        if (_binFillOrder[binIndex] == 0)
+            _binFillOrder[binIndex] = _nextFillOrdinal++;
+    }
+
+    private void Harmony_OnBinEmptied(int binIndex)
+    {
+        if (binIndex < 0) return;
+        if (_binFillOrder == null) return;
+        if (binIndex >= _binFillOrder.Count) return;
+
+        // Fill order is a state label (for UI/logic about “filled”).
+        _binFillOrder[binIndex] = 0;
+
+        // DO NOT clear _binChordIndex here.
+        // Chord identity is deterministic per bin index (or authored override), not fill state.
+    }
+
+    private int Harmony_GetChordIndexForBin(int binIndex)
+    {
+        var hd = GameFlowManager.Instance?.harmony;
+        if (hd == null) return -1;
+
+        int progLen = Mathf.Max(1, hd.ProgressionLength);
+        if (binIndex < 0) return -1;
+
+        // Optional: honor an authored override if present and valid.
+        if (_binChordIndex != null && binIndex < _binChordIndex.Count)
+        {
+            int authored = _binChordIndex[binIndex];
+            if (authored >= 0) return authored;
+        }
+
+        // Deterministic: absolute bin -> progression slot
+        return ((binIndex % progLen) + progLen) % progLen;
+    }
+
+    private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
 {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
 
     int chordIdx = Harmony_GetChordIndexForBin(bin);
-    if (chordIdx < 0) return midiNote; // unfilled bin → leave as-is
-
+    if (chordIdx < 0) return midiNote;
     var hd = GameFlowManager.Instance?.harmony;
     if (hd == null) return midiNote;
 
@@ -873,12 +933,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
 
     return best;
 }
-
-    private int Harmony_GetChordIndexForBin(int binIndex)
-    {
-        if (binIndex < 0 || binIndex >= _maxBins) return -1;
-        return _binChordIndex[binIndex];
-    }
+    
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
     {
         ascensionCohort = new AscensionCohort
@@ -903,30 +958,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         Debug.Log($"[CHORD][ARMED] {name} window=[{windowStartInclusive},{windowEndExclusive}) " +
                   $"count={ascensionCohort.stepsRemaining.Count} armed={ascensionCohort.armed}");
     }
-    public void NotifyNoteAscendedOrRemovedAtStep(int step)
-    {
-        Debug.Log($"[CHORD] Notification at {step}");
-        if (!ascensionCohort.armed) return;
-        Debug.Log($"[CHORD] Armed at {step}");
 
-        if (step < ascensionCohort.windowStartInclusive || step >= ascensionCohort.windowEndExclusive) return;
-        Debug.Log($"[CHORD] Window Open");
-
-        if (ascensionCohort.stepsRemaining.Remove(step))
-        {
-            if (ascensionCohort.stepsRemaining.Count == 0)
-            {
-                ascensionCohort.armed = false;
-                Debug.Log($"[CHORD] Invoking Ascent");
-// just before invoking the event:
-                Debug.Log($"[CHORD][TRACK→EVENT] Firing CohortCompleted " +
-                          $"track={name} role={assignedRole} window=[{ascensionCohort.windowStartInclusive},{ascensionCohort.windowEndExclusive}) " +
-                          $"step={step} remaining=0 listeners={(OnAscensionCohortCompleted==null?0:OnAscensionCohortCompleted.GetInvocationList().Length)}");
-
-                OnAscensionCohortCompleted?.Invoke(this, ascensionCohort.windowStartInclusive, ascensionCohort.windowEndExclusive);
-            }
-        }
-    }
     private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
     {
         List<int> allowedSteps = noteSet.GetStepList();
@@ -959,24 +991,13 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             _burstSteps[burstId] = set = new HashSet<int>();
         set.Add(step);
     }
-    public void RemoveNotesForBurst(int burstId)
-    {
-        if(burstId < 0) return;
-        _burstSteps.Remove(burstId);
-        if (!_burstSteps.TryGetValue(burstId, out var set) || set.Count == 0) return;
 
-        // remove loop notes whose step is in this burst
-//        persistentLoopNotes.RemoveAll(tuple => set.Contains(tuple.stepIndex));
-        controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, burstId);
-        EvaluateAndQueueCollapseIfPossible();
-    }
     public void ClearBinNotesKeepAllocated(int binIdx)
     {
         int binSize = Mathf.Max(1, BinSize());
         int start = binIdx * binSize;
         int end   = start + binSize;
 
-        // Remove notes that live in this bin window
         for (int i = persistentLoopNotes.Count - 1; i >= 0; i--)
         {
             var n = persistentLoopNotes[i];
@@ -984,7 +1005,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             if (step >= start && step < end)
                 persistentLoopNotes.RemoveAt(i);
         }
-// Keep allocation, mark as not filled WITHOUT changing span
+
         EnsureBinList();
         if (binIdx >= 0 && binIdx < _binFilled.Count)
         {
@@ -992,14 +1013,11 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             Harmony_OnBinEmptied(binIdx);
         }
 
-        // Optional: if you maintain other per-step registries, clear them here too.
-        // e.g., chord/progression bookkeeping, burst step maps, etc.
+        // CRITICAL: removed notes must stop playing immediately
+        _loopCacheDirtyPending = true;
 
-        // Ensure audio scheduling cache is rebuilt next Update()
-        MarkLoopCacheDirty();
-
-        Debug.Log($"[ASCEND][CLEAR_BIN] track={name} bin={binIdx} range=[{start},{end}) keptAllocated=true");
     }
+
 
     public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force) {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
@@ -1026,15 +1044,34 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
         }
 
-        // 2) Final target step is EXACTLY the absolute step decided at spawn.
-        int finalTargetStep = (collectable.intendedStep >= 0) ? collectable.intendedStep : GetCurrentStep(); // very rare fallbackint bin = BinSize();
-    
-        // Optional sanity: ensure the “reportedStep” matches what we expect.
-        // This is purely for debugging and can be removed if noisy.
-        if (reportedStep >= 0 && reportedStep != finalTargetStep) { 
-            Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep}");
+        // 2) Final target step must be deterministic (never time-based).
+        int finalTargetStep = -1;
+
+// Primary: the absolute step decided at spawn.
+        if (collectable.intendedStep >= 0)
+        {
+            finalTargetStep = collectable.intendedStep;
         }
-    
+// Secondary: use the reported step (still deterministic, not time-based).
+        else if (reportedStep >= 0)
+        {
+            finalTargetStep = reportedStep;
+            Debug.LogWarning($"[COLLECT:FALLBACK] {name} using reportedStep={reportedStep} because intendedStep was missing. burstId={collectable.burstId}");
+        }
+        else
+        {
+            Debug.LogWarning($"[COLLECT:ABORT] {name} no valid step (intendedStep={collectable.intendedStep}, reportedStep={reportedStep}) burstId={collectable.burstId}");
+            return;
+        }
+
+// Optional sanity: log if reported differs from intended (useful for chasing bad assignment upstream).
+        if (reportedStep >= 0 && collectable.intendedStep >= 0 && reportedStep != collectable.intendedStep)
+        {
+            Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep} burstId={collectable.burstId}");
+        }
+
+        int binSize = BinSize();
+
         // 3) Snapshot leader bins BEFORE we write (used for cross-track nudge later)
         int leaderBinsBeforeWrite = (controller != null) ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
         if (collectable.burstId != 0 && !_burstLeaderBinsBeforeWrite.ContainsKey(collectable.burstId)) { 
@@ -1065,7 +1102,6 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         {
             int filledBin = targetBin;
             // --- A) Compute collection intensity for this burst ---
-            float intensity = 0f;
             if(_burstWroteBin.TryGetValue(collectable.burstId, out var b))
                 filledBin = b;
             SetBinFilled(filledBin, true); 
@@ -1074,7 +1110,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             // the controller leader multiplier or until a later refresh happens, which looks like bins
             // failing to shrink to 1/2, 1/3, etc.
             if (controller != null && controller.noteVisualizer != null && drumTrack != null) { 
-                int binSize = Mathf.Max(1, drumTrack.totalSteps);
+                binSize = Mathf.Max(1, drumTrack.totalSteps);
                 // This track now requires at least (filledBin+1) bins to represent its authored content.
                 int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
                 // Also respect the global leader if it is already larger.
@@ -1084,21 +1120,11 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
 
             // This track is now eligible to push the global frontier forward by 1 bin on its next burst.
             if (controller != null)
+            {
                 controller.AllowAdvanceNextBurst(this);
-
-            if (_burstTotalSpawned.TryGetValue(collectable.burstId, out var total) && total > 0)
-            {
-                _burstCollected.TryGetValue(collectable.burstId, out var collectedCount);
-                intensity = Mathf.Clamp01((float)collectedCount / total);
             }
-
-            // --- B) Apply intensity to drums (ambient → steady → building → intense) ---
-            var gfm  = GameFlowManager.Instance;
-            var drum = drumTrack != null ? drumTrack : gfm?.activeDrumTrack;
-            if (drum != null)
-            {
-                drum.ApplyBeatIntensity(intensity);
-            }
+            
+            
             // Visual: "release" the charged playhead when the burst resolves.
             if (controller != null && controller.noteVisualizer != null)
             {
@@ -1131,8 +1157,8 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
             int   fuseLoops = Mathf.Max(1, ascendLoopCount);
             float seconds   = 1f;
 
-            if (drum != null)
-                seconds = Mathf.Max(0.0001f, drum.GetLoopLengthInSeconds() * fuseLoops);
+            if (drumTrack != null)
+                seconds = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds() * fuseLoops);
 
             EnqueueNextFrame(() =>
             {
@@ -1161,18 +1187,25 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
                 _currentBurstArmed = false;
             }
         }
-
-        return;
 }
+    public int GetHighestAllocatedBin()
+    {
+        if (binAllocated == null) return -1;
+
+        // IMPORTANT: allocation is a stable frontier; do NOT clamp by loopMultiplier.
+        for (int i = binAllocated.Length - 1; i >= 0; i--)
+            if (binAllocated[i]) return i;
+
+        return -1;
+    }
+
     public int GetHighestFilledBin()
     {
         EnsureBinList();
 
-        // Only bins within the CURRENT active loop span are meaningful for frontier decisions.
-        int activeBins = Mathf.Max(1, loopMultiplier);
-        int maxIndex = Mathf.Min(_binFilled.Count - 1, activeBins - 1);
-
-        for (int i = maxIndex; i >= 0; i--)
+        // IMPORTANT: filled is a content frontier; do NOT clamp by loopMultiplier either.
+        // (You can choose to clamp for “audible span” decisions elsewhere, but not for frontier detection.)
+        for (int i = _binFilled.Count - 1; i >= 0; i--)
             if (_binFilled[i]) return i;
 
         return -1;
@@ -1234,46 +1267,51 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     /// </summary>
     public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
     {
-        // Loop content + caches
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
+            $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
+            $"spawnedNotesCount={(_spawnedNotes != null ? _spawnedNotes.Count : -1)} " +
+            $"burstRemainingCount={(_burstRemaining != null ? _burstRemaining.Count : -1)}\n" +
+            Environment.StackTrace);
+
         persistentLoopNotes?.Clear();
-        MarkLoopCacheDirty();
+        _loopCacheDirtyPending = true;
 
         _loopNotes?.Clear();
         _spawnedNotes?.Clear();
 
-        // Burst bookkeeping
         _burstSteps?.Clear();
         _burstRemaining?.Clear();
         _burstTotalSpawned?.Clear();
         _burstCollected?.Clear();
 
-        // Expansion/mapping state + cursors
         ResetBinStateForNewPhase();
-
-        // Bin fill/allocation/harmony
         ResetBinsForPhase();
     }
 
     public void SoftReplaceLoop(IReadOnlyList<(int stepIndex, int note, int duration, float velocity)> newNotes)
     {
-        // Clear data + our own spawned visuals (quietly)
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=SoftReplaceLoop " +
+            $"newNotes={(newNotes != null ? newNotes.Count : -1)} " +
+            $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
+            Environment.StackTrace);
+
         persistentLoopNotes.Clear();
-        MarkLoopCacheDirty();
+        _loopCacheDirtyPending = true;
+
         _spawnedNotes.Clear();
 
-        // Rebuild notes + visuals quietly
         if (newNotes != null)
         {
             RecomputeBinsFromLoop();
             for (int i = 0; i < newNotes.Count; i++)
             {
                 var t = newNotes[i];
-                // Reuse your normal add path so markers & bookkeeping stay consistent
                 AddNoteToLoop(t.stepIndex, t.note, t.duration, t.velocity);
             }
         }
-
-    } 
+    }
     public bool HasNoteSet()
     {
         return _currentNoteSet != null;
@@ -1294,24 +1332,32 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
 
     public int GetTotalSteps()
     {
-        return _totalSteps;
+        // Always reflect current loopMultiplier.
+        // _totalSteps is treated as a fallback for early init / scenes where drumTrack is not ready.
+        int drumSteps = (drumTrack != null) ? Mathf.Max(1, drumTrack.totalSteps) : 0;
+        if (drumSteps > 0)
+            return drumSteps * Mathf.Max(1, loopMultiplier);
+
+        return Mathf.Max(1, _totalSteps);
     }
-    public void ClearLoopedNotes(Vehicle vehicle = null) {
+
+    public void ClearLoopedNotes(Vehicle vehicle = null)
+    {
         if (persistentLoopNotes.Count == 0) return;
-        ResetPerfectionFlag(); 
+
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=ClearLoopedNotes " +
+            $"vehicle={(vehicle != null ? vehicle.name : "null")} " +
+            $"persistentBefore={persistentLoopNotes.Count}\n" +
+            Environment.StackTrace);
+
+        ResetPerfectionFlag();
         controller?.noteVisualizer?.TriggerNoteBlastOff(this);
-        _spawnedNotes.Clear(); // Visuals are handled separately
+        _spawnedNotes.Clear();
         persistentLoopNotes.Clear();
-        MarkLoopCacheDirty();
+        _loopCacheDirtyPending = true;
         RecomputeBinsFromLoop();
         EvaluateAndQueueCollapseIfPossible();
-    }
-    private (int bin, int local) SplitAbsoluteStep(int stepIndex)
-    {
-        int binSize = BinSize();
-        int total   = Mathf.Max(1, binSize * Mathf.Max(1, loopMultiplier));
-        int s       = ((stepIndex % total) + total) % total;
-        return (s / binSize, s % binSize);
     }
 
     public void PlayNote(int note, int durationTicks, float velocity)
@@ -1372,31 +1418,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
         // Optional: reset pitch bend after short delay
         midiStreamPlayer.StartCoroutine(ResetPitchBendAfterDelay(0.2f));
     }
-    public void ApplyChord(Chord chord, bool reusePlayerNotes = true)
-    {
-        if (_currentNoteSet == null) return;
 
-        // Build allowed chord tones across the track's playable range
-        var allowed = new List<int>();
-        for (int octave = -2; octave <= 3; octave++)
-            foreach (var iv in chord.intervals)
-            {
-                int n = chord.rootNote + iv + 12 * octave;
-                if (n >= lowestAllowedNote && n <= highestAllowedNote)
-                    allowed.Add(n);
-            }
-        allowed.Sort();
-
-        // Remap player's collected notes instead of throwing them away
-        var modified = new List<(int step, int note, int dur, float vel)>();
-        foreach (var (step, note, dur, vel) in persistentLoopNotes)
-        {
-            int newNote = Closest(allowed, note);                // nearest chord tone
-            modified.Add((step, newNote, dur, vel));
-        }
-
-        RebuildLoopFromModifiedNotes(modified, transform.position);
-    }
     public void RetuneLoopToChord(Chord chord)
     {
         if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
@@ -1470,7 +1492,7 @@ private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
     {
         int qNote = QuantizeNoteToBinChord(stepIndex, note);
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force));
-        MarkLoopCacheDirty();
+        _loopCacheDirtyPending = true;
         GameObject noteMarker = null;
         // 🔑 Reuse any existing placeholder marker at (track, step)
         if (controller?.noteVisualizer != null &&
@@ -2120,147 +2142,6 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
     return true;
 }
 
-private bool TryPickSpawnCell2D(
-    BurstPlacementMode placementMode,
-    Vector2Int anchor,
-    int searchRadiusCells,
-    int trapBufferCells,
-    CosmicDustGenerator dustGen,
-    int gridW,
-    int gridH,
-    out Vector2Int chosen)
-{
-    chosen = new Vector2Int(-1, -1);
-
-    // Clamp + sanitize
-    int rMax = Mathf.Clamp(searchRadiusCells, 0, Mathf.Max(gridW, gridH));
-
-    // Expanding ring search around anchor (Chebyshev rings).
-    for (int r = 0; r <= rMax; r++)
-    {
-        for (int dx = -r; dx <= r; dx++)
-        {
-            // Only perimeter if r > 0 (otherwise we scan the same points repeatedly)
-            int dyTop = r;
-            int dyBot = -r;
-
-            // Top edge
-            {
-                int x = anchor.x + dx;
-                int y = anchor.y + dyTop;
-                if (x >= 0 && y >= 0 && x < gridW && y < gridH)
-                {
-                    var gp = new Vector2Int(x, y);
-                    if (Collectable.IsCellFreeStatic(gp))
-                    {
-                        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
-                        {
-                            if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
-                            {
-                                chosen = gp;
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            // Free mode: accept any free cell (prefer dust if you want, but keep simple).
-                            chosen = gp;
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            // Bottom edge (avoid double-scan when r == 0)
-            if (r > 0)
-            {
-                int x = anchor.x + dx;
-                int y = anchor.y + dyBot;
-                if (x >= 0 && y >= 0 && x < gridW && y < gridH)
-                {
-                    var gp = new Vector2Int(x, y);
-                    if (Collectable.IsCellFreeStatic(gp))
-                    {
-                        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
-                        {
-                            if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
-                            {
-                                chosen = gp;
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            chosen = gp;
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Left/right edges for this ring (excluding corners already scanned above)
-        if (r > 0)
-        {
-            for (int dy = -r + 1; dy <= r - 1; dy++)
-            {
-                // Left
-                {
-                    int x = anchor.x - r;
-                    int y = anchor.y + dy;
-                    if (x >= 0 && y >= 0 && x < gridW && y < gridH)
-                    {
-                        var gp = new Vector2Int(x, y);
-                        if (Collectable.IsCellFreeStatic(gp))
-                        {
-                            if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
-                            {
-                                if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
-                                {
-                                    chosen = gp;
-                                    return true;
-                                }
-                            }
-                            else
-                            {
-                                chosen = gp;
-                                return true;
-                            }
-                        }
-                    }
-                }
-
-                // Right
-                {
-                    int x = anchor.x + r;
-                    int y = anchor.y + dy;
-                    if (x >= 0 && y >= 0 && x < gridW && y < gridH)
-                    {
-                        var gp = new Vector2Int(x, y);
-                        if (Collectable.IsCellFreeStatic(gp))
-                        {
-                            if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin)
-                            {
-                                if (IsCellTrulyTrapped(gp, trapBufferCells, dustGen, gridW, gridH))
-                                {
-                                    chosen = gp;
-                                    return true;
-                                }
-                            }
-                            else
-                            {
-                                chosen = gp;
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return false;
-}
     private void OnCollectableDestroyed(Collectable c) { 
         if (c == null) return; 
         if (c.assignedInstrumentTrack != this) return;
@@ -2349,6 +2230,7 @@ private bool TryPickSpawnCell2D(
                       $"req.noteSet={req.noteSet} req.max={req.maxToSpawn} " +
                       $"afterClear pendReqNow={_pendingBurstAfterExpand.HasValue}"
                       );
+            drumTrack.QueueBeatMoodFromBinFill(controller.tracks);            
             EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId));
         }
         else { 
@@ -2503,21 +2385,27 @@ private bool TryPickSpawnCell2D(
         if (light != null) light.LightUp(trackColor);
     }
     private void ResetPerfectionFlag() => IsPerfectThisPhase = false;
-    private bool HasAlreadyShiftedNotes()
-    {
-        // Placeholder logic — adapt as needed for actual behavior detection
-        return persistentLoopNotes.Any(n => n.note > 127); // example threshold
-    }
+
     private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modified, Vector3 _)
     {
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=RebuildLoopFromModifiedNotes " +
+            $"modified={(modified != null ? modified.Count : -1)} " +
+            $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
+            Environment.StackTrace);
+
         persistentLoopNotes.Clear();
-        MarkLoopCacheDirty();
+        _loopCacheDirtyPending = true;
         foreach (var obj in _spawnedNotes) if (obj) Destroy(obj);
         _spawnedNotes.Clear();
 
-        foreach (var (step, note, dur, vel) in modified)
-            AddNoteToLoop(step, note, dur, vel); // <- this already places & registers the marker
+        if (modified != null)
+        {
+            foreach (var (step, note, dur, vel) in modified)
+                AddNoteToLoop(step, note, dur, vel);
+        }
     }
+
     public void PruneSpawnedCollectables()
     {
         if (spawnedCollectables == null) return;
@@ -2525,75 +2413,7 @@ private bool TryPickSpawnCell2D(
         // Remove nulls and inactive pooled objects so controller doesn't think they're "in flight"
         spawnedCollectables.RemoveAll(go => go == null || !go.activeInHierarchy);
     }
-    private int Closest(List<int> pool, int target)
-{
-    int best = pool[0];
-    int bestDist = Mathf.Abs(best - target);
-    for (int i = 1; i < pool.Count; i++)
-    {
-        int d = Mathf.Abs(pool[i] - target);
-        if (d < bestDist) { best = pool[i]; bestDist = d; }
-    }
-    return best;
-}
-    private void ApplyChordChange(NoteSet noteSet, Vector3 sourcePosition)
-{
-    int[] chordOffsets = noteSet.GetRandomChordOffsets();
-    var modifiedNotes = new List<(int, int, int, float)>();
 
-    for (int i = 0; i < persistentLoopNotes.Count; i++)
-    {
-        var (step, baseNote, duration, velocity) = persistentLoopNotes[i];
-        int offset = chordOffsets[i % chordOffsets.Length];
-        int newNote = Mathf.Clamp(baseNote + offset, lowestAllowedNote, highestAllowedNote);
-        modifiedNotes.Add((step, newNote, duration, velocity));
-    }
-
-    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
-}
-    private void ApplyRootShift(NoteSet noteSet, Vector3 sourcePosition)
-{
-    int shift = Random.Range(-3, 4); // ±3 semitones
-    noteSet.ShiftRoot(this, shift);
-
-    var newScaleNotes = noteSet.GetNoteList();
-    var modifiedNotes = new List<(int, int, int, float)>();
-
-    for (int i = 0; i < persistentLoopNotes.Count; i++)
-    {
-        var (step, oldNote, duration, velocity) = persistentLoopNotes[i];
-        int newNote = noteSet.GetClosestVoiceLeadingNote(oldNote, newScaleNotes);
-        modifiedNotes.Add((step, newNote, duration, velocity));
-    }
-
-    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
-}
-    private void ApplyNoteBehaviorChange(NoteSet noteSet, Vector3 sourcePosition)
-{
-    var values = Enum.GetValues(typeof(NoteBehavior)).Cast<NoteBehavior>().ToList();
-    values.Remove(noteSet.noteBehavior);
-    NoteBehavior newBehavior = values[Random.Range(0, values.Count)];
-
-    noteSet.ChangeNoteBehavior(this, newBehavior);
-
-    var modifiedNotes = new List<(int, int, int, float)>();
-
-    for (int i = 0; i < persistentLoopNotes.Count; i++)
-    {
-        var (step, note, _, velocity) = persistentLoopNotes[i];
-        int newDuration = newBehavior switch
-        {
-            NoteBehavior.Drone => 720,
-            NoteBehavior.Bass => 480,
-            NoteBehavior.Lead => 120,
-            _ => 360
-        };
-
-        modifiedNotes.Add((step, note, newDuration, velocity));
-    }
-
-    RebuildLoopFromModifiedNotes(modifiedNotes, sourcePosition);
-}
     private int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
         AddNoteToLoop(stepIndex, note, durationTicks, force);
@@ -2605,21 +2425,7 @@ private bool TryPickSpawnCell2D(
         yield return new WaitForSeconds(delay);
         midiStreamPlayer.MPTK_Channels[channel].fluid_channel_pitch_bend(8192); // Center
     }
-    private int GetCurrentStep()
-    {
-        if (drumTrack?.drumAudioSource == null) return -1;
 
-        float elapsed = (float)(AudioSettings.dspTime - drumTrack.startDspTime);
-        int bin = BinSize();
-        int controllerLeaderMul = controller ? Mathf.Max(1, controller.GetMaxActiveLoopMultiplier()) : loopMultiplier;
-        int leaderSteps = Mathf.Max(_totalSteps, controllerLeaderMul * bin); // same as Update()
-
-        float clipLen = drumTrack.GetClipLengthInSeconds(); 
-        float stepDur = clipLen / Mathf.Max(1, drumTrack.totalSteps); 
-        int   globalStep = Mathf.FloorToInt(elapsed / stepDur) % leaderSteps; // 0..leaderSteps-1
-
-        return globalStep; // no remap back to _totalSteps
-    }
     private int FirstEmptyBin()
     {
         for (int i = 0; i < _binFilled.Count; i++)

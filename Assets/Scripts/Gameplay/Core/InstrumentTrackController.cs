@@ -50,6 +50,11 @@ public static class ShipTrackAssigner
         }
     }
 }
+public struct TransportFrame
+{
+    public int barIndex;
+    public int playheadBin;
+}
 
 public class InstrumentTrackController : MonoBehaviour
 {
@@ -82,6 +87,7 @@ public class InstrumentTrackController : MonoBehaviour
     public void NotifyCollected() {
         lastCollectionTime = Time.time;
     }
+    
     public void ResetControllerBinGuards()
     {
         _binExtensionSignaled?.Clear();
@@ -108,6 +114,37 @@ public class InstrumentTrackController : MonoBehaviour
             drum.OnLoopBoundary += ArmCohortsOnLoopBoundary;
         ArmCohortsOnLoopBoundary();
     }
+    /// <summary>
+    /// Single source of truth for which bin is currently audible,
+    /// derived ONLY from DSP time and the drum clip length.
+    /// </summary>
+    public TransportFrame GetTransportFrame()
+    {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null)
+            return default;
+
+        double dspNow = AudioSettings.dspTime;
+        double start  = drum.startDspTime;
+        if (start <= 0.0)
+            return default;
+
+        float clipLen = drum.GetClipLengthInSeconds();
+        if (clipLen <= 0f)
+            return default;
+
+        int barIndex = Mathf.FloorToInt((float)((dspNow - start) / clipLen));
+
+        int leaderBins = Mathf.Max(1, GetGlobalVisualBins());
+        int playheadBin = ((barIndex % leaderBins) + leaderBins) % leaderBins;
+
+        return new TransportFrame
+        {
+            barIndex   = barIndex,
+            playheadBin = playheadBin
+        };
+    }
+
     void Update()
     {
         // Self-heal: if something reassigns tracks later, we’ll latch subscriptions once.
@@ -119,6 +156,7 @@ public class InstrumentTrackController : MonoBehaviour
         _chordEventsSubscribed = false;
         TrySubscribeChordEvents();   // first attempt
     }
+  
     void OnDisable()
     {
         UnsubscribeChordEvents();

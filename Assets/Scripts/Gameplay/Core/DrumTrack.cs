@@ -456,8 +456,8 @@ public class DrumTrack : MonoBehaviour
         if (_phaseTransitionManager != null &&
             _phaseTransitionManager.currentMotif != null &&
             beatMoodLibrary != null)  {
-            var mood = _phaseTransitionManager.currentMotif.beatMood; 
-            initialClip = beatMoodLibrary.GetRandomClip(mood);
+            var mood = _phaseTransitionManager.currentMotif.beatMood;
+            initialClip = beatMoodLibrary.GetFirstClip(mood);
             Debug.Log($"[BOOT] Using motif '{_phaseTransitionManager.currentMotif.motifId}' beat mood '{mood}' for initial drum loop: '{(initialClip != null ? initialClip.name : "null")}'.");
         }
 
@@ -670,7 +670,7 @@ public class DrumTrack : MonoBehaviour
             return;
         }
 
-        var clip = profile.GetRandomLoopClip();
+        var clip = profile.GetFirstLoopClip();
         if (clip == null)
         {
             Debug.LogWarning($"[DrumTrack] BeatMoodProfile {profile.name} has no loop clips for mood {mood}.");
@@ -686,41 +686,7 @@ public class DrumTrack : MonoBehaviour
         ScheduleDrumLoopChange(clip);
 
     }
-    /// <summary>
-    /// Apply a normalized intensity value [0..1] to the drum system by
-    /// selecting an appropriate BeatMood and scheduling a loop change.
-    /// Call this from gameplay systems that compute "how hard the player is going".
-    /// </summary>
-    public void ApplyBeatIntensity(float intensity01)
-    {
-        if (beatMoodLibrary == null)
-            return;
 
-        // Clamp to [0,1]
-        float x = Mathf.Clamp01(intensity01);
-
-        // Ensure thresholds are ordered
-        float tLow    = Mathf.Min(lowIntensityThreshold, mediumIntensityThreshold);
-        float tMed    = Mathf.Clamp(mediumIntensityThreshold, tLow, highIntensityThreshold);
-        float tHigh   = Mathf.Max(highIntensityThreshold, tMed);
-
-        // Map scalar to one of the four moods
-        BeatMood target;
-        if (x < tLow)
-            target = lowIntensityMood;
-        else if (x < tMed)
-            target = mediumIntensityMood;
-        else if (x < tHigh)
-            target = highIntensityMood;
-        else
-            target = extremeIntensityMood;
-
-        // If we already have an active profile with this mood, do nothing.
-        if (_activeBeatProfile != null && _activeBeatProfile.mood == target)
-            return;
-
-        ScheduleBeatMoodAndLoopChange(target);
-    }
     private bool EnsureCachedRefs()
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -1097,6 +1063,49 @@ public class DrumTrack : MonoBehaviour
 
         StartCoroutine(WaitAndChangeDrumLoop());
     }
+
+
+    public float ComputeBinFillIntensity(IReadOnlyList<InstrumentTrack> tracks)
+    {
+        if (tracks == null || tracks.Count == 0) return 0.25f;
+
+        int binsPerTrack = Mathf.Max(1, _binCount);
+
+        int activeTracks = 0;
+        int filled = 0;
+
+        for (int t = 0; t < tracks.Count; t++)
+        {
+            var tr = tracks[t];
+            if (tr == null) continue;
+
+            activeTracks++;
+
+            for (int b = 0; b < binsPerTrack; b++)
+                if (tr.IsBinFilled(b)) filled++;
+        }
+
+        if (activeTracks <= 0) return 0.25f;
+
+        int totalBins = binsPerTrack * activeTracks;
+
+        if (filled <= 0) return 1f / totalBins;
+        return (float)filled / totalBins;
+    }
+
+
+    public void QueueBeatMoodFromBinFill(IReadOnlyList<InstrumentTrack> tracks)
+    {
+        float intensity = ComputeBinFillIntensity(tracks);
+
+        // Map intensity -> mood using your existing threshold fields and queue slot.【turn69file13†L11-L35】
+        // If you already have ApplyBeatIntensity(float), call that instead.
+        if (intensity < lowIntensityThreshold)       QueuedBeatMood = lowIntensityMood;
+        else if (intensity < mediumIntensityThreshold) QueuedBeatMood = mediumIntensityMood;
+        else if (intensity < highIntensityThreshold)   QueuedBeatMood = highIntensityMood;
+        else                                         QueuedBeatMood = extremeIntensityMood;
+    }
+
     private IEnumerator WaitAndChangeDrumLoop()
     {
         if (drumAudioSource == null || drumAudioSource.clip == null)
