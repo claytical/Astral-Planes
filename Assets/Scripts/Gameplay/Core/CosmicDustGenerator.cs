@@ -1860,7 +1860,7 @@ public bool TryGetDustWeatherForce(
     {
         // Prefer live dust tint if the cell currently exists.
         if (TryGetDustAt(cell, out var dust) && dust != null)
-            return dust.CurrentTint;
+            return dust.GetBaseTintForDiffusion();
 
         // Otherwise prefer a pending MineNode imprint if present.
         if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
@@ -2013,9 +2013,16 @@ public bool TryGetDustWeatherForce(
         RemoveActiveAt(gridPos, go, toPool: false);
 
         if (go.TryGetComponent<CosmicDust>(out var dust))
+        {
+            // Visual cue: boost-carved dust should *flash charge* even if we remove topology immediately.
+            // IMPORTANT: this must happen BEFORE starting the fade so FadeOut starts from the charged tint.
+            dust.PulseCharge(1f, stickyUntilDestroyed: true);
             dust.DissipateAndPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds));
+        }
         else
+        {
             ReturnDustToPool(go);
+        }
 
         // Schedule regrow (will be held off by keep-clear and other vetoes inside coroutine)
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
@@ -2228,13 +2235,15 @@ public bool TryGetDustWeatherForce(
             Color avg = ComputeNeighborAverageColor(cell, radius, out int nCount);
             if (nCount <= 0) continue;
 
-            Color cur = dust.CurrentTint;
+            // Diffusion must operate on the BASE tint only (exclude transient shadow/charge/deny).
+            Color cur = dust.GetBaseTintForDiffusion();
             Color next = Color.Lerp(cur, avg, Mathf.Clamp01(tintDiffusionStrength));
 
             if (ColorMaxAbsDelta(cur, next) < tintDiffusionMinDelta)
                 continue;
 
-            dust.SetTint(next);
+            // Update base tint without clearing transient overlays.
+            dust.SetBaseTintFromDiffusion(next);
 
             if (tintDiffusionPropagateOnChange)
             {
