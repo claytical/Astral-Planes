@@ -304,7 +304,7 @@ public class CosmicDustGenerator : MonoBehaviour
         return false;
     }
 
-    private void MarkCompositeDirty()
+    public void MarkCompositeDirty()
     {
         EnsureCompositeRef();
         if (compositeCollider == null) return;
@@ -1083,6 +1083,7 @@ private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelayS
 
         if (go.TryGetComponent<CosmicDust>(out var dust))
         {
+            dust.BindToCell(gridPos,this, drums);
             dust.ResetVisualToBase();
         }
 
@@ -1093,6 +1094,31 @@ private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelayS
         yield break;
     }
 }
+public void DespawnDustInstance(CosmicDust dust)
+{
+    if (dust == null) return;
+
+    // Prefer authoritative binding.
+    if (dust.HasBoundCell)
+    {
+        DespawnDustAt(dust.BoundCell);
+        return;
+    }
+
+    // Fallback: try to find it in the map (O(n), debug-only or rare path).
+    foreach (var kvp in _hexMap)
+    {
+        if (kvp.Value == dust.gameObject)
+        {
+            DespawnDustAt(kvp.Key);
+            return;
+        }
+    }
+
+    // Last resort: pool it without map interaction, so it cannot remain visible forever.
+    ReturnDustToPoolPublic(dust.gameObject);
+}
+
 private bool IsInBounds(Vector2Int gp) { 
     if (drums == null) return false; 
     int w = drums.GetSpawnGridWidth(); 
@@ -1632,18 +1658,136 @@ private bool IsInBounds(Vector2Int gp) {
     [ContextMenu("Audit Orphan Dust")]
     public void AuditOrphanDust()
     {
-        var all = GetComponentsInChildren<CosmicDust>(true);
-        int tracked = 0, orphan = 0;
+        // IMPORTANT:
+        // - GetComponentsInChildren(...) on the generator will include poolRoot + inactive pooled dust.
+        //   Those are expected to NOT be in _hexMap and should not be counted as "orphan" blockers.
+        // - This audit focuses on dust currently under activeDustRoot (the only dust that should be contributing
+        //   to the CompositeCollider2D maze).
+
+        var root = activeDustRoot != null ? activeDustRoot : transform;
+        var all = root.GetComponentsInChildren<CosmicDust>(true);
+
+        int tracked = 0;
+        int orphan = 0;
+        int blockingOrphan = 0;
+
         var trackedSet = new HashSet<GameObject>(_hexMap.Values);
+
+        // Keep the log concise; we can expand later if needed.
+        const int kMaxList = 12;
+        int listed = 0;
 
         foreach (var d in all)
         {
-            if (trackedSet.Contains(d.gameObject)) tracked++;
-            else orphan++;
+            if (d == null) continue;
+            bool isTracked = trackedSet.Contains(d.gameObject);
+            if (isTracked) { tracked++; continue; }
+
+            orphan++;
+
+            // "Blocking" means it is active and has an enabled collider that can contribute to the composite.
+            // We cannot rely on private fields on CosmicDust from here, so we read the common contributor collider.
+            var box = d.GetComponent<BoxCollider2D>();
+            bool contributes = false;
+            if (box != null)
+            {
+                contributes = box.enabled && box.compositeOperation != Collider2D.CompositeOperation.None;
+            }
+            else
+            {
+                var col = d.GetComponent<Collider2D>();
+                contributes = col != null && col.enabled;
+            }
+
+            if (d.gameObject.activeInHierarchy && contributes)
+            {
+                blockingOrphan++;
+                if (listed < kMaxList)
+                {
+                    var gp = drums != null ? drums.WorldToGridPosition(d.transform.position) : new Vector2Int(int.MinValue, int.MinValue);
+                    Debug.Log(
+                        $"[DUST-AUDIT:BLOCKING] name='{d.name}' active={d.gameObject.activeInHierarchy} " +
+                        $"grid={gp} world=({d.transform.position.x:F2},{d.transform.position.y:F2}) " +
+                        $"box={(box ? "OK" : "NULL")} box.enabled={(box ? box.enabled : false)} " +
+                        $"box.op={(box ? box.compositeOperation.ToString() : "NULL")}",
+                        d
+                    );
+                    listed++;
+                }
+            }
         }
 
-        Debug.Log($"[DUST-AUDIT] totalUnderGenerator={all.Length} tracked={tracked} orphan={orphan} hexMapCount={_hexMap.Count}");
+        Debug.Log($"[DUST-AUDIT] root='{root.name}' totalUnderRoot={all.Length} tracked={tracked} orphan={orphan} blockingOrphan={blockingOrphan} hexMapCount={_hexMap.Count}");
     }
+
+	[ContextMenu("Fix Blocking Orphan Dust")]
+	public void FixBlockingOrphanDust()
+	{
+	    // Target only dust under activeDustRoot that is not tracked by _hexMap but is still contributing.
+	    var root = activeDustRoot != null ? activeDustRoot : transform;
+	    var all = root.GetComponentsInChildren<CosmicDust>(true);
+	    var trackedSet = new HashSet<GameObject>(_hexMap.Values);
+	    int fixedCount = 0;
+	
+	    foreach (var d in all)
+	    {
+	        if (d == null) continue;
+	        if (trackedSet.Contains(d.gameObject)) continue;
+	
+	        var box = d.GetComponent<BoxCollider2D>();
+	        bool contributes = box != null && box.enabled && box.compositeOperation != Collider2D.CompositeOperation.None;
+	        if (!d.gameObject.activeInHierarchy || !contributes) continue;
+	
+	        // Disable contribution immediately, then pool.
+	        d.SetTerrainColliderEnabled(false);
+	        ReturnDustToPool(d.gameObject);
+	        fixedCount++;
+	    }
+	
+
+
+    [ContextMenu("Fix Visible Orphan Dust (Pool)")]
+    void FixVisibleOrphanDust()
+    {
+        // Any CosmicDust instance under activeDustRoot that is not tracked in _hexMap is an orphan.
+        // Even if it is not currently contributing to the composite (CompositeOperation.None), it is
+        // visually misleading and can later re-enable via pooling mistakes. Pool it immediately.
+        if (activeDustRoot == null)
+        {
+            Debug.LogWarning("[DUST-FIX] activeDustRoot is null", this);
+            return;
+        }
+
+        int pooled = 0;
+        foreach (var dust in activeDustRoot.GetComponentsInChildren<CosmicDust>(true))
+        {
+            if (dust == null) continue;
+            if (_hexMap.ContainsValue(dust.gameObject)) continue;
+
+            // Ensure it stops colliding/contributing immediately.
+            dust.SetTerrainColliderEnabled(false);
+            var col = dust.GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
+
+            ReturnDustToPool(dust.gameObject);
+            pooled++;
+        }
+
+        if (pooled > 0)
+            MarkCompositeDirty();
+
+        Debug.Log($"[DUST-FIX] FixVisibleOrphanDust pooled={pooled}", this);
+    }
+	    if (fixedCount > 0)
+	    {
+	        MarkCompositeDirty();
+	        Debug.Log($"[DUST-AUDIT] Fixed blocking orphan dust: {fixedCount}", this);
+	    }
+	    else
+	    {
+	        Debug.Log("[DUST-AUDIT] No blocking orphan dust found.", this);
+	    }
+	}
     
     private Vector2 ComputePhaseBias(MusicalPhase phase)
     {
@@ -2057,10 +2201,40 @@ public bool TryGetDustWeatherForce(
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
     /// Boost carving should use this, NOT DespawnDustAt.
     /// </summary>
-    public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
+    
+
+    // --- Transient tint helpers (optional external callers: Vehicle, DustClaimManager, PhaseStar) ---
+    public bool PulseChargeAt(Vector2Int gridPos, float strength01 = 1f, float fadeSeconds = -1f, bool stickyUntilDestroyed = false)
+    {
+        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
+        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
+        dust.PulseCharge(strength01, fadeSeconds, stickyUntilDestroyed);
+        return true;
+    }
+
+    public bool PulseDenyAt(Vector2Int gridPos, float strength01 = 1f, float fadeSeconds = -1f)
+    {
+        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
+        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
+        dust.PulseDeny(strength01, fadeSeconds);
+        return true;
+    }
+
+    public bool SetShadowAt(Vector2Int gridPos, bool shadowOn)
+    {
+        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
+        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
+        dust.SetShadowTarget(shadowOn);
+        return true;
+    }
+public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
     {
         if (_permanentClearCells.Contains(gridPos)) return;
         if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return;
+
+        // VISUAL: mark this tile as ‘charged’ immediately so carving reads as an impact, even if it fades quickly.
+        if (go.TryGetComponent<CosmicDust>(out var preDust))
+            preDust.PulseCharge(1f, fadeSeconds: Mathf.Max(0.01f, fadeSeconds), stickyUntilDestroyed: true);
 
         RemoveActiveAt(gridPos, go, toPool: false);
 
@@ -2301,13 +2475,22 @@ public bool TryGetDustWeatherForce(
         }
     }
 
-private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
+    private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
         // Free grid cell by key (authoritative)
-        drums.FreeSpawnCell(grid.x, grid.y); 
+        drums.FreeSpawnCell(grid.x, grid.y);
+
+        // SAFETY: the *moment* a cell is logically cleared, it must stop contributing to the maze.
+        // This prevents "ghost walls" when an instance is left active briefly for fade-outs, FX, etc.
+        if (go != null && go.TryGetComponent<CosmicDust>(out var dust))
+        {
+            dust.SetTerrainColliderEnabled(false);
+        }
+
         // Drop from registries
-        _hexMap.Remove(grid); 
+        _hexMap.Remove(grid);
         if (go) hexagons.Remove(go);
-        // Pool the object
+
+        // Pool the object (may already be non-contributing due to SetTerrainColliderEnabled(false)).
         if (toPool && go) ReturnDustToPool(go);
 
         // Diffusion prep: removing dust can expose the base tint and create hard seams.
@@ -2842,12 +3025,12 @@ public int CarveTemporaryCellFromMineNode(
             var dust = activeDustRoot.GetComponentInChildren<CosmicDust>(true);
             if (dust != null)
             {
-                var poly = dust.GetComponent<PolygonCollider2D>();
+                var box = dust.GetComponent<BoxCollider2D>();
+                var col = dust.GetComponent<Collider2D>();
                 Debug.Log(
                     $"[DUST:TILE] sample='{dust.name}' layer={dust.gameObject.layer} " +
-                    $"poly={(poly ? "OK" : "NULL")} poly.enabled={(poly ? poly.enabled : false)} " +
-                    $"poly.usedByComposite={(poly ? poly.usedByComposite : false)} " +
-                    $"poly.isTrigger={(poly ? poly.isTrigger : false)}",
+                    $"collider={(col ? col.GetType().Name : "NULL")} enabled={(col ? col.enabled : false)} isTrigger={(col ? col.isTrigger : false)} " +
+                    $"box={(box ? "OK" : "NULL")} box.enabled={(box ? box.enabled : false)} box.compositeOperation={(box ? box.compositeOperation.ToString() : "NULL")}",
                     dust
                 );
             }

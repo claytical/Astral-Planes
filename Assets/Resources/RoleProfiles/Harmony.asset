@@ -15,9 +15,9 @@ MonoBehaviour:
   role: 1
   dustColors:
     baseColor: {r: 0.193041, g: 0.801, b: 0.48576203, a: 1}
-    chargeColor: {r: 0.38042897, g: 0.9716981, b: 0.41427955, a: 1}
-    denyColor: {r: 0.33882165, g: 0.509434, b: 0.405583, a: 1}
-    shadowColor: {r: 0.22908507, g: 0.33962262, b: 0.28066927, a: 1}
+    chargeColor: {r: 0, g: 0.972549, b: 0.057966582, a: 1}
+    denyColor: {r: 0.8, g: 0, b: 0.78036195, a: 1}
+    shadowColor: {r: 0.488, g: 0.8, b: 0.64000005, a: 1}
   baseAlpha: 1
   chargeToWhite: 1
   denyToShadow: 0.75
