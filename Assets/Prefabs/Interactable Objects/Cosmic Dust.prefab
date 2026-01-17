@@ -57,16 +57,6 @@ MonoBehaviour:
     starRemovesWithoutRegrow: 0
     starAlphaFadeBias: 0
     fadeSeconds: 0
-  tint:
-    baseColor: {r: 0.55, g: 0.55, b: 0.55, a: 0.5}
-    chargeColor: {r: 1, g: 1, b: 1, a: 1}
-    denyColor: {r: 1, g: 0, b: 0.4139762, a: 1}
-    shadowColor: {r: 0.8018868, g: 0.8018868, b: 0.8018868, a: 0.5}
-    chargeFadeSeconds: 0.25
-    denyFadeSeconds: 0.25
-    shadowInSeconds: 0.35
-    shadowOutSeconds: 0.35
-    baseColorVariance: 0.02
   interaction:
     speedScale: 0.4
     accelScale: 0.4
@@ -84,6 +74,15 @@ MonoBehaviour:
   terrainCollider: {fileID: 0}
   solidLayer: 7
   nonBlockingLayer: 0
+  tint:
+    baseColor: {r: 0.55, g: 0.55, b: 0.55, a: 0.5}
+    chargeColor: {r: 1, g: 1, b: 1, a: 1}
+    denyColor: {r: 1, g: 0, b: 0.4139762, a: 1}
+    shadowColor: {r: 0.4339623, g: 0.4339623, b: 0.4339623, a: 0.5}
+    chargeFadeSeconds: 1
+    denyFadeSeconds: 1
+    shadowInSeconds: 0.35
+    shadowOutSeconds: 0.35
   epochId: 0
   stayForceEvery: 0
   _baseEmission: 10
@@ -114,7 +113,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 1914cc8b2c1cd4b9faf047b184179035, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   role: 0
   dustColors:
-    baseColor: {r: 0.5244411, g: 0.14899999, b: 1, a: 1}
-    chargeColor: {r: 0.7647059, g: 0.654902, b: 1, a: 1}
-    denyColor: {r: 0.972549, g: 0.14509802, b: 0.8373217, a: 1}
+    baseColor: {r: 0.44239616, g: 0, b: 1, a: 1}
+    chargeColor: {r: 0.7934955, g: 0.631, b: 1, a: 1}
+    denyColor: {r: 0.998508, g: 0, b: 1, a: 1}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
   baseAlpha: 1
   chargeToWhite: 1

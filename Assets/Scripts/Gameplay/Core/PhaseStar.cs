@@ -1253,32 +1253,6 @@ private void PrepareNextDirective()
         return;
     }
 
-    void ReseedAfterRemoval()
-    {
-        // 1) Re-collect petals (N changed)
-        _petals.Clear();
-        foreach (var shard in previewRing)
-            if (shard.visual)
-                _petals.Add(shard.visual);
-        int N = _petals.Count;
-
-        if (N == 0) return;
-
-        // 2) Capture CURRENT angles as new baselines to avoid pops
-        var currentAngles = new List<float>(N);
-        for (int i = 0; i < N; i++)
-            currentAngles.Add(_petals[i].localEulerAngles.z);
-
-        // 3) Rebuild ladder turns and ω for new N
-        _turns.Clear();
-        for (int i = 0; i < N; i++) _turns.Add(1f / (i + 1f));
-        InitializeTimingAndSpeeds();
-
-        // 4) You can either keep the current angles (no snap) or re-spread to 0..90 and lerp over a short window.
-        // Minimal: keep as is, then just fix layering.
-        UpdateLayering();
-    }
-
 
     void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
