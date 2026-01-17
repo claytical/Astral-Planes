@@ -234,6 +234,8 @@ void FixedUpdate()
 
     private void OnCollisionEnter2D(Collision2D coll)
     {
+        Debug.Log($"[MN:DUST_HIT] self={coll.collider.name} other={coll.otherCollider.name} otherLayer={coll.otherCollider.gameObject.layer} otherGO={coll.otherCollider.gameObject.name}");
+
         if (coll == null || coll.collider == null) return;
 
         // Option 2.2: MineNodes never physically collide with dust.

@@ -151,6 +151,14 @@ public class CosmicDustGenerator : MonoBehaviour
     public event Action<Vector2Int?> OnMazeReady;
 
     [SerializeField] private float regrowCooldownSeconds = 3.0f;
+
+    [Header("Regrowth Step Pacing")]
+    [Tooltip("Maximum number of dust cells allowed to regrow per drum step. Set to 0 to disable step pacing.")]
+    [SerializeField] private int regrowCellsPerStep = 1;
+
+    // Runtime step budget (refilled when DrumTrack.currentStep advances)
+    private int _regrowBudgetThisStep = 0;
+    private int _lastRegrowBudgetStep = -1;
     [SerializeField] public bool  progressiveMaze = true;
     [SerializeField] private int   maxFeatures = 3;                 // how many features we keep alive
     [SerializeField] private int   addPerLoop  = 1;                 // features to add each loop
@@ -594,6 +602,10 @@ public void ClearVehicleKeepClear(int ownerId)
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
 
+        // Regrowth pacing: replenish the per-step regrow budget when the drum step advances.
+        // This must run even if other Update() work returns early.
+        UpdateRegrowStepGate();
+
         if(drums == null) return;
         IncrementalFlowFieldUpdate();
 
@@ -604,6 +616,30 @@ public void ClearVehicleKeepClear(int ownerId)
             hiveTimer = 0f;
             _lastPhaseBias = ComputePhaseBias(GetCurrentPhaseSafe());
         }
+    }
+
+    // ------------------------------------------------------------
+    // Regrowth step pacing
+    // ------------------------------------------------------------
+    private void UpdateRegrowStepGate()
+    {
+        if (regrowCellsPerStep <= 0) return;
+        if (drums == null) return;
+
+        int stepNow = drums.currentStep;
+        if (stepNow != _lastRegrowBudgetStep)
+        {
+            _lastRegrowBudgetStep = stepNow;
+            _regrowBudgetThisStep = Mathf.Max(0, regrowCellsPerStep);
+        }
+    }
+
+    private bool TryConsumeRegrowBudget()
+    {
+        if (regrowCellsPerStep <= 0) return true;
+        if (_regrowBudgetThisStep <= 0) return false;
+        _regrowBudgetThisStep--;
+        return true;
     }
     private void PrewarmPool()
     {
@@ -1020,6 +1056,22 @@ private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelayS
         {
             delaySeconds = Mathf.Max(0.05f, regrowVetoRetryDelaySeconds);
             continue;
+        }
+
+        // --- Step gate: only allow N cells to regrow per drum step (after delay + vetoes) ---
+        if (regrowCellsPerStep > 0)
+        {
+            // Wait until the step budget refills and we successfully consume one slot.
+            while (!TryConsumeRegrowBudget())
+            {
+                // If the cell became invalid while waiting, abort.
+                if (!IsInBounds(gridPos) || _permanentClearCells.Contains(gridPos) || _hexMap.ContainsKey(gridPos))
+                {
+                    _regrowthCoroutines.Remove(gridPos);
+                    yield break;
+                }
+                yield return null;
+            }
         }
 
         // --- Spawn dust (success path) ---
@@ -1860,7 +1912,7 @@ public bool TryGetDustWeatherForce(
     {
         // Prefer live dust tint if the cell currently exists.
         if (TryGetDustAt(cell, out var dust) && dust != null)
-            return dust.GetBaseTintForDiffusion();
+            return dust.CurrentTint;
 
         // Otherwise prefer a pending MineNode imprint if present.
         if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
@@ -2013,16 +2065,9 @@ public bool TryGetDustWeatherForce(
         RemoveActiveAt(gridPos, go, toPool: false);
 
         if (go.TryGetComponent<CosmicDust>(out var dust))
-        {
-            // Visual cue: boost-carved dust should *flash charge* even if we remove topology immediately.
-            // IMPORTANT: this must happen BEFORE starting the fade so FadeOut starts from the charged tint.
-            dust.PulseCharge(1f, stickyUntilDestroyed: true);
             dust.DissipateAndPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds));
-        }
         else
-        {
             ReturnDustToPool(go);
-        }
 
         // Schedule regrow (will be held off by keep-clear and other vetoes inside coroutine)
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
@@ -2235,15 +2280,13 @@ public bool TryGetDustWeatherForce(
             Color avg = ComputeNeighborAverageColor(cell, radius, out int nCount);
             if (nCount <= 0) continue;
 
-            // Diffusion must operate on the BASE tint only (exclude transient shadow/charge/deny).
-            Color cur = dust.GetBaseTintForDiffusion();
+            Color cur = dust.CurrentTint;
             Color next = Color.Lerp(cur, avg, Mathf.Clamp01(tintDiffusionStrength));
 
             if (ColorMaxAbsDelta(cur, next) < tintDiffusionMinDelta)
                 continue;
 
-            // Update base tint without clearing transient overlays.
-            dust.SetBaseTintFromDiffusion(next);
+            dust.SetTint(next);
 
             if (tintDiffusionPropagateOnChange)
             {

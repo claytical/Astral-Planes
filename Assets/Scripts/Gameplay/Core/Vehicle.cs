@@ -668,7 +668,7 @@ public class Vehicle : MonoBehaviour
                     bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
                     var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
                     InstrumentTrack instrument = ctrl.FindTrackByRole(MusicalRole.Harmony);
-                    CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
+                //    CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
                     _dustSfxCooldown = DustSfxInterval;
                 }
             }

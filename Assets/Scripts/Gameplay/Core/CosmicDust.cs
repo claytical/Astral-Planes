@@ -17,7 +17,6 @@ public class CosmicDust : MonoBehaviour {
         [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
 
         public SpriteRenderer sprite;
-
         [Header("PhaseStar Proximity")]
         public bool  starRemovesWithoutRegrow; // if false, it will regrow via generator
         public float starAlphaFadeBias;        // keep a little glow as it shrinks
@@ -25,28 +24,7 @@ public class CosmicDust : MonoBehaviour {
         [Header("Fade")]
         [Min(0.01f)] public float fadeSeconds;
     }
-
-    [Serializable]
-    public struct DustTintSettings
-    {
-        [Header("Palette")]
-        public Color baseColor;
-        public Color chargeColor;
-        public Color denyColor;
-        public Color shadowColor;
-
-        [Header("Timing")]
-        [Min(0.01f)] public float chargeFadeSeconds;
-        [Min(0.01f)] public float denyFadeSeconds;
-        [Min(0.01f)] public float shadowInSeconds;
-        [Min(0.01f)] public float shadowOutSeconds;
-
-        [Header("Spawn Variance")]
-        [Range(0f, 0.10f)] public float baseColorVariance;
-    }
-
     public Color CurrentTint => _currentTint;
-
     [Serializable]
     public struct DustInteractionSettings
     {
@@ -58,7 +36,6 @@ public class CosmicDust : MonoBehaviour {
         [Min(0f)] public float energyDrainPerSecond;
         public bool noDrainWhileBoosting;
     }
-
     [Serializable]
     public struct DustClearingSettings
     {
@@ -71,7 +48,6 @@ public class CosmicDust : MonoBehaviour {
         [Tooltip("Override delay (seconds) before temporary regrow into the SAME cell. -1 uses the phase default.")]
         public float temporaryRegrowDelaySeconds;
     }
-
     private readonly struct PhaseDustConfig
     {
         public readonly float scaleMul;
@@ -100,31 +76,16 @@ public class CosmicDust : MonoBehaviour {
             this.turb       = turb;
         }
     }
-
     [SerializeField] private DustVisualSettings visual = new DustVisualSettings
     {
-        prefabReferenceScale     = new Vector3(0.75f, 0.75f, 1f),
-        particleFootprintMul     = 0.85f,
+        prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
+        particleFootprintMul   = 0.85f,
         starRemovesWithoutRegrow = false,
-        starAlphaFadeBias        = 0.9f,
-        fadeSeconds              = 0.25f
+        starAlphaFadeBias      = 0.9f,
+        fadeSeconds            = 0.25f
     };
 
-    [SerializeField] private DustTintSettings tint = new DustTintSettings
-    {
-        baseColor         = new Color(0.55f, 0.55f, 0.55f, 0.50f),
-        chargeColor       = Color.white,
-        denyColor         = Color.black,
-        shadowColor       = new Color(0f, 0f, 0f, 0.50f),
-        chargeFadeSeconds = 0.25f,
-        denyFadeSeconds   = 0.25f,
-        shadowInSeconds   = 0.35f,
-        shadowOutSeconds  = 0.35f,
-        baseColorVariance = 0.02f
-    };
-
-
-[SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
+    [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
     {
         speedScale            = 0.8f,
         accelScale            = 0.8f,
@@ -175,23 +136,6 @@ public class CosmicDust : MonoBehaviour {
     private CosmicDustGenerator gen;
     private float _growInOverride = -1f;
     private Color _currentTint = Color.white;
-
-    // --- Tint pipeline (single source of truth) ---
-    private Color _baseTintRaw = Color.white;
-    private Color _baseTintVaried = Color.white;
-    private bool  _baseVarianceApplied;
-    // Stable per-cell variance offset, captured once so diffusion doesn't erase the "grain".
-    private float _baseVarianceOffset;
-    private bool  _baseVarianceOffsetCaptured;
-
-    private float _chargeW;
-    private float _denyW;
-    private float _shadowW;
-    private float _shadowTargetW;
-
-    private bool  _chargeSticky;
-    private float _growAlphaMul = 1f;
-
     [SerializeField] private int epochId;
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
@@ -233,8 +177,27 @@ public class CosmicDust : MonoBehaviour {
 
         // Terrain collider lives on this same prefab (PolygonCollider2D recommended).
         // It contributes to the CompositeCollider2D on the DustPool root.
-        if (terrainCollider == null) terrainCollider = GetComponent<Collider2D>();
-        if (terrainCollider != null) terrainCollider.isTrigger = false;
+        if (terrainCollider == null)
+        {
+            // Prefer the per-tile BoxCollider2D that contributes to the parent CompositeCollider2D.
+            // (In newer Unity versions, contribution is controlled by Collider2D.compositeOperation.)
+            terrainCollider = GetComponent<BoxCollider2D>();
+            if (terrainCollider == null)
+                terrainCollider = GetComponentInChildren<BoxCollider2D>(true);
+
+            // Fallback: if the prefab isn't using a BoxCollider2D, take any local collider.
+            if (terrainCollider == null)
+                terrainCollider = GetComponent<Collider2D>();
+        }
+
+        if (terrainCollider != null)
+        {
+            terrainCollider.isTrigger = false;
+            // Ensure this tile actually contributes to the composite maze collider.
+            // None => does not contribute. Merge => contributes.
+            if (terrainCollider.compositeOperation == Collider2D.CompositeOperation.None)
+                terrainCollider.compositeOperation = Collider2D.CompositeOperation.Merge;
+        }
         _box = GetComponent<BoxCollider2D>();
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         float mag = transform.localScale.magnitude; 
@@ -408,213 +371,26 @@ public class CosmicDust : MonoBehaviour {
 
     public void Begin()
     {
-        EnsureBaseVarianceApplied();
-
-        // Make sure the base tint is pushed into both sprite + particles before any grow-in.
-        ApplyTint(ComputeTint());
-
+        SetColorVariance();
         ResetAndPlayParticles();
         ApplyParticleFootprint();
         CaptureBaseVisual();
 
-        _growAlphaMul = 0f;
         _growInRoutine = StartCoroutine(GrowIn());
     }
-
-    private void Update()
-    {
-        // Drive transient tint channels with minimal tunables.
-        float dt = Time.deltaTime;
-
-        // Shadow ramp toward target.
-        if (!Mathf.Approximately(_shadowW, _shadowTargetW))
-        {
-            float seconds = (_shadowTargetW > _shadowW) ? Mathf.Max(0.01f, tint.shadowInSeconds) : Mathf.Max(0.01f, tint.shadowOutSeconds);
-            float step = dt / seconds;
-            _shadowW = Mathf.MoveTowards(_shadowW, _shadowTargetW, step);
-        }
-
-        // Charge/deny decay.
-        if (!_chargeSticky && _chargeW > 0f)
-        {
-            float decay = dt / Mathf.Max(0.01f, tint.chargeFadeSeconds);
-            _chargeW = Mathf.Max(0f, _chargeW - decay);
-        }
-        if (_denyW > 0f)
-        {
-            float decay = dt / Mathf.Max(0.01f, tint.denyFadeSeconds);
-            _denyW = Mathf.Max(0f, _denyW - decay);
-        }
-
-        // Only reapply if something is active or moving.
-        if (_chargeW > 0f || _denyW > 0f || !Mathf.Approximately(_shadowW, _shadowTargetW) || _shadowW > 0f || _growAlphaMul < 1f)
-        {
-            ApplyTint(ComputeTint());
-        }
-    }
-
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
         _drumTrack = _drums;
             }
-    public void SetTint(Color baseTint)
+    public void SetTint(Color tint)
     {
-        // Compatibility: existing systems call SetTint() to establish the *base* color.
-        // This now resets transient overlays (charge/deny/shadow) and reapplies via ComputeTint().
-        _baseTintRaw = baseTint;
-        _baseTintVaried = baseTint;
-        _baseVarianceApplied = false;
-
-        _chargeW = 0f;
-        _denyW   = 0f;
-        _shadowW = 0f;
-        _shadowTargetW = 0f;
-        _chargeSticky = false;
-
-        EnsureBaseVarianceApplied();
-        ApplyTint(ComputeTint());
-    }
-
-    /// <summary>
-    /// Returns the *base* tint (including stable per-cell variance), excluding transient channels
-    /// like shadow/charge/deny and excluding grow-in alpha.
-    /// Use this for tint diffusion / neighborhood blending.
-    /// </summary>
-    public Color GetBaseTintForDiffusion()
-    {
-        EnsureBaseVarianceApplied();
-        var c = _baseTintVaried;
-        // Ensure diffusion operates on un-multiplied alpha (grow-in is visual-only).
-        c.a = _baseTintVaried.a;
-        return c;
-    }
-
-    /// <summary>
-    /// Updates only the base tint for diffusion/blending without clearing transient overlays.
-    /// Preserves the stable per-cell variance offset.
-    /// </summary>
-    public void SetBaseTintFromDiffusion(Color newBaseTint)
-    {
-        _baseTintRaw = newBaseTint;
-
-        // Keep a stable variance offset captured once per dust cell.
-        if (!_baseVarianceOffsetCaptured)
-        {
-            float v = Mathf.Clamp(tint.baseColorVariance, 0f, 0.10f);
-            _baseVarianceOffset = (v > 0f) ? Random.Range(-v, v) : 0f;
-            _baseVarianceOffsetCaptured = true;
-        }
-
-        _baseTintVaried = ApplyVariance(_baseTintRaw, _baseVarianceOffset);
-        _baseVarianceApplied = true;
-
-        ApplyTint(ComputeTint());
-    }
-
-    // --- Public, minimal visual API ---
-    public void PulseCharge(float strength01 = 1f, float fadeSeconds = -1f, bool stickyUntilDestroyed = false)
-    {
-        strength01 = Mathf.Clamp01(strength01);
-        _chargeW = Mathf.Max(_chargeW, strength01);
-        _chargeSticky = stickyUntilDestroyed;
-        // fadeSeconds maps to linear decay per second
-        if (fadeSeconds > 0f) tint.chargeFadeSeconds = Mathf.Max(0.01f, fadeSeconds);
-        ApplyTint(ComputeTint());
-    }
-
-    public void PulseDeny(float strength01 = 1f, float fadeSeconds = -1f)
-    {
-        strength01 = Mathf.Clamp01(strength01);
-        _denyW = Mathf.Max(_denyW, strength01);
-        if (fadeSeconds > 0f) tint.denyFadeSeconds = Mathf.Max(0.01f, fadeSeconds);
-        ApplyTint(ComputeTint());
-    }
-
-    public void SetShadow(bool enabled, float secondsOverride = -1f)
-    {
-        _shadowTargetW = enabled ? 1f : 0f;
-        if (secondsOverride > 0f)
-        {
-            if (enabled) tint.shadowInSeconds = Mathf.Max(0.01f, secondsOverride);
-            else         tint.shadowOutSeconds = Mathf.Max(0.01f, secondsOverride);
-        }
-        ApplyTint(ComputeTint());
-    }
-
-    public void ClearTransientTint()
-    {
-        _chargeW = 0f;
-        _denyW   = 0f;
-        _shadowW = 0f;
-        _shadowTargetW = 0f;
-        _chargeSticky = false;
-        ApplyTint(ComputeTint());
-    }
-
-    private void EnsureBaseVarianceApplied()
-    {
-        if (_baseVarianceApplied) return;
-
-        float v = Mathf.Clamp(tint.baseColorVariance, 0f, 0.10f);
-        if (v <= 0f)
-        {
-            _baseTintVaried = _baseTintRaw;
-            _baseVarianceApplied = true;
-            return;
-        }
-
-        // Capture a stable per-instance variance offset once, so diffusion and base tint changes
-        // don't collapse the grain into a flat average.
-        if (!_baseVarianceOffsetCaptured)
-        {
-            _baseVarianceOffset = Random.Range(-v, v);
-            _baseVarianceOffsetCaptured = true;
-        }
-
-        _baseTintVaried = ApplyVariance(_baseTintRaw, _baseVarianceOffset);
-        _baseVarianceApplied = true;
-    }
-
-    private static Color ApplyVariance(Color c, float dv)
-    {
-        c.r = Mathf.Clamp01(c.r + dv);
-        c.g = Mathf.Clamp01(c.g + dv);
-        c.b = Mathf.Clamp01(c.b + dv);
-        return c;
-    }
-
-    private Color ComputeTint()
-    {
-        // Base layer
-        Color baseCol = _baseTintVaried;
-
-        // Shadow (ramps), then deny, then charge (strongest)
-        Color c = Color.Lerp(baseCol, tint.shadowColor, _shadowW);
-        c = Color.Lerp(c, tint.denyColor, _denyW);
-        c = Color.Lerp(c, tint.chargeColor, _chargeW);
-
-        // Grow-in multiplier (visual-only alpha ramp)
-        c.a *= Mathf.Clamp01(_growAlphaMul);
-        return c;
-    }
-
-    private void ApplyTint(Color c)
-    {
-        _currentTint = c;
-        if (visual.sprite != null) visual.sprite.color = c;
+        _currentTint = tint;
+        visual.sprite.color = tint;
         if (!visual.particleSystem) return;
-        SetDustColorAllParticles(c);
-    }
 
-    // Direct apply for fade routines that should not mutate base/transient channels.
-    private void ApplyTintDirect(Color c)
-    {
-        _currentTint = c;
-        if (visual.sprite != null) visual.sprite.color = c;
-        if (!visual.particleSystem) return;
-        SetDustColorAllParticles(c);
+        SetDustColorAllParticles(tint);
     }
 
     private void SetDustColorAllParticles(Color target)
@@ -678,14 +454,21 @@ public class CosmicDust : MonoBehaviour {
     }
     public void SetTerrainColliderEnabled(bool enabled)
     {
-        if (terrainCollider != null)
-            terrainCollider.enabled = enabled;
+        if (terrainCollider == null) return;
+
+        bool prev = terrainCollider.enabled;
+        terrainCollider.enabled = enabled;
+
+        // If we're using composite terrain, changing tile contribution must trigger a geometry rebuild.
+        if (gen != null && prev != enabled)
+            gen.NotifyCompositeDirty();
     }
     public void DissipateAndPoolVisualOnly(float fadeSeconds = 0.20f) {
         if (_isDespawned) return;
         _isDespawned = true; 
         // Ensure no collision during fade.
         if (terrainCollider != null) terrainCollider.enabled = false;
+        if (gen != null) gen.NotifyCompositeDirty();
         var col = GetComponent<Collider2D>(); 
         if (col != null) col.enabled = false; 
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
@@ -694,13 +477,62 @@ public class CosmicDust : MonoBehaviour {
 
     private void Visual_ChargeOnBoost(float appetite01)
     {
-        // Minimal: an immediate charge pulse that fades back to base tint.
-        PulseCharge(Mathf.Clamp01(appetite01));
+        if (visual.particleSystem == null) return;
+        if (!_baseCaptured) CaptureBaseVisual();
+
+        float a = Mathf.Clamp01(appetite01);
+
+        var ps   = visual.particleSystem;
+        var main = ps.main;
+
+        // Base hue: whatever the dust currently is (phase tint or imprint tint)
+        Color baseCol = _baseColor; // from CaptureBaseVisual
+        baseCol.a = _baseAlpha;
+
+        // Hue-preserving brighten toward white
+        Color chargeCol = Color.Lerp(baseCol, Color.white, Mathf.Lerp(0.55f, 0.85f, a));
+        chargeCol.a = _baseAlpha;
+
+        // RGB-only brightness boost (alpha unchanged)
+        chargeCol = MulRgb(chargeCol, Mathf.Lerp(1.05f, 1.25f, a));
+
+        // Optional: slight size increase
+        main.startSize = _baseSize * Mathf.Lerp(1.05f, 1.25f, a);
+
+        // Optional: emission bump (keep conservative at first)
+        var emission = ps.emission;
+        emission.rateOverTime = _baseEmission * Mathf.Lerp(1.0f, 1.15f, a);
+
+        SetDustColorAllParticles(chargeCol);
     }
 
     private void Visual_DenyOnBump(float severity01)
     {
-        PulseDeny(Mathf.Clamp01(severity01));
+        if (visual.particleSystem == null) return;
+        if (!_baseCaptured) CaptureBaseVisual();
+
+        float s = Mathf.Clamp01(severity01);
+
+        var main = visual.particleSystem.main;
+
+        // Deny target: role-authored shadow tint if imprinted; otherwise darken toward black.
+        Color denyTarget = _hasImprint ? _imprintShadowTint : Color.black;
+        denyTarget.a = _baseAlpha;
+
+        Color baseCol = _baseColor;
+        baseCol.a = _baseAlpha;
+
+        // Blend toward deny target
+        Color denyCol = Color.Lerp(baseCol, denyTarget, s);
+        denyCol.a = _baseAlpha;
+
+        // RGB-only darken (optional; tune)
+        denyCol = MulRgb(denyCol, Mathf.Lerp(0.90f, 0.65f, s));
+
+        SetDustColorAllParticles(denyCol);
+
+        // Optional: size response on deny (define it; don't use "size")
+        main.startSize = _baseSize * Mathf.Lerp(1.00f, 1.12f, s);
     }
 
     private void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
@@ -734,11 +566,11 @@ public class CosmicDust : MonoBehaviour {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
             transform.localScale = Vector3.Lerp(s0, s1, u);
-            ApplyTintDirect(Color.Lerp(from, to, u));
+            SetTint(Color.Lerp(from, to, u));
             yield return null;
         }
 
-        ApplyTintDirect(to);
+        SetTint(to);
 
         if (visual.particleSystem != null)
             visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -775,19 +607,8 @@ public class CosmicDust : MonoBehaviour {
             visual.particleSystem.Clear(true);
         }
 
-        _baseVarianceApplied = false;
-        _growAlphaMul = 1f;
-        _chargeW = 0f;
-        _denyW   = 0f;
-        _shadowW = 0f;
-        _shadowTargetW = 0f;
-        _chargeSticky = false;
-
-        // Default visible state for pooled reuse: use current base tint (if any), otherwise tint.baseColor
-        if (_baseTintRaw == default) _baseTintRaw = tint.baseColor;
-        _baseTintVaried = _baseTintRaw;
-        EnsureBaseVarianceApplied();
-        ApplyTint(ComputeTint());
+        _currentTint.a = 0.5f;
+        SetTint(_currentTint);
 
         clearing.hardness01 = 0f;
     }
@@ -808,12 +629,9 @@ public class CosmicDust : MonoBehaviour {
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
             Color now = Color.Lerp(from, toTint, u);
             // Apply each step (affects new and in-flight particles)
-            ApplyTintDirect(now);
+            SetTint(now);
             yield return null;
         }
-        ApplyTintDirect(toTint);
-
-        // Establish the new base tint after the animation completes.
         SetTint(toTint);
     }    
     public void DespawnToPoolInstant()
@@ -869,10 +687,11 @@ public class CosmicDust : MonoBehaviour {
         if (visual.particleSystem == null) return;
         var main = visual.particleSystem.main;
 
-        // Size/emission are still useful for non-color visuals, but tint is now driven by the pipeline.
+        _baseColor = main.startColor.color;
         _baseSize  = main.startSize.constant;
-        _baseAlpha = _baseTintVaried.a;
+        _baseAlpha = _baseColor.a;
         _baseCaptured = true;
+        
     }
     private void DisableInteractionImmediately() { 
         // Stop affecting vehicles instantly (even if particles linger)
@@ -889,19 +708,20 @@ public class CosmicDust : MonoBehaviour {
             ? _growInOverride
             : 5f;
 
-        if (duration <= 0f) yield break;
-
-        float t = 0f;
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            _growAlphaMul = Mathf.SmoothStep(0f, 1f, t / duration);
-            ApplyTint(ComputeTint());
+        if (visual.particleSystem == null || duration <= 0f) yield break;
+        
+        var main = visual.particleSystem.main; 
+        Color baseCol = _currentTint;
+        float t = 0f; 
+        while (t < duration) { 
+            t += Time.deltaTime; 
+            float a = Mathf.SmoothStep(0f, 1f, t / duration); 
+            var c = new Color(baseCol.r, baseCol.g, baseCol.b, baseCol.a * a);
+            SetDustColorAllParticles(c);
             yield return null;
         }
-
-        _growAlphaMul = 1f;
-        ApplyTint(ComputeTint());
+        // Ensure fully visible at end
+        SetDustColorAllParticles(baseCol);
 
     }
     private IEnumerator FadeOutThenPoolVisualOnly(float duration)
@@ -981,12 +801,9 @@ public class CosmicDust : MonoBehaviour {
         if (visual.particleSystem == null) return;
         if (!_baseCaptured) return;
 
-        ClearTransientTint();
-        if (visual.particleSystem != null)
-        {
-            var main = visual.particleSystem.main;
-            main.startSize = _baseSize;
-        }
+        var main = visual.particleSystem.main;
+        SetDustColorAllParticles(_baseColor);
+        main.startSize  = _baseSize;
         Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
 
@@ -1011,9 +828,12 @@ public class CosmicDust : MonoBehaviour {
     }
     private void SetColorVariance()
     {
-        // Deprecated: variance is now applied to the base tint once per spawn via EnsureBaseVarianceApplied().
-        EnsureBaseVarianceApplied();
-        ApplyTint(ComputeTint());
+        var c = _currentTint;
+        float variation = Random.Range(-.02f, .02f);
+        c.r = Mathf.Clamp01(c.r + variation);
+        c.g = Mathf.Clamp01(c.g + variation);
+        c.b = Mathf.Clamp01(c.b + variation);
+        SetTint(c);
     }
     private IEnumerator FadeOutThenPool(float duration)
     {
@@ -1032,12 +852,12 @@ public class CosmicDust : MonoBehaviour {
         {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
-            ApplyTintDirect(Color.Lerp(from, to, u));
+            SetTint(Color.Lerp(from, to, u));
 
             yield return null;
         }
 
-        ApplyTintDirect(to);
+        SetTint(to);
 
         if (visual.particleSystem != null)
             visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
