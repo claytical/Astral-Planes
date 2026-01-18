@@ -51,10 +51,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Dictionary<Vector2Int, int> _keepClearRefCount = new Dictionary<Vector2Int, int>();
     private readonly HashSet<Vector2Int> _pendingFadeRemovals = new HashSet<Vector2Int>();
 
-    // === Tint diffusion state (Option 2) ===
-    private readonly Queue<Vector2Int> _tintDirtyQueue = new Queue<Vector2Int>();
-    private readonly HashSet<Vector2Int> _tintDirtySet = new HashSet<Vector2Int>();
-    private float _tintDiffusionAccum = 0f;
+    // === Tint diffusion (Option 2) ===
+    private CosmicDustTintDiffusionSystem _tintDiffusion;
     private Coroutine _compositeRebuildCo;
     private bool _compositeDirty;
     [Tooltip("Debounce: minimum seconds between classic cycles.")]
@@ -563,6 +561,14 @@ public void ClearVehicleKeepClear(int ownerId)
         TryEnsureRefs();
         TryEnsureFlowField();
         PrewarmPool();
+
+        // Tint diffusion system (keeps visual seams soft around recent changes)
+        if (_tintDiffusion == null)
+        {
+            _tintDiffusion = new CosmicDustTintDiffusionSystem(
+                getDustOrNull: cell => { TryGetDustAt(cell, out var d); return d; },
+                getCellVisualColor: GetCellVisualColor);
+        }
     }
     private bool IsVehicleOverlappingCellWorld(Vector3 cellWorld, float cellWorldSize)
     {
@@ -602,6 +608,13 @@ public void ClearVehicleKeepClear(int ownerId)
         if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();
         TryEnsureFlowField();
         PrewarmPool();
+
+        if (_tintDiffusion == null)
+        {
+            _tintDiffusion = new CosmicDustTintDiffusionSystem(
+                getDustOrNull: cell => { TryGetDustAt(cell, out var d); return d; },
+                getCellVisualColor: GetCellVisualColor);
+        }
         
     }
     private bool IsDustSpawnBlocked(Vector2Int cell)
@@ -613,7 +626,15 @@ public void ClearVehicleKeepClear(int ownerId)
         // Flow-field: incremental update each frame (prevents periodic spikes)
         TryEnsureRefs();
         // Tint diffusion: keep visual seams soft around recent changes.
-        ProcessTintDiffusion(Time.deltaTime);
+        _tintDiffusion?.Tick(
+            dt: Time.deltaTime,
+            enabled: enableTintDiffusion,
+            intervalSeconds: tintDiffusionInterval,
+            maxCellsPerTick: tintDiffusionMaxCellsPerTick,
+            neighborRadius: tintDiffusionRadius,
+            strength: tintDiffusionStrength,
+            propagateOnChange: tintDiffusionPropagateOnChange,
+            minDelta: tintDiffusionMinDelta);
 
         if(drums == null) return;
         IncrementalFlowFieldUpdate();
@@ -2239,25 +2260,115 @@ public bool TryGetDustWeatherForce(
 
         switch (phase) {
             case MusicalPhase.Establish:
-                raw = Build_CA(center, hollowRadius, avoidStarHole);
+                {
+                    int W = drums.GetSpawnGridWidth();
+                    int H = drums.GetSpawnGridHeight();
+                    Vector3 centerWorld = drums.GridToWorldPosition(center);
+
+                    raw = CosmicDustMazePatterns.BuildCA(
+                        width: W,
+                        height: H,
+                        fillChance: GetFillProbability(MusicalPhase.Establish),
+                        iterations: iterations,
+                        getHexDirectionsByRow: GetHexDirections,
+                        gridToWorld: cell => drums.GridToWorldPosition(cell),
+                        isCellAvailable: (x, y) => drums.IsSpawnCellAvailable(x, y),
+                        includeWorld: world =>
+                        {
+                            if (!IsWorldPositionInsideScreen(world)) return false;
+                            if (avoidStarHole && hollowRadius > 0f)
+                            {
+                                float d = Vector3.Distance(world, centerWorld);
+                                if (d < hollowRadius) return false;
+                            }
+                            return true;
+                        });
+                }
                 break;
             case MusicalPhase.Evolve:
                 raw = CalculateCarvedMazeWalls(onScreenOnly: true, braidChance: 0.22f, corridorThickness: 1);
                 break;
             case MusicalPhase.Intensify:
-                raw = Build_RingChokepoints(center, ringSpacing: 3, ringThickness: 1, jitter: 0.25f, hollowRadius, avoidStarHole);
+                {
+                    int W = drums.GetSpawnGridWidth();
+                    int H = drums.GetSpawnGridHeight();
+                    Vector3 centerWorld = drums.GridToWorldPosition(center);
+
+                    raw = CosmicDustMazePatterns.BuildRingChokepoints(
+                        center: center,
+                        width: W,
+                        height: H,
+                        ringSpacing: 3,
+                        ringThickness: 1,
+                        jitter: 0.25f,
+                        getHexDirectionsByRow: GetHexDirections,
+                        gridToWorld: cell => drums.GridToWorldPosition(cell),
+                        isCellAvailable: (x, y) => drums.IsSpawnCellAvailable(x, y),
+                        includeCellForBfs: cell =>
+                        {
+                            // Match legacy Build_RingChokepoints behavior: optionally exclude the star-hole/hollow region
+                            // DURING BFS so the distance field "wraps" around the hole.
+                            if (avoidStarHole && hollowRadius > 0f)
+                            {
+                                float dd = Vector3.Distance(drums.GridToWorldPosition(cell), centerWorld);
+                                if (dd < hollowRadius) return false;
+                            }
+                            return true;
+                        },
+                        includeWorld: world => IsWorldPositionInsideScreen(world)
+                    );
+                }
                 break;
             case MusicalPhase.Wildcard:
-                raw = Build_DrunkenStrokes(strokes: 6, maxLen: 14, stepJitter: 0.35f, dilate: 0.35f);
+                {
+                    int W = drums.GetSpawnGridWidth();
+                    int H = drums.GetSpawnGridHeight();
+                    raw = CosmicDustMazePatterns.BuildDrunkenStrokes(
+                        width: W,
+                        height: H,
+                        strokes: 6,
+                        maxLen: 14,
+                        stepJitter: 0.35f,
+                        dilate: 0.35f,
+                        getHexDirectionsByRow: GetHexDirections,
+                        gridToWorld: cell => drums.GridToWorldPosition(cell),
+                        isCellAvailable: (x, y) => drums.IsSpawnCellAvailable(x, y),
+                        includeWorld: world => IsWorldPositionInsideScreen(world)
+                    );
+                }
                 break;
             case MusicalPhase.Release:
                 raw = CalculateCarvedMazeWalls(onScreenOnly: true, braidChance: 0.60f, corridorThickness: 2);
                 break;
             case MusicalPhase.Pop:
-                raw = Build_PopDots(step: 3, phaseOffset: 0); // or whatever you currently do
+                {
+                    int W = drums.GetSpawnGridWidth();
+                    int H = drums.GetSpawnGridHeight();
+                    raw = CosmicDustMazePatterns.BuildPopDots(
+                        width: W,
+                        height: H,
+                        step: 3,
+                        phaseOffset: 0,
+                        gridToWorld: cell => drums.GridToWorldPosition(cell),
+                        isCellAvailable: (x, y) => drums.IsSpawnCellAvailable(x, y),
+                        includeWorld: world => IsWorldPositionInsideScreen(world)
+                    );
+                }
                 break;
             default:
-                raw = Build_CA(center, hollowRadius: 0f, avoidStarHole: false);
+                {
+                    int W = drums.GetSpawnGridWidth();
+                    int H = drums.GetSpawnGridHeight();
+                    raw = CosmicDustMazePatterns.BuildCA(
+                        width: W,
+                        height: H,
+                        fillChance: GetFillProbability(MusicalPhase.Establish),
+                        iterations: iterations,
+                        getHexDirectionsByRow: GetHexDirections,
+                        gridToWorld: cell => drums.GridToWorldPosition(cell),
+                        isCellAvailable: (x, y) => drums.IsSpawnCellAvailable(x, y),
+                        includeWorld: world => IsWorldPositionInsideScreen(world));
+                }
                 break;
         }
 
@@ -2457,106 +2568,10 @@ public bool TryGetDustWeatherForce(
 
 
     // === Tint diffusion (Option 2) ===
-    private void EnqueueTintDirty(Vector2Int cell)
-    {
-        if (_tintDirtySet.Add(cell))
-            _tintDirtyQueue.Enqueue(cell);
-    }
-
+    // Minimal façade so call sites remain clean.
     private void MarkTintDirty(Vector2Int center, int radius)
     {
-        radius = Mathf.Max(0, radius);
-        EnqueueTintDirty(center);
-
-        if (radius == 0) return;
-
-        for (int dy = -radius; dy <= radius; dy++)
-        for (int dx = -radius; dx <= radius; dx++)
-        {
-            if (dx == 0 && dy == 0) continue;
-            EnqueueTintDirty(new Vector2Int(center.x + dx, center.y + dy));
-        }
-    }
-
-    private float ColorMaxAbsDelta(Color a, Color b)
-    {
-        float dr = Mathf.Abs(a.r - b.r);
-        float dg = Mathf.Abs(a.g - b.g);
-        float db = Mathf.Abs(a.b - b.b);
-        float da = Mathf.Abs(a.a - b.a);
-        return Mathf.Max(Mathf.Max(dr, dg), Mathf.Max(db, da));
-    }
-
-    private Color ComputeNeighborAverageColor(Vector2Int cell, int radius, out int count)
-    {
-        radius = Mathf.Max(0, radius);
-        count = 0;
-
-        if (radius == 0)
-            return GetCellVisualColor(cell);
-
-        float r = 0f, g = 0f, b = 0f, a = 0f;
-
-        for (int dy = -radius; dy <= radius; dy++)
-        for (int dx = -radius; dx <= radius; dx++)
-        {
-            if (dx == 0 && dy == 0) continue;
-
-            Color c = GetCellVisualColor(new Vector2Int(cell.x + dx, cell.y + dy));
-            r += c.r; g += c.g; b += c.b; a += c.a;
-            count++;
-        }
-
-        if (count <= 0)
-            return GetCellVisualColor(cell);
-
-        return new Color(r / count, g / count, b / count, a / count);
-    }
-
-    private void ProcessTintDiffusion(float dt)
-    {
-        if (!enableTintDiffusion) return;
-
-        _tintDiffusionAccum += dt;
-        if (_tintDiffusionAccum < tintDiffusionInterval) return;
-        _tintDiffusionAccum = 0f;
-
-        if (_tintDirtyQueue.Count == 0) return;
-
-        int budget = Mathf.Max(1, tintDiffusionMaxCellsPerTick);
-        int radius = tintDiffusionRadius;
-
-        for (int i = 0; i < budget && _tintDirtyQueue.Count > 0; i++)
-        {
-            Vector2Int cell = _tintDirtyQueue.Dequeue();
-            _tintDirtySet.Remove(cell);
-
-            if (!TryGetDustAt(cell, out var dust) || dust == null)
-                continue;
-
-            // Compute neighborhood average (includes live dust + pending imprints + maze fallback)
-            Color avg = ComputeNeighborAverageColor(cell, radius, out int nCount);
-            if (nCount <= 0) continue;
-
-            Color cur = dust.CurrentTint;
-            Color next = Color.Lerp(cur, avg, Mathf.Clamp01(tintDiffusionStrength));
-
-            if (ColorMaxAbsDelta(cur, next) < tintDiffusionMinDelta)
-                continue;
-
-            dust.SetTint(next);
-
-            if (tintDiffusionPropagateOnChange)
-            {
-                // Propagate softly to immediate neighbors only (prevents runaway queue growth).
-                for (int dy = -1; dy <= 1; dy++)
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    if (dx == 0 && dy == 0) continue;
-                    EnqueueTintDirty(new Vector2Int(cell.x + dx, cell.y + dy));
-                }
-            }
-        }
+        _tintDiffusion?.MarkDirty(center, radius);
     }
 
 private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {

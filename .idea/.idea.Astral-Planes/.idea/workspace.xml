@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/CosmicDustMazePatterns.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/CosmicDustMazePatterns.cs.meta" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Physics Materials/Debris.physicsMaterial2D" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Physics Materials/Debris.physicsMaterial2D" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/CosmicDustGenerator.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -269,7 +271,7 @@
       <workItem from="1767979301135" duration="138000" />
       <workItem from="1767979448363" duration="82610000" />
       <workItem from="1768415354575" duration="1434000" />
-      <workItem from="1768445105260" duration="67783000" />
+      <workItem from="1768445105260" duration="72257000" />
     </task>
     <servers />
   </component>
