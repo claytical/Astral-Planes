@@ -1287,6 +1287,7 @@ public void StartMazeAndStarForPhase(MusicalPhase phase)
         }
         dustGenerator.SetReservedVehicleCells(_vehicleCellsScratch);
     }
+    
     private GameObject FindByNameIncludingInactive(string name)
     {
         foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
