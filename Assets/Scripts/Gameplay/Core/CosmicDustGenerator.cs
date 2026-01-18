@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering.UI;
 using Random = UnityEngine.Random;
 
 public class CosmicDustGenerator : MonoBehaviour
@@ -51,6 +50,9 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Dictionary<Vector2Int, int> _keepClearRefCount = new Dictionary<Vector2Int, int>();
     private readonly HashSet<Vector2Int> _pendingFadeRemovals = new HashSet<Vector2Int>();
 
+    // --- Reserved cells (vehicles) ---
+    // Fed externally by GameFlowManager so regrowth can deterministically veto spawning colliders on top of vehicles.
+    private readonly HashSet<Vector2Int> _reservedVehicleCells = new HashSet<Vector2Int>();
     // === Tint diffusion state (Option 2) ===
     private readonly Queue<Vector2Int> _tintDirtyQueue = new Queue<Vector2Int>();
     private readonly HashSet<Vector2Int> _tintDirtySet = new HashSet<Vector2Int>();
@@ -83,6 +85,24 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Queue<List<Vector2Int>> _pendingCorridorRegrowth = new Queue<List<Vector2Int>>();
     public List<GameObject> hexagons = new List<GameObject>();
     private readonly Dictionary<Vector2Int, GameObject> _hexMap = new(); // Position → Hex
+
+    // --- Authoritative cell grid (no pooling, 2D-array authority) ---
+    // Each grid cell owns exactly one dust GameObject instance.
+    // The cell state is the only authority for whether it blocks / is visible / can regrow.
+    private enum DustCellState
+    {
+        Solid,
+        Clearing,
+        Regrowing,
+        Empty,
+        PendingRegrow
+    }
+
+    private GameObject[,] _cellGo;
+    private CosmicDust[,] _cellDust;
+    private DustCellState[,] _cellState;
+    private int _cellW, _cellH;
+    private readonly Dictionary<GameObject, Vector2Int> _goToCell = new();
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
 // Absolute time (Time.time) when the cell should next attempt regrow.
@@ -146,19 +166,12 @@ public class CosmicDustGenerator : MonoBehaviour
     private int _lastPulseId = -1;
     [SerializeField] private int poolPrewarm = 648;             // tune to your grid size
     [SerializeField] public Transform poolRoot;                 // optional, to keep Hierarchy tidy
-    private readonly Stack<GameObject> _dustPool = new();
+    // Pooling removed: each grid cell owns a persistent dust GameObject instance.
     [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
+    public CompositeCollider2D DustCompositeCollider => compositeCollider;
 
     [SerializeField] private float regrowCooldownSeconds = 3.0f;
-
-    [Header("Regrowth Step Pacing")]
-    [Tooltip("Maximum number of dust cells allowed to regrow per drum step. Set to 0 to disable step pacing.")]
-    [SerializeField] private int regrowCellsPerStep = 1;
-
-    // Runtime step budget (refilled when DrumTrack.currentStep advances)
-    private int _regrowBudgetThisStep = 0;
-    private int _lastRegrowBudgetStep = -1;
     [SerializeField] public bool  progressiveMaze = true;
     [SerializeField] private int   maxFeatures = 3;                 // how many features we keep alive
     [SerializeField] private int   addPerLoop  = 1;                 // features to add each loop
@@ -209,6 +222,17 @@ public class CosmicDustGenerator : MonoBehaviour
     [Range(0.25f, 1.25f)] 
     [SerializeField] private float regrowVetoBoxMul = 0.85f; 
     [SerializeField] private int regrowVetoMaxHits = 8; 
+
+    [Header("Regrow Step Gate")]
+    [Tooltip("How many cells are allowed to transition from PendingRegrow -> Solid per drum step.")]
+    [SerializeField] private int regrowCellsPerStep = 1;
+    [Tooltip("Seconds to wait after a cell becomes visible again before enabling its collider.")]
+    [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
+
+    private readonly Queue<Vector2Int> _pendingStepRegrow = new Queue<Vector2Int>();
+    private readonly HashSet<Vector2Int> _pendingStepRegrowSet = new HashSet<Vector2Int>();
+    private int _lastStepGateStep = int.MinValue;
+    private int _stepGateBudget = 0;
     
     private Collider2D[] _vehicleVetoHits;    
     private readonly Collider2D[] _dustHits = new Collider2D[16];
@@ -216,20 +240,147 @@ public class CosmicDustGenerator : MonoBehaviour
 
     [SerializeField] private DustClaimManager dustClaims;
 
+    /// <summary>
+    /// Called by GameFlowManager each frame/step to mark the cells currently occupied by vehicles.
+    /// Regrow/spawn logic may use this to veto placing dust colliders into those cells.
+    /// </summary>
+    public void SetReservedVehicleCells(IReadOnlyList<Vector2Int> cells)
+    {
+        _reservedVehicleCells.Clear();
+        if (cells == null) return;
+        for (int i = 0; i < cells.Count; i++)
+            _reservedVehicleCells.Add(cells[i]);
+    }
+    public void OnDustVisualFadedOut(CosmicDust dust)
+    {
+        if (dust == null) return;
 
-/// <summary>
-/// True if *any* system should be prevented from spawning dust in this cell right now.
-/// (Growth algorithm and regrow coroutine must both respect this.)
-/// </summary>
+        // Safety: once a tile finishes fading, it must not contribute collisions/topology.
+        dust.SetTerrainColliderEnabled(false);
 
+        // Resolve the authoritative cell via reverse lookup; fall back to drum-grid conversion.
+        Vector2Int gp = default;
+        bool haveGrid = _goToCell.TryGetValue(dust.gameObject, out gp);
+        if (!haveGrid && drums != null)
+        {
+            gp = drums.WorldToGridPosition(dust.transform.position);
+            haveGrid = true;
+        }
 
-/// <summary>
-/// Claim a single grid cell to remain dust-free until now+holdSeconds.
-/// priority: higher wins if multiple systems claim the same cell.
-/// </summary>
+        // Update authoritative state and legacy map.
+        if (haveGrid)
+        {
+            if (TryGetCellState(gp, out var st) && st == DustCellState.Clearing)
+                SetCellState(gp, DustCellState.Empty);
+            if (_hexMap != null && _hexMap.TryGetValue(gp, out var go) && go == dust.gameObject)
+                _hexMap.Remove(gp);
+        }
 
+        // Make it invisible immediately. (Pooling/reenable policy is handled elsewhere.)
+        dust.gameObject.SetActive(false);
+
+        MarkCompositeDirty();
+    }
+    private void EnsureCellGrid()
+    {
+        if (drums == null) return;
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+        if (_cellGo != null && _cellW == w && _cellH == h) return;
+
+        _cellW = w; _cellH = h;
+        _cellGo = new GameObject[w, h];
+        _cellDust = new CosmicDust[w, h];
+        _cellState = new DustCellState[w, h];
+        _goToCell.Clear();
+
+        // Re-register any pre-existing dust children under the root (prevents duplicates across hot reloads).
+        var root = (activeDustRoot != null) ? activeDustRoot : transform;
+        var existing = root.GetComponentsInChildren<CosmicDust>(true);
+        for (int i = 0; i < existing.Length; i++)
+        {
+            var d = existing[i];
+            if (d == null) continue;
+            var go = d.gameObject;
+            Vector2Int gp = drums.WorldToGridPosition(go.transform.position);
+            if ((uint)gp.x >= (uint)w || (uint)gp.y >= (uint)h) continue;
+            if (_cellGo[gp.x, gp.y] != null && _cellGo[gp.x, gp.y] != go)
+            {
+                // Duplicate occupant: hide it immediately so we don’t get stacked dust.
+                d.SetTerrainColliderEnabled(false);
+                go.SetActive(false);
+                continue;
+            }
+            _cellGo[gp.x, gp.y] = go;
+            _cellDust[gp.x, gp.y] = d;
+            _goToCell[go] = gp;
+            // Force authoritative placement/sizing (scaling correctness).
+            go.transform.position = drums.GridToWorldPosition(gp);
+            d.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), vwhidustFootprintMul, cellClearanceWorld);
+
+            // Establish authoritative state from scene (hot reload safety).
+            bool blocks = false;
+            if (d != null)
+            {
+                // Prefer the serialized terrainCollider reference if present.
+                // If it's not present, fall back to any collider on the same GO.
+                var tc = d.GetComponent<Collider2D>();
+                if (tc != null) blocks = tc.enabled && !tc.isTrigger && go.activeInHierarchy;
+            }
+            _cellState[gp.x, gp.y] = blocks ? DustCellState.Solid : DustCellState.Empty;
+        }
+
+        // Ensure every cell has an instance (no pooling). Keep inactive for Empty.
+        for (int y = 0; y < _cellH; y++)
+        for (int x = 0; x < _cellW; x++)
+        {
+            if (_cellGo[x, y] != null) continue;
+            var gp = new Vector2Int(x, y);
+            GetOrCreateCellGO(gp);
+            _cellState[x, y] = DustCellState.Empty;
+        }
+    }
+    private GameObject GetOrCreateCellGO(Vector2Int gp)
+    {
+        EnsureCellGrid();
+        if (_cellGo == null) return null;
+        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return null;
+        var go = _cellGo[gp.x, gp.y];
+        if (go != null) return go;
+        if (dustPrefab == null) return null;
+        var root = (activeDustRoot != null) ? activeDustRoot : transform;
+        go = Instantiate(dustPrefab, root);
+        go.name = $"Cosmic Dust ({gp.x},{gp.y})";
+        go.transform.position = drums.GridToWorldPosition(gp);
+        var d = go.GetComponent<CosmicDust>();
+        if (d == null) d = go.AddComponent<CosmicDust>();
+        d.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), vwhidustFootprintMul, cellClearanceWorld);
+        d.SetTerrainColliderEnabled(false);
+        go.SetActive(false);
+        _cellGo[gp.x, gp.y] = go;
+        _cellDust[gp.x, gp.y] = d;
+        _goToCell[go] = gp;
+        if (_cellState != null) _cellState[gp.x, gp.y] = DustCellState.Empty;
+        return go;
+    }
+    private bool TryGetCellState(Vector2Int gp, out DustCellState st)
+    {
+        st = DustCellState.Empty;
+        EnsureCellGrid();
+        if (_cellState == null) return false;
+        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
+        st = _cellState[gp.x, gp.y];
+        return true;
+    }
+    private void SetCellState(Vector2Int gp, DustCellState st)
+    {
+        EnsureCellGrid();
+        if (_cellState == null) return;
+        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return;
+        _cellState[gp.x, gp.y] = st;
+    }
     public void BeginCompositeBatch() => _compositeBatchDepth++;
-
     public void EndCompositeBatch()
     {
         _compositeBatchDepth = Mathf.Max(0, _compositeBatchDepth - 1);
@@ -245,7 +396,6 @@ public class CosmicDustGenerator : MonoBehaviour
         else
             _keepClearRefCount[cell] = 1;
     }
-
     private void DecKeepClear(Vector2Int cell)
     {
         if (!_keepClearRefCount.TryGetValue(cell, out int rc)) return;
@@ -253,7 +403,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (rc <= 0) _keepClearRefCount.Remove(cell);
         else _keepClearRefCount[cell] = rc;
     }
-
     public bool TryResolveDustCellFromWorldPoint(Vector2 world, int searchRadiusCells, out Vector2Int resolved)
     {
         resolved = default;
@@ -262,7 +411,7 @@ public class CosmicDustGenerator : MonoBehaviour
         Vector2Int baseCell = drums.WorldToGridPosition(world);
 
         // Perfect hit
-        if (_hexMap.ContainsKey(baseCell))
+        if (HasDustAt(baseCell))
         {
             resolved = baseCell;
             return true;
@@ -275,20 +424,20 @@ public class CosmicDustGenerator : MonoBehaviour
             for (int dx = -r; dx <= r; dx++)
             {
                 var c1 = new Vector2Int(baseCell.x + dx, baseCell.y + r);
-                if (_hexMap.ContainsKey(c1)) { resolved = c1; return true; }
+                if (HasDustAt(c1)) { resolved = c1; return true; }
 
                 var c2 = new Vector2Int(baseCell.x + dx, baseCell.y - r);
-                if (_hexMap.ContainsKey(c2)) { resolved = c2; return true; }
+                if (HasDustAt(c2)) { resolved = c2; return true; }
             }
 
             // Left/Right cols of ring (skip corners already checked)
             for (int dy = -r + 1; dy <= r - 1; dy++)
             {
                 var c1 = new Vector2Int(baseCell.x + r, baseCell.y + dy);
-                if (_hexMap.ContainsKey(c1)) { resolved = c1; return true; }
+                if (HasDustAt(c1)) { resolved = c1; return true; }
 
                 var c2 = new Vector2Int(baseCell.x - r, baseCell.y + dy);
-                if (_hexMap.ContainsKey(c2)) { resolved = c2; return true; }
+                if (HasDustAt(c2)) { resolved = c2; return true; }
             }
         }
 
@@ -303,8 +452,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return false;
     }
-
-    public void MarkCompositeDirty()
+    private void MarkCompositeDirty()
     {
         EnsureCompositeRef();
         if (compositeCollider == null) return;
@@ -317,7 +465,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
         ScheduleCompositeRebuild();
     }
-
     private void EnsureCompositeRef()
     {
         if (compositeCollider != null) return;
@@ -333,7 +480,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (_imprints == null)
             _imprints = new Dictionary<Vector2Int, DustImprint>();
     }
-
     public bool IsKeepClearCell(Vector2Int cell)
     {
         // Unified keep-clear refcount store
@@ -348,25 +494,11 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         _bulkTopologyDepth++;
     }
-
     private void EndBulkTopology()
     {
         _bulkTopologyDepth = Mathf.Max(0, _bulkTopologyDepth - 1);
     }
-   
-/// <summary>
-    /// Keeps a non-destructive legibility pocket around a vehicle.
-    /// Unlike erosion, this does NOT mark cells as cleared; it simply prevents regrowth/spawn in the pocket,
-    /// and force-removes any existing dust tiles currently occupying those cells.
-    /// Multiple vehicles are supported via per-cell reference counting.
-    /// </summary>
-public void SetVehicleKeepClear(
-    int ownerId,
-    Vector2Int centerCell,
-    int radiusCells,
-    MusicalPhase phase,
-    bool forceRemoveExisting,
-    float forceRemoveFadeSeconds = 0.20f)
+    public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, MusicalPhase phase, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
 {
     if (drums == null) return;
 
@@ -451,53 +583,23 @@ public void SetVehicleKeepClear(
     prev.Clear();
     foreach (var c in next) prev.Add(c);
 }
-public void ReleaseStarKeepClear(MusicalPhase phase)
-{
-    _starKeepClearPrev.Clear();
-    foreach (var c in _starKeepClearCells) _starKeepClearPrev.Add(c);
-    _starKeepClearCells.Clear();
-
-    foreach (var cell in _starKeepClearPrev)
+    public void ReleaseVehicleKeepClear(int ownerId, MusicalPhase phase)
     {
-        DecKeepClear(cell);
+        if (!_vehicleKeepClearCellsByOwner.TryGetValue(ownerId, out var prev) || prev == null) return;
 
-        if (!IsDustSpawnBlocked(cell) && !_permanentClearCells.Contains(cell) && !IsKeepClearCell(cell))
+        foreach (var cell in prev)
         {
-            RequestRegrowCellAt(cell, phase, refreshIfPending: true);
+            DecKeepClear(cell);
+
+            if (!IsDustSpawnBlocked(cell) && !_permanentClearCells.Contains(cell) && !IsKeepClearCell(cell))
+            {
+                RequestRegrowCellAt(cell, phase, refreshIfPending: true);
+            }
         }
+
+        prev.Clear();
+        _vehicleKeepClearCellsByOwner.Remove(ownerId);
     }
-}
-public void ReleaseVehicleKeepClear(int ownerId, MusicalPhase phase)
-{
-    if (!_vehicleKeepClearCellsByOwner.TryGetValue(ownerId, out var prev) || prev == null) return;
-
-    foreach (var cell in prev)
-    {
-        DecKeepClear(cell);
-
-        if (!IsDustSpawnBlocked(cell) && !_permanentClearCells.Contains(cell) && !IsKeepClearCell(cell))
-        {
-            RequestRegrowCellAt(cell, phase, refreshIfPending: true);
-        }
-    }
-
-    prev.Clear();
-    _vehicleKeepClearCellsByOwner.Remove(ownerId);
-}
-public void ClearVehicleKeepClear(int ownerId)
-{
-    if (!_vehicleKeepClearById.TryGetValue(ownerId, out var prevCells)) return;
-
-    foreach (var cell in prevCells)
-    {
-        DecKeepClear(cell);
-        RequestRegrowCellAt(cell, GetCurrentPhaseSafe(), delaySeconds: -1f, refreshIfPending: true);
-    }
-
-    _vehicleKeepClearById.Remove(ownerId);
-}
-
-
     private void ScheduleCompositeRebuild()
     {
         EnsureCompositeRef();
@@ -512,7 +614,6 @@ public void ClearVehicleKeepClear(int ownerId)
             _compositeRebuildCo = StartCoroutine(RebuildCompositeEndOfFrame());
         }
     }
-
     private IEnumerator RebuildCompositeEndOfFrame()
     {
         // Coalesce multiple dirties into one rebuild.
@@ -539,7 +640,6 @@ public void ClearVehicleKeepClear(int ownerId)
             _compositeRebuildCo = null;
         }
     }
-
     private void Start()
     {
         if (_vehicleVetoHits == null || _vehicleVetoHits.Length != regrowVetoMaxHits) 
@@ -549,7 +649,7 @@ public void ClearVehicleKeepClear(int ownerId)
         EnsureImprints();
         TryEnsureRefs();
         TryEnsureFlowField();
-        PrewarmPool();
+        // No pooling.
     }
     private bool IsVehicleOverlappingCellWorld(Vector3 cellWorld, float cellWorldSize)
     {
@@ -580,7 +680,6 @@ public void ClearVehicleKeepClear(int ownerId)
         if (drums == null) drums = gfm.activeDrumTrack;
         if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
     }
-
     public void ManualStart()
     {
         var gfm = GameFlowManager.Instance;
@@ -588,7 +687,7 @@ public void ClearVehicleKeepClear(int ownerId)
         phaseTransitionManager = gfm.phaseTransitionManager;
         if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();
         TryEnsureFlowField();
-        PrewarmPool();
+        // No pooling.
         
     }
     private bool IsDustSpawnBlocked(Vector2Int cell)
@@ -602,11 +701,46 @@ public void ClearVehicleKeepClear(int ownerId)
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
 
-        // Regrowth pacing: replenish the per-step regrow budget when the drum step advances.
-        // This must run even if other Update() work returns early.
-        UpdateRegrowStepGate();
-
         if(drums == null) return;
+
+        // Ensure the 2D array mirrors the current drum-grid dimensions.
+        EnsureCellGrid();
+
+        // --- Step-gated regrow consumption ---
+        int stepNow = drums.currentStep;
+        if (stepNow != _lastStepGateStep)
+        {
+            _lastStepGateStep = stepNow;
+            _stepGateBudget = Mathf.Max(0, regrowCellsPerStep);
+        }
+
+        while (_stepGateBudget > 0 && _pendingStepRegrow.Count > 0)
+        {
+            var gp = _pendingStepRegrow.Dequeue();
+            _pendingStepRegrowSet.Remove(gp);
+
+            if (!TryGetCellState(gp, out var st) || st != DustCellState.PendingRegrow)
+                continue;
+
+            // If something made this cell permanently open, drop it.
+            if (!IsInBounds(gp) || _permanentClearCells.Contains(gp) || IsEffectivelyOpenCell(gp))
+            {
+                SetCellState(gp, DustCellState.Empty);
+                continue;
+            }
+
+            // Deterministic veto: if blocked, requeue for a later step.
+            if (!CanRegrowIntoCellNow(gp))
+            {
+                // Put it back at the end of the queue.
+                if (_pendingStepRegrowSet.Add(gp))
+                    _pendingStepRegrow.Enqueue(gp);
+                break; // prevent spinning forever in one frame/step.
+            }
+
+            BeginRegrowCell(gp);
+            _stepGateBudget--;
+        }
         IncrementalFlowFieldUpdate();
 
         // Existing hive "intent" shift timer just changes the target bias occasionally
@@ -617,57 +751,9 @@ public void ClearVehicleKeepClear(int ownerId)
             _lastPhaseBias = ComputePhaseBias(GetCurrentPhaseSafe());
         }
     }
+    // Pooling removed: each cell owns its dust instance.
 
-    // ------------------------------------------------------------
-    // Regrowth step pacing
-    // ------------------------------------------------------------
-    private void UpdateRegrowStepGate()
-    {
-        if (regrowCellsPerStep <= 0) return;
-        if (drums == null) return;
-
-        int stepNow = drums.currentStep;
-        if (stepNow != _lastRegrowBudgetStep)
-        {
-            _lastRegrowBudgetStep = stepNow;
-            _regrowBudgetThisStep = Mathf.Max(0, regrowCellsPerStep);
-        }
-    }
-
-    private bool TryConsumeRegrowBudget()
-    {
-        if (regrowCellsPerStep <= 0) return true;
-        if (_regrowBudgetThisStep <= 0) return false;
-        _regrowBudgetThisStep--;
-        return true;
-    }
-    private void PrewarmPool()
-    {
-        if (!dustPrefab) return;
-        for (int i = 0; i < poolPrewarm; i++)
-        {
-            
-            var go = Instantiate(dustPrefab, new Vector3(9999,9999,0), Quaternion.identity, poolRoot);
-            if (i == 0)
-            {
-                var dust = go.GetComponent<CosmicDust>();
-                if (dust != null)
-                {
-                    float r = dust.GetWorldRadius();
-                    if (r > 0f)
-                        tileDiameterWorld = Mathf.Max(0.001f, drums.GetCellWorldSize());
-                }
-            }
-            go.SetActive(false);
-            _dustPool.Push(go);
-        }
-    }
-    
-    public IEnumerator GenerateMazeForPhaseWithPaths(
-        MusicalPhase phase,
-        Vector2Int starCell,
-        IReadOnlyList<Vector2Int> vehicleCells,
-        float totalSpawnDuration = 1.0f)
+    public IEnumerator GenerateMazeForPhaseWithPaths(MusicalPhase phase, Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
     {
         if (drums == null)
         {
@@ -704,8 +790,7 @@ public void ClearVehicleKeepClear(int ownerId)
             {
                 var v = vehicleCells[i];
                 reserved.Add(v);
-                _permanentClearCells.Add(v);
-                Debug.Log($"[MAZE] Mark vehicleCell[{i}] permanent: {v} permCount={_permanentClearCells.Count}");
+                // Do NOT mark vehicles as permanently clear: we only reserve them at spawn time.
             }
         }
 
@@ -756,8 +841,7 @@ public void ClearVehicleKeepClear(int ownerId)
             $"[MNDBG] MazeReady: phase={phase}, hexCount={_hexMap.Count}, permCount={_permanentClearCells.Count}"
         );
         OnMazeReady?.Invoke(starCell);
-    }
-    private void BuildStarPocketSet(Vector2Int starCell, int radiusCells)
+    } private void BuildStarPocketSet(Vector2Int starCell, int radiusCells)
     {
         _starClearCells.Clear();
 
@@ -798,24 +882,131 @@ public void ClearVehicleKeepClear(int ownerId)
 
         return false;
     }
-
     public bool IsEffectivelyDustCell(Vector2Int gp)
     {
         // If it must be treated as open, it’s not dust (even if a dust GO exists due to timing)
         if (IsEffectivelyOpenCell(gp)) return false;
 
-        // Otherwise, it’s dust only if there’s an active dust cell in the map
-        return _hexMap != null && _hexMap.ContainsKey(gp);
+        // 2D array is authoritative.
+        if (!TryGetCellState(gp, out var st)) return false;
+        return st == DustCellState.Solid || st == DustCellState.Clearing;
     }
     public bool HasDustAt(Vector2Int gridPos)
     {
-        return _hexMap.ContainsKey(gridPos);
+        if (!TryGetCellState(gridPos, out var st)) return false;
+        return st == DustCellState.Solid || st == DustCellState.Clearing;
+    }
+    private bool CanRegrowIntoCellNow(Vector2Int gridPos)
+    {
+        if (drums == null) return false;
+        if (!IsInBounds(gridPos)) return false;
+        if (_permanentClearCells.Contains(gridPos)) return false;
+        if (IsEffectivelyOpenCell(gridPos)) return false;
+
+        // Keep-clear (PhaseStar safety pocket, vehicle pocket, etc.)
+        if (IsKeepClearCell(gridPos)) return false;
+
+        // External claims (collectable pockets, etc.)
+        if (IsDustSpawnBlocked(gridPos)) return false;
+
+        // Spawn-grid occupancy (MineNodes, etc.)
+        if (!drums.IsSpawnCellAvailable(gridPos.x, gridPos.y)) return false;
+
+        Vector3 world = drums.GridToWorldPosition(gridPos);
+        float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+
+        // Vehicle overlap veto
+        if (IsVehicleOverlappingCellWorld(world, cellWorldSize)) return false;
+
+        // Collectable occupancy veto
+        if (!Collectable.IsCellFreeStatic(gridPos)) return false;
+
+        return true;
+    }
+    private bool TryGetCellGo(Vector2Int gp, out GameObject go)
+    {
+        go = null;
+
+        if (_cellGo == null) return false;
+        if (!IsInBounds(gp)) return false;
+
+        go = _cellGo[gp.x, gp.y];
+        return go != null;
+    }
+    
+    private bool TryGetCellDust(Vector2Int gp, out CosmicDust dust)
+    {
+        dust = null;
+        EnsureCellGrid();
+        if (_cellDust == null) return false;
+        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
+        dust = _cellDust[gp.x, gp.y];
+        if (dust != null) return true;
+        var go = _cellGo[gp.x, gp.y];
+        if (go == null) return false;
+        dust = go.GetComponent<CosmicDust>();
+        if (dust == null) dust = go.AddComponent<CosmicDust>();
+        _cellDust[gp.x, gp.y] = dust;
+        _goToCell[go] = gp;
+        return true;
     }
 
-    /// <summary>
-    /// Returns a normalized 0..1 "dust density" at the given world position.
-    /// For now this is binary: 1 if a dust hex exists in the cell, otherwise 0.
-    /// </summary>
+    private void BeginRegrowCell(Vector2Int gridPos)
+    {
+        if (!IsInBounds(gridPos)) return;
+        if (!TryGetCellGo(gridPos, out var go) || go == null)
+            go = GetOrCreateCellGO(gridPos);
+        if (go == null) return;
+
+        // Visible first, collider later (prevents "regrow on top of vehicle" collider traps).
+        Vector3 world = drums.GridToWorldPosition(gridPos);
+        go.transform.SetPositionAndRotation(world, Quaternion.identity);
+        if (!go.activeSelf) go.SetActive(true);
+
+        if (go.TryGetComponent<CosmicDust>(out var dust))
+        {
+            dust.SetTrackBundle(this, drums);
+            float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+            dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
+            dust.PrepareForReuse();
+            dust.SetGrowInDuration(hexGrowInSeconds);
+            dust.SetTint(_mazeTint);
+            dust.ConfigureForPhase(GetCurrentPhaseSafe());
+            dust.Begin();
+            dust.SetTerrainColliderEnabled(false);
+        }
+
+        // Authority: regrowing cells are not yet solid.
+        SetCellState(gridPos, DustCellState.Regrowing);
+        MarkTintDirty(gridPos, tintDirtyMarkRadius);
+
+        StartCoroutine(EnableRegrownCellColliderAfterDelay(gridPos));
+    }
+    private IEnumerator EnableRegrownCellColliderAfterDelay(Vector2Int gridPos)
+    {
+        float delay = Mathf.Max(0f, regrowColliderEnableDelaySeconds);
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+
+        if (!IsInBounds(gridPos)) yield break;
+        if (!TryGetCellState(gridPos, out var st) || st != DustCellState.Regrowing) yield break;
+        if (!CanRegrowIntoCellNow(gridPos))
+        {
+            // Still blocked: return to PendingRegrow so step-gate can try again later.
+            SetCellState(gridPos, DustCellState.PendingRegrow);
+            if (_pendingStepRegrowSet.Add(gridPos))
+                _pendingStepRegrow.Enqueue(gridPos);
+            yield break;
+        }
+
+        if (TryGetCellDust(gridPos, out var dust) && dust != null)
+            dust.SetTerrainColliderEnabled(true);
+
+        SetCellState(gridPos, DustCellState.Solid);
+        if (TryGetCellGo(gridPos, out var go) && go != null)
+            RegisterHex(gridPos, go); // legacy map for any remaining callers
+
+        MarkCompositeDirty();
+    }
     public float SampleDensity01(Vector3 worldPos)
     {
         if (drums == null) return 0f;
@@ -838,18 +1029,13 @@ public void ClearVehicleKeepClear(int ownerId)
     /// Schedule regrowth back into the same cell unless it becomes permanently cleared or blocked.
     /// This is your authoritative "TemporaryClear" state.
     /// </summary>
-    private void RequestRegrowCellAt(
-        Vector2Int gridPos,
-        MusicalPhase phase,
-        float delaySeconds = -1f,
-        bool refreshIfPending = false,
-        bool clearImprintOnRefresh = false)
+    private void RequestRegrowCellAt(Vector2Int gridPos, MusicalPhase phase, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (!IsInBounds(gridPos)) { 
 
-            if (_regrowthCoroutines != null && _regrowthCoroutines.TryGetValue(gridPos, out var pending))
+            if (_regrowthCoroutines != null && _regrowthCoroutines.TryGetValue(gridPos, out var pending1))
             { 
-                if (pending != null) StopCoroutine(pending);
+                if (pending1 != null) StopCoroutine(pending1);
                 _regrowthCoroutines.Remove(gridPos);
 
             } 
@@ -857,9 +1043,9 @@ public void ClearVehicleKeepClear(int ownerId)
         }
         
         bool shouldSchedule = !_permanentClearCells.Contains(gridPos);
-        
-        // If dust already exists here, no need to schedule.
-        if (shouldSchedule && _hexMap != null && _hexMap.ContainsKey(gridPos))
+
+        // If dust is already logically present here, no need to schedule.
+        if (shouldSchedule && HasDustAt(gridPos))
             shouldSchedule = false;
         
 
@@ -879,104 +1065,36 @@ public void ClearVehicleKeepClear(int ownerId)
         };
 
         delay *= GetRegrowDelayMul(phase);
-       
+
+        // Mark the cell as empty (authoritative) and schedule a single delayed enqueue.
+        // The step gate in Update() controls how many PendingRegrow cells actually transition to Solid per step.
+        if (TryGetCellState(gridPos, out var st) && st != DustCellState.Solid)
+        {
+            // leave as-is (Clearing/Empty/PendingRegrow)
+        }
+        else
+        {
+            SetCellState(gridPos, DustCellState.Empty);
+        }
+
+        // Refresh pending coroutine.
+        if (_regrowthCoroutines != null && _regrowthCoroutines.TryGetValue(gridPos, out var pending) && pending != null)
+        {
+            if (refreshIfPending)
+            {
+                StopCoroutine(pending);
+                _regrowthCoroutines.Remove(gridPos);
+            }
+            else
+            {
+                return;
+            }
+        }
+
         _regrowthCoroutines[gridPos] = StartCoroutine(RegrowCellAfterDelay(gridPos, delay));
     }
 
-    public void CarveTemporaryDiskFromMineNode(
-        Vector3 centerWorld,
-        float appetite,
-        MusicalPhase phase,
-        float regrowDelaySeconds,
-        Color imprintColor,
-        Color imprintShadowColor,
-        float imprintHardness01)
-
-    {
-        if (drums == null) return;
-        EnsureImprints();
-        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-        float rWorld   = Mathf.Max(0.2f, mineNodeErodeRadius * Mathf.Max(0.1f, appetite));
-        int   rCells   = Mathf.CeilToInt(rWorld / cellSize);
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-        Vector2Int c = drums.WorldToGridPosition(centerWorld);
-        int removed = 0;
-        int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f));
-
-        float hardness01 = Mathf.Clamp01(imprintHardness01);
-
-        for (int gx = c.x - rCells; gx <= c.x + rCells; gx++)
-        {
-            for (int gy = c.y - rCells; gy <= c.y + rCells; gy++)
-            {
-                if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
-                Vector2Int gp = new Vector2Int(gx, gy);
-
-                // Never touch permanent-clear cells.
-                if (_permanentClearCells.Contains(gp)) continue;
-
-                // Clear if present.
-                if (_hexMap.ContainsKey(gp))
-                {
-                    DespawnDustAt(gp);
-                    removed++;
-                }
-
-                // Record/refresh MineNode imprint for regrowth semantics.
-                // Blend the imprint toward its neighborhood so MineNode color marks don't create hard seams.
-                // (This also sets us up for optional diffusion later by ensuring the initial condition is already smooth.)
-                Color blendedImprint = BlendImprintWithNeighbors(gp, imprintColor, imprintBlendRadius, imprintNeighborWeight);
-                _imprints[gp] = new DustImprint
-                {
-                    color = blendedImprint,
-                    shadowColor =  imprintShadowColor,
-                    healDelay = regrowDelaySeconds,
-                    hardness01 = hardness01
-                };
-
-                // Diffusion prep: this cell (and neighbors) will be nudged toward local averages over time.
-                MarkTintDirty(gp, tintDirtyMarkRadius);
-
-                // Always refresh the regrow timer (even if cell is already empty).
-                // This is what allows a stationary node to keep a pocket/corridor open.
-                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
-
-                if (removed >= budget) return;
-            }
-        }
-    }
-
-    public void CarveTemporaryDiskFromMineNode(Vector3 centerWorld, float appetite, MusicalPhase phase, float regrowDelaySeconds) { 
-        if (drums == null) return;
-        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize()); 
-        float rWorld   = Mathf.Max(0.2f, mineNodeErodeRadius * Mathf.Max(0.1f, appetite)); 
-        int   rCells   = Mathf.CeilToInt(rWorld / cellSize);
-        int w = drums.GetSpawnGridWidth(); 
-        int h = drums.GetSpawnGridHeight();
-        Vector2Int c = drums.WorldToGridPosition(centerWorld);
-        int removed = 0; 
-        int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetite, 0.4f, 2f));
-        
-        for (int gx = c.x - rCells; gx <= c.x + rCells; gx++) {
-            for (int gy = c.y - rCells; gy <= c.y + rCells; gy++) {
-                if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
-                Vector2Int gp = new Vector2Int(gx, gy);
-                // Never touch permanent-clear cells.
-                if (_permanentClearCells.Contains(gp)) continue;
-                // Clear if present.
-                if (_hexMap.ContainsKey(gp)) { 
-                    DespawnDustAt(gp); 
-                    removed++;
-                }
-                // Always refresh the regrow timer (even if cell is already empty).
-                // // This is what allows a stationary node to keep a pocket/corridor open.
-                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
-                if (removed >= budget) return; 
-            }
-        }
-    }
-private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelaySeconds)
+    private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelaySeconds)
 {
     if (!IsInBounds(gridPos)) { 
         _regrowthCoroutines.Remove(gridPos); 
@@ -984,169 +1102,37 @@ private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelayS
     }
     float delaySeconds = Mathf.Max(0.0f, initialDelaySeconds);
 
-    while (true)
+    // Single delay, then enqueue the cell to be consumed by the per-step regrow gate in Update().
+    yield return new WaitForSeconds(delaySeconds);
+
+    if (!IsInBounds(gridPos) || _permanentClearCells.Contains(gridPos))
     {
-        if (!IsInBounds(gridPos)) { 
-            _regrowthCoroutines.Remove(gridPos); 
-            yield break;
-        }
-        // This log should now reflect the true wait each attempt.
-        yield return new WaitForSeconds(delaySeconds);
-
-        // Permanent veto: end the pipeline.
-        if (_permanentClearCells.Contains(gridPos))
-        {
-            _regrowthCoroutines.Remove(gridPos);
-            yield break;
-        }
-
-        // If already exists, we're done.
-        if (_hexMap.ContainsKey(gridPos))
-        {
-            _regrowthCoroutines.Remove(gridPos);
-            yield break;
-        }
-
-// Keep-clear (PhaseStar pocket / vehicle pocket / etc.)
-        if (IsKeepClearCell(gridPos))
-        {
-            // Wait until ALL keep-clear sources release (vehicle refcount OR star set).
-            yield return new WaitUntil(() =>
-                !IsKeepClearCell(gridPos) ||
-                _permanentClearCells.Contains(gridPos) ||
-                !IsInBounds(gridPos));
-
-            if (!IsInBounds(gridPos) || _permanentClearCells.Contains(gridPos))
-            {
-                _regrowthCoroutines.Remove(gridPos);
-                yield break;
-            }
-
-            delaySeconds = 0f;
-            continue;
-        }
-
-
-        // If you have other temporary vetoes, keep them as "continue" not "yield break".
-        if (IsDustSpawnBlocked(gridPos))
-        {
-            delaySeconds = Mathf.Max(0.05f, regrowVetoRetryDelaySeconds);
-            continue;
-        }
-
-        // Spawn-grid occupancy (MineNodes etc.) — retry.
-        if (!drums.IsSpawnCellAvailable(gridPos.x, gridPos.y))
-        {
-            delaySeconds = Mathf.Max(0.05f, regrowVetoRetryDelaySeconds);
-            continue;
-        }
-
-        Vector3 world = drums.GridToWorldPosition(gridPos);
-        float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-
-        // Vehicle overlap — retry.
-        if (IsVehicleOverlappingCellWorld(world, cellWorldSize))
-        {
-            delaySeconds = Mathf.Max(0.05f, regrowVetoRetryDelaySeconds);
-            continue;
-        }
-
-        // Collectable occupancy — retry.
-        if (!Collectable.IsCellFreeStatic(gridPos))
-        {
-            delaySeconds = Mathf.Max(0.05f, regrowVetoRetryDelaySeconds);
-            continue;
-        }
-
-        // --- Step gate: only allow N cells to regrow per drum step (after delay + vetoes) ---
-        if (regrowCellsPerStep > 0)
-        {
-            // Wait until the step budget refills and we successfully consume one slot.
-            while (!TryConsumeRegrowBudget())
-            {
-                // If the cell became invalid while waiting, abort.
-                if (!IsInBounds(gridPos) || _permanentClearCells.Contains(gridPos) || _hexMap.ContainsKey(gridPos))
-                {
-                    _regrowthCoroutines.Remove(gridPos);
-                    yield break;
-                }
-                yield return null;
-            }
-        }
-
-        // --- Spawn dust (success path) ---
-        var go = GetDustFromPool();
-        go.transform.SetPositionAndRotation(world, Quaternion.identity);
-
-        _hexMap[gridPos] = go;
-        hexagons.Add(go);
-
-        if (go.TryGetComponent<CosmicDust>(out var dust))
-        {
-            dust.BindToCell(gridPos,this, drums);
-            dust.ResetVisualToBase();
-        }
-
-        ScheduleCompositeRebuild();
-
-        // SUCCESS: clear bookkeeping and exit.
         _regrowthCoroutines.Remove(gridPos);
         yield break;
     }
-}
-public void DespawnDustInstance(CosmicDust dust)
-{
-    if (dust == null) return;
 
-    // Prefer authoritative binding.
-    if (dust.HasBoundCell)
+    // If the cell became solid again for any reason, stop.
+    if (HasDustAt(gridPos))
     {
-        DespawnDustAt(dust.BoundCell);
-        return;
+        _regrowthCoroutines.Remove(gridPos);
+        yield break;
     }
 
-    // Fallback: try to find it in the map (O(n), debug-only or rare path).
-    foreach (var kvp in _hexMap)
-    {
-        if (kvp.Value == dust.gameObject)
-        {
-            DespawnDustAt(kvp.Key);
-            return;
-        }
-    }
+    // Authoritative pipeline: Empty -> PendingRegrow. Actual spawn/enable is step-gated.
+    SetCellState(gridPos, DustCellState.PendingRegrow);
+    if (_pendingStepRegrowSet.Add(gridPos))
+        _pendingStepRegrow.Enqueue(gridPos);
 
-    // Last resort: pool it without map interaction, so it cannot remain visible forever.
-    ReturnDustToPoolPublic(dust.gameObject);
+    _regrowthCoroutines.Remove(gridPos);
 }
-
-private bool IsInBounds(Vector2Int gp) { 
+    private bool IsInBounds(Vector2Int gp) { 
     if (drums == null) return false; 
     int w = drums.GetSpawnGridWidth(); 
     int h = drums.GetSpawnGridHeight(); 
     if (w <= 0 || h <= 0) return false; 
     return gp.x >= 0 && gp.y >= 0 && gp.x < w && gp.y < h;
 }
-    public void ReleaseCollectableHoldAt(Vector2Int gridPos, MusicalPhase phase, float regrowDelaySeconds = 0.15f)
-    {
-        if (_collectableHoldUntil.ContainsKey(gridPos))
-            _collectableHoldUntil.Remove(gridPos);
-
-        // Ask for a regrow soon. This respects permanent/keep-clear rules internally.
-        RequestRegrowCellAt(
-            gridPos,
-            phase,
-            delaySeconds: Mathf.Max(0.01f, regrowDelaySeconds),
-            refreshIfPending: true,
-            clearImprintOnRefresh: false
-        );
-    }
-    public void ClaimTemporaryDiskForCollectable(
-        Vector3 centerWorld,
-        float radiusWorld,
-        MusicalPhase phase,
-        float holdSeconds,
-        int ownerId,
-        int priority = 50)
+    public void ClaimTemporaryDiskForCollectable(Vector3 centerWorld, float radiusWorld, MusicalPhase phase, float holdSeconds, int ownerId, int priority = 50)
     {
         if (drums == null) return;
 
@@ -1581,213 +1567,26 @@ private bool IsInBounds(Vector2Int gp) {
         BeginStaggeredMazeRegrowth(cellsToGrow);
     }
 
-    private GameObject GetDustFromPool()
-    {
-        // Pop until we find a live object
-        while (_dustPool.Count > 0)
-        {
-            var go = _dustPool.Pop();
-            if (!go) continue; // was destroyed after being pooled
-
-            var parentRoot = (activeDustRoot != null) ? activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
-            go.transform.SetParent(parentRoot, worldPositionStays: false);
-            go.SetActive(true);
-            Debug.Log($"[POOL] spawn go='{go.name}' parent='{go.transform.parent?.name}' active={go.activeInHierarchy} scale={go.transform.localScale}");
-            // Hard reset visuals + physics so it's never an invisible blocker
-            var dust = go.GetComponent<CosmicDust>();
-            if (dust == null) dust = go.AddComponent<CosmicDust>();
-            dust.OnSpawnedFromPool(_mazeTint); // restores collider, layer, alpha=1, scale=full
- 
-            MarkCompositeDirty();
-            return go;
-        }
-
-        // None in pool: create fresh and normalize through the same path
-        var created = Instantiate(dustPrefab, poolRoot);
-        var parentRoot2 = (activeDustRoot != null) ? activeDustRoot : transform; // never parent ACTIVE dust to poolRoot
-        created.transform.SetParent(parentRoot2, worldPositionStays: false);
-        created.SetActive(true);
-
-        var d = created.GetComponent<CosmicDust>();
-        if (d == null) d = created.AddComponent<CosmicDust>();
-        d.OnSpawnedFromPool(_mazeTint);
-
-        return created;
-    }
     public void NotifyCompositeDirty() { 
-        MarkCompositeDirty();
-    }
-    public void ReturnDustToPoolPublic(GameObject go) {
-        if (!go) return;
-        ReturnDustToPool(go);
-    }
-    private void ReturnDustToPool(GameObject go)
-    {
-        if (!go) return;
-
-        // Ensure it cannot slow/block anything and cannot render particles.
-        if (go.TryGetComponent<CosmicDust>(out var dust))
-        { 
-            dust.DespawnToPoolInstant(); // stops/clears particles + disables collider (and may disable child GO)
-            if(go.activeSelf) go.SetActive(false);
-        }
-        else
-        {
-            // Fallback safety if prefab ever changes.
-            var col = go.GetComponent<Collider2D>();
-            if (col) col.enabled = false;
-
-            var ps = go.GetComponentInChildren<ParticleSystem>(true);
-            if (ps)
-            {
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                ps.Clear(true);
-            }
-        }
-
-        // CRITICAL: pooled objects must be inactive (prevents "active but internally disabled" zombies)
-        go.SetActive(false);
-
-        var targetRoot = poolRoot != null ? poolRoot : transform;
-        go.transform.SetParent(targetRoot, worldPositionStays: false);
-
-        _dustPool.Push(go);
         MarkCompositeDirty();
     }
   
     [ContextMenu("Audit Orphan Dust")]
     public void AuditOrphanDust()
     {
-        // IMPORTANT:
-        // - GetComponentsInChildren(...) on the generator will include poolRoot + inactive pooled dust.
-        //   Those are expected to NOT be in _hexMap and should not be counted as "orphan" blockers.
-        // - This audit focuses on dust currently under activeDustRoot (the only dust that should be contributing
-        //   to the CompositeCollider2D maze).
-
-        var root = activeDustRoot != null ? activeDustRoot : transform;
-        var all = root.GetComponentsInChildren<CosmicDust>(true);
-
-        int tracked = 0;
-        int orphan = 0;
-        int blockingOrphan = 0;
-
-        var trackedSet = new HashSet<GameObject>(_hexMap.Values);
-
-        // Keep the log concise; we can expand later if needed.
-        const int kMaxList = 12;
-        int listed = 0;
+        var all = GetComponentsInChildren<CosmicDust>(true);
+        int tracked = 0, orphan = 0;
+        // With no pooling, "tracked" means "present in the authoritative 2D array / reverse lookup".
+        var trackedSet = new HashSet<GameObject>(_goToCell.Keys);
 
         foreach (var d in all)
         {
-            if (d == null) continue;
-            bool isTracked = trackedSet.Contains(d.gameObject);
-            if (isTracked) { tracked++; continue; }
-
-            orphan++;
-
-            // "Blocking" means it is active and has an enabled collider that can contribute to the composite.
-            // We cannot rely on private fields on CosmicDust from here, so we read the common contributor collider.
-            var box = d.GetComponent<BoxCollider2D>();
-            bool contributes = false;
-            if (box != null)
-            {
-                contributes = box.enabled && box.compositeOperation != Collider2D.CompositeOperation.None;
-            }
-            else
-            {
-                var col = d.GetComponent<Collider2D>();
-                contributes = col != null && col.enabled;
-            }
-
-            if (d.gameObject.activeInHierarchy && contributes)
-            {
-                blockingOrphan++;
-                if (listed < kMaxList)
-                {
-                    var gp = drums != null ? drums.WorldToGridPosition(d.transform.position) : new Vector2Int(int.MinValue, int.MinValue);
-                    Debug.Log(
-                        $"[DUST-AUDIT:BLOCKING] name='{d.name}' active={d.gameObject.activeInHierarchy} " +
-                        $"grid={gp} world=({d.transform.position.x:F2},{d.transform.position.y:F2}) " +
-                        $"box={(box ? "OK" : "NULL")} box.enabled={(box ? box.enabled : false)} " +
-                        $"box.op={(box ? box.compositeOperation.ToString() : "NULL")}",
-                        d
-                    );
-                    listed++;
-                }
-            }
+            if (trackedSet.Contains(d.gameObject)) tracked++;
+            else orphan++;
         }
 
-        Debug.Log($"[DUST-AUDIT] root='{root.name}' totalUnderRoot={all.Length} tracked={tracked} orphan={orphan} blockingOrphan={blockingOrphan} hexMapCount={_hexMap.Count}");
+        Debug.Log($"[DUST-AUDIT] totalUnderGenerator={all.Length} tracked={tracked} orphan={orphan} cellCount={_goToCell.Count} hexMapSolidCount={(_hexMap != null ? _hexMap.Count : 0)}");
     }
-
-	[ContextMenu("Fix Blocking Orphan Dust")]
-	public void FixBlockingOrphanDust()
-	{
-	    // Target only dust under activeDustRoot that is not tracked by _hexMap but is still contributing.
-	    var root = activeDustRoot != null ? activeDustRoot : transform;
-	    var all = root.GetComponentsInChildren<CosmicDust>(true);
-	    var trackedSet = new HashSet<GameObject>(_hexMap.Values);
-	    int fixedCount = 0;
-	
-	    foreach (var d in all)
-	    {
-	        if (d == null) continue;
-	        if (trackedSet.Contains(d.gameObject)) continue;
-	
-	        var box = d.GetComponent<BoxCollider2D>();
-	        bool contributes = box != null && box.enabled && box.compositeOperation != Collider2D.CompositeOperation.None;
-	        if (!d.gameObject.activeInHierarchy || !contributes) continue;
-	
-	        // Disable contribution immediately, then pool.
-	        d.SetTerrainColliderEnabled(false);
-	        ReturnDustToPool(d.gameObject);
-	        fixedCount++;
-	    }
-	
-
-
-    [ContextMenu("Fix Visible Orphan Dust (Pool)")]
-    void FixVisibleOrphanDust()
-    {
-        // Any CosmicDust instance under activeDustRoot that is not tracked in _hexMap is an orphan.
-        // Even if it is not currently contributing to the composite (CompositeOperation.None), it is
-        // visually misleading and can later re-enable via pooling mistakes. Pool it immediately.
-        if (activeDustRoot == null)
-        {
-            Debug.LogWarning("[DUST-FIX] activeDustRoot is null", this);
-            return;
-        }
-
-        int pooled = 0;
-        foreach (var dust in activeDustRoot.GetComponentsInChildren<CosmicDust>(true))
-        {
-            if (dust == null) continue;
-            if (_hexMap.ContainsValue(dust.gameObject)) continue;
-
-            // Ensure it stops colliding/contributing immediately.
-            dust.SetTerrainColliderEnabled(false);
-            var col = dust.GetComponent<Collider2D>();
-            if (col != null) col.enabled = false;
-
-            ReturnDustToPool(dust.gameObject);
-            pooled++;
-        }
-
-        if (pooled > 0)
-            MarkCompositeDirty();
-
-        Debug.Log($"[DUST-FIX] FixVisibleOrphanDust pooled={pooled}", this);
-    }
-	    if (fixedCount > 0)
-	    {
-	        MarkCompositeDirty();
-	        Debug.Log($"[DUST-AUDIT] Fixed blocking orphan dust: {fixedCount}", this);
-	    }
-	    else
-	    {
-	        Debug.Log("[DUST-AUDIT] No blocking orphan dust found.", this);
-	    }
-	}
     
     private Vector2 ComputePhaseBias(MusicalPhase phase)
     {
@@ -2194,54 +1993,26 @@ public bool TryGetDustWeatherForce(
     /// <summary>
     /// Returns the CompositeCollider2D used to represent dust terrain, if available.
     /// </summary>
-    public CompositeCollider2D DustCompositeCollider => compositeCollider;
-
-
+    
     /// <summary>
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
     /// Boost carving should use this, NOT DespawnDustAt.
     /// </summary>
-    
-
-    // --- Transient tint helpers (optional external callers: Vehicle, DustClaimManager, PhaseStar) ---
-    public bool PulseChargeAt(Vector2Int gridPos, float strength01 = 1f, float fadeSeconds = -1f, bool stickyUntilDestroyed = false)
-    {
-        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
-        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
-        dust.PulseCharge(strength01, fadeSeconds, stickyUntilDestroyed);
-        return true;
-    }
-
-    public bool PulseDenyAt(Vector2Int gridPos, float strength01 = 1f, float fadeSeconds = -1f)
-    {
-        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
-        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
-        dust.PulseDeny(strength01, fadeSeconds);
-        return true;
-    }
-
-    public bool SetShadowAt(Vector2Int gridPos, bool shadowOn)
-    {
-        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return false;
-        if (!go.TryGetComponent<CosmicDust>(out var dust) || dust == null) return false;
-        dust.SetShadowTarget(shadowOn);
-        return true;
-    }
-public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
+    public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
     {
         if (_permanentClearCells.Contains(gridPos)) return;
-        if (!_hexMap.TryGetValue(gridPos, out var go) || go == null) return;
+        if (!TryGetCellGo(gridPos, out var go) || go == null) return;
+        if (!TryGetCellState(gridPos, out var st) || st != DustCellState.Solid) return;
 
-        // VISUAL: mark this tile as ‘charged’ immediately so carving reads as an impact, even if it fades quickly.
-        if (go.TryGetComponent<CosmicDust>(out var preDust))
-            preDust.PulseCharge(1f, fadeSeconds: Mathf.Max(0.01f, fadeSeconds), stickyUntilDestroyed: true);
+        // Logical authority: this cell is no longer solid the moment it is carved.
+        SetCellState(gridPos, DustCellState.Clearing);
 
         RemoveActiveAt(gridPos, go, toPool: false);
 
         if (go.TryGetComponent<CosmicDust>(out var dust))
             dust.DissipateAndPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds));
         else
-            ReturnDustToPool(go);
+            go.SetActive(false);
 
         // Schedule regrow (will be held off by keep-clear and other vetoes inside coroutine)
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
@@ -2252,7 +2023,7 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
         Vector3 viewport = cam.WorldToViewportPoint(worldPos); 
         return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
     } 
-        private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration) {
+    private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration) {
         // Keep pacing similar, but enforce a per-frame millisecond budget
         float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
 
@@ -2289,22 +2060,28 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
                     // ---------------------------
                     if (_permanentClearCells.Contains(grid)) continue;
                     if (IsKeepClearCell(grid)) continue;
-                    if (_hexMap.ContainsKey(grid)) continue;
+                    if (HasDustAt(grid)) continue;
                     if (!drums.IsSpawnCellAvailable(grid.x, grid.y)) continue;
                     if (IsDustSpawnBlocked(grid)) continue;          // includes permanent + keepclear + claims/holds
                     if (!Collectable.IsCellFreeStatic(grid)) continue; // never grow dust on top of a collectable
+
                     // ---------------------------
                     // SPAWN + REGISTER (VISUAL FIRST)
                     // ---------------------------
-                    var hex = GetDustFromPool();
+                    var hex = GetOrCreateCellGO(grid);
+                    if (hex == null) continue;
+
+                    // Authoritative placement (pos was precomputed from drums.GridToWorldPosition)
                     hex.transform.SetPositionAndRotation(pos, Quaternion.identity);
-                    hexagons.Add(hex);
+                    if (!hex.activeSelf) hex.SetActive(true);
+                    if (!hexagons.Contains(hex)) hexagons.Add(hex);
 
                     if (hex.TryGetComponent<CosmicDust>(out var dust))
                     {
                         dust.SetTrackBundle(this, drums);
                         dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
 
+                        // Reset transient state from prior clears.
                         dust.PrepareForReuse();
                         dust.SetGrowInDuration(hexGrowInSeconds);
                         dust.SetTint(_mazeTint);
@@ -2315,6 +2092,10 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
                         dust.SetTerrainColliderEnabled(false);
                         spawnedDust.Add(dust);
                     }
+
+                    // Logical authority: mark as dust and register in map for queries.
+                    EnsureCellGrid();
+                    SetCellState(grid, DustCellState.Solid);
 
                     // This updates _hexMap but (during bulk) will NOT schedule composite rebuilds.
                     RegisterHex(grid, hex);
@@ -2370,15 +2151,11 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
             _isSpawningMaze = false;
         }
     }
-
-
-    // === Tint diffusion (Option 2) ===
     private void EnqueueTintDirty(Vector2Int cell)
     {
         if (_tintDirtySet.Add(cell))
             _tintDirtyQueue.Enqueue(cell);
     }
-
     private void MarkTintDirty(Vector2Int center, int radius)
     {
         radius = Mathf.Max(0, radius);
@@ -2393,7 +2170,6 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
             EnqueueTintDirty(new Vector2Int(center.x + dx, center.y + dy));
         }
     }
-
     private float ColorMaxAbsDelta(Color a, Color b)
     {
         float dr = Mathf.Abs(a.r - b.r);
@@ -2402,7 +2178,6 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
         float da = Mathf.Abs(a.a - b.a);
         return Mathf.Max(Mathf.Max(dr, dg), Mathf.Max(db, da));
     }
-
     private Color ComputeNeighborAverageColor(Vector2Int cell, int radius, out int count)
     {
         radius = Mathf.Max(0, radius);
@@ -2428,7 +2203,6 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
 
         return new Color(r / count, g / count, b / count, a / count);
     }
-
     private void ProcessTintDiffusion(float dt)
     {
         if (!enableTintDiffusion) return;
@@ -2474,24 +2248,25 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
             }
         }
     }
-
     private void RemoveActiveAt(Vector2Int grid, GameObject go, bool toPool = true) {
         // Free grid cell by key (authoritative)
-        drums.FreeSpawnCell(grid.x, grid.y);
+        drums.FreeSpawnCell(grid.x, grid.y); 
+        // Authority: a cell is no longer solid as soon as it is logically cleared.
+        if (TryGetCellState(grid, out var st) && st != DustCellState.Clearing)
+            SetCellState(grid, DustCellState.Empty);
 
-        // SAFETY: the *moment* a cell is logically cleared, it must stop contributing to the maze.
-        // This prevents "ghost walls" when an instance is left active briefly for fade-outs, FX, etc.
-        if (go != null && go.TryGetComponent<CosmicDust>(out var dust))
-        {
-            dust.SetTerrainColliderEnabled(false);
-        }
-
-        // Drop from registries
+        // Drop from registries (legacy map tracks only truly-solid cells)
         _hexMap.Remove(grid);
         if (go) hexagons.Remove(go);
 
-        // Pool the object (may already be non-contributing due to SetTerrainColliderEnabled(false)).
-        if (toPool && go) ReturnDustToPool(go);
+        // No pooling: optionally deactivate immediately. Visual-only fades will call back into the generator
+        // (OnDustVisualFadedOut) and we will deactivate there.
+        if (toPool && go)
+        {
+            if (go.TryGetComponent<CosmicDust>(out var dust))
+                dust.SetTerrainColliderEnabled(false);
+            go.SetActive(false);
+        }
 
         // Diffusion prep: removing dust can expose the base tint and create hard seams.
         MarkTintDirty(grid, tintDirtyMarkRadius);
@@ -2499,13 +2274,15 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
         MarkCompositeDirty();
         Debug.Log($"[DUSTGEN] RemoveActiveAt grid={grid} hexMapHasAfter={_hexMap.ContainsKey(grid)} go={(go ? go.name : "null")}", this);
     }
-    
-        private void RegisterHex(Vector2Int gridPos, GameObject hex)
+    private void RegisterHex(Vector2Int gridPos, GameObject hex)
     {
         if (_hexMap.TryGetValue(gridPos, out var existing) && existing != null && existing != hex)
         {
             hexagons.Remove(existing);
-            ReturnDustToPool(existing);
+            // No pooling: deactivate the stray instance and ensure it does not contribute to the maze.
+            if (existing.TryGetComponent<CosmicDust>(out var exDust))
+                exDust.SetTerrainColliderEnabled(false);
+            existing.SetActive(false);
         }
 
         _hexMap[gridPos] = hex;
@@ -2519,8 +2296,7 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
 
         MarkCompositeDirty();
     }
-
-        private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
+    private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
         var growth = new List<(Vector2Int, Vector3)>();
 
     int w = drums.GetSpawnGridWidth();   // grid size comes from SpawnGrid
@@ -2618,7 +2394,7 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
     }
     return growth;
 }
-        private static Vector2Int Any(HashSet<Vector2Int> set) {
+    private static Vector2Int Any(HashSet<Vector2Int> set) {
         foreach (var v in set) return v;             // returns the first enumerated element
         return new Vector2Int(-1, -1);
     } 
@@ -2631,8 +2407,10 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
     {
         if (_permanentClearCells.Contains(gridPos)) return;
 
-        if (_hexMap.TryGetValue(gridPos, out var go) && go != null)
+        if (TryGetCellState(gridPos, out var st) && st == DustCellState.Solid && TryGetCellGo(gridPos, out var go) && go != null)
+        {
             RemoveActiveAt(gridPos, go, toPool: true);
+        }
 
         // CRITICAL: schedule regrow.
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
@@ -2661,16 +2439,7 @@ public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
             new(-1, 0), new(0, -1), new(1, -1)
         };
     }
-    
-public int CarveTemporaryCellFromMineNode(
-    Vector3 centerWorld,
-    MusicalPhase phase,
-    float regrowDelaySeconds,
-    Color imprintColor,
-    Color imprintShadowColor,
-    float imprintHardness01,
-    int resolveRadiusCells,
-    float appetiteMul = 1f)
+    public int CarveTemporaryCellFromMineNode(Vector3 centerWorld, MusicalPhase phase, float regrowDelaySeconds, Color imprintColor, Color imprintShadowColor, float imprintHardness01, int resolveRadiusCells, float appetiteMul = 1f)
 {
     if (drums == null) return 0;
 
@@ -2732,12 +2501,7 @@ public int CarveTemporaryCellFromMineNode(
 
     return removed;
 }
-
-    public void CarveTemporaryCellFromVehicle(
-        Vector3 worldPos,
-        MusicalPhase phase,
-        float healDelaySeconds,
-        int resolveRadiusCells = 0)
+    public void CarveTemporaryCellFromVehicle(Vector3 worldPos, MusicalPhase phase, float healDelaySeconds, int resolveRadiusCells = 0)
     {
         if (drums == null) return;
 
@@ -2774,7 +2538,6 @@ public int CarveTemporaryCellFromMineNode(
             refreshIfPending: true
         );
     }
-
     private float GetFillProbability(MusicalPhase phase)
     {
         return phase switch
@@ -3025,12 +2788,12 @@ public int CarveTemporaryCellFromMineNode(
             var dust = activeDustRoot.GetComponentInChildren<CosmicDust>(true);
             if (dust != null)
             {
-                var box = dust.GetComponent<BoxCollider2D>();
-                var col = dust.GetComponent<Collider2D>();
+                var poly = dust.GetComponent<PolygonCollider2D>();
                 Debug.Log(
                     $"[DUST:TILE] sample='{dust.name}' layer={dust.gameObject.layer} " +
-                    $"collider={(col ? col.GetType().Name : "NULL")} enabled={(col ? col.enabled : false)} isTrigger={(col ? col.isTrigger : false)} " +
-                    $"box={(box ? "OK" : "NULL")} box.enabled={(box ? box.enabled : false)} box.compositeOperation={(box ? box.compositeOperation.ToString() : "NULL")}",
+                    $"poly={(poly ? "OK" : "NULL")} poly.enabled={(poly ? poly.enabled : false)} " +
+                    $"poly.usedByComposite={(poly ? poly.usedByComposite : false)} " +
+                    $"poly.isTrigger={(poly ? poly.isTrigger : false)}",
                     dust
                 );
             }
