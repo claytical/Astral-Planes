@@ -66,6 +66,9 @@ public class GameFlowManager : MonoBehaviour
     private MusicalPhaseProfile _pendingPhaseProfile;  // optional: set when the next star is known
     private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
+
+    // Scratch list for dust regrow veto (prevents collider "trap" when a cell regrows under a vehicle).
+    private readonly List<Vector2Int> _vehicleCellsScratch = new List<Vector2Int>(8);
     public List<InstrumentTrack> _activeTracks = new();
     private bool _remixArmed = false;                  // true once previous star’s set is completed
     private bool _nextPhaseLoopArmed = false;
@@ -1251,6 +1254,38 @@ public void StartMazeAndStarForPhase(MusicalPhase phase)
         }
         OnRemixCommitted += _ => harmony?.CommitNextChordNow();
         MusicalPhaseLibrary.InitializeProfiles(phaseProfiles);
+    }
+
+    private void Update()
+    {
+        // Feed current vehicle grid positions to the dust generator so regrowth can be vetoed deterministically.
+        if (dustGenerator == null || activeDrumTrack == null) return;
+
+        _vehicleCellsScratch.Clear();
+
+        // Prefer an explicit list if your flow populates it; otherwise fall back to scene scan.
+        Vehicle[] vs = null;
+        if (vehicles != null && vehicles.Count > 0)
+        {
+            // Filter nulls/inactive.
+            for (int i = 0; i < vehicles.Count; i++)
+            {
+                var v = vehicles[i];
+                if (v == null || !v.isActiveAndEnabled) continue;
+                _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
+            }
+        }
+        else
+        {
+            vs = FindObjectsOfType<Vehicle>();
+            for (int i = 0; i < vs.Length; i++)
+            {
+                var v = vs[i];
+                if (v == null || !v.isActiveAndEnabled) continue;
+                _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
+            }
+        }
+        dustGenerator.SetReservedVehicleCells(_vehicleCellsScratch);
     }
     private GameObject FindByNameIncludingInactive(string name)
     {
