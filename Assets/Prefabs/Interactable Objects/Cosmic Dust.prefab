@@ -74,15 +74,6 @@ MonoBehaviour:
   terrainCollider: {fileID: 0}
   solidLayer: 7
   nonBlockingLayer: 0
-  tint:
-    baseColor: {r: 0.55, g: 0.55, b: 0.55, a: 0.5}
-    chargeColor: {r: 1, g: 1, b: 1, a: 1}
-    denyColor: {r: 1, g: 0, b: 0.4139762, a: 1}
-    shadowColor: {r: 0.4339623, g: 0.4339623, b: 0.4339623, a: 0.5}
-    chargeFadeSeconds: 1
-    denyFadeSeconds: 1
-    shadowInSeconds: 0.35
-    shadowOutSeconds: 0.35
   epochId: 0
   stayForceEvery: 0
   _baseEmission: 10
@@ -5157,7 +5148,7 @@ SpriteMask:
   m_SortingOrder: 0
   m_Sprite: {fileID: 4412486014302810088, guid: d74e19106b29d4bfab46b0e4cd838279,
     type: 3}
-  m_MaskAlphaCutoff: 0.665
+  m_MaskAlphaCutoff: 0.67
   m_FrontSortingLayerID: 0
   m_BackSortingLayerID: 0
   m_FrontSortingLayer: 0

@@ -11480,6 +11480,8 @@ MonoBehaviour:
   mineNodeErodePerTick: 10
   vwhidustFootprintMul: 1.15
   tileDiameterWorld: 1
+  regrowCellsPerStep: 1
+  regrowColliderEnableDelaySeconds: 0.2
   hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   imprintBlendRadius: 1
