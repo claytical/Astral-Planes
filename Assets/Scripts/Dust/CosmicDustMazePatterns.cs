@@ -171,13 +171,108 @@ public static class CosmicDustMazePatterns
         return growth;
     }
 
+
+
     /// <summary>
-    /// Polka-dot style periodic mask, matching the legacy Build_PopDots behavior currently used by CosmicDustGenerator.
-    ///
-    /// Caller supplies:
-    /// - gridToWorld(cell) -> world position for a grid cell
-    /// - isCellAvailable(x,y) -> whether the spawn grid cell may be occupied
-    /// - includeWorld(world) -> optional world-space veto applied when emitting results (e.g., screen bounds)
+    /// Drunken strokes pattern used for Wildcard-like phases.
+    /// Generates several short random walks on the hex grid, optionally dilating the result.
+    /// </summary>
+    public static List<(Vector2Int cell, Vector3 world)> BuildDrunkenStrokes(
+        int width,
+        int height,
+        int strokes,
+        int maxLen,
+        float stepJitter,
+        float dilate,
+        Func<int, List<Vector2Int>> getHexDirectionsByRow,
+        Func<Vector2Int, Vector3> gridToWorld,
+        Func<int, int, bool> isCellAvailable,
+        Func<Vector3, bool> includeWorld = null)
+    {
+        var list = new List<(Vector2Int, Vector3)>();
+        if (width <= 0 || height <= 0) return list;
+        if (getHexDirectionsByRow == null) return list;
+        if (gridToWorld == null) return list;
+        if (isCellAvailable == null) return list;
+
+        strokes = Mathf.Max(0, strokes);
+        maxLen = Mathf.Max(1, maxLen);
+        stepJitter = Mathf.Clamp01(stepJitter);
+        dilate = Mathf.Clamp01(dilate);
+
+        var growth = new HashSet<Vector2Int>();
+
+        for (int s = 0; s < strokes; s++)
+        {
+            // random start on-screen & available
+            Vector2Int p0 = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
+            int safety = 0;
+            while (safety++ < 100 &&
+                   (!isCellAvailable(p0.x, p0.y) ||
+                    (includeWorld != null && !includeWorld(gridToWorld(p0)))))
+            {
+                p0 = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
+            }
+
+            if (safety >= 100) continue;
+
+            int len = Random.Range(maxLen / 2, maxLen + 1);
+            Vector2Int cur = p0;
+
+            for (int i = 0; i < len; i++)
+            {
+                growth.Add(cur);
+
+                var dirs = getHexDirectionsByRow(cur.y);
+                if (dirs == null || dirs.Count == 0) break;
+
+                var step = dirs[Random.Range(0, dirs.Count)];
+                if (Random.value < stepJitter)
+                    step = dirs[Random.Range(0, dirs.Count)];
+
+                var n = cur + step;
+
+                if ((uint)n.x >= (uint)width || (uint)n.y >= (uint)height) break;
+                if (!isCellAvailable(n.x, n.y)) break;
+
+                var wpos = gridToWorld(n);
+                if (includeWorld != null && !includeWorld(wpos)) break;
+
+                cur = n;
+            }
+        }
+
+        // Optional dilation to thicken strokes
+        if (dilate > 0f)
+        {
+            var thick = new HashSet<Vector2Int>(growth);
+            foreach (var c in growth)
+            {
+                var dirs = getHexDirectionsByRow(c.y);
+                if (dirs == null) continue;
+                for (int i = 0; i < dirs.Count; i++)
+                {
+                    if (Random.value < dilate)
+                        thick.Add(c + dirs[i]);
+                }
+            }
+            growth = thick;
+        }
+
+        foreach (var g in growth)
+        {
+            if ((uint)g.x >= (uint)width || (uint)g.y >= (uint)height) continue;
+            if (!isCellAvailable(g.x, g.y)) continue;
+            var wpos = gridToWorld(g);
+            if (includeWorld != null && !includeWorld(wpos)) continue;
+            list.Add((g, wpos));
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// Periodic mask (polka dots) used for Pop-like phases.
     /// </summary>
     public static List<(Vector2Int cell, Vector3 world)> BuildPopDots(
         int width,
@@ -199,7 +294,6 @@ public static class CosmicDustMazePatterns
         for (int y = 0; y < height; y++)
         {
             if (!isCellAvailable(x, y)) continue;
-            // simple periodic mask -> polka dots
             if (((x + (y * 2) + phaseOffset) % step) != 0) continue;
 
             var grid = new Vector2Int(x, y);
@@ -211,129 +305,6 @@ public static class CosmicDustMazePatterns
 
         return growth;
     }
-
-    /// <summary>
-    /// Drunken strokes pattern, matching the legacy Build_DrunkenStrokes behavior currently used by CosmicDustGenerator.
-    ///
-    /// Caller supplies:
-    /// - getHexDirectionsByRow(row) -> neighbor offsets (Vector2Int) for the given row parity
-    /// - gridToWorld(cell) -> world position for a grid cell
-    /// - isCellAvailable(x,y) -> whether the spawn grid cell may be occupied
-    /// - includeWorld(world) -> optional world-space veto applied during walk + emit (e.g., screen bounds)
-    ///
-    /// Notes:
-    /// - The stroke walk adds each visited cell to a set.
-    /// - The optional dilation mirrors the legacy behavior: randomly add neighbor cells around the visited cells.
-    /// </summary>
-    public static List<(Vector2Int cell, Vector3 world)> BuildDrunkenStrokes(
-        int width,
-        int height,
-        int strokes,
-        int maxLen,
-        float stepJitter,
-        float dilate,
-        Func<int, List<Vector2Int>> getHexDirectionsByRow,
-        Func<Vector2Int, Vector3> gridToWorld,
-        Func<int, int, bool> isCellAvailable,
-        Func<Vector3, bool> includeWorld = null)
-    {
-        var list = new List<(Vector2Int, Vector3)>();
-        if (width <= 0 || height <= 0) return list;
-        if (getHexDirectionsByRow == null) return list;
-        if (gridToWorld == null) return list;
-        if (isCellAvailable == null) return list;
-
-        var growth = new HashSet<Vector2Int>();
-
-        strokes = Mathf.Max(0, strokes);
-        maxLen = Mathf.Max(0, maxLen);
-
-        for (int s = 0; s < strokes; s++)
-        {
-            // Random start on-screen & available (legacy behavior)
-            Vector2Int p = new(
-                Random.Range(0, width),
-                Random.Range(0, height)
-            );
-
-            int safety = 0;
-            while (safety++ < 100)
-            {
-                if (!isCellAvailable(p.x, p.y))
-                {
-                    p = new(Random.Range(0, width), Random.Range(0, height));
-                    continue;
-                }
-
-                if (includeWorld != null)
-                {
-                    Vector3 pw = gridToWorld(p);
-                    if (!includeWorld(pw))
-                    {
-                        p = new(Random.Range(0, width), Random.Range(0, height));
-                        continue;
-                    }
-                }
-
-                break; // OK
-            }
-
-            if (safety >= 100) continue;
-
-            int len = Random.Range(maxLen / 2, maxLen + 1);
-            Vector2Int cur = p;
-            for (int i = 0; i < len; i++)
-            {
-                growth.Add(cur);
-
-                // jittered random neighbor (legacy behavior)
-                var dirs = getHexDirectionsByRow(cur.y);
-                if (dirs == null || dirs.Count == 0) break;
-
-                var nxt = dirs[Random.Range(0, dirs.Count)];
-                if (Random.value < stepJitter)
-                    nxt = dirs[Random.Range(0, dirs.Count)];
-
-                var n = cur + nxt;
-
-                if ((uint)n.x >= (uint)width || (uint)n.y >= (uint)height) break;
-                if (!isCellAvailable(n.x, n.y)) break;
-
-                if (includeWorld != null)
-                {
-                    Vector3 nw = gridToWorld(n);
-                    if (!includeWorld(nw)) break;
-                }
-
-                cur = n;
-            }
-        }
-
-        // Optional dilation to thicken strokes (legacy behavior)
-        if (dilate > 0f)
-        {
-            var thick = new HashSet<Vector2Int>(growth);
-            foreach (var c in growth)
-            {
-                var dirs = getHexDirectionsByRow(c.y);
-                if (dirs == null) continue;
-                for (int i = 0; i < dirs.Count; i++)
-                    if (Random.value < dilate) thick.Add(c + dirs[i]);
-            }
-            growth = thick;
-        }
-
-        // Pack into list (legacy behavior)
-        foreach (var g in growth)
-        {
-            var world = gridToWorld(g);
-            if (includeWorld != null && !includeWorld(world)) continue;
-            list.Add((g, world));
-        }
-
-        return list;
-    }
-
     private static int CountFilledNeighbors(
         Vector2Int cell,
         Dictionary<Vector2Int, bool> fillMap,
