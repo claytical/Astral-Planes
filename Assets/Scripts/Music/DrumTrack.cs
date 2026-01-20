@@ -263,31 +263,18 @@ public class DrumTrack : MonoBehaviour
         }
 		return true;
 	}
+    public int GetCommittedBinCount() => Mathf.Max(1, _binCount);
+
     public void SetBinCount(int bins)
     {
-        // Always clamp the requested value to something sane.
-        int requested = Mathf.Max(1, bins);
-
-        int final = requested;
-
-        // If we have a track controller, treat it as authority for bin count:
-        // transport bins == placement bins == leader loopMultiplier.
-        if (_trackController != null)
-        {
-            int leaderBins = Mathf.Max(1, _trackController.GetMaxLoopMultiplier());
-
-            if (leaderBins != requested)
-            {
-                Debug.LogWarning(
-                    $"[DrumTrack] SetBinCount request={requested}, " +
-                    $"but leader loopMultiplier={leaderBins}. " +
-                    $"Using leaderBins as transport bin count.");
-            }
-
-            final = leaderBins;
-        }
-
-        _binCount = final;
+        // Bin count here is used for *visual/logic binning inside the leader loop* (OnBinChanged),
+        // not for capacity. Do NOT override to a track's maxLoopMultiplier (capacity), because that
+        // causes the system to behave as if bins 2..N exist even when they have not been committed.
+        //
+        // Authority:
+        // - InstrumentTrackController (or callers) decide the current *committed* leader bin count.
+        // - DrumTrack simply clamps and applies it.
+        _binCount = Mathf.Max(1, bins);
     }
     private void Update()
     {
@@ -367,25 +354,10 @@ public class DrumTrack : MonoBehaviour
                 _binIdx = idx;
                 OnBinChanged?.Invoke(_binIdx, bins);
             }
-            int extendedLoop = Mathf.FloorToInt(elapsedTime / effectiveLen);
-            
-            if (extendedLoop > _lastLoopCount)
-            {
-                _lastLoopCount = extendedLoop;
-                int prev = _lastLoopCount;
-                _boundarySerial++;
-
-                bool effChanged = (_lastEffectiveLen > 0f && Mathf.Abs(effectiveLen - _lastEffectiveLen) > 0.001f);
-
-                Debug.Log(
-                    $"[BOUNDARY#{_boundarySerial}] extLoop={extendedLoop} last={_lastLoopCount} " +
-                    $"elapsed={elapsedTime:F3} effLen={effectiveLen:F6} prevEff={_lastEffectiveLen:F6} effChanged={effChanged} " +
-                    $"clipLen={_clipLengthSec:F6} leaderSteps={GetLeaderSteps()} totalSteps={totalSteps} " + 
-                    $"completedLoops={completedLoops} bins={bins} binIdx={_binIdx} startDsp={startDspTime:F3} leaderStart={leaderStartDspTime:F3}"
-                );
-//Removing multiple calls to loop routines
-                LoopRoutines();
-            }
+            // IMPORTANT:
+            // OnLoopBoundary is already fired by the leader-loop catchup loop above.
+            // Do not fire it a second time via LoopRoutines(), otherwise expansion commits
+            // can desynchronize and appear to "never happen" or happen twice.
             _lastEffectiveLen = effectiveLen;
         }
 

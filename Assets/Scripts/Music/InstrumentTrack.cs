@@ -420,7 +420,8 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         int targetCurLocal = ((curStep % binSize) + binSize) % binSize;
 
 // ----- PLAYBACK (catch-up deterministically) -----
-        int leaderBins = Mathf.Max(1, controller.GetGlobalVisualBins());
+        // Audio must follow the committed leader bins (transport), not the UI's visual bins.
+        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
 
 // Play every missed step exactly once, in order.
         int startStep = _lastLocalStep + 1;
@@ -2292,6 +2293,10 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
     loopMultiplier = newBins;
     _totalSteps    = BinSize() * loopMultiplier;
     EnsureBinList();
+    // Immediately re-sync controller/drum/ui to the new committed width.
+    // Without this, the transport can be correct while the NoteVisualizer remains at 1 bin until the next loop.
+    if (controller != null)
+        controller.ResyncLeaderBinsNow();
     Debug.Log($"[TRK:COMMIT_EXPAND] track={name} PATH=WIDEN_APPLIED curBurstId={curBid0} " + $"newBins={newBins} loopMulNow={loopMultiplier} totalStepsNow={_totalSteps} halfOffset={_halfOffsetAtExpand} mapSecondHalf={_mapIncomingCollectionsToSecondHalf}");
     // D) Mark the new bin as created but empty; flags above prevent auto-collapse
     SetBinAllocated(loopMultiplier -1, true);

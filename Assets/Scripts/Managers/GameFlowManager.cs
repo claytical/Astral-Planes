@@ -736,6 +736,17 @@ private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
     var drums = activeDrumTrack;
     var dust  = dustGenerator;
 
+    // === Motif boundary hard reset ===
+    // Requirement: when a new PhaseStar begins, we start from silence and an empty NoteVisualizer.
+    // Do this BEFORE we request the next PhaseStar / spawn anything for the new phase.
+    if (controller != null)
+        controller.BeginNewMotif($"PhaseStart {nextPhase}");
+
+    // Redundant safety: if the controller isn't wired to the NoteVisualizer in the scene,
+    // force-clear it here so we never carry markers into the next phase.
+    if (noteViz != null)
+        noteViz.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
+
     if (drums == null)
     {
         Debug.LogWarning("[GFM] Cannot start next phase maze: no DrumTrack.");
