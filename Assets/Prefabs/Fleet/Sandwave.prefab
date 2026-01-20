@@ -176,6 +176,11 @@ MonoBehaviour:
   keepDustClearAroundVehicle: 1
   vehicleKeepClearRadiusCells: 1
   vehicleKeepClearRefreshSeconds: 0.1
+  carveSpawnRestPocket: 1
+  spawnRestPocketAutoRadius: 0
+  spawnRestPocketRadiusCells: 3
+  spawnRestPocketFadeSeconds: 0.05
+  spawnRestPocketDelaySeconds: 0
   dustImpactDrainPerSecondMax: 8
   dustImpactForceVelScale: 0.02
   dustImpactOppositionWeight: 1

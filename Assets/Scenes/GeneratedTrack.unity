@@ -11462,12 +11462,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10df134e68a684e7fa84763b72dde178, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
+  debugVehicleCarve: 1
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
-  visualBottomExcludeViewport: 0.151
-  visualFadeBandViewport: 0.0391
   iterations: 3
-  cycleMode: 1
   cellClearanceWorld: 0
   edgeRadiusFrac: 0.132
   abrasionWearPerSecondAtFullImpact: 0.65
@@ -11478,7 +11476,7 @@ MonoBehaviour:
   vehicleErodePerTick: 5
   mineNodeErodeRadius: 1
   mineNodeErodePerTick: 10
-  vwhidustFootprintMul: 1.15
+  dustFootprintMul: 1
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
@@ -11537,7 +11535,6 @@ MonoBehaviour:
   dustTurbulenceFrac: 0.15
   dustNoiseScale: 0.65
   dustNoiseSpeed: 0.6
-  dustFootprintMul: 1
 --- !u!114 &869126482
 MonoBehaviour:
   m_ObjectHideFlags: 0
