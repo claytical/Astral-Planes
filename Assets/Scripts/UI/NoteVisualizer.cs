@@ -656,7 +656,7 @@ public class NoteVisualizer : MonoBehaviour
         if (!_ghostNoteSteps.TryGetValue(track, out var set))
             _ghostNoteSteps[track] = set = new HashSet<int>();
 
-        int leaderBins = (_ctrl != null) ? Mathf.Max(1, _ctrl.GetMaxLoopMultiplier()) : 1;
+        int leaderBins = (_ctrl != null) ? Mathf.Max(1, _ctrl.GetCommittedLeaderBins()) : 1;
         int binSize    = (_drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
         int total      = Mathf.Max(1, leaderBins * binSize);
 
@@ -739,7 +739,7 @@ public class NoteVisualizer : MonoBehaviour
     int GetDeclaredLongestSteps()
     {
         if (!RefreshCoreRefs(false)) return 1;
-        int leaderBins  = Mathf.Max(1, _ctrl.GetMaxLoopMultiplier());
+        int leaderBins  = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
         int binSize     = Mathf.Max(1, _drum.totalSteps);
         return leaderBins * binSize;
     }
@@ -1634,7 +1634,7 @@ private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, b
     if (_forcedLeaderSteps >= 1)
         leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
     else
-        leaderBinsBase = Mathf.Max(1, _ctrl.GetMaxActiveLoopMultiplier());
+        leaderBinsBase = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
 
     int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize));
 
@@ -1795,7 +1795,7 @@ private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, b
             leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
         }
         else { 
-            leaderBinsBase = Mathf.Max(1, _ctrl.GetMaxActiveLoopMultiplier());
+            leaderBinsBase = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
         }
         // Ensure placement width can represent this track's current bins.
         int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize)); 

@@ -125,7 +125,10 @@ public class InstrumentTrackController : MonoBehaviour
             return default;
 
         double dspNow = AudioSettings.dspTime;
-        double start  = drum.startDspTime;
+        // IMPORTANT: use the *leader-loop* transport anchor when available.
+        // startDspTime is the clip schedule anchor; leaderStartDspTime is rebased when
+        // the effective leader loop length changes (expand/collapse).
+        double start  = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
         if (start <= 0.0)
             return default;
 
@@ -133,9 +136,11 @@ public class InstrumentTrackController : MonoBehaviour
         if (clipLen <= 0f)
             return default;
 
+        // Each “bin” is one base drum clip.
         int barIndex = Mathf.FloorToInt((float)((dspNow - start) / clipLen));
 
-        int leaderBins = Mathf.Max(1, GetGlobalVisualBins());
+        // Transport must be derived from *committed/audible* leader bins, not visual bins.
+        int leaderBins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
         int playheadBin = ((barIndex % leaderBins) + leaderBins) % leaderBins;
 
         return new TransportFrame
@@ -143,6 +148,32 @@ public class InstrumentTrackController : MonoBehaviour
             barIndex   = barIndex,
             playheadBin = playheadBin
         };
+    }
+
+    /// <summary>
+    /// Immediate re-sync of drum binning + note grid to the committed leader bins.
+    /// Call this when a track commits an expand/collapse mid-frame so the UI/audio
+    /// cannot spend a whole loop visually desynchronized.
+    /// </summary>
+    public void ResyncLeaderBinsNow()
+    {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return;
+
+        int bins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
+        drum.SetBinCount(bins);
+
+        if (noteVisualizer != null)
+        {
+            int baseSteps = Mathf.Max(1, drum.totalSteps);
+            noteVisualizer.RequestLeaderGridChange(bins * baseSteps);
+        }
+    }
+    public int GetCommittedLeaderBins()
+    {
+        var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (drum == null) return 1;
+        return Mathf.Max(1, drum.GetCommittedBinCount());
     }
 
     void Update()
@@ -260,11 +291,26 @@ public class InstrumentTrackController : MonoBehaviour
     private void ArmCohortsOnLoopBoundary()
     {
         var drum = GameFlowManager.Instance.activeDrumTrack;
+
+        // Keep the drum's binning logic and the UI timebase aligned to the *committed* leader bins.
+        // This is the primary place we re-sync, because it is guaranteed to run on loop boundaries.
+        int committedBins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
+        if (drum != null)
+            drum.SetBinCount(committedBins);
+
         int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
         if (leaderSteps <= 0)
         {
             // Fallback: use max of actual tracks if drum not ready yet
             leaderSteps = tracks.Where(t => t != null).Select(t => t.GetTotalSteps()).DefaultIfEmpty(32).Max();
+        }
+
+        // Force the note grid to match the committed leader steps immediately.
+        // Without this, the UI may remain at 1 bin even when the transport is already wider.
+        if (noteVisualizer != null && drum != null)
+        {
+            int baseSteps = Mathf.Max(1, drum.totalSteps);
+            noteVisualizer.RequestLeaderGridChange(committedBins * baseSteps);
         }
 
         int start = 0;
@@ -620,10 +666,8 @@ public int GetBinForNextSpawn(InstrumentTrack track)
         {
             if (t == null) continue;
 
-            var loopNotes = t.GetPersistentLoopNotes();
-            if (loopNotes == null || loopNotes.Count == 0) continue;
-
-            // “Active” means “audible and committed to this loop width.”
+            // “Committed” means “this track’s authoritative loop span,” regardless of whether
+            // a particular bin is currently silent.
             maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
         }
         return maxMul;
