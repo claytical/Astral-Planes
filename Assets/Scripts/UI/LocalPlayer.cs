@@ -35,6 +35,23 @@ public class LocalPlayer : MonoBehaviour
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
     private bool _usingMouse;
+
+    // --- Dust spawn pocket / keep-clear ---
+    // Use CosmicDustGenerator's ref-counted vehicle keep-clear to carve the spawn cell
+    // before instantiating the vehicle, avoiding initial collider interpenetration.
+    [Header("Spawn Pocket")]
+    [Tooltip("Carve a dust-free pocket at the spawn cell before placing the vehicle.")]
+    public bool carveSpawnPocket = true;
+
+    [Tooltip("Radius (in dust grid cells) for the spawn pocket. 0 clears only the spawn cell.")]
+    public int spawnPocketRadiusCells = 0;
+
+    [Tooltip("Fade duration for spawn-pocket dust clearing.")]
+    public float spawnPocketFadeSeconds = 0.02f;
+
+    private int _dustKeepClearOwnerId;
+    private Vector2Int _dustKeepClearCell;
+    private bool _dustKeepClearActive;
     public bool IsReady
     {
         get => _isReady;
@@ -94,6 +111,28 @@ private IEnumerator LaunchWhenReady()
 
     if (drums != null && spawnGrid != null)
     {
+        // --- NEW: carve a safe spawn cell BEFORE we place/instantiate the vehicle ---
+        if (carveSpawnPocket && gfm.dustGenerator != null)
+        {
+            _dustKeepClearOwnerId = GetInstanceID();
+            _dustKeepClearCell = spawnCell;
+
+            // Determine phase for regrowth scheduling (keep-clear itself blocks regrow).
+            MusicalPhase phaseNow = (gfm.phaseTransitionManager != null)
+                ? gfm.phaseTransitionManager.currentPhase
+                : MusicalPhase.Establish;
+
+            gfm.dustGenerator.SetVehicleKeepClear(
+                ownerId: _dustKeepClearOwnerId,
+                centerCell: _dustKeepClearCell,
+                radiusCells: Mathf.Max(0, spawnPocketRadiusCells),
+                phase: phaseNow,
+                forceRemoveExisting: true,
+                forceRemoveFadeSeconds: Mathf.Max(0.01f, spawnPocketFadeSeconds)
+            );
+            _dustKeepClearActive = true;
+        }
+
 // Snap LocalPlayer to that grid cell in world space
         Vector3 spawnWorld = drums.GridToWorldPosition(spawnCell);
         transform.position = spawnWorld;
@@ -161,6 +200,18 @@ private IEnumerator LaunchWhenReady()
             _confirmEnabled = true;
         };
 
+    }
+
+    private void OnDisable()
+    {
+        // Release the initial spawn keep-clear so dust can regrow if this player is removed.
+        if (!_dustKeepClearActive) return;
+        var gfm = GameFlowManager.Instance;
+        if (gfm != null && gfm.dustGenerator != null)
+        {
+            gfm.dustGenerator.ReleaseVehicleKeepClear(_dustKeepClearOwnerId);
+        }
+        _dustKeepClearActive = false;
     }
     void FixedUpdate()
     {

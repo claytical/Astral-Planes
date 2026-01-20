@@ -410,7 +410,7 @@ public void ReleaseStarKeepClear(MusicalPhase phase)
 }
 
 
-public void ReleaseVehicleKeepClear(int ownerId, MusicalPhase phase)
+public void ReleaseVehicleKeepClear(int ownerId, MusicalPhase phase = MusicalPhase.Establish)
 {
     _tmpReleased.Clear();
     _exclusions.ReleaseVehicleFootprint(ownerId, _tmpReleased);
@@ -2002,7 +2002,23 @@ public bool TryGetDustWeatherForce(
     /// </summary>
     public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
     {
-        if (_permanentClearCells.Contains(gridPos)) return;
+        // IMPORTANT: "Permanent clear" was originally used to keep an authored tunnel open.
+        // In the refactor, we still want *pockets* and dynamic clearing. If a cell is marked
+        // permanent-clear but somehow still contains Solid dust (e.g., legacy init path),
+        // we treat that as stale state: remove the flag and allow carving.
+        if (_permanentClearCells.Contains(gridPos))
+        {
+            if (TryGetCellState(gridPos, out var st0) && st0 == DustCellState.Solid)
+            {
+                _permanentClearCells.Remove(gridPos);
+                Debug.Log($"[DUST:CARVE] Stale permanent-clear on {gridPos}; removed flag and carving.");
+            }
+            else
+            {
+                Debug.Log($"[DUST:CARVE] Reject {gridPos}: permanent clear");
+                return;
+            }
+        }
         if (!TryGetCellState(gridPos, out var st) || st != DustCellState.Solid) return;
         if (!TryGetCellGo(gridPos, out var go) || go == null) return;
 

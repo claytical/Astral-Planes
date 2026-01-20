@@ -101,6 +101,20 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float vehicleKeepClearRefreshSeconds = 0.10f;
     private float _nextVehicleKeepClearRefreshAt = 0f;
 
+    private Coroutine _spawnRestPocketCo;
+
+    [Header("Dust Spawn Rest Pocket")]
+    [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
+    [SerializeField] private bool carveSpawnRestPocket = true;
+    [Tooltip("If true, compute the pocket radius from the vehicle collider bounds and the drum grid cell size.")]
+    [SerializeField] private bool spawnRestPocketAutoRadius = true;
+    [Tooltip("Used when Auto Radius is disabled.")]
+    [SerializeField] private int spawnRestPocketRadiusCells = 1;
+    [Tooltip("Fade time (seconds) for the initial pocket carve.")]
+    [SerializeField] private float spawnRestPocketFadeSeconds = 0.05f;
+    [Tooltip("Delay (seconds) before carving the pocket. Useful if spawn ordering is tight.")]
+    [SerializeField] private float spawnRestPocketDelaySeconds = 0.0f;
+
     [Header("Dust Impact Damage (Non-Boost)")]
     [SerializeField] private float dustImpactDrainPerSecondMax = 8f;
     [SerializeField] private float dustImpactForceVelScale = 0.02f;
@@ -223,6 +237,60 @@ public class Vehicle : MonoBehaviour
         );
     }
 
+    private IEnumerator Co_CarveSpawnRestPocket()
+    {
+        // Optional delay to allow spawn ordering (dust grid, drumTrack, etc.) to settle.
+        if (spawnRestPocketDelaySeconds > 0f)
+            yield return new WaitForSeconds(spawnRestPocketDelaySeconds);
+        else
+            yield return null; // at least one frame so the dust grid exists
+
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) yield break;
+
+        var gen = gfm.dustGenerator;
+        var drum = gfm.activeDrumTrack;
+        if (gen == null || drum == null) yield break;
+
+        var phaseNow = (gfm.phaseTransitionManager != null)
+            ? gfm.phaseTransitionManager.currentPhase
+            : MusicalPhase.Establish;
+
+        // Compute which cell we're currently in.
+        Vector2 pos = (rb != null) ? rb.position : (Vector2)transform.position;
+        Vector2Int centerCell = drum.WorldToGridPosition(pos);
+
+        // Choose a radius that guarantees we are not born overlapping walls.
+        int radiusCells = Mathf.Max(0, spawnRestPocketRadiusCells);
+        if (spawnRestPocketAutoRadius)
+        {
+            float cellWorld = Mathf.Max(0.01f, drum.GetCellWorldSize());
+            float rWorld = 0.0f;
+            var col = GetComponent<Collider2D>();
+            if (col != null)
+                rWorld = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y);
+            else
+                rWorld = 0.35f; // conservative fallback
+
+            // Expand by a small margin so resting contacts don't continuously resolve.
+            float rWithMargin = rWorld + (cellWorld * 0.15f);
+            radiusCells = Mathf.Max(0, Mathf.CeilToInt(rWithMargin / cellWorld));
+        }
+
+        // Carve a small pocket *once*, then release keep-clear so regrowth behaves normally.
+        // This creates a "rest" volume without creating a tunnel or permanently preventing regrowth.
+        int ownerId = GetInstanceID();
+        gen.SetVehicleKeepClear(
+            ownerId,
+            centerCell,
+            radiusCells,
+            phaseNow,
+            forceRemoveExisting: true,
+            forceRemoveFadeSeconds: Mathf.Max(0.01f, spawnRestPocketFadeSeconds)
+        );
+        gen.ReleaseVehicleKeepClear(ownerId, phaseNow);
+    }
+
     private void OnDestroy()
     {
         var gfm = GameFlowManager.Instance;
@@ -302,6 +370,15 @@ public class Vehicle : MonoBehaviour
             energyLevel = capacity; // Start at full energy
             lastPosition = transform.position;
             SyncEnergyUI();
+
+            // --- Spawn rest pocket ---
+            // The vehicle often spawns inside a solid dust tile by design (teaches boosting),
+            // but we still need a tiny free volume so we don't start interpenetrating colliders.
+            if (carveSpawnRestPocket)
+            {
+                if (_spawnRestPocketCo != null) StopCoroutine(_spawnRestPocketCo);
+                _spawnRestPocketCo = StartCoroutine(Co_CarveSpawnRestPocket());
+            }
         }
     
     public void SyncEnergyUI()

@@ -113,6 +113,10 @@ public class CosmicDust : MonoBehaviour {
     private Vector3 _baseLocalScale = Vector3.one;
 
     [SerializeField] public Collider2D terrainCollider;
+
+    // Some prefab variants ended up with colliders on children (or multiple colliders).
+    // Carve/disable must be authoritative, so we cache all colliders in the hierarchy.
+    private Collider2D[] _cachedColliders;
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
     [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
     private BoxCollider2D _box;
@@ -175,10 +179,15 @@ public class CosmicDust : MonoBehaviour {
             _prefabLayerCaptured = true;
         }
 
-        // Terrain collider lives on this same prefab (PolygonCollider2D recommended).
-        // It contributes to the CompositeCollider2D on the DustPool root.
+        // Terrain collider typically lives on this same prefab (PolygonCollider2D recommended),
+        // but some prefab variants place colliders on children.
         if (terrainCollider == null) terrainCollider = GetComponent<Collider2D>();
+        if (terrainCollider == null) terrainCollider = GetComponentInChildren<Collider2D>(true);
         if (terrainCollider != null) terrainCollider.isTrigger = false;
+
+        // Cache all colliders so we can disable collisions even if terrainCollider is not assigned
+        // (or if there are multiple colliders involved in contact).
+        _cachedColliders = GetComponentsInChildren<Collider2D>(true);
         _box = GetComponent<BoxCollider2D>();
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         float mag = transform.localScale.magnitude; 
@@ -435,16 +444,27 @@ public class CosmicDust : MonoBehaviour {
     }
     public void SetTerrainColliderEnabled(bool enabled)
     {
-        if (terrainCollider != null)
-            terrainCollider.enabled = enabled;
+        // Prefer cached colliders so we reliably disable whatever collider is actually producing contact.
+        if (_cachedColliders == null || _cachedColliders.Length == 0)
+            _cachedColliders = GetComponentsInChildren<Collider2D>(true);
+
+        if (_cachedColliders != null)
+        {
+            for (int i = 0; i < _cachedColliders.Length; i++)
+            {
+                var c = _cachedColliders[i];
+                if (c != null) c.enabled = enabled;
+            }
+        }
+
+        // Maintain legacy field behavior too.
+        if (terrainCollider != null) terrainCollider.enabled = enabled;
     }
     public void DissipateAndPoolVisualOnly(float fadeSeconds = 0.20f) {
         if (_isDespawned) return;
         _isDespawned = true; 
         // Ensure no collision during fade.
-        if (terrainCollider != null) terrainCollider.enabled = false;
-        var col = GetComponent<Collider2D>(); 
-        if (col != null) col.enabled = false; 
+        SetTerrainColliderEnabled(false);
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
         _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
     }
