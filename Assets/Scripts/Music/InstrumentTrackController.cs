@@ -500,7 +500,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     /// </summary>
     public void BeginNewMotif(string reason = "BeginNewMotif") {
         Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
-
+        GameFlowManager.Instance?.activeDrumTrack?.ResetMotifDrumSequencing();
         // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.
         ForceDestroyAllCollectablesInFlight(reason);
 

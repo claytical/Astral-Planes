@@ -15,10 +15,21 @@ public class MotifProfile : ScriptableObject
     public string motifId;                  // Stable identifier (e.g. "RockSteady_A")
     public string displayName;             // Designer-friendly label
 
-    [Tooltip("Beat mood for this motif (controls drum clips/BPM/time-feel).")]
-    public BeatMood beatMood;
     public int keyRootMidi = 60;   // default C4
-    
+    [Header("Drums")]
+    [Tooltip("Entry loops: minimal / nearly silent. One will be chosen at motif start.")]
+    public List<AudioClip> entryDrumLoops = new();
+
+    [Tooltip("Intensity loops: index maps to intensity (0 = B / low, last = E / high).")]
+    public List<AudioClip> intensityDrumLoops = new();
+
+    [Min(0), Tooltip("How many full drum loops to stay in the entry loop(s) before mapping intensity.")]
+    public int entryLoopCount = 1;
+
+    [Header("Timing")]
+    public float bpm = 120f;
+    public int stepsPerLoop = 16;
+
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;
@@ -33,27 +44,17 @@ public class MotifProfile : ScriptableObject
     [Header("Selection")]
     [Tooltip("Optional weight for random selection in a MotifLibrary.")]
     public float selectionWeight = 1f;
+    
+    [Tooltip("How many entries at the front of beatProfileSequence play once per motif, then are skipped on wrap.")]
+    public int beatIntroCount = 0;
 
-    /// <summary>
-    /// Get the RoleMotifNoteSetConfig for a specific role in this motif, if present.
-    /// </summary>
-    public RoleMotifNoteSetConfig GetRoleConfig(MusicalRole role)
-    {
-        if (roleNoteConfigs == null) return null;
-        for (int i = 0; i < roleNoteConfigs.Count; i++)
-        {
-            var cfg = roleNoteConfigs[i];
-            if (cfg != null && cfg.role == role)
-                return cfg;
-        }
-        return null;
-    }
-    public int GetLoopsToAscendFor(MusicalRole role, int fallback = 1)
-    {
-        var cfg = GetRoleConfig(role);
-        return (cfg != null && cfg.loopsToAscend > 0)
-            ? cfg.loopsToAscend
-            : fallback;
+    [Tooltip("If true, drums are driven by player energy expenditure through beatProfileSequence.")]
+    public bool driveBeatsFromEnergy = true;
+    private void OnValidate() { 
+        if (beatIntroCount < 0) beatIntroCount = 0; 
+        if (entryDrumLoops == null) entryDrumLoops = new List<AudioClip>();
+        if (intensityDrumLoops == null) intensityDrumLoops = new List<AudioClip>();
+        if (beatIntroCount > entryDrumLoops.Count) beatIntroCount = entryDrumLoops.Count; 
     }
 
     public RoleMotifNoteSetConfig GetConfigForRole(MusicalRole role)

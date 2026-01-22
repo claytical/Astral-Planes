@@ -12,6 +12,5 @@ public class MusicalPhaseQueue : ScriptableObject
 public class MusicalPhaseGroup
 {
     public MusicalPhase phase;
-    public List<RemixUtility> remixUtilities;
     public bool allowRandomSelection = true;
 }

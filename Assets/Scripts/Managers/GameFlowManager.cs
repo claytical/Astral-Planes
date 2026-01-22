@@ -73,7 +73,6 @@ public class GameFlowManager : MonoBehaviour
     private bool _remixArmed = false;                  // true once previous star’s set is completed
     private bool _nextPhaseLoopArmed = false;
     private bool hasGameOverStarted = false;
-    public int playerProgress;
     private readonly List<Renderer> _bridgeHiddenRenderers = new();
 
     [Header("Phase Bridge Audio")]
@@ -83,19 +82,9 @@ public class GameFlowManager : MonoBehaviour
     [Tooltip("Seconds to fade in the next motif after the new phase begins.")]
     [SerializeField] private float phaseBridgeFadeInSeconds  = 0.6f;
     private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
-
-    public bool IsBridgeActive => GhostCycleInProgress;
     public bool GhostCycleInProgress { get; private set; }
     public event Action<MusicalPhaseProfile> OnRemixCommitted;
-
-    private struct SavedTrackState {
-    public InstrumentTrack track;
-    public NoteBehavior originalBehavior;
-    public RhythmStyle originalRhythm;
-    public SavedTrackState(InstrumentTrack t, NoteBehavior b, RhythmStyle r) { track=t; originalBehavior=b; originalRhythm=r; }
-}
-
-
+    
     // Bridge suppression: when true, tracks should not spawn collectables during bridge pending/in-progress.
     public static bool ShouldSuppressCollectableSpawns
     {
@@ -113,6 +102,7 @@ public class GameFlowManager : MonoBehaviour
         get => currentState;
         set => currentState = value;
     }
+    
     public void JoinGame()
     {
         var intro = FindByNameIncludingInactive("IntroScreen");
@@ -298,7 +288,7 @@ public class GameFlowManager : MonoBehaviour
             Debug.Log("[GFM] PlayerStatsGrid unregistered (scene unload?).");
         }
     }
-private IEnumerator HandleTrackSceneSetupAsync()
+    private IEnumerator HandleTrackSceneSetupAsync()
 {
     _setupInFlight = true;
     vehicles.Clear();
@@ -423,6 +413,37 @@ private IEnumerator HandleTrackSceneSetupAsync()
 
     yield break;
 }
+    public float GetMostSpentEnergyTanks() {
+        float best = 0f;
+        if (vehicles != null && vehicles.Count > 0) {
+            for (int i = 0; i < vehicles.Count; i++) {
+                var v = vehicles[i]; 
+                if (v == null || !v.isActiveAndEnabled) continue; 
+                best = Mathf.Max(best, v.GetCumulativeSpentTanks());
+            } 
+            return best;
+        }
+    
+                // Fallback: scene scan (consistent with your dust-regrow logic).
+        var vs = FindObjectsOfType<Vehicle>(); 
+        for (int i = 0; i < vs.Length; i++) {
+            var v = vs[i]; 
+            if (v == null || !v.isActiveAndEnabled) continue; 
+            best = Mathf.Max(best, v.GetCumulativeSpentTanks()); }
+        return best;
+    }
+    public void RegisterVehicle(Vehicle v)
+    {
+        if (v == null) return;
+        if (vehicles == null) vehicles = new List<Vehicle>();
+        if (!vehicles.Contains(v)) vehicles.Add(v);
+    }
+
+    public void UnregisterVehicle(Vehicle v)
+    {
+        if (v == null || vehicles == null) return;
+        vehicles.Remove(v);
+    }
 
     private bool HaveAllCoreRefs() { 
         return activeDrumTrack && controller && dustGenerator && noteViz && harmony && phaseTransitionManager && spawnGrid && playerStatsGrid;
@@ -535,7 +556,7 @@ private IEnumerator HandleTrackSceneSetupAsync()
         return list;
     }
 
-private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
+    private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
 {
     // ===== Lock gameplay & prep =====
     GhostCycleInProgress = true;
@@ -731,7 +752,7 @@ private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextP
     SetBridgeVisualMode(false);
 }
 
-private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
+    private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
 {
     var drums = activeDrumTrack;
     var dust  = dustGenerator;
@@ -751,6 +772,16 @@ private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
     {
         Debug.LogWarning("[GFM] Cannot start next phase maze: no DrumTrack.");
         yield break;
+    }
+    
+    // === RE-ARM PHASE/MOTIF -> DRUMS AFTER RESET ===
+    // // BeginNewMotif clears track content + visuals. We must immediately select the next motif and
+    // hand it back to the DrumTrack so driveFromEnergy/sequence is live.
+    if (phaseTransitionManager != null) {
+        phaseTransitionManager.HandlePhaseTransition(nextPhase, "GFM/StartNextPhaseMazeAndStar");
+    }
+    else {
+        Debug.LogWarning("[GFM] No PhaseTransitionManager; cannot arm motif for next phase.");
     }
     // ---- 1) Wait for players to actually spawn their Vehicles / lanes ----
     float waitStart   = Time.time;
@@ -826,11 +857,6 @@ private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
     );
 }
 
-public float GetBeatInterval()
-{
-    var drums = activeDrumTrack;
-    return drums != null ? drums.drumLoopBPM : 0.5f;
-}
     private PhaseSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum){
         var snapshot = new PhaseSnapshot { Timestamp = Time.time };
 
@@ -1029,12 +1055,12 @@ public float GetBeatInterval()
 /// <summary>
 /// Adapter to obtain the per-track color for snapshot entries.
 /// </summary>
-private Color ResolveTrackColor(InstrumentTrack t)
+    private Color ResolveTrackColor(InstrumentTrack t)
 {
     // Per your API: InstrumentTrack.trackColor
     return (t != null) ? t.trackColor : Color.white;
 }
-private void ResetPhaseBinStateAndGrid()
+    private void ResetPhaseBinStateAndGrid()
 {
     // 1) Tracks: cursors & per-burst guards
     if (controller?.tracks != null)
@@ -1051,47 +1077,10 @@ private void ResetPhaseBinStateAndGrid()
         // Let NoteVisualizer apply on its next loop boundary; grid is clean.
     }
 }
-
-private IEnumerator GrowCoralPlaceholder(CoralVisualizer cv, float seconds, List<InstrumentTrack> retained)
-{
-    if (cv == null) yield break;
-
-    // Color hint: blend retained track colors, fallback to white
-    Color tint = Color.white;
-    if (retained != null && retained.Count > 0)
+    public void StartMazeAndStarForPhase(MusicalPhase phase)
     {
-        float r = 0, g = 0, b = 0;
-        foreach (var t in retained) { r += t.trackColor.r; g += t.trackColor.g; b += t.trackColor.b; }
-        tint = new Color(r / retained.Count, g / retained.Count, b / retained.Count, 1f);
+        StartCoroutine(StartNextPhaseMazeAndStar(phase));
     }
-
-    // Try to color sprites/meshes if available
-    foreach (var sr in cv.GetComponentsInChildren<SpriteRenderer>(true)) if (sr) sr.color = tint;
-    foreach (var mr in cv.GetComponentsInChildren<MeshRenderer>(true))
-    {
-        if (!mr) continue;
-        var mat = mr.material; if (mat && mat.HasProperty("_Color")) { var c = mat.color; c = Color.Lerp(c, tint, 0.8f); mat.color = c; }
-    }
-
-    // Simple scale-up over the bridge duration
-    var root = cv.transform;
-    Vector3 start = Vector3.zero;
-    Vector3 end   = Vector3.one;
-    float t2 = 0f, dur = Mathf.Max(0.05f, seconds);
-    while (t2 < 1f && cv)
-    {
-        t2 += Time.deltaTime / dur;
-        float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t2));
-        root.localScale = Vector3.LerpUnclamped(start, end, u);
-        yield return null;
-    }
-    if (cv) root.localScale = end;
-}
-
-public void StartMazeAndStarForPhase(MusicalPhase phase)
-{
-    StartCoroutine(StartNextPhaseMazeAndStar(phase));
-}
     private CoralVisualizer EnsureCoral()
     {
         if (_coralInstance != null) return _coralInstance;
@@ -1144,112 +1133,6 @@ public void StartMazeAndStarForPhase(MusicalPhase phase)
         }
     }
 
-    private IEnumerator FadeCoralAlpha(CoralVisualizer cv, float target, float seconds)
-{
-    if (cv == null) yield break;
-
-    var lineRs   = cv.GetComponentsInChildren<LineRenderer>(includeInactive:true);
-    var meshRs   = cv.GetComponentsInChildren<MeshRenderer>(includeInactive:true);
-    var spriteRs = cv.GetComponentsInChildren<SpriteRenderer>(includeInactive:true);
-
-    var startLine  = new Dictionary<LineRenderer,(float sa,float ea)>(lineRs.Length);
-    foreach (var lr in lineRs) {
-        if (!lr) continue;
-        startLine[lr] = (lr.startColor.a, lr.endColor.a);
-    }
-
-    var startMesh  = new Dictionary<MeshRenderer,float>(meshRs.Length);
-    foreach (var mr in meshRs) {
-        if (!mr) continue;
-        var mat = mr.material; if (!mat || !mat.HasProperty("_Color")) continue;
-        startMesh[mr] = mat.color.a;
-    }
-
-    var startSprite = new Dictionary<SpriteRenderer,float>(spriteRs.Length);
-    foreach (var sr in spriteRs) {
-        if (!sr) continue;
-        startSprite[sr] = sr.color.a;
-    }
-
-// 2) Now do the timed fade using TryGetValue guards (your loop already does this).
-
-    float t = 0f;
-    while (t < seconds)
-    {
-        // if the whole coral is gone, stop gracefully
-        if (cv == null) yield break;
-
-        t += Time.deltaTime;
-        float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / seconds));
-
-        bool anyAlive = false;
-
-        // Lines
-        foreach (var lr in lineRs)
-        {
-            if (!lr) continue; // destroyed since snapshot
-            if (!startLine.TryGetValue(lr, out var se)) continue;
-
-            anyAlive = true;
-            // read-modify-write guarded
-            var c0 = lr.startColor; c0.a = Mathf.Lerp(se.sa, target, u);
-            var c1 = lr.endColor;   c1.a = Mathf.Lerp(se.ea, target, u);
-            lr.startColor = c0; lr.endColor = c1;
-        }
-
-        // Meshes
-        foreach (var mr in meshRs)
-        {
-            if (!mr) continue;
-            if (!startMesh.TryGetValue(mr, out var a0)) continue;
-
-            var mat = mr.material;
-            if (!mat) continue;
-            if (!mat.HasProperty("_Color")) continue;
-
-            anyAlive = true;
-            var c = mat.color; c.a = Mathf.Lerp(a0, target, u);
-            mat.color = c;
-        }
-
-        // Sprites
-        foreach (var sr in spriteRs)
-        {
-            if (!sr) continue;
-            if (!startSprite.TryGetValue(sr, out var a0)) continue;
-
-            anyAlive = true;
-            var c = sr.color; c.a = Mathf.Lerp(a0, target, u);
-            sr.color = c;
-        }
-
-        // If everything was destroyed mid-fade, bail out so the bridge can continue
-        if (!anyAlive) yield break;
-
-        yield return null;
-    }
-
-    // Final snap (in case the loop exited by time) with guards
-    foreach (var lr in lineRs)
-    {
-        if (!lr) continue;
-        if (!startLine.TryGetValue(lr, out var se)) continue;
-        var c0 = lr.startColor; c0.a = target;
-        var c1 = lr.endColor;   c1.a = target;
-        lr.startColor = c0; lr.endColor = c1;
-    }
-    foreach (var mr in meshRs)
-    {
-        if (!mr) continue;
-        var mat = mr.material; if (!mat || !mat.HasProperty("_Color")) continue;
-        var c = mat.color; c.a = target; mat.color = c;
-    }
-    foreach (var sr in spriteRs)
-    {
-        if (!sr) continue;
-        var c = sr.color; c.a = target; sr.color = c;
-    }
-}
     private void Awake()
     {
         if (Instance == null)

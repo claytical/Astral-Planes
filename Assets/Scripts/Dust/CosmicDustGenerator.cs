@@ -1916,10 +1916,17 @@ public bool TryGetDustWeatherForce(
     }
 
     public void RetintExisting(float seconds = 0.35f) {
+        if (!isActiveAndEnabled) return;
+        // If this generator is active but its GameObject is not in hierarchy (parent disabled), also bail.
+        if (!gameObject.activeInHierarchy) return;
+        
         foreach (var go in hexagons) { 
             if (!go) continue; 
+            if (!go.activeInHierarchy) continue;
             var d = go.GetComponent<CosmicDust>(); 
-            if (d != null) StartCoroutine(d.RetintOver(seconds, _mazeTint));
+            if (d == null) continue; 
+            if (!d.isActiveAndEnabled) continue; 
+            StartCoroutine(d.RetintOver(seconds, _mazeTint));
         }
     }
 

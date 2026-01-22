@@ -80,7 +80,7 @@ public class LocalPlayer : MonoBehaviour
         StartCoroutine(LaunchWhenReady());
     }
 
-private IEnumerator LaunchWhenReady()
+    private IEnumerator LaunchWhenReady()
 {
     // Wait for authoritative deps from GameFlowManager
     yield return new WaitUntil(() =>
@@ -142,6 +142,8 @@ private IEnumerator LaunchWhenReady()
         // --- Vehicle
         var vehicleGO = Instantiate(playerVehicle, transform);
         plane = vehicleGO.GetComponent<Vehicle>();
+        if (plane != null)
+            gfm.RegisterVehicle(plane);
     }
 
     // Player stats plumbing
@@ -204,9 +206,10 @@ private IEnumerator LaunchWhenReady()
 
     private void OnDisable()
     {
+        var gfm = GameFlowManager.Instance; 
+        if (gfm != null && plane != null) gfm.UnregisterVehicle(plane);
         // Release the initial spawn keep-clear so dust can regrow if this player is removed.
         if (!_dustKeepClearActive) return;
-        var gfm = GameFlowManager.Instance;
         if (gfm != null && gfm.dustGenerator != null)
         {
             gfm.dustGenerator.ReleaseVehicleKeepClear(_dustKeepClearOwnerId);

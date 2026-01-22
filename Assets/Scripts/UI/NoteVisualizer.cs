@@ -1079,7 +1079,11 @@ public class NoteVisualizer : MonoBehaviour
     }
     
     public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds) {
-    if (track == null || burstId < 0) return;
+    if (track == null || burstId < 0) return; 
+    if (!isActiveAndEnabled) return;
+    
+    var uiParent = GetUIParent(); 
+    if (uiParent != null && !uiParent.gameObject.activeInHierarchy) return;
 
     // Ascend BOTH lit and placeholder markers for this burst.
     // If you truly only want lit loop-owned markers to rise, you can reintroduce filtering,
@@ -1457,16 +1461,7 @@ public class NoteVisualizer : MonoBehaviour
             img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor;
         }
     }
-    public void TriggerNoteRushToVehicle(InstrumentTrack track, Vehicle v)
-    {
-        foreach (var marker in GetNoteMarkers(track))
-            EnqueueRush(marker, v.transform, 0.6f, () =>
-            {
-                EnqueueBlast(marker, UnityEngine.Random.insideUnitSphere, 0.25f);
-            });
-
-    }
-    public void TriggerNoteBlastOff(InstrumentTrack track)
+     public void TriggerNoteBlastOff(InstrumentTrack track)
     {
         var gos = GetNoteMarkers(track);
         var keys = new List<(InstrumentTrack,int)>();
