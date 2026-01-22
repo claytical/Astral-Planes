@@ -153,42 +153,17 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
         var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
         if (steps.Count == 0) steps.Add(0);
 
-        // --- 3) Apply BeatMood-based step density scaling ---
-        var moodProfile = GetActiveBeatMoodProfile();
-        
-        steps = ApplyBeatMoodStepDensity(steps, moodProfile, rng);
-
-        // --- 4) Generate pitches for each step, with BeatMood-influenced rest density ---
+// --- 3) Generate pitches for each step (BeatMood/BeatIntensity no longer modifies note density here) ---
         var v     = cfg.variation;
         var notes = new List<int>(steps.Count);
 
         for (int i = 0; i < steps.Count; i++)
         {
-            // Rest probability possibly scaled by BeatMood.noteDensityMultiplier
-            float restProb = v.restProb;
-            if (moodProfile != null)
-            {
-                float density = Mathf.Max(0f, moodProfile.noteDensityMultiplier);
-                // density = 1 → no change
-                // density < 1 → more rests
-                // density > 1 → fewer rests
-                float adjust = (1f - density) * 0.5f;
-                restProb = Mathf.Clamp01(restProb + adjust);
-            }
-
-            float finalRestProb = v.restProb;  
-            if (moodProfile != null)
-            {
-                // Lower density = more rests; higher density = fewer rests
-                finalRestProb = Mathf.Clamp01(v.restProb + (1f - moodProfile.noteDensityMultiplier) * 0.4f);
-            }
-
-            if (rng.NextDouble() < finalRestProb)
+            if (rng.NextDouble() < v.restProb)
             {
                 notes.Add(int.MinValue);
                 continue;
             }
-
 
             // Map this index into the chord sequence
             var chord = chordSeq[(i * chordSeq.Count) / Mathf.Max(1, steps.Count)];
@@ -206,13 +181,10 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
 
             // Extensions / octave motion according to variation profile
             if (rng.NextDouble() < v.extensionBias)
-            {
                 midi = AddExtension(midi, chord, rng);
-            }
+
             if (rng.NextDouble() < v.octaveMoveProb)
-            {
                 midi += 12 * (rng.Next(0, 2) == 0 ? -1 : 1);
-            }
 
             notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
         }
@@ -254,171 +226,29 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
         ns.Initialize(track, total);
         return ns;
     } 
-    private int GetAuthoritativeStepsPerLoop(InstrumentTrack track) { 
-        var mood = GetActiveBeatMoodProfile(); 
-        if (mood != null && mood.stepsPerLoop > 0) 
-            return mood.stepsPerLoop;
-        // Conservative fallback: preserve legacy behavior.
+    private int GetAuthoritativeStepsPerLoop(InstrumentTrack track)
+    {
+        // DrumTrack is the runtime authority for step-domain (matches BinSize/leader semantics).
+        var gfm = GameFlowManager.Instance;
+        var drum = gfm != null ? gfm.activeDrumTrack : null;
+
+        if (drum != null && drum.totalSteps > 0)
+            return drum.totalSteps;
+
+        // Conservative fallback
         return 16;
     }
 
+
     // --- BeatMood integration helpers ---
 
-    private BeatMoodProfile GetActiveBeatMoodProfile()
-    {
-        var gfm  = GameFlowManager.Instance;
-        if (gfm == null) return null;
-
-        var drum = gfm.activeDrumTrack;
-        if (drum == null) return null;
-
-        return drum.ActiveBeatMoodProfile;
-    }
 
     /// <summary>
     /// Adjusts the list of step positions according to the BeatMood's stepDensityMultiplier.
     /// Multiplier < 1 => fewer steps (sparser). Multiplier > 1 => more steps (denser, via duplication).
     /// Always returns a non-empty, sorted list.
     /// </summary>
-    private List<int> ApplyBeatMoodStepDensity(List<int> steps, BeatMoodProfile mood, System.Random rng)
-    {
-        if (steps == null || steps.Count == 0)
-            return new List<int> { 0 };
-
-        if (mood == null)
-            return new List<int>(steps); // no change
-
-        float mult = Mathf.Max(0.05f, mood.stepDensityMultiplier);
-        int baseCount    = steps.Count;
-        int desiredCount = Mathf.RoundToInt(baseCount * mult);
-        desiredCount     = Mathf.Clamp(desiredCount, 1, Mathf.Max(1, baseCount * 4));
-
-        // No change needed
-        if (desiredCount == baseCount)
-            return new List<int>(steps);
-        
-        if (desiredCount < baseCount)
-        {
-            // Downsample: random subset, then sort
-            // (we preserve rhythmic variety while reducing density)
-            var shuffled = steps
-                .Select(s => (step: s, key: (float)rng.NextDouble()))
-                .OrderBy(t => t.key)
-                .Take(desiredCount)
-                .Select(t => t.step)
-                .ToList();
-
-            shuffled.Sort();
-            return shuffled;
-        }
-        // Upsample: add NEW steps by interpolating/jittering into empty positions.
-        // We need an authoritative domain length to know which step positions are "available".
-        int domain = 16;
-        // Prefer BeatMood's step grid authority.
-        if (mood.stepsPerLoop > 0) domain = mood.stepsPerLoop;
-        else
-        {
-            // Fallback to active track grid if BeatMood doesn't specify it.
-            // (This preserves current runtime behavior where InstrumentTrack BinSize references drumTrack.totalSteps.)
-            domain = Mathf.Max(16, domain);
-        }
-
-        // Normalize into domain and ensure uniqueness.
-        var used = new HashSet<int>();
-        for (int i = 0; i < steps.Count; i++)
-        {
-            int s = steps[i] % domain;
-            if (s < 0) s += domain;
-            used.Add(s);
-        }
-        if (used.Count == 0) used.Add(0);
-
-        // If the domain is small, cap at domain size (cannot exceed unique positions).
-        desiredCount = Mathf.Clamp(desiredCount, 1, domain);
-
-        // Early exit if already at/above desired unique density.
-        if (used.Count >= desiredCount)
-            return used.OrderBy(x => x).ToList();
-
-        // Helper to compute cyclic distance forward (a -> b) in [0, domain)
-        int CycDist(int a, int b)
-        {
-            int d = b - a;
-            if (d < 0) d += domain;
-            return d;
-        }
-
-        // Insert new steps into the largest gaps first.
-        // Each insertion chooses a point near the midpoint of a gap, with jitter, preferring empty slots.
-        int safety = 0;
-        while (used.Count < desiredCount && safety++ < domain * 8)
-        {
-           var ordered = used.OrderBy(x => x).ToList();
-            if (ordered.Count == 0) { used.Add(0); continue; }
-
-            // Find the largest forward gap between consecutive used points (cyclic).
-            int bestA = ordered[0];
-            int bestB = ordered[0];
-            int bestGap = -1;
-
-            for (int i = 0; i < ordered.Count; i++)
-            {
-                int a = ordered[i];
-                int b = ordered[(i + 1) % ordered.Count];
-                int gap = CycDist(a, b);
-                if (gap > bestGap)
-                {
-                    bestGap = gap;
-                    bestA = a;
-                    bestB = b;
-                }
-            }
-
-            // If all positions are filled (shouldn't happen due to clamp), break.
-            if (bestGap <= 1) break;
-
-            // Midpoint inside the gap (exclusive of endpoints).
-            int half = bestGap / 2;
-            int mid = (bestA + half) % domain;
-
-            // Jitter: bias towards mid, but allow small variation.
-            // The larger the gap, the larger the permissible jitter.
-            int maxJitter = Mathf.Clamp(bestGap / 4, 1, 4);
-            int jitter = rng.Next(-maxJitter, maxJitter + 1);
-            int candidate = (mid + jitter) % domain;
-            if (candidate < 0) candidate += domain;
-
-            // If candidate occupied, walk outward from mid to find the nearest empty slot.
-            if (used.Contains(candidate))
-            {
-                bool found = false;
-                for (int r = 1; r < bestGap; r++)
-                {
-                    int c1 = (mid + r) % domain;
-                    int c2 = (mid - r) % domain;
-                    if (c2 < 0) c2 += domain;
-
-                    if (!used.Contains(c1))
-                    {
-                        candidate = c1;
-                        found = true;
-                        break;
-                    }
-                    if (!used.Contains(c2))
-                    {
-                        candidate = c2;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) break;
-            }
-
-            used.Add(candidate);
-        }
-
-        return used.OrderBy(x => x).ToList();
-    }
+   
     T PickWeighted<T>(List<Weighted<T>> list, System.Random rng)
     {
         if (list == null || list.Count == 0) throw new Exception("Empty weighted list");

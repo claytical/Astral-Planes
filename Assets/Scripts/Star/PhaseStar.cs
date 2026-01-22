@@ -193,6 +193,20 @@ public class PhaseStar : MonoBehaviour
             InitializeTimingAndSpeeds();
         }
     }
+    void OnEnable()
+    {
+        var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (drum != null) drum.OnBinChanged += HandleBinChanged;
+        if (drum != null) drum.OnStepPulseN += HandleStepPulse;
+    }
+
+
+
+    private void HandleBinChanged(int idx, int bins)
+    {
+        // Each bin ≈ one base clip duration in the expanded leader loop.
+        RotateHighlightedShardNow(1);
+    }
 
     public void Initialize(
         DrumTrack drum,
@@ -292,6 +306,7 @@ public class PhaseStar : MonoBehaviour
             float dps = _omega.Count > i ? _omega[i] : 0f;
             t.Rotate(Vector3.forward, dps * dt, Space.Self);
         }
+        
     }
 
     private void SafeUnsubscribeAll()
@@ -763,7 +778,8 @@ public class PhaseStar : MonoBehaviour
             && !_awaitingCollectableClear && !_awaitingLoopPhaseFinish && !_advanceStarted && !_ejectionInFlight &&
             HasShardsRemaining() && !AnyCollectablesInFlightGlobal() && !AnyExpansionPendingGlobal())
         {
-            RotateHighlightedShardNow(1);
+            
+            //RotateHighlightedShardNow(1);
             DBG($"[PS:LB] Rotated offered shard at boundary. currentShardIndex={currentShardIndex}");
         }
 
@@ -787,6 +803,11 @@ public class PhaseStar : MonoBehaviour
             DBG("[PS:LB] -> No need to arm");
         }
 
+    }
+
+    private void HandleStepPulse(int step, int n)
+    {
+        RotateHighlightedShardNow(1);
     }
 
     private void DBG(string msg)
@@ -870,6 +891,9 @@ public class PhaseStar : MonoBehaviour
 
     private void OnDisable()
     {
+        var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (drum != null) drum.OnBinChanged -= HandleBinChanged;
+        if (drum != null) drum.OnStepPulseN -= HandleStepPulse;
         SafeUnsubscribeAll();
         if (!StarKeepsDustClear) return;
         var gen = gfm != null ? gfm.dustGenerator : null;
@@ -877,6 +901,7 @@ public class PhaseStar : MonoBehaviour
 
         var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
         gen.ClearStarKeepClear(phase);
+        
     }
 
     private void OnDestroy()

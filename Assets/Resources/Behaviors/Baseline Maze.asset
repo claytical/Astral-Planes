@@ -19,7 +19,7 @@ MonoBehaviour:
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 3
   enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 2
+  safetyBubbleRadiusCells: 3
   rotateSelectionOnLoopBoundary: 1
   rotateEveryNLoops: 1
   collectableClearTimeoutLoops: 1

@@ -2231,7 +2231,6 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
                       $"req.noteSet={req.noteSet} req.max={req.maxToSpawn} " +
                       $"afterClear pendReqNow={_pendingBurstAfterExpand.HasValue}"
                       );
-            drumTrack.QueueBeatMoodFromBinFill(controller.tracks);            
             EnqueueNextFrame(() => SpawnCollectableBurst(req.noteSet, req.maxToSpawn, req.burstId));
         }
         else { 

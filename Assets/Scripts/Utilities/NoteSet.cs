@@ -112,9 +112,6 @@ public class NoteSet
     public List<NoteBehavior> behaviorsSeed;             // NEW: candidates to apply via rings/auto-variation
     public List<(int step,int note,int duration,float vel)> persistentTemplate; // NEW: initial phrase
 
-    [Header("Remix System")]
-    public RemixUtility remixUtility;
-
     [HideInInspector] public List<int> ghostNoteSequence = new List<int>();
 
     private int? _dominantNote;

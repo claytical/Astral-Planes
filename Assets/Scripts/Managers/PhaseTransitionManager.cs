@@ -41,10 +41,7 @@ public class PhaseTransitionManager : MonoBehaviour
 
         // 3) drive drums from motif’s BeatMood
         var drums = GameFlowManager.Instance?.activeDrumTrack;
-        if (drums != null && currentMotif != null)
-        {
-            drums.ScheduleBeatMoodAndLoopChange(currentMotif.beatMood);
-        }
+        drums.SetMotifBeatSequence(currentMotif);
         ConfigureTracksForCurrentPhaseAndMotif();
     }
 private void ConfigureTracksForCurrentPhaseAndMotif()

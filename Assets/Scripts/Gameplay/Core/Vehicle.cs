@@ -43,7 +43,7 @@ public class Vehicle : MonoBehaviour
     private float _nextCarveTime;
     private Collider2D _lastDustCollider;
     private Vector2 _lastDustContact;
-
+    private float _cumulativeEnergySpent = 0f;
 // Single environment scalar (0..1], replaces envSpeedScale/envAccelScale in movement
     [SerializeField] private float envScale = 1f;
     [Header("Input Filtering")]
@@ -53,7 +53,7 @@ public class Vehicle : MonoBehaviour
     private GameFlowManager gfm;
     float   _lastMoveStamp;
     private Vector2 _moveInput;
-
+    private float _boostEnergySpentAccum = 0f;
     public float energyLevel;
     public ParticleSystem remixParticleEffect;
     private float difficultyMultiplier = 1f;
@@ -491,11 +491,15 @@ public class Vehicle : MonoBehaviour
             activeTrail.GetComponent<TrailRenderer>().emitting = false;
         }
     }
-
+    public float GetCumulativeSpentTanks() {
+        if (capacity <= 0f) return 0f; 
+        return _cumulativeEnergySpent / capacity;
+    }
     private void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
+            _cumulativeEnergySpent += Mathf.Max(0f, amount);
             if (energyLevel <= 0)
             {
                 rb.linearVelocity = Vector2.zero;
@@ -758,19 +762,22 @@ public class Vehicle : MonoBehaviour
     ClampAngularVelocity();
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
 }
-
+    public float ConsumeBoostEnergySpentSinceLastSample()
+    {
+        float v = _boostEnergySpentAccum;
+        _boostEnergySpentAccum = 0f;
+        return v;
+    }
     public void DrainEnergy(float amount, string source = "Unknown")
 {
     if (amount <= 0f) return;
 
     // Calls your existing clamp/UI logic
-    ConsumeEnergy(amount); // ConsumeEnergy is currently private :contentReference[oaicite:8]{index=8}
+    // Count only boost-related drain (or broaden if you want "effort" = all movement).
+    if (source == "Boost")
+        _boostEnergySpentAccum += amount;
 
-    // Throttle logs so you actually see them without spamming
-    if (Time.time - _lastEnergyDrainLogTime > 0.75f)
-    {
-        _lastEnergyDrainLogTime = Time.time;
-    }
+    ConsumeEnergy(amount);
 }
 
     public void EnterDustField(float speedScale, float accelScale)

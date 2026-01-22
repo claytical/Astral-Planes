@@ -14,7 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Shifted Echoes
   displayName: Shifted Echoes
-  beatMood: 2
   keyRootMidi: 62
   chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
   phaseProfile: {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
@@ -24,3 +23,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 27d8cef77dcdd411dad8cef6e224500d, type: 2}
   - {fileID: 11400000, guid: 593cedb00dbf04725a66e0244cd58f07, type: 2}
   selectionWeight: 1
+  beatProfileSequence:
+  - {fileID: 11400000, guid: 2640e5487e5e24a62a5b30a635f59875, type: 2}
+  - {fileID: 11400000, guid: 32bc830c41b4a4abb83f77ec6aa7a06a, type: 2}
+  beatIntroCount: 1
+  driveBeatsFromEnergy: 1

@@ -11462,7 +11462,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10df134e68a684e7fa84763b72dde178, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
-  debugVehicleCarve: 1
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   iterations: 3
@@ -12333,6 +12332,7 @@ MonoBehaviour:
   mediumIntensityMood: 1
   highIntensityMood: 2
   extremeIntensityMood: 3
+  stepPulseEveryN: 4
   lockPlayAreaAfterInit: 1
 --- !u!4 &1354683683
 Transform:
