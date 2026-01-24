@@ -34,9 +34,6 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;
 
-    [Tooltip("Per-role strategies (bridge behavior, ghost strategies, etc.).")]
-    public MusicalPhaseProfile phaseProfile;   // Reuses your existing phase profile type
-
     [Header("Per-role NoteSet configs")]
     [Tooltip("Per-role NoteSet generation configs for this motif.")]
     public List<RoleMotifNoteSetConfig> roleNoteConfigs = new List<RoleMotifNoteSetConfig>();

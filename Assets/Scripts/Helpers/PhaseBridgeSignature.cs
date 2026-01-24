@@ -40,7 +40,7 @@ public class PhaseBridgeSignature
 
 public static class BridgeLibrary
 {
-    public static PhaseBridgeSignature Default(MazeArchetype from, MazeArchetype to) => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Default(MazeArchetype from, MazeArchetype to) => new PhaseBridgeSignature {
         fromPhase = from, toPhase = to,
         useOnlyPerfectTracks = true, maxBridgeTracks = 4, includeDrums = true,
         bars = 1, humanizeMs = 8f,
@@ -52,7 +52,7 @@ public static class BridgeLibrary
         fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Establish_To_Intensify() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Establish_To_Intensify() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Establish, toPhase = MazeArchetype.Intensify,
         bars = 2, humanizeMs = 6f,
         rhythmOverride = RhythmStyle.Dense,
@@ -64,7 +64,7 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Evolve_To_Intensify() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Evolve_To_Intensify() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Evolve, toPhase = MazeArchetype.Intensify,
         bars = 2, humanizeMs = 10f,
         rhythmOverride = RhythmStyle.Breakbeat,
@@ -76,7 +76,7 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Intensify_To_Release() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Intensify_To_Release() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Intensify, toPhase = MazeArchetype.Release,
         bars = 1, humanizeMs = 0f,
         rhythmOverride = RhythmStyle.Sparse,
@@ -88,7 +88,7 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Release_To_Wildcard() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Release_To_Wildcard() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Release, toPhase = MazeArchetype.Wildcard,
         bars = 1, humanizeMs = 0f,
         rhythmOverride = RhythmStyle.Triplet,
@@ -100,7 +100,7 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Wildcard_To_Pop() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Wildcard_To_Pop() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Wildcard, toPhase = MazeArchetype.Pop,
         bars = 2, humanizeMs = 8f,
         rhythmOverride = RhythmStyle.Syncopated,
@@ -112,7 +112,7 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature Pop_To_Evolve() => new PhaseBridgeSignature {
+    private static PhaseBridgeSignature Pop_To_Evolve() => new PhaseBridgeSignature {
         fromPhase = MazeArchetype.Pop, toPhase = MazeArchetype.Evolve,
         bars = 2, humanizeMs = 12f,
         rhythmOverride = RhythmStyle.Steady,
