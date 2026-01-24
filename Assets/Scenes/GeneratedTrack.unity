@@ -12275,7 +12275,6 @@ GameObject:
   - component: {fileID: 1354683690}
   - component: {fileID: 1354683692}
   - component: {fileID: 1354683685}
-  - component: {fileID: 1354683693}
   - component: {fileID: 1354683698}
   m_Layer: 0
   m_Name: Tracks
@@ -12324,15 +12323,9 @@ MonoBehaviour:
   uiBottomPaddingPx: 160
   autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
-  beatMoodLibrary: {fileID: 11400000, guid: 9d93d03e5cfdb4717bb2c8809701b3c3, type: 2}
-  lowIntensityThreshold: 0.25
-  mediumIntensityThreshold: 0.5
-  highIntensityThreshold: 0.75
-  lowIntensityMood: 0
-  mediumIntensityMood: 1
-  highIntensityMood: 2
-  extremeIntensityMood: 3
   stepPulseEveryN: 4
+  tanksPerLoopAtFullIntensity: 0.35
+  intensityHysteresis: 0.08
   lockPlayAreaAfterInit: 1
 --- !u!4 &1354683683
 Transform:
@@ -12522,28 +12515,6 @@ AudioReverbFilter:
   m_LFReference: 250
   m_ReflectionsDelay: 0
   m_ReverbPreset: 3
---- !u!114 &1354683693
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1354683681}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ef797a8c829e42449c31e3a0ead935b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  drumTrack: {fileID: 1354683682}
-  influenceToggles:
-  - influence: {fileID: 11400000, guid: c3c4120f5dd06436990eef9352c54345, type: 2}
-    enabled: 1
-  - influence: {fileID: 11400000, guid: 2f73fd5e5e5054aa5b6f63ebddae8445, type: 2}
-    enabled: 1
-  - influence: {fileID: 11400000, guid: da2d7ee4985f34c758502495a42c9dc9, type: 2}
-    enabled: 1
-  currentVolume: 0.7
-  smoothingSpeed: 1.5
 --- !u!114 &1354683694
 MonoBehaviour:
   m_ObjectHideFlags: 0

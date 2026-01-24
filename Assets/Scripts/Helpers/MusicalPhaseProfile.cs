@@ -15,6 +15,15 @@ public class RoleStrategy
     public MusicalRole role;
     public PatternStrategy strategy;
 }
+public enum MusicalPhase
+{
+    Establish,   // early stable loop
+    Evolve,      // moderate complexity
+    Intensify,   // denser and brighter
+    Release,     // breath or breakdown
+    Wildcard,    // glitchy, unpredictable
+    Pop          // catchy hook
+}
 
 [CreateAssetMenu(menuName = "Astral Planes/Musical Phase Profile")]
 public class MusicalPhaseProfile : ScriptableObject

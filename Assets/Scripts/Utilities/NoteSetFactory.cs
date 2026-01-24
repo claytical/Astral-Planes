@@ -16,78 +16,8 @@ public readonly struct StepDomain
 }
 public class NoteSetFactory : MonoBehaviour
 {
-    [Header("Config Library (ScriptableObject)")]
-    public NoteSetConfigLibrary configLibrary;
 
-public NoteSet Generate(InstrumentTrack track, MusicalPhase phase, int entropy = 0)
-{
-    var cfg = configLibrary?.GetConfig(track.assignedRole, phase);
-    if (cfg == null) { Debug.LogWarning($"Missing config for {track.assignedRole}/{phase}"); return null; }
-
-    var rng = SessionGenome.For($"{phase}-{track.assignedRole}-{track.GetInstanceID()}-n{entropy}");
-
-    // (weighted picks + guards as you have now)
-    var scale  = PickWeighted(cfg.scales, rng);
-    var pat    = PickWeighted(cfg.patterns, rng);
-    var rhythm = PickWeighted(cfg.rhythms, rng);
-
-    var chosenFns = (cfg.chordFunctions?.Count > 0)
-        ? PickK(cfg.chordFunctions, Mathf.Max(1, cfg.chordsPerRegion), rng)
-        : new List<string>{ "I" };
-
-    var chordSeq = RealizeChordFunctions(chosenFns, track, scale);
-    if (chordSeq == null || chordSeq.Count == 0)
-        chordSeq = new List<Chord>{ new Chord{ rootNote = track.lowestAllowedNote, intervals = new List<int>{0,4,7} } };
-
-    var rp    = RhythmPatterns.Patterns[rhythm];
-    int total = GetAuthoritativeStepsPerLoop(track); 
-    var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
-    if (steps.Count == 0) steps.Add(0);
-
-    var v = cfg.variation;
-    var notes = new List<int>(steps.Count);
-    for (int i = 0; i < steps.Count; i++)
-    {
-        if (rng.NextDouble() < v.restProb) { notes.Add(int.MinValue); continue; }
-        var chord = chordSeq[(i * chordSeq.Count) / Mathf.Max(1, steps.Count)];
-        var midi = GeneratePitchForStrategy(pat, chord, scale, v, rng, track.lowestAllowedNote, track.highestAllowedNote);
-        if (rng.NextDouble() < v.extensionBias)  midi = AddExtension(midi, chord, rng);
-        if (rng.NextDouble() < v.octaveMoveProb) midi += 12 * (rng.Next(0,2)==0 ? -1 : 1);
-        notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
-    }
-
-    var persistent = new List<(int step,int note,int duration,float vel)>(steps.Count);
-    var proxy = new NoteSet { scale = scale, rhythmStyle = rhythm }; // plain object proxy
-    for (int i = 0; i < steps.Count; i++)
-    {
-        int step = steps[i], midi = notes[i];
-        if (midi == int.MinValue) continue;
-        int dur = track.CalculateNoteDuration(step, proxy);
-        dur = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
-        float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
-        persistent.Add((step, midi, dur, vel));
-    }
-
-    var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
-        ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
-        : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(phase, track.assignedRole));
-
-    var ns = new NoteSet {
-        assignedInstrumentTrack = track,
-        rootMidi           = track.lowestAllowedNote,
-        scale              = scale,
-        patternStrategy    = pat,
-        rhythmStyle        = rhythm,
-        chordRegion        = chordSeq,
-        behaviorsSeed      = behaviors,
-        persistentTemplate = persistent
-    };
-
-    ns.Initialize(track, total);
-    return ns;
-}
-
-public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy = 0)
+    public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy = 0)
 {
     if (track == null)
     {
@@ -98,9 +28,6 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
     if (motif == null)
     {
         Debug.LogWarning("[NoteSetFactory] Motif is null; falling back to phase-based path.");
-        var ptm   = GameFlowManager.Instance?.phaseTransitionManager;
-        var phase = (ptm != null) ? ptm.currentPhase : MusicalPhase.Establish;
-        return Generate(track, phase, entropy);
     }
 
     // Look up the motif config for this role
@@ -108,9 +35,6 @@ public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy =
     if (cfg == null)
     {
         Debug.LogWarning($"[NoteSetFactory] No RoleMotifNoteSetConfig for role {track.assignedRole} in motif {motif.name}. Falling back to phase-based path.");
-        var ptm   = GameFlowManager.Instance?.phaseTransitionManager;
-        var phase = (ptm != null) ? ptm.currentPhase : MusicalPhase.Establish;
-        return Generate(track, phase, entropy);
     }
 
     var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-n{entropy}");

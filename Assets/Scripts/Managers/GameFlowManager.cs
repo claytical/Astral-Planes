@@ -167,9 +167,9 @@ public class GameFlowManager : MonoBehaviour
         _bridgeHiddenRenderers.Clear();
     }
 
-    public NoteSet GenerateNotes(InstrumentTrack track)
+    public NoteSet GenerateNotes(InstrumentTrack track, int entropy = 0)
     {
-        var ns = phaseTransitionManager.noteSetFactory.Generate(track, phaseTransitionManager.currentMotif);
+        var ns = phaseTransitionManager.noteSetFactory.Generate(track, phaseTransitionManager.currentMotif, entropy);
         return ns;
     }
     void Start()
@@ -1147,7 +1147,6 @@ public class GameFlowManager : MonoBehaviour
             Destroy(gameObject);
         }
         OnRemixCommitted += _ => harmony?.CommitNextChordNow();
-        MusicalPhaseLibrary.InitializeProfiles(phaseProfiles);
     }
 
     private void Update()

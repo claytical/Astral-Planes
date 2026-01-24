@@ -6,101 +6,113 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Diamond.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Diamond.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Debris.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Debris.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Collected Shard.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Collected Shard.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/BeatMoodLibrary.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/BeatMoodLibrary.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Ambient.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Ambient.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Building.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Building.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Intense.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Intense.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Steady.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Beats/Steady.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Lead/Lead Smooth Glide.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Lead/Lead Smooth Glide.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Radiant Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Radiant Groove.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Shifted Echoes.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Shifted Echoes.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Establish - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Evolve - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Rhythm.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Intensify - Rhythm.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Pop - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Release - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixStrategies/Wildcard - Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixUtility.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RemixUtility.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/DrumVolumeMixerEditor.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/DrumVolumeMixerEditor.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Establish/Establish_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Evolve/Evolve_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Intensify/Intensify_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/NoteSetConfigLibrary.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/NoteSetConfigLibrary.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Pop/Pop_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Release/Release_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Bass.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Bass.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Groove.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Groove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Harmony.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Harmony.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Lead.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/NoteSetConfigs/Wildcard/Wildcard_Lead.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Baseline Maze.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Evolve Behavior.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Intensify Behavior.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Pop Behavior.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Release Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Release Behavior.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Behaviors/Wildcard Behavior.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/DrumInfluences.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/DrumInfluences/BoostingInfluence.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/DrumInfluences/BoostingInfluence.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/DrumInfluences/DensityInfluence.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/DrumInfluences/DensityInfluence.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Moonlight.sf2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Moonlight.sf2.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Musical Phase Queue.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Musical Phase Queue.asset.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/RainbowLerp.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/RainbowLerp.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseQueue.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseQueue.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/RemixUtility.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/RemixUtility.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Editor/NoteSetConfigGenerator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Editor/NoteSetConfigGenerator.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Editor/RolePhaseNoteSetQuickFill.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Editor/RolePhaseNoteSetQuickFill.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/NoteBehaviorPolicy.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/NoteBehaviorPolicy.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/BoostingInfluence.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/BoostingInfluence.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/DensityInfluence.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/DensityInfluence.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/DrumVolumeInfluence.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/DrumVolumeInfluence.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseQueue.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/MusicalPhaseQueue.cs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodLibrary.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/BeatMoodProfile.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSet.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/DrumVolumeMixer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/DrumVolumeMixer.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MusicalPhaseLibrary.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetConfigLibrary.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetConfigLibrary.cs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RolePhaseNoteSetConfig.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RolePhaseNoteSetConfig.cs.meta" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -362,7 +374,7 @@
       <workItem from="1768415354575" duration="1434000" />
       <workItem from="1768445105260" duration="83791000" />
       <workItem from="1768789581726" duration="41822000" />
-      <workItem from="1769093396747" duration="6183000" />
+      <workItem from="1769093396747" duration="13468000" />
     </task>
     <servers />
   </component>

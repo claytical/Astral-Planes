@@ -1081,9 +1081,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         }
         // 4) Write exactly where spawn intended
         int note = collectable.GetNote();
-        if (collectable.IsDark) {
-            PlayDarkNote(note, durationTicks, force);
-        }
         CollectNote(finalTargetStep, note, durationTicks, force);
 
         // Mark bin filled + hooks
@@ -2420,10 +2417,95 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
 
     private int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
+        // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force);
-        PlayNote(note, durationTicks, force);
+
+        // Immediate tactile feedback (short), then audition on-grid (full voice).
+        PlayCollectionConfirm(note, force);
+        QuantizedAuditionToStep(stepIndex, note, durationTicks, force);
+
         return stepIndex;
     }
+    private void QuantizedAuditionToStep(int stepIndex, int note, int durationTicks, float velocity)
+    {
+        if (drumTrack == null) return;
+
+        // Use the leader transport so the audition aligns to what the player hears.
+        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
+        float loopLenSec = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds());
+
+        // Normalize step into leader range.
+        int s = stepIndex % leaderSteps;
+        if (s < 0) s += leaderSteps;
+
+        // If leaderStartDspTime hasn't been anchored yet, fail safe: don't audition.
+        double loopStartDsp = drumTrack.leaderStartDspTime;
+        if (loopStartDsp <= 0.0) return;
+
+        double dspNow = AudioSettings.dspTime;
+
+        // Time within current loop [0, loopLenSec)
+        double tInLoop = (dspNow - loopStartDsp) % loopLenSec;
+        if (tInLoop < 0) tInLoop += loopLenSec;
+
+        double stepDur = loopLenSec / leaderSteps;
+        double targetT = s * stepDur;
+
+        // Seconds until next occurrence of that step.
+        double dt = targetT - tInLoop;
+        if (dt < 0) dt += loopLenSec;
+
+        // If we're very close, play immediately to avoid “why didn’t it respond?”.
+        const double snapEps = 0.050; // 50ms; tune to taste
+        if (dt <= snapEps)
+        {
+            PlayNote(note, durationTicks, velocity);
+            return;
+        }
+
+        // Schedule using DSP polling (more robust than WaitForSeconds if frame hitches occur).
+        double targetDsp = dspNow + dt;
+        StartCoroutine(PlayNoteAtDsp(targetDsp, note, durationTicks, velocity));
+    }
+
+    private IEnumerator PlayNoteAtDsp(double targetDsp, int note, int durationTicks, float velocity)
+    {
+        // Poll DSP time so we stay accurate under variable frame time.
+        while (AudioSettings.dspTime < targetDsp)
+            yield return null;
+
+        PlayNote(note, durationTicks, velocity);
+    }
+    private void PlayCollectionConfirm(int note, float velocity)
+    {
+        if (midiStreamPlayer == null) return;
+
+        // Short confirmation; do not trim to RemainingActiveWindowSec().
+        const int confirmDurationMs = 35;
+
+        midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
+        midiStreamPlayer.MPTK_Channels[channel].ForcedBank   = bank;
+
+        int v = Mathf.Clamp(Mathf.RoundToInt(velocity * 0.45f), 1, 80);
+
+        var ev = new MPTKEvent
+        {
+            Command  = MPTKCommand.NoteOn,
+            Value    = note,
+            Channel  = channel,
+            Duration = confirmDurationMs,
+            Velocity = v,
+        };
+
+        midiStreamPlayer.MPTK_PlayEvent(ev);
+    }
+    
+    private IEnumerator PlayNoteAfterDelay(float delaySec, int note, int durationTicks, float velocity)
+    {
+        yield return new WaitForSeconds(delaySec);
+        PlayNote(note, durationTicks, velocity);
+    }
+
     private IEnumerator ResetPitchBendAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
