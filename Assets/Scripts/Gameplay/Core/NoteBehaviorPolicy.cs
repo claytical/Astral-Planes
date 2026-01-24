@@ -53,54 +53,54 @@ public static class NoteBehaviorPolicy
             default:                      return new[] { legacy };
         }
     }
-        public static IReadOnlyList<NoteBehavior> GetDefaults(MusicalPhase phase, MusicalRole role) {
+        public static IReadOnlyList<NoteBehavior> GetDefaults(MazeArchetype phase, MusicalRole role) {
         switch (role)
         {
             case MusicalRole.Bass:
                 switch (phase)
                 {
-                    case MusicalPhase.Establish:  return new[] { NoteBehavior.Legatify, NoteBehavior.VelocityShape };
-                    case MusicalPhase.Evolve:     return new[] { NoteBehavior.Staccatify, NoteBehavior.HumanizeTiming };
-                    case MusicalPhase.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
-                    case MusicalPhase.Release:    return new[] { NoteBehavior.Legatify };
-                    case MusicalPhase.Wildcard:   return new[] { NoteBehavior.HumanizeTiming, NoteBehavior.Swingify };
-                    case MusicalPhase.Pop:        return new[] { NoteBehavior.Staccatify, NoteBehavior.VelocityShape };
+                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Legatify, NoteBehavior.VelocityShape };
+                    case MazeArchetype.Evolve:     return new[] { NoteBehavior.Staccatify, NoteBehavior.HumanizeTiming };
+                    case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
+                    case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify };
+                    case MazeArchetype.Wildcard:   return new[] { NoteBehavior.HumanizeTiming, NoteBehavior.Swingify };
+                    case MazeArchetype.Pop:        return new[] { NoteBehavior.Staccatify, NoteBehavior.VelocityShape };
                     default:                      return new[] { NoteBehavior.None };
                 }
 
             case MusicalRole.Harmony:
                 switch (phase)
                 {
-                    case MusicalPhase.Establish:  return new[] { NoteBehavior.Legatify };
-                    case MusicalPhase.Evolve:     return new[] { NoteBehavior.VelocityShape, NoteBehavior.AddNeighborOrnament };
-                    case MusicalPhase.Intensify:  return new[] { NoteBehavior.InvertVoicing, NoteBehavior.DensityPulse };
-                    case MusicalPhase.Release:    return new[] { NoteBehavior.Legatify, NoteBehavior.RegisterCompress };
-                    case MusicalPhase.Wildcard:   return new[] { NoteBehavior.HumanizeTiming };
-                    case MusicalPhase.Pop:        return new[] { NoteBehavior.VelocityShape };
+                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Legatify };
+                    case MazeArchetype.Evolve:     return new[] { NoteBehavior.VelocityShape, NoteBehavior.AddNeighborOrnament };
+                    case MazeArchetype.Intensify:  return new[] { NoteBehavior.InvertVoicing, NoteBehavior.DensityPulse };
+                    case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify, NoteBehavior.RegisterCompress };
+                    case MazeArchetype.Wildcard:   return new[] { NoteBehavior.HumanizeTiming };
+                    case MazeArchetype.Pop:        return new[] { NoteBehavior.VelocityShape };
                     default:                      return new[] { NoteBehavior.None };
                 }
 
             case MusicalRole.Lead:
                 switch (phase)
                 {
-                    case MusicalPhase.Establish:  return new[] { NoteBehavior.VelocityShape };
-                    case MusicalPhase.Evolve:     return new[] { NoteBehavior.AddNeighborOrnament, NoteBehavior.HumanizeTiming };
-                    case MusicalPhase.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
-                    case MusicalPhase.Release:    return new[] { NoteBehavior.Legatify };
-                    case MusicalPhase.Wildcard:   return new[] { NoteBehavior.HumanizeTiming, NoteBehavior.Swingify };
-                    case MusicalPhase.Pop:        return new[] { NoteBehavior.VelocityShape };
+                    case MazeArchetype.Establish:  return new[] { NoteBehavior.VelocityShape };
+                    case MazeArchetype.Evolve:     return new[] { NoteBehavior.AddNeighborOrnament, NoteBehavior.HumanizeTiming };
+                    case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
+                    case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify };
+                    case MazeArchetype.Wildcard:   return new[] { NoteBehavior.HumanizeTiming, NoteBehavior.Swingify };
+                    case MazeArchetype.Pop:        return new[] { NoteBehavior.VelocityShape };
                     default:                      return new[] { NoteBehavior.None };
                 }
 
             case MusicalRole.Groove:
                 switch (phase)
                 {
-                    case MusicalPhase.Establish:  return new[] { NoteBehavior.Staccatify };
-                    case MusicalPhase.Evolve:     return new[] { NoteBehavior.HumanizeTiming };
-                    case MusicalPhase.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
-                    case MusicalPhase.Release:    return new[] { NoteBehavior.HumanizeTiming };
-                    case MusicalPhase.Wildcard:   return new[] { NoteBehavior.Swingify };
-                    case MusicalPhase.Pop:        return new[] { NoteBehavior.Staccatify };
+                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Staccatify };
+                    case MazeArchetype.Evolve:     return new[] { NoteBehavior.HumanizeTiming };
+                    case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
+                    case MazeArchetype.Release:    return new[] { NoteBehavior.HumanizeTiming };
+                    case MazeArchetype.Wildcard:   return new[] { NoteBehavior.Swingify };
+                    case MazeArchetype.Pop:        return new[] { NoteBehavior.Staccatify };
                     default:                      return new[] { NoteBehavior.None };
                 }
 
@@ -110,7 +110,7 @@ public static class NoteBehaviorPolicy
     }
 
     // Convenience: primary default (first item)
-    public static NoteBehavior GetDefault(MusicalPhase phase, MusicalRole role)
+    public static NoteBehavior GetDefault(MazeArchetype phase, MusicalRole role)
     {
         var list = GetDefaults(phase, role);
         return (list != null && list.Count > 0) ? list[0] : NoteBehavior.None;

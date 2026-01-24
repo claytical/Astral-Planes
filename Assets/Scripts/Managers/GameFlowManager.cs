@@ -36,7 +36,7 @@ public class GameFlowManager : MonoBehaviour
 
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
-    private struct PhaseChordMap { public MusicalPhase phase; public ChordProgressionProfile progression; }
+    private struct PhaseChordMap { public MazeArchetype phase; public ChordProgressionProfile progression; }
 
     private List<PhaseChordMap> chordMaps = new();
 
@@ -213,7 +213,7 @@ public class GameFlowManager : MonoBehaviour
         // No need to call PlayerInput.Instantiate — joining is handled by PlayerInputManager
         Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
     }
-    public void BeginPhaseBridge(MusicalPhase to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
+    public void BeginPhaseBridge(MazeArchetype to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
 {
     Debug.Log($"[BRIDGE] Starting bridge for nextPhase={to.ToString() ?? "<null>"} at t={AudioSettings.dspTime:0.00}");
 
@@ -529,7 +529,7 @@ public class GameFlowManager : MonoBehaviour
         StartCoroutine(HandleTrackSceneSetupAsync());
     }
 
-    private ChordProgressionProfile GetProfileForPhase(MusicalPhase phase)
+    private ChordProgressionProfile GetProfileForPhase(MazeArchetype phase)
     {
         for (int i = 0; i < chordMaps.Count; i++) if (chordMaps[i].phase == phase) return chordMaps[i].progression;
         return null;
@@ -556,7 +556,7 @@ public class GameFlowManager : MonoBehaviour
         return list;
     }
 
-    private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MusicalPhase nextPhase)
+    private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MazeArchetype nextPhase)
 {
     // ===== Lock gameplay & prep =====
     GhostCycleInProgress = true;
@@ -584,7 +584,7 @@ public class GameFlowManager : MonoBehaviour
     // ----------------------------------------------------------------------
     var motifSnapshot = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
     // Preserve semantic phase identity for storage and later browsing.
-    motifSnapshot.Pattern = phaseTransitionManager != null ? phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+    motifSnapshot.Pattern = phaseTransitionManager != null ? phaseTransitionManager.currentPhase : MazeArchetype.Establish;
     // Color is optional; set if you have a motif/phase color source.
     // motifSnapshot.Color = <your phase color>;
     _motifSnapshots.Add(motifSnapshot); 
@@ -752,7 +752,7 @@ public class GameFlowManager : MonoBehaviour
     SetBridgeVisualMode(false);
 }
 
-    private IEnumerator StartNextPhaseMazeAndStar(MusicalPhase nextPhase)
+    private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase)
 {
     var drums = activeDrumTrack;
     var dust  = dustGenerator;
@@ -1077,7 +1077,7 @@ public class GameFlowManager : MonoBehaviour
         // Let NoteVisualizer apply on its next loop boundary; grid is clean.
     }
 }
-    public void StartMazeAndStarForPhase(MusicalPhase phase)
+    public void StartMazeAndStarForPhase(MazeArchetype phase)
     {
         StartCoroutine(StartNextPhaseMazeAndStar(phase));
     }

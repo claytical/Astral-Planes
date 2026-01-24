@@ -190,7 +190,7 @@ public class Vehicle : MonoBehaviour
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
+            : MazeArchetype.Establish;
 
         gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
     }
@@ -212,7 +212,7 @@ public class Vehicle : MonoBehaviour
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
+            : MazeArchetype.Establish;
 
         int ownerId = GetInstanceID();
 
@@ -254,7 +254,7 @@ public class Vehicle : MonoBehaviour
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
+            : MazeArchetype.Establish;
 
         // Compute which cell we're currently in.
         Vector2 pos = (rb != null) ? rb.position : (Vector2)transform.position;
@@ -299,7 +299,7 @@ public class Vehicle : MonoBehaviour
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
+            : MazeArchetype.Establish;
 
         gen.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
     }
@@ -572,7 +572,7 @@ public class Vehicle : MonoBehaviour
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MusicalPhase.Establish;
+            : MazeArchetype.Establish;
 
         int ownerId = GetInstanceID();
 
@@ -686,7 +686,7 @@ public class Vehicle : MonoBehaviour
     // --- Dust weather force-field (terrain maze) ---
     if (gfm != null && gfm.dustGenerator != null)
     {
-        var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+        var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MazeArchetype.Establish;
         _dustDebugCooldown -= Time.fixedDeltaTime;
         bool debugPulse = _dustDebugCooldown <= 0f;
         Vector3 vehicleWorld = rb.position;

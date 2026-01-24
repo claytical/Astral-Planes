@@ -51,7 +51,7 @@ public class WeightedMineNode
     public MinedObjectType minedObjectType = MinedObjectType.NoteSpawner;
     
     public MusicalRole role;                      // optional: used by your NodeFitsTrack policy
-    public List<MusicalPhase> allowedPhases = new List<MusicalPhase>();
+    public List<MazeArchetype> allowedPhases = new List<MazeArchetype>();
 
     [Min(1)] public int weight = 1;
     public int quota = -1;                        // optional future use

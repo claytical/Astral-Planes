@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Motif-scoped NoteSet configuration for a single role.
-/// This replaces the old RolePhaseNoteSetConfig, but does NOT depend on global MusicalPhase.
+/// This replaces the old RolePhaseNoteSetConfig, but does NOT depend on global MazeArchetype.
 /// </summary>
 [CreateAssetMenu(
     fileName = "RoleMotifNoteSetConfig",

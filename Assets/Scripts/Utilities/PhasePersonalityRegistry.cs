@@ -7,13 +7,13 @@ public class PhasePersonalityRegistry : ScriptableObject
     [System.Serializable]
     public struct Entry
     {
-        public MusicalPhase phase;
+        public MazeArchetype phase;
         public PhaseStarBehaviorProfile profile;
     }
 
     public Entry[] entries;
 
-    public PhaseStarBehaviorProfile Get(MusicalPhase phase)
+    public PhaseStarBehaviorProfile Get(MazeArchetype phase)
     {
         if (entries == null) return null;
         for (int i = 0; i < entries.Length; i++)

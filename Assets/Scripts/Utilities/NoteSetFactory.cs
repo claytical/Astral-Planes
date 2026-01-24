@@ -133,7 +133,7 @@ public class NoteSetFactory : MonoBehaviour
         // --- 6) Pick behaviors and construct the NoteSet ---
         var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
             ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
-            : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MusicalPhase.Establish, track.assignedRole));
+            : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MazeArchetype.Establish, track.assignedRole));
 
         var ns = new NoteSet
         {

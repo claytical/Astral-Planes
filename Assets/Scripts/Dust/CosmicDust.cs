@@ -263,12 +263,12 @@ public class CosmicDust : MonoBehaviour {
         if (terrainCollider != null) terrainCollider.enabled = true;
     }
 
-    public void ConfigureForPhase(MusicalPhase phase)
+    public void ConfigureForPhase(MazeArchetype phase)
     {
         // One switch → one config object → one assignment block.
         var cfg = phase switch
         {
-            MusicalPhase.Establish => new PhaseDustConfig(
+            MazeArchetype.Establish => new PhaseDustConfig(
                 scaleMul:   0.25f,
                 drainMul:   0.50f,
                 behavior:   DustBehavior.SiltDissipate,
@@ -278,7 +278,7 @@ public class CosmicDust : MonoBehaviour {
                 turb:       0f
             ),
 
-            MusicalPhase.Evolve => new PhaseDustConfig(
+            MazeArchetype.Evolve => new PhaseDustConfig(
                 scaleMul:   1.00f,
                 drainMul:   1.00f,
                 behavior:   DustBehavior.CrossCurrent,
@@ -288,7 +288,7 @@ public class CosmicDust : MonoBehaviour {
                 turb:       0.25f
             ),
 
-            MusicalPhase.Intensify => new PhaseDustConfig(
+            MazeArchetype.Intensify => new PhaseDustConfig(
                 scaleMul:   1.20f,
                 drainMul:   1.60f,
                 behavior:   DustBehavior.StaticCling,
@@ -298,7 +298,7 @@ public class CosmicDust : MonoBehaviour {
                 turb:       0.4f
             ),
 
-            MusicalPhase.Release => new PhaseDustConfig(
+            MazeArchetype.Release => new PhaseDustConfig(
                 scaleMul:   1.00f,
                 drainMul:   0.90f,
                 behavior:   DustBehavior.SiltDissipate,
@@ -308,7 +308,7 @@ public class CosmicDust : MonoBehaviour {
                 turb:       0f
             ),
 
-            MusicalPhase.Wildcard => new PhaseDustConfig(
+            MazeArchetype.Wildcard => new PhaseDustConfig(
                 scaleMul:   1.10f,
                 drainMul:   1.25f,
                 behavior:   DustBehavior.Turbulent,
@@ -318,7 +318,7 @@ public class CosmicDust : MonoBehaviour {
                 turb:       2.0f
             ),
 
-            MusicalPhase.Pop => new PhaseDustConfig(
+            MazeArchetype.Pop => new PhaseDustConfig(
                 scaleMul:   0.95f,
                 drainMul:   0.75f,
                 behavior:   DustBehavior.ViscousSlow,

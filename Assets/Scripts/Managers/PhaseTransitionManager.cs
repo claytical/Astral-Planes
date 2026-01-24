@@ -2,8 +2,8 @@ using UnityEngine;
 
 public class PhaseTransitionManager : MonoBehaviour
 {
-    public MusicalPhase previousPhase;
-    public MusicalPhase currentPhase;
+    public MazeArchetype previousPhase;
+    public MazeArchetype currentPhase;
     private PhaseStarBehaviorProfile _activeBehaviorProfile;
     public NoteSetFactory noteSetFactory;
     private bool _phaseAdvanceArmed;
@@ -17,9 +17,9 @@ public class PhaseTransitionManager : MonoBehaviour
     // The motif associated with the currentPhase (if any)
     public MotifProfile currentMotif { get; private set; }
 
-    public event System.Action<MusicalPhase, MusicalPhase> OnPhaseChanged;
+    public event System.Action<MazeArchetype, MazeArchetype> OnPhaseChanged;
 
-    public void HandlePhaseTransition(MusicalPhase nextPhase, string who)
+    public void HandlePhaseTransition(MazeArchetype nextPhase, string who)
     {
         var oldPrev = previousPhase;
         var oldCur  = currentPhase;
@@ -114,7 +114,7 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
     }
 }
 
-    private MotifProfile SelectMotifForPhase(MusicalPhase nextPhase)
+    private MotifProfile SelectMotifForPhase(MazeArchetype nextPhase)
     {
         MotifProfile motif = null;
 
@@ -143,7 +143,7 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
         return motif;
     }
 
-    private void HandlePhaseStarSpawned(MusicalPhase phase, PhaseStarBehaviorProfile profile) {
+    private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile) {
 
         // Only update if we're actually changing phases
         if (phase != currentPhase) {

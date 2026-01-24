@@ -6,8 +6,8 @@ public enum HarmonyCommit { AtBridgeStart, MidBridge, AtBridgeEnd }
 [Serializable]
 public class PhaseBridgeSignature
 {
-    public MusicalPhase fromPhase;
-    public MusicalPhase toPhase;
+    public MazeArchetype fromPhase;
+    public MazeArchetype toPhase;
 
     [Header("Who plays")]
     public bool useOnlyPerfectTracks = true;
@@ -40,7 +40,7 @@ public class PhaseBridgeSignature
 
 public static class BridgeLibrary
 {
-    public static PhaseBridgeSignature Default(MusicalPhase from, MusicalPhase to) => new PhaseBridgeSignature {
+    public static PhaseBridgeSignature Default(MazeArchetype from, MazeArchetype to) => new PhaseBridgeSignature {
         fromPhase = from, toPhase = to,
         useOnlyPerfectTracks = true, maxBridgeTracks = 4, includeDrums = true,
         bars = 1, humanizeMs = 8f,
@@ -53,7 +53,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Establish_To_Intensify() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Establish, toPhase = MusicalPhase.Intensify,
+        fromPhase = MazeArchetype.Establish, toPhase = MazeArchetype.Intensify,
         bars = 2, humanizeMs = 6f,
         rhythmOverride = RhythmStyle.Dense,
         noteBehaviorOverride = NoteBehavior.Percussion,
@@ -65,7 +65,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Evolve_To_Intensify() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Evolve, toPhase = MusicalPhase.Intensify,
+        fromPhase = MazeArchetype.Evolve, toPhase = MazeArchetype.Intensify,
         bars = 2, humanizeMs = 10f,
         rhythmOverride = RhythmStyle.Breakbeat,
         noteBehaviorOverride = NoteBehavior.Lead,
@@ -77,7 +77,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Intensify_To_Release() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Intensify, toPhase = MusicalPhase.Release,
+        fromPhase = MazeArchetype.Intensify, toPhase = MazeArchetype.Release,
         bars = 1, humanizeMs = 0f,
         rhythmOverride = RhythmStyle.Sparse,
         noteBehaviorOverride = NoteBehavior.Drone,
@@ -89,7 +89,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Release_To_Wildcard() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Release, toPhase = MusicalPhase.Wildcard,
+        fromPhase = MazeArchetype.Release, toPhase = MazeArchetype.Wildcard,
         bars = 1, humanizeMs = 0f,
         rhythmOverride = RhythmStyle.Triplet,
         noteBehaviorOverride = NoteBehavior.Glitch,
@@ -101,7 +101,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Wildcard_To_Pop() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Wildcard, toPhase = MusicalPhase.Pop,
+        fromPhase = MazeArchetype.Wildcard, toPhase = MazeArchetype.Pop,
         bars = 2, humanizeMs = 8f,
         rhythmOverride = RhythmStyle.Syncopated,
         noteBehaviorOverride = NoteBehavior.Hook,
@@ -113,7 +113,7 @@ public static class BridgeLibrary
     };
 
     public static PhaseBridgeSignature Pop_To_Evolve() => new PhaseBridgeSignature {
-        fromPhase = MusicalPhase.Pop, toPhase = MusicalPhase.Evolve,
+        fromPhase = MazeArchetype.Pop, toPhase = MazeArchetype.Evolve,
         bars = 2, humanizeMs = 12f,
         rhythmOverride = RhythmStyle.Steady,
         noteBehaviorOverride = NoteBehavior.Lead,
@@ -124,14 +124,14 @@ public static class BridgeLibrary
         includeDrums = true, fadeRibbons = true, growCoral = true
     };
 
-    public static PhaseBridgeSignature For(MusicalPhase from, MusicalPhase to)
+    public static PhaseBridgeSignature For(MazeArchetype from, MazeArchetype to)
     {
-        if (from == MusicalPhase.Establish && to == MusicalPhase.Intensify) return Establish_To_Intensify();
-        if (from == MusicalPhase.Evolve     && to == MusicalPhase.Intensify) return Evolve_To_Intensify();
-        if (from == MusicalPhase.Intensify  && to == MusicalPhase.Release)   return Intensify_To_Release();
-        if (from == MusicalPhase.Release    && to == MusicalPhase.Wildcard)  return Release_To_Wildcard();
-        if (from == MusicalPhase.Wildcard   && to == MusicalPhase.Pop)       return Wildcard_To_Pop();
-        if (from == MusicalPhase.Pop        && to == MusicalPhase.Evolve)    return Pop_To_Evolve();
+        if (from == MazeArchetype.Establish && to == MazeArchetype.Intensify) return Establish_To_Intensify();
+        if (from == MazeArchetype.Evolve     && to == MazeArchetype.Intensify) return Evolve_To_Intensify();
+        if (from == MazeArchetype.Intensify  && to == MazeArchetype.Release)   return Intensify_To_Release();
+        if (from == MazeArchetype.Release    && to == MazeArchetype.Wildcard)  return Release_To_Wildcard();
+        if (from == MazeArchetype.Wildcard   && to == MazeArchetype.Pop)       return Wildcard_To_Pop();
+        if (from == MazeArchetype.Pop        && to == MazeArchetype.Evolve)    return Pop_To_Evolve();
         return Default(from, to);
     }
 }

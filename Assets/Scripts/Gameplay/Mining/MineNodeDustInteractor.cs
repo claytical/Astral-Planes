@@ -194,7 +194,7 @@ void FixedUpdate()
         inDust = true;
     }
 
-    MusicalPhase phase = _drumTrack.GetCurrentPhaseSafe();
+    MazeArchetype phase = _drumTrack.GetCurrentPhaseSafe();
 
     float healDelay =
         (_node != null) ? _node.GetCorridorHealDelaySeconds() : -1f;
