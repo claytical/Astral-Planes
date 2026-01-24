@@ -40,9 +40,6 @@ public class GameFlowManager : MonoBehaviour
 
     private List<PhaseChordMap> chordMaps = new();
 
-    [Header("Settings")]
-    public List<MusicalPhaseProfile> phaseProfiles;
-
     public HarmonyDirector harmony;
     public InstrumentTrackController controller;
     //public ChordChangeArpeggiator arp;
@@ -63,7 +60,6 @@ public class GameFlowManager : MonoBehaviour
     private CoralVisualizer _coralInstance;
     private readonly List<PhaseSnapshot> _motifSnapshots = new();
     private GameState currentState = GameState.Begin;
-    private MusicalPhaseProfile _pendingPhaseProfile;  // optional: set when the next star is known
     private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
 
@@ -83,7 +79,6 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private float phaseBridgeFadeInSeconds  = 0.6f;
     private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
     public bool GhostCycleInProgress { get; private set; }
-    public event Action<MusicalPhaseProfile> OnRemixCommitted;
     
     // Bridge suppression: when true, tracks should not spawn collectables during bridge pending/in-progress.
     public static bool ShouldSuppressCollectableSpawns
@@ -1146,7 +1141,6 @@ public class GameFlowManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
-        OnRemixCommitted += _ => harmony?.CommitNextChordNow();
     }
 
     private void Update()

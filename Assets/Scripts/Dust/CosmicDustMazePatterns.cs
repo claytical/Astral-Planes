@@ -14,6 +14,16 @@ using Random = UnityEngine.Random;
 /// This class does NOT know about pooling, regrowth, claims, composite colliders,
 /// or tint systems. Callers may supply predicates to veto cells/world positions.
 /// </summary>
+public enum MazeArchetype
+{
+    Establish = 0,   // early stable loop
+    Evolve = 1,      // moderate complexity
+    Intensify = 2,   // denser and brighter
+    Release = 3,     // breath or breakdown
+    Wildcard = 4,    // glitchy, unpredictable
+    Pop = 5          // catchy hook
+}
+
 public static class CosmicDustMazePatterns
 {
     /// <summary>
