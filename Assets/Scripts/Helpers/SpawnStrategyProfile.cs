@@ -38,22 +38,3 @@ public class SpawnStrategyProfile : ScriptableObject
         return role;
     }
 }
-
-/// <summary>
-/// This class already exists in your project; keeping the same name to avoid asset breakage.
-/// Only change is semantic: when type == NoteSpawner, trackModifierType is ignored.
-/// </summary>
-[Serializable]
-public class WeightedMineNode
-{
-    public string label;
-
-    public MinedObjectType minedObjectType = MinedObjectType.NoteSpawner;
-    
-    public MusicalRole role;                      // optional: used by your NodeFitsTrack policy
-    public List<MazeArchetype> allowedPhases = new List<MazeArchetype>();
-
-    [Min(1)] public int weight = 1;
-    public int quota = -1;                        // optional future use
-    public int rarity = 0;                        // optional future use
-}
