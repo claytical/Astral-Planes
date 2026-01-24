@@ -71,7 +71,7 @@ public class PhaseStar : MonoBehaviour
     private List<float> _petalTargetAngles = new();
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
-    private MusicalPhase _assignedPhase;
+    private MazeArchetype _assignedPhase;
     [SerializeField] private bool _isInFocusMode = false;
     private bool _lockPreviewTintUntilIdle;
     private Color _lockedTint;
@@ -212,7 +212,7 @@ public class PhaseStar : MonoBehaviour
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
         PhaseStarBehaviorProfile profile,
-        MusicalPhase assignedPhase,
+        MazeArchetype assignedPhase,
         MotifProfile motif = null)
     {
 // Safe, null-tolerant log:
@@ -921,7 +921,7 @@ public class PhaseStar : MonoBehaviour
 
     private int _plannedShardCount = 0;
 
-    private void BuildPhasePlan(MusicalPhase phase, int shardCount)
+    private void BuildPhasePlan(MazeArchetype phase, int shardCount)
     {
         _phasePlanRoles = new List<MusicalRole>();
         if (!spawnStrategyProfile) return;
@@ -1627,7 +1627,7 @@ private void PrepareNextDirective()
     /// <summary>
     /// True if worldPos is inside any active PhaseStar safety bubble (Chebyshev radius in grid cells).
     /// </summary>
-    public static bool IsWorldPosInsideAnySafetyBubble(Vector2 worldPos, MusicalPhase phase)
+    public static bool IsWorldPosInsideAnySafetyBubble(Vector2 worldPos, MazeArchetype phase)
     {
         // Legacy compatibility shim: we now use a single static world-radius bubble.
         return IsPointInsideSafetyBubble(worldPos);

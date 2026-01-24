@@ -8,7 +8,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private float _timer;
     private PhaseStarBehaviorProfile _profile;
-    private MusicalPhase _lastPhase; // fallback for clearing
+    private MazeArchetype _lastPhase; // fallback for clearing
     private bool _hasLastPhase;
 
     private void Update()
@@ -39,7 +39,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         gen.SetStarKeepClearWorld(
             (Vector2)transform.position,
             radiusWorld,
-            _hasLastPhase ? _lastPhase : MusicalPhase.Establish
+            _hasLastPhase ? _lastPhase : MazeArchetype.Establish
         );
         
     }
@@ -64,7 +64,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             if (gen == null) return;
 
             // Release the keep-clear pocket so those cells can regrow normally.
-            gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MusicalPhase.Establish);
+            gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Establish);
         };
     }
 }

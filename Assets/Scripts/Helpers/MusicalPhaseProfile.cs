@@ -15,20 +15,20 @@ public class RoleStrategy
     public MusicalRole role;
     public PatternStrategy strategy;
 }
-public enum MusicalPhase
+public enum MazeArchetype
 {
-    Establish,   // early stable loop
-    Evolve,      // moderate complexity
-    Intensify,   // denser and brighter
-    Release,     // breath or breakdown
-    Wildcard,    // glitchy, unpredictable
-    Pop          // catchy hook
+    Establish = 0,   // early stable loop
+    Evolve = 1,      // moderate complexity
+    Intensify = 2,   // denser and brighter
+    Release = 3,     // breath or breakdown
+    Wildcard = 4,    // glitchy, unpredictable
+    Pop = 5          // catchy hook
 }
 
 [CreateAssetMenu(menuName = "Astral Planes/Musical Phase Profile")]
 public class MusicalPhaseProfile : ScriptableObject
 {
-    public MusicalPhase phase;
+    public MazeArchetype phase;
     
     [Header("Labels")]
     public string shortLabel;
@@ -50,8 +50,8 @@ public class MusicalPhaseProfile : ScriptableObject
 }
 [Serializable]
 public class BridgeSignature {
-    public MusicalPhase fromPhase;
-    public MusicalPhase toPhase;
+    public MazeArchetype fromPhase;
+    public MazeArchetype toPhase;
 
     // who plays the bridge
     public bool useOnlyPerfectTracks = true;     // perfect tracks only

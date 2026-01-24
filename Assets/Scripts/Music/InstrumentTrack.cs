@@ -1905,7 +1905,7 @@ public void SpawnCollectableBurst(
             float radiusWorld = cellWorld * 0.15f;
 
             var gfm = GameFlowManager.Instance;
-            MusicalPhase phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
+            MazeArchetype phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
                 : drumTrack.GetCurrentPhaseSafe();
 

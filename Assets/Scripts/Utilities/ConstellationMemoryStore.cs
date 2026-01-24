@@ -34,7 +34,7 @@ public static class ConstellationMemoryStore
     {
         return session.snapshots.Select(s => new PhaseSnapshot
         {
-            Pattern = Enum.TryParse<MusicalPhase>(s.pattern, out var parsedPhase) ? parsedPhase : MusicalPhase.Establish,
+            Pattern = Enum.TryParse<MazeArchetype>(s.pattern, out var parsedPhase) ? parsedPhase : MazeArchetype.Establish,
             Color = s.color,
             Timestamp = s.timestamp,
             CollectedNotes = s.collectedNotes.Select(n => new PhaseSnapshot.NoteEntry(

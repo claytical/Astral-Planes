@@ -154,9 +154,9 @@ public class Collectable : MonoBehaviour
             // Carving makes it "not dust" — but we still need to keep the pocket held open.
             float hold = Mathf.Max(dustPocketTickSeconds * 2f, dustPocketHoldSeconds);
 
-            MusicalPhase phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
+            MazeArchetype phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
-                : MusicalPhase.Establish;
+                : MazeArchetype.Establish;
             dustGen.ClaimTemporaryDiskForCollectable(
                 cur,
                 dustPocketRadiusWorld,

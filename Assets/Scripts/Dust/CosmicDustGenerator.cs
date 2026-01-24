@@ -86,8 +86,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private Dictionary<Vector2Int, GameObject> _hexMap = new(); // Position → Hex
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
-    // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MusicalPhase).
-    private readonly Dictionary<MusicalPhase, float> _regrowDelayMulByPhase = new();
+    // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
+    private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
     [Header("Tint Blending (Neighborhood)")]
     [Tooltip("When MineNodes imprint dust colors, blend the imprint toward nearby cell tints to avoid sharp grid seams.")]
@@ -111,7 +111,7 @@ public class CosmicDustGenerator : MonoBehaviour
     [Range(0f, 0.05f)] [SerializeField] private float tintDiffusionMinDelta = 0.0025f;
     [Tooltip("How far out to mark cells dirty when a tint-affecting event occurs (imprint, regrow, removal).")]
     [Range(0, 3)] [SerializeField] private int tintDirtyMarkRadius = 1;
-    private float GetRegrowDelayMul(MusicalPhase phase)
+    private float GetRegrowDelayMul(MazeArchetype phase)
         => _regrowDelayMulByPhase.TryGetValue(phase, out var m) ? m : 1f;
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
@@ -120,7 +120,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private float _commitCooldownUntil, _epochStartTime;
     private int _currentEpoch = 0, _nextFeatureId = 1, _progressiveLoop = 0;
     double _lastClassicCycleDSP; 
-    private MusicalPhase _progressivePhase = MusicalPhase.Establish;
+    private MazeArchetype _progressivePhase = MazeArchetype.Establish;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
     private int _mazeBuildId = 0;
@@ -331,7 +331,7 @@ public void SetVehicleKeepClear(
     int ownerId,
     Vector2Int centerCell,
     int radiusCells,
-    MusicalPhase phase,
+    MazeArchetype phase,
     bool forceRemoveExisting,
     float forceRemoveFadeSeconds = 0.20f)
 {
@@ -396,7 +396,7 @@ public void SetVehicleKeepClear(
     }
 }
 
-public void ReleaseStarKeepClear(MusicalPhase phase)
+public void ReleaseStarKeepClear(MazeArchetype phase)
 {
     _tmpReleased.Clear();
     _exclusions.ClearStarPocket(_tmpReleased);
@@ -410,7 +410,7 @@ public void ReleaseStarKeepClear(MusicalPhase phase)
 }
 
 
-public void ReleaseVehicleKeepClear(int ownerId, MusicalPhase phase = MusicalPhase.Establish)
+public void ReleaseVehicleKeepClear(int ownerId, MazeArchetype phase = MazeArchetype.Establish)
 {
     _tmpReleased.Clear();
     _exclusions.ReleaseVehicleFootprint(ownerId, _tmpReleased);
@@ -678,7 +678,7 @@ private void ScheduleCompositeRebuild()
     }
 
     public IEnumerator GenerateMazeForPhaseWithPaths(
-        MusicalPhase phase,
+        MazeArchetype phase,
         Vector2Int starCell,
         IReadOnlyList<Vector2Int> vehicleCells,
         float totalSpawnDuration = 1.0f)
@@ -1029,7 +1029,7 @@ private void ScheduleCompositeRebuild()
         Vector2Int cell = drums.WorldToGridPosition(worldPos);
         return HasDustAt(cell) ? 1f : 0f;
     }
-    public void SetStarKeepClearWorld(Vector2 centerWorld, float radiusWorld, MusicalPhase phase)
+    public void SetStarKeepClearWorld(Vector2 centerWorld, float radiusWorld, MazeArchetype phase)
     {
         if (drums == null) return;
 
@@ -1046,7 +1046,7 @@ private void ScheduleCompositeRebuild()
     /// </summary>
     private void RequestRegrowCellAt(
         Vector2Int gridPos,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float delaySeconds = -1f,
         bool refreshIfPending = false,
         bool clearImprintOnRefresh = false)
@@ -1075,12 +1075,12 @@ private void ScheduleCompositeRebuild()
         // Compute delay (phase default unless explicitly overridden).
         float delay = delaySeconds >= 0f ? delaySeconds : phase switch
         {
-            MusicalPhase.Establish  => 16f,
-            MusicalPhase.Evolve     => 12f,
-            MusicalPhase.Intensify  => 8f,
-            MusicalPhase.Release    => 32f,
-            MusicalPhase.Wildcard   => 16f,
-            MusicalPhase.Pop        => 24f,
+            MazeArchetype.Establish  => 16f,
+            MazeArchetype.Evolve     => 12f,
+            MazeArchetype.Intensify  => 8f,
+            MazeArchetype.Release    => 32f,
+            MazeArchetype.Wildcard   => 16f,
+            MazeArchetype.Pop        => 24f,
             _ => 32f
         };
 
@@ -1097,7 +1097,7 @@ private bool IsInBounds(Vector2Int gp) {
     if (w <= 0 || h <= 0) return false; 
     return gp.x >= 0 && gp.y >= 0 && gp.x < w && gp.y < h;
 }
-    public void ReleaseCollectableHoldAt(Vector2Int gridPos, MusicalPhase phase, float regrowDelaySeconds = 0.15f)
+    public void ReleaseCollectableHoldAt(Vector2Int gridPos, MazeArchetype phase, float regrowDelaySeconds = 0.15f)
     {
         if (_collectableHoldUntil.ContainsKey(gridPos))
             _collectableHoldUntil.Remove(gridPos);
@@ -1114,7 +1114,7 @@ private bool IsInBounds(Vector2Int gp) {
     public void ClaimTemporaryDiskForCollectable(
         Vector3 centerWorld,
         float radiusWorld,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float holdSeconds,
         int ownerId,
         int priority = 50)
@@ -1160,7 +1160,7 @@ private bool IsInBounds(Vector2Int gp) {
     public void CarveTemporaryDiskFromCollectable(
         Vector3 centerWorld,
         float radiusWorld,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float holdSeconds)
     {
         if (drums == null) return;
@@ -1217,7 +1217,7 @@ private bool IsInBounds(Vector2Int gp) {
     /// Cells leaving the pocket are scheduled to regrow in-place.
    
    
-    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, MusicalPhase phase, bool forceRemoveExisting)
+    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, MazeArchetype phase, bool forceRemoveExisting)
     {
         if (drums == null) return;
 
@@ -1259,7 +1259,7 @@ private bool IsInBounds(Vector2Int gp) {
         }
     }
 
-    public void ClearStarKeepClear(MusicalPhase phase)
+    public void ClearStarKeepClear(MazeArchetype phase)
     {
         _exclusions.ClearStarPocket(_tmpReleased);
         for (int i = 0; i < _tmpReleased.Count; i++)
@@ -1501,13 +1501,13 @@ private bool IsInBounds(Vector2Int gp) {
     }
     
 
-    public void RegrowPreviousCorridorOnNewNodeSpawn(MusicalPhase phase)
+    public void RegrowPreviousCorridorOnNewNodeSpawn(MazeArchetype phase)
     {
         if (_pendingCorridorRegrowth.Count == 0) return;
         var path = _pendingCorridorRegrowth.Dequeue();
         BeginCorridorRegrowthReverse(path, phase);
     }
-    private void BeginCorridorRegrowthReverse(List<Vector2Int> carvedPath, MusicalPhase phase)
+    private void BeginCorridorRegrowthReverse(List<Vector2Int> carvedPath, MazeArchetype phase)
     {
         if (carvedPath == null || carvedPath.Count == 0) return;
         
@@ -1622,14 +1622,14 @@ private bool IsInBounds(Vector2Int gp) {
         Debug.Log($"[DUST-AUDIT] totalUnderGenerator={all.Length} tracked={tracked} orphan={orphan} hexMapCount={_hexMap.Count}");
     }
     
-    private Vector2 ComputePhaseBias(MusicalPhase phase)
+    private Vector2 ComputePhaseBias(MazeArchetype phase)
     {
         Vector2 bias =
-            phase == MusicalPhase.Establish  ? new Vector2( 0f, -1f) :
-            phase == MusicalPhase.Evolve     ? new Vector2( 0.6f, 0f) :
-            phase == MusicalPhase.Intensify  ? new Vector2( 0f,  1f) :
-            phase == MusicalPhase.Release    ? new Vector2(-0.6f, 0f) :
-            phase == MusicalPhase.Wildcard  ? Random.insideUnitCircle.normalized :
+            phase == MazeArchetype.Establish  ? new Vector2( 0f, -1f) :
+            phase == MazeArchetype.Evolve     ? new Vector2( 0.6f, 0f) :
+            phase == MazeArchetype.Intensify  ? new Vector2( 0f,  1f) :
+            phase == MazeArchetype.Release    ? new Vector2(-0.6f, 0f) :
+            phase == MazeArchetype.Wildcard  ? Random.insideUnitCircle.normalized :
             /* Pop */                          new Vector2( 0f, -0.4f);
         return bias.normalized * phaseFlowBias;
     }
@@ -1684,33 +1684,33 @@ private struct DustWeatherParams
     public float drainPerSecond;
 }
 
-private DustWeatherParams GetDustWeatherParams(MusicalPhase phase)
+private DustWeatherParams GetDustWeatherParams(MazeArchetype phase)
 {
     // These are intentionally simple, phase-level defaults. Later, MineNode regrowth
     // can override at a per-cell granularity (instrument role weather).
     return phase switch
     {
-        MusicalPhase.Establish => new DustWeatherParams
+        MazeArchetype.Establish => new DustWeatherParams
         {
             repelMul = 1.0f, tangentialMul = 0.25f, flowMul = 0.35f, turbulenceMul = 0.05f, drainPerSecond = 0.015f
         },
-        MusicalPhase.Evolve => new DustWeatherParams
+        MazeArchetype.Evolve => new DustWeatherParams
         {
             repelMul = 0.95f, tangentialMul = 0.65f, flowMul = 0.45f, turbulenceMul = 0.20f, drainPerSecond = 0.022f
         },
-        MusicalPhase.Intensify => new DustWeatherParams
+        MazeArchetype.Intensify => new DustWeatherParams
         {
             repelMul = 1.35f, tangentialMul = 0.20f, flowMul = 0.25f, turbulenceMul = 0.45f, drainPerSecond = 0.040f
         },
-        MusicalPhase.Release => new DustWeatherParams
+        MazeArchetype.Release => new DustWeatherParams
         {
             repelMul = 0.85f, tangentialMul = 0.15f, flowMul = 0.25f, turbulenceMul = 0.05f, drainPerSecond = 0.018f
         },
-        MusicalPhase.Wildcard => new DustWeatherParams
+        MazeArchetype.Wildcard => new DustWeatherParams
         {
             repelMul = 1.05f, tangentialMul = 0.55f, flowMul = 0.55f, turbulenceMul = 0.90f, drainPerSecond = 0.030f
         },
-        MusicalPhase.Pop => new DustWeatherParams
+        MazeArchetype.Pop => new DustWeatherParams
         {
             repelMul = 1.10f, tangentialMul = 0.20f, flowMul = 0.15f, turbulenceMul = 0.25f, drainPerSecond = 0.016f
         },
@@ -1727,7 +1727,7 @@ private DustWeatherParams GetDustWeatherParams(MusicalPhase phase)
 /// </summary>
 public bool TryGetDustWeatherForce(
     Vector3 vehicleWorld,
-    MusicalPhase phase,
+    MazeArchetype phase,
     out Vector2 force,
     out float influence01,
     out float drainPerSecond)
@@ -1950,29 +1950,29 @@ public bool TryGetDustWeatherForce(
 
     public List<(Vector2Int, Vector3)> CalculateMazeGrowth(
         Vector2Int center,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float hollowRadius = 0f,
         bool avoidStarHole = false)
     {
         List<(Vector2Int, Vector3)> raw;
 
         switch (phase) {
-            case MusicalPhase.Establish:
+            case MazeArchetype.Establish:
                 raw = Build_CA(center, hollowRadius, avoidStarHole);
                 break;
-            case MusicalPhase.Evolve:
+            case MazeArchetype.Evolve:
                 raw = CalculateCarvedMazeWalls(onScreenOnly: true, braidChance: 0.22f, corridorThickness: 1);
                 break;
-            case MusicalPhase.Intensify:
+            case MazeArchetype.Intensify:
                 raw = Build_RingChokepoints(center, ringSpacing: 3, ringThickness: 1, jitter: 0.25f, hollowRadius, avoidStarHole);
                 break;
-            case MusicalPhase.Wildcard:
+            case MazeArchetype.Wildcard:
                 raw = Build_DrunkenStrokes(strokes: 6, maxLen: 14, stepJitter: 0.35f, dilate: 0.35f);
                 break;
-            case MusicalPhase.Release:
+            case MazeArchetype.Release:
                 raw = CalculateCarvedMazeWalls(onScreenOnly: true, braidChance: 0.60f, corridorThickness: 2);
                 break;
-            case MusicalPhase.Pop:
+            case MazeArchetype.Pop:
                 raw = Build_PopDots(step: 3, phaseOffset: 0); // or whatever you currently do
                 break;
             default:
@@ -2089,7 +2089,7 @@ public bool TryGetDustWeatherForce(
             drums.SyncTileWithScreen();
             float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
 
-            MusicalPhase phaseNow = GetCurrentPhaseSafe();
+            MazeArchetype phaseNow = GetCurrentPhaseSafe();
 
             float lastPacedAt = Time.realtimeSinceStartup;
             int i = 0;
@@ -2381,10 +2381,10 @@ public bool TryGetDustWeatherForce(
         foreach (var v in set) return v;             // returns the first enumerated element
         return new Vector2Int(-1, -1);
     } 
-    private MusicalPhase GetCurrentPhaseSafe()
+    private MazeArchetype GetCurrentPhaseSafe()
     {
         TryEnsureRefs();
-        return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MusicalPhase.Establish;
+        return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MazeArchetype.Establish;
     }  
     public void DespawnDustAt(Vector2Int gridPos)
     {
@@ -2435,7 +2435,7 @@ public bool TryGetDustWeatherForce(
     
 public int CarveTemporaryCellFromMineNode(
     Vector3 centerWorld,
-    MusicalPhase phase,
+    MazeArchetype phase,
     float regrowDelaySeconds,
     Color imprintColor,
     Color imprintShadowColor,
@@ -2506,7 +2506,7 @@ public int CarveTemporaryCellFromMineNode(
 
     public void CarveTemporaryCellFromVehicle(
         Vector3 worldPos,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float healDelaySeconds,
         int resolveRadiusCells = 0)
     {
@@ -2546,15 +2546,15 @@ public int CarveTemporaryCellFromMineNode(
         );
     }
 
-    private float GetFillProbability(MusicalPhase phase)
+    private float GetFillProbability(MazeArchetype phase)
     {
         return phase switch
         {
-            MusicalPhase.Establish => 0.90f,
-            MusicalPhase.Evolve => 0.30f,
-            MusicalPhase.Intensify => 0.45f,
-            MusicalPhase.Release => 0.15f,
-            MusicalPhase.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
+            MazeArchetype.Establish => 0.90f,
+            MazeArchetype.Evolve => 0.30f,
+            MazeArchetype.Intensify => 0.45f,
+            MazeArchetype.Release => 0.15f,
+            MazeArchetype.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
             _ => 0.35f
         };
     }
@@ -2564,7 +2564,7 @@ public int CarveTemporaryCellFromMineNode(
         _fillMap.Clear();
 
         Vector3 centerWorld = drums.GridToWorldPosition(center);
-        float fillChance = GetFillProbability(MusicalPhase.Establish);
+        float fillChance = GetFillProbability(MazeArchetype.Establish);
         int W = drums.GetSpawnGridWidth();
         int H = drums.GetSpawnGridHeight();
 

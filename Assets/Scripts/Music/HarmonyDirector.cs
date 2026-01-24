@@ -102,7 +102,7 @@ void OnDestroy()
         ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
 }
 
-private void HandlePhaseChangedBridgeAware(MusicalPhase from, MusicalPhase to)
+private void HandlePhaseChangedBridgeAware(MazeArchetype from, MazeArchetype to)
 {
     // 1) If enabled, stage the motif's chord progression as the next profile.
     MotifProfile motif = null;

@@ -598,7 +598,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         player.MPTK_Volume = 0f;
     }
-    public void ApplyPhaseSeedOutcome(MusicalPhase nextPhase, List<InstrumentTrack> seeds)
+    public void ApplyPhaseSeedOutcome(MazeArchetype nextPhase, List<InstrumentTrack> seeds)
     {
         var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
         foreach (var t in tracks)
@@ -758,13 +758,13 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
     // NoteVisualizer can read t.IsMuted to dim rows, if you want.
 }
-    public void RemixAllTracksForBridge(MusicalPhase phase, PhaseBridgeSignature sig)
+    public void RemixAllTracksForBridge(MazeArchetype phase, PhaseBridgeSignature sig)
 {
     if (tracks == null) return;
     foreach (var t in tracks)
         RemixTrackForBridge(t, phase, sig);
 }
-    private void RemixTrackForBridge(InstrumentTrack track, MusicalPhase phase, PhaseBridgeSignature sig)
+    private void RemixTrackForBridge(InstrumentTrack track, MazeArchetype phase, PhaseBridgeSignature sig)
 {
     if (track == null) return;
 
@@ -807,7 +807,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     // Atomic swap: no blast visuals, no collapse-to-x1
     track.SoftReplaceLoop(fresh);
 }
-    private void RemixSeedForPhase(InstrumentTrack t, MusicalPhase phase) {
+    private void RemixSeedForPhase(InstrumentTrack t, MazeArchetype phase) {
 
     // Nudge its pattern/behavior so the new phase has a recognizable seed
     var ns = t.GetActiveNoteSet();
@@ -819,7 +819,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         // Optional: quick spice if you’re re-integrating “remix boost”
         // ns.RandomizeArpOrder();
-        // ns.ShiftOctave(phase == MusicalPhase.Intensify ? +1 : 0);
+        // ns.ShiftOctave(phase == MazeArchetype.Intensify ? +1 : 0);
     }
 
     // Also clear old collectables to avoid stale rot on seeds
@@ -833,24 +833,24 @@ public int GetBinForNextSpawn(InstrumentTrack track)
         }
     }
 }
-    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MusicalPhase phase, MusicalRole role) {
+    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MazeArchetype phase, MusicalRole role) {
     switch (phase)
     {
-        case MusicalPhase.Intensify:
+        case MazeArchetype.Intensify:
             return role == MusicalRole.Groove
                 ? (NoteBehavior.Percussion, RhythmStyle.Dense)
                 : (NoteBehavior.Lead, RhythmStyle.Syncopated);
 
-        case MusicalPhase.Release:
+        case MazeArchetype.Release:
             return (NoteBehavior.Drone, RhythmStyle.Sparse);
 
-        case MusicalPhase.Evolve:
+        case MazeArchetype.Evolve:
             return (NoteBehavior.Lead, RhythmStyle.Steady);
 
-        case MusicalPhase.Wildcard:
+        case MazeArchetype.Wildcard:
             return (NoteBehavior.Glitch, RhythmStyle.Triplet);
 
-        case MusicalPhase.Pop:
+        case MazeArchetype.Pop:
             return (NoteBehavior.Harmony, RhythmStyle.Steady);
 
         default: // Establish

@@ -118,9 +118,9 @@ public class LocalPlayer : MonoBehaviour
             _dustKeepClearCell = spawnCell;
 
             // Determine phase for regrowth scheduling (keep-clear itself blocks regrow).
-            MusicalPhase phaseNow = (gfm.phaseTransitionManager != null)
+            MazeArchetype phaseNow = (gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
-                : MusicalPhase.Establish;
+                : MazeArchetype.Establish;
 
             gfm.dustGenerator.SetVehicleKeepClear(
                 ownerId: _dustKeepClearOwnerId,
@@ -378,7 +378,7 @@ public class LocalPlayer : MonoBehaviour
         if (GameFlowManager.Instance.ReadyToPlay() && GameFlowManager.Instance.CurrentState == GameState.Playing)
         {
             var drumTrack = FindAnyObjectByType<DrumTrack>();
-            if (drumTrack != null && GameFlowManager.Instance.phaseTransitionManager.currentPhase == MusicalPhase.Wildcard)
+            if (drumTrack != null && GameFlowManager.Instance.phaseTransitionManager.currentPhase == MazeArchetype.Wildcard)
             {
                 GameFlowManager.Instance.glitch.ToggleEffect(index);
             }

@@ -36,7 +36,7 @@ public class MineNodeCharacterVis : MonoBehaviour
     float wobblePhase;
     float wobbleHz;
 
-    public void Configure(MusicalRole role, MusicalPhase phase)
+    public void Configure(MusicalRole role, MazeArchetype phase)
     {
         // Base per-role personality
         float baseFaceTurn = 0f, baseWobHz = 0f, baseWobDeg = 0f, baseThinkSpin = 0f;
@@ -61,12 +61,12 @@ public class MineNodeCharacterVis : MonoBehaviour
         // Phase modifiers
         float phaseSpeedMul = phase switch
         {
-            MusicalPhase.Establish => 0.85f,
-            MusicalPhase.Evolve    => 1.00f,
-            MusicalPhase.Intensify => 1.20f,
-            MusicalPhase.Release   => 0.85f,
-            MusicalPhase.Wildcard  => 1.30f,
-            MusicalPhase.Pop       => 1.05f,
+            MazeArchetype.Establish => 0.85f,
+            MazeArchetype.Evolve    => 1.00f,
+            MazeArchetype.Intensify => 1.20f,
+            MazeArchetype.Release   => 0.85f,
+            MazeArchetype.Wildcard  => 1.30f,
+            MazeArchetype.Pop       => 1.05f,
             _ => 1f
         };
 

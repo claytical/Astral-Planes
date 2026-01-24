@@ -6,7 +6,7 @@ using Random = UnityEngine.Random;
 
 public class PhaseSnapshot
 {
-    public MusicalPhase Pattern;
+    public MazeArchetype Pattern;
     public Color Color;
     public List<NoteEntry> CollectedNotes = new();
     public Dictionary<MusicalRole, float> TrackScores = new();
@@ -116,7 +116,7 @@ public class DrumTrack : MonoBehaviour
     private bool _pendingClipArmed;
 
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
-    public event System.Action<MusicalPhase, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
+    public event System.Action<MazeArchetype, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int,int> OnBinChanged; // (idx, binCount)
     public event System.Action<int,int> OnStepChanged;     // (stepIndex, leaderSteps)
     public event System.Action<int,int> OnStepPulseN;      // (stepIndex, n)
@@ -664,7 +664,7 @@ public void ManualStart()
     }
 
     // Establish is the first phase; force motif selection.
-    var boot = MusicalPhase.Establish;
+    var boot = MazeArchetype.Establish;
 
     if (_phaseTransitionManager != null)
     {
@@ -803,7 +803,7 @@ public void ManualStart()
     {
         if (_dust == null) return;
 
-        MusicalPhase phase = GetCurrentPhaseSafe();
+        MazeArchetype phase = GetCurrentPhaseSafe();
 
         _dust.CarveTemporaryCellFromVehicle(
             worldPos,
@@ -814,7 +814,7 @@ public void ManualStart()
     }
     
 
-    public void RequestPhaseStar(MusicalPhase phase, Vector2Int? cellHint = null)
+    public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     {
         if (isPhaseStarActive)
         {
@@ -904,7 +904,7 @@ public void ManualStart()
 
     public int CarveTemporaryCellFromMineNode(
         Vector3 worldPos,
-        MusicalPhase phase,
+        MazeArchetype phase,
         float healDelaySeconds,
         Color imprintColor,
         Color imprintShadowColor,
@@ -966,11 +966,11 @@ public void ManualStart()
         activeMineNodes.Remove(obj);
     }
 
-    public MusicalPhase GetCurrentPhaseSafe()
+    public MazeArchetype GetCurrentPhaseSafe()
     {
         // DrumTrack is level authority; phaseTransitionManager is already cached here.
         if (_phaseTransitionManager != null) return _phaseTransitionManager.currentPhase;
-        return MusicalPhase.Establish;
+        return MazeArchetype.Establish;
     }
     
     private void ValidateSpawnGrid()
