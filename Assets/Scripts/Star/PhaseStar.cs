@@ -1407,7 +1407,6 @@ private void PrepareNextDirective()
         Vector2Int cell = _drum.GetRandomAvailableCell(); // ✅ DrumTrack wrapper
         if (cell.x < 0) return null;
         _drum.OccupySpawnCell(cell.x, cell.y, GridObjectType.Node);
-        var worldPos = _drum.GridToWorldPosition(cell);
         var go = Instantiate(_drum.mineNodePrefab, spawnFrom, Quaternion.identity);
         var node = go.GetComponent<MineNode>();
         if (!node)
@@ -1425,11 +1424,15 @@ private void PrepareNextDirective()
         {
             rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
         }
-
-        node.Initialize(track, color, cell); // MineNode will spawn payload and register with DrumTrack, etc.
+        int entropy = CurrentEntropyForSelection();
+        var noteSet = GameFlowManager.Instance != null ? GameFlowManager.Instance.GenerateNotes(track, entropy) : null;
+        node.Initialize(track, noteSet, color, cell);        
         return node;
     }
-
+    private int CurrentEntropyForSelection() {
+        // Minimal: shard selection index. Replace with per-role toggles later if desired.
+        return currentShardIndex;
+    }
     private IEnumerator CompleteAndAdvanceAsync()
     {
         Trace("Bridge: enter");

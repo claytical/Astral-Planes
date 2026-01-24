@@ -18,7 +18,7 @@ public class MineNode : MonoBehaviour
 // Cached authored steps for O(1) membership tests
     private HashSet<int> _turnStepSet;
     private NoteSet _cachedTurnSetSource;
-
+    public NoteSet NoteSet => _noteSet;
 // Stuck breaker state
     private float _nextEscapeAllowedTime = 0f;
     private Vector2 _lastPosForStall;
@@ -316,58 +316,41 @@ public class MineNode : MonoBehaviour
         // high note -> soft / fast-healing
         return Mathf.Clamp01(1f - _lastNote01);
     }
- 
-    public void Initialize(InstrumentTrack track, Color tint, Vector2Int spawnCell)
-    {
-        _track = track;
-        _spawnCell = spawnCell;
-        _role          = track != null ? track.assignedRole : default;
-        _noteSet = (track != null) ? GameFlowManager.Instance.GenerateNotes(track) : null;
-        _lockedColor   = tint;
-        // DrumTrack authority: from assigned track, not from minedObject
+    public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
+        _track = track; 
+        _spawnCell = spawnCell; 
+        _role = track != null ? track.assignedRole : default; 
+        _noteSet = noteSet; 
+        _lockedColor = tint; 
         _drumTrack = (track != null) ? track.drumTrack : null;
-        if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f)
-        {
-            _desiredHeading = _rb.linearVelocity.normalized;
-            _smoothedHeading = _desiredHeading;
-        }
-        else
-        {
-            _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized;
-            _smoothedHeading = _desiredHeading;
-        }
-
-        // NoteSet authority: MineNode owns it (or you can store it on track, but currently you’re generating here)
         
-        float a = UnityEngine.Random.Range(0f, 360f);
-        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
+        if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f) {
+            _desiredHeading = _rb.linearVelocity.normalized; 
+            _smoothedHeading = _desiredHeading;
+        }
+        else {
+            _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized; 
+            _smoothedHeading = _desiredHeading;
+        }
+        
+        float a = UnityEngine.Random.Range(0f, 360f); 
+        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized; 
         _lastProcessedStep = -1;
-
-        if (_drumTrack != null)
-        {
-           _drumTrack.RegisterMineNode(this);
+        if (_drumTrack != null) { 
+            _drumTrack.RegisterMineNode(this); 
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
         }
-
-        var dust = GetComponent<MineNodeDustInteractor>();
-        if (dust != null)
-        {
-            dust.SetLevelAuthority(_drumTrack);
-        }
-        _carvedPath.Clear();
+        
+        var dust = GetComponent<MineNodeDustInteractor>(); 
+        if (dust != null) dust.SetLevelAuthority(_drumTrack); 
+        _carvedPath.Clear(); 
         if (track != null) ConfigureFromRole(track.assignedRole);
-
-        // Visuals
-        if (coreSprite != null)
-        {
-            // Prefer locked tint if you are feeding it from preview shard selection.
-            tint.a = 1;
+        if (coreSprite != null) {
+            tint.a = 1; 
             coreSprite.color = tint;
-            
         }
-        // call both from Initialize after rb/drumTrack are ready:
-        CacheAuthoredStepsFromNoteSet();
-        SeedInitialHeadingFromVelocity();
+        CacheAuthoredStepsFromNoteSet(); 
+        SeedInitialHeadingFromVelocity(); 
     }
 
     private void HandleLoopBoundary()

@@ -1,5 +1,41 @@
+using System;
 using System.Collections.Generic;
+public enum NoteBehavior
+{
+    // Canonical, transformation-style behaviors
+    None = 0,
+    RootShift,
+    ChordChange,
+    InvertVoicing,
+    RegisterExpand,
+    RegisterCompress,
+    AddNeighborOrnament,
+    AddPassingTones,
+    HumanizeTiming,
+    Staccatify,
+    Legatify,
+    VelocityShape,
+    Swingify,
+    DensityPulse, // accent cycles (e.g., 2/3 over 4)
 
+    // ---- Legacy aliases (compile-safe) ----
+    // These used to be treated like styles/roles. Keep them to un-break references,
+    // but we'll *map* them to the canonical behaviors at runtime.
+    [Obsolete("Alias: maps to Legatify + VelocityShape(-)")] Drone,
+    [Obsolete("Alias: maps to Staccatify + VelocityShape(+)")] Lead,
+    [Obsolete("Alias: maps to Staccatify + HumanizeTiming")] Percussion,
+    [Obsolete("Alias: maps to HumanizeTiming + Swingify or jitter")] Glitch,
+    [Obsolete("Alias: maps to Legatify (mild)")] Harmony,
+    [Obsolete("Alias: maps to Legatify")] Sustain,
+    [Obsolete("Alias: maps to VelocityShape + Ostinato-like accents")] Hook,
+    [Obsolete("Alias: maps to Staccatify + VelocityShape(+)")] Bass
+}
+public enum PatternStrategy {
+    Arpeggiated, ArpUp, ArpDown, ArpPingPong,
+    StaticRoot, FifthJump, WalkingBass, ScaleWalk,
+    MelodicPhrase, NeighborOrnament, Ostinato, CallAndResponse,
+    ChordalStab, Drone, PercussiveLoop, SyncopatedHook, HemiolaFigure, Randomized
+}
 public static class NoteBehaviorPolicy
 {
     public static IReadOnlyList<NoteBehavior> MapLegacy(NoteBehavior legacy)
