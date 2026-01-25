@@ -8,14 +8,6 @@ public class CollectableParticles : MonoBehaviour
     private NoteTether _tetherRef;
     [SerializeField] private float pullStrength = 0.7f;  // force toward tether
     [SerializeField] private float baseUpSpeed  = 0.35f; // fountain upward component
-    public void EmitZap()
-    {
-        if (particleSystem == null) return;
-
-        var burst = new ParticleSystem.Burst(0f, 8); // 8 sparks immediately
-        _emission.SetBursts(new[] { burst });
-        particleSystem.Play();
-    }
 
     void Awake()
     {
@@ -112,16 +104,16 @@ public class CollectableParticles : MonoBehaviour
     // Upward cone with a narrow angle (feels “pressurized”)
     shape.enabled   = true;
     shape.shapeType = ParticleSystemShapeType.Cone;
-    shape.radius    = 0.05f;
+    shape.radius    = 0.025f;
     shape.angle     = 12f;
     shape.position  = Vector3.zero;
     shape.rotation  = Vector3.zero; // local +Y
 
     // Gentle turbulence so it feels raw
     noise.enabled     = true;
-    noise.strength    = 0.2f;
-    noise.frequency   = 0.5f;
-    noise.scrollSpeed = 0.6f;
+    noise.strength    = 0.1f;
+    noise.frequency   = 0.4f;
+    noise.scrollSpeed = 0.3f;
 
     // Breath over lifetime
     sizeL.enabled = true;
@@ -137,7 +129,7 @@ public class CollectableParticles : MonoBehaviour
 
     // Emission: sustained for long notes, one-shot for very short
     emis.enabled = true;
-    emis.rateOverTime = isShort ? 0f : Mathf.Clamp(4f + durSteps * 0.8f, 5f, 20f);
+    emis.rateOverTime = isShort ? 0f : Mathf.Clamp(4f + durSteps * 0.8f, 2f, 10f);
 
     // Short pop without SetBursts (avoids the crash)
     if (isShort)

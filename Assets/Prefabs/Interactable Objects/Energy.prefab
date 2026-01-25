@@ -185,6 +185,7 @@ MonoBehaviour:
   assignedInstrumentTrack: {fileID: 0}
   energySprite: {fileID: 212503362928707232}
   burstId: 0
+  isTrappedInDust: 0
   dustCollisionEnterImpulse: 0.85
   dustCollisionStayForce: 2.25
   dustEscapeCooldownSeconds: 0.35
@@ -200,6 +201,10 @@ MonoBehaviour:
   minAlpha: 0.25
   maxAlpha: 0.65
   pulseScale: 1.08
+  carryOrbitRadius: 0.25
+  carryOrbitAngularSpeed: 4
+  carryOrbitFollowLerp: 18
+  carryOrbitVerticalBias: 0.05
   sharedTargetSteps: 
   minSpeed: 0.8
   maxSpeed: 3.5
@@ -764,7 +769,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.5
+      scalar: 0.25
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -5613,7 +5618,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.5
+      scalar: 0.25
       minScalar: 1
       maxCurve:
         serializedVersion: 2

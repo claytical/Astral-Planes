@@ -758,55 +758,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
     // NoteVisualizer can read t.IsMuted to dim rows, if you want.
 }
-    public void RemixAllTracksForBridge(MazeArchetype phase, PhaseBridgeSignature sig)
-{
-    if (tracks == null) return;
-    foreach (var t in tracks)
-        RemixTrackForBridge(t, phase, sig);
-}
-    private void RemixTrackForBridge(InstrumentTrack track, MazeArchetype phase, PhaseBridgeSignature sig)
-{
-    if (track == null) return;
-
-    // 1) Clear the loop so the bridge is audibly different
-//    track.ClearLoopedNotes(TrackClearType.Remix);
-
-    // 2) Get / ensure a NoteSet
-    var ns = track.GetActiveNoteSet();
-    if (ns == null) return; // nothing to remix
-
-    // 3) Phase/role defaults, then bridge overrides
-    var (defBehavior, defRhythm) = GetDefaultStyleForPhaseAndRole(phase, track.assignedRole);
-
-    ns.ChangeNoteBehavior(track, defBehavior);     // you already use this elsewhere
-    ns.rhythmStyle = defRhythm;                    // rhythm impacts durations downstream
-
-    // 4) Inline seeding: pick a few allowed steps and add arpeggiated notes
-    var steps = ns.GetStepList();               // <-- you use this pattern already
-    if (steps == null || steps.Count == 0) return;
-
-    var fresh = new List<(int step,int note,int duration,float velocity)>();
-    int seeds = 8; // a touch denser for lift-off; tweak to taste
-    for (int i = 0; i < seeds; i++) { 
-        int step = steps[UnityEngine.Random.Range(0, steps.Count)]; 
-        int note = ns.GetNextArpeggiatedNote(step); 
-        int dur  = track.CalculateNoteDuration(step, ns); 
-        float vel = Mathf.Lerp(70f, 110f, UnityEngine.Random.value); 
-        fresh.Add((step, note, dur, vel));
-    } 
-    if (fresh.Count < 6) { 
-        int topUp = 6 - fresh.Count; 
-        for (int i = 0; i < topUp; i++) {
-            int step = steps[UnityEngine.Random.Range(0, steps.Count)]; 
-            int note = ns.GetNextArpeggiatedNote(step); 
-            int dur  = track.CalculateNoteDuration(step, ns); 
-            float vel = Mathf.Lerp(80f, 115f, UnityEngine.Random.value); 
-            fresh.Add((step, note, dur, vel));
-        }
-    }
-    // Atomic swap: no blast visuals, no collapse-to-x1
-    track.SoftReplaceLoop(fresh);
-}
     private void RemixSeedForPhase(InstrumentTrack t, MazeArchetype phase) {
 
     // Nudge its pattern/behavior so the new phase has a recognizable seed

@@ -63,6 +63,22 @@ public class Collectable : MonoBehaviour
     private int _dustClaimOwnerId;
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
+// ---- Carry Orbit ----
+    [Header("Carry Orbit")]
+    [SerializeField] private float carryOrbitRadius = 0.55f;
+    [SerializeField] private float carryOrbitAngularSpeed = 3.0f; // radians/sec
+    [SerializeField] private float carryOrbitFollowLerp = 18f;
+    [SerializeField] private float carryOrbitVerticalBias = 0.05f; // small upward bias so it reads above vehicle
+
+    private int _carryOrbitIndex = -1;
+    private float _carryOrbitPhaseOffset;
+    private bool _registeredInCarryOrbit;
+
+// Vehicle transform -> carried collectables (for spacing)
+    private static readonly Dictionary<Transform, List<Collectable>> _carryOrbitByCollector = new();    
+    private Transform _collector;
+    private Coroutine _carryRoutine;
+    private bool _inCarry;
     bool _hasReservation;
     public bool ReportedCollected { get; private set; }
     public delegate void OnCollectedHandler(int duration, float force);
@@ -88,6 +104,10 @@ public class Collectable : MonoBehaviour
     {
         if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null && occ != self) return true;
         return false;
+    }
+    public void SetCollector(Transform collector)
+    {
+        _collector = collector;
     }
     private void StartDustPocket()
     {
@@ -354,7 +374,7 @@ public class Collectable : MonoBehaviour
     {
         yield return new WaitForFixedUpdate();
         if (_rb == null) continue;
-
+        if (_inCarry) continue;
         var gfm = GameFlowManager.Instance;
         var dustGen = (gfm != null) ? gfm.dustGenerator : null;
         var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
@@ -566,10 +586,10 @@ public class Collectable : MonoBehaviour
     // Particle drip hookup if present
     if (TryGetComponent(out CollectableParticles cp) && tether != null)
         cp.RegisterTether(tether, pull: 0.7f);
-}
+    }
     public void TravelAlongTetherAndFinalize(int durationTicks, float force, float seconds = 0.35f)
     {
-        StartCoroutine(TravelRoutine(durationTicks, force, seconds));
+        StartCoroutine(TravelRoutine(durationTicks, force, seconds, onArrived: null));
     }
     void Start()
     {
@@ -602,7 +622,7 @@ public class Collectable : MonoBehaviour
             ml.SetGrey(new Color(1f, 1f, 1f, 0.18f));
         }
     }
-    private IEnumerator TravelRoutine(int durationTicks, float force, float seconds)
+    private IEnumerator TravelRoutine(int durationTicks, float force, float seconds, Action onArrived)
     {
         if (TryGetComponent(out Collider2D col)) col.enabled = false;
         var ps = GetComponentInChildren<ParticleSystem>();
@@ -617,13 +637,14 @@ public class Collectable : MonoBehaviour
             yield return null;
         }
         if (ribbonMarker) transform.position = ribbonMarker.position;
-
+        onArrived?.Invoke();
+        _inCarry = false;
         var ml = ribbonMarker ? ribbonMarker.GetComponent<MarkerLight>() : null;
         if (ml) ml.LightUp(tether != null ? tether.baseColor : Color.white);
 
         ReportedCollected = true; 
         OnCollected?.Invoke(durationTicks, force); // ✅ event raised inside Collectable
-        OnDestroyed?.Invoke();
+        NotifyDestroyedOnce();
         if (tether) Destroy(tether.gameObject);
         Destroy(gameObject);
     }
@@ -660,6 +681,7 @@ public class Collectable : MonoBehaviour
     {
         ClearReservation();
         UnregisterOccupant();
+        UnregisterCarryOrbit();
         StopDustPocket();
         var dustClaims = FindObjectOfType<DustClaimManager>();
         if (dustClaims != null)
@@ -737,40 +759,169 @@ public class Collectable : MonoBehaviour
             _rb.AddForce(n * dustCollisionStayForce, ForceMode2D.Force);
         }
     }
+    public void BeginCarryThenDeposit(double depositDspTime, float leadSeconds, int durationTicks, float force, Action onArrived)
+    {
+        if (_carryRoutine != null) StopCoroutine(_carryRoutine);
+        _carryRoutine = StartCoroutine(CarryThenDepositRoutine(depositDspTime, leadSeconds, durationTicks, force, onArrived));
+    }
+private void RegisterCarryOrbit()
+{
+    if (_collector == null || _registeredInCarryOrbit) return;
 
-private void OnTriggerEnter2D(Collider2D coll)
+    if (!_carryOrbitByCollector.TryGetValue(_collector, out var list) || list == null)
+    {
+        list = new List<Collectable>();
+        _carryOrbitByCollector[_collector] = list;
+    }
+
+    if (!list.Contains(this))
+        list.Add(this);
+
+    _registeredInCarryOrbit = true;
+    _carryOrbitPhaseOffset = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+
+    RefreshCarryOrbitIndices(_collector);
+}
+
+private void UnregisterCarryOrbit()
+{
+    if (_collector == null || !_registeredInCarryOrbit) return;
+
+    if (_carryOrbitByCollector.TryGetValue(_collector, out var list) && list != null)
+    {
+        list.Remove(this);
+
+        if (list.Count == 0)
+            _carryOrbitByCollector.Remove(_collector);
+        else
+            RefreshCarryOrbitIndices(_collector);
+    }
+
+    _registeredInCarryOrbit = false;
+    _carryOrbitIndex = -1;
+}
+
+private static void RefreshCarryOrbitIndices(Transform collector)
+{
+    if (collector == null) return;
+    if (!_carryOrbitByCollector.TryGetValue(collector, out var list) || list == null) return;
+
+    // Compact and re-index so orbit slots are stable and evenly spaced
+    for (int i = list.Count - 1; i >= 0; i--)
+        if (list[i] == null) list.RemoveAt(i);
+
+    for (int i = 0; i < list.Count; i++)
+        if (list[i] != null) list[i]._carryOrbitIndex = i;
+}
+
+private Vector3 ComputeCarryOrbitTargetWorld()
+{
+    if (_collector == null) return transform.position;
+
+    int count = 1;
+    if (_carryOrbitByCollector.TryGetValue(_collector, out var list) && list != null)
+        count = Mathf.Max(1, list.Count);
+
+    // Even angular distribution around the vehicle
+    float slotAngle = (Mathf.PI * 2f) * (_carryOrbitIndex / (float)count);
+
+    // Rotate over time for “orbit” feel
+    float t = Time.time;
+    float angle = _carryOrbitPhaseOffset + slotAngle + t * carryOrbitAngularSpeed;
+
+    Vector3 center = _collector.position;
+    Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * carryOrbitRadius;
+
+    // Optional readability bias (slightly above the vehicle)
+    offset.y += carryOrbitVerticalBias;
+
+    return center + offset;
+}
+    private IEnumerator CarryThenDepositRoutine(double depositDspTime, float leadSeconds, int durationTicks, float force, Action onArrived)
+    {
+        _inCarry = true;
+        if (_rb != null) _rb.simulated = false;
+        // Make it non-collectable immediately.
+        if (TryGetComponent(out Collider2D col)) col.enabled = false;
+
+        // Optional: stop any particle emission while carried
+        var ps = GetComponentInChildren<ParticleSystem>();
+        if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
+        // Carry until just before the deposit moment.
+        double startDepositDsp = depositDspTime - Math.Max(0.0, (double)leadSeconds);
+
+        while (_collector != null && AudioSettings.dspTime < startDepositDsp)
+        {
+            // Orbit around the vehicle while carried
+            Vector3 target = ComputeCarryOrbitTargetWorld();
+            transform.position = Vector3.Lerp(transform.position, target, carryOrbitFollowLerp * Time.deltaTime);
+            yield return null;
+        }
+        UnregisterCarryOrbit();
+        // Deposit travel should finish on-beat.
+        float seconds = Mathf.Max(0.02f, leadSeconds);
+        yield return StartCoroutine(TravelRoutine(durationTicks, force, seconds, onArrived));
+    }
+    private void OnTriggerEnter2D(Collider2D coll)
     {
         var vehicle = coll.GetComponent<Vehicle>();
         if (vehicle == null || _handled) return;
+        _collector = vehicle.transform;
         _handled = true; // ✅ idempotent
+        RegisterCarryOrbit();
 
         // (Optional availability check)
         // if (_availableUntilDsp > 0 && AudioSettings.dspTime > _availableUntilDsp) { OnFailedCollect(); return; }
+        var drumTrack = assignedInstrumentTrack.drumTrack;
+        if (drumTrack == null) return;
 
-        // 1) compute loop timing
-        var drumTrack    = assignedInstrumentTrack.drumTrack;
-        double dspNow    = AudioSettings.dspTime;
-        double loopLen   = drumTrack.GetLoopLengthInSeconds();
-        double stepDur   = loopLen / drumTrack.totalSteps;
-        double timingWin = stepDur * drumTrack.timingWindowSteps * 0.5;
-        double loopStart = drumTrack.startDspTime;
-        double tPos      = (dspNow - loopStart) % loopLen;
+        double dspNow  = AudioSettings.dspTime;
+        double loopLen = drumTrack.GetLoopLengthInSeconds();
+
+        int baseSteps   = Mathf.Max(1, drumTrack.totalSteps);
+        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
+
+// We expect leaderSteps to be an integer multiple of baseSteps.
+        int mul = Mathf.Max(1, Mathf.RoundToInt(leaderSteps / (float)baseSteps));
+
+// Anchor to what the player hears.
+        double loopStart = drumTrack.leaderStartDspTime;
+        if (loopStart <= 0.0) return;
+
+// Position in the *leader* loop timeline [0, loopLen)
+        double tPos = (dspNow - loopStart) % loopLen;
         if (tPos < 0) tPos += loopLen;
 
-        // 2) pick the best matching target step (within timing window)
+// Leader step duration (seconds)
+        double leaderStepDur = loopLen / leaderSteps;
+
+// Timing window expressed in leader steps, derived from your existing setting.
+// If timingWindowSteps is defined in base steps, multiply it by mul; if it’s already
+// leader-steps-based, leave it alone. Given your current code used base stepDur,
+// it likely represents "base steps", so multiply.
+        double timingWin = leaderStepDur * (drumTrack.timingWindowSteps * mul) * 0.5;
+
         int matchedStep = -1;
         double bestErr = timingWin;
+
         for (int i = 0; i < sharedTargetSteps.Count; i++)
         {
-            int step = sharedTargetSteps[i];
-            double stepPos = (step * stepDur) % loopLen;
-            double delta   = Math.Abs(stepPos - tPos);
+            int baseStep = sharedTargetSteps[i];
+
+            // Base step projected into leader timeline.
+            int leaderStep = baseStep * mul;
+
+            // Convert to position in seconds within loop.
+            double stepPos = (leaderStep * leaderStepDur) % loopLen;
+
+            double delta = Math.Abs(stepPos - tPos);
             if (delta > loopLen * 0.5) delta = loopLen - delta;
 
             if (delta < bestErr)
             {
                 bestErr = delta;
-                matchedStep = step;
+                matchedStep = baseStep; // keep returning base index
             }
         }
 
