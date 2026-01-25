@@ -483,7 +483,12 @@ private void ScheduleCompositeRebuild()
         // Init extracted systems (no pooling/legacy queues required).
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
-                cell => { TryGetDustAt(cell, out var d); return d; },
+                cell => { // If a MineNode has imprinted this cell, keep that tint stable until something else changes it.
+                    if (_imprints != null && _imprints.ContainsKey(cell)) 
+                        return null; 
+                    TryGetDustAt(cell, out var d); 
+                    return d;
+                },
                 GetCellVisualColor);
 
         // Flow field sizing is lazy and handled in Update once drums is valid.
@@ -644,7 +649,8 @@ private void ScheduleCompositeRebuild()
         {
             dust.PrepareForReuse();
             dust.SetGrowInDuration(hexGrowInSeconds);
-            dust.SetTint(_mazeTint);
+            Color regrowTint = GetCellVisualColor(gp);
+            dust.SetTint(regrowTint);
             dust.Begin();
             dust.SetTerrainColliderEnabled(false);
         }
@@ -1075,7 +1081,7 @@ private void ScheduleCompositeRebuild()
         // Compute delay (phase default unless explicitly overridden).
         float delay = delaySeconds >= 0f ? delaySeconds : phase switch
         {
-            MazeArchetype.Establish  => 16f,
+            MazeArchetype.Establish  => 4f,
             MazeArchetype.Evolve     => 12f,
             MazeArchetype.Intensify  => 8f,
             MazeArchetype.Release    => 32f,

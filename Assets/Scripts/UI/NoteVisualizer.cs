@@ -2,9 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using MidiPlayerTK;
 using UnityEngine.UI;
 
 public class NoteVisualizer : MonoBehaviour
@@ -12,25 +10,19 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Ascension")]
     [Tooltip("World-space UI reference the notes should rise to (e.g., a RectTransform named 'Line of Ascent').")]
     public RectTransform lineOfAscent;
-
     [Tooltip("Ascend duration in drum loops (1 = one full loop).")]
     [Min(1)] public int ascendLoops = 8;
-
     [Tooltip("Extra seconds added to the loop-based duration to avoid snapping on the boundary.")]
     public float ascendPaddingSeconds = 0.15f;
-
     [Tooltip("Small world-space Y padding to keep notes from sitting exactly on the line.")]
     public float ascendLineWorldPadding = 0f;
-    
     [Header("Playhead")]
     public RectTransform playheadLine;
     public ParticleSystem playheadParticles;
-    // --- Playhead / line-of-ascension visual state ---
     [Range(0f, 1f)]
     [SerializeField] private float _playheadEnergy01 = 0f;       // what we actually render
     private float _playheadEnergyTarget01 = 0f;                  // what game logic asks for
     [SerializeField] private float _playheadEnergyLerpSpeed = 4f;
-
     // Each ascended note bumps this; decays over time. Drives extra particle activity.
     [Range(0f, 1f)]
     [SerializeField] private float _lineCharge01 = 0f;
@@ -42,11 +34,6 @@ public class NoteVisualizer : MonoBehaviour
     private GameFlowManager _gfm;
     private InstrumentTrackController _ctrl;
     private DrumTrack _drum;
-
-// Optional: track if we ever successfully bound (helps debugging)
-    private bool _refsBoundOnce = false;
-
-    private Image _playheadImage;
     private float _playheadBaseHeight;
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
@@ -98,17 +85,14 @@ public class NoteVisualizer : MonoBehaviour
         public float t;           // normalized 0..1
         public System.Action onDone; // optional (SFX, pooling return, etc.)
     }
-
     private struct MarkerState
     {
         public GameObject go;
         public (InstrumentTrack track, int step) key;
         public float stepY;              // distance moved per loop tick
-
         public int delayLoopsRemaining;  // per-marker optional delay
         public int loopsRemaining;       // per-marker countdown to arrival
-
-        public System.Action onDonePerMarker; // your old coroutine's onDone lambda
+        public Action onDonePerMarker; // your old coroutine's onDone lambda
     }
     private struct RushTask
     {
@@ -117,7 +101,7 @@ public class NoteVisualizer : MonoBehaviour
         public Transform target;     // vehicle (or any target)
         public float dur;            // seconds
         public float t;              // normalized 0..1
-        public System.Action onArrive; // called when we reach target (chain effects/cleanup)
+        public Action onArrive; // called when we reach target (chain effects/cleanup)
     }
     private readonly Dictionary<InstrumentTrack, AscendTask> _ascendTasks = new();
     private int _lastObservedCompletedLoops = -1;
@@ -150,7 +134,6 @@ public class NoteVisualizer : MonoBehaviour
         var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>(); 
         ml.LightUp(track.trackColor);
     }
-
     public void Initialize()
     {
         isInitialized = true;
@@ -222,7 +205,6 @@ public class NoteVisualizer : MonoBehaviour
         // Cache playhead visuals (optional if you want to scale/alpha it with energy)
         if (playheadLine != null)
         {
-            _playheadImage = playheadLine.GetComponent<Image>();
             _playheadBaseHeight = playheadLine.sizeDelta.y;
             if (_playheadBaseHeight <= 0f)
                 _playheadBaseHeight = 100f; // defensive default
@@ -663,20 +645,6 @@ public class NoteVisualizer : MonoBehaviour
         for (int i = 0; i < count; i++)
             set.Add((startStepInclusive + i) % total);
     }
-    private void EnqueueRush(GameObject marker, Transform target, float durationSeconds, System.Action onArrive = null)
-    {
-        if (!marker || !target) return;
-
-        _rushTasks.Add(new RushTask
-        {
-            go       = marker,
-            startPos = marker.transform.position,
-            target   = target,
-            dur      = Mathf.Max(0.01f, durationSeconds),
-            t        = 0f,
-            onArrive = onArrive
-        });
-    }
     private bool RefreshCoreRefs(bool force = false)
     {
         // Cache the singleton once (still cheap, but avoid repeating per-frame)
@@ -692,7 +660,6 @@ public class NoteVisualizer : MonoBehaviour
         {
             _drum = newDrum;
             _ctrl = newCtrl;
-            _refsBoundOnce = (_drum != null && _ctrl != null);
         }
 
         return (_drum != null && _ctrl != null && _ctrl.tracks != null);
@@ -727,13 +694,19 @@ public class NoteVisualizer : MonoBehaviour
         // Fallback (old behavior) — but you generally should not rely on this.
         return GetTopWorldY() + ascendLineWorldPadding;
     }
-
     public float GetTopWorldY()
     {
         RectTransform rt = GetComponent<RectTransform>();
         Vector3[] worldCorners = new Vector3[4];
         rt.GetWorldCorners(worldCorners);
         return worldCorners[1].y;
+    }
+    private float GetBottomWorldY()
+    {
+        RectTransform rt = GetComponent<RectTransform>();
+        Vector3[] worldCorners = new Vector3[4];
+        rt.GetWorldCorners(worldCorners);
+        return worldCorners[0].y; // bottom-left corner
     }
     public Transform GetUIParent() => _uiParent;
     int GetDeclaredLongestSteps()
@@ -743,8 +716,6 @@ public class NoteVisualizer : MonoBehaviour
         int binSize     = Mathf.Max(1, _drum.totalSteps);
         return leaderBins * binSize;
     }
-
-
     public void CanonicalizeTrackMarkers(InstrumentTrack track, int currentBurstId)
 {
     if (track == null) return;
@@ -884,7 +855,7 @@ public class NoteVisualizer : MonoBehaviour
             return true;
         }
     }
-  public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
+    public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
 {
     Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
     Debug.Log($"[NoteViz] Placing Persistent Note marker for {track} at {stepIndex}, lit {lit} burst id {burstId}");
@@ -1040,15 +1011,7 @@ public class NoteVisualizer : MonoBehaviour
     Debug.Log($"Returning final marker [PLACE] {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
     return marker;
 }
-
-    private float GetBottomWorldY()
-    {
-        RectTransform rt = GetComponent<RectTransform>();
-        Vector3[] worldCorners = new Vector3[4];
-        rt.GetWorldCorners(worldCorners);
-        return worldCorners[0].y; // bottom-left corner
-    }
-    public void UpdateNoteMarkerPositions(bool forceXReflow = false)
+    private void UpdateNoteMarkerPositions(bool forceXReflow = false)
     {
         var deadKeys = new List<(InstrumentTrack, int)>();
         foreach (var kvp in noteMarkers)
@@ -1077,7 +1040,6 @@ public class NoteVisualizer : MonoBehaviour
         }
         foreach (var k in deadKeys) noteMarkers.Remove(k);
     }
-    
     public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds) {
     if (track == null || burstId < 0) return; 
     if (!isActiveAndEnabled) return;
@@ -1190,12 +1152,7 @@ public class NoteVisualizer : MonoBehaviour
 
     StartCoroutine(AscendCohortCoroutine(track, burstId, cohort, durationSeconds));
 }
-
-    private IEnumerator AscendCohortCoroutine(
-    InstrumentTrack track,
-    int burstId,
-    List<(int step, Transform rt, MarkerTag tag)> cohort,
-    float durationSeconds)
+    private IEnumerator AscendCohortCoroutine(InstrumentTrack track, int burstId, List<(int step, Transform rt, MarkerTag tag)> cohort, float durationSeconds)
 {
     // Spawn stationary grey placeholders so the lit marker can rise away.
     foreach (var c in cohort)
@@ -1322,8 +1279,7 @@ public class NoteVisualizer : MonoBehaviour
 
     StartCoroutine(ClearBinOnNextBarBoundary(track, binIdx, burstId));
 }
-    private IEnumerator ClearBinOnNextBarBoundary(InstrumentTrack track, int binIdx, int burstId)
-    {
+    private IEnumerator ClearBinOnNextBarBoundary(InstrumentTrack track, int binIdx, int burstId) {
         if (track == null)
             yield break;
 
@@ -1361,7 +1317,6 @@ public class NoteVisualizer : MonoBehaviour
         track.ClearBinNotesKeepAllocated(binIdx);
         CanonicalizeTrackMarkers(track, burstId);
     }
-
     public void ConfigureBinStrip(int activeBinCount)
 {
     if (binStripParent == null || binIndicatorPrefab == null)
@@ -1505,7 +1460,7 @@ public class NoteVisualizer : MonoBehaviour
             ? new Vector3(xLocal, lp.y, lp.z)      // preserve Y during ascent
             : new Vector3(xLocal, lp.y, 0f);       // preserve Y generally; row handles baseline
     }
-private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, bool dryRun = true)
+    private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, bool dryRun = true)
 {
     int trackIndex = Array.IndexOf(_ctrl.tracks, track);
     if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
@@ -1604,12 +1559,11 @@ private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, b
         }
     }
 }
-
     private float GetScreenWidth() {
         RectTransform rt = _worldSpaceCanvas.GetComponent<RectTransform>();
         return rt.rect.width;
     }
-   public void RecomputeTrackLayout(InstrumentTrack track)
+    public void RecomputeTrackLayout(InstrumentTrack track)
 {
     Debug.Log($"[RECOMPUTE] {track?.name ?? "NULL"} Running");
     if (track == null) return;
@@ -1783,7 +1737,6 @@ private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, b
 #endif
     }
 }
-
     private int GetLeaderBinsForPlacement(InstrumentTrack track, int totalSteps, int binSize) {
         int leaderBinsBase; 
         if (_forcedLeaderSteps >= 1) { 

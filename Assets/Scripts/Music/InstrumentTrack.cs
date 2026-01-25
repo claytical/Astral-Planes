@@ -35,7 +35,7 @@ public class InstrumentTrack : MonoBehaviour
     public int maxLoopMultiplier = 4;
     [Header("Ascension Fuse")]
     [Tooltip("How many extended loops markers for this track take to reach the line of ascension after a burst is armed.")]
-    public int ascendLoopCount = 1;
+    public int ascendLoopCount = 4;
     [Header("Undeveloped Bin Playback ")]
     [Tooltip("If true, when the global leader width is wider than this track, this track's notes will 'ghost repeat' into undeveloped bins at reduced velocity.")]
     [SerializeField] private bool ghostUndevelopedBins = true; 
@@ -1064,6 +1064,18 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             Debug.LogWarning($"[COLLECT:ABORT] {name} no valid step (intendedStep={collectable.intendedStep}, reportedStep={reportedStep}) burstId={collectable.burstId}");
             return;
         }
+        int binSize = Mathf.Max(1, BinSize());
+        if (collectable.intendedStep < 0 && finalTargetStep >= 0 && controller != null)
+        {
+            // reportedStep is base-step local (0..binSize-1) -> map into CURRENT transport bin
+         
+            int local = ((finalTargetStep % binSize) + binSize) % binSize;
+
+            var tf = controller.GetTransportFrame();
+            finalTargetStep = tf.playheadBin * binSize + local;
+
+            Debug.LogWarning($"[COLLECT:BASE->ABS] {name} mapped baseStep={reportedStep} into absStep={finalTargetStep} using playheadBin={tf.playheadBin}");
+        }        
 
 // Optional sanity: log if reported differs from intended (useful for chasing bad assignment upstream).
         if (reportedStep >= 0 && collectable.intendedStep >= 0 && reportedStep != collectable.intendedStep)
@@ -1071,7 +1083,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep} burstId={collectable.burstId}");
         }
 
-        int binSize = BinSize();
 
         // 3) Snapshot leader bins BEFORE we write (used for cross-track nudge later)
         int leaderBinsBeforeWrite = (controller != null) ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
@@ -1086,10 +1097,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // Mark bin filled + hooks
         int targetBin = BinIndexForStep(finalTargetStep);
         Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
-
-
-        // Visuals
-        LightMarkerAt(finalTargetStep, collectable.burstId);
         RegisterBurstStep(collectable.burstId, finalTargetStep);
         spawnedCollectables?.Remove(collectable.gameObject);
     // 5) Per-burst decrement + rise + cursor advance
@@ -1176,7 +1183,47 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     }
 
         // 6) Animate the pickup and finalize
-        collectable.TravelAlongTetherAndFinalize(durationTicks, force, seconds: 1f);
+// Visual: ensure marker exists but stays “waiting” until deposit.
+        GameObject markerGo = null;
+        if (controller != null && controller.noteVisualizer != null)
+        {
+            markerGo = controller.noteVisualizer.PlacePersistentNoteMarker(this, finalTargetStep, lit: false, burstId: collectable.burstId);
+        }
+        if (markerGo != null)
+        {
+            collectable.ribbonMarker = markerGo.transform;
+            if (collectable.tether != null)
+                collectable.tether.SetEndpoints(collectable.transform, collectable.ribbonMarker, this.trackColor, 1f);
+        }
+// Schedule deposit to land right on the step.
+        double depositDsp = NextOccurrenceDspForAbsoluteStep(finalTargetStep);
+        const float leadSec = 0.5f; // tune; 80–160ms tends to feel good
+
+        collectable.BeginCarryThenDeposit(
+            depositDsp,
+            leadSec,
+            durationTicks,
+            force,
+            onArrived: () =>
+            {
+                if (controller == null || controller.noteVisualizer == null || markerGo == null) return;
+
+                // 1) Make this marker the canonical one for (track, step) and mark it lit.
+                controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
+
+                // 2) Force visual lit state on the exact instance we carried (no ambiguity).
+                var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
+                tag.isPlaceholder = false;
+                tag.burstId = collectable.burstId;
+
+                var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
+                ml.LightUp(this.trackColor);
+
+                // Optional: if VisualNoteMarker has “waiting particles”, switch it to lit visuals.
+                var vnm = markerGo.GetComponent<VisualNoteMarker>();
+                if (vnm != null) vnm.Initialize(this.trackColor);
+            }
+        );
         if (_currentBurstArmed && _currentBurstRemaining > 0)
         {
             _currentBurstRemaining--;
@@ -1196,7 +1243,46 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return -1;
     }
+    private double NextOccurrenceDspForAbsoluteStep(int absoluteStep)
+    {
+        if (drumTrack == null || controller == null) return 0.0;
 
+        int binSize = Mathf.Max(1, BinSize()); // base steps (e.g., 16)
+        int targetBin = Mathf.FloorToInt(absoluteStep / (float)binSize);
+        int targetLocal = absoluteStep - targetBin * binSize;
+
+        float clipLen = drumTrack.GetClipLengthInSeconds();
+        if (clipLen <= 0f) return 0.0;
+
+        // Must match the transport anchor used by GetTransportFrame()
+        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
+        if (start <= 0.0) return 0.0;
+
+        var tf = controller.GetTransportFrame();
+        int barIndexNow = tf.barIndex;
+        int playheadBinNow = tf.playheadBin;
+
+        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
+
+        // How many bars until the transport is on the bin that owns this note?
+        int barsUntilBin = ((targetBin - playheadBinNow) % leaderBins + leaderBins) % leaderBins;
+
+        double dspNow = AudioSettings.dspTime;
+        double barStartNow = start + (double)barIndexNow * clipLen;
+        double tInBarNow = dspNow - barStartNow;
+
+        double stepDur = clipLen / binSize;
+        double targetTInBar = targetLocal * stepDur;
+
+        // If it's this bin, but we've already passed the step, push to next cycle of that bin
+        const double kEps = 0.002; // 2ms guard
+        if (barsUntilBin == 0 && targetTInBar <= tInBarNow + kEps)
+            barsUntilBin = leaderBins;
+
+        int targetBarIndex = barIndexNow + barsUntilBin;
+        double targetBarStart = start + (double)targetBarIndex * clipLen;
+        return targetBarStart + targetTInBar;
+    }
     public int GetHighestFilledBin()
     {
         EnsureBinList();
@@ -1287,29 +1373,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         ResetBinsForPhase();
     }
 
-    public void SoftReplaceLoop(IReadOnlyList<(int stepIndex, int note, int duration, float velocity)> newNotes)
-    {
-        Debug.LogWarning(
-            $"[TRK:CLEAR_LOOP] track={name} fn=SoftReplaceLoop " +
-            $"newNotes={(newNotes != null ? newNotes.Count : -1)} " +
-            $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
-            Environment.StackTrace);
-
-        persistentLoopNotes.Clear();
-        _loopCacheDirtyPending = true;
-
-        _spawnedNotes.Clear();
-
-        if (newNotes != null)
-        {
-            RecomputeBinsFromLoop();
-            for (int i = 0; i < newNotes.Count; i++)
-            {
-                var t = newNotes[i];
-                AddNoteToLoop(t.stepIndex, t.note, t.duration, t.velocity);
-            }
-        }
-    }
     public bool HasNoteSet()
     {
         return _currentNoteSet != null;
@@ -1486,7 +1549,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return chosenDurationTicks;
     }
-    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force)
+    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow)
     {
         int qNote = QuantizeNoteToBinChord(stepIndex, note);
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force));
@@ -1500,28 +1563,28 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         {
             noteMarker = t.gameObject;
             var dbgTag = noteMarker.GetComponent<MarkerTag>();
-            Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=True markerId={noteMarker.GetInstanceID()} tagPlaceholder={(dbgTag!=null && dbgTag.isPlaceholder)} tagBurst={(dbgTag!=null?dbgTag.burstId:-999)}");
-
-            // Flip placeholder → lit
-            var tag = noteMarker.GetComponent<MarkerTag>() ?? noteMarker.AddComponent<MarkerTag>();
-            tag.track = this;
-            tag.step = stepIndex;
-            tag.isPlaceholder = false;
-            var vnm = noteMarker.GetComponent<VisualNoteMarker>();
-            if (vnm != null) vnm.Initialize(trackColor);
-
-            var ml = noteMarker.GetComponent<MarkerLight>() ?? noteMarker.AddComponent<MarkerLight>();
-            ml.LightUp(trackColor);
+            if (lightMarkerNow) { 
+                var tag = noteMarker.GetComponent<MarkerTag>() ?? noteMarker.AddComponent<MarkerTag>(); 
+                tag.track = this;
+                tag.step = stepIndex;
+                tag.isPlaceholder = false;
+                var vnm = noteMarker.GetComponent<VisualNoteMarker>(); 
+                if (vnm != null) vnm.Initialize(trackColor);
+                var ml = noteMarker.GetComponent<MarkerLight>() ?? noteMarker.AddComponent<MarkerLight>();
+                ml.LightUp(trackColor);
+            }
         }
         else
         {
-            // Fallback: create a new lit marker if none existed
-            noteMarker = controller?.noteVisualizer?.PlacePersistentNoteMarker(this, stepIndex, lit: true, burstId:-1);
-            Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False createdLit={(noteMarker!=null)} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
+            bool lit = lightMarkerNow;
+            int burst = lightMarkerNow ? -1 : currentBurstId; // optional: keep it burst-owned while waiting
+            noteMarker = controller?.noteVisualizer?.PlacePersistentNoteMarker(this, stepIndex, lit: lit, burstId: burst);
+            Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False lit={lit} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
         }
 
         if (noteMarker != null) _spawnedNotes.Add(noteMarker);
-        controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
+        if (lightMarkerNow)
+            controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
         return stepIndex;
     }
     public float GetVelocityAtStep(int step)
@@ -2403,7 +2466,7 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
         if (modified != null)
         {
             foreach (var (step, note, dur, vel) in modified)
-                AddNoteToLoop(step, note, dur, vel);
+                AddNoteToLoop(step, note, dur, vel, true);
         }
     }
 
@@ -2418,54 +2481,13 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
     private int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
         // Commit immediately (the loop evolves as notes are collected).
-        AddNoteToLoop(stepIndex, note, durationTicks, force);
+        AddNoteToLoop(stepIndex, note, durationTicks, force, false);
 
         // Immediate tactile feedback (short), then audition on-grid (full voice).
         PlayCollectionConfirm(note, force);
-        QuantizedAuditionToStep(stepIndex, note, durationTicks, force);
+        //QuantizedAuditionToStep(stepIndex, note, durationTicks, force);
 
         return stepIndex;
-    }
-    private void QuantizedAuditionToStep(int stepIndex, int note, int durationTicks, float velocity)
-    {
-        if (drumTrack == null) return;
-
-        // Use the leader transport so the audition aligns to what the player hears.
-        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
-        float loopLenSec = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds());
-
-        // Normalize step into leader range.
-        int s = stepIndex % leaderSteps;
-        if (s < 0) s += leaderSteps;
-
-        // If leaderStartDspTime hasn't been anchored yet, fail safe: don't audition.
-        double loopStartDsp = drumTrack.leaderStartDspTime;
-        if (loopStartDsp <= 0.0) return;
-
-        double dspNow = AudioSettings.dspTime;
-
-        // Time within current loop [0, loopLenSec)
-        double tInLoop = (dspNow - loopStartDsp) % loopLenSec;
-        if (tInLoop < 0) tInLoop += loopLenSec;
-
-        double stepDur = loopLenSec / leaderSteps;
-        double targetT = s * stepDur;
-
-        // Seconds until next occurrence of that step.
-        double dt = targetT - tInLoop;
-        if (dt < 0) dt += loopLenSec;
-
-        // If we're very close, play immediately to avoid “why didn’t it respond?”.
-        const double snapEps = 0.050; // 50ms; tune to taste
-        if (dt <= snapEps)
-        {
-            PlayNote(note, durationTicks, velocity);
-            return;
-        }
-
-        // Schedule using DSP polling (more robust than WaitForSeconds if frame hitches occur).
-        double targetDsp = dspNow + dt;
-        StartCoroutine(PlayNoteAtDsp(targetDsp, note, durationTicks, velocity));
     }
 
     private IEnumerator PlayNoteAtDsp(double targetDsp, int note, int durationTicks, float velocity)
