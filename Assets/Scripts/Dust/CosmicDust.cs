@@ -15,7 +15,7 @@ public class CosmicDust : MonoBehaviour {
 
         [Header("Visual Footprint")]
         [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
-
+        
         public SpriteRenderer sprite;
         [Header("PhaseStar Proximity")]
         public bool  starRemovesWithoutRegrow; // if false, it will regrow via generator
@@ -24,6 +24,24 @@ public class CosmicDust : MonoBehaviour {
         [Header("Fade")]
         [Min(0.01f)] public float fadeSeconds;
     }
+    [System.Serializable]
+    public struct DustVisualTimings
+    {
+        [Min(0.01f)] public float spriteScaleInSeconds;   // Circle scale 0->1
+        [Min(0.01f)] public float spriteScaleOutSeconds;  // Circle scale 1->0
+        [Min(0.01f)] public float particleGrowInSeconds;  // particle alpha ramp
+        [Min(0.01f)] public float fadeOutSeconds;         // tint/alpha fade out (if used)
+    }
+
+    [SerializeField] private DustVisualTimings _timings = new DustVisualTimings
+    {
+        spriteScaleInSeconds = 0.20f,
+        spriteScaleOutSeconds = 0.20f,
+        particleGrowInSeconds = 1.00f,
+        fadeOutSeconds = 0.20f
+    };
+
+
     public Color CurrentTint => _currentTint;
     [Serializable]
     public struct DustInteractionSettings
@@ -82,7 +100,7 @@ public class CosmicDust : MonoBehaviour {
         particleFootprintMul   = 0.85f,
         starRemovesWithoutRegrow = false,
         starAlphaFadeBias      = 0.9f,
-        fadeSeconds            = 0.25f
+        fadeSeconds            = 1f
     };
 
     [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
@@ -145,7 +163,7 @@ public class CosmicDust : MonoBehaviour {
     private float _stayForceUntil;
     private bool _isBreaking;
     [SerializeField] private float _baseEmission = 1;
-
+    private Coroutine _spriteScaleRoutine;
     void Awake() {
         if (!_cachedInitialScale)
         {
@@ -202,6 +220,37 @@ public class CosmicDust : MonoBehaviour {
         if (psr) psr.sortingFudge = 0f;
         ApplyParticleFootprint();
     }
+    public void SetVisualTimings(DustVisualTimings t)
+    {
+        // Defensive clamps so bad inspector values can’t break everything.
+        t.spriteScaleInSeconds  = Mathf.Max(0.01f, t.spriteScaleInSeconds);
+        t.spriteScaleOutSeconds = Mathf.Max(0.01f, t.spriteScaleOutSeconds);
+        t.particleGrowInSeconds = Mathf.Max(0.01f, t.particleGrowInSeconds);
+        t.fadeOutSeconds        = Mathf.Max(0.01f, t.fadeOutSeconds);
+        _timings = t;
+    }
+
+
+    private IEnumerator ScaleSpriteRoutine(float from, float to, float seconds)
+    {
+        Vector3 a = Vector3.one * from;
+        Vector3 b = Vector3.one * to;
+
+        float t = 0f;
+        seconds = Mathf.Max(0.01f, seconds);
+
+        visual.sprite.transform.localScale = a;
+
+        while (t < seconds)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / seconds);
+            visual.sprite.transform.localScale = Vector3.Lerp(a, b, u);
+            yield return null;
+        }
+
+        visual.sprite.transform.localScale = b;
+    }
     public float GetWorldRadius()
     {
         if (!terrainCollider)
@@ -218,49 +267,6 @@ public class CosmicDust : MonoBehaviour {
         var bounds = terrainCollider.bounds;
         // Use the larger extent to be safe.
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
-    }
-    private void EnsureParticleHierarchyActive()
-    {
-        if (visual.particleSystem == null) return;
-        // Ensure the particle system GO and its parents are active up to this dust root.
-        Transform t = visual.particleSystem.transform;
-        while (t != null)
-        {
-            Debug.Log($"[PS-HIER] {t.name} activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy}");
-
-            if (!t.gameObject.activeSelf)
-                t.gameObject.SetActive(true);
-
-            if (t == transform) break;
-            t = t.parent;
-        }
-        var cols = GetComponentsInChildren<Collider2D>(true);
-        Debug.Log($"[REGROWTH] colliders={cols.Length} enabled={string.Join(",", cols.Select(c=>c.enabled))}");
-    }
-    public void OnSpawnedFromPool(Color tint)
-    {
-        // Ensure this object is actually usable again
-        if (!_cachedInitialScale)
-        {
-            _initialLocalScale = transform.localScale;
-            if (_initialLocalScale == Vector3.zero) _initialLocalScale = Vector3.one;
-            _cachedInitialScale = true;
-        }
-
-        // CRITICAL: DespawnToPoolInstant() scales to zero; we must undo that here.
-        transform.localScale = _initialLocalScale;
-
-        EnsureParticleHierarchyActive();
-        ResetAndPlayParticles();
-
-        // Visual reset
-        SetTint(tint);
-
-        // Physics reset (your existing layer safety)
-        int targetLayer = (solidLayer == 0) ? _prefabInitialLayer : solidLayer;
-        gameObject.layer = targetLayer;
-
-        if (terrainCollider != null) terrainCollider.enabled = true;
     }
 
     public void ConfigureForPhase(MazeArchetype phase)
@@ -361,14 +367,16 @@ public class CosmicDust : MonoBehaviour {
 
     public void Begin()
     {
+        SetVisualsEnabled(true);
         SetColorVariance();
         ResetAndPlayParticles();
         ApplyParticleFootprint();
         CaptureBaseVisual();
-
+        ResetSpriteScaleTo(0f);
+        AnimateSpriteScale(0f, 1f); // uses _timings.spriteScaleInSeconds
         _growInRoutine = StartCoroutine(GrowIn());
     }
-    public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
+
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
@@ -395,7 +403,7 @@ public class CosmicDust : MonoBehaviour {
 
         // Premultiply for premultiplied-alpha material.
         Color pm = Premultiply(target);
-
+        Debug.Log($"[DUST] Target: {target} Premultiply: {pm}");
         var g = new Gradient();
         g.SetKeys(
             new[] {
@@ -420,7 +428,7 @@ public class CosmicDust : MonoBehaviour {
         main.startColor = pm;
     }
 
-
+    public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
     private static Color Premultiply(Color c)
     {
         c.r *= c.a;
@@ -428,20 +436,7 @@ public class CosmicDust : MonoBehaviour {
         c.b *= c.a;
         return c;
     }
-    private void DespawnGracefully(float fadeSeconds = 0.25f)
-    {
-        if (_isDespawned) return;
-        _isDespawned = true;
 
-        // Open the corridor immediately.
-        if (terrainCollider != null) terrainCollider.enabled = false;
-        if (gen != null) gen.NotifyCompositeDirty();
-        // Kill any ongoing visual routines from prior state.
-        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
-        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-
-        _fadeRoutine = StartCoroutine(FadeOutThenPool(fadeSeconds));
-    }
     public void SetTerrainColliderEnabled(bool enabled)
     {
         // Prefer cached colliders so we reliably disable whatever collider is actually producing contact.
@@ -460,18 +455,21 @@ public class CosmicDust : MonoBehaviour {
         // Maintain legacy field behavior too.
         if (terrainCollider != null) terrainCollider.enabled = enabled;
     }
-    public void DissipateAndPoolVisualOnly(float fadeSeconds = 0.20f) {
+    public void DissipateAndHideVisualOnly(float fadeSeconds = -1) {
         if (_isDespawned) return;
         _isDespawned = true; 
         // Ensure no collision during fade.
         SetTerrainColliderEnabled(false);
+        float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.spriteScaleOutSeconds;
+        AnimateSpriteScale(1f, 0f, d);
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
-        _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(Mathf.Max(0.01f, fadeSeconds)));
+        _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(d));
     }
 
     private void Visual_ChargeOnBoost(float appetite01)
     {
         if (visual.particleSystem == null) return;
+        Debug.Log($"[DUST] Charging on boost with appetite 1: {appetite01}");
         if (!_baseCaptured) CaptureBaseVisual();
 
         float a = Mathf.Clamp01(appetite01);
@@ -529,11 +527,7 @@ public class CosmicDust : MonoBehaviour {
         main.startSize = _baseSize * Mathf.Lerp(1.00f, 1.12f, s);
     }
 
-    private void BeginFadeOutVisualOnly(float duration, System.Action onComplete = null)
-    {
-        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
-        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(duration, onComplete));
-    }
+
     private static Color MulRgb(Color c, float mul)
     {
         return new Color(c.r * mul, c.g * mul, c.b * mul, c.a);
@@ -549,9 +543,6 @@ public class CosmicDust : MonoBehaviour {
         Color from = _currentTint;
         Color to   = _currentTint; to.a = 0f;
 
-        Vector3 s0 = transform.localScale;
-        Vector3 s1 = s0 * 0.85f;
-
         // Optional: if you want “stop blocking immediately”
         SetTerrainColliderEnabled(false);
 
@@ -559,7 +550,6 @@ public class CosmicDust : MonoBehaviour {
         {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
-            transform.localScale = Vector3.Lerp(s0, s1, u);
             SetTint(Color.Lerp(from, to, u));
             yield return null;
         }
@@ -576,7 +566,9 @@ public class CosmicDust : MonoBehaviour {
     {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-
+        if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
+        SetVisualsEnabled(true);
+        ResetSpriteScaleTo(0f);
         _isBreaking = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
@@ -601,7 +593,7 @@ public class CosmicDust : MonoBehaviour {
             visual.particleSystem.Clear(true);
         }
 
-        _currentTint.a = 0.5f;
+        _currentTint.a = 0f;
         SetTint(_currentTint);
 
         clearing.hardness01 = 0f;
@@ -628,21 +620,40 @@ public class CosmicDust : MonoBehaviour {
         }
         SetTint(toTint);
     }    
-    public void DespawnToPoolInstant()
-    { 
-        DisableInteractionImmediately();
-        // If you do NOT want lingering particles when pooled:
-        if (visual.particleSystem != null) { 
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); 
-            visual.particleSystem.Clear(true);
-        }
-        var cHide = _currentTint; cHide.a = 0f;
-        SetTint(cHide);
-        transform.localScale = Vector3.zero;
 
-        _isDespawned = true;
-        DespawnGracefully();
-    }    
+    public void SetVisualsEnabled(bool enabled) {
+         if (visual.sprite != null) 
+             visual.sprite.enabled = enabled;
+         if (visual.particleSystem != null) {
+             if (enabled) { 
+                 var emission = visual.particleSystem.emission;
+                 emission.enabled = true;
+                 if (!visual.particleSystem.isPlaying) 
+                     visual.particleSystem.Play(true);
+             }
+             else {
+                 visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                 visual.particleSystem.Clear(true);
+             }
+         }
+    }
+
+    public void HideVisualsInstant() {
+     // Stop any running sprite scale/fade routines that might fight this.
+     if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
+     if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
+     if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
+    
+     // Make fully invisible.
+     var c = _currentTint;
+     c.a = 0f;
+     SetTint(c);
+    
+     if (visual.sprite != null)
+         visual.sprite.transform.localScale = Vector3.zero;
+     SetVisualsEnabled(false);
+    }
+
     private void SyncParticlesToCollider()
     {
         if (visual.particleSystem == null || _box == null) return;
@@ -664,10 +675,7 @@ public class CosmicDust : MonoBehaviour {
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
-
-        // Keep PS transform stable; drive footprint via startSize.
-        visual.particleSystem.transform.localScale = Vector3.one;
-
+        
         var main = visual.particleSystem.main;
 
         float mul = Mathf.Clamp(visual.particleFootprintMul, 0.05f, 2.0f);
@@ -687,20 +695,13 @@ public class CosmicDust : MonoBehaviour {
         _baseCaptured = true;
         
     }
-    private void DisableInteractionImmediately() { 
-        // Stop affecting vehicles instantly (even if particles linger)
-        if (terrainCollider) if (terrainCollider != null) if (terrainCollider != null) terrainCollider.enabled = false; 
-        var col = GetComponent<Collider2D>(); 
-        if (col) col.enabled = false; 
-        gameObject.layer = nonBlockingLayer;
-        if (gen != null) gen.NotifyCompositeDirty();
-    }
+
     private IEnumerator GrowIn()
     {
 
         float duration = (_growInOverride > 0f)
             ? _growInOverride
-            : 5f;
+            : _timings.particleGrowInSeconds;
 
         if (visual.particleSystem == null || duration <= 0f) yield break;
         
@@ -718,16 +719,58 @@ public class CosmicDust : MonoBehaviour {
         SetDustColorAllParticles(baseCol);
 
     }
-    private IEnumerator FadeOutThenPoolVisualOnly(float duration)
+// ------------- TIMING HELPERS -------------
+    private float ResolveScaleSeconds(float from, float to, float seconds)
     {
-        BeginFadeOutVisualOnly(duration, () =>
-        {
-            if (gen != null) gen.OnDustVisualFadedOut(this);
-            else gameObject.SetActive(false);
-        });
+        if (seconds > 0f) return seconds;
 
-        // Wait until the fade completes (if your calling code expects a coroutine)
-        yield return new WaitForSeconds(duration);
+        // Default based on direction.
+        // Assumes your struct has these fields; if names differ, align them to your actual DustVisualTimings.
+        return (to >= from) ? _timings.spriteScaleInSeconds : _timings.spriteScaleOutSeconds;
+    }
+
+    private float ResolveFadeOutSeconds(float seconds)
+    {
+        if (seconds > 0f) return seconds;
+        return _timings.fadeOutSeconds;
+    }
+
+// ------------- SCALE -------------
+    private void AnimateSpriteScale(float from, float to, float seconds = -1f)
+    {
+        float dur = ResolveScaleSeconds(from, to, seconds);
+
+        if (_spriteScaleRoutine != null)
+            StopCoroutine(_spriteScaleRoutine);
+
+        _spriteScaleRoutine = StartCoroutine(ScaleSpriteRoutine(from, to, dur));
+    }
+
+    private void ResetSpriteScaleTo(float s)
+    {
+        if (visual.sprite == null) return;
+        visual.sprite.transform.localScale = Vector3.one * s; // your current semantics are fine【turn20file14†CosmicDust.cs†L93-L96】
+    }
+
+// ------------- FADE -------------
+    private void BeginFadeOutVisualOnly(float duration = -1f, System.Action onComplete = null)
+    {
+        float dur = ResolveFadeOutSeconds(duration);
+
+        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
+        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(dur, onComplete));
+    }
+
+    private IEnumerator FadeOutThenPoolVisualOnly(float duration = -1f)
+    {
+        float dur = ResolveFadeOutSeconds(duration);
+
+        // run the fade as a coroutine we can truly await
+        yield return FadeOutVisualOnly(dur, onComplete: null);
+
+        // after fade completes, notify generator (or hide locally)
+        if (gen != null) gen.OnDustVisualFadedOut(this);
+        else HideVisualsInstant();
     }
     private void OnCollisionStay2D(Collision2D collision)
     {
@@ -805,7 +848,7 @@ public class CosmicDust : MonoBehaviour {
     {
         _cellWorldSize       = Mathf.Max(0.001f, cellWorldSize);
         _cellClearanceWorld  = Mathf.Max(0f, clearanceWorld);
-        transform.localScale = Vector3.one;
+//        transform.localScale = Vector3.one;
         ApplyParticleFootprint();
         RebuildBoxColliderForCurrentScale();
         SyncParticlesToCollider();
@@ -829,49 +872,10 @@ public class CosmicDust : MonoBehaviour {
         c.b = Mathf.Clamp01(c.b + variation);
         SetTint(c);
     }
-    private IEnumerator FadeOutThenPool(float duration)
-    {
-        // Let already-emitted particles remain; stop emission only.
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
-        float t = 0f;
-        Color from = _currentTint;
-        Color to   = _currentTint; to.a = 0f;
-
-        Vector3 startScale = transform.localScale;
-        Vector3 endScale   = startScale * 0.85f; // subtle shrink; optional
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
-            SetTint(Color.Lerp(from, to, u));
-
-            yield return null;
-        }
-
-        SetTint(to);
-
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        // Hand back to generator/pool via your existing path.
-        if (_drumTrack != null && gen != null)
-        {
-            var gridPos = _drumTrack.WorldToGridPosition(transform.position);
-            gen.DespawnDustAt(gridPos);
-        }
-        else
-        {
-            gameObject.SetActive(false);
-        }
-    }
     private void ResetAndPlayParticles()
     {
         if (visual.particleSystem == null) return;
-        visual.particleSystem.gameObject.SetActive(true);
-        visual.particleSystem.transform.parent.gameObject.SetActive(true);
         var r = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
         if (r != null) r.enabled = true;
 
