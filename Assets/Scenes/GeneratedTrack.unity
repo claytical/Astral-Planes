@@ -11351,8 +11351,6 @@ GameObject:
   m_Component:
   - component: {fileID: 869126478}
   - component: {fileID: 869126481}
-  - component: {fileID: 869126480}
-  - component: {fileID: 869126479}
   - component: {fileID: 869126482}
   m_Layer: 0
   m_Name: DustPool
@@ -11375,81 +11373,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 823134540}
-  - {fileID: 1164776387}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!66 &869126479
-CompositeCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 869126477}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_GeometryType: 0
-  m_GenerationType: 1
-  m_EdgeRadius: 0
-  m_ColliderPaths: []
-  m_CompositePaths:
-    m_Paths: []
-  m_VertexDistance: 0.0005
-  m_OffsetDistance: 0
-  m_UseDelaunayMesh: 0
-  m_CompositeGameObject: {fileID: 869126477}
---- !u!50 &869126480
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 869126477}
-  m_BodyType: 2
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
-  m_Constraints: 0
 --- !u!114 &869126481
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11470,6 +11395,11 @@ MonoBehaviour:
   abrasionWearPerSecondAtFullImpact: 0.65
   abrasionDissipateFadeSeconds: 0.2
   abrasionHardnessAtFullWear: 0.9
+  dustTimings:
+    spriteScaleInSeconds: 0.2
+    spriteScaleOutSeconds: 0.2
+    particleGrowInSeconds: 1
+    fadeOutSeconds: 0.2
   minClassicCycleInterval: 0.25
   vehicleErodeRadius: 1
   vehicleErodePerTick: 5
@@ -11491,9 +11421,17 @@ MonoBehaviour:
   tintDiffusionPropagateOnChange: 1
   tintDiffusionMinDelta: 0.0025
   tintDirtyMarkRadius: 1
+  dustWeatherDebug: 0
+  dustWeatherDebugInterval: 0.5
+  dustInfluenceRadiusTiles: 1
+  dustMaxForce: 0
+  dustTangentialFrac: 0.35
+  dustFlowFrac: 0.25
+  dustTurbulenceFrac: 0.15
+  dustNoiseScale: 0.65
+  dustNoiseSpeed: 0.6
   flowTilesPerFrame: 256
   poolPrewarm: 720
-  poolRoot: {fileID: 1164776387}
   maxSpawnMillisPerFrame: 1.2
   regrowCooldownSeconds: 3
   progressiveMaze: 1
@@ -11511,8 +11449,8 @@ MonoBehaviour:
   vehicleNudge: 0.25
   starErodeRadius: 1.2
   starErodePerTick: 6
-  compositeCollider: {fileID: 869126479}
-  compositeRebuildMinInterval: 0.1
+  compositeCollider: {fileID: 0}
+  compositeRebuildMinInterval: 0
   dustTerrainMask:
     serializedVersion: 2
     m_Bits: 128
@@ -11525,15 +11463,6 @@ MonoBehaviour:
   regrowVetoBoxMul: 0.85
   regrowVetoMaxHits: 8
   dustClaims: {fileID: 869126482}
-  dustWeatherDebug: 0
-  dustWeatherDebugInterval: 0.5
-  dustInfluenceRadiusTiles: 1
-  dustMaxForce: 0
-  dustTangentialFrac: 0.35
-  dustFlowFrac: 0.25
-  dustTurbulenceFrac: 0.15
-  dustNoiseScale: 0.65
-  dustNoiseSpeed: 0.6
 --- !u!114 &869126482
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11876,37 +11805,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1080859562}
   m_CullTransparentMesh: 1
---- !u!1 &1164776386
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1164776387}
-  m_Layer: 7
-  m_Name: Pooled Dust
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1164776387
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1164776386}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 869126478}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1190942844
 GameObject:
   m_ObjectHideFlags: 0

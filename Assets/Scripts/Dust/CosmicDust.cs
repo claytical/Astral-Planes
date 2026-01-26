@@ -138,6 +138,7 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
     [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
     private BoxCollider2D _box;
+    private CircleCollider2D _circle;
     private float _nonBoostClearSeconds;
     private float _cellWorldSize = 1f;
     private float _cellClearanceWorld = 0f;
@@ -207,6 +208,10 @@ public class CosmicDust : MonoBehaviour {
         // (or if there are multiple colliders involved in contact).
         _cachedColliders = GetComponentsInChildren<Collider2D>(true);
         _box = GetComponent<BoxCollider2D>();
+        // CircleCollider2D support (grid-of-circles dust tiles)
+        _circle = terrainCollider as CircleCollider2D;
+        if (_circle == null) _circle = GetComponent<CircleCollider2D>();
+        if (_circle == null) _circle = GetComponentInChildren<CircleCollider2D>(true);
         // If the prefab/instance was saved at scale 0, use a sane fallback.
         float mag = transform.localScale.magnitude; 
         if (mag < 0.05f || mag > 20f) 
@@ -250,6 +255,38 @@ public class CosmicDust : MonoBehaviour {
         }
 
         visual.sprite.transform.localScale = b;
+    }
+
+
+    // Sprite alpha fades are presentation details (eg. regrow), and must respect the authored
+    // tint alpha (eg. MusicalRoleProfile.baseColor.a). Do not overwrite _currentTint.a here.
+    private void SetSpriteAlphaOnly(float a01)
+    {
+        if (visual.sprite == null) return;
+        var c = visual.sprite.color;
+        c.a = Mathf.Clamp01(a01);
+        visual.sprite.color = c;
+    }
+
+    private void BeginFadeInSpriteAlpha(float durationSeconds, float targetAlpha)
+    {
+        if (visual.sprite == null) return;
+        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
+        _fadeRoutine = StartCoroutine(FadeSpriteAlphaRoutine(0f, Mathf.Clamp01(targetAlpha), durationSeconds));
+    }
+
+    private IEnumerator FadeSpriteAlphaRoutine(float from, float to, float seconds)
+    {
+        seconds = Mathf.Max(0.01f, seconds);
+        float t = 0f;
+        while (t < seconds)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / seconds);
+            SetSpriteAlphaOnly(Mathf.Lerp(from, to, u));
+            yield return null;
+        }
+        SetSpriteAlphaOnly(to);
     }
     public float GetWorldRadius()
     {
@@ -351,7 +388,7 @@ public class CosmicDust : MonoBehaviour {
 // Apply phase scale to particle footprint only
         ApplyParticleFootprint();
 
-        RebuildBoxColliderForCurrentScale();
+        RebuildColliderForCurrentScale();
         SyncParticlesToCollider();
 
 // IMPORTANT: do not compound drain each time ConfigureForPhase runs
@@ -372,8 +409,15 @@ public class CosmicDust : MonoBehaviour {
         ResetAndPlayParticles();
         ApplyParticleFootprint();
         CaptureBaseVisual();
+
+        // Rule #2: regrow should fade sprite alpha back to 1 (not pop).
+        SetSpriteAlphaOnly(0f);
+
         ResetSpriteScaleTo(0f);
         AnimateSpriteScale(0f, 1f); // uses _timings.spriteScaleInSeconds
+        // Fade back to the authored tint alpha (not a hardcoded value).
+        BeginFadeInSpriteAlpha(_timings.spriteScaleInSeconds, _currentTint.a);
+
         _growInRoutine = StartCoroutine(GrowIn());
     }
 
@@ -439,9 +483,26 @@ public class CosmicDust : MonoBehaviour {
 
     public void SetTerrainColliderEnabled(bool enabled)
     {
-        // Prefer cached colliders so we reliably disable whatever collider is actually producing contact.
+        // Prefer cached colliders so we reliably toggle whatever collider is actually producing contact.
         if (_cachedColliders == null || _cachedColliders.Length == 0)
             _cachedColliders = GetComponentsInChildren<Collider2D>(true);
+
+        // Determine current effective state (defensive: prefab defaults can drift from our expectations).
+        bool currentlyEnabled = false;
+        if (_cachedColliders != null)
+        {
+            for (int i = 0; i < _cachedColliders.Length; i++)
+            {
+                var c = _cachedColliders[i];
+                if (c != null && c.enabled) { currentlyEnabled = true; break; }
+            }
+        }
+        if (terrainCollider != null && terrainCollider.enabled)
+            currentlyEnabled = true;
+
+        // If already in the desired state, do nothing.
+        if (currentlyEnabled == enabled)
+            return;
 
         if (_cachedColliders != null)
         {
@@ -454,6 +515,14 @@ public class CosmicDust : MonoBehaviour {
 
         // Maintain legacy field behavior too.
         if (terrainCollider != null) terrainCollider.enabled = enabled;
+
+        // When enabling collision, ensure CircleCollider2D radius matches the current sprite footprint.
+        if (enabled)
+        {
+            RebuildColliderForCurrentScale();
+            SyncColliderRadiusToSprite();
+        }
+
     }
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1) {
         if (_isDespawned) return;
@@ -580,11 +649,7 @@ public class CosmicDust : MonoBehaviour {
             ? _baseLocalScale
             : (visual.prefabReferenceScale.sqrMagnitude > 0.0001f ? visual.prefabReferenceScale : Vector3.one);
 
-        if (terrainCollider != null) terrainCollider.enabled = true;
-
-        var col = GetComponent<Collider2D>();
-        if (col) col.enabled = true;
-
+        SetTerrainColliderEnabled(false);
         if (visual.particleSystem != null)
         {
             var emission = visual.particleSystem.emission;
@@ -651,26 +716,33 @@ public class CosmicDust : MonoBehaviour {
     
      if (visual.sprite != null)
          visual.sprite.transform.localScale = Vector3.zero;
+     SetTerrainColliderEnabled(false);
      SetVisualsEnabled(false);
     }
 
     private void SyncParticlesToCollider()
     {
-        if (visual.particleSystem == null || _box == null) return;
-        // World size of the box collider:
-        // WorldSize = localSize * lossyScale
-        Vector2 world = new Vector2(
-            _box.size.x * Mathf.Abs(transform.lossyScale.x),
-            _box.size.y * Mathf.Abs(transform.lossyScale.y)
-        );
+        if (visual.particleSystem == null) return;
+
+        // Prefer circle collider, then box, then any collider reference.
+        Collider2D c = (Collider2D)_circle;
+        if (c == null) c = (Collider2D)_box;
+        if (c == null) c = terrainCollider;
+        if (c == null)
+        {
+            if (_cachedColliders == null || _cachedColliders.Length == 0)
+                _cachedColliders = GetComponentsInChildren<Collider2D>(true);
+            if (_cachedColliders != null && _cachedColliders.Length > 0)
+                c = _cachedColliders[0];
+        }
+        if (c == null) return;
+
+        // Use collider bounds in WORLD space to drive particle shape scale.
+        Vector3 size = c.bounds.size;
 
         var shape = visual.particleSystem.shape;
-
         if (shape.enabled)
-        {
-            shape.scale = new Vector3(world.x, world.y, 1f);
-        }
-
+            shape.scale = new Vector3(size.x, size.y, 1f);
     }
     private void ApplyParticleFootprint()
     {
@@ -850,18 +922,48 @@ public class CosmicDust : MonoBehaviour {
         _cellClearanceWorld  = Mathf.Max(0f, clearanceWorld);
 //        transform.localScale = Vector3.one;
         ApplyParticleFootprint();
-        RebuildBoxColliderForCurrentScale();
+        RebuildColliderForCurrentScale();
         SyncParticlesToCollider();
     }
-    private void RebuildBoxColliderForCurrentScale()
+    private void RebuildColliderForCurrentScale()
     {
+        // Keep legacy BoxCollider2D support, but prefer CircleCollider2D for the new grid-of-circles approach.
+        // If neither is present, we do nothing.
+        if (_circle != null)
+        {
+            // For circle tiles, radius is driven by the sprite footprint (Rule #3).
+            SyncColliderRadiusToSprite();
+            return;
+        }
+
         if (_box == null) return;
 
         float desiredWorld = Mathf.Clamp(_cellWorldSize - _cellClearanceWorld, 0.001f, _cellWorldSize);
 
-        // With transform.localScale == 1, local size == world size.
-        _box.size   = new Vector2(desiredWorld, desiredWorld);
+        // Convert desired WORLD size into LOCAL size accounting for lossy scale.
+        // This prevents oversized colliders when the dust root or prefab is scaled.
+        float sx = Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.x));
+        float sy = Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.y));
+
+        _box.size   = new Vector2(desiredWorld / sx, desiredWorld / sy);
         _box.offset = Vector2.zero;
+    }
+
+    private void SyncColliderRadiusToSprite()
+    {
+        // Rule #3: collider radius should match the size of the visual sprite.
+        if (_circle == null || visual.sprite == null) return;
+
+        // Sprite bounds are in world space and already include current transform scale.
+        float worldRadius = Mathf.Max(0.0001f, Mathf.Max(visual.sprite.bounds.extents.x, visual.sprite.bounds.extents.y));
+
+        // Convert world radius to collider-local radius (CircleCollider2D.radius is in the collider's local space).
+        float sx = Mathf.Max(0.0001f, Mathf.Abs(_circle.transform.lossyScale.x));
+        float sy = Mathf.Max(0.0001f, Mathf.Abs(_circle.transform.lossyScale.y));
+        float lossy = Mathf.Max(sx, sy);
+
+        _circle.radius = worldRadius / lossy;
+        _circle.offset = Vector2.zero;
     }
     private void SetColorVariance()
     {

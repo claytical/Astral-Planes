@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 1980146515134306388}
   - component: {fileID: 8747843313378906591}
-  - component: {fileID: 1128350258214105976}
+  - component: {fileID: 6114654052489321639}
   m_Layer: 7
   m_Name: Cosmic Dust
   m_TagString: Untagged
@@ -49,6 +49,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _timings:
+    spriteScaleInSeconds: 0.2
+    spriteScaleOutSeconds: 0.2
+    particleGrowInSeconds: 1
+    fadeOutSeconds: 0.2
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
@@ -94,8 +99,8 @@ MonoBehaviour:
   preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
---- !u!61 &1128350258214105976
-BoxCollider2D:
+--- !u!58 &6114654052489321639
+CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -104,7 +109,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 1914cc8b2c1cd4b9faf047b184179035, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -129,17 +134,7 @@ BoxCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_SpriteTilingProperty:
-    border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0, y: 0}
-    oldSize: {x: 0, y: 0}
-    newSize: {x: 0, y: 0}
-    adaptiveTilingThreshold: 0
-    drawMode: 0
-    adaptiveTiling: 0
-  m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
-  m_EdgeRadius: 0
+  m_Radius: 0.4
 --- !u!1 &2371707622271433480
 GameObject:
   m_ObjectHideFlags: 0
@@ -5055,9 +5050,9 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 7476157650917278790, guid: c414f77bbc0ce4375b2a81edf31f558d,
+  m_Sprite: {fileID: -4034737190437275596, guid: d6d83a12a019d4ff2bc4b2258795a6ad,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -5083,7 +5078,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8294084348089236440
 Transform:
   m_ObjectHideFlags: 0

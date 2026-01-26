@@ -13,6 +13,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void Update()
     {
+        
         _timer += Time.deltaTime;
         if (_timer < keepClearTick) return;
         _timer = 0f;

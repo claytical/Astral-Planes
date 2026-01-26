@@ -794,7 +794,6 @@ public class Vehicle : MonoBehaviour
         envScale = 1f;
         _inDust = false;
     }    
-
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"[VEHICLE:COLLISION] hit '{coll.collider.name}' layer={coll.collider.gameObject.layer}", this);
