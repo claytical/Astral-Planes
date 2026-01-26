@@ -49,10 +49,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _timings:
+    spriteScaleInSeconds: 0.2
+    spriteScaleOutSeconds: 0.2
+    particleGrowInSeconds: 1
+    fadeOutSeconds: 0.2
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
     particleFootprintMul: 0.775
+    sprite: {fileID: 0}
     starRemovesWithoutRegrow: 0
     starAlphaFadeBias: 0
     fadeSeconds: 0
@@ -4991,7 +4997,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &5160715109473589012
 Transform:
   m_ObjectHideFlags: 0
@@ -5054,9 +5060,9 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b,
+  m_Sprite: {fileID: -4034737190437275596, guid: d6d83a12a019d4ff2bc4b2258795a6ad,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.09803922}
+  m_Color: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

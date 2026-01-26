@@ -15,7 +15,7 @@ MonoBehaviour:
   personality: 0
   mazeColor: {r: 1, g: 1, b: 1, a: 0.23921569}
   nodesPerStar: 8
-  inactiveShardTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  inactiveShardTint: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 3
   enableSafetyBubble: 1
