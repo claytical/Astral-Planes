@@ -39,6 +39,13 @@ public class CosmicDustGenerator : MonoBehaviour
     private float _tintDiffusionAccum = 0f;
     private Coroutine _compositeRebuildCo;
     private bool _compositeDirty;
+    [Tooltip("Debounce: minimum seconds between classic cycles.")]
+    [Header("Vehicle erosion (temporary)")]
+    [SerializeField] private float vehicleErodeRadius = 1f;   // world units
+    [SerializeField] private int vehicleErodePerTick = 2;       // max cells per call
+    [Header("MineNode Erosion")]
+    [SerializeField] private float mineNodeErodeRadius = 1f;
+
     [SerializeField] private int mineNodeErodePerTick = 10;
     [Header("Dust Visual Footprint")]
     [Range(0.8f, 1.6f)]
@@ -46,7 +53,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
     [Header("Tile Sizing")]
     [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox
-    
     // ------------------------------------------------------------------
     // Authoritative grid (no pooling). The grid is the traffic cop.
     // ------------------------------------------------------------------
@@ -71,7 +77,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
 
     private readonly Queue<List<Vector2Int>> _pendingCorridorRegrowth = new Queue<List<Vector2Int>>();
-    public List<GameObject> hexagons = new List<GameObject>();
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
     // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
@@ -137,15 +142,14 @@ public class CosmicDustGenerator : MonoBehaviour
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     private Coroutine _spawnRoutine;
     private bool _isSpawningMaze = true;
+    private MazeArchetype _progressivePhase = MazeArchetype.Establish;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
-    
     [SerializeField] private int flowTilesPerFrame = 128;   // tune to grid size (e.g., 32x18 grid ≈ 576 → 128–256 is good)
     [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
 
     [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
-    
     [SerializeField] private float globalTurbulence = 0.5f;
     [SerializeField] private float hiveShiftInterval = 4f;  // how often the hive changes its mind
     [SerializeField] private float hiveShiftBlend    = 0.40f; // how strongly to blend to the new direction
@@ -1757,14 +1761,40 @@ private void EnsureCellGrid()
         if (!isActiveAndEnabled) return;
         // If this generator is active but its GameObject is not in hierarchy (parent disabled), also bail.
         if (!gameObject.activeInHierarchy) return;
-        
-        foreach (var go in hexagons) { 
-            if (!go) continue; 
-            if (!go.activeInHierarchy) continue;
-            var d = go.GetComponent<CosmicDust>(); 
-            if (d == null) continue; 
-            if (!d.isActiveAndEnabled) continue; 
-            StartCoroutine(d.RetintOver(seconds, _mazeTint));
+
+        // Primary: iterate the authoritative grid.
+        if (_cellGridReady && _cellGo != null)
+        {
+            for (int x = 0; x < _cellW; x++)
+            {
+                for (int y = 0; y < _cellH; y++)
+                {
+                    var go = _cellGo[x, y];
+                    if (!go) continue;
+                    if (!go.activeInHierarchy) continue;
+
+                    var d = _cellDust != null ? _cellDust[x, y] : go.GetComponent<CosmicDust>();
+                    if (d == null) continue;
+                    if (!d.isActiveAndEnabled) continue;
+
+                    StartCoroutine(d.RetintOver(seconds, _mazeTint));
+                }
+            }
+            return;
+        }
+
+        // Fallback: if the grid isn't ready yet, scan children under the dust root.
+        // This preserves behavior during early initialization / phase transitions.
+        if (activeDustRoot != null)
+        {
+            var dusts = activeDustRoot.GetComponentsInChildren<CosmicDust>(includeInactive: false);
+            for (int i = 0; i < dusts.Length; i++)
+            {
+                var d = dusts[i];
+                if (d == null) continue;
+                if (!d.isActiveAndEnabled) continue;
+                StartCoroutine(d.RetintOver(seconds, _mazeTint));
+            }
         }
     }
 
@@ -1782,7 +1812,6 @@ private void EnsureCellGrid()
                         RemoveActiveAt(gp, go);
                 }
             }
-            hexagons.Clear();
             _permanentClearCells.Clear();
         }
         finally
@@ -1957,7 +1986,6 @@ private void EnsureCellGrid()
                     // SPAWN + REGISTER (VISUAL FIRST)
                     // ---------------------------
                     var hex = GetOrCreateCellGO(grid);
-                    if (!hexagons.Contains(hex)) hexagons.Add(hex);
 
                     if (hex.TryGetComponent<CosmicDust>(out var dust))
                     {
@@ -2072,8 +2100,9 @@ private void EnsureCellGrid()
         // Logical authority: the moment a cell is cleared, it stops contributing to the maze.
         SetCellState(grid, DustCellState.Empty);
 
-        // Drop from legacy registries
-        if (go) hexagons.Remove(go);
+        // Drop from the reverse-lookup map.
+        if (go != null)
+            _goToCell.Remove(go);
 
         // No pooling: hide immediately. Any fade-out behavior should be handled by CosmicDust.
         if (go != null)
@@ -2123,10 +2152,11 @@ private void EnsureCellGrid()
         // If something already occupies this cell, hide it (no pooling).
         if (TryGetCellGo(gridPos, out var existing) && existing != null && existing != hex)
         {
-            hexagons.Remove(existing);
+            _goToCell.Remove(existing);
             if (existing.TryGetComponent<CosmicDust>(out var exDust) && exDust != null)
                 SetDustCollision(exDust, false);
-                HideCellGO(existing);
+
+            HideCellGO(existing);
         }
 
         // Register in the authoritative grid.
@@ -2447,7 +2477,7 @@ private void EnsureCellGrid()
             _fillMap[pos] = Random.value < fillChance;
         }
 
-        for (int i = 0; i < 1; i++)
+        for (int i = 0; i < 3; i++)
         {
             var next = new Dictionary<Vector2Int, bool>();
             foreach (var cell in _fillMap.Keys)
