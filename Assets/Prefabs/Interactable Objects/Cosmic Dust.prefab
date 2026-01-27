@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4213040972611002}
   - component: {fileID: 1980146515134306388}
   - component: {fileID: 8747843313378906591}
-  - component: {fileID: 6114654052489321639}
+  - component: {fileID: 3983120499980671434}
   m_Layer: 7
   m_Name: Cosmic Dust
   m_TagString: Untagged
@@ -68,10 +68,11 @@ MonoBehaviour:
     energyDrainPerSecond: 0
     noDrainWhileBoosting: 0
   clearing:
-    hardness01: 0.2
+    hardness01: 0.367
     nonBoostSecondsToBreak: 0
     temporaryRegrowDelaySeconds: 0
   useWorkShaderParams: 1
+  previewWorkHoldSeconds: 0.1
   behavior: 0
   slowFactor: 0.2
   slowDuration: 0.1
@@ -100,8 +101,8 @@ MonoBehaviour:
   preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
---- !u!58 &6114654052489321639
-CircleCollider2D:
+--- !u!61 &3983120499980671434
+BoxCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -135,7 +136,17 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.4
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 1, y: 1}
+  m_EdgeRadius: 0
 --- !u!1 &2371707622271433480
 GameObject:
   m_ObjectHideFlags: 0
