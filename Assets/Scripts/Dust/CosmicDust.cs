@@ -852,8 +852,6 @@ public class CosmicDust : MonoBehaviour {
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return; 
         Debug.Log($"[DUST] OnCollisionStay2D: {collision.gameObject.name} with hardness {clearing.hardness01}");
-        // Optional: make dust affect the ship handling when physically contacting a tile.
-        vehicle.EnterDustField(interaction.speedScale, interaction.accelScale);
 
         // --- Clearing rules ---
         if (vehicle.boosting)
