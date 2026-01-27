@@ -14,6 +14,12 @@ public class CosmicDustGenerator : MonoBehaviour
     [Header("Maze Collision Shape")]
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
     public float cellClearanceWorld = 0f;
+
+    [Header("Hardness")]
+    [Tooltip("Baseline dust hardness for non-imprinted maze cells. Imprinted MineNode cells override this via DustImprint.hardness01.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float defaultMazeHardness01 = 0f;
+
     struct DustImprint
     {
         public Color color;
@@ -485,6 +491,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.PrepareForReuse();
             dust.SetVisualTimings(dustTimings);
             dust.SetGrowInDuration(dustTimings.particleGrowInSeconds);
+            dust.clearing.hardness01 = GetCellHardness01(gp);
             Color regrowTint = GetCellVisualColor(gp);
             dust.SetTint(regrowTint);
             dust.Begin();
@@ -801,6 +808,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), dustFootprintMul, cellClearanceWorld);
             dust.PrepareForReuse();
             dust.SetGrowInDuration(hexGrowInSeconds);
+            dust.clearing.hardness01 = GetCellHardness01(gp);
             dust.SetTint(_mazeTint);
             dust.Begin();
             SetDustCollision(dust, false);
@@ -1141,6 +1149,15 @@ public class CosmicDustGenerator : MonoBehaviour
         // Default: current phase maze tint (PhaseStarBehaviorProfile.mazeColor).
         return _mazeTint;
     }
+
+    private float GetCellHardness01(Vector2Int cell)
+    {
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+            return Mathf.Clamp01(imp.hardness01);
+
+        return Mathf.Clamp01(defaultMazeHardness01);
+    }
+
     private Color BlendImprintWithNeighbors(Vector2Int cell, Color target, int radius, float neighborWeight)
     {
         radius = Mathf.Max(0, radius);
@@ -1366,6 +1383,7 @@ public class CosmicDustGenerator : MonoBehaviour
                         dust.PrepareForReuse();
                         dust.SetGrowInDuration(hexGrowInSeconds);
                         dust.SetTint(_mazeTint);
+                        dust.clearing.hardness01 = GetCellHardness01(grid);
                         dust.ConfigureForPhase(phaseNow);
                         dust.Begin();
 
