@@ -419,13 +419,6 @@ public class Collectable : MonoBehaviour
                 step += seek;
             }
         }
-        if (dustGen != null)
-        {
-            Vector2 flow = dustGen.SampleFlowAtWorld((Vector3)cur);
-            if (flow.sqrMagnitude > 0.0001f)
-                step += flow.normalized * (FLOW_STEP_SCALE * _speed * Time.fixedDeltaTime);
-        }
-
         float t = Time.time;
         float nx = Mathf.PerlinNoise(seedA, t * 0.35f) * 2f - 1f;
         float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
