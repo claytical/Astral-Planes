@@ -952,17 +952,12 @@ MonoBehaviour:
   disableCoralDuringBridge: 1
   noteViz: {fileID: 0}
   glitch: {fileID: 0}
-  motifQueue: {fileID: 11400000, guid: 266e8ac30daaa4002b473d9de45ffea5, type: 2}
-  motifLibrary: {fileID: 11400000, guid: 442706371a61147f0b0ad47d1691b5a1, type: 2}
-  previousPhase: 0
-  currentPhase: 0
+  phaseTransitionManager: {fileID: 0}
   localPlayers: []
   playerStatsGrid: {fileID: 0}
   _activeTracks: []
   phaseBridgeFadeOutSeconds: 1
   phaseBridgeFadeInSeconds: 0.6
-  noteSetFactory: {fileID: -4105871785280924453, guid: c4eb69c1639e44822871748faa6b2751,
-    type: 3}
 --- !u!114 &1151719980
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -977,7 +972,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   profile: {fileID: 11400000, guid: c7be627f460294316900846114b342f3, type: 2}
   cursor: 0
+  remixRings: 0
   commitWindowBeats: 1
+  burnIfOutsideWindow: 0
+  spreadOverLoops: 1
   retunePolicy: 0
   seedFromProfileOnPhaseStart: 0
   useMotifChordProfiles: 1

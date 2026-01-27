@@ -473,8 +473,7 @@ public class MineNode : MonoBehaviour
         // burst spawn: your existing call site is good; just make it depend on (_track, _noteSet)
         var origin = transform.position;
         var repelFrom = vehicle != null ? vehicle.transform.position : origin;
-
-        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.TrappedInDustNearOrigin, 10);
+        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10);
 
         TriggerExplosion();
     }

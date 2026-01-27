@@ -14,13 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Minor Check
   displayName: Minor Check
-  beatMood: 0
   keyRootMidi: 55
-  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
-  phaseProfile: {fileID: 11400000, guid: a756d4e83a53b43ed990e4579dde83e8, type: 2}
+  entryDrumLoops:
+  - {fileID: 8300000, guid: d8d6154a598ef4807b2450da93814fe1, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: f58c5aab1881b4af68864550df141a3a, type: 3}
+  - {fileID: 8300000, guid: 6c2479da8cfaa4a5daa93dd97ea6427c, type: 3}
+  - {fileID: 8300000, guid: 3542ee37aa85440588332c6aa220b5c2, type: 3}
+  - {fileID: 8300000, guid: 720d74577fa6e4a1b8eb4872b3512f3b, type: 3}
+  - {fileID: 8300000, guid: ee4f03bf8a099423889135fc6748832e, type: 3}
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: c7be627f460294316900846114b342f3, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 11cb3704113c845758b5967f0256a8af, type: 2}
   - {fileID: 11400000, guid: d19a70b25bf994732a4b4a38ccfb16c8, type: 2}
   - {fileID: 11400000, guid: 5b9c935d3689e4a129d3e3d632569110, type: 2}
   - {fileID: 11400000, guid: 9e78967671b4d4ae08f936b848a67d14, type: 2}
   selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

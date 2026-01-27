@@ -67,6 +67,15 @@ public class InstrumentTrackController : MonoBehaviour
     public float lastCollectionTime { get; private set; } = -1f;
     private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
     private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
+    [Header("Gravity Void (Expansion Waiting)")]
+    [Tooltip("Spawned when this track stages an expansion (waiting for expansion). Despawned when expansion commits.")]
+    [SerializeField] private GameObject gravityVoidPrefab;
+    [Tooltip("Optional parent for the spawned gravity void instance.")]
+    [SerializeField] private Transform gravityVoidParent;
+    [Tooltip("Scale multiplier applied to the spawned void instance.")]
+    [SerializeField] private float gravityVoidScale = 1f;
+    private GameObject _gravityVoidInstance;
+    private ParticleSystem[] _gravityVoidParticles;
 
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
@@ -87,7 +96,41 @@ public class InstrumentTrackController : MonoBehaviour
     public void NotifyCollected() {
         lastCollectionTime = Time.time;
     }
-    
+
+    public void DespawnGravityVoid() { 
+        if (_gravityVoidInstance != null) { 
+            Destroy(_gravityVoidInstance);
+            _gravityVoidInstance = null;
+            _gravityVoidParticles = null;
+        }
+    }
+
+    public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint) {
+        if (gravityVoidPrefab == null) return;
+        if (_gravityVoidInstance == null) { 
+            var parent = (gravityVoidParent != null) ? gravityVoidParent : transform;
+            _gravityVoidInstance = Instantiate(gravityVoidPrefab, worldPos, Quaternion.identity, parent);
+            if (gravityVoidScale != 1f && _gravityVoidInstance != null) 
+                _gravityVoidInstance.transform.localScale *= gravityVoidScale;
+            _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
+        }
+        else { 
+            _gravityVoidInstance.transform.position = worldPos;
+        }
+        if (_gravityVoidParticles != null) {
+            // Preserve prefab alpha by multiplying.
+            for (int i = 0; i < _gravityVoidParticles.Length; i++) {
+                var ps = _gravityVoidParticles[i]; 
+                if (ps == null) continue;
+                var main = ps.main;
+                Color baseC = main.startColor.color;
+                Color outC = tint;
+                outC.a = baseC.a * tint.a;
+                main.startColor = outC;
+            }
+        }
+    }
+
     public void ResetControllerBinGuards()
     {
         _binExtensionSignaled?.Clear();

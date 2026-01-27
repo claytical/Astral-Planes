@@ -416,8 +416,8 @@ public class Vehicle : MonoBehaviour
         float diameter = r * 2f; 
         float ratio = diameter / cell; // 1.0 means vehicle ~ 1 cell wide
     }
-    private void RefreshVehicleKeepClearIfNeeded()
-    {
+    private void RefreshVehicleKeepClearIfNeeded() {
+        if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
         if (!keepDustClearAroundVehicle) return;
 
         // Throttle refresh
@@ -597,7 +597,6 @@ public class Vehicle : MonoBehaviour
         {
             TriggerThud(coll.contacts[0].point);
         }
-
 
         // ---- Impact dig (dust maze) ----
         // Design intent: a single strike on collision entry triggers a chain reaction trench down a grid line.

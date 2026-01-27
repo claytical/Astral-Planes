@@ -11390,6 +11390,7 @@ MonoBehaviour:
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   cellClearanceWorld: 0
+  defaultMazeHardness01: 0.5
   dustTimings:
     spriteScaleInSeconds: 0.2
     spriteScaleOutSeconds: 0.2
@@ -12225,6 +12226,10 @@ MonoBehaviour:
   noteVisualizer: {fileID: 45202786}
   cohortTriggerRole: 2
   cohortWindowFraction: 0.5
+  gravityVoidPrefab: {fileID: 9142743768792165380, guid: 3c8cf7e4f7b0f479b9cd36dffc6bdbe5,
+    type: 3}
+  gravityVoidParent: {fileID: 1354683683}
+  gravityVoidScale: 1
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0

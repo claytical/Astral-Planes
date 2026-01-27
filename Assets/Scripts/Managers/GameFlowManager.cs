@@ -211,7 +211,6 @@ public class GameFlowManager : MonoBehaviour
     public void BeginPhaseBridge(MazeArchetype to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
 {
     Debug.Log($"[BRIDGE] Starting bridge for nextPhase={to.ToString() ?? "<null>"} at t={AudioSettings.dspTime:0.00}");
-
     var sig = BridgeLibrary.For(phaseTransitionManager.currentPhase, to);
     StartCoroutine(PlayPhaseBridge(sig, to));
 }
@@ -555,6 +554,7 @@ public class GameFlowManager : MonoBehaviour
 {
     // ===== Lock gameplay & prep =====
     GhostCycleInProgress = true;
+    BridgePending = true;
     FreezeGameplayForBridge();                      // despawn collectables, gate input
 
     var drum = activeDrumTrack;
@@ -706,7 +706,8 @@ public class GameFlowManager : MonoBehaviour
     if (demoMode) {
         // tidy up bridge accent / flags
         if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
-        GhostCycleInProgress = false; 
+        GhostCycleInProgress = false;
+        BridgePending = false;
         SetBridgeVisualMode(false);
         // Go back to the starting screen (Main) and clear players.
         // This uses your existing path.
@@ -744,6 +745,7 @@ public class GameFlowManager : MonoBehaviour
         } 
         if (sig.includeDrums && drum) drum.SetBridgeAccent(false); 
     GhostCycleInProgress = false;
+    BridgePending = false;
     SetBridgeVisualMode(false);
 }
 
@@ -1097,6 +1099,8 @@ public class GameFlowManager : MonoBehaviour
         _coralInstance.gameObject.SetActive(false);
         return _coralInstance;
     }
+
+
     private void FreezeGameplayForBridge()
     {
         CleanupAllNoteTethers();
