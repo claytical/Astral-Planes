@@ -11389,18 +11389,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
-  iterations: 3
   cellClearanceWorld: 0
-  edgeRadiusFrac: 0.132
-  abrasionWearPerSecondAtFullImpact: 0.65
-  abrasionDissipateFadeSeconds: 0.2
-  abrasionHardnessAtFullWear: 0.9
   dustTimings:
     spriteScaleInSeconds: 0.2
     spriteScaleOutSeconds: 0.2
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.2
-  minClassicCycleInterval: 0.25
   vehicleErodeRadius: 1
   vehicleErodePerTick: 5
   mineNodeErodeRadius: 1
@@ -11409,7 +11403,6 @@ MonoBehaviour:
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
-  hexagons: []
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   imprintBlendRadius: 1
   imprintNeighborWeight: 0.55
@@ -11421,41 +11414,9 @@ MonoBehaviour:
   tintDiffusionPropagateOnChange: 1
   tintDiffusionMinDelta: 0.0025
   tintDirtyMarkRadius: 1
-  dustWeatherDebug: 0
-  dustWeatherDebugInterval: 0.5
-  dustInfluenceRadiusTiles: 1
-  dustMaxForce: 0
-  dustTangentialFrac: 0.35
-  dustFlowFrac: 0.25
-  dustTurbulenceFrac: 0.15
-  dustNoiseScale: 0.65
-  dustNoiseSpeed: 0.6
-  flowTilesPerFrame: 256
-  poolPrewarm: 720
   maxSpawnMillisPerFrame: 1.2
-  regrowCooldownSeconds: 3
-  progressiveMaze: 1
-  maxFeatures: 3
-  addPerLoop: 10
-  featureSpawnBudgetFrac: 0.12
-  featureFadeDurationFrac: 0.25
   hexGrowInSeconds: 0.45
-  globalTurbulence: 0.5
-  hiveShiftInterval: 4
-  hiveShiftBlend: 0.4
-  baseFlowStrength: 0.2
-  phaseFlowBias: 0.15
-  vehicleInfluenceRadius: 3.5
-  vehicleNudge: 0.25
-  starErodeRadius: 1.2
-  starErodePerTick: 6
-  compositeCollider: {fileID: 0}
-  compositeRebuildMinInterval: 0
-  dustTerrainMask:
-    serializedVersion: 2
-    m_Bits: 128
   dustQueryRadiusWorld: 1.25
-  dustQueryMaxColliders: 16
   vehicleMask:
     serializedVersion: 2
     m_Bits: 0
@@ -12218,7 +12179,7 @@ MonoBehaviour:
   dustBandTopInsetWorld: 0
   referenceWidthPx: 1920
   referenceColumns: 36
-  uiBottomPaddingPx: 160
+  uiBottomPaddingPx: 180
   autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
   stepPulseEveryN: 4
