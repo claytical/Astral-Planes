@@ -28,6 +28,12 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Baseline alpha for this role when used as a semantic color (track / MineNode / imprints).")]
     public float baseAlpha = 0.25f;
 
+
+[Header("Dust Mining")]
+[Range(0f, 1f)]
+[Tooltip("How hard dust imprinted/regrown with this role should be. 0 = soft/easy, 1 = hard/resists digging.")]
+public float dustHardness01 = 0.50f;
+
     [Header("Charge / Deny Tuning")]
     [Range(0f, 1f)]
     [Tooltip("How strongly charge pushes defaultColor toward white at full appetite.")]
@@ -93,4 +99,6 @@ public class MusicalRoleProfile : ScriptableObject
         c.a = Mathf.Clamp01(baseAlpha + denyAlphaBoost * s);
         return c;
     }
+
+    public float GetDustHardness01() => Mathf.Clamp01(dustHardness01);
 }
