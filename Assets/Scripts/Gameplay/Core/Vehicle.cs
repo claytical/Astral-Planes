@@ -24,9 +24,6 @@ public class Vehicle : MonoBehaviour
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     private float _dustSfxCooldown = 0f;
     private const float DustSfxInterval = 0.10f; // at most 10 Hz when really grinding dust
-    private bool _inDust = false;
-    private float _lastDustContactTime = -999f;
-    [SerializeField] private float dustExitGraceSeconds = 0.20f;    
     // === Arcade RB2D tuning ===
     [Header("Arcade Movement")]
     [SerializeField] private float arcadeMaxSpeed = 14f;
@@ -42,10 +39,8 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float carveTickHz = 20f; // 20 Hz is plenty
     private float _nextCarveTime;
     private Collider2D _lastDustCollider;
-    private Vector2 _lastDustContact;
     private float _cumulativeEnergySpent = 0f;
 // Single environment scalar (0..1], replaces envSpeedScale/envAccelScale in movement
-    [SerializeField] private float envScale = 1f;
     [Header("Input Filtering")]
     [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
     [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
@@ -55,7 +50,6 @@ public class Vehicle : MonoBehaviour
     private Vector2 _moveInput;
     private float _boostEnergySpentAccum = 0f;
     public float energyLevel;
-    public ParticleSystem remixParticleEffect;
     private float difficultyMultiplier = 1f;
 
     public bool boosting = false;
@@ -73,26 +67,19 @@ public class Vehicle : MonoBehaviour
     private Rigidbody2D rb;
     private AudioManager audioManager;
     private bool isInConstellation = false;
-    public Color profileColor;
     [SerializeField] private float minAlpha = 0.2f;
     [SerializeField] private float maxAlpha = 1f;
     private SpriteRenderer baseSprite;
     [SerializeField] private bool isLocked = false;
-    [SerializeField] private SpriteRenderer shipRenderer;
     private Coroutine rainbowRoutine;
     private bool remixTriggeredThisLoop;
     private Vector3 lastPosition;
-    private Vector3 originalScale;
     private DrumTrack drumTrack;
     private bool incapacitated = false;
     private double loopStartDSPTime;
-    private float boostTimeThisLoop = 0f;
-    [SerializeField] public RemixRingHolder remixRingHolder;
     private float _lastDamageTime = -1f;
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
-    public HashSet<MusicalRole> collectedRemixRoles = new();
-    private Color currentColorBlend = Color.white;
     [SerializeField] HarmonyDirector harmony;
     [SerializeField] private ShipMusicalProfile shipProfile;
     [Header("Dust Legibility Pocket")]
@@ -115,11 +102,6 @@ public class Vehicle : MonoBehaviour
     [Tooltip("Delay (seconds) before carving the pocket. Useful if spawn ordering is tight.")]
     [SerializeField] private float spawnRestPocketDelaySeconds = 0.0f;
 
-    [Header("Dust Impact Damage (Non-Boost)")]
-    [SerializeField] private float dustImpactDrainPerSecondMax = 8f;
-    [SerializeField] private float dustImpactForceVelScale = 0.02f;
-    [Range(0f, 1f)]
-    [SerializeField] private float dustImpactOppositionWeight = 1f;
     [Header("Scale Calibration (Debug)")] 
     [SerializeField] private bool logScaleCalibrationOnAssign = true;
     private bool _scaleCalibrationLogged = false;
@@ -176,7 +158,6 @@ public class Vehicle : MonoBehaviour
         } 
         float diameter = r * 2f; 
         float ratio = diameter / cell; // 1.0 means vehicle ~ 1 cell wide
-        Debug.Log($"[Scale] {name}: cellWorld={cell:F3}  vehicleDiameter≈{diameter:F3}  ratio(vehicle/cell)={ratio:F2}  " + $"keepClearRadiusCells={vehicleKeepClearRadiusCells}  dustExitGrace={dustExitGraceSeconds:F2}s", this);
     }
 
     public float GetMaxSpeed()
@@ -323,10 +304,7 @@ public class Vehicle : MonoBehaviour
             );
        
             baseSprite = GetComponent<SpriteRenderer>();
-            profileColor = baseSprite.color;
-            shipRenderer = baseSprite;
             audioManager = GetComponent<AudioManager>();
-            originalScale = transform.localScale;
             loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
             ApplyShipProfile(profile);
             if (rb == null)
@@ -597,21 +575,15 @@ public class Vehicle : MonoBehaviour
         );
     }
     void FixedUpdate() {
-        if (_inDust && (Time.time - _lastDustContactTime) > dustExitGraceSeconds) { 
-            ExitDustField();
-        }
+
         if (incapacitated) return;
     // --- PhaseStar Safety Bubble: dust has no effect inside the bubble ---
         if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
         {
-            if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
         }
 
         float dt = Time.fixedDeltaTime;
         RefreshVehicleKeepClearIfNeeded();
-        // --- Boost timer (use fixed dt in FixedUpdate) ---
-        if (boosting) boostTimeThisLoop += dt;
-
         // --- Loop boundary check (null-safe) ---
         if (drumTrack != null)
         {
@@ -632,16 +604,15 @@ public class Vehicle : MonoBehaviour
         // ---- movement ----
         if(canThrust && (hasInput || boosting)) {
             // Target velocity from input (single env scalar)
-            //Vector2 desiredVel = _moveInput.normalized * (arcadeMaxSpeed * envScale);
             Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
             // Target velocity from steer direction (sing env scalar)
-            Vector2 desiredVel = steerDir * (arcadeMaxSpeed * envScale);
+            Vector2 desiredVel = steerDir * arcadeMaxSpeed;
             // Acceleration pick (handles boost-only ships with accel=0)
             float accelUsed;
             if (requireBoostForThrust)
-                accelUsed = boosting ? (arcadeBoostAccel * envScale) : 0f;
+                accelUsed = boosting ? arcadeBoostAccel : 0f;
             else
-                accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel) * envScale;
+                accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel);
 
             if (accelUsed > 0f)
             {
@@ -683,79 +654,6 @@ public class Vehicle : MonoBehaviour
             rb.rotation = angleDeg;
         }
 
-    // --- Dust weather force-field (terrain maze) ---
-    if (gfm != null && gfm.dustGenerator != null)
-    {
-        var phaseNow = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : MazeArchetype.Establish;
-        _dustDebugCooldown -= Time.fixedDeltaTime;
-        bool debugPulse = _dustDebugCooldown <= 0f;
-        Vector3 vehicleWorld = rb.position;
-        if (debugPulse) _dustDebugCooldown = DustDebugInterval;
-        
-        if (gfm.dustGenerator.TryGetDustWeatherForce(vehicleWorld, phaseNow, out Vector2 dustForce, out float influence01, out float drainPerSecond)) {
-            if (PhaseStar.IsWorldPosInsideAnySafetyBubble(vehicleWorld, phaseNow)) {
-                if(_inDust) ExitDustField();
-            }
-            RefreshVehicleKeepClearPocket();
-            if (debugPulse)
-            {
-                Debug.Log($"[DustWeather] pulse, phase={phaseNow} pos={transform.position}", this);
-            }
-            rb.AddForce(dustForce, ForceMode2D.Force);
-
-            // Treat "near dust" like being in dust, but with a grace exit so it doesn’t flicker.
-            _inDust = true;
-            _lastDustContactTime = Time.time;
-
-            // Energy drain while lingering in dust (non-boost contact), scaled by how "deep" we are.
-            if (!boosting && drainPerSecond > 0f)
-                DrainEnergy(drainPerSecond * influence01 * dt, "DustWeather");
-
-            if (!boosting && dustImpactDrainPerSecondMax > 0f && rb.linearVelocity.sqrMagnitude > 0.0001f)
-            {
-                float fMag = dustForce.magnitude;
-                float vMag = rb.linearVelocity.magnitude;
-
-                float opposition01 = 1f;
-                if (fMag > 0.0001f && vMag > 0.0001f)
-                {
-                    Vector2 fDir = dustForce / fMag;
-                    Vector2 vDir = rb.linearVelocity / vMag;
-                    float oppose = Mathf.Clamp01(-Vector2.Dot(fDir, vDir)); // 1 when opposing
-                    opposition01 = Mathf.Lerp(1f, oppose, dustImpactOppositionWeight);
-                }
-
-                float impact01 = Mathf.Clamp01(fMag * vMag * dustImpactForceVelScale) * opposition01;
-                float impactDrain = dustImpactDrainPerSecondMax * impact01 * influence01 * dt;
-                if (impactDrain > 0f)
-                    if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
-                    {
-                        if (_inDust) ExitDustField();      // clears flags/scales so it feels truly safe
-                    }
-                    else
-                    {
-                        DrainEnergy(impactDrain, "DustImpact");
-                    }
-
-            }
-            
-            // SFX feedback (throttled)
-            var ctrl = gfm.controller;
-            if (ctrl != null)
-            {
-                _dustSfxCooldown -= Time.fixedDeltaTime;
-                if (_dustSfxCooldown <= 0f)
-                {
-                    bool pushing = boosting && rb.linearVelocity.sqrMagnitude > 0.5f;
-                    var behavior = pushing ? DustBehaviorType.PushThrough : DustBehaviorType.Repel;
-                    InstrumentTrack instrument = ctrl.FindTrackByRole(MusicalRole.Harmony);
-                //    CollectionSoundManager.Instance?.PlayDustInteraction(instrument,  instrument.GetCurrentNoteSet(), influence01, behavior);
-                    _dustSfxCooldown = DustSfxInterval;
-                }
-            }
-
-        }
-}
 // Stats + audio
 
     UpdateDistanceCovered();
@@ -780,20 +678,7 @@ public class Vehicle : MonoBehaviour
     ConsumeEnergy(amount);
 }
 
-    public void EnterDustField(float speedScale, float accelScale)
-    {
-        float incoming = Mathf.Min(speedScale, accelScale);
-        float floor    = shipProfile ? shipProfile.envScaleFloor : 0.60f;
-        envScale = Mathf.Max(floor, incoming);
-        _inDust = true;
-        _lastDustContactTime = Time.time;
-    }
 
-    public void ExitDustField()
-    {
-        envScale = 1f;
-        _inDust = false;
-    }    
     void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"[VEHICLE:COLLISION] hit '{coll.collider.name}' layer={coll.collider.gameObject.layer}", this);
@@ -873,8 +758,7 @@ public class Vehicle : MonoBehaviour
         if (boosting && gfm != null && gfm.dustGenerator != null && gfm.dustGenerator.IsDustTerrainCollider(coll.collider))
         {
             _lastDustCollider = coll.collider;
-            _lastDustContact  = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
-        }
+                    }
 
     }
     void OnCollisionStay2D(Collision2D coll)
@@ -884,7 +768,6 @@ public class Vehicle : MonoBehaviour
         if (!gfm.dustGenerator.IsDustTerrainCollider(coll.collider)) return;
 
         _lastDustCollider = coll.collider;
-        _lastDustContact  = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
 
         // Rate-limit carving so it’s stable and doesn’t explode CPU
         if (Time.time < _nextCarveTime) return;
