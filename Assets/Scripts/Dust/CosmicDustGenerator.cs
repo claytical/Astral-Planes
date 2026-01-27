@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering.UI;
 using Random = UnityEngine.Random;
 
 public class CosmicDustGenerator : MonoBehaviour
@@ -18,7 +17,6 @@ public class CosmicDustGenerator : MonoBehaviour
     struct DustImprint
     {
         public Color color;
-        public Color shadowColor;
         public float healDelay;
         public float hardness01;
     }
@@ -32,14 +30,10 @@ public class CosmicDustGenerator : MonoBehaviour
     
     // --- Extracted controllers (refactor targets) ---
     private CosmicDustExclusionMap _exclusions = new CosmicDustExclusionMap();
-    private CosmicDustFlowFieldController _flowController = new CosmicDustFlowFieldController();
     private CosmicDustTintDiffusionSystem _tintDiffusionSystem;
     private readonly List<Vector2Int> _tmpReleased = new List<Vector2Int>(512);
     private readonly List<Vector2Int> _tmpClaimed  = new List<Vector2Int>(512);
     private float _tintDiffusionAccum = 0f;
-    private Coroutine _compositeRebuildCo;
-    private bool _compositeDirty;
-    [Tooltip("Debounce: minimum seconds between classic cycles.")]
     [Header("Vehicle erosion (temporary)")]
     [SerializeField] private float vehicleErodeRadius = 1f;   // world units
     [SerializeField] private int vehicleErodePerTick = 2;       // max cells per call
@@ -104,11 +98,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [Range(0f, 0.05f)] [SerializeField] private float tintDiffusionMinDelta = 0.0025f;
     [Tooltip("How far out to mark cells dirty when a tint-affecting event occurs (imprint, regrow, removal).")]
     [Range(0, 3)] [SerializeField] private int tintDirtyMarkRadius = 1;
-    // =====================================================================
-// Dust Weather Force Field (terrain maze)
-// Each active dust cell behaves like a local force field that repels vehicles
-// back toward empty space. The PhaseStar controls the global "weather" by phase.
-// =====================================================================
 
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
@@ -121,35 +110,18 @@ public class CosmicDustGenerator : MonoBehaviour
     private MazeArchetype _progressivePhase = MazeArchetype.Establish;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
-    [SerializeField] private int flowTilesPerFrame = 128;   // tune to grid size (e.g., 32x18 grid ≈ 576 → 128–256 is good)
     [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
 
     [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
-    [SerializeField] private float globalTurbulence = 0.5f;
-    [SerializeField] private float hiveShiftInterval = 4f;  // how often the hive changes its mind
-    [SerializeField] private float hiveShiftBlend    = 0.40f; // how strongly to blend to the new direction
-    [SerializeField] private float baseFlowStrength  = 0.20f; // world units per second
-    [SerializeField] private float phaseFlowBias     = 0.15f; // extra per-phase bias
     private int _ffW = -1, _ffH = -1;
-    private int _bulkTopologyDepth = 0;
-    private bool IsBulkTopology => _bulkTopologyDepth > 0;
     private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
     public float TileDiameterWorld
     {
         get => tileDiameterWorld;
         set => tileDiameterWorld = value;
     }
-    [Header("Composite Collider (Manual Generation)")]
-    [Tooltip("CompositeCollider2D that merges dust colliders. If null, we'll try activeDustRoot, then self.")]
-    [SerializeField] private CompositeCollider2D compositeCollider;
-
-    [Tooltip("Debounce interval (seconds) for composite rebuilds. 0 = once per frame.")]
-    [SerializeField] private float compositeRebuildMinInterval = 0.0f;
-
-    private float _nextCompositeRebuildAt;
     [Header("Dust Terrain Query")]
-    [SerializeField] private LayerMask dustTerrainMask;
     [SerializeField] private float dustQueryRadiusWorld = 1.25f;
     [Header("Regrow Veto (Vehicle Overlap)")] 
     [Tooltip("If a vehicle overlaps a cell, regrow/spawn is deferred to prevent collider penetration shoves.")] 
@@ -161,22 +133,11 @@ public class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private int regrowVetoMaxHits = 8; 
     
     private Collider2D[] _vehicleVetoHits;    
-    private readonly Collider2D[] _dustHits = new Collider2D[16];
-    private int _compositeBatchDepth = 0;
 
     [SerializeField] private DustClaimManager dustClaims;
 
-    // ------------------------------------------------------------------
-    // Compatibility: some CosmicDust variants call back into the generator
-    // when a tile's collider enabled state changes (e.g., after a visual-only
-    // fade completes). We keep this as a lightweight shim so older/alternate
-    // dust scripts compile, and so the composite collider stays correct.
-    // ------------------------------------------------------------------
-    public void NotifyDustColliderStateChanged()
-    {
-        MarkCompositeDirty();
-    }
-    public void BeginCompositeBatch() => _compositeBatchDepth++;
+    // Back-compat hooks (no-op now that composite rebuilds are removed).
+    public void BeginCompositeBatch() { }
     public enum DustClearMode
     {
         FadeAndHide,
@@ -201,7 +162,7 @@ public class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Clearing); 
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){ 
            SetDustCollision(dust, false);
-        }        MarkCompositeDirty();
+        }
 
          // Visual policy
          if (dust != null) { 
@@ -223,14 +184,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
          if (scheduleRegrow) 
              RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true); 
-    }
-    public void EndCompositeBatch()
-    {
-        _compositeBatchDepth = Mathf.Max(0, _compositeBatchDepth - 1);
-
-        // If we just ended the outermost batch, schedule one rebuild.
-        if (_compositeBatchDepth == 0 && _compositeDirty)
-            ScheduleCompositeRebuild();
     }
     public bool TryResolveDustCellFromWorldPoint(Vector2 world, int searchRadiusCells, out Vector2Int resolved)
     {
@@ -281,40 +234,10 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return false;
     }
-    private void MarkCompositeDirty()
-    {
-        EnsureCompositeRef();
-        if (compositeCollider == null) return;
-
-        _compositeDirty = true;
-
-        // In bulk topology mode (maze build / large edits), we intentionally avoid
-        // rebuilding the composite during the bulk operation. The outermost
-        // EndBulkTopology() will schedule a single rebuild.
-        if (_bulkTopologyDepth > 0)
-            return;
-
-        // If batching, do not rebuild now.
-        if (_compositeBatchDepth > 0)
-            return;
-
-        ScheduleCompositeRebuild();
-    }
     private void SetDustCollision(CosmicDust dust, bool enabled)
     {
         if (dust == null) return;
         dust.SetTerrainColliderEnabled(enabled);
-        MarkCompositeDirty();
-    }
-    private void EnsureCompositeRef()
-    {
-        if (compositeCollider != null) return;
-
-        if (activeDustRoot != null)
-            compositeCollider = activeDustRoot.GetComponent<CompositeCollider2D>();
-
-        if (compositeCollider == null)
-            compositeCollider = GetComponent<CompositeCollider2D>();
     }
     private void EnsureImprints()
     {
@@ -322,21 +245,6 @@ public class CosmicDustGenerator : MonoBehaviour
             _imprints = new Dictionary<Vector2Int, DustImprint>();
     }
     public bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
-    private void BeginBulkTopology()
-    {
-        _bulkTopologyDepth++;
-    }
-
-    private void EndBulkTopology()
-    {
-        _bulkTopologyDepth = Mathf.Max(0, _bulkTopologyDepth - 1);
-
-        // IMPORTANT: if we dirtied the composite while in bulk mode, the coroutine
-        // rebuild path may have exited early and never rescheduled. Ensure we
-        // schedule a rebuild once bulk changes complete.
-        if (_bulkTopologyDepth == 0 && _compositeDirty && _compositeBatchDepth == 0)
-            ScheduleCompositeRebuild();
-    }
    
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, MazeArchetype phase, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
 {
@@ -436,54 +344,7 @@ public class CosmicDustGenerator : MonoBehaviour
         RequestRegrowCellAt(cell, phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
     }
 }
-
-    private void ScheduleCompositeRebuild()
-    {
-        EnsureCompositeRef();
-        if (compositeCollider == null) return;
-
-        // Throttle rebuild frequency (critical).
-        if (compositeRebuildMinInterval > 0f && Time.unscaledTime < _nextCompositeRebuildAt)
-            return;
-
-        if (_compositeRebuildCo == null)
-        {
-            _compositeRebuildCo = StartCoroutine(RebuildCompositeEndOfFrame());
-        }
-    }
-
-    private IEnumerator RebuildCompositeEndOfFrame()
-    {
-        // Coalesce multiple dirties into one rebuild.
-        // We want the composite geometry updated *before* the next physics step,
-        // otherwise vehicles can hit "ghost" composite edges for an entire
-        // FixedUpdate tick. EndOfFrame tends to be the earliest safe point after
-        // we've disabled/enabled child colliders.
-        yield return new WaitForEndOfFrame();
-
-        try
-        {
-            EnsureCompositeRef();
-            if (compositeCollider == null) yield break;
-
-            // If we are in a bulk/batch mode, let EndBulkTopology schedule the next rebuild.
-            if (_bulkTopologyDepth > 0) yield break; // use your actual bulk flag/depth
-            // Rebuild now
-            Physics2D.SyncTransforms();
-            compositeCollider.GenerateGeometry();
-
-            _compositeDirty = false;
-
-            _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
-                ? (Time.unscaledTime + compositeRebuildMinInterval)
-                : Time.unscaledTime;
-        }
-        finally
-        {
-            _compositeRebuildCo = null;
-        }
-    }
-
+    
     private void Start()
     {
         if (_vehicleVetoHits == null || _vehicleVetoHits.Length != regrowVetoMaxHits) 
@@ -591,7 +452,6 @@ public class CosmicDustGenerator : MonoBehaviour
     void Update()
     {
         TryEnsureRefs();
-        TryEnsureRefs();
 
         if (!_cellGridReady)
         {
@@ -601,30 +461,17 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         if (!drums) return;
-        EnsureFlowController();
         EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
 
         if (drums == null) return;
 
-        // Flow-field: incremental update each frame (prevents periodic spikes)
-        _flowController.EnsureSize(drums.GetSpawnGridWidth(), drums.GetSpawnGridHeight());
-        _flowController.Tick(
-            dt: Time.deltaTime,
-            flowTilesPerFrame: flowTilesPerFrame,
-            hiveShiftInterval: hiveShiftInterval,
-            hiveShiftBlend: hiveShiftBlend,
-            computeNewBias: () => ComputePhaseBias(GetCurrentPhaseSafe()));
 
         // Regrow step gate: promote PendingRegrow -> Regrowing/Solid rhythmically on drum steps.
         _regrow?.ProcessStepGate(drums.currentStep);
     }
-    private void EnsureFlowController()
-    {
-        if (_flowController == null)
-            _flowController = new CosmicDustFlowFieldController();
-    }
+
     private bool IsVehicleOverlappingCell(Vector2Int gp)
     {        _goToCell ??= new Dictionary<GameObject, Vector2Int>(1024);
         _permanentClearCells ??= new HashSet<Vector2Int>();
@@ -811,9 +658,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // Authoritative: if we have dust (Solid), it is not open.
         return !HasDustAt(gp);
     }
-
-
-
+    
     public bool IsEffectivelyDustCell(Vector2Int gp)
     {
         // If it must be treated as open, it’s not dust (even if a dust GO exists due to timing)
@@ -826,7 +671,7 @@ public class CosmicDustGenerator : MonoBehaviour
     // ------------------------------------------------------------------
     // Authoritative cell grid helpers
     // ------------------------------------------------------------------
-private void EnsureCellGrid()
+    private void EnsureCellGrid()
 {
     _goToCell ??= new Dictionary<GameObject, Vector2Int>(1024);
     _permanentClearCells ??= new HashSet<Vector2Int>();
@@ -835,7 +680,6 @@ private void EnsureCellGrid()
     _reservedVehicleCells ??= new List<Vector2Int>(64);
 
     _exclusions ??= new CosmicDustExclusionMap();
-    if (_flowController == null) _flowController = new CosmicDustFlowFieldController();
 
     TryEnsureRefs();
 
@@ -1463,27 +1307,6 @@ private void EnsureCellGrid()
         // Reuse your existing “staggered growth” feel.
         BeginStaggeredMazeRegrowth(cellsToGrow);
     }
-    public void NotifyCompositeDirty() { 
-        MarkCompositeDirty();
-    }
-    private Vector2 ComputePhaseBias(MazeArchetype phase)
-    {
-        Vector2 bias =
-            phase == MazeArchetype.Establish  ? new Vector2( 0f, -1f) :
-            phase == MazeArchetype.Evolve     ? new Vector2( 0.6f, 0f) :
-            phase == MazeArchetype.Intensify  ? new Vector2( 0f,  1f) :
-            phase == MazeArchetype.Release    ? new Vector2(-0.6f, 0f) :
-            phase == MazeArchetype.Wildcard  ? Random.insideUnitCircle.normalized :
-            /* Pop */                          new Vector2( 0f, -0.4f);
-        return bias.normalized * phaseFlowBias;
-    }
-    public Vector2 SampleFlowAtWorld(Vector3 worldPos)
-    {
-        if (drums == null) return Vector2.zero;
-        var grid = drums.WorldToGridPosition(worldPos);
-        return _flowController.SampleAtGrid(grid) * baseFlowStrength;
-    }
-    
     private Color GetCellVisualColor(Vector2Int cell)
     {
         // MineNode imprint should override everything while it's present.
@@ -1616,7 +1439,6 @@ private void EnsureCellGrid()
         }
         finally
         {
-            EndCompositeBatch(); // one rebuild at end
         }
     }
 
@@ -1654,26 +1476,6 @@ private void EnsureCellGrid()
 
         return FilterOutPermanent(raw);
     }
-    public bool IsDustTerrainCollider(Collider2D col) { 
-        if (col == null) return false;
-        // Primary: layer mask
-        int bit = 1 << col.gameObject.layer; 
-        if ((dustTerrainMask.value & bit) != 0) return true;
-        // Fallback: collider belongs under THIS generator (composite + children)
-        var owner = col.GetComponentInParent<CosmicDustGenerator>(); 
-        return owner == this;
-    }
-
-    // ---------------------------------------------------------------------
-    // Dust Terrain Contour API (CompositeCollider2D)
-    // Used by PhaseStarMotion2D to steer along corridors/edges without "eating" dust.
-    // ---------------------------------------------------------------------
-
-    /// <summary>
-    /// Returns the CompositeCollider2D used to represent dust terrain, if available.
-    /// </summary>
-    public CompositeCollider2D DustCompositeCollider => compositeCollider;
-
 
     /// <summary>
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
@@ -1708,7 +1510,7 @@ private void EnsureCellGrid()
         // Stop contributing collisions/topology immediately.
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){ 
             SetDustCollision(dust, false); 
-        }        MarkCompositeDirty();
+        }
         // Visual: allow dust to fade out; when the fade completes the tile will call
         // back into OnDustVisualFadedOut(), which finalizes the Empty state.
         if (go.TryGetComponent<CosmicDust>(out var d) && d != null)
@@ -1747,7 +1549,6 @@ private void EnsureCellGrid()
         float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
 
         _isSpawningMaze = true;
-        BeginBulkTopology();
         try
         {
             if (drums == null) drums = FindObjectOfType<DrumTrack>();
@@ -1818,7 +1619,7 @@ private void EnsureCellGrid()
             }
 
             // --------------------------------------------------------------------
-            // PHYSICS PHASE: re-enable colliders gradually, then rebuild composite ONCE
+            // PHYSICS PHASE: re-enable colliders gradually
             // --------------------------------------------------------------------
             int j = 0;
             while (j < spawnedDust.Count)
@@ -1850,20 +1651,10 @@ private void EnsureCellGrid()
                 yield return null;
             }
 
-            // Now rebuild composite once after colliders are in their final state.
-            EnsureCompositeRef();
-            if (compositeCollider != null)
-            {
-                compositeCollider.GenerateGeometry();
-                _compositeDirty = false;
-                _nextCompositeRebuildAt = (compositeRebuildMinInterval > 0f)
-                    ? (Time.unscaledTime + compositeRebuildMinInterval)
-                    : Time.unscaledTime;
-            }
+            // No composite collider to rebuild.
         }
         finally
         {
-            EndBulkTopology();
             _isSpawningMaze = false;
         }
     }
@@ -1871,14 +1662,6 @@ private void EnsureCellGrid()
     {
         if (_tintDiffusionSystem == null) return;
         _tintDiffusionSystem.MarkDirty(center, radius);
-    }
-     private float ColorMaxAbsDelta(Color a, Color b)
-    {
-        float dr = Mathf.Abs(a.r - b.r);
-        float dg = Mathf.Abs(a.g - b.g);
-        float db = Mathf.Abs(a.b - b.b);
-        float da = Mathf.Abs(a.a - b.a);
-        return Mathf.Max(Mathf.Max(dr, dg), Mathf.Max(db, da));
     }
 
     private void ProcessTintDiffusion(float dt)
@@ -1915,7 +1698,7 @@ private void EnsureCellGrid()
         // Diffusion prep: removing dust can expose the base tint and create hard seams.
         MarkTintDirty(grid, tintDirtyMarkRadius);
 
-        MarkCompositeDirty();
+        // (no composite collider rebuild)
         Debug.Log($"[DUSTGEN] RemoveActiveAt grid={grid} hexMapHasAfter={HasDustAt(grid)} go={(go ? go.name : "null")}", this);
     }
 
@@ -1969,14 +1752,7 @@ private void EnsureCellGrid()
             SetCellState(gridPos, DustCellState.Solid);
         }
 
-        // During bulk spawn/regrow, defer composite rebuild until the end.
-        if (IsBulkTopology)
-        {
-            _compositeDirty = true;
-            return;
-        }
-
-        MarkCompositeDirty();
+        // No composite collider rebuild (per-cell terrain only).
     }
 
     private List<(Vector2Int, Vector3)> CalculateCarvedMazeWalls(bool onScreenOnly = true, float braidChance = 0.0f, int corridorThickness = 1) { 
@@ -2099,7 +1875,7 @@ private void EnsureCellGrid()
             HideCellGO(go);
         }
 
-        SetCellState(gridPos, DustCellState.Empty);        MarkCompositeDirty();
+        SetCellState(gridPos, DustCellState.Empty);
 
         // CRITICAL: schedule regrow.
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
@@ -2174,7 +1950,6 @@ private void EnsureCellGrid()
                 _imprints[gp] = new DustImprint
                 {
                     color       = blendedImprint,
-                    shadowColor = imprintShadowColor,
                     healDelay   = regrowDelaySeconds,
                     hardness01  = hardness01
                 };

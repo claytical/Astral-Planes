@@ -708,7 +708,6 @@ public class Vehicle : MonoBehaviour
         if (!boosting) return;
         if (gfm == null || gfm.dustGenerator == null) return;
 
-        if (!gfm.dustGenerator.IsDustTerrainCollider(coll.collider)) return;
 
         // Contact point
         Vector2 contact = (coll.contactCount > 0) ? coll.GetContact(0).point : (Vector2)transform.position;
@@ -755,18 +754,12 @@ public class Vehicle : MonoBehaviour
                 CarveForward_Wedge(contact, v, budget, cellWorld);
                 break;
         }
-        if (boosting && gfm != null && gfm.dustGenerator != null && gfm.dustGenerator.IsDustTerrainCollider(coll.collider))
-        {
-            _lastDustCollider = coll.collider;
-                    }
 
     }
     void OnCollisionStay2D(Collision2D coll)
     {
         if (!boosting) return;
         if (gfm == null || gfm.dustGenerator == null) return;
-        if (!gfm.dustGenerator.IsDustTerrainCollider(coll.collider)) return;
-
         _lastDustCollider = coll.collider;
 
         // Rate-limit carving so it’s stable and doesn’t explode CPU
