@@ -429,13 +429,11 @@ public class CosmicDustGenerator : MonoBehaviour
         if (gfm == null) return;
 
         if (drums == null) drums = gfm.activeDrumTrack;
-        if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
     }
     public void ManualStart()
     {
         var gfm = GameFlowManager.Instance;
         drums = gfm.activeDrumTrack;
-        phaseTransitionManager = gfm.phaseTransitionManager;
         TryEnsureRefs();
         EnsureRegrowController();
         if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();
@@ -952,6 +950,25 @@ public class CosmicDustGenerator : MonoBehaviour
             // Use an expiry so it regrows if the collectable stops refreshing.
             dustClaims.ClaimCell(owner, gp, DustClaimType.TemporaryCarve, seconds: holdSeconds, refresh: true);
         }
+    }
+    public bool TryPreviewBoostWorkAtWorldPoint(Vector2 world, int resolveRadiusCells, float damage01, float holdSeconds = 0.10f)
+    {
+        if (!TryResolveDustCellFromWorldPoint(world, resolveRadiusCells, out var cell))
+            return false;
+
+        if (!TryGetCellGo(cell, out var go) || go == null)
+            return true; // resolved, but nothing to preview
+
+        var dust = go.GetComponent<CosmicDust>();
+        if (dust == null)
+            return true; // resolved, but not a dust cell GO
+
+        float d01 = Mathf.Clamp01(damage01);
+        float hardness01 = Mathf.Clamp01(dust.clearing.hardness01);
+        float effective = d01 * Mathf.Lerp(1.0f, 0.25f, hardness01);
+
+        dust.PreviewBoostWork(effective, holdSeconds);
+        return true;
     }
     public void CarveTemporaryDiskFromCollectable(
         Vector3 centerWorld,

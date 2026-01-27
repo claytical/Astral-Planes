@@ -62,7 +62,7 @@ public static class VisualFeedbackUtility
         }
 
         float flickerAlpha = 0.5f;
-        Color flickerColor = Color.red;
+        Color flickerColor = Color.gray;
         flickerColor.a = flickerAlpha;
 
         float elapsed = 0f;
