@@ -615,132 +615,141 @@ public class Vehicle : MonoBehaviour
     // ------------------------------------------------------------------------
     // Impact Dig (chain reaction trench)
     // ------------------------------------------------------------------------
-    private void DoImpactDig(Collision2D coll)
+private void DoImpactDig(Collision2D coll)
+{
+    if (coll == null) return;
+    if (coll.contactCount <= 0) return;
+    if (!boosting) return;
+    if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
+
+    var gen = gfm.dustGenerator;
+
+    // --- Choose the contact that best represents "into-surface" impact ---
+    Vector2 relV = coll.relativeVelocity;
+    if (rb != null && relV.sqrMagnitude < 0.0001f)
+        relV = rb.linearVelocity;
+
+    var best = coll.GetContact(0);
+    float bestInto = float.NegativeInfinity;
+
+    for (int i = 0; i < coll.contactCount; i++)
     {
-        if (coll == null) return;
-        if (coll.contactCount <= 0) return;
-        if (!boosting) return;
-        if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
-
-        var gen = gfm.dustGenerator;
-        // Choose the contact that best represents "into-surface" impact.
-        Vector2 relV = coll.relativeVelocity;
-        if (rb != null && relV.sqrMagnitude < 0.0001f)
-            relV = rb.linearVelocity;
-
-        var best = coll.GetContact(0);
-        float bestInto = -999f;
-
-        for (int i = 0; i < coll.contactCount; i++)
+        var c = coll.GetContact(i);
+        float into = Vector2.Dot(relV, -c.normal); // >0 means we're moving into the surface
+        if (into > bestInto)
         {
-            var c = coll.GetContact(i);
-            float into = Vector2.Dot(relV, -c.normal); // positive means we're moving into the surface
-            if (into > bestInto)
-            {
-                bestInto = into;
-                best = c;
-            }
-        }
-
-        // Entry point (world)
-        Vector2 contactWorld = best.point;
-    // --- Compute normalized speeds ---
-        float speedMag = (rb != null) ? rb.linearVelocity.magnitude : relV.magnitude;
-
-    // raw (can be negative when boxed in / sliding)
-        float intoSpeedRaw = Vector2.Dot(relV, -best.normal);
-
-        float speedMag01 = 0f;
-        float into01 = 0f;
-        if (arcadeMaxSpeed > 0.0001f)
-        {
-            speedMag01 = Mathf.Clamp01(speedMag / arcadeMaxSpeed);
-            into01     = Mathf.Clamp01(Mathf.Max(0f, intoSpeedRaw) / arcadeMaxSpeed);
-        }
-
-    // --- Direction ---
-    // Prefer "into-surface" when it’s actually meaningful.
-    // If not (boxed in / tangential), follow player intent so you can dig out.
-        Vector2 digDirWorld;
-        if (intoSpeedRaw > 0.05f) // threshold avoids noisy normals when stationary
-        {
-            digDirWorld = -best.normal;
-        }
-        else if (_moveInput.sqrMagnitude > 0.0001f)
-        {
-            digDirWorld = _moveInput.normalized;
-        }
-        else if (_lastNonZeroInput.sqrMagnitude > 0.0001f)
-        {
-            digDirWorld = _lastNonZeroInput.normalized;
-        }
-        else
-        {
-            // last fallback: at least attempt into-surface
-            digDirWorld = -best.normal;
-        }
-
-        if (digDirWorld.sqrMagnitude < 0.0001f)
-            return;
-
-        digDirWorld.Normalize();
-
-    // --- Budget ---
-    // Use the better of (true impact) or (overall speed).
-    // Then guarantee a minimum trench while boosting so boxed-in players can escape.
-        float drive01 = Mathf.Max(into01, speedMag01);
-        float budget  = maxDigCellsSoft * drive01;
-
-    // minimum “unstick” trench on boost strikes
-        budget = Mathf.Max(budget, minDigCellsWhenBoosting);
-
-        if (budget < 0.01f) return;
-
-        // Resolve entry cell: start at the cell under the contact point; if empty, search neighbors.
-        if (!TryFindEntryDustCell(contactWorld, resolveRadiusCells: 1, out var gp))
-        {
-            return;
-            
-        }
-
-        // Quantize direction to 8-way grid step.
-        Vector2Int step = QuantizeDir8_ToGridStep(digDirWorld);
-        Debug.Log($"[VEHICLE:DIG] {coll.gameObject.name} Step {step}");
-        
-        if (step == Vector2Int.zero) return;
-
-        // Walk the line, spending budget per cell based on hardness.
-        // Hardness authority is dust.clearing.hardness01 (which should be set from MusicalRoleProfile at regrow/imprint).
-        float remaining = budget;
-        Debug.Log($"[VEHICLE:DIG] {coll.gameObject.name} Remaining {remaining}");
-
-        // Safety cap: never march more than a sane number of cells per strike.
-        int maxSteps = Mathf.Clamp(Mathf.CeilToInt(budget * 4f) + 4, 4, 128);
-
-        Vector2Int last = new Vector2Int(int.MinValue, int.MinValue);
-
-        for (int i = 0; i < maxSteps; i++)
-        {
-            Debug.Log($"[VEHICLE:DIG] {i + 1}/{maxSteps}");
-            if (gp == last) { gp += step; continue; }
-            last = gp;
-
-            if (!gen.TryGetDustAt(gp, out var dust) || dust == null)
-                break;
-
-            float h01 = Mathf.Clamp01(dust.clearing.hardness01);
-            float cellCost = Mathf.Max(0.001f, digBaseCellCost + h01 * digHardnessCost);
-
-            remaining -= cellCost;
-            if (remaining < 0f)
-                break;
-
-            // Clear immediately (your generator should handle fade/scale/collider disable rules).
-            gen.CarveDustAt(gp, fadeSeconds: 0.20f);
-
-            gp += step;
+            bestInto = into;
+            best = c;
         }
     }
+
+    Vector2 contactWorld = best.point;
+
+    // --- Impact measurement (only into-normal speed scales trench) ---
+    Vector2 v = (rb != null) ? rb.linearVelocity : relV;
+    float intoSpeed = Vector2.Dot(v, -best.normal);
+    if (intoSpeed < 0f) intoSpeed = 0f;
+
+    // --- Direction ---
+    // If you actually hit into the surface, dig straight into it.
+    // Otherwise (boxed-in / grazing), dig in the player's intended direction, but only 1 cell.
+    const float kMinIntoForMulti = 0.25f; // not a "tuning number" so much as noise floor; adjust if needed
+    bool hasMeaningfulImpact = intoSpeed >= kMinIntoForMulti;
+
+    Vector2 digDirWorld;
+    if (hasMeaningfulImpact)
+    {
+        digDirWorld = -best.normal;
+    }
+    else if (_moveInput.sqrMagnitude > 0.0001f)
+    {
+        digDirWorld = _moveInput.normalized;
+    }
+    else if (_lastNonZeroInput.sqrMagnitude > 0.0001f)
+    {
+        digDirWorld = _lastNonZeroInput.normalized;
+    }
+    else
+    {
+        digDirWorld = -best.normal;
+    }
+
+    if (digDirWorld.sqrMagnitude < 0.0001f) return;
+    digDirWorld.Normalize();
+
+    // --- Resolve entry cell ---
+    if (!TryFindEntryDustCell(contactWorld, resolveRadiusCells: 1, out var gp))
+        return;
+
+    // Quantize direction to 8-way grid step.
+    Vector2Int step = QuantizeDir8_ToGridStep(digDirWorld);
+    if (step == Vector2Int.zero) return;
+
+    // --- Determine intended trench length ---
+    // Rule: touching + boost always removes exactly 1 cell.
+    int cellsToCarve = 1;
+
+    if (hasMeaningfulImpact)
+    {
+        // Map intoSpeed -> extra cells.
+        // Shape: starts at 1, climbs with impact, clamped.
+        // You can change these later without changing the model.
+        const float kIntoForMax = 6.0f;     // "full-speed hit" reference
+        const int   kMaxCells   = 12;       // absolute cap per strike
+
+        float t = Mathf.InverseLerp(kMinIntoForMulti, kIntoForMax, intoSpeed);
+        t = Mathf.Clamp01(t);
+
+        // Slightly convex curve so small impacts don't explode into long trenches.
+        t = t * t;
+
+        int extra = Mathf.FloorToInt(t * (kMaxCells - 1));
+        cellsToCarve = 1 + Mathf.Clamp(extra, 0, kMaxCells - 1);
+    }
+
+    // --- Hardness shortens trenches ---
+    // Always carve the first cell. For subsequent cells, hardness may terminate.
+    // Impact helps push slightly through hardness (optional but feels good).
+    float impactT01 = 0f;
+    if (hasMeaningfulImpact)
+    {
+        const float kIntoForMax = 6.0f;
+        impactT01 = Mathf.InverseLerp(kMinIntoForMulti, kIntoForMax, intoSpeed);
+        impactT01 = Mathf.Clamp01(impactT01);
+    }
+
+    float ContinueChance(float hardness01)
+    {
+        float h = Mathf.Clamp01(hardness01);
+        float baseContinue = 1f - h;          // hard => low continue chance
+        float impactBonus  = 0.65f * impactT01 * h; // impact slightly counters hardness only when hard
+        return Mathf.Clamp01(baseContinue + impactBonus);
+    }
+
+    Vector2Int last = new Vector2Int(int.MinValue, int.MinValue);
+
+    for (int i = 0; i < cellsToCarve; i++)
+    {
+        if (gp == last) { gp += step; continue; }
+        last = gp;
+
+        if (!gen.TryGetDustAt(gp, out var dust) || dust == null)
+            break;
+
+        // First cell guaranteed.
+        if (i > 0 && hasMeaningfulImpact)
+        {
+            float p = ContinueChance(dust.clearing.hardness01);
+            if (UnityEngine.Random.value > p)
+                break;
+        }
+
+        gen.CarveDustAt(gp, fadeSeconds: 0.20f);
+        gp += step;
+    }
+
+    Debug.Log($"[VEHICLE:DIG] intoSpeed={intoSpeed:F2} meaningful={hasMeaningfulImpact} cells={cellsToCarve} step={step}");
+}
     private bool TryFindEntryDustCell(Vector2 world, int resolveRadiusCells, out Vector2Int gp)
 {
     gp = default;

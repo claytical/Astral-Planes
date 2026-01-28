@@ -138,14 +138,15 @@ public class InstrumentTrack : MonoBehaviour
     private void OnDisable()
     {
         UnhookExpandBoundary();
-        controller.DespawnGravityVoid();
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);
     }
 
     private void OnDestroy()
     {
         UnhookExpandBoundary();
-        controller.DespawnGravityVoid();
-    }
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);    }
 
     //public (NoteSet noteSet, int maxToSpawn)? _pendingBurstAfterExpand;
     private readonly List<Action> _nextFrameQueue = new();
@@ -1836,7 +1837,14 @@ public void SpawnCollectableBurst(
         // Tint should match what will burst. Defaulting to trackColor is consistent with role color.
         // If you want MineNode-specific color, pass it into this call path later and swap here.
         Color voidTint = trackColor;
-        controller.SpawnOrUpdateGravityVoid(voidPos, voidTint);
+        if (controller != null && originWorld.HasValue)
+        {
+            var gen = GameFlowManager.Instance?.dustGenerator;
+            if (gen != null && gen.TryResolveDustCellFromWorldPoint(originWorld.Value, 0, out var gp))
+            {
+                controller.BeginGravityVoidForPendingExpand(this, originWorld.Value, gp);
+            }
+        }
         Debug.Log($"[TRK:STAGE_EXPAND] track={name} RESERVED burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} pendingExpand={_pendingExpandForBurst}. {controller.tracks.Length} tracks");
 
         foreach (var t in controller.tracks)
@@ -2283,7 +2291,8 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
     {
         Debug.Log($"[TRK:COMMIT_EXPAND] track={name} EXIT(noop) reason=no_pending_flags curBurstId={curBid0}");
         UnhookExpandBoundary();
-        controller.DespawnGravityVoid();
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);
         return;
     }
 
@@ -2297,7 +2306,8 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
                     );
         _pendingExpandForBurst = false;
         if (_pendingBurstAfterExpand.HasValue) {
-            controller.DespawnGravityVoid();
+            if (controller != null)
+                controller.EndGravityVoidForPendingExpand(this);
             var req = _pendingBurstAfterExpand.Value;
             _pendingBurstAfterExpand = null;
             
@@ -2338,7 +2348,8 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
         _pendingExpandForBurst              = false; 
         _mapIncomingCollectionsToSecondHalf = false; 
         _expandCommitted                    = false;
-        controller.DespawnGravityVoid();
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);
         if (_pendingBurstAfterExpand.HasValue) { 
             Debug.LogWarning($"[TRK:COMMIT_EXPAND] track={name} PATH=MAXED_DENSITY ENQUEUE_SPAWN curBurstId={curBid0} " +
                              $"overrideBin={_overrideNextSpawnBin} req.noteSet={req0.noteSet} req.max={req0.maxToSpawn}");
@@ -2372,7 +2383,8 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
     if (controller != null)
         controller.ResyncLeaderBinsNow();
     Debug.Log($"[TRK:COMMIT_EXPAND] track={name} PATH=WIDEN_APPLIED curBurstId={curBid0} " + $"newBins={newBins} loopMulNow={loopMultiplier} totalStepsNow={_totalSteps} halfOffset={_halfOffsetAtExpand} mapSecondHalf={_mapIncomingCollectionsToSecondHalf}");
-    controller.DespawnGravityVoid();
+    if (controller != null)
+        controller.EndGravityVoidForPendingExpand(this);
     // D) Mark the new bin as created but empty; flags above prevent auto-collapse
     SetBinAllocated(loopMultiplier -1, true);
     SetBinFilled(loopMultiplier - 1, false);

@@ -27,28 +27,39 @@ public class NoteSetFactory : MonoBehaviour
 
     if (motif == null)
     {
-        Debug.LogWarning("[NoteSetFactory] Motif is null; falling back to phase-based path.");
+        // NOTE: this overload does not have phase context, so we cannot safely fall back here.
+        Debug.LogWarning("[NoteSetFactory] Motif is null; cannot generate motif-based NoteSet.");
+        return null;
     }
 
     // Look up the motif config for this role
     var cfg = motif.GetConfigForRole(track.assignedRole);
     if (cfg == null)
     {
-        Debug.LogWarning($"[NoteSetFactory] No RoleMotifNoteSetConfig for role {track.assignedRole} in motif {motif.name}. Falling back to phase-based path.");
+        Debug.LogWarning($"[NoteSetFactory] No RoleMotifNoteSetConfig for role {track.assignedRole} in motif {motif.name}. Cannot generate motif-based NoteSet.");
+        return null;
     }
 
     var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-n{entropy}");
     string key = $"{motif.name}/{track.assignedRole}";
 
-    return GenerateFromMotifConfig(track, cfg, rng, key);
+    return GenerateFromMotifConfig(track, motif, cfg, rng, key);
 }
 
     private NoteSet GenerateFromMotifConfig(
         InstrumentTrack track,
+        MotifProfile motif,
         RoleMotifNoteSetConfig cfg,
         System.Random rng,
         string debugKey)
     {
+        // Resolve motif key root into the playable range for this track.
+        int rootMidi = ResolveRootMidiInRange(
+            motif != null ? motif.keyRootMidi : track.lowestAllowedNote,
+            track.lowestAllowedNote,
+            track.highestAllowedNote
+        );
+
         // --- 1) Pick high-level musical parameters from the motif config ---
         var scale  = PickWeighted(cfg.scales,   rng);
         var pat    = PickWeighted(cfg.patterns, rng);
@@ -58,17 +69,51 @@ public class NoteSetFactory : MonoBehaviour
             ? PickK(cfg.chordFunctions, Mathf.Max(1, cfg.chordsPerRegion), rng)
             : new List<string> { "I" };
 
-        var chordSeq = RealizeChordFunctions(chosenFns, track, scale);
+        // Motif-level chord progression override (preferred).
+        // If present, use motif-authored chords (transposed so the first chord aligns to motif.keyRootMidi).
+        List<Chord> chordSeq = null;
+        Debug.Log($"[NoteSetFactory] Motif: {motif.name} Chord Progression: {motif.chordProgression} Chord Sequence: {motif.chordProgression.chordSequence.Count}");
+
+        if (motif != null && motif.chordProgression != null && motif.chordProgression.chordSequence != null && motif.chordProgression.chordSequence.Count > 0)
+        {
+            int authoredFirst = motif.chordProgression.chordSequence[0].rootNote;
+            Debug.Log($"[NoteSetFactory] Root Note: {authoredFirst}");
+
+            int delta = rootMidi - authoredFirst;
+            chordSeq = new List<Chord>(motif.chordProgression.chordSequence.Count);
+            for (int i = 0; i < motif.chordProgression.chordSequence.Count; i++)
+            {
+                var c = motif.chordProgression.chordSequence[i];
+                chordSeq.Add(new Chord
+                {
+                    // Keep the authored shape but transpose into this motif's key.
+                    rootNote = c.rootNote + delta,
+                    intervals = c.intervals != null ? new List<int>(c.intervals) : new List<int> { 0, 4, 7 }
+                });
+                Debug.Log($"[NoteSetFactory] Chord Sequence {chordSeq.ToArray()}");
+
+            }
+        }
+        else
+        {
+            // Config-level functional harmony fallback.
+            chordSeq = RealizeChordFunctions(chosenFns, rootMidi, scale);
+            Debug.Log($"[NoteSetFactory Config Level Functional Harmony Fallback with {chordSeq}");
+
+        }
+
         if (chordSeq == null || chordSeq.Count == 0)
         {
             chordSeq = new List<Chord>
             {
                 new Chord
                 {
-                    rootNote  = track.lowestAllowedNote,
+                    rootNote  = rootMidi,
                     intervals = new List<int> { 0, 4, 7 }
                 }
             };
+            Debug.Log($"[NoteSetFactory] Chord Sequence Null, Using {chordSeq}");
+
         }
 
         // --- 2) Build base step grid from rhythm pattern and extended loop length ---
@@ -112,6 +157,7 @@ public class NoteSetFactory : MonoBehaviour
 
             notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
         }
+        Debug.Log($"[NoteSetFactory] Using Notes: {notes.ToArray()}");
 
         // --- 5) Build persistent template with durations & velocities ---
         var persistent = new List<(int step, int note, int duration, float vel)>(steps.Count);
@@ -138,7 +184,7 @@ public class NoteSetFactory : MonoBehaviour
         var ns = new NoteSet
         {
             assignedInstrumentTrack = track,
-            rootMidi           = track.lowestAllowedNote,
+            rootMidi           = rootMidi,
             scale              = scale,
             patternStrategy    = pat,
             rhythmStyle        = rhythm,
@@ -148,6 +194,8 @@ public class NoteSetFactory : MonoBehaviour
         };
 
         ns.Initialize(track, total);
+        Debug.Log($"[NoteSetFactory] Returning Noteset {ns}");
+
         return ns;
     } 
     private int GetAuthoritativeStepsPerLoop(InstrumentTrack track)
@@ -161,6 +209,43 @@ public class NoteSetFactory : MonoBehaviour
 
         // Conservative fallback
         return 16;
+    }
+
+    /// <summary>
+    /// Attempts to place a desired root MIDI note inside the track's playable range by octave-shifting.
+    /// If the range is too narrow or shifting cannot land inside, clamps as a last resort.
+    /// </summary>
+    private int ResolveRootMidiInRange(int desiredRootMidi, int lo, int hi)
+    {
+        if (lo > hi)
+        {
+            int tmp = lo;
+            lo = hi;
+            hi = tmp;
+        }
+
+        // Fast path
+        if (desiredRootMidi >= lo && desiredRootMidi <= hi)
+            return desiredRootMidi;
+
+        int r = desiredRootMidi;
+
+        // Shift up/down in octaves to try to land in range.
+        // We prefer shifting towards the range rather than oscillating.
+        if (r < lo)
+        {
+            while (r < lo) r += 12;
+        }
+        else if (r > hi)
+        {
+            while (r > hi) r -= 12;
+        }
+
+        // If we landed in range, great. Otherwise clamp.
+        if (r >= lo && r <= hi)
+            return r;
+
+        return Mathf.Clamp(r, lo, hi);
     }
 
 
@@ -261,7 +346,7 @@ public class NoteSetFactory : MonoBehaviour
         if (steps.Count == 0) steps.Add(0);
         return steps.OrderBy(s => s).ToList();
     }
-    List<Chord> RealizeChordFunctions(List<string> fns, InstrumentTrack track, ScaleType scale)
+    List<Chord> RealizeChordFunctions(List<string> fns, int rootMidi, ScaleType scale)
     {
         // simple diatonic mapping; expand as you wish
         var map = new Dictionary<string, (int deg, string quality)> {
@@ -270,7 +355,7 @@ public class NoteSetFactory : MonoBehaviour
             {"bVII",(6,"Major")}
         };
 
-        int root = track.lowestAllowedNote;
+        int root = rootMidi;
         var chords = new List<Chord>();
         foreach (var fn in fns)
         {

@@ -54,9 +54,11 @@ MonoBehaviour:
     spriteScaleOutSeconds: 0.2
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.2
+  _chargeColor: {r: 1, g: 1, b: 1, a: 1}
+  _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
-    particleSystem: {fileID: 0}
+    particleSystem: {fileID: 5371160903463010692}
     particleFootprintMul: 0.775
     sprite: {fileID: 8999714297043290424}
     starRemovesWithoutRegrow: 0
@@ -370,7 +372,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 0, b: 0, a: 0.35686275}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.09019608}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -434,7 +436,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 2
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -1017,7 +1019,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
+      scalar: 120
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -1126,7 +1128,7 @@ ParticleSystem:
     enabled: 1
     curve:
       serializedVersion: 2
-      minMaxState: 3
+      minMaxState: 1
       scalar: 1.15
       minScalar: 1
       maxCurve:
@@ -1136,19 +1138,19 @@ ParticleSystem:
           time: 0
           value: 0
           inSlope: 0
-          outSlope: 1
+          outSlope: 0
           tangentMode: 0
           weightedMode: 0
           inWeight: 0.33333334
           outWeight: 0.33333334
         - serializedVersion: 3
           time: 1
-          value: 1
-          inSlope: 1
-          outSlope: 0
+          value: 0
+          inSlope: -0.9115512
+          outSlope: -0.9115512
           tangentMode: 0
           weightedMode: 0
-          inWeight: 0.33333334
+          inWeight: 0.4309765
           outWeight: 0.33333334
         m_PreInfinity: 2
         m_PostInfinity: 2
@@ -1179,7 +1181,7 @@ ParticleSystem:
         m_RotationOrder: 4
     y:
       serializedVersion: 2
-      minMaxState: 3
+      minMaxState: 1
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -1232,7 +1234,7 @@ ParticleSystem:
         m_RotationOrder: 4
     z:
       serializedVersion: 2
-      minMaxState: 3
+      minMaxState: 1
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -1638,7 +1640,7 @@ ParticleSystem:
     flipU: 0
     flipV: 0
   VelocityModule:
-    enabled: 1
+    enabled: 0
     x:
       serializedVersion: 2
       minMaxState: 0
@@ -2336,7 +2338,7 @@ ParticleSystem:
         m_RotationOrder: 4
     m_Range: {x: 0, y: 1}
   ForceModule:
-    enabled: 1
+    enabled: 0
     x:
       serializedVersion: 2
       minMaxState: 0
@@ -5040,7 +5042,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: d4afd2f4e92e04358991194a83bc6e66, type: 2}
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

@@ -64,6 +64,8 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private MusicalRole cohortTriggerRole = MusicalRole.Lead;
     [SerializeField] private float cohortWindowFraction = 0.5f; // e.g., lower half of the leader loop (0..16 when leader is 32)
     private bool _chordEventsSubscribed;
+    private Vector2Int _gravityVoidCenterGP;
+    private bool _gravityVoidHasCenterGP;
     public float lastCollectionTime { get; private set; } = -1f;
     private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
     private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
@@ -76,7 +78,17 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private float gravityVoidScale = 1f;
     private GameObject _gravityVoidInstance;
     private ParticleSystem[] _gravityVoidParticles;
-
+    [Header("Gravity Void → Dust Imprint")]
+    [SerializeField] private float gravityVoidGrowSeconds = 1.25f;
+    [SerializeField] private int gravityVoidMaxRadiusCells = 12;
+    [SerializeField] private float gravityVoidImprintTickSeconds = 0.05f;
+    [SerializeField] private int gravityVoidImprintBudgetPerTick = 80; // -1 = unlimited
+    private Coroutine _gravityVoidRoutine;
+    private InstrumentTrack _gravityVoidOwner;
+    private Vector3 _gravityVoidCenterWorld;
+    private Color _gravityVoidParticleTint;
+    private Color _gravityVoidDustImprintTint;
+    private float _gravityVoidDustHardness01;
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
@@ -97,40 +109,151 @@ public class InstrumentTrackController : MonoBehaviour
         lastCollectionTime = Time.time;
     }
 
-    public void DespawnGravityVoid() { 
-        if (_gravityVoidInstance != null) { 
-            Destroy(_gravityVoidInstance);
-            _gravityVoidInstance = null;
-            _gravityVoidParticles = null;
+    public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
+    {
+        if (ownerTrack == null) return;
+
+        _gravityVoidOwner = ownerTrack;
+        _gravityVoidCenterWorld = centerWorld;
+        _gravityVoidCenterGP = centerGP;
+        _gravityVoidHasCenterGP = true;
+
+        // Resolve tint/hardness from role profile (or fallback).
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
+        if (roleProfile != null)
+        {
+            _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
+            _gravityVoidDustHardness01  = roleProfile.GetDustHardness01();
+
+            _gravityVoidParticleTint = roleProfile.GetBaseColor();
+            _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
         }
+        else
+        {
+            _gravityVoidDustImprintTint = ownerTrack.trackColor;
+            _gravityVoidDustHardness01  = 0.5f;
+
+            _gravityVoidParticleTint = ownerTrack.trackColor;
+            _gravityVoidParticleTint.a = 1f;
+        }
+
+        SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
+
+        if (_gravityVoidRoutine != null)
+            StopCoroutine(_gravityVoidRoutine);
+        _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
     }
 
-    public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint) {
-        if (gravityVoidPrefab == null) return;
-        if (_gravityVoidInstance == null) { 
-            var parent = (gravityVoidParent != null) ? gravityVoidParent : transform;
-            _gravityVoidInstance = Instantiate(gravityVoidPrefab, worldPos, Quaternion.identity, parent);
-            if (gravityVoidScale != 1f && _gravityVoidInstance != null) 
-                _gravityVoidInstance.transform.localScale *= gravityVoidScale;
-            _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
-        }
-        else { 
-            _gravityVoidInstance.transform.position = worldPos;
-        }
-        if (_gravityVoidParticles != null) {
-            // Preserve prefab alpha by multiplying.
-            for (int i = 0; i < _gravityVoidParticles.Length; i++) {
-                var ps = _gravityVoidParticles[i]; 
-                if (ps == null) continue;
-                var main = ps.main;
-                Color baseC = main.startColor.color;
-                Color outC = tint;
-                outC.a = baseC.a * tint.a;
-                main.startColor = outC;
+public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
+{
+    // If caller provides an owner, only allow the owner to end it.
+    if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
+        return;
+
+    _gravityVoidOwner = null;
+
+    if (_gravityVoidRoutine != null)
+    {
+        StopCoroutine(_gravityVoidRoutine);
+        _gravityVoidRoutine = null;
+    }
+
+    DespawnGravityVoid();
+}
+
+private IEnumerator GravityVoidGrowAndImprintRoutine()
+{
+    var gfm = GameFlowManager.Instance;
+    var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+    if (dustGen == null)
+        yield break;
+
+    float dur  = Mathf.Max(0.01f, gravityVoidGrowSeconds);
+    float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
+    int maxR   = Mathf.Max(0, gravityVoidMaxRadiusCells);
+
+    float t = 0f;
+    int lastR = 0;
+
+    while (t < dur && _gravityVoidOwner != null)
+    {
+        t += tick;
+        float frac = Mathf.Clamp01(t / dur);
+        int r = Mathf.RoundToInt(frac * maxR);
+
+        if (r > lastR)
+        {
+            if (_gravityVoidHasCenterGP && r > lastR)
+            {
+                dustGen.ApplyVoidImprintDiskFromGrid(
+                    _gravityVoidCenterGP,
+                    outerRadiusCells: r,
+                    imprintColor: _gravityVoidDustImprintTint,
+                    imprintHardness01: _gravityVoidDustHardness01,
+                    maxCellsThisCall: gravityVoidImprintBudgetPerTick,
+                    innerRadiusCellsExclusive: lastR
+                );
+
+                lastR = r;
             }
+
+            lastR = r;
         }
+
+        // Keep VFX positioned (no “polling,” just while the pending window is active).
+        SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
+
+        yield return new WaitForSeconds(tick);
     }
 
+    _gravityVoidRoutine = null;
+}
+
+public void DespawnGravityVoid()
+{
+    if (_gravityVoidInstance == null) return;
+
+    Destroy(_gravityVoidInstance);
+    _gravityVoidInstance = null;
+    _gravityVoidParticles = null;
+}
+
+public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
+{
+    if (gravityVoidPrefab == null) return;
+
+    if (_gravityVoidInstance == null)
+    {
+        var parent = (gravityVoidParent != null) ? gravityVoidParent : transform;
+        _gravityVoidInstance = Instantiate(gravityVoidPrefab, worldPos, Quaternion.identity, parent);
+
+        if (gravityVoidScale != 1f)
+            _gravityVoidInstance.transform.localScale *= gravityVoidScale;
+
+        _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
+    }
+    else
+    {
+        _gravityVoidInstance.transform.position = worldPos;
+    }
+
+    if (_gravityVoidParticles == null) return;
+
+    // Preserve prefab alpha: output alpha = prefabAlpha * tintAlpha
+    for (int i = 0; i < _gravityVoidParticles.Length; i++)
+    {
+        var ps = _gravityVoidParticles[i];
+        if (ps == null) continue;
+
+        var main = ps.main;
+        Color baseC = main.startColor.color;
+
+        Color outC = tint;
+        outC.a = baseC.a * tint.a;
+
+        main.startColor = outC;
+    }
+}
     public void ResetControllerBinGuards()
     {
         _binExtensionSignaled?.Clear();
@@ -761,6 +884,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         return maxBins;
     }
+    
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)

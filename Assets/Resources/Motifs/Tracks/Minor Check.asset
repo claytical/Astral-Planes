@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Minor Check
   displayName: Minor Check
-  keyRootMidi: 55
+  keyRootMidi: 57
   entryDrumLoops:
   - {fileID: 8300000, guid: d8d6154a598ef4807b2450da93814fe1, type: 3}
   intensityDrumLoops:
@@ -26,10 +26,10 @@ MonoBehaviour:
   entryLoopCount: 1
   bpm: 120
   stepsPerLoop: 16
-  chordProgression: {fileID: 11400000, guid: c7be627f460294316900846114b342f3, type: 2}
+  chordProgression: {fileID: 11400000, guid: 573a1343fbd264c84923bbc53ada2c03, type: 2}
   roleNoteConfigs:
-  - {fileID: 11400000, guid: 11cb3704113c845758b5967f0256a8af, type: 2}
-  - {fileID: 11400000, guid: d19a70b25bf994732a4b4a38ccfb16c8, type: 2}
+  - {fileID: 11400000, guid: 701f9af54f3184d73be39ee952867643, type: 2}
+  - {fileID: 11400000, guid: 7272346a169de42e4988ee6a31f096b8, type: 2}
   - {fileID: 11400000, guid: 5b9c935d3689e4a129d3e3d632569110, type: 2}
   - {fileID: 11400000, guid: 9e78967671b4d4ae08f936b848a67d14, type: 2}
   selectionWeight: 1
