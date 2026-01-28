@@ -494,6 +494,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.clearing.hardness01 = GetCellHardness01(gp);
             Color regrowTint = GetCellVisualColor(gp);
             dust.SetTint(regrowTint);
+            dust.SetFeedbackColors(Color.white, Color.violetRed);
             dust.Begin();
             SetDustCollision(dust, false);        }
 
@@ -810,6 +811,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.SetGrowInDuration(hexGrowInSeconds);
             dust.clearing.hardness01 = GetCellHardness01(gp);
             dust.SetTint(_mazeTint);
+            dust.SetFeedbackColors(Color.white, Color.violetRed);
             dust.Begin();
             SetDustCollision(dust, false);
         }
@@ -825,7 +827,75 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         return TryGetCellState(gridPos, out var st) && st == DustCellState.Solid;
     }
-    
+    /// <summary>
+/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
+/// Intended for Gravity Void expansion effects.
+/// </summary>
+/// <returns>Number of cells processed</returns>
+/// <summary>
+/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
+/// Intended for Gravity Void expansion effects.
+/// </summary>
+/// <returns>Number of cells processed</returns>
+/// <summary>
+/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
+/// Center is specified in GRID coordinates.
+/// </summary>
+/// <returns>Number of cells processed</returns>
+public int ApplyVoidImprintDiskFromGrid(
+    Vector2Int centerGP,
+    int outerRadiusCells,
+    Color imprintColor,
+    float imprintHardness01,
+    int maxCellsThisCall = -1,
+    int innerRadiusCellsExclusive = -1)
+{
+    if (outerRadiusCells <= 0)
+        return 0;
+
+    imprintHardness01 = Mathf.Clamp01(imprintHardness01);
+
+    int processed = 0;
+    int rOuterSq = outerRadiusCells * outerRadiusCells;
+    int rInnerSq = innerRadiusCellsExclusive >= 0
+        ? innerRadiusCellsExclusive * innerRadiusCellsExclusive
+        : -1;
+
+    for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
+    {
+        for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
+        {
+            int dSq = dx * dx + dy * dy;
+            if (dSq > rOuterSq) continue;
+            if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
+
+            Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+
+            // Persistent imprint (regrow will pick this up).
+            _imprints[gp] = new DustImprint
+            {
+                color = imprintColor,
+                hardness01 = imprintHardness01
+            };
+
+            // Live update if the cell GO exists right now.
+            if (TryGetCellGo(gp, out GameObject go) && go != null)
+            {
+                if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
+                {
+                    dust.SetTint(imprintColor);
+                    dust.clearing.hardness01 = imprintHardness01;
+                }
+            }
+
+            processed++;
+            if (maxCellsThisCall > 0 && processed >= maxCellsThisCall)
+                return processed;
+        }
+    }
+
+    return processed;
+}
     public float SampleDensity01(Vector3 worldPos)
     {
         if (drums == null) return 0f;
@@ -1383,6 +1453,7 @@ public class CosmicDustGenerator : MonoBehaviour
                         dust.PrepareForReuse();
                         dust.SetGrowInDuration(hexGrowInSeconds);
                         dust.SetTint(_mazeTint);
+                        dust.SetFeedbackColors(Color.white, Color.violetRed);
                         dust.clearing.hardness01 = GetCellHardness01(grid);
                         dust.ConfigureForPhase(phaseNow);
                         dust.Begin();

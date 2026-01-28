@@ -83,18 +83,9 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
             {
                 string keyInfo = $"motif={currentMotif.motifId} role={track.assignedRole}";
                 Debug.Log($"[MOTIF] Generating NoteSet for track '{track.name}' via motif ({keyInfo}).");
-
                 noteSet = noteSetFactory.Generate(track, currentMotif, baseEntropy);
             }
-            /*
-            else
-            {
-                // Fallback: phase-based generation
-                Debug.Log($"[MOTIF] No current motif; generating NoteSet for track '{track.name}' from phase {currentPhase}.");
 
-                noteSet = noteSetFactory.Generate(track, currentPhase, baseEntropy);
-            }
-            */
         }
         catch (System.Exception ex)
         {
@@ -127,6 +118,7 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
             int idx = rng.Next(count);
 
             motif = motifQueue.motifs[idx];
+            
             Debug.Log($"[MOTIF] Random queue pick index={idx}/{count}, phase={nextPhase}, motif={motif}");
         }
         else
@@ -136,7 +128,8 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
 
         if (motif == null && motifLibrary != null)
         {
-            motif = motifLibrary.PickRandomWeighted(SessionGenome.For("motifphase"));
+//            motif = motifLibrary.PickRandomWeighted(SessionGenome.For("motifphase"));
+            motif = motifLibrary.PickNext();
             Debug.Log($"[MOTIF] Fallback library pick motif={motif}");
         }
 

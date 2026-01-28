@@ -14,13 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Night Walk
   displayName: Nighrt Walk
-  beatMood: 1
   keyRootMidi: 57
-  chordProgression: {fileID: 11400000, guid: c7be627f460294316900846114b342f3, type: 2}
-  phaseProfile: {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
+  entryDrumLoops: []
+  intensityDrumLoops: []
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: 573a1343fbd264c84923bbc53ada2c03, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 420fb848826624ec09d1a00f405bb07a, type: 2}
   - {fileID: 11400000, guid: a72011f25a227483286efd196dc60dd0, type: 2}
   - {fileID: 11400000, guid: ccb6175bc4f4e44b4856b40ae83eec1e, type: 2}
   - {fileID: 11400000, guid: 7e475dccaefca4a088fecb009d542996, type: 2}
   selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

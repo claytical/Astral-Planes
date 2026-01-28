@@ -11390,7 +11390,7 @@ MonoBehaviour:
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   cellClearanceWorld: 0
-  defaultMazeHardness01: 0.5
+  defaultMazeHardness01: 0.2
   dustTimings:
     spriteScaleInSeconds: 0.2
     spriteScaleOutSeconds: 0.2
@@ -12168,7 +12168,7 @@ MonoBehaviour:
   uiReserveTopInsetWorld: 0
   drumLoopBPM: 120
   gridPadding: 1
-  totalSteps: 16
+  totalSteps: 32
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
@@ -12230,6 +12230,10 @@ MonoBehaviour:
     type: 3}
   gravityVoidParent: {fileID: 1354683683}
   gravityVoidScale: 1
+  gravityVoidGrowSeconds: 1.25
+  gravityVoidMaxRadiusCells: 12
+  gravityVoidImprintTickSeconds: 0.05
+  gravityVoidImprintBudgetPerTick: 80
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0

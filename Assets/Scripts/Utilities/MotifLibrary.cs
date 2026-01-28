@@ -17,6 +17,7 @@ public enum BeatMood
     menuName = "Astral Planes/Motif/Motif Library")]
 public class MotifLibrary : ScriptableObject
 {
+    private int mIndex = 0;
     public List<MotifProfile> motifs = new List<MotifProfile>();
 
     /// <summary>
@@ -37,6 +38,15 @@ public class MotifLibrary : ScriptableObject
         if (valid.Count == 0) return null;
         int index = rng.Next(valid.Count);
         return valid[index];
+    }
+
+    public MotifProfile PickNext()
+    {
+        if (motifs == null) return null;
+        MotifProfile next = motifs[mIndex];
+        mIndex++;
+        if(mIndex >= motifs.Count) mIndex = 0;
+        return next;
     }
 
     /// <summary>
