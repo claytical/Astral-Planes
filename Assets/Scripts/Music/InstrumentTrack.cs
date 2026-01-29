@@ -1836,21 +1836,27 @@ public void SpawnCollectableBurst(
             spreadAngleDeg = spreadAngleDeg
         };
         // --- GRAVITY VOID: show "waiting for expansion" ---
-        // Prefer MineNode death location (originWorld). Fall back to impact/vehicle (repelFromWorld). Then track position.
+// --- GRAVITY VOID: show "waiting for expansion" ---
+// Prefer MineNode death location (originWorld). Fall back to impact/vehicle (repelFromWorld). Then track position.
+// --- GRAVITY VOID: show "waiting for expansion" ---
+// Center the void at MineNode death (originWorld) when possible.
         Vector3 voidPos = originWorld ?? repelFromWorld ?? transform.position;
-        // Tint should match what will burst. Defaulting to trackColor is consistent with role color.
-        // If you want MineNode-specific color, pass it into this call path later and swap here.
-        Color voidTint = trackColor;
-        if (controller != null && originWorld.HasValue)
+
+        if (controller != null)
         {
-            var gen = GameFlowManager.Instance?.dustGenerator;
-            if (gen != null && gen.TryResolveDustCellFromWorldPoint(originWorld.Value, 0, out var gp))
+            // IMPORTANT: do NOT require dust to exist at the center.
+            // MineNode depletion usually clears dust at the impact cell, but we still want a center point
+            // so the void can imprint outward.
+            if (drumTrack != null)
             {
-                controller.BeginGravityVoidForPendingExpand(this, originWorld.Value, gp);
+                Vector2Int gp = drumTrack.WorldToGridPosition(voidPos);
+                controller.BeginGravityVoidForPendingExpand(this, voidPos, gp);
+            }
+            else
+            {
+                Debug.LogWarning($"[TRK:STAGE_EXPAND] track={name} burstId={burstId} GravityVoid NOT started (drumTrack null) voidPos={voidPos}");
             }
         }
-        Debug.Log($"[TRK:STAGE_EXPAND] track={name} RESERVED burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} pendingExpand={_pendingExpandForBurst}. {controller.tracks.Length} tracks");
-
         foreach (var t in controller.tracks)
         {
             Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
