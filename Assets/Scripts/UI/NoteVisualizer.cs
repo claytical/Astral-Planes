@@ -1220,10 +1220,7 @@ public class NoteVisualizer : MonoBehaviour
         try { clipLen = _drum.GetClipLengthInSeconds(); } catch {}
         loopLen = (clipLen > 0f) ? clipLen : Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds());
     }
-
-    float minDur = Mathf.Max(0.05f, (ascendLoops * loopLen) + ascendPaddingSeconds);
-    durationSeconds = Mathf.Max(durationSeconds, minDur);
-
+    
     float t = 0f;
     while (t < durationSeconds)
     {

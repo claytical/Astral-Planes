@@ -122,12 +122,95 @@ public class NoteSet
     private int _grooveIndex;
     private readonly int[] _accentPattern = { 1, 0, 0, 1 }; // Accent on 1st and 4th
 
-    
     public void Initialize(InstrumentTrack track, int totalSteps)
     {
+        // If a persistentTemplate was supplied (riff-authoritative), use it as the source of truth.
+        if (persistentTemplate != null && persistentTemplate.Count > 0)
+        {
+            BuildTemplateLookup(track, totalSteps);
+            BuildAllowedStepsFromTemplate(totalSteps);
+
+            // Optional: keep _notes populated for any systems that expect it (UI/debug/etc).
+            BuildNotesFromTemplate(track);
+            return;
+        }
+
+        // Default generative path
         BuildNotesFromKey(track);
         BuildAllowedStepsFromStyle(totalSteps);
     }
+    // Riff-authoritative lookup: step -> (note,dur,vel)
+private readonly Dictionary<int, (int note, int dur, float vel)> _templateByStep
+    = new Dictionary<int, (int note, int dur, float vel)>();
+
+private void BuildTemplateLookup(InstrumentTrack track, int totalSteps)
+{
+    _templateByStep.Clear();
+
+    for (int i = 0; i < persistentTemplate.Count; i++)
+    {
+        var t = persistentTemplate[i];
+        int step = t.step;
+
+        if (step < 0 || step >= totalSteps)
+            continue;
+
+        int note = t.note;
+        if (track != null)
+            note = Mathf.Clamp(note, track.lowestAllowedNote, track.highestAllowedNote);
+
+        // If multiple notes share a step, keep the "strongest" by velocity.
+        if (_templateByStep.TryGetValue(step, out var existing))
+        {
+            if (t.vel > existing.vel)
+                _templateByStep[step] = (note, t.duration, t.vel);
+        }
+        else
+        {
+            _templateByStep.Add(step, (note, t.duration, t.vel));
+        }
+    }
+}
+
+private void BuildAllowedStepsFromTemplate(int totalSteps)
+{
+    _allowedSteps.Clear();
+
+    // Keep deterministic order: ascending by step.
+    // No LINQ: small list, simple sort.
+    var steps = new List<int>(_templateByStep.Keys);
+    steps.Sort();
+
+    for (int i = 0; i < steps.Count; i++)
+    {
+        int s = steps[i];
+        if (s >= 0 && s < totalSteps)
+            _allowedSteps.Add(s);
+    }
+}
+
+private void BuildNotesFromTemplate(InstrumentTrack track)
+{
+    _notes.Clear();
+
+    // Populate with unique notes from the template (useful for any systems expecting _notes)
+    foreach (var kvp in _templateByStep)
+    {
+        int n = kvp.Value.note;
+        if (track != null)
+            n = Mathf.Clamp(n, track.lowestAllowedNote, track.highestAllowedNote);
+
+        // Avoid LINQ/HashSet allocations (tiny list)
+        bool exists = false;
+        for (int i = 0; i < _notes.Count; i++)
+        {
+            if (_notes[i] == n) { exists = true; break; }
+        }
+        if (!exists) _notes.Add(n);
+    }
+
+    _notes.Sort();
+}
     public int GetRootNote()
     {
         return Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
@@ -146,6 +229,25 @@ public class NoteSet
     }
     public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
+        // Riff-authoritative: step->note comes directly from the template
+        if (persistentTemplate != null && persistentTemplate.Count > 0)
+        {
+            if (_templateByStep.TryGetValue(step, out var e))
+                return e.note;
+
+            // If called on a non-authored step, fail gracefully:
+            // fall back to nearest earlier authored step, otherwise first authored.
+            int bestStep = int.MinValue;
+            foreach (var k in _templateByStep.Keys)
+            {
+                if (k <= step && k > bestStep) bestStep = k;
+            }
+            if (bestStep != int.MinValue)
+                return _templateByStep[bestStep].note;
+
+            foreach (var k in _templateByStep.Keys)
+                return _templateByStep[k].note;
+        }
         var strategy = this.patternStrategy; // prefer the NoteSet’s own strategy; fallback handled below
         if (!Enum.IsDefined(typeof(PatternStrategy), strategy)) strategy = PatternStrategy.Arpeggiated; // safe default
         switch (strategy)
