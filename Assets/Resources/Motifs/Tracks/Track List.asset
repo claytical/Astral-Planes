@@ -13,5 +13,4 @@ MonoBehaviour:
   m_Name: Track List
   m_EditorClassIdentifier: Assembly-CSharp::MotifQueue
   motifs:
-  - {fileID: 11400000, guid: 4916e13dcd00947bf914e5ce6a9bbca1, type: 2}
-  - {fileID: 11400000, guid: 52c8bd8445bcf4020bc0ce9e803f0d41, type: 2}
+  - {fileID: 11400000, guid: 3a305243250bf4020aef9d5d3f0320e4, type: 2}

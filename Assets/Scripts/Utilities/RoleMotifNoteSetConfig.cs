@@ -15,6 +15,11 @@ public class RoleMotifNoteSetConfig : ScriptableObject
     public string id;                   // Optional stable ID (e.g. "MotifA_BassMain")
     public MusicalRole role;            // Bass, Harmony, Lead, Groove, etc.
 
+    [Header("Authored Riff (optional)")]
+    public RiffAsset riff;
+
+// If true, bypass procedural pitch/rhythm generation
+    public bool useRiffAsAuthoritativeScore = false;
     [Header("Pitch / Scale")]
     public List<Weighted<ScaleType>> scales;          // e.g. Major(0.4), Dorian(0.35), Phrygian(0.25)
 

@@ -45,159 +45,291 @@ public class NoteSetFactory : MonoBehaviour
 
     return GenerateFromMotifConfig(track, motif, cfg, rng, key);
 }
+private NoteSet GenerateFromMotifConfig(
+    InstrumentTrack track,
+    MotifProfile motif,
+    RoleMotifNoteSetConfig cfg,
+    System.Random rng,
+    string debugKey)
+{
+    int rootMidi = ResolveRootMidiInRange(
+        motif != null ? motif.keyRootMidi : track.lowestAllowedNote,
+        track.lowestAllowedNote,
+        track.highestAllowedNote
+    );
 
-    private NoteSet GenerateFromMotifConfig(
-        InstrumentTrack track,
-        MotifProfile motif,
-        RoleMotifNoteSetConfig cfg,
-        System.Random rng,
-        string debugKey)
+    // --------------------------
+    // Resolve chordSeq:
+    // Motif progression wins; otherwise default to I triad.
+    // (Riff-only testing shouldn't require any other config.)
+    // --------------------------
+    List<Chord> chordSeq = null;
+
+    int motifChordCount =
+        (motif != null &&
+         motif.chordProgression != null &&
+         motif.chordProgression.chordSequence != null)
+            ? motif.chordProgression.chordSequence.Count
+            : 0;
+
+    if (motifChordCount > 0)
     {
-        // Resolve motif key root into the playable range for this track.
-        int rootMidi = ResolveRootMidiInRange(
-            motif != null ? motif.keyRootMidi : track.lowestAllowedNote,
+        int authoredFirst = motif.chordProgression.chordSequence[0].rootNote;
+        int delta = rootMidi - authoredFirst;
+
+        chordSeq = new List<Chord>(motifChordCount);
+        for (int i = 0; i < motifChordCount; i++)
+        {
+            var c = motif.chordProgression.chordSequence[i];
+            chordSeq.Add(new Chord
+            {
+                rootNote = c.rootNote + delta,
+                intervals = (c.intervals != null && c.intervals.Count > 0)
+                    ? new List<int>(c.intervals)
+                    : new List<int> { 0, 4, 7 }
+            });
+        }
+    }
+
+    if (chordSeq == null || chordSeq.Count == 0)
+    {
+        chordSeq = new List<Chord>
+        {
+            new Chord { rootNote = rootMidi, intervals = new List<int> { 0, 4, 7 } }
+        };
+    }
+
+// ------------------------------------------------------------
+// 1) RIFF MODE: no fallthrough into generative mode
+// Uses EXACT authored event list (no bin replication)
+// ------------------------------------------------------------
+if (cfg != null && cfg.useRiffAsAuthoritativeScore)
+{
+    int totalSteps = GetAuthoritativeStepsPerLoop(track);
+
+    // Hard fail fast if the ref isn't wired.
+    if (cfg.riff == null)
+    {
+        Debug.LogError(
+            $"[NoteSetFactory] Riff-authoritative enabled but cfg.riff is null. " +
+            $"track='{track?.name}' cfg='{cfg?.name}' motif='{motif?.name}' debugKey={debugKey}"
+        );
+
+        var silent = new NoteSet
+        {
+            assignedInstrumentTrack = track,
+            rootMidi = rootMidi,
+            chordRegion = chordSeq,
+            behaviorsSeed = new List<NoteBehavior>(),
+            persistentTemplate = new List<(int step, int note, int duration, float vel)>()
+        };
+        silent.Initialize(track, totalSteps);
+        return silent;
+    }
+
+    var riff = cfg.riff.riff;
+
+    if (riff.events == null || riff.events.Count == 0)
+    {
+        Debug.LogError(
+            $"[NoteSetFactory] Riff-authoritative enabled but riff has no events. " +
+            $"track='{track?.name}' riffAsset='{cfg.riff.name}' debugKey={debugKey}"
+        );
+
+        var silent = new NoteSet
+        {
+            assignedInstrumentTrack = track,
+            rootMidi = rootMidi,
+            chordRegion = chordSeq,
+            behaviorsSeed = new List<NoteBehavior>(),
+            persistentTemplate = new List<(int step, int note, int duration, float vel)>()
+        };
+        silent.Initialize(track, totalSteps);
+        return silent;
+    }
+
+    // Debug: proves we’re actually reading the asset you think we are.
+    Debug.Log(
+        $"[NoteSetFactory] RIFF MODE track='{track.name}' cfg='{cfg.name}' riffAsset='{cfg.riff.name}' " +
+        $"events={riff.events.Count} authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} " +
+        $"totalSteps={totalSteps} debugKey={debugKey}"
+    );
+
+    const int stepsPerBar = 16;
+    const int beatsPerBar = 4;
+    const int ticksPerQuarter = 480;
+    int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar); // 120 ticks/step
+
+    // Use first chord/root as the target transpose anchor.
+    int targetRoot = (chordSeq != null && chordSeq.Count > 0) ? chordSeq[0].rootNote : rootMidi;
+    int delta = targetRoot - riff.authoredRootMidi + (riff.octaveShift * 12);
+
+    var ordered = riff.events.OrderBy(e => e.step).ToList();
+    var riffPersistent = new List<(int step, int note, int duration, float vel)>(ordered.Count);
+
+    for (int i = 0; i < ordered.Count; i++)
+    {
+        var e = ordered[i];
+
+        int step = e.step;
+        if (step < 0 || step >= totalSteps) continue;
+
+        int midi = e.midiNote + delta;
+        if (riff.clampToTrackRange)
+            midi = Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote);
+
+        int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
+
+        // Optional overlap clamp (within this one authored sequence)
+        if (riff.overlapPolicy == RiffOverlapPolicy.ClampToNextOnset && i < ordered.Count - 1)
+        {
+            int nextStep = ordered[i + 1].step;
+            if (nextStep > step)
+            {
+                int maxSteps = nextStep - step;
+                durTicks = Mathf.Min(durTicks, maxSteps * ticksPerStep);
+            }
+        }
+
+        float vel127 = Mathf.Clamp01(e.velocity01) * 127f;
+        riffPersistent.Add((step, midi, durTicks, vel127));
+    }
+
+    var riffNs = new NoteSet
+    {
+        assignedInstrumentTrack = track,
+        rootMidi = rootMidi,
+        chordRegion = chordSeq,
+        behaviorsSeed = new List<NoteBehavior>(),
+        persistentTemplate = riffPersistent
+    };
+
+    riffNs.Initialize(track, totalSteps);
+    return riffNs;
+}
+    // ------------------------------------------------------------
+    // 2) GENERATIVE MODE (unchanged): only runs when NOT riff-authoritative
+    // ------------------------------------------------------------
+    var scale  = PickWeighted(cfg.scales, rng);
+    var pat    = PickWeighted(cfg.patterns, rng);
+    var rhythm = PickWeighted(cfg.rhythms, rng);
+
+    var chosenFnsGen = (cfg.chordFunctions != null && cfg.chordFunctions.Count > 0)
+        ? PickK(cfg.chordFunctions, Mathf.Max(1, cfg.chordsPerRegion), rng)
+        : new List<string> { "I" };
+
+    if (motifChordCount <= 0)
+        chordSeq = RealizeChordFunctions(chosenFnsGen, rootMidi, scale);
+
+    if (chordSeq == null || chordSeq.Count == 0)
+    {
+        chordSeq = new List<Chord>
+        {
+            new Chord { rootNote = rootMidi, intervals = new List<int> { 0, 4, 7 } }
+        };
+    }
+
+    var rp = RhythmPatterns.Patterns[rhythm];
+    int total = GetAuthoritativeStepsPerLoop(track);
+    var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
+    if (steps.Count == 0) steps.Add(0);
+
+    var v = cfg.variation;
+    var notes = new List<int>(steps.Count);
+
+    for (int i = 0; i < steps.Count; i++)
+    {
+        if (rng.NextDouble() < v.restProb)
+        {
+            notes.Add(int.MinValue);
+            continue;
+        }
+
+        var chord = chordSeq[(i * chordSeq.Count) / Mathf.Max(1, steps.Count)];
+
+        var midi = GeneratePitchForStrategy(
+            pat,
+            chord,
+            scale,
+            v,
+            rng,
             track.lowestAllowedNote,
             track.highestAllowedNote
         );
 
-        // --- 1) Pick high-level musical parameters from the motif config ---
-        var scale  = PickWeighted(cfg.scales,   rng);
-        var pat    = PickWeighted(cfg.patterns, rng);
-        var rhythm = PickWeighted(cfg.rhythms,  rng);
+        if (rng.NextDouble() < v.extensionBias)
+            midi = AddExtension(midi, chord, rng);
 
-        var chosenFns = (cfg.chordFunctions != null && cfg.chordFunctions.Count > 0)
-            ? PickK(cfg.chordFunctions, Mathf.Max(1, cfg.chordsPerRegion), rng)
-            : new List<string> { "I" };
+        if (rng.NextDouble() < v.octaveMoveProb)
+            midi += 12 * (rng.Next(0, 2) == 0 ? -1 : 1);
 
-        // Motif-level chord progression override (preferred).
-        // If present, use motif-authored chords (transposed so the first chord aligns to motif.keyRootMidi).
-        List<Chord> chordSeq = null;
-        Debug.Log($"[NoteSetFactory] Motif: {motif.name} Chord Progression: {motif.chordProgression} Chord Sequence: {motif.chordProgression.chordSequence.Count}");
+        notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
+    }
 
-        if (motif != null && motif.chordProgression != null && motif.chordProgression.chordSequence != null && motif.chordProgression.chordSequence.Count > 0)
-        {
-            int authoredFirst = motif.chordProgression.chordSequence[0].rootNote;
-            Debug.Log($"[NoteSetFactory] Root Note: {authoredFirst}");
+    var persistent = new List<(int step, int note, int duration, float vel)>(steps.Count);
+    var proxy = new NoteSet { scale = scale, rhythmStyle = rhythm };
 
-            int delta = rootMidi - authoredFirst;
-            chordSeq = new List<Chord>(motif.chordProgression.chordSequence.Count);
-            for (int i = 0; i < motif.chordProgression.chordSequence.Count; i++)
-            {
-                var c = motif.chordProgression.chordSequence[i];
-                chordSeq.Add(new Chord
-                {
-                    // Keep the authored shape but transpose into this motif's key.
-                    rootNote = c.rootNote + delta,
-                    intervals = c.intervals != null ? new List<int>(c.intervals) : new List<int> { 0, 4, 7 }
-                });
-                Debug.Log($"[NoteSetFactory] Chord Sequence {chordSeq.ToArray()}");
+    for (int i = 0; i < steps.Count; i++)
+    {
+        int step = steps[i];
+        int midi = notes[i];
+        if (midi == int.MinValue) continue;
 
-            }
-        }
-        else
-        {
-            // Config-level functional harmony fallback.
-            chordSeq = RealizeChordFunctions(chosenFns, rootMidi, scale);
-            Debug.Log($"[NoteSetFactory Config Level Functional Harmony Fallback with {chordSeq}");
+        int dur = track.CalculateNoteDuration(step, proxy);
+        dur = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
+        float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
 
-        }
+        persistent.Add((step, midi, dur, vel));
+    }
 
-        if (chordSeq == null || chordSeq.Count == 0)
-        {
-            chordSeq = new List<Chord>
-            {
-                new Chord
-                {
-                    rootNote  = rootMidi,
-                    intervals = new List<int> { 0, 4, 7 }
-                }
-            };
-            Debug.Log($"[NoteSetFactory] Chord Sequence Null, Using {chordSeq}");
+    var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
+        ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
+        : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MazeArchetype.Establish, track.assignedRole));
 
-        }
+    var ns = new NoteSet
+    {
+        assignedInstrumentTrack = track,
+        rootMidi = rootMidi,
+        scale = scale,
+        patternStrategy = pat,
+        rhythmStyle = rhythm,
+        chordRegion = chordSeq,
+        behaviorsSeed = behaviors,
+        persistentTemplate = persistent
+    };
 
-        // --- 2) Build base step grid from rhythm pattern and extended loop length ---
-        var rp    = RhythmPatterns.Patterns[rhythm];
-        int total = GetAuthoritativeStepsPerLoop(track); 
-        var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
-        if (steps.Count == 0) steps.Add(0);
+    ns.Initialize(track, total);
+    return ns;
+}
 
-// --- 3) Generate pitches for each step (BeatMood/BeatIntensity no longer modifies note density here) ---
-        var v     = cfg.variation;
-        var notes = new List<int>(steps.Count);
+private static string DebugAssetPath(UnityEngine.Object o)
+{
+#if UNITY_EDITOR
+    return string.IsNullOrEmpty(o ? UnityEditor.AssetDatabase.GetAssetPath(o) : null)
+        ? "<not-an-asset>"
+        : UnityEditor.AssetDatabase.GetAssetPath(o);
+#else
+    return "<runtime>";
+#endif
+}
 
-        for (int i = 0; i < steps.Count; i++)
-        {
-            if (rng.NextDouble() < v.restProb)
-            {
-                notes.Add(int.MinValue);
-                continue;
-            }
+private static void LogCfgRiffState(RoleMotifNoteSetConfig cfg, InstrumentTrack track, string debugKey)
+{
+    if (cfg == null)
+    {
+        Debug.LogError($"[NoteSetFactory] cfg is NULL track='{track?.name}' debugKey={debugKey}");
+        return;
+    }
 
-            // Map this index into the chord sequence
-            var chord = chordSeq[(i * chordSeq.Count) / Mathf.Max(1, steps.Count)];
+    string cfgPath = DebugAssetPath(cfg);
+    string riffName = (cfg.riff != null) ? cfg.riff.name : "<null>";
+    string riffPath = (cfg.riff != null) ? DebugAssetPath(cfg.riff) : "<null>";
 
-            // Base pitch selection from pattern strategy
-            var midi = GeneratePitchForStrategy(
-                pat,
-                chord,
-                scale,
-                v,
-                rng,
-                track.lowestAllowedNote,
-                track.highestAllowedNote
-            );
-
-            // Extensions / octave motion according to variation profile
-            if (rng.NextDouble() < v.extensionBias)
-                midi = AddExtension(midi, chord, rng);
-
-            if (rng.NextDouble() < v.octaveMoveProb)
-                midi += 12 * (rng.Next(0, 2) == 0 ? -1 : 1);
-
-            notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
-        }
-        Debug.Log($"[NoteSetFactory] Using Notes: {notes.ToArray()}");
-
-        // --- 5) Build persistent template with durations & velocities ---
-        var persistent = new List<(int step, int note, int duration, float vel)>(steps.Count);
-        var proxy      = new NoteSet { scale = scale, rhythmStyle = rhythm }; // plain object proxy
-
-        for (int i = 0; i < steps.Count; i++)
-        {
-            int step = steps[i];
-            int midi = notes[i];
-            if (midi == int.MinValue) continue;
-
-            int dur   = track.CalculateNoteDuration(step, proxy);
-            dur       = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
-            float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
-
-            persistent.Add((step, midi, dur, vel));
-        }
-
-        // --- 6) Pick behaviors and construct the NoteSet ---
-        var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
-            ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
-            : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MazeArchetype.Establish, track.assignedRole));
-
-        var ns = new NoteSet
-        {
-            assignedInstrumentTrack = track,
-            rootMidi           = rootMidi,
-            scale              = scale,
-            patternStrategy    = pat,
-            rhythmStyle        = rhythm,
-            chordRegion        = chordSeq,
-            behaviorsSeed      = behaviors,
-            persistentTemplate = persistent
-        };
-
-        ns.Initialize(track, total);
-        Debug.Log($"[NoteSetFactory] Returning Noteset {ns}");
-
-        return ns;
-    } 
+    Debug.Log(
+        $"[NoteSetFactory] cfg='{cfg.name}' id='{cfg.id}' role={cfg.role} useRiff={cfg.useRiffAsAuthoritativeScore} " +
+        $"cfgPath={cfgPath} riffRef={riffName} riffPath={riffPath} track='{track?.name}' debugKey={debugKey}"
+    );
+}
     private int GetAuthoritativeStepsPerLoop(InstrumentTrack track)
     {
         // DrumTrack is the runtime authority for step-domain (matches BinSize/leader semantics).
@@ -296,7 +428,65 @@ public class NoteSetFactory : MonoBehaviour
         if (k == 0) return new List<NoteBehavior>();
         return PickK(list, k, rng);
     }
-    
+    public static void AppendRiffToPersistentLoop(
+        List<(int stepIndex, int note, int duration, float velocity)> loop,
+        Riff riff,
+        int binIndex,
+        int stepsPerBin,              // should be 16
+        int motifKeyRootMidi,
+        int[] progressionOffsets,     // e.g. I–II–III → {0, +2, +4}
+        float motifBpm,
+        int trackMinNote,
+        int trackMaxNote
+    )
+    {
+        if (riff.events == null || riff.events.Count == 0)
+            return;
+
+        // --- Resolve this bin’s chord root ---
+        int progIdx = Mathf.Clamp(binIndex, 0, progressionOffsets.Length - 1);
+        int binChordRoot = motifKeyRootMidi + progressionOffsets[progIdx];
+
+        int transposeDelta =
+            binChordRoot - riff.authoredRootMidi + (riff.octaveShift * 12);
+
+        // --- Timing ---
+        float msPerBeat = 60000f / motifBpm;
+        float msPerStep = msPerBeat / 4f; // 16 steps / bar, 4 beats
+
+        // Sort by step for overlap logic
+        var ordered = riff.events.OrderBy(e => e.step).ToList();
+
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var e = ordered[i];
+
+            int stepIndex = binIndex * stepsPerBin + e.step;
+
+            int note = e.midiNote + transposeDelta;
+            if (riff.clampToTrackRange)
+                note = Mathf.Clamp(note, trackMinNote, trackMaxNote);
+
+            int durationMs = Mathf.RoundToInt(e.durSteps * msPerStep);
+
+            // --- Optional overlap clamp (monophonic safety) ---
+            if (riff.overlapPolicy == RiffOverlapPolicy.ClampToNextOnset &&
+                i < ordered.Count - 1)
+            {
+                int nextStep = ordered[i + 1].step;
+                int maxDurSteps = Mathf.Max(1, nextStep - e.step);
+                int maxDurMs = Mathf.RoundToInt(maxDurSteps * msPerStep);
+                durationMs = Mathf.Min(durationMs, maxDurMs);
+            }
+
+            loop.Add((
+                stepIndex,
+                note,
+                durationMs,
+                Mathf.Clamp01(e.velocity01)
+            ));
+        }
+    }
     NoteSet TrackToNoteSetProxy(ScaleType scale, RhythmStyle rhythm) { 
         // minimal proxy NoteSet so CalculateNoteDuration can read rhythmStyle
         return new NoteSet { scale = scale, rhythmStyle = rhythm };

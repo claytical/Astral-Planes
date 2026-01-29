@@ -16,7 +16,8 @@ public enum RhythmStyle
     TripletFlare,
     CallResponse,
     PulseBuild2Bar,    
-    Breakbeat
+    Breakbeat,
+    Straight
 }
 
 public enum ChordPattern

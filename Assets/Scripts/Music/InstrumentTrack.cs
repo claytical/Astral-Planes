@@ -36,6 +36,8 @@ public class InstrumentTrack : MonoBehaviour
     [Header("Ascension Fuse")]
     [Tooltip("How many extended loops markers for this track take to reach the line of ascension after a burst is armed.")]
     public int ascendLoopCount = 4;
+    [SerializeField]
+    private int ascensionLoopsPerExtraBin = 2;
     [Header("Undeveloped Bin Playback ")]
     [Tooltip("If true, when the global leader width is wider than this track, this track's notes will 'ghost repeat' into undeveloped bins at reduced velocity.")]
     [SerializeField] private bool ghostUndevelopedBins = true; 
@@ -1168,9 +1170,14 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                 controller.AdvanceOtherTrackCursors(this, 1); // silence = absence on others
 
             // --- E) Loop-based fuse for ascension (note markers rising) ---
-            int   fuseLoops = Mathf.Max(1, ascendLoopCount);
-            float seconds   = 1f;
+            int binCount = BinSize();
 
+            int effectiveLoops =
+                ascendLoopCount +
+                Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+
+            float seconds =
+                drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
             if (drumTrack != null)
                 seconds = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds() * fuseLoops);
 
@@ -2517,15 +2524,7 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
 
         return stepIndex;
     }
-
-    private IEnumerator PlayNoteAtDsp(double targetDsp, int note, int durationTicks, float velocity)
-    {
-        // Poll DSP time so we stay accurate under variable frame time.
-        while (AudioSettings.dspTime < targetDsp)
-            yield return null;
-
-        PlayNote(note, durationTicks, velocity);
-    }
+    
     private void PlayCollectionConfirm(int note, float velocity)
     {
         if (midiStreamPlayer == null) return;
@@ -2550,11 +2549,6 @@ private bool IsDeepDustCell(Vector2Int gp, int buffer, CosmicDustGenerator dustG
         midiStreamPlayer.MPTK_PlayEvent(ev);
     }
     
-    private IEnumerator PlayNoteAfterDelay(float delaySec, int note, int durationTicks, float velocity)
-    {
-        yield return new WaitForSeconds(delaySec);
-        PlayNote(note, durationTicks, velocity);
-    }
 
     private IEnumerator ResetPitchBendAfterDelay(float delay)
     {
