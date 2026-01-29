@@ -1176,10 +1176,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                 ascendLoopCount +
                 Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
 
-            float seconds =
-                drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
-            if (drumTrack != null)
-                seconds = Mathf.Max(0.0001f, drumTrack.GetLoopLengthInSeconds() * fuseLoops);
+            float seconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
 
             EnqueueNextFrame(() =>
             {
