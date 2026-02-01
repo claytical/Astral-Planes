@@ -797,7 +797,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Press anything to phase in...
+  m_text: Press a button to start
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
@@ -941,14 +941,18 @@ MonoBehaviour:
   BridgePending: 0
   suppressCollectableSpawnsDuringBridge: 1
   phaseBridgeWaitMaxLoops: 64
+  useSpiralCoralDuringBridge: 1
+  coralRoot: {fileID: 0}
+  spiralCoralBase: {fileID: 0}
+  spiralCoralGrower: {fileID: 0}
+  fadeSpiralCoralDuringBridge: 1
+  spiralCoralFadeTarget: 0.65
   demoMode: 0
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}
   dustGenerator: {fileID: 0}
   spawnGrid: {fileID: 0}
-  coralPrefab: {fileID: 3306639670150737611, guid: 8d387e67775794007ba96dfadbea003d,
-    type: 3}
   disableCoralDuringBridge: 1
   noteViz: {fileID: 0}
   glitch: {fileID: 0}

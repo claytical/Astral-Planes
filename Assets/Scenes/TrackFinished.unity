@@ -643,7 +643,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Restoration Complete
+  m_text: Nothing more can be sustained.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
@@ -797,17 +797,85 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b9719a5ef47f54f508bee99167dc603b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  branchPrefab: {fileID: 1489691682797356712, guid: 464038b6578f540738168f487b8bd898,
-    type: 3}
-  tendrilPrefab: {fileID: 2567590292593330884, guid: 33a2b2f200d00462d98bf2d2315a21a3,
-    type: 3}
-  branchLength: 2
-  branchSpreadAngle: 45
-  tendrilSpacing: 0.2
-  rotationSpeed: 15
-  coralRoot: {fileID: 1899443904}
-  coralOrigin: {x: -7, y: -5, z: 0}
-  branchScale: 1.5
+  style:
+    coreRadius: 0.22
+    baseBranchLength: 2.2
+    velocityToLength: 0.006
+    densityToWidth: 0.0028
+    stemHeight: 0.75
+    stemBlendPortion: 0.25
+    outwardRadius: 0.55
+    outwardRadiusJitter: 0.12
+    rings: 22
+    radialSegments: 10
+    taperPower: 2.4
+    minTipRadius: 0.004
+    bendStrength: 0.35
+    twistDegPerUnit: 80
+    hueStep: 0.14
+    hueAlongLength: 0.75
+    saturation: 0.85
+    value: 1
+    fillAlpha: 0.16
+    outlineRadiusMul: 1.1
+    growSeconds: 1.35
+    growCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fallbackGradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+  fillMaterial: {fileID: 0}
+  outlineMaterial: {fileID: 0}
+  origin: {x: 0, y: 0, z: 0}
 --- !u!1 &1811426716
 GameObject:
   m_ObjectHideFlags: 0

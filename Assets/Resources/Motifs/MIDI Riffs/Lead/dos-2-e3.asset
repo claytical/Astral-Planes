@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: dos-2-e3
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: dos-2-e3
+    authoredRootMidi: 64
+    loopSteps: 16
+    events:
+    - step: 0
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 1
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 2
+      midiNote: 62
+      durSteps: 2
+      velocity01: 0.78740156
+    - step: 4
+      midiNote: 64
+      durSteps: 2
+      velocity01: 0.78740156
+    - step: 6
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 7
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 8
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 9
+      midiNote: 64
+      durSteps: 3
+      velocity01: 0.78740156
+    - step: 12
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 13
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 14
+      midiNote: 62
+      durSteps: 2
+      velocity01: 0.78740156
+    overlapPolicy: 1
+    clampToTrackRange: 0
+    octaveShift: 0

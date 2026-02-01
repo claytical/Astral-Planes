@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Uno
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: uno
+  displayName: uno por favor
+  keyRootMidi: 57
+  entryDrumLoops:
+  - {fileID: 8300000, guid: d8d6154a598ef4807b2450da93814fe1, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: f58c5aab1881b4af68864550df141a3a, type: 3}
+  - {fileID: 8300000, guid: 6c2479da8cfaa4a5daa93dd97ea6427c, type: 3}
+  - {fileID: 8300000, guid: 3542ee37aa85440588332c6aa220b5c2, type: 3}
+  - {fileID: 8300000, guid: 720d74577fa6e4a1b8eb4872b3512f3b, type: 3}
+  - {fileID: 8300000, guid: ee4f03bf8a099423889135fc6748832e, type: 3}
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: 8f712aab8f8c14f04822507d0f5f1f86, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: a17187d36acbe46809b6b575a87861c3, type: 2}
+  - {fileID: 11400000, guid: b83d4f3a63f5d4f7a8c1eaa7a7ae88ea, type: 2}
+  - {fileID: 11400000, guid: 834ee76f4f8e745538b1a2a29a1049bc, type: 2}
+  - {fileID: 11400000, guid: 389737c6c2d1a427d8659a5fa9d75954, type: 2}
+  - {fileID: 11400000, guid: 97d9dec725edf43149c21d1c92d7e239, type: 2}
+  - {fileID: 11400000, guid: b569c9dafa42642da9714143df2aed97, type: 2}
+  - {fileID: 11400000, guid: 9f75a28fc17ae44f5b84e929fcdab969, type: 2}
+  - {fileID: 11400000, guid: 76af9457db7f04a76a33cb2e20e35953, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

@@ -86,6 +86,7 @@ MonoBehaviour:
   epochId: 0
   stayForceEvery: 0
   _baseEmission: 10
+  denyPulseDefaultSeconds: 0.25
 --- !u!114 &8747843313378906591
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -190,7 +191,7 @@ ParticleSystem:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2371707622271433480}
   serializedVersion: 8
-  lengthInSec: 1
+  lengthInSec: 0.5
   simulationSpeed: 0.4
   stopAction: 0
   cullingMode: 0
@@ -265,7 +266,7 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
+      scalar: 1
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -372,7 +373,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 0.050980393}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.011764706}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -898,7 +899,7 @@ ParticleSystem:
     m_TextureBilinearFiltering: 0
     randomDirectionAmount: 0
     sphericalDirectionAmount: 0
-    randomPositionAmount: 0.3
+    randomPositionAmount: 1
     radius:
       value: 0.0001
       mode: 0
@@ -958,7 +959,7 @@ ParticleSystem:
           m_RotationOrder: 4
     arc:
       value: 360
-      mode: 3
+      mode: 0
       spread: 0
       speed:
         serializedVersion: 2
@@ -2834,7 +2835,7 @@ ParticleSystem:
         m_PostInfinity: 2
         m_RotationOrder: 4
   NoiseModule:
-    enabled: 0
+    enabled: 1
     strength:
       serializedVersion: 2
       minMaxState: 3
@@ -5064,9 +5065,9 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -4034737190437275596, guid: d6d83a12a019d4ff2bc4b2258795a6ad,
+  m_Sprite: {fileID: 6485846461334653488, guid: 43dc102d976b24668a4c8bf47427b57d,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.49803922}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

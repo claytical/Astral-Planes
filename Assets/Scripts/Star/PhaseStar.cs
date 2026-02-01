@@ -31,6 +31,11 @@ public class PhaseStar : MonoBehaviour
     // -------------------- Profile-driven tuning (authoring surface) --------------------
     // PhaseStar no longer owns duplicated serialized fields for these knobs; they come from PhaseStarBehaviorProfile.
     // Defaults here are used only if behaviorProfile is missing.
+    [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
+    [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
+
+    private bool _cachedIsSuperNode = false;
+    private NoteSet _cachedPlannedNoteSet = null;
 
     private bool StarKeepsDustClear => !behaviorProfile || behaviorProfile.starKeepsDustClear;
 
@@ -396,9 +401,30 @@ public class PhaseStar : MonoBehaviour
     private bool AnyCollectablesInFlightGlobal()
     {
         var gfm = GameFlowManager.Instance;
-        // If your wiring uses a different access path, swap this for whatever is correct in your project.
-        var tc = gfm != null ? gfm.controller : null; // often InstrumentTrackController lives here
-        return (tc != null && tc.AnyCollectablesInFlight());
+        if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
+            return false;
+
+        bool any = false;
+
+        foreach (var t in gfm.controller.tracks)
+        {
+            if (t == null) continue;
+
+            // Prune nulls defensively (destroyed objects can linger as null refs)
+            if (t.spawnedCollectables != null)
+                t.spawnedCollectables.RemoveAll(go => go == null);
+
+            int count = (t.spawnedCollectables != null) ? t.spawnedCollectables.Count : 0;
+
+            if (count > 0)
+            {
+                any = true;
+                // Optional: leave this on until you confirm the fix
+                Debug.Log($"[PS:CIF] track={t.name} spawnedCollectables={count}");
+            }
+        }
+
+        return any;
     }
 
     private void BeginBridgeNow()
@@ -779,7 +805,6 @@ public class PhaseStar : MonoBehaviour
             HasShardsRemaining() && !AnyCollectablesInFlightGlobal() && !AnyExpansionPendingGlobal())
         {
             
-            //RotateHighlightedShardNow(1);
             DBG($"[PS:LB] Rotated offered shard at boundary. currentShardIndex={currentShardIndex}");
         }
 
@@ -976,11 +1001,13 @@ public class PhaseStar : MonoBehaviour
         UpdatePreviewTint();
     }
 
-private void PrepareNextDirective()
+    private void PrepareNextDirective()
     {
         Trace("PrepareNextDirective() begin");
 
         _cachedTrack = null;
+        _cachedIsSuperNode = false;
+        _cachedPlannedNoteSet = null;
 
         if (_drum == null || spawnStrategyProfile == null) return;
 
@@ -991,8 +1018,49 @@ private void PrepareNextDirective()
 
         _cachedTrack = track;
 
+        // --- Decide what NoteSet a "normal" node would use ---
+        // Primary: repeat whatever the track is already using.
+        NoteSet planned = track.GetCurrentNoteSet();
+
+        // Optional fallback: if your system expects a note set to exist,
+        // generate one in the same way HarmonyDirector does.
+        if (planned == null)
+        {
+            var gfm = GameFlowManager.Instance;
+            var factory = gfm != null ? gfm.phaseTransitionManager.noteSetFactory : null;
+            var phase = (gfm != null && gfm.phaseTransitionManager != null)
+                ? gfm.phaseTransitionManager.currentPhase
+                : MazeArchetype.Establish;
+
+            if (factory != null)
+                planned = factory.Generate(track, _assignedMotif);
+        }
+
+        _cachedPlannedNoteSet = planned;
+
+        // --- Saturation decision ---
+        // Use repeating check if you only want super nodes on "same NoteSet again".
+// --- Saturation decision ---
+// SuperNode only when the track is fully expanded AND repeating the same NoteSet would add no new coverage.
+        if (planned != null)
+        {
+            int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
+            bool atMaxBins = track.loopMultiplier >= maxBins;
+
+            _cachedIsSuperNode = (_cachedTrack != null) && ShouldSpawnSuperNodeForTrack(_cachedTrack);
+
+
+        }
+        else
+        {
+            _cachedIsSuperNode = false;
+        }
+
+        // If you want super nodes anytime the set would add no new step coverage:
+        // _cachedIsSuperNode = track.IsSaturatedForNoteSet(planned);
+
         if (!_lockPreviewTintUntilIdle)
-            UpdatePreviewTint(); // should read from previewRing[currentShardIndex]
+            UpdatePreviewTint();
     }
 
     void BuildPreviewRing()
@@ -1376,11 +1444,46 @@ private void PrepareNextDirective()
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         ActivateSafetyBubble();
-        SpawnNodeCommon(contact, ejectedTrack);
+        if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
+            SpawnSuperNodeCommon(contact, ejectedTrack);
+        else
+            SpawnNodeCommon(contact, ejectedTrack);
 
         currentShardIndex = Mathf.Clamp(currentShardIndex, 0, Mathf.Max(0, remainingAfter - 1));
         RebuildPreviewRingForRemainingShards(keepCurrentIndex: true);
         PrepareNextDirective();
+    }
+    private void SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
+    {
+        if (superNodePrefab == null)
+        {
+            Debug.LogError("[PhaseStar] superNodePrefab is null.");
+            return;
+        }
+
+        if (soloVoice == null)
+        {
+            soloVoice = FindAnyObjectByType<SoloVoice>();
+            if (soloVoice == null)
+            {
+                Debug.LogError("[PhaseStar] SoloVoice not found.");
+                return;
+            }
+        }
+
+        // Spawn
+        var go = Instantiate(superNodePrefab, contactWorld, Quaternion.identity);
+//        _activeNode = go;
+
+        // Initialize component
+        var sn = go.GetComponent<SuperNode>();
+        if (sn == null)
+        {
+            Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
+            return;
+        }
+        sn.Initialize(soloVoice, _drum);
+
     }
 
     void EjectCachedDirectiveAndFlow(Collision2D coll)
@@ -1397,8 +1500,61 @@ private void PrepareNextDirective()
         bool isFinal = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
         Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving, _cachedTrack.trackColor);
         ActivateSafetyBubble();
-        SpawnNodeCommon(contact, _cachedTrack);
+        if (_cachedIsSuperNode)
+            SpawnSuperNodeCommon(contact, _cachedTrack);
+        else
+            SpawnNodeCommon(contact, _cachedTrack);
     }
+    private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
+    {
+        if (track == null) return false;
+
+        // --- Interpret "fully expanded" in a bin-count safe way ---
+        // If your loopMultiplier is already 1..maxBins, this works.
+        // If it's 0..(maxBins-1), this also works because we treat it as "bins = loopMultiplier + 1".
+        int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
+
+        // Try to interpret loopMultiplier robustly
+        int binsIfMultiplierIsCount = Mathf.Max(1, track.loopMultiplier);
+        int binsIfMultiplierIsIndex = Mathf.Max(1, track.loopMultiplier + 1);
+
+        bool fullyExpanded =
+            (binsIfMultiplierIsCount >= maxBins) ||
+            (binsIfMultiplierIsIndex >= maxBins);
+
+        if (!fullyExpanded)
+        {
+            Debug.Log(
+                $"[SuperNodeGate] NO: not fully expanded. " +
+                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
+                $"bins(count)={binsIfMultiplierIsCount} bins(index+1)={binsIfMultiplierIsIndex}"
+            );
+            return false;
+        }
+
+        // --- Must have a current note set ---
+        var planned = track.GetCurrentNoteSet();
+        if (planned == null)
+        {
+            Debug.Log(
+                $"[SuperNodeGate] NO: planned noteSet is null. " +
+                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
+            );
+            return false;
+        }
+
+        // --- The actual differentiator: repeating set is already saturated ---
+        bool saturated = track.IsSaturatedForRepeatingNoteSet(planned);
+
+        Debug.Log(
+            $"[SuperNodeGate] {(saturated ? "YES" : "NO")}: " +
+            $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
+            $"saturated={saturated}"
+        );
+
+        return saturated;
+    }
+
 
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)
     {

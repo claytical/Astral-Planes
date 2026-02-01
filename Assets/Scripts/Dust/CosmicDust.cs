@@ -44,7 +44,7 @@ public class CosmicDust : MonoBehaviour {
 
     public Color CurrentTint => _currentTint;
     [SerializeField] private Color _chargeColor = Color.white;
-    [SerializeField] private Color _denyColor = Color.violetRed;
+    [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
     [Serializable]
     public struct DustInteractionSettings
@@ -142,6 +142,16 @@ public class CosmicDust : MonoBehaviour {
     [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
     private Vector3 _baseLocalScale = Vector3.one;
+// ---- Particle visibility control ----
+// We treat particle emission as an on/off module toggle and never "cache whatever the current rate is"
+// while hidden (which can permanently cache 0 and cause particles to stay off).
+    private ParticleSystem.MinMaxCurve[] _baseRateOverTime;
+    private bool[] _baseEmissionEnabled;
+    private bool _baseParticleEmissionCaptured;
+
+// Captured from the prefab at runtime (root particle system) for preview effects.
+    private ParticleSystem.MinMaxCurve _baseEmissionCurve;
+    private bool _baseEmissionCurveCaptured;
 
     [SerializeField] public Collider2D terrainCollider;
 
@@ -162,8 +172,6 @@ public class CosmicDust : MonoBehaviour {
     private bool  _hasImprint;
     private Color _imprintBaseTint;
     private Color _imprintShadowTint;
-    private int _prefabInitialLayer;
-    private bool _prefabLayerCaptured;
 
     private bool _isDespawned;
     private bool _shrinkingFromStar;
@@ -178,6 +186,13 @@ public class CosmicDust : MonoBehaviour {
     private bool _isBreaking;
     [SerializeField] private float _baseEmission = 1;
     private Coroutine _spriteScaleRoutine;
+    private float _emissionMulCurrent = 1f;
+    private Coroutine _emissionMulRoutine;
+
+    [Header("Deny Feedback")]
+    [SerializeField] private float denyPulseDefaultSeconds = 0.25f;
+    private Coroutine _denyPulseRoutine;
+    private int _denyPulseToken = 0;
     void Awake() {
         if (!_cachedInitialScale)
         {
@@ -194,42 +209,28 @@ public class CosmicDust : MonoBehaviour {
         if (visual.particleSystem != null) 
             _psRenderer = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
         // If the prefab has PlayOnAwake accidentally enabled, force idle so pool/prewarm won't explode.
-
+// --- Particles: always visible/running, default emission on boot ---
         if (visual.particleSystem != null)
         {
-            // Capture authored emission settings (root + children) before we shut anything off.
             EnsureBaseParticleEmissionCaptured();
 
-            // Force idle so pool/prewarm won't explode, and ensure everything starts hidden.
-            var systems = GetAllParticleSystems();
-            if (systems != null)
-            {
-                for (int i = 0; i < systems.Length; i++)
-                {
-                    var ps = systems[i];
-                    if (ps == null) continue;
+            // Ensure it's actually running (no Stop/Clear usage anywhere)
+            EnsureParticlesPlaying();
 
-                    var main = ps.main;
-                    main.playOnAwake = false;
-                    main.scalingMode = ParticleSystemScalingMode.Local;
+            // Establish initial tint BEFORE emission so the first spawned particles aren't black.
+            // Prefer authored sprite color if present.
+            if (visual.sprite != null)
+                _currentTint = visual.sprite.color;
 
-                    var emission = ps.emission;
-                    emission.enabled = false;
+            // Apply tint to sprite + particle material/gradient.
+            SetTint(_currentTint);
 
-                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                    ps.Clear(true);
-                }
-            }
+            // Start at default emission (mul = 1). Carved state will drive this to 0 later.
+            ApplyEmissionMultiplierImmediate(100f);
 
             // Keep root particle transform stable in pooled scenarios
             visual.particleSystem.transform.localScale = Vector3.one;
         }
-        if (!_prefabLayerCaptured)
-        {
-            _prefabInitialLayer = gameObject.layer;
-            _prefabLayerCaptured = true;
-        }
-
         // Terrain collider typically lives on this same prefab (PolygonCollider2D recommended),
         // but some prefab variants place colliders on children.
         if (terrainCollider == null) terrainCollider = GetComponent<Collider2D>();
@@ -258,35 +259,6 @@ public class CosmicDust : MonoBehaviour {
         ApplyParticleFootprint();
         ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
     }
-    public void PreviewBoostWork(float effective01, float holdSeconds = -1f)
-    {
-        if (_isDespawned || _isBreaking) return;
-
-        Visual_ChargeOnBoost(Mathf.Clamp01(effective01));
-
-        float hold = (holdSeconds > 0f) ? holdSeconds : previewWorkHoldSeconds;
-        _previewWorkToken++;
-        int token = _previewWorkToken;
-
-        if (_previewWorkRoutine != null)
-        {
-            StopCoroutine(_previewWorkRoutine);
-            _previewWorkRoutine = null;
-        }
-        _previewWorkRoutine = StartCoroutine(ClearPreviewWorkAfter(token, hold));
-    }
-
-    private IEnumerator ClearPreviewWorkAfter(int token, float holdSeconds)
-    {
-        if (holdSeconds > 0f)
-            yield return new WaitForSeconds(holdSeconds);
-
-        if (token != _previewWorkToken)
-            yield break;
-
-        ResetVisualToBase();
-        _previewWorkRoutine = null;
-    }
     public void SetVisualTimings(DustVisualTimings t)
     {
         // Defensive clamps so bad inspector values can’t break everything.
@@ -296,8 +268,6 @@ public class CosmicDust : MonoBehaviour {
         t.fadeOutSeconds        = Mathf.Max(0.01f, t.fadeOutSeconds);
         _timings = t;
     }
-
-
     private IEnumerator ScaleSpriteRoutine(float from, float to, float seconds)
     {
         Vector3 a = Vector3.one * from;
@@ -318,38 +288,8 @@ public class CosmicDust : MonoBehaviour {
 
         visual.sprite.transform.localScale = b;
     }
-
-
     // Sprite alpha fades are presentation details (eg. regrow), and must respect the authored
     // tint alpha (eg. MusicalRoleProfile.baseColor.a). Do not overwrite _currentTint.a here.
-    private void SetSpriteAlphaOnly(float a01)
-    {
-        if (visual.sprite == null) return;
-        var c = visual.sprite.color;
-        c.a = Mathf.Clamp01(a01);
-        visual.sprite.color = c;
-    }
-
-    private void BeginFadeInSpriteAlpha(float durationSeconds, float targetAlpha)
-    {
-        if (visual.sprite == null) return;
-        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
-        _fadeRoutine = StartCoroutine(FadeSpriteAlphaRoutine(0f, Mathf.Clamp01(targetAlpha), durationSeconds));
-    }
-
-    private IEnumerator FadeSpriteAlphaRoutine(float from, float to, float seconds)
-    {
-        seconds = Mathf.Max(0.01f, seconds);
-        float t = 0f;
-        while (t < seconds)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.Clamp01(t / seconds);
-            SetSpriteAlphaOnly(Mathf.Lerp(from, to, u));
-            yield return null;
-        }
-        SetSpriteAlphaOnly(to);
-    }
     public float GetWorldRadius()
     {
         if (!terrainCollider)
@@ -367,7 +307,6 @@ public class CosmicDust : MonoBehaviour {
         // Use the larger extent to be safe.
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
     }
-
     public void ConfigureForPhase(MazeArchetype phase)
     {
         // One switch → one config object → one assignment block.
@@ -463,26 +402,29 @@ public class CosmicDust : MonoBehaviour {
         lateralForce   = cfg.lateral;
         turbulence     = cfg.turb;
     }
-
     public void Begin()
     {
+        // Sprite is the primary "solid" visual. It scales in/out on carve/regrow.
         SetVisualsEnabled(true);
         SetColorVariance();
-        ResetAndPlayParticles();
+
         ApplyParticleFootprint();
         CaptureBaseVisual();
 
-        // Rule #2: regrow should fade sprite alpha back to 1 (not pop).
-        SetSpriteAlphaOnly(0f);
-
+        // Sprite scale-in
         ResetSpriteScaleTo(0f);
         AnimateSpriteScale(0f, 1f); // uses _timings.spriteScaleInSeconds
-        // Fade back to the authored tint alpha (not a hardcoded value).
-        BeginFadeInSpriteAlpha(_timings.spriteScaleInSeconds, _currentTint.a);
 
-        _growInRoutine = StartCoroutine(GrowIn());
+        // Particles remain running; regrow restores default emission smoothly.
+        EnsureParticlesPlaying();
+        SetEmissionMultiplier(1f, seconds: _timings.particleGrowInSeconds);
+
+        // Ensure particle tint matches our current tint (including alpha).
+        if (useWorkShaderParams)
+            ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
+        else
+            SetDustColorAllParticles(_currentTint);
     }
-
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
@@ -491,23 +433,14 @@ public class CosmicDust : MonoBehaviour {
     public void SetTint(Color tint)
     {
         _currentTint = tint;
-        if (visual.sprite != null) 
-            visual.sprite.color = tint;
-        
-        if (!visual.particleSystem) return;
-        
-        // For particles we still want "base hue" to match tint, but interaction feedback modifies particles.
-        if (useWorkShaderParams) { 
-            // Keep particle vertex/gradient neutral; hue comes from _RoleColor on the particle material.
-            SetDustColorAllParticles(new Color(1f, 1f, 1f, tint.a));
-            ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: _workSigned01);
-        }
-        else { 
-            // Legacy: bake hue into gradient
-            SetDustColorAllParticles(tint);
-        }
-    }
 
+        // Sprite is the dominant visual and is the only thing we tint by default.
+        if (visual.sprite != null)
+            visual.sprite.color = tint;
+
+        // Particles: leave authored color/gradient/material alone.
+        // (If you later want particle tinting, do it as an explicit opt-in path.)
+    }
     private void SetDustColorAllParticles(Color target)
     {
         if (visual.particleSystem == null) return;
@@ -517,7 +450,7 @@ public class CosmicDust : MonoBehaviour {
         var col  = ps.colorOverLifetime;
 
         col.enabled = true;
-
+/*
         // Premultiply for premultiplied-alpha material.
         Color pm = Premultiply(target);
         var g = new Gradient();
@@ -542,8 +475,8 @@ public class CosmicDust : MonoBehaviour {
 
         // Also set startColor for newly emitted particles.
         main.startColor = pm;
+*/
     }
-
     public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
     private static Color Premultiply(Color c)
     {
@@ -552,7 +485,6 @@ public class CosmicDust : MonoBehaviour {
         c.b *= c.a;
         return c;
     }
-
     public void SetTerrainColliderEnabled(bool enabled)
     {
         // Prefer cached colliders so we reliably toggle whatever collider is actually producing contact.
@@ -596,87 +528,78 @@ public class CosmicDust : MonoBehaviour {
         }
 
     }
-    public void DissipateAndHideVisualOnly(float fadeSeconds = -1) {
+    public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
+    {
         if (_isDespawned) return;
-        _isDespawned = true; 
-        // Ensure no collision during fade.
+        _isDespawned = true;
+
+        // No collision while carved/empty.
         SetTerrainColliderEnabled(false);
-        SetVisualsEnabled(false);
+
         float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.spriteScaleOutSeconds;
+
+        // Sprite scales down (solid disappears).
         AnimateSpriteScale(1f, 0f, d);
-        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; } 
-        _fadeRoutine = StartCoroutine(FadeOutThenPoolVisualOnly(d));
+
+        // Particles stay visible, but stop emitting smoothly.
+        SetEmissionMultiplier(0f, seconds: d);
+
+        // Notify generator after the carve-out read, so it can finalize state bookkeeping.
+        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
+        _fadeRoutine = StartCoroutine(NotifyGeneratorAfter(d));
     }
-
-
-
-    private static Color MulRgb(Color c, float mul)
+    private IEnumerator NotifyGeneratorAfter(float seconds)
     {
-        return new Color(c.r * mul, c.g * mul, c.b * mul, c.a);
+        if (seconds > 0f) yield return new WaitForSeconds(seconds);
+
+        if (gen != null) gen.OnDustVisualFadedOut(this);
+        _fadeRoutine = null;
     }
-
-    private IEnumerator FadeOutVisualOnly(float duration, System.Action onComplete)
+    // Called by the generator when a Clearing -> Empty transition is finalized.
+    // Keeps particles alive (no Stop/Clear), but ensures the cell is visually "carved".
+    public void FinalizeClearedVisuals()
     {
-        // Stop new particles, but don’t clear until the end (your current semantics)
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-        float t = 0f;
-        Color from = _currentTint;
-        Color to   = _currentTint; to.a = 0f;
-
-        // Optional: if you want “stop blocking immediately”
         SetTerrainColliderEnabled(false);
+        SetVisualsEnabled(true);
 
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, duration));
-            SetTint(Color.Lerp(from, to, u));
-            yield return null;
-        }
-
-        SetTint(to);
-
-        if (visual.particleSystem != null)
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        onComplete?.Invoke();
+        ResetSpriteScaleTo(0f);
+        ApplyEmissionMultiplierImmediate(0f);
     }
-
     public void PrepareForReuse()
     {
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
-        SetVisualsEnabled(true);
-        ResetSpriteScaleTo(0f);
+        if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
+        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
+        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
+
         _isBreaking = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
         SetWorkSigned01(0f);
+
         // Restore captured prefab/base scale instead of Vector3.one
         transform.localScale = (_baseLocalScale.sqrMagnitude > 0.0001f)
             ? _baseLocalScale
             : (visual.prefabReferenceScale.sqrMagnitude > 0.0001f ? visual.prefabReferenceScale : Vector3.one);
 
+        // Invisible until Begin() is called.
         SetTerrainColliderEnabled(false);
-        if (visual.particleSystem != null)
-        {
-            var emission = visual.particleSystem.emission;
-            emission.enabled = false;
-            visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            visual.particleSystem.Clear(true);
-        }
+        SetVisualsEnabled(true);
+        ResetSpriteScaleTo(0f);
 
-        _currentTint.a = 0f;
-        SetTint(_currentTint);
+        // Keep particles running but quiet until Begin() restores default emission.
+        EnsureParticlesPlaying();
+        ApplyEmissionMultiplierImmediate(0f);
+
+        // Don’t stomp tint alpha; just ensure sprite matches _currentTint.
+        if (visual.sprite != null) visual.sprite.color = _currentTint;
 
         clearing.hardness01 = 0f;
     }
-
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
         if (visual.particleSystem == null) yield break;
@@ -698,25 +621,12 @@ public class CosmicDust : MonoBehaviour {
         }
         SetTint(toTint);
     }    
-
-// ---- Particle visibility control ----
-// We treat particle emission as an on/off module toggle and never "cache whatever the current rate is"
-// while hidden (which can permanently cache 0 and cause particles to stay off).
-private ParticleSystem.MinMaxCurve[] _baseRateOverTime;
-private bool[] _baseEmissionEnabled;
-private bool _baseParticleEmissionCaptured;
-
-// Captured from the prefab at runtime (root particle system) for preview effects.
-private ParticleSystem.MinMaxCurve _baseEmissionCurve;
-private bool _baseEmissionCurveCaptured;
-
-private ParticleSystem[] GetAllParticleSystems()
+    private ParticleSystem[] GetAllParticleSystems()
 {
     if (visual.particleSystem == null) return null;
     return visual.particleSystem.GetComponentsInChildren<ParticleSystem>(true);
 }
-
-private void EnsureBaseParticleEmissionCaptured()
+    private void EnsureBaseParticleEmissionCaptured()
 {
     var systems = GetAllParticleSystems();
     if (systems == null || systems.Length == 0) return;
@@ -761,8 +671,7 @@ private void EnsureBaseParticleEmissionCaptured()
 
     _baseParticleEmissionCaptured = true;
 }
-
-private static ParticleSystem.MinMaxCurve ScaleCurve(ParticleSystem.MinMaxCurve c, float mul)
+    private static ParticleSystem.MinMaxCurve ScaleCurve(ParticleSystem.MinMaxCurve c, float mul)
 {
     // Scale without destroying the authored curve modes.
     switch (c.mode)
@@ -783,75 +692,135 @@ private static ParticleSystem.MinMaxCurve ScaleCurve(ParticleSystem.MinMaxCurve 
             return c;
     }
 }
+// ---- Particle emission control ----
+// Particle systems should stay running to avoid abrupt "loop pops" caused by Stop/Clear.
+// We only modulate emission rate (rateOverTime) via a multiplier.
+    private void EnsureParticlesPlaying()
+    {
+        if (visual.particleSystem == null) return;
 
-public void SetVisualsEnabled(bool enabled)
+        var systems = GetAllParticleSystems();
+        if (systems == null || systems.Length == 0) return;
+
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var ps = systems[i];
+            if (ps == null) continue;
+
+            // Do NOT touch main module settings or renderer flags here.
+            // Only ensure the system is running so emission ramps are continuous.
+            if (!ps.isPlaying)
+                ps.Play(true);
+        }
+    }
+    private void ApplyEmissionMultiplierImmediate(float mul01)
 {
-    if (visual.sprite != null)
-        visual.sprite.enabled = enabled;
-
-    if (visual.particleSystem == null)
-        return;
+    if (visual.particleSystem == null) return;
 
     EnsureBaseParticleEmissionCaptured();
+    EnsureParticlesPlaying();
 
     var systems = GetAllParticleSystems();
-    if (systems == null || systems.Length == 0)
+    if (systems == null || systems.Length == 0) return;
+
+    float mul = Mathf.Max(0f, mul01);
+    _emissionMulCurrent = mul;
+
+    for (int i = 0; i < systems.Length; i++)
+    {
+        var ps = systems[i];
+        if (ps == null) continue;
+
+        var em = ps.emission;
+        em.enabled = true;
+
+        if (_baseRateOverTime != null && i < _baseRateOverTime.Length)
+            em.rateOverTime = ScaleCurve(_baseRateOverTime[i], mul);
+    }
+}
+    private IEnumerator LerpEmissionMultiplier(float from, float to, float seconds)
+{
+    seconds = Mathf.Max(0.01f, seconds);
+    float t = 0f;
+
+    while (t < seconds)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.SmoothStep(0f, 1f, t / seconds);
+        ApplyEmissionMultiplierImmediate(Mathf.Lerp(from, to, u));
+        yield return null;
+    }
+
+    ApplyEmissionMultiplierImmediate(to);
+    _emissionMulRoutine = null;
+}
+    private void SetEmissionMultiplier(float targetMul, float seconds = 0f)
+{
+    targetMul = Mathf.Max(0f, targetMul);
+
+    if (_emissionMulRoutine != null)
+    {
+        StopCoroutine(_emissionMulRoutine);
+        _emissionMulRoutine = null;
+    }
+
+    if (seconds <= 0f)
+    {
+        ApplyEmissionMultiplierImmediate(targetMul);
         return;
+    }
 
-    if (enabled)
+    _emissionMulRoutine = StartCoroutine(LerpEmissionMultiplier(_emissionMulCurrent, targetMul, seconds));
+}
+    public void SetVisualsEnabled(bool enabled)
+{
+    // In the simplified model, we only toggle sprite visibility.
+    // Particles stay enabled; their "presence" is driven by emission rate (SetEmissionMultiplier).
+    if (visual.sprite != null)
+        visual.sprite.enabled = enabled;
+}
+    public void HideVisualsInstant()
     {
-        for (int i = 0; i < systems.Length; i++)
+        // Stop any running routines that might fight this.
+        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
+        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
+        if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
+        if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
+        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
+
+        // Disable collisions immediately.
+        SetTerrainColliderEnabled(false);
+
+        // Hide sprite (authoritative for "solid" dust).
+        if (visual.sprite != null)
         {
-            var ps = systems[i];
-            if (ps == null) continue;
+            visual.sprite.transform.localScale = Vector3.zero;
+            visual.sprite.enabled = false;
+        }
 
-            var em = ps.emission;
+        // For pooling / true hiding, stop particles completely.
+        if (visual.particleSystem != null)
+        {
+            var systems = GetAllParticleSystems();
+            if (systems != null)
+            {
+                for (int i = 0; i < systems.Length; i++)
+                {
+                    var ps = systems[i];
+                    if (ps == null) continue;
 
-            // Restore authored emission state + rate (do NOT "restore last seen", which might be 0).
-            if (_baseEmissionEnabled != null && i < _baseEmissionEnabled.Length)
-                em.enabled = _baseEmissionEnabled[i];
-            else
-                em.enabled = true;
+                    var em = ps.emission;
+                    em.enabled = false;
 
-            if (_baseRateOverTime != null && i < _baseRateOverTime.Length)
-                em.rateOverTime = _baseRateOverTime[i];
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                    ps.Clear(true);
 
-            ps.Clear(true);
-            ps.Play(true);
+                    var r = ps.GetComponent<ParticleSystemRenderer>();
+                    if (r != null) r.enabled = false;
+                }
+            }
         }
     }
-    else
-    {
-        for (int i = 0; i < systems.Length; i++)
-        {
-            var ps = systems[i];
-            if (ps == null) continue;
-
-            var em = ps.emission;
-            em.enabled = false;
-
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            ps.Clear(true);
-        }
-    }
-	}
-    public void HideVisualsInstant() {
-     // Stop any running sprite scale/fade routines that might fight this.
-     if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
-     if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-     if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
-    
-     // Make fully invisible.
-     var c = _currentTint;
-     c.a = 0f;
-     SetTint(c);
-    
-     if (visual.sprite != null)
-         visual.sprite.transform.localScale = Vector3.zero;
-     SetTerrainColliderEnabled(false);
-     SetVisualsEnabled(false);
-    }
-
     private void SyncParticlesToCollider()
     {
         if (visual.particleSystem == null) return;
@@ -870,11 +839,13 @@ public void SetVisualsEnabled(bool enabled)
         if (c == null) return;
 
         // Use collider bounds in WORLD space to drive particle shape scale.
+/*
         Vector3 size = c.bounds.size;
 
         var shape = visual.particleSystem.shape;
         if (shape.enabled)
             shape.scale = new Vector3(size.x, size.y, 1f);
+  */
     }
     private void ApplyParticleFootprint()
     {
@@ -884,10 +855,9 @@ public void SetVisualsEnabled(bool enabled)
 
         float mul = Mathf.Clamp(visual.particleFootprintMul, 0.05f, 2.0f);
         float size = _cellWorldSize * mul;
-        main.startSize = size;
+//        main.startSize = size;
 
     }
-
     private void CaptureBaseVisual()
     {
         if (visual.particleSystem == null) return;
@@ -900,30 +870,6 @@ public void SetVisualsEnabled(bool enabled)
         _baseCaptured = true;
         
     }
-
-    private IEnumerator GrowIn()
-    {
-
-        float duration = (_growInOverride > 0f)
-            ? _growInOverride
-            : _timings.particleGrowInSeconds;
-
-        if (visual.particleSystem == null || duration <= 0f) yield break;
-        
-        var main = visual.particleSystem.main; 
-        Color baseCol = _currentTint;
-        float t = 0f; 
-        while (t < duration) { 
-            t += Time.deltaTime; 
-            float a = Mathf.SmoothStep(0f, 1f, t / duration); 
-            var c = new Color(baseCol.r, baseCol.g, baseCol.b, baseCol.a * a);
-            SetDustColorAllParticles(c);
-            yield return null;
-        }
-        // Ensure fully visible at end
-        SetDustColorAllParticles(baseCol);
-
-    }
 // ------------- TIMING HELPERS -------------
     private float ResolveScaleSeconds(float from, float to, float seconds)
     {
@@ -933,13 +879,6 @@ public void SetVisualsEnabled(bool enabled)
         // Assumes your struct has these fields; if names differ, align them to your actual DustVisualTimings.
         return (to >= from) ? _timings.spriteScaleInSeconds : _timings.spriteScaleOutSeconds;
     }
-
-    private float ResolveFadeOutSeconds(float seconds)
-    {
-        if (seconds > 0f) return seconds;
-        return _timings.fadeOutSeconds;
-    }
-
 // ------------- SCALE -------------
     private void AnimateSpriteScale(float from, float to, float seconds = -1f)
     {
@@ -950,32 +889,10 @@ public void SetVisualsEnabled(bool enabled)
 
         _spriteScaleRoutine = StartCoroutine(ScaleSpriteRoutine(from, to, dur));
     }
-
     private void ResetSpriteScaleTo(float s)
     {
         if (visual.sprite == null) return;
-        visual.sprite.transform.localScale = Vector3.one * s; // your current semantics are fine【turn20file14†CosmicDust.cs†L93-L96】
-    }
-
-// ------------- FADE -------------
-    private void BeginFadeOutVisualOnly(float duration = -1f, System.Action onComplete = null)
-    {
-        float dur = ResolveFadeOutSeconds(duration);
-
-        if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
-        _fadeRoutine = StartCoroutine(FadeOutVisualOnly(dur, onComplete));
-    }
-
-    private IEnumerator FadeOutThenPoolVisualOnly(float duration = -1f)
-    {
-        float dur = ResolveFadeOutSeconds(duration);
-
-        // run the fade as a coroutine we can truly await
-        yield return FadeOutVisualOnly(dur, onComplete: null);
-
-        // after fade completes, notify generator (or hide locally)
-        if (gen != null) gen.OnDustVisualFadedOut(this);
-        else HideVisualsInstant();
+        visual.sprite.transform.localScale = Vector3.one * s; // your current semantics are fine
     }
     private void OnCollisionStay2D(Collision2D collision)
     {
@@ -1005,34 +922,90 @@ public void SetVisualsEnabled(bool enabled)
         float severity01 = Mathf.Clamp01(_nonBoostClearSeconds / denom);
 
 // Visual denial shift
-        Visual_DenyOnBump(severity01);
+        // Non-carve bump feedback: quick tint pulse, then return to base.
+        if (_nonBoostClearSeconds <= Time.fixedDeltaTime * 1.5f)
+            TriggerDenyTintPulse(Mathf.Lerp(0.12f, 0.35f, severity01));
 
 // IMPORTANT: no breaking/clearing here.
 
     }
-    private void Visual_DenyOnBump(float severity01)
+private void TriggerDenyTintPulse(float seconds = -1f)
+{
+    float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
+    if (dur <= 0f) return;
+
+    // Invalidate any currently-running pulse without force-stopping it
+    // so it doesn't "freeze" the tint mid-pulse.
+    _denyPulseToken++;
+    int token = _denyPulseToken;
+
+    // Start a new pulse; it will smoothly lerp from current tint.
+    _denyPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
+}
+
+private IEnumerator DenyTintPulseRoutine(int token, float seconds)
+{
+    if (seconds <= 0f) yield break;
+
+    // Capture the tint we want to return to.
+    // IMPORTANT: this should represent your "base" at the moment of denial.
+    // If you have a more canonical base tint variable than _currentTint, use that instead.
+    Color baseTint = _currentTint;
+
+    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
+    denyTint.a = baseTint.a;
+
+    // Pulse shape: fade in -> brief hold -> fade out
+    // Tuned to avoid flicker when spam-triggered.
+    float fadeIn  = Mathf.Clamp(seconds * 0.25f, 0.03f, 0.10f);
+    float fadeOut = Mathf.Clamp(seconds * 0.35f, 0.05f, 0.14f);
+    float hold    = Mathf.Max(0f, seconds - fadeIn - fadeOut);
+
+    // Fade IN: from whatever tint is currently applied (smooth on retrigger)
+    Color startTint = _currentTint;
+    float t = 0f;
+    while (t < fadeIn)
     {
-        if (visual.particleSystem == null) return;
-        if (!_baseCaptured) CaptureBaseVisual();
-
-        float s = Mathf.Clamp01(severity01);
-
-        var ps = visual.particleSystem;
-        var main = ps.main;
-
-        // Particle tint: blend from base -> denyColor. Keep alpha consistent.
-        Color baseCol = _currentTint;
-        baseCol.a = _baseAlpha;
-
-        Color target = _hasFeedbackColors ? _denyColor : Color.black;
-        target.a = _baseAlpha;
-
-        Color denyCol = Color.Lerp(baseCol, target, s);
-        SetDustColorAllParticles(denyCol);
-
-        // Optional size response on deny
-        main.startSize = _baseSize * Mathf.Lerp(1.00f, 1.12f, s);
+        if (token != _denyPulseToken) yield break;
+        t += Time.deltaTime;
+        float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
+        SetTint(Color.Lerp(startTint, denyTint, a));
+        yield return null;
     }
+
+    // Hold
+    if (hold > 0f)
+    {
+        float end = Time.time + hold;
+        while (Time.time < end)
+        {
+            if (token != _denyPulseToken) yield break;
+            // Keep it pinned (in case other systems tug tint)
+            SetTint(denyTint);
+            yield return null;
+        }
+    }
+
+    // Fade OUT: again start from current (handles other tint changes gracefully)
+    startTint = _currentTint;
+    t = 0f;
+    while (t < fadeOut)
+    {
+        if (token != _denyPulseToken) yield break;
+        t += Time.deltaTime;
+        float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
+        SetTint(Color.Lerp(startTint, baseTint, a));
+        yield return null;
+    }
+
+    // Final snap to base (only if still the active pulse)
+    if (token == _denyPulseToken)
+    {
+        SetTint(baseTint);
+        _denyPulseRoutine = null;
+    }
+}
+
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {
         // Shader is retired; interpret workSigned01 as:
@@ -1072,37 +1045,6 @@ public void SetVisualsEnabled(bool enabled)
         // Retained for callers like ResetVisualToBase().
         ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: workSigned01);
     }
-    private void Visual_ChargeOnBoost(float appetite01)
-    {
-        if (visual.particleSystem == null) return;
-        if (!_baseCaptured) CaptureBaseVisual();
-
-        float a = Mathf.Clamp01(appetite01);
-
-        var ps = visual.particleSystem;
-        var main = ps.main;
-
-        // Particle tint: blend from base -> chargeColor. Keep alpha consistent.
-        Color baseCol = _currentTint;
-        baseCol.a = _baseAlpha;
-
-        Color target = _hasFeedbackColors ? _chargeColor : Color.white;
-        target.a = _baseAlpha;
-
-        Color chargeCol = Color.Lerp(baseCol, target, a);
-        SetDustColorAllParticles(chargeCol);
-
-        // Optional size/emission response (keep as-is)
-        main.startSize = _baseSize * Mathf.Lerp(1.05f, 1.25f, a);
-
-        var emission = ps.emission;
-        EnsureBaseParticleEmissionCaptured();
-        float mul = Mathf.Lerp(1.0f, 1.15f, a);
-        if (_baseEmissionCurveCaptured)
-            emission.rateOverTime = ScaleCurve(_baseEmissionCurve, mul);
-        else
-            emission.rateOverTime = _baseEmission * mul;
-    }
     public void SetFeedbackColors(Color chargeColor, Color denyColor)
     {
         _chargeColor = chargeColor;
@@ -1117,6 +1059,14 @@ public void SetVisualsEnabled(bool enabled)
         _nonBoostClearSeconds = 0f;
         ResetVisualToBase();
     }
+    private void OnDisable()
+    {
+        _denyPulseToken++;           // invalidate any running routine
+        _denyPulseRoutine = null;
+        // If you have a known base tint, restore it here:
+        // SetTint(_baseTint);
+    }
+
     public void ResetVisualToBase()
     {
         // Reset shader param #2 back to neutral.
@@ -1137,7 +1087,6 @@ public void SetVisualsEnabled(bool enabled)
             emission.rateOverTime = _baseEmission;
         Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
-
     public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f, float clearanceWorld = 0f)
     {
         _cellWorldSize       = Mathf.Max(0.001f, cellWorldSize);
@@ -1170,7 +1119,6 @@ public void SetVisualsEnabled(bool enabled)
         _box.size   = new Vector2(desiredWorld / sx, desiredWorld / sy);
         _box.offset = Vector2.zero;
     }
-
     private void SyncColliderRadiusToSprite()
     {
         // Rule #3: collider radius should match the size of the visual sprite.
@@ -1197,17 +1145,4 @@ public void SetVisualsEnabled(bool enabled)
         SetTint(c);
     }
 
-    private void ResetAndPlayParticles()
-    {
-        if (visual.particleSystem == null) return;
-        var r = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
-        if (r != null) r.enabled = true;
-
-        var emission = visual.particleSystem.emission;
-        emission.enabled = true;
-
-        visual.particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        visual.particleSystem.Simulate(0f, true, true, true);
-        visual.particleSystem.Play(true);
-    }
 }

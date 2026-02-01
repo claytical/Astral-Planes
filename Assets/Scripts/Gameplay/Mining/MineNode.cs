@@ -484,7 +484,7 @@ public class MineNode : MonoBehaviour
 
         int stepNow = _drumTrack.currentStep;
         int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
-        _track.PlayNote(note, 180, 0.9f);
+        _track.PlayNote127(note, 180, 0.9f);
     }
     private IEnumerator CleanupAndDestroy()
     {

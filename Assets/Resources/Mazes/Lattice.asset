@@ -17,7 +17,7 @@ MonoBehaviour:
   nodesPerStar: 8
   inactiveShardTint: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
   starKeepsDustClear: 1
-  starKeepClearRadiusCells: 3
+  starKeepClearRadiusCells: 2
   enableSafetyBubble: 1
   safetyBubbleRadiusCells: 3
   rotateSelectionOnLoopBoundary: 1
@@ -27,7 +27,7 @@ MonoBehaviour:
   particlePulseSpeed: 1
   starAlphaMin: 0.1
   starAlphaMax: 0.68
-  rolePattern: 03000000000000000100000002000000
+  rolePattern: 000000000300000000000000020000000000000001000000
   previewPulseScale: 1.2
   rotationMode: 4
   minPreviewIntervalSec: 2

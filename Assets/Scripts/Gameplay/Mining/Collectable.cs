@@ -15,6 +15,8 @@ public class Collectable : MonoBehaviour
     public float dustEscapeCooldownSeconds = 0.35f;
     private float _dustEscapeCooldown;
     private bool _hasDesiredGridTarget; 
+    public int intendedBin = -1;
+
     // Desired SpawnGrid target (Option A): used by DebrisRoutine to bias motion within the SpawnGrid.
     private Vector2Int _desiredGridTarget;
 // ---- Dust pocket (collectable visibility) ----
@@ -63,6 +65,28 @@ public class Collectable : MonoBehaviour
     private int _dustClaimOwnerId;
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
+    // ---- Autonomy (Loop Boundary "Idea") ----
+    [Header("Autonomy (Loop Boundary Idea)")]
+    [SerializeField] private bool useLoopBoundaryIdea = true;
+
+    [Tooltip("How many grid cells ahead we evaluate when choosing an idea direction.")]
+    [SerializeField] private int ideaLookaheadCells = 5;
+
+    [Tooltip("Idea direction bias strength as a fraction of base move speed.")]
+    [Range(0f, 1.5f)]
+    [SerializeField] private float ideaBiasStrength = 0.55f;
+
+    [Tooltip("How quickly the note turns toward its new idea direction.")]
+    [SerializeField] private float ideaTurnLerp = 6.0f;
+
+    [Tooltip("Small turbulence layered on top of idea bias.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float microTurbulenceStrength = 0.20f;
+
+    private Vector2 _ideaDir = Vector2.zero;
+    private Vector2 _ideaDirSmoothed = Vector2.zero;
+    private DrumTrack _boundDrumTrack;
+
 // ---- Carry Orbit ----
     [Header("Carry Orbit")]
     [SerializeField] private float carryOrbitRadius = 0.55f;
@@ -96,6 +120,7 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float lingerShortNote = 0.02f; // minimal pause for short notes
     [SerializeField] private float dustAdjacencyProbe = 0.42f; // radius used to detect nearby dust
     [SerializeField] private int   neighborRadiusCells = 1;    // how far from current cell to consider neighbors (4-neighbors)
+
     private Rigidbody2D _rb;
     private float _speed;
     private System.Random _rng;       // deterministic per-track/per-note
@@ -109,9 +134,114 @@ public class Collectable : MonoBehaviour
     {
         _collector = collector;
     }
+  private void TryBindLoopBoundary()
+{
+    if (!useLoopBoundaryIdea) return;
+    if (assignedInstrumentTrack == null) return;
+
+    var dt = assignedInstrumentTrack.drumTrack;
+    if (dt == null) return;
+
+    if (_boundDrumTrack == dt) return;
+
+    // Rebind
+    if (_boundDrumTrack != null)
+        _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
+
+    _boundDrumTrack = dt;
+    _boundDrumTrack.OnLoopBoundary += HandleLoopBoundaryIdea;
+}
+
+private void UnbindLoopBoundary()
+{
+    if (_boundDrumTrack != null)
+        _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
+
+    _boundDrumTrack = null;
+}
+
+private void HandleLoopBoundaryIdea()
+{
+    if (!useLoopBoundaryIdea) return;
+    if (_inCarry) return;
+
+    var gfm = GameFlowManager.Instance;
+    var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+    var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
+    if (dustGen == null || dt == null) return;
+
+    Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
+
+    _ideaDir = ChooseIdeaDirection(cur, dt, dustGen, Mathf.Max(1, ideaLookaheadCells));
+    if (_ideaDir.sqrMagnitude < 0.0001f)
+        _ideaDir = UnityEngine.Random.insideUnitCircle.normalized;
+}
+
+private static readonly Vector2Int[] kDirs8 = new Vector2Int[]
+{
+    new Vector2Int( 1, 0),
+    new Vector2Int(-1, 0),
+    new Vector2Int( 0, 1),
+    new Vector2Int( 0,-1),
+    new Vector2Int( 1, 1),
+    new Vector2Int( 1,-1),
+    new Vector2Int(-1, 1),
+    new Vector2Int(-1,-1),
+};
+
+private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen, int lookaheadCells)
+{
+    int w = dt.GetSpawnGridWidth();
+    int h = dt.GetSpawnGridHeight();
+    if (w <= 0 || h <= 0) return Vector2.zero;
+
+    Vector2Int c = dt.WorldToGridPosition(worldPos);
+    c.x = Mathf.Clamp(c.x, 0, w - 1);
+    c.y = Mathf.Clamp(c.y, 0, h - 1);
+
+    float bestScore = float.NegativeInfinity;
+    Vector2Int best = Vector2Int.zero;
+
+    for (int d = 0; d < kDirs8.Length; d++)
+    {
+        var dir = kDirs8[d];
+        float score = 0f;
+
+        for (int i = 1; i <= lookaheadCells; i++)
+        {
+            var gp = c + dir * i;
+            if (gp.x < 0 || gp.y < 0 || gp.x >= w || gp.y >= h)
+                break;
+
+            bool hasDust = dustGen.HasDustAt(gp);
+            // Reward open space; penalize dust.
+            score += hasDust ? -2.0f : +1.0f;
+
+            // Immediate wall is especially bad (jail ring effect).
+            if (i == 1 && hasDust)
+                score -= 2.0f;
+        }
+
+        // Tiny randomness breaks ties and makes behavior feel "alive".
+        score += UnityEngine.Random.Range(-0.15f, +0.15f);
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            best = dir;
+        }
+    }
+
+    Vector2 wdir = new Vector2(best.x, best.y);
+    if (wdir.sqrMagnitude > 0f) wdir.Normalize();
+    return wdir;
+}
+
+
     private void StartDustPocket()
     {
         if (!keepDustPocketOpen) return;
+        if (isTrappedInDust) return; // Jail model.
         if (_dustPocketRoutine != null) return;
         _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
     }
@@ -139,6 +269,7 @@ public class Collectable : MonoBehaviour
     private void StartDustPocketRoutineIfNeeded()
     {
         if (!keepDustPocketOpen) return;
+        if (isTrappedInDust) return;
         if (_dustPocketRoutine != null) return;
         _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
     }
@@ -158,7 +289,7 @@ public class Collectable : MonoBehaviour
             yield return new WaitForSeconds(Mathf.Max(0.02f, dustPocketTickSeconds));
 
             if (!keepDustPocketOpen) continue;
-            if (!isTrappedInDust) continue;                 // IMPORTANT: only trapped notes maintain a pocket
+            if (isTrappedInDust) continue;                 // jail model
             if (assignedInstrumentTrack == null) continue;
 
             var dt = assignedInstrumentTrack.drumTrack;
@@ -358,11 +489,7 @@ public class Collectable : MonoBehaviour
     if (!_rb && !TryGetComponent(out _rb)) yield break;
 
     _speed = ComputeMoveSpeed();
-    float linger = ComputeLingerSeconds();
-    // Weather is now the primary (and only) driver.
-    const float FLOW_STEP_SCALE = 1.0f;   // tune
     const float TURB_STEP_SCALE = 0.35f;  // tune
-
     // Optional: trapped drift damping so notes don't "skate through dust"
     const float TRAPPED_DRIFT_MUL = 0.35f; // could be a serialized field if desired
 
@@ -393,38 +520,25 @@ public class Collectable : MonoBehaviour
         }
         
         Vector2 step = Vector2.zero; 
-        // ------------------------------------------------------------
-        // OPTION A: "grid-intent + weather"
-        // - If a desired SpawnGrid target is set (from the spawner/track), seek that cell center.
-        // - Once we reach it (within arriveRadius), stop seeking and let weather dominate.
-        // ------------------------------------------------------------
-        if (_hasDesiredGridTarget && !reachedDestination && dt != null) {
-            Vector3 tgtW3 = dt.GridToWorldPosition(_desiredGridTarget); 
-            Vector2 tgt   = (Vector2)tgtW3;
-            Vector2 to = (tgt - cur);
-            float dist = to.magnitude;
-            if (dist <= arriveRadius) {
-                reachedDestination = true; 
-                // brief linger gives "arrival" a moment of stability
-                if (linger > 0f) { 
-                    yield return new WaitForSeconds(linger);
-                }
-            } else { 
-                Vector2 dir = to / Mathf.Max(0.0001f, dist);
-                float maxStep0 = _speed * Time.fixedDeltaTime; 
-                Vector2 seek  = dir * maxStep0;
-                // Avoid overshoot jitter: clamp to exact target when we'd cross it.
-                if (seek.sqrMagnitude > to.sqrMagnitude) 
-                    seek = to;
-                step += seek;
-            }
+// ------------------------------------------------------------
+// LOOP-BOUNDARY IDEA BIAS
+// - On each leader loop boundary, we choose an "idea direction".
+// - Each FixedUpdate, we gently bias motion toward that direction.
+// ------------------------------------------------------------
+        _ideaDirSmoothed = Vector2.Lerp(_ideaDirSmoothed, _ideaDir, Mathf.Clamp01(Time.fixedDeltaTime * ideaTurnLerp));
+        if (_ideaDirSmoothed.sqrMagnitude > 0.0001f)
+        {
+            Vector2 ideaStep = _ideaDirSmoothed.normalized * (_speed * ideaBiasStrength * Time.fixedDeltaTime);
+            step += ideaStep;
         }
+
         float t = Time.time;
         float nx = Mathf.PerlinNoise(seedA, t * 0.35f) * 2f - 1f;
         float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
         Vector2 turb = new Vector2(nx, ny);
         if (turb.sqrMagnitude > 0.0001f)
-            step += turb.normalized * (TURB_STEP_SCALE * _speed * Time.fixedDeltaTime);
+            step += turb.normalized * (microTurbulenceStrength * _speed * Time.fixedDeltaTime);
+
 
         if (insideDust)
             step *= TRAPPED_DRIFT_MUL;
@@ -478,6 +592,9 @@ public class Collectable : MonoBehaviour
         _dustClaimOwnerId = GetInstanceID();
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
+        TryBindLoopBoundary();
+        HandleLoopBoundaryIdea(); // seed an initial idea immediately
+
         if (!isTrappedInDust)
             StartDustPocket(); 
 
@@ -667,12 +784,27 @@ public class Collectable : MonoBehaviour
         _handled = false;
         _destroyNotified = false;
         if (isInitialized) StartDustPocketRoutineIfNeeded();
-        if(isTrappedInDust) StartDustPocket();
+    }
+    private void StopDustPocketAndReleaseClaims()
+    {
+        if (_dustPocketRoutine != null)
+        {
+            StopCoroutine(_dustPocketRoutine);
+            _dustPocketRoutine = null;
+        }
+
+        // If you have an owner id / claim owner string, release it here.
+        // Example patterns you likely already have:
+        // dustGen?.ReleaseClaimsForOwner(_dustClaimOwnerId);
+        // or dustClaims?.ReleaseOwner(ownerString);
+
+        _dustClaimOwnerId = 0;
     }
 
     private void OnDestroy()
     {
         ClearReservation();
+        UnbindLoopBoundary();
         UnregisterOccupant();
         UnregisterCarryOrbit();
         StopDustPocket();
@@ -685,6 +817,7 @@ public class Collectable : MonoBehaviour
     private void OnDisable()
     {
         ClearReservation();
+        UnbindLoopBoundary();
         StopDustPocketRoutineIfRunning();
         UnregisterOccupant();
         StopDustPocket();
@@ -754,6 +887,7 @@ public class Collectable : MonoBehaviour
     }
     public void BeginCarryThenDeposit(double depositDspTime, float leadSeconds, int durationTicks, float force, Action onArrived)
     {
+        StopDustPocketAndReleaseClaims();
         if (_carryRoutine != null) StopCoroutine(_carryRoutine);
         _carryRoutine = StartCoroutine(CarryThenDepositRoutine(depositDspTime, leadSeconds, durationTicks, force, onArrived));
     }
@@ -862,6 +996,7 @@ private Vector3 ComputeCarryOrbitTargetWorld()
         if (vehicle == null || _handled) return;
         _collector = vehicle.transform;
         _handled = true; // ✅ idempotent
+        StopDustPocketAndReleaseClaims();
         RegisterCarryOrbit();
 
         // (Optional availability check)

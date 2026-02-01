@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MidiPlayerTK;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -33,6 +34,15 @@ public class GameFlowManager : MonoBehaviour
 
     [Tooltip("Max extra loops to wait for collectables to clear before starting the bridge.")]
     public int phaseBridgeWaitMaxLoops = 64;
+    [Header("Coral (New Spiral)")]
+    [SerializeField] private bool useSpiralCoralDuringBridge = true;
+    [SerializeField] private Transform coralRoot; // scene object root
+    [SerializeField] private SpiralCoralBaseBuilder spiralCoralBase;
+    [SerializeField] private SpiralCoralTrackGrower spiralCoralGrower;
+
+// Optional: fade using renderer alpha (Standard shader)
+    [SerializeField] private bool fadeSpiralCoralDuringBridge = true;
+    [SerializeField, Min(0f)] private float spiralCoralFadeTarget = 0.65f;
 
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
@@ -42,11 +52,11 @@ public class GameFlowManager : MonoBehaviour
 
     public HarmonyDirector harmony;
     public InstrumentTrackController controller;
-    //public ChordChangeArpeggiator arp;
+    
     public DrumTrack activeDrumTrack;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
-    public GameObject coralPrefab;  
+      
     public bool disableCoralDuringBridge = true;
     public NoteVisualizer noteViz;    // assign in scene
     public GlitchManager glitch; // Assign dynamically if needed
@@ -90,7 +100,21 @@ public class GameFlowManager : MonoBehaviour
             return gfm.suppressCollectableSpawnsDuringBridge && (gfm.BridgePending || gfm.GhostCycleInProgress);
         }
     }
+    public void RegisterSpiralCoralRig(
+        Transform rigRoot,
+        SpiralCoralBaseBuilder baseBuilder,
+        SpiralCoralTrackGrower trackGrower)
+    {
+        // assign to FIELDS (avoid shadowing)
+        this.coralRoot = rigRoot;
+        this.spiralCoralBase = baseBuilder;
+        this.spiralCoralGrower = trackGrower;
 
+        Debug.Log($"[CORAL:RIG] Registered rig root={this.coralRoot?.name} base={this.spiralCoralBase!=null} grower={this.spiralCoralGrower!=null}");
+    }
+
+    private bool HasSpiralRig()
+        => coralRoot != null && spiralCoralBase != null && spiralCoralGrower != null;
 
     public GameState CurrentState
     {
@@ -160,6 +184,39 @@ public class GameFlowManager : MonoBehaviour
             if (r) r.enabled = true;
         }
         _bridgeHiddenRenderers.Clear();
+    }
+    private void BuildSpiralCoralFromSnapshot(PhaseSnapshot snap)
+    {
+        if (snap == null) return;
+        if (!RefreshSpiralCoralRefs(force:false)) return;
+
+        // Make sure root is active before spawning
+        coralRoot.gameObject.SetActive(true);
+
+        // Optional clear if your scripts support it
+        spiralCoralBase.Clear();
+        spiralCoralGrower.Clear();
+
+        spiralCoralBase.BuildBase(snap);
+        spiralCoralGrower.BuildTracks(snap);
+    }
+
+    private bool RefreshSpiralCoralRefs(bool force = false)
+    {
+        if (!useSpiralCoralDuringBridge) return false;
+
+        if (!force && coralRoot != null && spiralCoralBase != null && spiralCoralGrower != null)
+            return true;
+
+        if (coralRoot == null) return false;
+
+        if (spiralCoralBase == null)
+            spiralCoralBase = coralRoot.GetComponentInChildren<SpiralCoralBaseBuilder>(true);
+
+        if (spiralCoralGrower == null)
+            spiralCoralGrower = coralRoot.GetComponentInChildren<SpiralCoralTrackGrower>(true);
+
+        return (spiralCoralBase != null && spiralCoralGrower != null);
     }
 
     public NoteSet GenerateNotes(InstrumentTrack track, int entropy = 0)
@@ -363,7 +420,6 @@ public class GameFlowManager : MonoBehaviour
     harmony.Initialize(activeDrumTrack, controller);
     Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END");
 
-
     // --------------------
     // STEP 3: Start drums
     // --------------------
@@ -499,6 +555,54 @@ public class GameFlowManager : MonoBehaviour
             ConstellationMemoryStore.SaveSessionToDisk(_motifSnapshots);
         }
         StartCoroutine(TransitionToScene("TrackFinished"));
+    }
+    
+    private IEnumerator FadeSpiralCoralAlpha(Transform root, float target, float seconds)
+    {
+        if (root == null) yield break;
+
+        var meshRs = root.GetComponentsInChildren<MeshRenderer>(includeInactive: true);
+        var startA = new Dictionary<MeshRenderer, float>(meshRs.Length);
+
+        foreach (var mr in meshRs)
+        {
+            if (!mr) continue;
+            var mat = mr.material;
+            if (!mat || !mat.HasProperty("_Color")) continue;
+            startA[mr] = mat.color.a;
+        }
+
+        float t = 0f;
+        while (t < seconds)
+        {
+            if (root == null) yield break;
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / Mathf.Max(0.0001f, seconds)));
+
+            foreach (var kvp in startA)
+            {
+                var mr = kvp.Key;
+                if (!mr) continue;
+                var mat = mr.material;
+                if (!mat || !mat.HasProperty("_Color")) continue;
+
+                var c = mat.color;
+                c.a = Mathf.Lerp(kvp.Value, target, u);
+                mat.color = c;
+            }
+
+            yield return null;
+        }
+
+        // final snap
+        foreach (var kvp in startA)
+        {
+            var mr = kvp.Key;
+            if (!mr) continue;
+            var mat = mr.material;
+            if (!mat || !mat.HasProperty("_Color")) continue;
+            var c = mat.color; c.a = target; mat.color = c;
+        }
     }
 
     private IEnumerator TransitionToScene(string sceneName)
@@ -640,32 +744,48 @@ public class GameFlowManager : MonoBehaviour
     // C) Play the REMIXED bridge ONCE while showing only CORAL
     // ----------------------------------------------------------------------
     if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
+// --- Spiral Coral: show completed motif sculpture during the bridge ---
+    PhaseSnapshot bridgeSnap = null;
 
-    var coral = EnsureCoral(); 
-    if (coral != null) {
-        coral.gameObject.SetActive(true); 
-        // Hide gameplay UI during the cinematic loop
-        if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
-
-        // Run coral growth across exactly one full loop while the completed motif plays as-is.
-        // Schedule an end-of-loop fade-out so the next motif can start from silence.
-        var coralAnim = StartCoroutine(AnimateCoralBridge(coral, motifSnapshot, bridgeOnceSec));
-
-        float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
-        yield return new WaitForSeconds(Mathf.Max(0f, bridgeOnceSec - fadeOutSec));
-        yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
-
-        // Ensure the coral loop completes (safe even if fadeOutSec == bridgeOnceSec)
-        yield return coralAnim;
-    }
-    else
+    if (useSpiralCoralDuringBridge && HasSpiralRig())
     {
-        // No coral visualizer available; still hold for exactly one loop and fade audio.
+        // Use the motif snapshot you just committed (represents the completed motif that ended).
+        bridgeSnap = motifSnapshot;
+
+        // IMPORTANT: ensure Color is set if you want phase tint.
+        // Right now you're setting Pattern below; set Color from whatever your phase palette is.
+        // bridgeSnap.Color = <phase/maze dust color for bridgeSnap.Pattern>;
+
+        coralRoot.gameObject.SetActive(true);
+
+        spiralCoralBase.Clear();
+        spiralCoralGrower.Clear();
+
+        spiralCoralBase.BuildBase(motifSnapshot);
+        spiralCoralGrower.BuildTracks(motifSnapshot);
+        if (fadeSpiralCoralDuringBridge && coralRoot != null)
+        {
+            // Fade to a readable alpha (Standard shader needs _Color.a)
+            yield return StartCoroutine(
+                FadeSpiralCoralAlpha(coralRoot, spiralCoralFadeTarget, Mathf.Min(0.25f, bridgeOnceSec * 0.25f))
+            );
+        }
+    }
+
+    // No coral visualizer available; still hold for exactly one loop and fade audio.
         float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
 
         yield return new WaitForSeconds(Mathf.Max(0f, bridgeOnceSec - fadeOutSec));
         yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
-    }
+
+        // --- Spiral coral: fade out + hide after bridge ---
+        if (useSpiralCoralDuringBridge && sig.growCoral && coralRoot != null)
+        {
+            if (fadeSpiralCoralDuringBridge)
+                yield return StartCoroutine(FadeSpiralCoralAlpha(coralRoot, 0f, Mathf.Min(0.25f, bridgeOnceSec * 0.25f)));
+
+            coralRoot.gameObject.SetActive(false);
+        }
 
 
     // ----------------------------------------------------------------------
@@ -699,7 +819,7 @@ public class GameFlowManager : MonoBehaviour
         if (viz != null)
             viz.ConfigureBinStrip(1);
 
-        if (coral != null) coral.gameObject.SetActive(false);
+//        if (coral != null) coral.gameObject.SetActive(false);
             // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
 
             // ========= DEMO SHORT-CIRCUIT =========
@@ -729,9 +849,8 @@ public class GameFlowManager : MonoBehaviour
         if (activeDrumTrack != null)
         {
             // New path: start next phase maze & PhaseStar, carving corridors from
-            // the current Vehicle positions to the star cell.
-            // New path: start next phase maze & PhaseStar, carving corridors from
     // the current Vehicle positions to the star cell.
+    dustGenerator.activeDustRoot.gameObject.SetActive(true);
     yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
 
     // Now that the new phase geometry/star exist, we can safely restore visuals without a flash.
@@ -748,6 +867,43 @@ public class GameFlowManager : MonoBehaviour
     BridgePending = false;
     SetBridgeVisualMode(false);
 }
+    /// <summary>
+    /// Scene authority pass: ensure any standalone MidiVoice (e.g., SoloVoice FX) has an active DrumTrack reference.
+    /// InstrumentTrack already binds its own MidiVoice in Awake; this is for voices outside that pipeline.
+    /// </summary>
+
+    private void BindSceneVoicesToTimingAuthority()
+    {
+        if (activeDrumTrack == null) return;
+
+        // Bind all MidiVoices in scene that are NOT owned by an InstrumentTrack.
+        // InstrumentTrack already binds its own MidiVoice in Awake.
+        var voices = FindObjectsOfType<MidiVoice>(includeInactive: true);
+        foreach (var v in voices)
+        {
+            if (v == null) continue;
+
+            // If this voice lives under an InstrumentTrack, let InstrumentTrack binding stand.
+            if (v.GetComponentInParent<InstrumentTrack>() != null)
+                continue;
+
+            v.SetDrumTrack(activeDrumTrack);
+
+            // Optional: ensure it has a MidiStreamPlayer (common for Solo/FX child objects).
+            var player = v.GetComponent<MidiStreamPlayer>() ?? v.GetComponentInParent<MidiStreamPlayer>();
+            if (player != null)
+                v.SetMidiStreamPlayer(player);
+        }
+
+        // Also ensure SoloVoice has its DrumTrack reference, if it isn't manually set.
+        var solos = FindObjectsOfType<SoloVoice>(includeInactive: true);
+        foreach (var s in solos)
+        {
+            if (s == null) continue;
+            // SoloVoice already subscribes; this just prevents an unset reference case.
+            // (If drumTrack is [SerializeField], you can add a setter later if needed.)
+        }
+    }
 
     private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase)
 {
@@ -853,28 +1009,47 @@ public class GameFlowManager : MonoBehaviour
         )
     );
 }
+    private static Color QuantizeToColor32(Color c)
+    {
+        Color32 cc = (Color32)c;
+        return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
+    }
 
-    private PhaseSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum){
+    private PhaseSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum)
+    {
         var snapshot = new PhaseSnapshot { Timestamp = Time.time };
 
-       if (retained == null || retained.Count == 0) return snapshot;
+        // --- PHASE CONTEXT (REPLACE THESE 2 LINES WITH YOUR REAL API) ---
+        snapshot.Pattern = MazeArchetype.Establish;   // MusicalPhase
+        snapshot.Color = dustGenerator.MazeColor();   // Color (maze/dust/phase tint)
+        // ---------------------------------------------------------------
 
-        // Build CollectedNotes, ordered by musical step so kinks occur in musical order.
-        foreach (var track in retained) {
+        if (retained == null || retained.Count == 0) return snapshot;
+
+        foreach (var track in retained)
+        {
             if (!track) continue;
+
             var notes = track.GetPersistentLoopNotes();
             if (notes == null || notes.Count == 0) continue;
-            var c = ResolveTrackColor(track);
-            // notes: List<(int stepIndex, int note, int duration, float velocity)>
-            foreach (var n in notes.OrderBy(n => n.stepIndex)) {
-                // Map directly to PhaseSnapshot.NoteEntry
-                snapshot.CollectedNotes.Add(new PhaseSnapshot.NoteEntry(step:     n.stepIndex, note:     n.note, velocity: n.velocity, trackColor: c)); 
-            } 
-        }
-        Debug.Log(
-            $"[PHASE SNAPSHOT FINALIZE] phase={snapshot.Pattern} notes={{snapshot.CollectedNotes.Count}})"
-        );
 
+            var c = QuantizeToColor32(ResolveTrackColor(track));
+
+            // notes: List<(int stepIndex, int note, int duration, float velocity)>
+            foreach (var n in notes.OrderBy(n => n.stepIndex))
+            {
+                snapshot.CollectedNotes.Add(
+                    new PhaseSnapshot.NoteEntry(
+                        step: n.stepIndex,
+                        note: n.note,
+                        velocity: n.velocity,
+                        trackColor: c
+                    )
+                );
+            }
+        }
+
+        Debug.Log($"[PHASE SNAPSHOT FINALIZE] phase={snapshot.Pattern} notes={snapshot.CollectedNotes.Count}");
         return snapshot;
     }
 
@@ -1078,28 +1253,6 @@ public class GameFlowManager : MonoBehaviour
     {
         StartCoroutine(StartNextPhaseMazeAndStar(phase));
     }
-    private CoralVisualizer EnsureCoral()
-    {
-        if (_coralInstance != null) return _coralInstance;
-
-        if (coralPrefab == null)
-        {
-            Debug.LogWarning("[Bridge/Coral] No coralPrefab assigned; skipping coral.");
-            return null;
-        }
-
-        var go = Instantiate(coralPrefab);
-        _coralInstance = go.GetComponentInChildren<CoralVisualizer>(true);
-        if (_coralInstance == null)
-        {
-            Debug.LogWarning("[Bridge/Coral] Coral prefab has no CoralVisualizer component (root or children). Skipping coral.");
-            return null;
-        }
-
-        _coralInstance.gameObject.SetActive(false);
-        return _coralInstance;
-    }
-
 
     private void FreezeGameplayForBridge()
     {
@@ -1203,6 +1356,7 @@ public class GameFlowManager : MonoBehaviour
         spawnGrid              = a.spawnGrid;          // <- now reliably assigned
         glitch                 = a.glitchManager;      // <- now reliably assigned
         Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
+        BindSceneVoicesToTimingAuthority();
     }
 
     public void UnregisterTracksBundle(TracksBundleAnchor a)

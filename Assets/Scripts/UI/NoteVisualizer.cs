@@ -54,7 +54,7 @@ public class NoteVisualizer : MonoBehaviour
 
     [Tooltip("Color for the currently active target bin.")]
     public Color binActiveColor = new Color(1f, 1f, 1f, 0.9f);
-
+    private List<(InstrumentTrack, int)> deadKeys = new List<(InstrumentTrack, int)>();
     private Canvas _worldSpaceCanvas;
     private Transform _uiParent;
     private bool isInitialized;
@@ -164,7 +164,7 @@ public class NoteVisualizer : MonoBehaviour
         _stepBurst.Clear();
         _animatingSteps.Clear();
         _ghostNoteSteps.Clear();
-        _trackStepWorldPositions.Clear();
+        //_trackStepWorldPositions.Clear();
         _lastObservedCompletedLoops = -1;
 
         // Destroy existing marker GameObjects so nothing "sticks" into the next motif.
@@ -451,7 +451,7 @@ public class NoteVisualizer : MonoBehaviour
         // --- Build step → world position maps per row (no lines; direct math) ---
         var controller = GameFlowManager.Instance.controller;
         int longestSteps = GetDeclaredLongestSteps();
-
+/*
         for (int i = 0; i < controller.tracks.Length && i < trackRows.Count; i++)
         {
             InstrumentTrack track = controller.tracks[i];
@@ -475,9 +475,9 @@ public class NoteVisualizer : MonoBehaviour
                 stepMap[step] = row.TransformPoint(localPos);
             }
 
-            _trackStepWorldPositions[track] = stepMap;
+            //_trackStepWorldPositions[track] = stepMap;
         }
-
+*/
         // Move any live markers to their updated step positions
         UpdateNoteMarkerPositions();
 
@@ -1013,33 +1013,45 @@ public class NoteVisualizer : MonoBehaviour
 }
     private void UpdateNoteMarkerPositions(bool forceXReflow = false)
     {
-        var deadKeys = new List<(InstrumentTrack, int)>();
-        foreach (var kvp in noteMarkers)
+        // Snapshot to avoid "collection modified" issues if other code mutates noteMarkers this frame.
+        var kvs = noteMarkers.ToArray();
+
+        // Reuse a list if you can; shown inline for clarity.
+       deadKeys.Clear();
+
+        foreach (var kvp in kvs)
         {
             var track  = kvp.Key.Item1;
             var step   = kvp.Key.Item2;
             var marker = kvp.Value;
-            if (!forceXReflow && _animatingSteps.Contains((track, step))) 
+
+            if (!forceXReflow && _animatingSteps != null && _animatingSteps.Contains((track, step)))
                 continue;
+
             if (marker == null) { deadKeys.Add(kvp.Key); continue; }
 
-            if (!_trackStepWorldPositions.TryGetValue(track, out var map)) continue;
+            if (track == null) { deadKeys.Add(kvp.Key); continue; }
 
-            int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-            if (trackIndex < 0 || trackIndex >= trackRows.Count) continue;
+            if (_trackStepWorldPositions == null || !_trackStepWorldPositions.TryGetValue(track, out var map) || map == null)
+                continue;
+            int trackIndex = (_ctrl != null && _ctrl.tracks != null) ? Array.IndexOf(_ctrl.tracks, track) : -1;
+            if (trackIndex < 0 || trackRows == null || trackIndex >= trackRows.Count) continue;
 
             RectTransform row = trackRows[trackIndex];
+            if (row == null) continue;
 
             if (map.TryGetValue(step, out var worldPos))
             {
-                // Preserve current Y/Z; only update X from worldPos
                 var lp = marker.localPosition;
                 float newX = row.InverseTransformPoint(worldPos).x;
                 marker.localPosition = new Vector3(newX, lp.y, lp.z);
             }
         }
-        foreach (var k in deadKeys) noteMarkers.Remove(k);
+
+        for (int i = 0; i < deadKeys.Count; i++)
+            noteMarkers.Remove(deadKeys[i]);
     }
+
     public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds) {
     if (track == null || burstId < 0) return; 
     if (!isActiveAndEnabled) return;
@@ -1562,176 +1574,178 @@ public class NoteVisualizer : MonoBehaviour
     }
     public void RecomputeTrackLayout(InstrumentTrack track)
 {
-    Debug.Log($"[RECOMPUTE] {track?.name ?? "NULL"} Running");
-    if (track == null) return;
-
-    int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-    if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
-
-    RectTransform row = trackRows[trackIndex];
-    Rect rowRect = row.rect;
-
-    int totalSteps = Mathf.Max(1, track.GetTotalSteps());
-    int binSize    = Mathf.Max(1, track.BinSize());
-
-    int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
-
-    int leaderBinsBase;
-    if (_forcedLeaderSteps >= 1)
-        leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
-    else
-        leaderBinsBase = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
-
-    int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize));
-
-    Debug.Log($"[RECOMPUTE] Track: {track.name} (totalSteps={totalSteps}, binSize={binSize}, leaderBinsForPlacement(pre)={leaderBinsForPlacement}, leaderBinsBase={leaderBinsBase}, trackBins={trackBins})");
-
-    leaderBinsForPlacement = Mathf.Max(leaderBinsBase, trackBins);
-    Debug.Log($"[RECOMPUTE] LeaderBinsForPlacement(final)={leaderBinsForPlacement}");
-
-    float bottomWorldY = GetBottomWorldY();
-    float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
-
-    // -----------------------------------------------------------------
-    // 1) Reconcile duplicates: choose a canonical marker per step
-    //    based on tags on row children, then force noteMarkers to match.
-    // -----------------------------------------------------------------
-    var chosenByStep = new Dictionary<int, Transform>(64);
-    var chosenTagByStep = new Dictionary<int, MarkerTag>(64);
-
-    for (int i = 0; i < row.childCount; i++)
+    try
     {
-        var child = row.GetChild(i);
-        if (!child) continue;
+        if (track == null) return;
 
-        var tag = child.GetComponent<MarkerTag>();
-        if (tag == null) continue;
+        int trackIndex = Array.IndexOf(_ctrl.tracks, track);
+        if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
 
-        if (tag.track != track) continue;
+        RectTransform row = trackRows[trackIndex];
+        Rect rowRect = row.rect;
 
-        int step = tag.step;
-        if (step < 0) continue;
+        int totalSteps = Mathf.Max(1, track.GetTotalSteps());
+        int binSize = Mathf.Max(1, track.BinSize());
 
-        // If multiple markers exist for this step, pick a canonical one.
-        if (!chosenByStep.TryGetValue(step, out var existingTf) || !existingTf)
+        int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
+
+        int leaderBinsBase;
+        if (_forcedLeaderSteps >= 1)
+            leaderBinsBase = Mathf.Max(1, Mathf.CeilToInt(_forcedLeaderSteps / (float)binSize));
+        else
+            leaderBinsBase = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
+
+        int trackBins = Mathf.Max(1, Mathf.CeilToInt(totalSteps / (float)binSize));
+
+        leaderBinsForPlacement = Mathf.Max(leaderBinsBase, trackBins);
+
+        float bottomWorldY = GetBottomWorldY();
+        float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
+
+        // -----------------------------------------------------------------
+        // 1) Reconcile duplicates: choose a canonical marker per step
+        //    based on tags on row children, then force noteMarkers to match.
+        // -----------------------------------------------------------------
+        var chosenByStep = new Dictionary<int, Transform>(64);
+        var chosenTagByStep = new Dictionary<int, MarkerTag>(64);
+
+        for (int i = 0; i < row.childCount; i++)
         {
-            chosenByStep[step] = child;
-            chosenTagByStep[step] = tag;
-            continue;
+            var child = row.GetChild(i);
+            if (!child) continue;
+
+            var tag = child.GetComponent<MarkerTag>();
+            if (tag == null) continue;
+
+            if (tag.track != track) continue;
+
+            int step = tag.step;
+            if (step < 0) continue;
+
+            // If multiple markers exist for this step, pick a canonical one.
+            if (!chosenByStep.TryGetValue(step, out var existingTf) || !existingTf)
+            {
+                chosenByStep[step] = child;
+                chosenTagByStep[step] = tag;
+                continue;
+            }
+
+            var existingTag = chosenTagByStep[step];
+
+            // Priority rules:
+            // 1) Prefer ascending over non-ascending (ascending is the one that should align with audio during ascent)
+            // 2) Prefer non-placeholder over placeholder
+            // 3) Prefer higher burstId (newer/explicit) when all else equal
+            bool aAsc = tag.isAscending;
+            bool bAsc = existingTag != null && existingTag.isAscending;
+
+            bool aPH = tag.isPlaceholder;
+            bool bPH = existingTag != null && existingTag.isPlaceholder;
+
+            int aBid = tag.burstId;
+            int bBid = existingTag != null ? existingTag.burstId : -999999;
+
+            bool takeA = false;
+
+            if (aAsc != bAsc) takeA = aAsc; // ascending wins
+            else if (aPH != bPH) takeA = !aPH; // non-placeholder wins
+            else if (aBid != bBid) takeA = aBid > bBid; // higher burst id wins (heuristic)
+            else takeA = false; // keep existing deterministically
+
+            if (takeA)
+            {
+                chosenByStep[step] = child;
+                chosenTagByStep[step] = tag;
+            }
         }
 
-        var existingTag = chosenTagByStep[step];
-
-        // Priority rules:
-        // 1) Prefer ascending over non-ascending (ascending is the one that should align with audio during ascent)
-        // 2) Prefer non-placeholder over placeholder
-        // 3) Prefer higher burstId (newer/explicit) when all else equal
-        bool aAsc = tag.isAscending;
-        bool bAsc = existingTag != null && existingTag.isAscending;
-
-        bool aPH = tag.isPlaceholder;
-        bool bPH = existingTag != null && existingTag.isPlaceholder;
-
-        int aBid = tag.burstId;
-        int bBid = existingTag != null ? existingTag.burstId : -999999;
-
-        bool takeA = false;
-
-        if (aAsc != bAsc) takeA = aAsc;                       // ascending wins
-        else if (aPH != bPH) takeA = !aPH;                    // non-placeholder wins
-        else if (aBid != bBid) takeA = aBid > bBid;           // higher burst id wins (heuristic)
-        else takeA = false;                                   // keep existing deterministically
-
-        if (takeA)
+        // Force dictionary to point at the canonical marker for each discovered step.
+        foreach (var kv in chosenByStep)
         {
-            chosenByStep[step] = child;
-            chosenTagByStep[step] = tag;
-        }
-    }
+            int step = kv.Key;
+            var tf = kv.Value;
+            if (!tf) continue;
 
-    // Force dictionary to point at the canonical marker for each discovered step.
-    foreach (var kv in chosenByStep)
-    {
-        int step = kv.Key;
-        var tf   = kv.Value;
-        if (!tf) continue;
+            var dictKey = (track, step);
+            if (noteMarkers.TryGetValue(dictKey, out var oldTf) && oldTf && oldTf != tf)
+            {
+                Debug.LogWarning(
+                    $"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
+            }
 
-        var dictKey = (track, step);
-        if (noteMarkers.TryGetValue(dictKey, out var oldTf) && oldTf && oldTf != tf)
-        {
-            Debug.LogWarning($"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
-        }
-        noteMarkers[dictKey] = tf;
-    }
-
-    // -----------------------------------------------------------------
-    // 2) Reposition the canonical instances (dict-owned after reconciliation).
-    // -----------------------------------------------------------------
-    var kvs = noteMarkers.ToArray();
-    foreach (var kv in kvs)
-    {
-        var key = kv.Key;
-        var tf  = kv.Value;
-
-        if (key.Item1 != track || !tf) continue;
-
-        int stepIndex = key.Item2;
-
-        float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
-
-        var lp = tf.localPosition;
-
-        // Preserve Y if ascending, otherwise pin to bottom.
-        float yLocal = IsAscending(tf) ? lp.y : bottomLocalY;
-
-        tf.localPosition = new Vector3(xLocal, yLocal, lp.z);
-
-        // Optional high-signal logging (can be noisy)
-        Debug.Log($"[RECOMPUTE] APPLY track={track.name} step={stepIndex} go={tf.gameObject.GetInstanceID()} asc={IsAscending(tf)} x={xLocal} y={yLocal}");
-    }
-
-    // -----------------------------------------------------------------
-    // 3) Optional cleanup: destroy non-canonical duplicates in this row.
-    //    This is what removes the “mystery” markers during commit expand.
-    // -----------------------------------------------------------------
-    for (int i = row.childCount - 1; i >= 0; i--)
-    {
-        var child = row.GetChild(i);
-        if (!child) continue;
-
-        var tag = child.GetComponent<MarkerTag>();
-        if (tag == null) continue;
-        if (tag.track != track) continue;
-
-        int step = tag.step;
-        if (step < 0) continue;
-
-        if (!chosenByStep.TryGetValue(step, out var canonical) || !canonical) continue;
-
-        if (child == canonical) continue;
-
-        // Don’t kill things mid-animation churn.
-        bool isAnimatingNow = false;
-        if (_animatingSteps != null)
-        {
-            var animKey = (track, step);
-            isAnimatingNow = _animatingSteps.Contains(animKey);
+            noteMarkers[dictKey] = tf;
         }
 
-        if (isAnimatingNow)
+        // -----------------------------------------------------------------
+        // 2) Reposition the canonical instances (dict-owned after reconciliation).
+        // -----------------------------------------------------------------
+        var kvs = noteMarkers.ToArray();
+        foreach (var kv in kvs)
         {
-            Debug.LogWarning($"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
-            continue;
+            var key = kv.Key;
+            var tf = kv.Value;
+
+            if (key.Item1 != track || !tf) continue;
+
+            int stepIndex = key.Item2;
+
+            float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
+
+            var lp = tf.localPosition;
+
+            // Preserve Y if ascending, otherwise pin to bottom.
+            float yLocal = IsAscending(tf) ? lp.y : bottomLocalY;
+
+            tf.localPosition = new Vector3(xLocal, yLocal, lp.z);
         }
 
-        Debug.LogWarning($"[RECOMPUTE] DESTROY_DUP track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()} dupAsc={tag.isAscending} dupPH={tag.isPlaceholder} dupBid={tag.burstId}");
+        // -----------------------------------------------------------------
+        // 3) Optional cleanup: destroy non-canonical duplicates in this row.
+        //    This is what removes the “mystery” markers during commit expand.
+        // -----------------------------------------------------------------
+        for (int i = row.childCount - 1; i >= 0; i--)
+        {
+            var child = row.GetChild(i);
+            if (!child) continue;
+
+            var tag = child.GetComponent<MarkerTag>();
+            if (tag == null) continue;
+            if (tag.track != track) continue;
+
+            int step = tag.step;
+            if (step < 0) continue;
+
+            if (!chosenByStep.TryGetValue(step, out var canonical) || !canonical) continue;
+
+            if (child == canonical) continue;
+
+            // Don’t kill things mid-animation churn.
+            bool isAnimatingNow = false;
+            if (_animatingSteps != null)
+            {
+                var animKey = (track, step);
+                isAnimatingNow = _animatingSteps.Contains(animKey);
+            }
+
+            if (isAnimatingNow)
+            {
+                Debug.LogWarning(
+                    $"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
+                continue;
+            }
+
 
 #if UNITY_EDITOR
-        if (!Application.isPlaying) DestroyImmediate(child.gameObject);
-        else Destroy(child.gameObject);
+            if (!Application.isPlaying) DestroyImmediate(child.gameObject);
+            else Destroy(child.gameObject);
 #else
         Destroy(child.gameObject);
 #endif
+        }
+    }
+    catch (Exception ex)
+    {
+        Debug.LogError($"[RECOMPUTE] EXCEPTION track={track?.name ?? "NULL"} ex={ex}");
     }
 }
     private int GetLeaderBinsForPlacement(InstrumentTrack track, int totalSteps, int binSize) {
@@ -1755,7 +1769,7 @@ public class NoteVisualizer : MonoBehaviour
          if (_ctrl?.tracks == null) return;
          foreach (var t in _ctrl.tracks) 
              if (t) RecomputeTrackLayout(t);
-         UpdateNoteMarkerPositions(true);
+         //UpdateNoteMarkerPositions(true);
     }
     private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
         int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
@@ -1765,18 +1779,24 @@ public class NoteVisualizer : MonoBehaviour
     }
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {
-        
-        // Which bin does this step belong to on THIS track?
-        int binIndex = stepIndex / binSize;
+        if (track == null) return rowRect.xMin;
+
+        if (stepIndex < 0) return rowRect.xMin;
+
+        binSize = Mathf.Max(1, binSize);
+        leaderBinsForPlacement = Mathf.Max(1, leaderBinsForPlacement);
+
+        int binIndex   = stepIndex / binSize;
         int localInBin = stepIndex % binSize;
-        float uMin = (float)binIndex / leaderBinsForPlacement; 
+
+        float uMin = (float)binIndex / leaderBinsForPlacement;
         float uMax = (float)(binIndex + 1) / leaderBinsForPlacement;
 
-        // Position inside the bin: center in each step cell
         float uLocal = (localInBin + 0.5f) / binSize;
 
-        // Lerp into rowRect
         float u = Mathf.Lerp(uMin, uMax, uLocal);
+        u = Mathf.Clamp01(u);
+
         return Mathf.Lerp(rowRect.xMin, rowRect.xMax, u);
     }
     private Transform TryAdoptExistingAt(InstrumentTrack track, int stepIndex, RectTransform row)
