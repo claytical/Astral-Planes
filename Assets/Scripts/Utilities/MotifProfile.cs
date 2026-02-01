@@ -56,14 +56,27 @@ public class MotifProfile : ScriptableObject
 
     public RoleMotifNoteSetConfig GetConfigForRole(MusicalRole role)
     {
-        if (roleNoteConfigs == null) return null;
+        if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
+            return null;
+
+        // Collect all configs matching this role
+        List<RoleMotifNoteSetConfig> matches = null;
+
         for (int i = 0; i < roleNoteConfigs.Count; i++)
         {
             var cfg = roleNoteConfigs[i];
             if (cfg != null && cfg.role == role)
-                return cfg;
+            {
+                matches ??= new List<RoleMotifNoteSetConfig>();
+                matches.Add(cfg);
+            }
         }
-        return null;
+
+        if (matches == null || matches.Count == 0)
+            return null;
+
+        // Pick one at random
+        return matches[UnityEngine.Random.Range(0, matches.Count)];
     }
 
 }

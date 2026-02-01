@@ -6,49 +6,6 @@ using MidiPlayerTK;
 using Random = UnityEngine.Random;
 public static class ShipTrackAssigner
 {
-    public static void AssignShipsToTracks(List<ShipMusicalProfile> selectedShips, List<InstrumentTrack> tracks)
-    {
-        List<InstrumentTrack> unassignedTracks = new List<InstrumentTrack>(tracks);
-
-        // Step 1: Assign presets from ships
-        foreach (var ship in selectedShips)
-        {
-            foreach (var track in unassignedTracks.ToList())
-            {
-                var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-                if (roleProfile == null || roleProfile.allowedMidiPresets == null) continue;
-
-                if (ship.allowedMidiPresets.Any(p => roleProfile.allowedMidiPresets.Contains(p)))
-                {
-                    var validPresets = ship.allowedMidiPresets
-                        .Where(p => roleProfile.allowedMidiPresets.Contains(p))
-                        .ToList();
-
-                    if (validPresets.Count == 0) continue;
-
-                    int preset = validPresets[Random.Range(0, validPresets.Count)];
-                    track.preset = preset;
-                    var noteSet = new NoteSet { assignedInstrumentTrack = track, noteBehavior = roleProfile.defaultBehavior}; 
-                    noteSet.Initialize(track, track.GetTotalSteps());
-                    unassignedTracks.Remove(track);
-                    break;
-                }
-            }
-        }
-
-        // Step 2: Assign remaining tracks randomly
-        foreach (var track in unassignedTracks)
-        {
-            var fallbackProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-            if (fallbackProfile == null || fallbackProfile.allowedMidiPresets.Count == 0) continue;
-
-            int randomPreset = fallbackProfile.allowedMidiPresets[Random.Range(0, fallbackProfile.allowedMidiPresets.Count)];
-            track.preset = randomPreset;
-
-            var noteSet = new NoteSet { assignedInstrumentTrack = track, noteBehavior = fallbackProfile.defaultBehavior };
-                        noteSet.Initialize(track, track.GetTotalSteps());
-        }
-    }
 }
 public struct TransportFrame
 {
@@ -78,9 +35,15 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private float gravityVoidScale = 1f;
     private GameObject _gravityVoidInstance;
     private ParticleSystem[] _gravityVoidParticles;
+    // Cache prefab alpha per particle system so alpha doesn't compound.
+    private float[] _gravityVoidPrefabStartAlpha;
+
+// Optionally track current outer radius for VFX scaling.
+    private int _gravityVoidCurrentOuterR;
+
     [Header("Gravity Void → Dust Imprint")]
     [SerializeField] private float gravityVoidGrowSeconds = 1.25f;
-    [SerializeField] private int gravityVoidMaxRadiusCells = 12;
+    [SerializeField] private int gravityVoidMaxRadiusCells = 120;
     [SerializeField] private float gravityVoidImprintTickSeconds = 0.05f;
     [SerializeField] private int gravityVoidImprintBudgetPerTick = 80; // -1 = unlimited
     private Coroutine _gravityVoidRoutine;
@@ -89,6 +52,9 @@ public class InstrumentTrackController : MonoBehaviour
     private Color _gravityVoidParticleTint;
     private Color _gravityVoidDustImprintTint;
     private float _gravityVoidDustHardness01;
+    private float _gravityVoidGrowSecondsRuntime = -1f;
+    private int   _gravityVoidMaxRadiusRuntime   = -1;
+
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
@@ -109,48 +75,108 @@ public class InstrumentTrackController : MonoBehaviour
         lastCollectionTime = Time.time;
     }
 
-    public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
+public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
+{
+    if (ownerTrack == null) return;
+
+    // Is this a repeat Begin for the same owner while already active?
+    bool sameOwner = (_gravityVoidOwner != null && ownerTrack == _gravityVoidOwner);
+    bool routineRunning = (_gravityVoidRoutine != null);
+    bool instanceAlive = (_gravityVoidInstance != null);
+
+    // Update owner + center every time (Begin acts as "refresh" too).
+    _gravityVoidOwner = ownerTrack;
+    _gravityVoidCenterWorld = centerWorld;
+    _gravityVoidCenterGP = centerGP;
+    _gravityVoidHasCenterGP = true;
+
+    // Resolve tint/hardness from role profile (or fallback).
+    var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
+    if (roleProfile != null)
     {
-        if (ownerTrack == null) return;
+        _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
+        _gravityVoidDustHardness01 = roleProfile.GetDustHardness01();
 
-        _gravityVoidOwner = ownerTrack;
-        _gravityVoidCenterWorld = centerWorld;
-        _gravityVoidCenterGP = centerGP;
-        _gravityVoidHasCenterGP = true;
-
-        // Resolve tint/hardness from role profile (or fallback).
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
-        if (roleProfile != null)
-        {
-            _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
-            _gravityVoidDustHardness01  = roleProfile.GetDustHardness01();
-
-            _gravityVoidParticleTint = roleProfile.GetBaseColor();
-            _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
-        }
-        else
-        {
-            _gravityVoidDustImprintTint = ownerTrack.trackColor;
-            _gravityVoidDustHardness01  = 0.5f;
-
-            _gravityVoidParticleTint = ownerTrack.trackColor;
-            _gravityVoidParticleTint.a = 1f;
-        }
-
-        SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
-
-        if (_gravityVoidRoutine != null)
-            StopCoroutine(_gravityVoidRoutine);
-        _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
+        _gravityVoidParticleTint = roleProfile.GetBaseColor();
+        _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
     }
+    else
+    {
+        _gravityVoidDustImprintTint = ownerTrack.trackColor;
+        _gravityVoidDustHardness01 = 0.5f;
+
+        _gravityVoidParticleTint = ownerTrack.trackColor;
+        _gravityVoidParticleTint.a = 1f;
+    }
+
+    // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
+    SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
+
+    // Recompute runtime parameters; these can change while pending.
+    _gravityVoidGrowSecondsRuntime = gravityVoidGrowSeconds;
+    _gravityVoidMaxRadiusRuntime = gravityVoidMaxRadiusCells;
+
+    if (_gravityVoidOwner != null)
+    {
+        // Drive dur by DSP time-to-commit, so the final radius happens at the commit point.
+        float secsToCommit = _gravityVoidOwner.GetSecondsUntilNextLoopBoundaryDSP();
+        if (secsToCommit > 0.01f)
+            _gravityVoidGrowSecondsRuntime = secsToCommit;
+
+        // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
+        int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
+        _gravityVoidMaxRadiusRuntime = targetRadius;
+    }
+
+    // --- CRITICAL: don't restart the coroutine if it's already running for this owner. ---
+    // Restarting here is what looks like "respawn at the boundary".
+    if (sameOwner && routineRunning)
+    {
+        Debug.Log(
+            $"[VOID] REFRESH (no-restart) track={ownerTrack.name} " +
+            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} " +
+            $"pos={centerWorld} gp={centerGP} grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
+        );
+        return;
+    }
+
+    // If owner changed, or routine is missing, (re)start cleanly.
+    if (_gravityVoidRoutine != null)
+    {
+        StopCoroutine(_gravityVoidRoutine);
+        _gravityVoidRoutine = null;
+    }
+
+    Debug.Log(
+        $"[VOID] BEGIN (start) track={ownerTrack.name} " +
+        $"prevOwner={(sameOwner ? "same" : "changed")} routineWas={routineRunning} instWas={instanceAlive} " +
+        $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} pos={centerWorld} gp={centerGP} " +
+        $"grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
+    );
+
+    _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
+}
 
 public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
 {
     // If caller provides an owner, only allow the owner to end it.
     if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
+    {
+        Debug.LogWarning(
+            $"[VOID] END ignored (wrong owner) caller={ownerTrack.name} owner={_gravityVoidOwner.name} " +
+            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
+        );
         return;
+    }
+
+    Debug.Log(
+        $"[VOID] END track={(_gravityVoidOwner ? _gravityVoidOwner.name : "null")} " +
+        $"caller={(ownerTrack ? ownerTrack.name : "null")} " +
+        $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
+    );
 
     _gravityVoidOwner = null;
+    _gravityVoidHasCenterGP = false;
 
     if (_gravityVoidRoutine != null)
     {
@@ -163,62 +189,237 @@ public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
 
 private IEnumerator GravityVoidGrowAndImprintRoutine()
 {
+    int _lastGravityVoidChordBin = -1;
     var gfm = GameFlowManager.Instance;
     var dustGen = (gfm != null) ? gfm.dustGenerator : null;
     if (dustGen == null)
         yield break;
 
-    float dur  = Mathf.Max(0.01f, gravityVoidGrowSeconds);
+    float dur  = Mathf.Max(0.01f, (_gravityVoidGrowSecondsRuntime > 0f) ? _gravityVoidGrowSecondsRuntime : gravityVoidGrowSeconds);
     float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
-    int maxR   = Mathf.Max(0, gravityVoidMaxRadiusCells);
+    int maxR   = Mathf.Max(0, (_gravityVoidMaxRadiusRuntime >= 0) ? _gravityVoidMaxRadiusRuntime : gravityVoidMaxRadiusCells);
 
-    float t = 0f;
-    int lastR = 0;
+    // We track the OUTER radius we've actually completed imprinting up to.
+    int completedOuterR = 0;
 
-    while (t < dur && _gravityVoidOwner != null)
+    float startTime = Time.time;
+    float nextTickTime = startTime; // immediate first tick
+
+    // How long each radius step should take to feel like constant outward growth.
+    float secsPerRadius = (maxR > 0) ? (dur / maxR) : dur;
+
+    while (_gravityVoidOwner != null)
     {
-        t += tick;
-        float frac = Mathf.Clamp01(t / dur);
-        int r = Mathf.RoundToInt(frac * maxR);
-
-        if (r > lastR)
-        {
-            if (_gravityVoidHasCenterGP && r > lastR)
-            {
-                dustGen.ApplyVoidImprintDiskFromGrid(
-                    _gravityVoidCenterGP,
-                    outerRadiusCells: r,
-                    imprintColor: _gravityVoidDustImprintTint,
-                    imprintHardness01: _gravityVoidDustHardness01,
-                    maxCellsThisCall: gravityVoidImprintBudgetPerTick,
-                    innerRadiusCellsExclusive: lastR
-                );
-
-                lastR = r;
-            }
-
-            lastR = r;
-        }
-
-        // Keep VFX positioned (no “polling,” just while the pending window is active).
+        // Always keep VFX positioned (and potentially scaled in SpawnOrUpdate)
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
-        yield return new WaitForSeconds(tick);
+        float now = Time.time;
+        float elapsed = now - startTime;
+// ------------------------------------------------------------
+// Gravity Void chord pulse: fire ONCE at each bin boundary
+// ------------------------------------------------------------
+        int playheadBin = GetTransportFrame().playheadBin;
+        if (playheadBin != _lastGravityVoidChordBin)
+        {
+            _lastGravityVoidChordBin = playheadBin;
+
+            int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
+            PlayGravityVoidChordPulse(_gravityVoidOwner, playheadBin, chordSize);
+        }
+
+        // --- STEADY GROWTH MAPPING ---
+        // Radius increases by ~1 every secsPerRadius seconds, up to maxR.
+        int targetOuterR = (maxR <= 0)
+            ? 0
+            : Mathf.Clamp(1 + Mathf.FloorToInt(elapsed / Mathf.Max(0.001f, secsPerRadius)), 1, maxR);
+        _gravityVoidCurrentOuterR = targetOuterR;
+
+        // If we haven't reached our target radius, do budgeted imprint work toward it.
+        if (_gravityVoidHasCenterGP && dustGen != null && targetOuterR > completedOuterR)
+        {
+            int budget = gravityVoidImprintBudgetPerTick;
+
+            int processed = dustGen.ApplyVoidImprintDiskFromGrid(
+                _gravityVoidCenterGP,
+                outerRadiusCells: targetOuterR,
+                imprintColor: _gravityVoidDustImprintTint,
+                imprintHardness01: _gravityVoidDustHardness01,
+                maxCellsThisCall: budget,
+                innerRadiusCellsExclusive: completedOuterR
+            );
+
+            // Budget semantics:
+            // - If budget < 0 => unlimited, treat as fully completed.
+            // - If processed < budget => likely finished the requested annulus this tick.
+            // - If processed == budget => likely capped, keep working this annulus next tick.
+            if (budget < 0)
+            {
+                completedOuterR = targetOuterR;
+            }
+            else if (processed > 0 && processed < budget)
+            {
+                completedOuterR = targetOuterR;
+            }
+            else
+            {
+                // processed == 0 or processed == budget: do not advance completedOuterR.
+                // This keeps us filling the same annulus over multiple ticks rather than skipping ahead.
+            }
+        }
+
+        // After we reach max radius, we keep running (VFX stays) until EndGravityVoid... clears owner.
+        // That matches "keeps moving outward until the void disappears."
+        nextTickTime += tick;
+        float wait = Mathf.Max(0.001f, nextTickTime - Time.time);
+        yield return new WaitForSeconds(wait);
     }
 
     _gravityVoidRoutine = null;
 }
+private void PlayGravityVoidChordPulse(
+    InstrumentTrack track,
+    int playheadBin,
+    int chordSize)
+{
+    if (track == null) return;
+
+    var harmony = GameFlowManager.Instance?.harmony;
+    if (harmony == null) return;
+
+    int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
+    if (chordIdx < 0) return;
+
+    if (!harmony.TryGetChordAt(chordIdx, out var chord))
+        return;
+
+    var notes = BuildGravityVoidVoicing(
+        track.assignedRole,
+        chord,
+        chordSize,
+        track.lowestAllowedNote,
+        track.highestAllowedNote
+    );
+
+    int durTicks = 240;   // short, declarative hit
+    float vel127 = 80f;
+
+    foreach (int midi in notes)
+        track.PlayNote127(midi, durTicks, vel127);
+}
+private List<int> BuildGravityVoidVoicing(
+    MusicalRole role,
+    Chord chord,
+    int targetCount,
+    int low,
+    int high)
+{
+    // Build pitch classes from chord
+    var pcs = chord.intervals
+        .Select(i => (chord.rootNote + i) % 12)
+        .Distinct()
+        .ToList();
+
+    int rootPC  = chord.rootNote % 12;
+    int thirdPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 3 or 4);
+    int fifthPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 == 7);
+    int seventhPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 10 or 11);
+
+    List<int> priorityPCs = role switch
+    {
+        // --------------------------------------------------
+        // Bass: guide tones first, avoid root dominance
+        // --------------------------------------------------
+        MusicalRole.Bass => new()
+        {
+            thirdPC,
+            seventhPC,
+            fifthPC,
+            rootPC,
+            thirdPC
+        },
+
+        // --------------------------------------------------
+        // Harmony: classic shell → full stack
+        // --------------------------------------------------
+        MusicalRole.Harmony => new()
+        {
+            thirdPC,
+            seventhPC,
+            rootPC,
+            fifthPC,
+            seventhPC
+        },
+
+        // --------------------------------------------------
+        // Lead: color tones, higher tension
+        // --------------------------------------------------
+        MusicalRole.Lead => new()
+        {
+            seventhPC,
+            thirdPC,
+            fifthPC,
+            rootPC,
+            seventhPC
+        },
+
+        // --------------------------------------------------
+        // Groove / mid-perc tonal
+        // --------------------------------------------------
+        MusicalRole.Groove => new()
+        {
+            thirdPC,
+            fifthPC,
+            seventhPC,
+            rootPC,
+            thirdPC
+        },
+
+        _ => pcs
+    };
+
+    var result = new List<int>();
+    int octaveAnchor = (low + high) / 2;
+
+    foreach (int pc in priorityPCs)
+    {
+        if (result.Count >= targetCount) break;
+
+        int note = FitPitchClassToRange(pc, octaveAnchor, low, high);
+        if (!result.Contains(note))
+            result.Add(note);
+    }
+
+    return result;
+}
+private int FitPitchClassToRange(int pc, int anchor, int low, int high)
+{
+    int note = anchor - ((anchor - pc + 120) % 12);
+    while (note < low)  note += 12;
+    while (note > high) note -= 12;
+    return Mathf.Clamp(note, low, high);
+}
 
 public void DespawnGravityVoid()
 {
-    if (_gravityVoidInstance == null) return;
+    if (_gravityVoidInstance == null)
+        return;
 
     Destroy(_gravityVoidInstance);
+
     _gravityVoidInstance = null;
     _gravityVoidParticles = null;
+
+    // Clear cached prefab alpha so the next spawn re-captures it
+    _gravityVoidPrefabStartAlpha = null;
+
+    // Reset VFX growth state
+    _gravityVoidCurrentOuterR = 0;
+
+    // Clear center bookkeeping (defensive; owner is cleared elsewhere)
+    _gravityVoidHasCenterGP = false;
 }
 
-public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
+    public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
 {
     if (gravityVoidPrefab == null) return;
 
@@ -231,6 +432,24 @@ public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
             _gravityVoidInstance.transform.localScale *= gravityVoidScale;
 
         _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
+
+        // Cache each particle system's prefab alpha ONCE so we can preserve it.
+        if (_gravityVoidParticles != null && _gravityVoidParticles.Length > 0)
+        {
+            _gravityVoidPrefabStartAlpha = new float[_gravityVoidParticles.Length];
+            for (int i = 0; i < _gravityVoidParticles.Length; i++)
+            {
+                var ps = _gravityVoidParticles[i];
+                if (ps == null) { _gravityVoidPrefabStartAlpha[i] = 1f; continue; }
+
+                var main = ps.main;
+
+                // startColor can be a gradient; this grabs a representative color.
+                // If your prefab uses gradients heavily and you need exactness, we can upgrade this,
+                // but for your use (white low-alpha ring), this is correct.
+                _gravityVoidPrefabStartAlpha[i] = main.startColor.color.a;
+            }
+        }
     }
     else
     {
@@ -239,21 +458,42 @@ public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
 
     if (_gravityVoidParticles == null) return;
 
-    // Preserve prefab alpha: output alpha = prefabAlpha * tintAlpha
+    // ----- OPTIONAL: scale VFX outward to match current radius -----
+    // This assumes your prefab ring looks correct at "max" scale = gravityVoidScale.
+    // We scale from a small minimum up to full based on current outer radius.
+    if (_gravityVoidInstance != null && _gravityVoidMaxRadiusRuntime > 0)
+    {
+        float frac = Mathf.Clamp01((float)_gravityVoidCurrentOuterR / (float)_gravityVoidMaxRadiusRuntime);
+
+        // Keep a visible presence even at the start (so it doesn't look like "nothing happens").
+        const float minFrac = 0.15f;
+        float s = Mathf.Lerp(minFrac, 1f, frac);
+
+        // Preserve your authored prefab scale + gravityVoidScale multiplier.
+        // We apply a uniform multiplier on top.
+        Vector3 baseScale = Vector3.one * gravityVoidScale;
+        _gravityVoidInstance.transform.localScale = baseScale * s;
+    }
+
+    // ----- Tint particles without compounding alpha -----
     for (int i = 0; i < _gravityVoidParticles.Length; i++)
     {
         var ps = _gravityVoidParticles[i];
         if (ps == null) continue;
 
         var main = ps.main;
-        Color baseC = main.startColor.color;
+
+        float prefabA = 1f;
+        if (_gravityVoidPrefabStartAlpha != null && i >= 0 && i < _gravityVoidPrefabStartAlpha.Length)
+            prefabA = _gravityVoidPrefabStartAlpha[i];
 
         Color outC = tint;
-        outC.a = baseC.a * tint.a;
+        outC.a = prefabA * tint.a;      // preserve prefab alpha; tint.a is your multiplier
 
         main.startColor = outC;
     }
 }
+
     public void ResetControllerBinGuards()
     {
         _binExtensionSignaled?.Clear();
@@ -720,7 +960,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     }
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
     {
-        ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList());
+//        ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList());
         UpdateVisualizer();
     } 
     public InstrumentTrack GetAmbientContextTrack() {

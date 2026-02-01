@@ -19,6 +19,9 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Baseline dust hardness for non-imprinted maze cells. Imprinted MineNode cells override this via DustImprint.hardness01.")]
     [Range(0f, 1f)]
     [SerializeField] private float defaultMazeHardness01 = 0f;
+// Track bin edge so we only fire once per bin boundary
+    int lastPlayheadBin = -1;
+    float lastPulseTime = -999f; // optional: debouncing / spam guard
 
     struct DustImprint
     {
@@ -494,7 +497,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.clearing.hardness01 = GetCellHardness01(gp);
             Color regrowTint = GetCellVisualColor(gp);
             dust.SetTint(regrowTint);
-            dust.SetFeedbackColors(Color.white, Color.violetRed);
+            dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();
             SetDustCollision(dust, false);        }
 
@@ -784,7 +787,7 @@ public class CosmicDustGenerator : MonoBehaviour
             if (TryGetCellState(gp, out var st) && st == DustCellState.Clearing)
                 SetCellState(gp, DustCellState.Empty);        }
 
-        dust.HideVisualsInstant();
+        dust.FinalizeClearedVisuals();
     }
 
     private GameObject GetOrCreateCellGO(Vector2Int gp)
@@ -811,7 +814,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.SetGrowInDuration(hexGrowInSeconds);
             dust.clearing.hardness01 = GetCellHardness01(gp);
             dust.SetTint(_mazeTint);
-            dust.SetFeedbackColors(Color.white, Color.violetRed);
+            dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();
             SetDustCollision(dust, false);
         }
@@ -826,19 +829,29 @@ public class CosmicDustGenerator : MonoBehaviour
     public bool HasDustAt(Vector2Int gridPos)
     {
         return TryGetCellState(gridPos, out var st) && st == DustCellState.Solid;
+    } 
+    public void CreateJailCenterForCollectable(
+        Vector2Int gpCenter,
+        MazeArchetype phase,
+        float holdSeconds,
+        int ownerId,
+        DustClearMode mode = DustClearMode.HideInstant,
+        float fadeSeconds = 0.10f,
+        float regrowDelaySeconds = -1f)
+    {
+        // 1) Clear ONLY the center cell (the "jail cell" the note occupies).
+        ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, phase: phase, regrowDelaySeconds: regrowDelaySeconds);
+
+        // 2) Claim ONLY the center so it stays empty while jailed.
+        if (dustClaims != null && holdSeconds > 0f)
+        {
+            string owner = $"Collectable#{ownerId}";
+            dustClaims.ClaimCell(owner, gpCenter, DustClaimType.TemporaryCarve, seconds: holdSeconds, refresh: true);
+        }
     }
-    /// <summary>
-/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
-/// Intended for Gravity Void expansion effects.
-/// </summary>
-/// <returns>Number of cells processed</returns>
-/// <summary>
-/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
-/// Intended for Gravity Void expansion effects.
-/// </summary>
-/// <returns>Number of cells processed</returns>
-/// <summary>
-/// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
+
+    
+    /// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
 /// Center is specified in GRID coordinates.
 /// </summary>
 /// <returns>Number of cells processed</returns>
@@ -1260,6 +1273,11 @@ public int ApplyVoidImprintDiskFromGrid(
         if (!TryGetCellGo(cell, out var go) || go == null) return false;
         return go.TryGetComponent(out dust) && dust != null;
     }
+
+    public Color MazeColor()
+    {
+        return _mazeTint;
+    }
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
@@ -1453,7 +1471,7 @@ public int ApplyVoidImprintDiskFromGrid(
                         dust.PrepareForReuse();
                         dust.SetGrowInDuration(hexGrowInSeconds);
                         dust.SetTint(_mazeTint);
-                        dust.SetFeedbackColors(Color.white, Color.violetRed);
+                        dust.SetFeedbackColors(Color.white, Color.darkGray);
                         dust.clearing.hardness01 = GetCellHardness01(grid);
                         dust.ConfigureForPhase(phaseNow);
                         dust.Begin();

@@ -412,7 +412,7 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
     Debug.Log($"[DrumTrack] Scheduled drum loop change at dsp={start:F3} clip={newClip.name}");
 }
 
-private void Update()
+    private void Update()
 {
     // 0) Manager may exist but not be ready (or still wiring scenes)
     if (_gfm == null || !_gfm.ReadyToPlay())
@@ -523,6 +523,71 @@ private void Update()
     if (activeMineNodes != null)
         activeMineNodes.RemoveAll(n => n == null);
 }
+    public bool TryGetNextStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
+{
+    nextStepDsp = 0;
+    stepDurationSec = 0f;
+
+    if (leaderStartDspTime <= 0.0) return false;
+
+    double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
+    int leaderSteps = GetLeaderSteps();
+    if (leaderSteps <= 0) return false;
+
+    stepDurationSec = (float)(effLen / leaderSteps);
+    if (stepDurationSec <= 0f || float.IsInfinity(stepDurationSec)) return false;
+
+    double dspNow = AudioSettings.dspTime;
+    double elapsed = dspNow - leaderStartDspTime;
+    if (elapsed < 0) elapsed = 0;
+
+    double tInLoop = elapsed % effLen;
+
+    // Current step index (same as Update)
+    int curStep = Mathf.FloorToInt((float)(tInLoop / stepDurationSec));
+    int targetStep = curStep + Mathf.Max(1, stepOffset);
+
+    // DSP time at the start of that target step (within the same or next loop)
+    nextStepDsp = leaderStartDspTime + (targetStep * stepDurationSec);
+
+    // Ensure it's in the future (hitch guard)
+    const double kMinLead = 0.005;
+    if (nextStepDsp <= dspNow + kMinLead)
+        nextStepDsp = dspNow + 0.010;
+
+    return true;
+}
+    public bool TryGetNextBaseStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
+    {
+        nextStepDsp = 0;
+        stepDurationSec = 0f;
+
+        if (leaderStartDspTime <= 0.0) return false;
+
+        double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
+        int steps = Mathf.Max(1, totalSteps);   // <- STABLE grid
+        stepDurationSec = (float)(effLen / steps);
+
+        if (stepDurationSec <= 0f || float.IsInfinity(stepDurationSec)) return false;
+
+        double dspNow = AudioSettings.dspTime;
+        double elapsed = dspNow - leaderStartDspTime;
+        if (elapsed < 0) elapsed = 0;
+
+        double tInLoop = elapsed % effLen;
+
+        int curStep = Mathf.FloorToInt((float)(tInLoop / stepDurationSec));
+        int targetStep = curStep + Mathf.Max(1, stepOffset);
+
+        nextStepDsp = leaderStartDspTime + (targetStep * stepDurationSec);
+
+        // ensure future
+        const double kMinLead = 0.005;
+        if (nextStepDsp <= dspNow + kMinLead)
+            nextStepDsp = dspNow + 0.010;
+
+        return true;
+    }
 
     private void HandleBeatSequencingAtLoopBoundary(float loopSeconds)
     {

@@ -10,7 +10,7 @@ public class PhaseTransitionManager : MonoBehaviour
     [Header("Motif / BeatMood (motif-based music)")]
     [SerializeField] private MotifQueue motifQueue;
     [SerializeField] private MotifLibrary motifLibrary;
-
+    private int _motifQueueCycleIndex = -1;
     // Index into motifQueue, if you want a fixed album-like order
     private int _motifIndex = 0;
 
@@ -105,36 +105,37 @@ private void ConfigureTracksForCurrentPhaseAndMotif()
     }
 }
 
-    private MotifProfile SelectMotifForPhase(MazeArchetype nextPhase)
+private MotifProfile SelectMotifForPhase(MazeArchetype nextPhase)
+{
+    MotifProfile motif = null;
+
+    if (motifQueue != null && motifQueue.motifs != null && motifQueue.motifs.Count > 0)
     {
-        MotifProfile motif = null;
+        int count = motifQueue.motifs.Count;
+        Debug.Log($"[MOTIF] PreCycle index={_motifQueueCycleIndex} instance={GetInstanceID()} phase={nextPhase}");
 
-        if (motifQueue != null && motifQueue.motifs != null && motifQueue.motifs.Count > 0)
-        {
-            int count = motifQueue.motifs.Count;
+        _motifQueueCycleIndex = (_motifQueueCycleIndex + 1) % count;
 
-            // Use a session-scoped RNG so picks are random but reproducible per play session
-            var rng = SessionGenome.For("motifQueue");
-            int idx = rng.Next(count);
-
-            motif = motifQueue.motifs[idx];
-            
-            Debug.Log($"[MOTIF] Random queue pick index={idx}/{count}, phase={nextPhase}, motif={motif}");
-        }
-        else
-        {
-            Debug.LogWarning("[MOTIF] MotifQueue empty or null; falling back to library.");
-        }
-
-        if (motif == null && motifLibrary != null)
-        {
-//            motif = motifLibrary.PickRandomWeighted(SessionGenome.For("motifphase"));
-            motif = motifLibrary.PickNext();
-            Debug.Log($"[MOTIF] Fallback library pick motif={motif}");
-        }
-
-        return motif;
+        motif = motifQueue.motifs[_motifQueueCycleIndex];
+        Debug.Log($"[MOTIF] Cycle queue pick index={_motifQueueCycleIndex}/{count}, phase={nextPhase}, motif={motif}");
     }
+    else
+    {
+        Debug.LogWarning("[MOTIF] MotifQueue empty or null; falling back to library.");
+    }
+
+    if (motif == null && motifLibrary != null)
+    {
+        motif = motifLibrary.PickNext();
+        Debug.Log($"[MOTIF] Fallback library pick motif={motif}");
+    }
+
+    return motif;
+}
+private void Start()
+{
+    _motifQueueCycleIndex = -1;
+}
 
     private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile) {
 

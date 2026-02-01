@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Dos
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: dos
+  displayName: dos
+  keyRootMidi: 57
+  entryDrumLoops:
+  - {fileID: 8300000, guid: d8d6154a598ef4807b2450da93814fe1, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: f58c5aab1881b4af68864550df141a3a, type: 3}
+  - {fileID: 8300000, guid: 6c2479da8cfaa4a5daa93dd97ea6427c, type: 3}
+  - {fileID: 8300000, guid: 3542ee37aa85440588332c6aa220b5c2, type: 3}
+  - {fileID: 8300000, guid: 720d74577fa6e4a1b8eb4872b3512f3b, type: 3}
+  - {fileID: 8300000, guid: ee4f03bf8a099423889135fc6748832e, type: 3}
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 2d17debea3d964de787df10adcf39897, type: 2}
+  - {fileID: 11400000, guid: d1b118598fe7843d48129e4aebfa8f34, type: 2}
+  - {fileID: 11400000, guid: 5e36fb92a68224e189756d2b54c04877, type: 2}
+  - {fileID: 11400000, guid: d77c421fdbf2c43a9ad26cc9b5d25079, type: 2}
+  - {fileID: 11400000, guid: fb9e9531d6c4f40ac9e203d30821d424, type: 2}
+  - {fileID: 11400000, guid: 83968ba4ab4274e9fba292ffad98efd2, type: 2}
+  - {fileID: 11400000, guid: 540d6b645cdfc4187bd270c0824daf51, type: 2}
+  - {fileID: 11400000, guid: 01437d6fc4e1342629c5c0333c5154d8, type: 2}
+  - {fileID: 11400000, guid: a8f11794e240e43d191538cbf3321ff5, type: 2}
+  - {fileID: 11400000, guid: 42589eaf750424c35ba967194eecf666, type: 2}
+  - {fileID: 11400000, guid: 035d34f07f52d4ce8b7a29adefdd5e21, type: 2}
+  - {fileID: 11400000, guid: f8bcb11bad7504cbc864ec2c2a868555, type: 2}
+  - {fileID: 11400000, guid: b8466a1c4aaa34bdeae66cb3eabde007, type: 2}
+  - {fileID: 11400000, guid: 29cddc8d45a5d472f8ff4e34fcc86503, type: 2}
+  - {fileID: 11400000, guid: 4344bbc14c43d4f84868f9806a5a8081, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1
