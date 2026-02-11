@@ -10902,7 +10902,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.8
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -10993,6 +10993,18 @@ PrefabInstance:
       insertIndex: 2
       addedObject: {fileID: 480221063}
   m_SourcePrefab: {fileID: 100100000, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+--- !u!114 &480221060 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+    type: 3}
+  m_PrefabInstance: {fileID: 480221059}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 480221062}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a10fc17731b73e545b0078250340235c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &480221061 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328,
@@ -11017,10 +11029,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11ce2ca362e448e6abebcc17c72aa1e6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MidiVoice
-  midiStreamPlayer: {fileID: 0}
-  drumTrack: {fileID: 0}
+  midiStreamPlayer: {fileID: 480221060}
+  drumTrack: {fileID: 1354683682}
   channel: 5
-  preset: 1
+  preset: 12
   bank: 0
 --- !u!1001 &608598248
 PrefabInstance:
@@ -11201,7 +11213,7 @@ MonoBehaviour:
   lowestAllowedNote: 48
   highestAllowedNote: 72
   controller: {fileID: 1354683684}
-  midiStreamPlayer: {fileID: 608598250}
+  midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   preset: 4
   bank: 0
@@ -11338,9 +11350,9 @@ MonoBehaviour:
   lowestAllowedNote: 48
   highestAllowedNote: 96
   controller: {fileID: 1354683684}
-  midiStreamPlayer: {fileID: 1849649912}
+  midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
-  preset: 8
+  preset: 1
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -11400,7 +11412,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 8
+  preset: 1
   bank: 0
 --- !u!1 &657963290
 GameObject:
@@ -12833,6 +12845,7 @@ MonoBehaviour:
     type: 3}
   motifQueue: {fileID: 11400000, guid: 266e8ac30daaa4002b473d9de45ffea5, type: 2}
   motifLibrary: {fileID: 11400000, guid: 442706371a61147f0b0ad47d1691b5a1, type: 2}
+  loopMotifQueue: 1
 --- !u!114 &1354683698
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13748,7 +13761,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.6
+      value: 0.75
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -13871,7 +13884,7 @@ MonoBehaviour:
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
-  preset: 8
+  preset: 12
   bank: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -13946,7 +13959,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 6
+  preset: 3
   bank: 0
 --- !u!1 &1736554591
 GameObject:
@@ -14061,7 +14074,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.75
+      value: 0.9
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -14350,7 +14363,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.7
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -14461,7 +14474,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.6
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}

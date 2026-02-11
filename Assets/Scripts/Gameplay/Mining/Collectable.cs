@@ -697,10 +697,7 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
     if (TryGetComponent(out CollectableParticles cp) && tether != null)
         cp.RegisterTether(tether, pull: 0.7f);
     }
-    public void TravelAlongTetherAndFinalize(int durationTicks, float force, float seconds = 0.35f)
-    {
-        StartCoroutine(TravelRoutine(durationTicks, force, seconds, onArrived: null));
-    }
+
     void Start()
     {
         isInitialized = true;
@@ -993,16 +990,33 @@ private Vector3 ComputeCarryOrbitTargetWorld()
     private void OnTriggerEnter2D(Collider2D coll)
     {
         var vehicle = coll.GetComponent<Vehicle>();
-        if (vehicle == null || _handled) return;
-        _collector = vehicle.transform;
-        _handled = true; // ✅ idempotent
-        StopDustPocketAndReleaseClaims();
+        if (vehicle == null || _handled) return; 
+        // ---- Validate we can actually process a collection BEFORE latching _handled ----
+        if (assignedInstrumentTrack == null) { 
+            Debug.LogWarning($"[COLLECT] Ignored: assignedInstrumentTrack is null (name={name})."); 
+            return; }
+        var drumTrack = assignedInstrumentTrack.drumTrack; 
+        if (drumTrack == null) { 
+            Debug.LogWarning($"[COLLECT] Ignored: track '{assignedInstrumentTrack.name}' has no DrumTrack yet (name={name})."); 
+            return;
+        }
+        // Anchor to what the player hears. During phase/motif setup this can briefly be 0.
+        double loopStart = drumTrack.leaderStartDspTime; 
+        if (loopStart <= 0.0) 
+            loopStart = drumTrack.startDspTime; // fallback for early phase setup
+        if (loopStart <= 0.0) {
+            // IMPORTANT: Do NOT latch _handled; let the player collect once timing is ready.
+            Debug.LogWarning($"[COLLECT] Deferred: drum transport not anchored yet (leaderStartDspTime/startDspTime <= 0). name={name}"); 
+            return;
+        }
+        
+        // Now we can safely latch idempotency + switch to carry behavior._collector = vehicle.transform;
+        _handled = true; 
+        StopDustPocketAndReleaseClaims(); 
         RegisterCarryOrbit();
-
+        
         // (Optional availability check)
         // if (_availableUntilDsp > 0 && AudioSettings.dspTime > _availableUntilDsp) { OnFailedCollect(); return; }
-        var drumTrack = assignedInstrumentTrack.drumTrack;
-        if (drumTrack == null) return;
 
         double dspNow  = AudioSettings.dspTime;
         double loopLen = drumTrack.GetLoopLengthInSeconds();
@@ -1012,11 +1026,7 @@ private Vector3 ComputeCarryOrbitTargetWorld()
 
 // We expect leaderSteps to be an integer multiple of baseSteps.
         int mul = Mathf.Max(1, Mathf.RoundToInt(leaderSteps / (float)baseSteps));
-
-// Anchor to what the player hears.
-        double loopStart = drumTrack.leaderStartDspTime;
-        if (loopStart <= 0.0) return;
-
+        
 // Position in the *leader* loop timeline [0, loopLen)
         double tPos = (dspNow - loopStart) % loopLen;
         if (tPos < 0) tPos += loopLen;
@@ -1057,7 +1067,9 @@ private Vector3 ComputeCarryOrbitTargetWorld()
             float force = vehicle.GetForceAsMidiVelocity();
             vehicle.CollectEnergy(amount);
             Debug.Log("[COLLECT] Collectable Triggered");
-            assignedInstrumentTrack.OnCollectableCollected(this, intendedStep >= 0 ? intendedStep : matchedStep, noteDurationTicks, force);
+            int stepToReport = (intendedStep >= 0) ? intendedStep : (matchedStep  >= 0) ? matchedStep  : 0; // defensive: never send -1
+            assignedInstrumentTrack.OnCollectableCollected(this, stepToReport, noteDurationTicks, force);
+
             if (TryGetComponent(out Collider2D col)) col.enabled = false;
             var explode = GetComponent<Explode>();
             if(explode != null) explode.Permanent(false);

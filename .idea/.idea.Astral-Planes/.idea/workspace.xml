@@ -5,91 +5,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNode.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNode.cs.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/CoralRigRegistrar.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/CoralRigRegistrar.cs.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Music/SoloVoice.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Music/SoloVoice.cs.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/SpiralCoralTrackGrower.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/SpiralCoralTrackGrower.cs.meta" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Dust.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Void.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Void.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/ChordProfiles/Dorian_i-ii-IV-v.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/ChordProfiles/Dorian_i-ii-IV-v.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Lattice.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Mazes/Lattice.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Bass.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Bass/C-D.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Bass/C-D.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Bass/bass-riff-cd.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Bass/bass-riff-cd.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Harmony.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Harmony/G-A-F.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Harmony/G-A-F.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Harmony/grooveharmony-riff-cd.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Harmony/grooveharmony-riff-cd.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/C-F-G-A.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/C-F-G-A.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/lead-riff-cd 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/lead-riff-cd 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/lead-riff-cd.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/MIDI/Lead/lead-riff-cd.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Bass Riff.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Bass Riff.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Groove Riff.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Groove Riff.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Harmony Riff.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Harmony Riff.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Lead Riff.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Test/Lead Riff.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Riff Track.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Riff Track.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Establish.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Evolve.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Intensify.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Pop.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Release.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Walking.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MusicalPhases/Wildcard.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Uno/Uno.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Uno/Uno.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ShipMusicalProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ShipMusicalProfile.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectSettings/TagManager.asset" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/TagManager.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -350,7 +281,8 @@
       <workItem from="1769093396747" duration="30970000" />
       <workItem from="1769360745031" duration="13393000" />
       <workItem from="1769617544191" duration="8456000" />
-      <workItem from="1769645702699" duration="69369000" />
+      <workItem from="1769645702699" duration="72926000" />
+      <workItem from="1770675809917" duration="27049000" />
     </task>
     <servers />
   </component>

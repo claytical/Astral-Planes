@@ -572,7 +572,8 @@ private bool IsCellEmpty(Vector2Int gp)
     {
         float s2 = rb.linearVelocity.sqrMagnitude;
         float t2 = arcadeMaxSpeed * arcadeMaxSpeed;
-        return Mathf.Lerp(80f, 127f, Mathf.InverseLerp(0, t2, s2));
+        float v = Mathf.Lerp(80f, 127f, Mathf.InverseLerp(0, t2, s2));
+        return v;
     }
     public void Move(Vector2 direction)
     {

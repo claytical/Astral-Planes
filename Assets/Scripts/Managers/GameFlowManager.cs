@@ -39,7 +39,7 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private Transform coralRoot; // scene object root
     [SerializeField] private SpiralCoralBaseBuilder spiralCoralBase;
     [SerializeField] private SpiralCoralTrackGrower spiralCoralGrower;
-
+    private float _bridgeDrumStartVolume = 1f;
 // Optional: fade using renderer alpha (Standard shader)
     [SerializeField] private bool fadeSpiralCoralDuringBridge = true;
     [SerializeField, Min(0f)] private float spiralCoralFadeTarget = 0.65f;
@@ -418,11 +418,20 @@ public class GameFlowManager : MonoBehaviour
 
     noteViz.Initialize();
     harmony.Initialize(activeDrumTrack, controller);
-    Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END");
-
+    Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END"); 
+    // STEP 2.5: Commit initial phase+motif BEFORE starting drums.
+    // DrumTrack.ManualStart expects PTM.currentMotif to already be selected.
+    if (phaseTransitionManager != null) { 
+        var bootPhase = phaseTransitionManager.currentPhase; 
+        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(bootPhase, advanceMotif: true, who: "GFM/TrackSetup");
+    }
     // --------------------
     // STEP 3: Start drums
     // --------------------
+    if (phaseTransitionManager != null) { 
+        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(MazeArchetype.Establish, advanceMotif: false, who: "GFM/HandleTrackSceneSetupAsync");
+    }
+    
     Debug.Log("[GFM] [STEP 3] activeDrumTrack.ManualStart BEGIN");
     activeDrumTrack.ManualStart();
     dustGenerator.ManualStart();
@@ -493,6 +502,64 @@ public class GameFlowManager : MonoBehaviour
     {
         if (v == null || vehicles == null) return;
         vehicles.Remove(v);
+    }
+
+    public void BeginMotifBridge(MazeArchetype phaseToRestart, string who)
+    {
+        Debug.Log($"[MOTIF-BRIDGE] BeginMotifBridge phase={phaseToRestart} by={who}");
+        StartCoroutine(PlayMotifBridgeAndRestart(phaseToRestart));
+    }
+
+    private IEnumerator PlayMotifBridgeAndRestart(MazeArchetype phaseToRestart)
+    {
+        // Reuse your existing bridge gating flags so PhaseStar waits correctly.
+        GhostCycleInProgress = true;
+        BridgePending = true;
+
+        FreezeGameplayForBridge(); // you already have this
+
+        // Optional: short accent / bridge audio here (or reuse sig.includeDrums logic)
+        yield return null;
+
+        // IMPORTANT: This is the real "new level"
+        yield return StartCoroutine(StartNextMotifInPhase(phaseToRestart));
+
+        GhostCycleInProgress = false;
+        BridgePending = false;
+    }
+// GameFlowManager.cs
+
+    private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
+    {
+        // 0) Hard reset world state for new motif-level
+        if (controller != null)
+            controller.BeginNewMotif($"MotifStart {phase}");
+
+        if (noteViz != null)
+            noteViz.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
+
+        // 1) Advance motif (even if phase stays Establish)
+        if (phaseTransitionManager != null)
+        {
+            phaseTransitionManager.BootIfNeeded(phase, "GFM/StartNextMotifInPhase");
+            var newMotif = phaseTransitionManager.AdvanceMotif("GFM/StartNextMotifInPhase");
+
+            // Apply to drums FIRST so timing is authoritative before anything queries it.
+            if (activeDrumTrack != null)
+                activeDrumTrack.ApplyMotif(newMotif, armAtNextBoundary: true, who: "GFM/StartNextMotifInPhase");
+            // Then configure note sets for tracks based on motif
+            // (If your PTM does this internally, call that. Otherwise keep your existing function.)
+            phaseTransitionManager.ConfigureTracksForCurrentPhaseAndMotif();
+        }
+        else
+        {
+            Debug.LogWarning("[GFM] No PhaseTransitionManager; cannot advance motif.");
+        }
+
+        // 2) Rebuild maze + spawn new star (still phase-driven architecture)
+        StartMazeAndStarForPhase(phase);
+
+        yield break;
     }
 
     private bool HaveAllCoreRefs() { 
@@ -851,7 +918,7 @@ public class GameFlowManager : MonoBehaviour
             // New path: start next phase maze & PhaseStar, carving corridors from
     // the current Vehicle positions to the star cell.
     dustGenerator.activeDustRoot.gameObject.SetActive(true);
-    yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
+    yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase, true));
 
     // Now that the new phase geometry/star exist, we can safely restore visuals without a flash.
     SetBridgeCinematicMode(false);
@@ -904,112 +971,101 @@ public class GameFlowManager : MonoBehaviour
             // (If drumTrack is [SerializeField], you can add a setter later if needed.)
         }
     }
-
-    private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase)
-{
-    var drums = activeDrumTrack;
-    var dust  = dustGenerator;
-
-    // === Motif boundary hard reset ===
-    // Requirement: when a new PhaseStar begins, we start from silence and an empty NoteVisualizer.
-    // Do this BEFORE we request the next PhaseStar / spawn anything for the new phase.
-    if (controller != null)
-        controller.BeginNewMotif($"PhaseStart {nextPhase}");
-
-    // Redundant safety: if the controller isn't wired to the NoteVisualizer in the scene,
-    // force-clear it here so we never carry markers into the next phase.
-    if (noteViz != null)
-        noteViz.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
-
-    if (drums == null)
+// Motif boundaries occur when a PhaseStar runs out of shards.
+// For now, motif advance is parallel to a "phase transition" call even when the phase stays the same
+// (e.g., Establish -> Establish). In the future, motifs may advance multiple times within one phase.
+    private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool advanceMotif)
     {
-        Debug.LogWarning("[GFM] Cannot start next phase maze: no DrumTrack.");
-        yield break;
-    }
-    
-    // === RE-ARM PHASE/MOTIF -> DRUMS AFTER RESET ===
-    // // BeginNewMotif clears track content + visuals. We must immediately select the next motif and
-    // hand it back to the DrumTrack so driveFromEnergy/sequence is live.
-    if (phaseTransitionManager != null) {
-        phaseTransitionManager.HandlePhaseTransition(nextPhase, "GFM/StartNextPhaseMazeAndStar");
-    }
-    else {
-        Debug.LogWarning("[GFM] No PhaseTransitionManager; cannot arm motif for next phase.");
-    }
-    // ---- 1) Wait for players to actually spawn their Vehicles / lanes ----
-    float waitStart   = Time.time;
-    const float maxWait = 5f; // safety
-    while (localPlayers != null &&
-           localPlayers.Any(lp => lp && lp.plane == null) &&
-           Time.time - waitStart < maxWait)
-    {
-        yield return null;
-    }
+        var drums = activeDrumTrack;
+        var dust  = dustGenerator;
 
-    // Filter to only live players
-    var livePlayers = (localPlayers ?? new List<LocalPlayer>())
-        .Where(lp => lp != null && lp.plane != null)
-        .ToList();
+        // === Motif boundary hard reset ===
+        if (controller != null)
+            controller.BeginNewMotif($"PhaseStart {nextPhase}");
 
-    // ---- 2) Build vehicleCells from actual spawned positions ----
-    var vehicleCells = new List<Vector2Int>();
+        if (noteViz != null)
+            noteViz.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
 
-    if (livePlayers.Count > 0)
-    {
-        foreach (var lp in livePlayers)
+        if (drums == null)
         {
-            // You can use either lp.transform.position (lane anchor)
-            // or lp.plane.transform.position (actual ship position).
-            // Using the lane anchor keeps corridors stable.
-            Vector3 worldPos = lp.transform.position;
-            Vector2Int cell  = drums.WorldToGridPosition(worldPos);
-            vehicleCells.Add(cell);
+            Debug.LogWarning("[GFM] Cannot start next phase maze: no DrumTrack.");
+            yield break;
         }
-    }
-    else if (vehicles != null && vehicles.Count > 0)
-    {
-        foreach (var v in vehicles)
+
+        // === RE-ARM PHASE/MOTIF -> DRUMS AFTER RESET ===
+        if (phaseTransitionManager != null)
         {
-            if (!v) continue;
-            Vector2Int cell = drums.WorldToGridPosition(v.transform.position);
-            vehicleCells.Add(cell);
+            phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(
+                nextPhase,
+                advanceMotif: advanceMotif,
+                who: "GFM/StartNextPhaseMazeAndStar"
+            );
         }
-    }
+        else
+        {
+            Debug.LogWarning("[GFM] No PhaseTransitionManager; cannot arm motif for next phase/motif.");
+        }
+        if (dust == null)   {
+            Debug.LogWarning("[GFM] Cannot start next phase maze: no CosmicDustGenerator.");
+            yield break;
+        }
 
-    // ---- 3) Choose ONE starCell and keep it consistent ----
-    // Pick a random star cell that is not already occupied by a vehicle cell.
-    Vector2Int starCell = drums.GetRandomAvailableCell();
-    int safety = 32;
-    while (vehicleCells.Contains(starCell) && safety-- > 0)
-    {
-        starCell = drums.GetRandomAvailableCell();
-    }
+        // Ensure phase-start bin/grid state is sane before we generate anything
+        ResetPhaseBinStateAndGrid();
+        // Wait until SpawnGrid + camera exist (matches dust generator assumptions)
+        yield return new WaitUntil(() =>
+            drums.HasSpawnGrid() &&
+            drums.GetSpawnGridWidth() > 0 &&
+            drums.GetSpawnGridHeight() > 0 &&
+            Camera.main != null);
 
-    // ---- 4) Handle "no dust" fallback cleanly ----
-    if (dust == null)
-    {
-        Debug.LogWarning("[GFM] No CosmicDustGenerator; spawning PhaseStar without maze.");
+        // 1) Choose a star cell (this MUST be shared between dust carve + star spawn)
+        var starCell = drums.GetRandomAvailableCell();
+        if (starCell.x < 0)
+        {
+            Debug.LogWarning("[GFM] No available spawn cell for PhaseStar; aborting maze+star start.");
+            yield break;
+        }
+
+        // 2) Gather vehicle grid cells (so maze carves pockets for ships too)
+        _vehicleCellsScratch.Clear();
+        if (vehicles != null && vehicles.Count > 0)
+        {
+            for (int i = 0; i < vehicles.Count; i++)
+            {
+                var v = vehicles[i];
+                if (v == null || !v.isActiveAndEnabled) continue;
+                _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
+            }
+        }
+        else
+        {
+            var vs = FindObjectsOfType<Vehicle>();
+            for (int i = 0; i < vs.Length; i++)
+            {
+                var v = vs[i];
+                if (v == null || !v.isActiveAndEnabled) continue;
+                _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
+            }
+        }
+
+        // 3) Build maze (dust fill + carve star pocket + carve vehicle pockets)
+        yield return StartCoroutine(
+            dust.GenerateMazeForPhaseWithPaths(
+                nextPhase,
+                starCell,
+                _vehicleCellsScratch,
+                totalSpawnDuration: 1.0f
+           )
+        );
+        // 4) Spawn PhaseStar at the SAME cell used by dust
         drums.RequestPhaseStar(nextPhase, starCell);
-        yield break;
+
+        Debug.Log($"[GFM] Maze+Star started: phase={nextPhase} starCell={starCell} vehicleCells={_vehicleCellsScratch.Count}");
+        yield break;        
     }
 
-    // ---- 5) Normal path: spawn star + build maze using the SAME starCell ----
-    drums.RequestPhaseStar(nextPhase, starCell);
-
-    Debug.Log(
-        $"[GFM] StartNextPhaseMazeAndStar: phase={nextPhase}, " +
-        $"starCell={starCell}, vehicles={vehicleCells.Count}"
-    );
-
-    yield return StartCoroutine(
-        dust.GenerateMazeForPhaseWithPaths(
-            nextPhase,
-            starCell,
-            vehicleCells
-        )
-    );
-}
-    private static Color QuantizeToColor32(Color c)
+       private static Color QuantizeToColor32(Color c)
     {
         Color32 cc = (Color32)c;
         return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
@@ -1119,7 +1175,7 @@ public class GameFlowManager : MonoBehaviour
         float drumStart = 1f;
         if (drum != null && drum.drumAudioSource != null)
             drumStart = drum.drumAudioSource.volume;
-
+        _bridgeDrumStartVolume = drumStart;
         float elapsed = 0f;
         while (elapsed < dur)
         {
@@ -1159,11 +1215,9 @@ public class GameFlowManager : MonoBehaviour
     private IEnumerator FadeInBridgeAudio(List<InstrumentTrack> tracks, DrumTrack drum, float durationSeconds)
     {
         float dur = Mathf.Max(0.01f, durationSeconds);
-
-        // If we never faded out (or tracks changed), fall back to 1.0.
-        float drumTarget = 1f;
-        if (drum != null && drum.drumAudioSource != null)
-            drumTarget = Mathf.Max(0f, drum.drumAudioSource.volume);
+// Use cached pre-fade value so we don't fade back to 0 forever.
+        float drumTarget = Mathf.Max(0f, _bridgeDrumStartVolume);
+        if (drumTarget <= 0.0001f) drumTarget = 1f;
 
         // Determine per-track targets.
         var targets = new Dictionary<InstrumentTrack, float>();
@@ -1251,7 +1305,7 @@ public class GameFlowManager : MonoBehaviour
 }
     public void StartMazeAndStarForPhase(MazeArchetype phase)
     {
-        StartCoroutine(StartNextPhaseMazeAndStar(phase));
+        StartCoroutine(StartNextPhaseMazeAndStar(phase, false));
     }
 
     private void FreezeGameplayForBridge()

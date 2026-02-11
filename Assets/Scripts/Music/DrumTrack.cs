@@ -1,7 +1,9 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using Steamworks;
 using Random = UnityEngine.Random;
 
 public class PhaseSnapshot
@@ -36,18 +38,20 @@ public class DrumTrack : MonoBehaviour
     private bool _hasLastPlayAreaForTileCache = false;
     public GameObject phaseStarPrefab;
     public GameObject mineNodePrefab;
-    public PhasePersonalityRegistry phasePersonalityRegistry; 
-    
-    [Header("Play Area Mapping")] 
-    [Tooltip("If true, GetPlayAreaWorld() is clamped to Dust Band (min/max Y). If false, grid uses full screen minus UI reserve.")] 
-    [SerializeField] private bool clampPlayAreaToDustBand = false;    [Header("UI Safe Area (Viewport)")]
-    [Range(0f, 0.5f)]
-    [SerializeField] private float uiReserveBottomViewport = 0.14f; // reserve bottom 14% for UI
+    public PhasePersonalityRegistry phasePersonalityRegistry;
 
-    [Range(0f, 0.5f)]
-    [SerializeField] private float uiReserveTopViewport = 0.00f;    // optional top reserve
+    [Header("Play Area Mapping")]
+    [Tooltip(
+        "If true, GetPlayAreaWorld() is clamped to Dust Band (min/max Y). If false, grid uses full screen minus UI reserve.")]
+    [SerializeField]
+    private bool clampPlayAreaToDustBand = false;
 
-    [SerializeField] private float uiReserveBottomInsetWorld = 0f;  // optional fine-tune in world units
+    [Header("UI Safe Area (Viewport)")] [Range(0f, 0.5f)] [SerializeField]
+    private float uiReserveBottomViewport = 0.14f; // reserve bottom 14% for UI
+
+    [Range(0f, 0.5f)] [SerializeField] private float uiReserveTopViewport = 0.00f; // optional top reserve
+
+    [SerializeField] private float uiReserveBottomInsetWorld = 0f; // optional fine-tune in world units
     [SerializeField] private float uiReserveTopInsetWorld = 0f;
 
     public float drumLoopBPM = 120f;
@@ -56,28 +60,37 @@ public class DrumTrack : MonoBehaviour
     public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
     public double startDspTime;
-    private AudioSource _drumA;                 // primary deck
-    private AudioSource _drumB;                 // secondary deck (created at runtime if missing)
-    private AudioSource _activeDrum;            // currently audible deck
-    private AudioSource _inactiveDrum;   
+    private AudioSource _drumA; // primary deck
+    private AudioSource _drumB; // secondary deck (created at runtime if missing)
+    private AudioSource _activeDrum; // currently audible deck
+    private AudioSource _inactiveDrum;
     public double leaderStartDspTime { get; private set; }
     public List<PhaseSnapshot> SessionPhases = new();
-    public List <MineNode> activeMineNodes = new List<MineNode>();
+    public List<MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
-    [Header("Dust Band Mapping (Viewport Y)")]
-    [Range(0f, 1f)] [SerializeField] private float dustBandMinY = 0.00f; // bottom of screen
+
+    [Header("Dust Band Mapping (Viewport Y)")] [Range(0f, 1f)] [SerializeField]
+    private float dustBandMinY = 0.00f; // bottom of screen
+
     [Range(0f, 1f)] [SerializeField] private float dustBandMaxY = 0.80f; // 80% up the screen
-    [SerializeField] private float dustBandTopInsetWorld = 0f;           // optional extra inset in world units
-    [Header("Grid Sizing (Pixel-driven)")] 
-    [Tooltip("Reference screen width used to derive a default cell pixel size (e.g., 1920).")] 
-    [SerializeField] private int referenceWidthPx = 1920;
-    [Tooltip("Reference grid columns used with referenceWidthPx to derive cell pixel size (e.g., 36).")] 
-    [SerializeField] private int referenceColumns = 36;
-    [Tooltip("Bottom UI padding in pixels to exclude from the grid area (e.g., 160).")] 
-    [SerializeField] private int uiBottomPaddingPx = 160;
-    [Tooltip("If true, DrumTrack will resize SpawnGrid at runtime to fill the usable screen.")] 
-    [SerializeField] private bool autoSizeSpawnGridToScreen = true;
+    [SerializeField] private float dustBandTopInsetWorld = 0f; // optional extra inset in world units
+
+    [Header("Grid Sizing (Pixel-driven)")]
+    [Tooltip("Reference screen width used to derive a default cell pixel size (e.g., 1920).")]
+    [SerializeField]
+    private int referenceWidthPx = 1920;
+
+    [Tooltip("Reference grid columns used with referenceWidthPx to derive cell pixel size (e.g., 36).")]
+    [SerializeField]
+    private int referenceColumns = 36;
+
+    [Tooltip("Bottom UI padding in pixels to exclude from the grid area (e.g., 160).")] [SerializeField]
+    private int uiBottomPaddingPx = 160;
+
+    [Tooltip("If true, DrumTrack will resize SpawnGrid at runtime to fill the usable screen.")] [SerializeField]
+    private bool autoSizeSpawnGridToScreen = true;
+
     public int completedLoops { get; private set; } = 0;
     private float _loopLengthInSeconds, _phaseStartTime;
     private float _gridCheckTimer;
@@ -95,80 +108,115 @@ public class DrumTrack : MonoBehaviour
     private InstrumentTrackController _trackController;
     public PhaseStar _star;
     private PhaseTransitionManager _phaseTransitionManager;
-    
+
     private float _cachedTileDiameterWorld = -1f;
 
     private int _binIdx = -1;
-    private int _binCount = 4;                   // default; PhaseStar can override per-spawn
-    
-    
+    private int _binCount = 4; // default; PhaseStar can override per-spawn
+
+
     // DrumTrack.cs (fields)
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;
     private List<AudioClip> _intensityLoops;
 
     private int _entryLoopsRemaining;
-    
-    private AudioClip _currentDrumClip;
 
-// Pending scheduled clip (applied on next leader boundary)
-    private AudioClip _pendingClip;
-    private bool _pendingClipArmed;
+    private AudioClip _currentDrumClip;
 
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
     public event System.Action<MazeArchetype, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
-    public event System.Action<int,int> OnBinChanged; // (idx, binCount)
-    public event System.Action<int,int> OnStepChanged;     // (stepIndex, leaderSteps)
-    public event System.Action<int,int> OnStepPulseN;      // (stepIndex, n)
+    public event System.Action<int, int> OnBinChanged; // (idx, binCount)
+    public event System.Action<int, int> OnStepChanged; // (stepIndex, leaderSteps)
+    public event System.Action<int, int> OnStepPulseN; // (stepIndex, n)
 
-    [SerializeField] private int stepPulseEveryN = 0;      // 0 disables
+    [SerializeField] private int stepPulseEveryN = 0; // 0 disables
     private int _lastStepIdx = -1;
     private bool _driveFromEnergy;
-    
+
     [SerializeField, Tooltip("How many 'spent tanks' per loop counts as full intensity (E). Tune while testing.")]
     private float tanksPerLoopAtFullIntensity = 0.35f;
 
     [SerializeField, Tooltip("Optional: minimum change in intensity01 required before allowing a new target profile.")]
     private float intensityHysteresis = 0.08f;
 
-    private float _lastSpentTanksSample = -1f;     // baseline at last boundary
-    private float _lastIntensity01 = 0f;           // for hysteresis
+    private float _lastSpentTanksSample = -1f; // baseline at last boundary
+    private float _lastIntensity01 = 0f; // for hysteresis
 
-    public void SetMotifBeatSequence(MotifProfile motif)
-    {
-        _motif = motif;
+// armNow: when true, schedules a drum loop change to the motif's selected entry clip
+// at the next leader boundary (if already running). This is the common case for motif changes.
 
-        // New model: motif directly provides clips
-        _entryLoops     = (motif != null) ? motif.entryDrumLoops : null;
-        _intensityLoops = (motif != null) ? motif.intensityDrumLoops : null;
-
-        _entryLoopsRemaining = (motif != null) ? Mathf.Max(0, motif.entryLoopCount) : 0;
-        _driveFromEnergy     = (motif != null) && motif.driveBeatsFromEnergy;
-
-        // Reset per-motif sampling / hysteresis
-        _lastSpentTanksSample = -1f;
-        _lastIntensity01      = 0f;
-
-        // Optional: apply timing from motif if you added these fields
-        if (motif != null)
-        {
-            // Only do this if these fields exist in your MotifProfile now:
-            // drumLoopBPM = motif.bpm;
-            // totalSteps  = motif.stepsPerLoop;
-        }
-
-        // Pick entry clip now (boot will PlayScheduled it)
-        _currentDrumClip = ChooseEntryClip();
-
-        Debug.Log($"[DRUM] Motif drums armed: entry={( _entryLoops!=null ? _entryLoops.Count : 0)} intensity={(_intensityLoops!=null ? _intensityLoops.Count : 0)} entryLoopsRemaining={_entryLoopsRemaining} drive={_driveFromEnergy}");
-    }
     private AudioClip ChooseEntryClip()
     {
         if (_entryLoops == null || _entryLoops.Count == 0) return null;
         int i = UnityEngine.Random.Range(0, _entryLoops.Count);
         return _entryLoops[i];
     }
+    public void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)    {
+        _motif = motif;
+        _entryLoops = (_motif != null) ? _motif.entryDrumLoops : null;
+        _intensityLoops = (_motif != null) ? _motif.intensityDrumLoops : null;
 
+        _entryLoopsRemaining = (_motif != null) ? Mathf.Max(0, _motif.entryLoopCount) : 0; 
+        _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
+        // Motif timing is authoritative.
+        if (_motif != null)
+        {
+            drumLoopBPM = _motif.bpm;
+            totalSteps  = _motif.stepsPerLoop;
+        }
+
+        // Reset intensity sampling for this motif (prevents “stuck at 0” after first motif).
+        _lastSpentTanksSample = -1f;
+        _lastIntensity01 = 0f;
+
+        // Pick an initial clip for this motif.
+        AudioClip clip = ChooseEntryClip();
+
+        Debug.Log(
+            $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
+            $"entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
+            $"entryLoopCount={_entryLoopsRemaining} drive={_driveFromEnergy} bpm={drumLoopBPM} steps={totalSteps} " +
+            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport}"
+        );
+
+        if (clip == null)
+        {
+            Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
+            return;
+        }
+
+        // If we haven't started yet, let ManualStart handle scheduling.
+        if (!_started)
+            return;
+
+        if (restartTransport) {
+            // Hard reset both decks, then schedule fresh.
+            try { if (_activeDrum != null) _activeDrum.Stop(); } catch { }
+            try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+            _pendingDrumLoop = null;
+            _pendingDrumLoopArmed = false;
+
+            EnsureDualDrumSources();
+            if (_activeDrum == null) return;
+
+            _activeDrum.clip = clip;
+            _activeDrum.loop = true;
+            _clipLengthSec = Mathf.Max(clip.length, 0f);
+
+            double dspStart = AudioSettings.dspTime + 0.05;
+            _activeDrum.PlayScheduled(dspStart);
+            drumAudioSource = _activeDrum;
+            startDspTime = dspStart;
+            leaderStartDspTime = dspStart;
+            _currentDrumClip = clip;
+            return;
+
+}
+        // Normal path: arm a pending clip and let Update() schedule the swap at a safe boundary.
+        _pendingDrumLoop = clip;
+        _pendingDrumLoopArmed = armAtNextBoundary; 
+    }
     private AudioClip ResolveIntensityClip(float intensity01)
     {
         if (_intensityLoops == null || _intensityLoops.Count == 0) return null;
@@ -176,6 +224,34 @@ public class DrumTrack : MonoBehaviour
         int n = _intensityLoops.Count;
         int idx = Mathf.Clamp(Mathf.FloorToInt(intensity01 * n), 0, n - 1);
         return _intensityLoops[idx];
+    }
+
+    public void SetMotifBeatSequence(MotifProfile motif)
+    {
+        if (motif == null)
+        {
+            Debug.LogWarning("[DrumTrack] SetMotifBeatSequence called with null motif.");
+            return;
+        }
+        
+        // If we are already running, schedule the first entry clip on next boundary.
+        if (_started)
+        {
+            var clip = ChooseEntryClip();
+            if (clip != null)
+                ScheduleDrumLoopChange(clip);
+        }
+    }
+    public void SetMotifBeatSequence(MotifProfile motif, bool restartTransport) { 
+        // Default behavior for legacy calls:
+        // - do NOT arm at next boundary (boot-time callers often want immediate setup)
+        // - use a generic "who" for logging
+        SetMotifBeatSequence(motif, armAtNextBoundary: false,
+                    who: "DrumTrack/SetMotifBeatSequence(legacy)",
+                    restartTransport: restartTransport);
+    }
+    public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {
+        ApplyMotif(motif, armAtNextBoundary, who, restartTransport);
     }
 
     public void ResetMotifDrumSequencing()
@@ -334,75 +410,66 @@ public class DrumTrack : MonoBehaviour
         // - DrumTrack simply clamps and applies it.
         _binCount = Mathf.Max(1, bins);
     }
-private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, double effectiveLoopLen)
-{
+    private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, double effectiveLoopLen) {
     if (!_pendingDrumLoopArmed || _pendingDrumLoop == null) return;
-    if (_activeDrum != null && _activeDrum.clip != null && _pendingDrumLoop != null)
-    {
-        if (Mathf.Abs(_activeDrum.clip.length - _pendingDrumLoop.length) > 0.025f)
-            Debug.LogWarning($"[DrumTrack] Clip length mismatch: active={_activeDrum.clip.length:F3}s pending={_pendingDrumLoop.length:F3}s");
-    }
 
     EnsureDualDrumSources();
-    if (_activeDrum == null || _inactiveDrum == null)
-        return;
+    if (_activeDrum == null || _inactiveDrum == null) return;
 
     double dspNow = AudioSettings.dspTime;
+
+    // We *want* to change near the leader boundary, but we must not cut a looping drum clip mid-bar.
+    // So: pick a swap time at/after nextBoundaryDsp that lands on a drum-bar boundary (clip boundary).
     double start = nextBoundaryDsp;
 
-    // Safety: must schedule in the future.
-    if (start <= dspNow + 0.005)
-        start = nextBoundaryDsp + Mathf.Max(0.0001f, (float)effectiveLoopLen);
+    if (_activeDrum.clip != null && _activeDrum.clip.length > 0.0001f)
+    {
+        double barLen = _activeDrum.clip.length;
+
+        // Anchor bar counting off leaderStartDspTime so swaps stay musically consistent.
+        double t = start - leaderStartDspTime;
+        if (t < 0) t = 0;
+
+        double bars = Math.Ceiling(t / barLen);
+        start = leaderStartDspTime + bars * barLen;
+    }
+
+    // Safety: must schedule in the future
+    if (start <= dspNow + 0.01)
+        start = dspNow + 0.05;
 
     var newClip = _pendingDrumLoop;
-    float clipLen = (newClip != null) ? newClip.length : 0f;
-
-    // Warn if clip length doesn't match the effective leader loop length.
-    // If these differ, boundaries will align but "inside the bar" will feel wrong.
-    if (newClip != null && Mathf.Abs((float)effectiveLoopLen - clipLen) > 0.025f)
+    if (newClip == null)
     {
-        Debug.LogWarning(
-            $"[DrumTrack] Drum clip length mismatch vs effective loop. " +
-            $"effectiveLoopLen={effectiveLoopLen:F3}s clipLen={clipLen:F3}s clip={newClip.name}. " +
-            $"This can cause perceived drift inside the loop even if boundaries align."
-        );
+        _pendingDrumLoopArmed = false;
+        return;
     }
 
-    // Stop anything previously scheduled on inactive deck (defensive)
+    // Defensive: stop anything previously scheduled on inactive deck
     try { _inactiveDrum.Stop(); } catch { }
 
-    // Schedule inactive deck to start exactly at boundary
     _inactiveDrum.clip = newClip;
     _inactiveDrum.loop = true;
-
-    // Ensure it doesn't play immediately
     _inactiveDrum.playOnAwake = false;
 
-    // Active deck ends exactly at boundary (no gaps)
-    try
-    {
-        _activeDrum.SetScheduledEndTime(start);
-    }
-    catch
-    {
-        // Some backends/platforms can be finicky; scheduling start is the important part.
-    }
+    // Try to end active at the swap boundary (avoids overlaps)
+    try { _activeDrum.SetScheduledEndTime(start); } catch { }
 
     _inactiveDrum.PlayScheduled(start);
 
-    // Swap decks: the scheduled deck becomes active *for subsequent scheduling*
+    // Swap decks
     var prevActive = _activeDrum;
     _activeDrum = _inactiveDrum;
     _inactiveDrum = prevActive;
 
-    // Keep public reference coherent (anything reading drumAudioSource sees the active deck)
     drumAudioSource = _activeDrum;
 
-    // Update clip length cache based on the clip now driving the active deck
+    // Cache clip length from the clip now driving the deck
     _clipLengthSec = Mathf.Max(newClip.length, 0f);
 
-    // Re-anchor drum start dsp to the boundary to keep GetTimeToLoopEnd coherent for drums
+    // Re-anchor startDspTime to keep internal drum timing coherent
     startDspTime = start;
+    leaderStartDspTime = start;
 
     _currentDrumClip = newClip;
     _pendingDrumLoopArmed = false;
@@ -516,6 +583,28 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
         {
             _binIdx = idx;
             OnBinChanged?.Invoke(_binIdx, bins);
+        }
+    }
+// --- Transport watchdog: if scheduling ever fails, don't stay silent ---
+    if (_activeDrum != null && _activeDrum.clip != null)
+    {
+        // If we have started transport and the active deck is not playing, restart safely.
+        // This prevents "SetScheduledEndTime() ended the active deck but inactive never began" silence.
+        if (leaderStartDspTime > 0.0 && !_activeDrum.isPlaying)
+        {
+            double dspNow = AudioSettings.dspTime;
+            double restart = dspNow + 0.05;
+
+            try { _activeDrum.Stop(); } catch { }
+            _activeDrum.loop = true;
+            _activeDrum.PlayScheduled(restart);
+
+            startDspTime = restart;
+            leaderStartDspTime = restart;
+
+            _clipLengthSec = Mathf.Max(_activeDrum.clip.length, 0f);
+
+            Debug.LogWarning($"[DRUM] Watchdog restart: clip={_activeDrum.clip.name} dsp={restart:F3}");
         }
     }
 
@@ -690,142 +779,122 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
         drumAudioSource = _activeDrum;
     }
 
-public void ManualStart()
-{
-    _gfm = GameFlowManager.Instance;
-    if (_gfm != null)
+    public void ManualStart()
     {
-        _spawnGrid = _gfm.spawnGrid;
-        _dust = _gfm.dustGenerator;
-        _trackController = _gfm.controller;
-        _phaseTransitionManager = _gfm.phaseTransitionManager;
+        _gfm = GameFlowManager.Instance;
+        if (_gfm != null)
+        {
+            _spawnGrid = _gfm.spawnGrid;
+            _dust = _gfm.dustGenerator;
+            _trackController = _gfm.controller;
+            _phaseTransitionManager = _gfm.phaseTransitionManager;
+        }
+
+        if (_gfm != null && _spawnGrid != null && _dust != null)
+        {
+            float tile = GetTileDiameterWorld();
+            int w = _spawnGrid.gridWidth;
+            float worldW = tile * (w - 1);
+            float scrW = GetScreenWorldWidth();
+            Debug.Log(
+                $"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / scrW:F3}");
+        }
+
+        isPhaseStarActive = false;
+        if (_started) return;
+
+        if (drumAudioSource == null)
+        {
+            Debug.LogError("DrumTrack: No AudioSource assigned!");
+            return;
+        }
+
+        // Ensure dual-deck scheduling is available (A/B decks).
+        EnsureDualDrumSources();
+        if (_activeDrum == null)
+        {
+            Debug.LogError("[BOOT] DrumTrack: dual-drum source init failed (_activeDrum is null).");
+            return;
+        }
+
+        // Establish is the first phase; force motif selection.
+        var boot = MazeArchetype.Establish;
+
+        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
+        if (_dust != null && bootProfile != null)
+        {
+            _dust.ApplyProfile(bootProfile);
+            SyncTileWithScreen();
+        }
+
+// ManualStart can occur before any explicit PhaseTransitionManager commit.
+// Ensure PTM has at least a current motif selected (without advancing).
+        if (_phaseTransitionManager != null) { 
+            _phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(boot, advanceMotif: false, who: "DrumTrack/ManualStart");
+        }
+
+        // --- Motif-driven drum boot ---
+        AudioClip initialClip = null;
+
+        if (_phaseTransitionManager != null)
+        {
+            _phaseTransitionManager.InitializeIfNeeded("DrumTrack/ManualStart");
+            _phaseTransitionManager.BootIfNeeded(MazeArchetype.Establish, "DrumTrack/ManualStart");
+            if (_phaseTransitionManager.currentMotif != null) 
+                _motif = _phaseTransitionManager.currentMotif;
+
+            // Timing from motif is authoritative
+            drumLoopBPM = _motif.bpm;
+            totalSteps = _motif.stepsPerLoop;
+            
+            if (_motif != null) { 
+                // Use the shared “apply” path so boot and later motif changes behave the same.
+                ApplyMotif(_motif, armAtNextBoundary: false, who: "DrumTrack/ManualStart", restartTransport: false); 
+                // ApplyMotif chooses the clip; but ManualStart still needs initialClip for deck scheduling below.
+                initialClip = ChooseEntryClip();
+            } 
+            if (initialClip == null) 
+                initialClip = drumAudioSource != null ? drumAudioSource.clip : null; 
+            if (initialClip == null) { 
+                Debug.LogError("[BOOT] DrumTrack.ManualStart: no initial drum clip available (motif entry clip + AudioSource.clip are null).");
+                return; 
+            } 
+            // Prevent hearing the inspector/default loop.
+            try { if (_activeDrum != null) _activeDrum.Stop(); } catch { } 
+            try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+            _pendingDrumLoop = null; 
+            _pendingDrumLoopArmed = false;
+            _activeDrum.clip = initialClip; 
+            _activeDrum.loop = true; 
+            _activeDrum.playOnAwake = false;
+            _clipLengthSec = Mathf.Max(initialClip.length, 0f);
+            
+            double dspStart = AudioSettings.dspTime + 0.05; 
+            _activeDrum.PlayScheduled(dspStart);
+            drumAudioSource = _activeDrum; 
+            startDspTime = dspStart;
+            leaderStartDspTime = dspStart; 
+            _currentDrumClip = initialClip; 
+            _started = true;
+            Debug.Log($"[BOOT] Drum transport started: clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
+       
+        }
+
     }
-
-    if (_gfm != null && _spawnGrid != null && _dust != null)
-    {
-        float tile = GetTileDiameterWorld();
-        int w = _spawnGrid.gridWidth;
-        float worldW = tile * (w - 1);
-        float scrW = GetScreenWorldWidth();
-        Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / scrW:F3}");
+    private IEnumerator DeferredBootWhenMotifReady() { 
+        float start = Time.time; 
+        const float timeout = 5f; 
+        while (Time.time - start < timeout) { 
+            if (_phaseTransitionManager != null && _phaseTransitionManager.currentMotif != null) { 
+                Debug.Log($"[BOOT] Deferred drum boot: motif ready '{_phaseTransitionManager.currentMotif.motifId}'. Booting now."); 
+                _started = false; // allow ManualStart to run again
+                ManualStart(); 
+                yield break;
+            }
+            yield return null;
+        } 
+        Debug.LogError("[BOOT] Deferred drum boot timed out waiting for PhaseTransitionManager.currentMotif.");
     }
-
-    isPhaseStarActive = false;
-    if (_started) return;
-    _started = true;
-
-    if (drumAudioSource == null)
-    {
-        Debug.LogError("DrumTrack: No AudioSource assigned!");
-        return;
-    }
-
-    // Ensure dual-deck scheduling is available (A/B decks).
-    EnsureDualDrumSources();
-    if (_activeDrum == null)
-    {
-        Debug.LogError("[BOOT] DrumTrack: dual-drum source init failed (_activeDrum is null).");
-        return;
-    }
-
-    // Establish is the first phase; force motif selection.
-    var boot = MazeArchetype.Establish;
-
-    if (_phaseTransitionManager != null)
-    {
-        Debug.Log($"[BOOT] Handling phase {_phaseTransitionManager.currentPhase}");
-        _phaseTransitionManager.HandlePhaseTransition(boot, "DrumTrack/ManualStart");
-    }
-    else
-    {
-        Debug.Log($"[BOOT] no phase transition manager found! {_phaseTransitionManager}");
-    }
-
-    var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
-    if (_dust != null && bootProfile != null)
-    {
-        _dust.ApplyProfile(bootProfile);
-        SyncTileWithScreen();
-    }
-
-    // --- Motif-driven drum boot ---
-    AudioClip initialClip = null;
-
-    if (_phaseTransitionManager != null && _phaseTransitionManager.currentMotif != null)
-    {
-        _motif = _phaseTransitionManager.currentMotif;
-
-        _entryLoops = _motif.entryDrumLoops;
-        _intensityLoops = _motif.intensityDrumLoops;
-
-        _entryLoopsRemaining = Mathf.Max(0, _motif.entryLoopCount);
-        _driveFromEnergy = _motif.driveBeatsFromEnergy;
-
-        // Timing from motif is authoritative
-        drumLoopBPM = _motif.bpm;
-        totalSteps = _motif.stepsPerLoop;
-
-        // Reset intensity sampling for this motif
-        _lastSpentTanksSample = -1f;
-        _lastIntensity01 = 0f;
-
-        initialClip = ChooseEntryClip();
-
-        Debug.Log(
-            $"[BOOT] Motif '{_motif.motifId}' entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} " +
-            $"intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
-            $"entryLoopCount={_entryLoopsRemaining} drive={_driveFromEnergy} " +
-            $"bpm={drumLoopBPM} stepsPerLoop={totalSteps} initialClip={(initialClip ? initialClip.name : "null")}"
-        );
-    }
-
-    if (initialClip == null)
-    {
-        Debug.LogError("[BOOT] DrumTrack ManualStart: initialClip is null (motif entryDrumLoops empty or motif missing).");
-        return;
-    }
-
-    // Hard reset transport + scheduling state (prevents ghost “pause then resume” conditions)
-    _pendingDrumLoop = null;
-    _pendingDrumLoopArmed = false;
-
-    completedLoops = 0;
-    _lastStepIdx = -1;
-    _binIdx = -1;
-
-    // Stop both decks defensively
-    try { _activeDrum.Stop(); } catch { }
-    if (_inactiveDrum != null)
-    {
-        try { _inactiveDrum.Stop(); } catch { }
-    }
-
-    _activeDrum.clip = initialClip;
-    _activeDrum.loop = true;
-
-    // Cache clip length from the actual playing clip
-    _clipLengthSec = Mathf.Max(initialClip.length, 0f);
-
-    // Align to DSP so transport is stable from frame 0.
-    double dspStart = AudioSettings.dspTime + 0.05;
-
-    // Ensure we never schedule in the past (extreme edge cases)
-    if (dspStart <= AudioSettings.dspTime + 0.005)
-        dspStart = AudioSettings.dspTime + 0.05;
-
-    _activeDrum.PlayScheduled(dspStart);
-
-    // Keep public reference coherent for any external reads
-    drumAudioSource = _activeDrum;
-
-    startDspTime = dspStart;
-    leaderStartDspTime = dspStart;
-
-    StartCoroutine(DeferredInit());
-    StartCoroutine(InitializeDrumLoop());
-    isPhaseStarActive = false;
-}
-
     private IEnumerator DeferredInit()
     {
         yield return null;          // one frame

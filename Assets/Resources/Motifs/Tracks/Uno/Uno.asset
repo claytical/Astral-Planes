@@ -17,9 +17,9 @@ MonoBehaviour:
   keyRootMidi: 57
   entryDrumLoops:
   - {fileID: 8300000, guid: d8d6154a598ef4807b2450da93814fe1, type: 3}
-  intensityDrumLoops:
   - {fileID: 8300000, guid: f58c5aab1881b4af68864550df141a3a, type: 3}
   - {fileID: 8300000, guid: 6c2479da8cfaa4a5daa93dd97ea6427c, type: 3}
+  intensityDrumLoops:
   - {fileID: 8300000, guid: 3542ee37aa85440588332c6aa220b5c2, type: 3}
   - {fileID: 8300000, guid: 720d74577fa6e4a1b8eb4872b3512f3b, type: 3}
   - {fileID: 8300000, guid: ee4f03bf8a099423889135fc6748832e, type: 3}
