@@ -39,7 +39,6 @@ public class CollectionSoundManager : MonoBehaviour
         Instance = this;
 
         if (!fxVoice) fxVoice = GetComponent<MidiVoice>();
-        if (!fxVoice) fxVoice = GetComponent<MidiVoice>();
 
         BindFxVoiceAuthorityIfNeeded();
         StartCoroutine(WaitForSoundFontReady());
@@ -60,7 +59,7 @@ public class CollectionSoundManager : MonoBehaviour
 
         // Set default program for FX
         fxVoice.PlayOneShotMs127(60, 1, 1, (int)defaultFxPreset, fxBank); // "poke" to force channel init
-        fxVoice.SetProgram((int)defaultFxPreset, fxBank);
+       // fxVoice.SetProgram((int)defaultFxPreset, fxBank);
 
         Debug.Log("✅ SoundFont ready. CollectionSoundManager FX voice initialized.");
     }
@@ -212,7 +211,7 @@ public class CollectionSoundManager : MonoBehaviour
             // We schedule by temporarily overriding program per event.
             // Easiest: schedule using fxVoice’s current program and do a one-shot override “poke”.
             // If you want true per-event override scheduling, add ScheduleOneShotMs127(...) to MidiVoice.
-            fxVoice.SetProgram(track.Preset, track.Bank);
+//            fxVoice.SetProgram(track.Preset, track.Bank);
             fxVoice.ScheduleNoteMs127(note, durationMs: 100, velocity127: vel, whenDSP: when);
         }
 

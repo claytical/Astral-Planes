@@ -205,13 +205,7 @@ public class InstrumentTrack : MonoBehaviour
 
         return b >= 0 && b < _binFilled.Count && _binFilled[b];
     }
-
-    private void RebuildLoopCacheIfDirty()
-    {
-        if (loopPattern == null) return;
-        loopPattern.RebuildLoopCacheIfDirty(this);
-    }
-
+    
     public bool IsExpansionPending => _pendingExpandForBurst || _pendingBurstAfterExpand.HasValue || _hookedBoundaryForExpand;
     public List<(int stepIndex, int note, int duration, float velocity)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
@@ -388,6 +382,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         int barIndex    = tf.barIndex;
         int playheadBin = tf.playheadBin;
 
+// Normalize playheadBin into [0, leaderBins-1].
 // ----- CLOCK (single authority: DSP) -----
         double dspNow = AudioSettings.dspTime;
 
@@ -433,6 +428,8 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 // ----- PLAYBACK (catch-up deterministically) -----
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
         int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
+// This prevents “bin disappears” if transport emits -1 or leaderBins at wrap.
+        playheadBin = WrapIndex(playheadBin, leaderBins);
 
 // Play every missed step exactly once, in order.
         int startStep = _lastLocalStep + 1;
@@ -455,7 +452,13 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             }
         }
     }
-    
+    private static int WrapIndex(int i, int n)
+    {
+        if (n <= 0) return 0;
+        int m = i % n;
+        return (m < 0) ? (m + n) : m;
+    }
+
     private int GetDspStepIndexInBar(double dspNow, double barStartDsp, float clipLen, int drumSteps)
     {
         // Clamp inputs defensively

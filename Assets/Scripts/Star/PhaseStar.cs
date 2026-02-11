@@ -1602,8 +1602,7 @@ public class PhaseStar : MonoBehaviour
         var next = _assignedPhase;
 
         Trace($"BeginPhaseBridge → next={next}");
-
-        GameFlowManager.Instance?.BeginPhaseBridge(next, null, Color.white);
+        GameFlowManager.Instance?.BeginMotifBridge(next, "PhaseStar/CompleteAdvanceAsync");
 
         // --- Wait for the bridge to start (be defensive) ---
         float start = Time.time;

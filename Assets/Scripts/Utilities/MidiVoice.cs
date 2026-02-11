@@ -18,66 +18,15 @@ public class MidiVoice : MonoBehaviour
     [SerializeField] private int channel = 0;
     [SerializeField] private int preset = 0;
     [SerializeField] private int bank = 0;
-        
-    private static PropertyInfo _piForcedPreset;
-    private static PropertyInfo _piForcedBank;
+    
     private static bool _forcedProgramPropsCached;
 
     // Optional callback so trimming logic can use track’s windowing model.
     private System.Func<float> _remainingActiveWindowSec;
-// Add near your existing private fields:
+
     private bool _warnedMissingDrums;
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
-    private void AssertNotOnFxChannel(string context)
-    {
-        // Change these to match your project conventions.
-        const int FxReservedChannel = 5;
 
-        // If this MidiVoice is *supposed* to be FX, you can add a bool flag instead.
-        bool thisIsFx = gameObject.name.IndexOf("fx", System.StringComparison.OrdinalIgnoreCase) >= 0
-                        || name.IndexOf("fx", System.StringComparison.OrdinalIgnoreCase) >= 0;
-
-        if (!thisIsFx && channel == FxReservedChannel)
-        {
-            Debug.LogError($"[MIDI] Non-FX voice is using FX channel {FxReservedChannel}. context={context} voice={name}", this);
-        }
-    }
-    private void PushProgram(int _preset, int bank, out int prevPreset, out int prevBank)
-    {
-        prevPreset = -1;
-        prevBank = -1;
-
-        if (midiStreamPlayer == null) return;
-        var arr = midiStreamPlayer.MPTK_Channels;
-        if (arr == null) return;
-        if (channel < 0 || channel >= arr.Length) return;
-
-        // If MPTK exposes getters, use them; if not, you can just “not restore”
-        // and rely on strict channel isolation (recommended).
-        // prevPreset = arr[channel].ForcedPreset;
-        // prevBank   = arr[channel].ForcedBank;
-
-        arr[channel].ForcedPreset = _preset;
-        arr[channel].ForcedBank   = bank;
-    }
-
-    private void PopProgram(int prevPreset, int prevBank)
-    {
-        if (prevPreset < 0 || prevBank < 0) return;
-
-        if (midiStreamPlayer == null) return;
-        var arr = midiStreamPlayer.MPTK_Channels;
-        if (arr == null) return;
-        if (channel < 0 || channel >= arr.Length) return;
-
-        arr[channel].ForcedPreset = prevPreset;
-        arr[channel].ForcedBank   = prevBank;
-    }
-
-    /// <summary>
-    /// Authority binding (e.g., GameFlowManager) can call this to ensure the voice can
-    /// convert ticks using the active DrumTrack.
-    /// </summary>
     public void SetDrumTrack(DrumTrack drums)
     {
         if (drums != null) drumTrack = drums;
@@ -91,64 +40,7 @@ public class MidiVoice : MonoBehaviour
         midiStreamPlayer = player;
         drumTrack = drums;
         _remainingActiveWindowSec = remainingActiveWindowSec;
-    }
-    private static void CacheForcedProgramPropsIfNeeded(object channelObj)
-    {
-        if (_forcedProgramPropsCached) return;
-        _forcedProgramPropsCached = true;
-
-        if (channelObj == null) return;
-
-        var t = channelObj.GetType();
-        // Look for public instance properties ForcedPreset / ForcedBank
-        _piForcedPreset = t.GetProperty("ForcedPreset", BindingFlags.Instance | BindingFlags.Public);
-        _piForcedBank   = t.GetProperty("ForcedBank",   BindingFlags.Instance | BindingFlags.Public);
-    }
-    private bool TryGetMptkChannelObject(out object channelObj)
-    {
-        channelObj = null;
-
-        if (midiStreamPlayer == null)
-            return false;
-
-        var arr = midiStreamPlayer.MPTK_Channels; // this compiles in your project
-        if (arr == null)
-            return false;
-
-        if (channel < 0 || channel >= arr.Length)
-            return false;
-
-        channelObj = arr[channel];
-        return channelObj != null;
-    }
-    private bool TrySetForcedProgram(object channelObj, int forcedPreset, int forcedBank)
-    {
-        if (channelObj == null) return false;
-
-        CacheForcedProgramPropsIfNeeded(channelObj);
-
-        bool ok = false;
-
-        try
-        {
-            if (_piForcedPreset != null)
-            {
-                _piForcedPreset.SetValue(channelObj, forcedPreset, null);
-                ok = true;
-            }
-            if (_piForcedBank != null)
-            {
-                _piForcedBank.SetValue(channelObj, forcedBank, null);
-                ok = true;
-            }
-        }
-        catch
-        {
-            // Swallow: property may exist but setter may throw in some versions/configs.
-            return false;
-        }
-
-        return ok;
+        
     }
 
     /// <summary>
@@ -199,19 +91,7 @@ public class MidiVoice : MonoBehaviour
     {
         if (player != null) midiStreamPlayer = player;
     }
-
-    /// <summary>Change program for this voice (forced preset/bank on its channel).</summary>
-    public void SetProgram(int preset, int bank)
-    {
-        if (midiStreamPlayer == null) return;
-        var arr = midiStreamPlayer.MPTK_Channels;
-        if (arr == null) return;
-        if (channel < 0 || channel >= arr.Length) return;
-
-        // The only invariant you need:
-        arr[channel].ForcedPreset = preset;
-        arr[channel].ForcedBank   = bank;
-    }
+    
 
 
     public void ScheduleNoteMs127(int note, int durationMs, int velocity127, double whenDSP)
@@ -250,11 +130,10 @@ public class MidiVoice : MonoBehaviour
         if (midiStreamPlayer == null)
             return;
 
-        if (!TryGetMptkChannelObject(out var chObj))
-            return;
-
-        // Best-effort override program
-        TrySetForcedProgram(chObj, overridePreset, overrideBank);
+        if (overridePreset != preset)
+        {
+            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = overridePreset;
+        }
 
         var ev = new MPTKEvent
         {
@@ -266,9 +145,11 @@ public class MidiVoice : MonoBehaviour
         };
 
         midiStreamPlayer.MPTK_PlayEvent(ev);
+        if (overridePreset != preset)
+        {
+            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
+        }
 
-        // Best-effort restore
-        TrySetForcedProgram(chObj, preset, bank);
     }
     /// <summary>
     /// Short tactile confirmation. Duration is fixed and NOT trimmed.
