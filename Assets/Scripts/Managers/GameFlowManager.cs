@@ -423,7 +423,7 @@ public class GameFlowManager : MonoBehaviour
     // DrumTrack.ManualStart expects PTM.currentMotif to already be selected.
     if (phaseTransitionManager != null) { 
         var bootPhase = phaseTransitionManager.currentPhase; 
-        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(bootPhase, advanceMotif: true, who: "GFM/TrackSetup");
+        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(bootPhase, advanceMotif: false, who: "GFM/TrackSetup");
     }
     // --------------------
     // STEP 3: Start drums

@@ -33,7 +33,7 @@ public class InstrumentTrack : MonoBehaviour
 
     public int Preset => preset;
     public int Bank   => bank;
-
+    public int authoredRootMidi;
     public int loopMultiplier = 1;
     public int maxLoopMultiplier = 4;
     [Header("Ascension Fuse")]
@@ -55,8 +55,7 @@ public class InstrumentTrack : MonoBehaviour
     private bool _currentBurstArmed = false;
     private NoteSet _currentNoteSet;
     private Boundaries _boundaries;
-    private readonly List<(int stepIndex, int note, int duration, float velocity)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity)>();
-    List<GameObject> _spawnedNotes = new();
+    private readonly List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)>();    List<GameObject> _spawnedNotes = new();
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
     private int _lastLoopSeen = -1;
@@ -159,10 +158,10 @@ public class InstrumentTrack : MonoBehaviour
         public int note;
         public int duration;
         public float velocity;
+        public int authoredRootMidi;
     }
 
-    internal List<(int stepIndex, int note, int duration, float velocity)> MutablePersistentLoopNotes => persistentLoopNotes;
-
+    internal List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> MutablePersistentLoopNotes => persistentLoopNotes;
 // IMPORTANT: change _loopNotes to be List<LoopNotePublic> (one-time type swap)
     internal List<LoopNotePublic> MutableLoopNotes => _loopNotes;
     [SerializeField]
@@ -207,17 +206,15 @@ public class InstrumentTrack : MonoBehaviour
     }
     
     public bool IsExpansionPending => _pendingExpandForBurst || _pendingBurstAfterExpand.HasValue || _hookedBoundaryForExpand;
-    public List<(int stepIndex, int note, int duration, float velocity)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
+    public List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
     }    
-    private bool IsOpenOrPermanentCell(CosmicDustGenerator dustGen, Vector2Int gp)
-{
-    if (dustGen == null) return true;
-    if (dustGen.IsPermanentlyClearCell(gp)) return true;
-    return !dustGen.HasDustAt(gp);
-}
-        private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells)
-{
+    private bool IsOpenOrPermanentCell(CosmicDustGenerator dustGen, Vector2Int gp) {
+        if (dustGen == null) return true;
+        if (dustGen.IsPermanentlyClearCell(gp)) return true;
+        return !dustGen.HasDustAt(gp);
+    }
+        private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells) {
     if (bufferCells <= 0) return true;
 
     // Treat edges as "open" so we don't place on borders of the maze.
@@ -344,15 +341,22 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
     void Update() {
         // One-shot replacement for WaitForDrumTrackStartTime()
-        if (_waitingForDrumReady) { 
-            if (drumTrack != null && drumTrack.GetLoopLengthInSeconds() > 0 && drumTrack.startDspTime != 0) { 
-                _totalSteps = drumTrack.totalSteps * loopMultiplier; 
-                _waitingForDrumReady = false; // done
-            } else { 
-                // Still not ready—skip the rest of Update to mimic the original gating (optional)
-                return;
+
+        if (_waitingForDrumReady)
+        {
+            bool ready =
+                drumTrack != null &&
+                drumTrack.GetLoopLengthInSeconds() > 0f &&
+                ((drumTrack.leaderStartDspTime > 0.0) || (drumTrack.startDspTime != 0));
+
+            if (ready)
+            {
+                _totalSteps = drumTrack.totalSteps * loopMultiplier;
+                _waitingForDrumReady = false;
             }
+            else return;
         }
+
         if (drumTrack == null) return;
         if (_nextFrameQueue.Count > 0)
         {
@@ -399,10 +403,18 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         int drumSteps = Mathf.Max(1, drumTrack.totalSteps);
         int binSize   = Mathf.Max(1, BinSize());
 
-        double start = drumTrack.startDspTime;
+        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         if (start <= 0.0) return;
 
         double barStart = start + (double)barIndex * clipLen;
+        double transportStart = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
+        double localStart     = drumTrack.startDspTime;
+
+        if (System.Math.Abs(transportStart - localStart) > 0.0005) // 0.5ms
+        {
+            Debug.LogWarning($"[TRK:ANCHOR_MISMATCH] track={name} transportStart={transportStart:F6} localStart={localStart:F6} barIndex={barIndex}");
+        }
+
 
 // ----- BAR BOUNDARY COMMIT (cache + step reset) -----
         if (barIndex != _lastCommittedBar)
@@ -427,7 +439,8 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
 // ----- PLAYBACK (catch-up deterministically) -----
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
-        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
+//        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
+        int leaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
 // This prevents “bin disappears” if transport emits -1 or leaderBins at wrap.
         playheadBin = WrapIndex(playheadBin, leaderBins);
 
@@ -488,8 +501,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         for (int i = 0; i < persistentLoopNotes.Count; i++)
         {
-            var (stepIndex, note, duration, velocity) = persistentLoopNotes[i];
-
+            var (stepIndex, note, duration, velocity, authoredRootMidi) = persistentLoopNotes[i];
             if (stepIndex < 0 || stepIndex >= maxStepExclusive)
                 continue;
 
@@ -539,12 +551,11 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         for (int i = 0; i < _tmpStepNotes.Count; i++)
         {
-            var (note, duration, vel01) = _tmpStepNotes[i];
-
-            int vel127 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(vel01) * 127f), 1, 127);
-
-            // PlayNote routes into MidiVoice now (per your split), keeping existing signature.
+            var (note, duration, vel127f) = _tmpStepNotes[i];
+            int vel127 = Mathf.Clamp(Mathf.RoundToInt(vel127f), 1, 127);
             PlayNote127(note, duration, vel127);
+
+
         }
     }
 
@@ -725,7 +736,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         int drumSteps = drumTrack != null ? drumTrack.totalSteps : 16;
         int maxUsedStep = 0;
-        foreach (var (step, _, _, _) in persistentLoopNotes)
+        foreach (var (step, _, _, _, _) in persistentLoopNotes)
             if (step > maxUsedStep) maxUsedStep = step;
 
         int requiredBins = Mathf.CeilToInt((maxUsedStep + 1) / (float)drumSteps);
@@ -893,8 +904,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         return ((binIndex % progLen) + progLen) % progLen;
     }
 
-    private int QuantizeNoteToBinChord(int stepIndex, int midiNote)
-{
+    private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
 
@@ -904,55 +914,58 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     if (hd == null) return midiNote;
 
     if (!hd.TryGetChordAt(chordIdx, out var chord)) return midiNote;
-
-    // --- Determine a "base" chord root to transpose from ---
-    // Prefer whatever chord bin 0 is using (if it has one), otherwise fall back to chord 0.
-    int baseChordIdx = Harmony_GetChordIndexForBin(0);
-    if (baseChordIdx < 0) baseChordIdx = 0;
-
-    if (!hd.TryGetChordAt(baseChordIdx, out var baseChord))
-        baseChord = chord; // last resort: no meaningful transpose
-
-    // Root delta in semitones (base → current)
-    int rootDelta = chord.rootNote - baseChord.rootNote;
+    // --- Determine transpose anchor (authored root for THIS note) ---
+    // If authoredRootMidi is not provided, fall back to previous behavior: bin-0 chord as proxy.
+    int rootDelta; 
+    if (authoredRootMidi != int.MinValue) { 
+        // Root delta in semitones (authored → current)
+        rootDelta = chord.rootNote - authoredRootMidi;
+    }
+    else {
+        int baseChordIdx = Harmony_GetChordIndexForBin(0);
+        if (baseChordIdx < 0) baseChordIdx = 0;
+        if (!hd.TryGetChordAt(baseChordIdx, out var baseChord))
+            baseChord = chord; // last resort
+        rootDelta = chord.rootNote - baseChord.rootNote;
+    }
 
     // First: transpose by the chord-root delta (this is the part you *expect* to hear)
-    int shifted = midiNote + rootDelta;
+        int shifted = midiNote + rootDelta;
 
-    // Clamp to this track's playable range
-    shifted = Mathf.Clamp(shifted, lowestAllowedNote, highestAllowedNote);
+        // Clamp to this track's playable range
+        shifted = Mathf.Clamp(shifted, lowestAllowedNote, highestAllowedNote);
 
-    // Second: snap to nearest chord tone (optional but keeps your original intent)
-    // Build allowed chord tones across this track’s playable range
-    var allowed = new List<int>(64);
-    for (int oct = -2; oct <= 3; oct++)
-    {
-        for (int k = 0; k < chord.intervals.Count; k++)
+        // Second: snap to nearest chord tone (optional but keeps your original intent)
+        // Build allowed chord tones across this track’s playable range
+        var allowed = new List<int>(64);
+        for (int oct = -2; oct <= 3; oct++)
         {
-            int n = chord.rootNote + chord.intervals[k] + 12 * oct;
-            if (n >= lowestAllowedNote && n <= highestAllowedNote)
-                allowed.Add(n);
+            for (int k = 0; k < chord.intervals.Count; k++)
+            {
+                int n = chord.rootNote + chord.intervals[k] + 12 * oct;
+                if (n >= lowestAllowedNote && n <= highestAllowedNote)
+                    allowed.Add(n);
+            }
         }
-    }
 
-    if (allowed.Count == 0) return shifted;
-    allowed.Sort();
+        if (allowed.Count == 0) return shifted;
+        allowed.Sort();
 
-    // Snap to nearest chord tone
-    int best = allowed[0];
-    int bestDist = Mathf.Abs(best - shifted);
+        // Snap to nearest chord tone
+        int best = allowed[0];
+        int bestDist = Mathf.Abs(best - shifted);
 
-    for (int i = 1; i < allowed.Count; i++)
-    {
-        int d = Mathf.Abs(allowed[i] - shifted);
-        if (d < bestDist)
+        for (int i = 1; i < allowed.Count; i++)
         {
-            best = allowed[i];
-            bestDist = d;
+            int d = Mathf.Abs(allowed[i] - shifted);
+            if (d < bestDist)
+            {
+                best = allowed[i];
+                bestDist = d;
+            }
         }
-    }
 
-    return best;
+        return best;
 }
     
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
@@ -968,7 +981,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         var loop = GetPersistentLoopNotes();
         if (loop != null)
         {
-            foreach (var (step, _, _, _) in loop)
+            foreach (var (step, _, _, _, _) in loop)
                 if (step >= windowStartInclusive && step < windowEndExclusive)
                     ascensionCohort.stepsRemaining.Add(step);
         }
@@ -1490,7 +1503,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         }
 
         var modified = new List<(int step, int note, int dur, float vel)>(persistentLoopNotes.Count);
-        foreach (var (step, note, dur, vel) in persistentLoopNotes)
+        foreach (var (step, note, dur, vel, authoredRootMidi) in persistentLoopNotes)
             modified.Add((step, Closest(note), dur, vel));
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
@@ -1530,10 +1543,11 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return chosenDurationTicks;
     }
-    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow)
+    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue)
     {
-        int qNote = QuantizeNoteToBinChord(stepIndex, note);
-        persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force));
+        int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi); 
+        persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
+
         _loopCacheDirtyPending = true;
         GameObject noteMarker = null;
         // 🔑 Reuse any existing placeholder marker at (track, step)
@@ -1571,7 +1585,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     public float GetVelocityAtStep(int step)
     {
         float max = 0f;
-        foreach (var (noteStep, _, _, velocity) in GetPersistentLoopNotes())
+        foreach (var (noteStep, _, _, velocity, _) in GetPersistentLoopNotes())
         {
             if (noteStep == step)
                 max = Mathf.Max(max, velocity);
@@ -2490,7 +2504,7 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
         EnsureBinList();
         for (int i = 0; i < _binFilled.Count; i++) _binFilled[i] = false;
 
-        foreach (var (step, _, _, _) in persistentLoopNotes)
+        foreach (var (step, _, _, _, _) in persistentLoopNotes)
         {
             int b = BinIndexForStep(step);
             if (b >= 0 && b < _binFilled.Count) _binFilled[b] = true;

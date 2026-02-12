@@ -19,7 +19,8 @@ public class Vehicle : MonoBehaviour
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     // === Arcade RB2D tuning ===
     [Header("Arcade Movement")]
-    [SerializeField] private float arcadeMaxSpeed = 14f;
+    [SerializeField]
+    public float arcadeMaxSpeed = 14f;
     [SerializeField] private float arcadeAccel = 40f;
     [SerializeField] private float arcadeBoostAccel = 80f;
     [SerializeField] private float arcadeLinearDamping = 2f;   // typical 0–5
@@ -65,7 +66,7 @@ public class Vehicle : MonoBehaviour
     public PlayerStatsTracking playerStats;
     
     private GameObject activeTrail; // Reference to the currently active trail instance 
-    private Rigidbody2D rb;
+    public Rigidbody2D rb;
     private AudioManager audioManager;
     private SpriteRenderer baseSprite;
     [SerializeField] private bool isLocked = false;
@@ -570,11 +571,24 @@ private bool IsCellEmpty(Vector2Int gp)
         }
     public float GetForceAsMidiVelocity()
     {
-        float s2 = rb.linearVelocity.sqrMagnitude;
-        float t2 = arcadeMaxSpeed * arcadeMaxSpeed;
-        float v = Mathf.Lerp(80f, 127f, Mathf.InverseLerp(0, t2, s2));
-        return v;
+        
+        
+        
+        
+        float speed = rb.linearVelocity.magnitude;
+
+        // Make sure this reflects *true* achievable speed (including boost),
+        // otherwise you will peg at 127 constantly.
+        float max = Mathf.Max(0.01f, arcadeMaxSpeed);
+
+        float x = Mathf.Clamp01(speed / max);
+
+        // Optional: curve to give more resolution in the midrange
+        // x = Mathf.Pow(x, 0.7f);
+
+        return Mathf.Lerp(40f, 127f, x);
     }
+
     public void Move(Vector2 direction)
     {
         if (isLocked) return;

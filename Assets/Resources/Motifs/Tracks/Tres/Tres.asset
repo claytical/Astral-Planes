@@ -17,7 +17,6 @@ MonoBehaviour:
   keyRootMidi: 52
   entryDrumLoops:
   - {fileID: 8300000, guid: aeb7ed25dee4a4a8186ca42288dfaf11, type: 3}
-  - {fileID: 8300000, guid: 2185e48f79119498da033150fdae7941, type: 3}
   intensityDrumLoops:
   - {fileID: 8300000, guid: 2185e48f79119498da033150fdae7941, type: 3}
   - {fileID: 8300000, guid: dadbab4f097e248a3a12a88de7068440, type: 3}
@@ -25,7 +24,7 @@ MonoBehaviour:
   entryLoopCount: 4
   bpm: 157
   stepsPerLoop: 16
-  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
+  chordProgression: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: c65d7fc24884645408cbc58ec876f500, type: 2}
   - {fileID: 11400000, guid: 534d3a0a13e9c46448247bf63fd8edf0, type: 2}

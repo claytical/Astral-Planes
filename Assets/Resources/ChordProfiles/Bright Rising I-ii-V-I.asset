@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e67ece5ef2df74ddc978b82f3c1fcd6d, type: 3}
+  m_Name: Bright Rising I-ii-V-I
+  m_EditorClassIdentifier: Assembly-CSharp::ChordProgressionProfile
+  progressionName: "Bright \xB7 Rising \xB7 I\u2013ii\u2013V\u2013I"
+  beatsPerChord: 4
+  chordSequence:
+  - label: I
+    rootNote: 60
+    intervals: 000000000400000007000000
+  - label: ii
+    rootNote: 62
+    intervals: 000000000300000007000000
+  - label: V
+    rootNote: 67
+    intervals: 000000000400000007000000
+  - label: I
+    rootNote: 60
+    intervals: 000000000400000007000000

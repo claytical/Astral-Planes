@@ -234,6 +234,7 @@ public void EnsureMotifInitialized(string who)
                 string keyInfo = $"motif={currentMotif.motifId} role={track.assignedRole}";
                 Debug.Log($"[MOTIF] Generating NoteSet for track '{track.name}' via motif ({keyInfo}).");
                 noteSet = noteSetFactory.Generate(track, currentMotif, baseEntropy);
+                track.authoredRootMidi = currentMotif.keyRootMidi;
             }
 
         }

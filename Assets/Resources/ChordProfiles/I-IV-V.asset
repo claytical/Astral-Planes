@@ -11,9 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e67ece5ef2df74ddc978b82f3c1fcd6d, type: 3}
   m_Name: I-IV-V
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChordProgressionProfile
   progressionName: "I\u2013IV\u2013V"
-  phase: 0
   beatsPerChord: 4
   chordSequence:
   - label: I

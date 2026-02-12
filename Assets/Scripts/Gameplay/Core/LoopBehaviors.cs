@@ -8,12 +8,12 @@ public static class LoopBehaviors {
         switch (b) {
             case NoteBehavior.Staccatify:
                 for (int i=0;i<notes.Count;i++)
-                    notes[i] = (notes[i].stepIndex, notes[i].note, (int)(notes[i].duration*0.55f), notes[i].velocity+5);
+                    notes[i] = (notes[i].stepIndex, notes[i].note, (int)(notes[i].duration*0.55f), notes[i].velocity+5, notes[i].authoredRootMidi);
                 break;
 
             case NoteBehavior.Legatify:
                 for (int i=0;i<notes.Count;i++)
-                    notes[i] = (notes[i].stepIndex, notes[i].note, (int)(notes[i].duration*1.35f), notes[i].velocity-5);
+                    notes[i] = (notes[i].stepIndex, notes[i].note, (int)(notes[i].duration*1.35f), notes[i].velocity-5, notes[i].authoredRootMidi);
                 break;
 
             case NoteBehavior.HumanizeTiming:
@@ -21,7 +21,7 @@ public static class LoopBehaviors {
                 for (int i=0;i<notes.Count;i++) {
                     int d = notes[i].duration;
                     int skew = (int)(d * (rng.NextDouble()*0.05 - 0.025)); // ±2.5%
-                    notes[i] = (notes[i].stepIndex, notes[i].note, d + skew, notes[i].velocity);
+                    notes[i] = (notes[i].stepIndex, notes[i].note, d + skew, notes[i].velocity, notes[i].authoredRootMidi);
                 }
                 break;
 
@@ -29,7 +29,7 @@ public static class LoopBehaviors {
                 for (int i=0;i<notes.Count;i++) {
                     float u = i/(float)Mathf.Max(1, notes.Count-1); // 0..1 across phrase
                     float shaped = Mathf.Lerp(80, 115, Mathf.SmoothStep(0,1,u));
-                    notes[i] = (notes[i].stepIndex, notes[i].note, notes[i].duration, shaped);
+                    notes[i] = (notes[i].stepIndex, notes[i].note, notes[i].duration, shaped, notes[i].authoredRootMidi);
                 }
                 break;
 

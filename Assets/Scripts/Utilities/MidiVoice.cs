@@ -47,7 +47,7 @@ public class MidiVoice : MonoBehaviour
     /// Plays a normal note. Expects duration in TICKS (MPTK convention),
     /// converts to ms using drum BPM, and trims to the remaining audible window.
     /// </summary>
-    public void PlayNoteTicks(int note, int durationTicks, float velocity127)
+    public void PlayNoteTicks(int note, int durationTicks, float velocity)
     {
         if (midiStreamPlayer == null || drumTrack == null || drumTrack.drumLoopBPM <= 0f)
         {
@@ -76,15 +76,18 @@ public class MidiVoice : MonoBehaviour
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
 
+        float v127 = (velocity <= 1.01f) ? (velocity * 127f) : velocity;
+
         var noteOn = new MPTKEvent
         {
-            Command = MPTKCommand.NoteOn,
-            Value = note,
-            Channel = channel,
+            Command  = MPTKCommand.NoteOn,
+            Value    = note,
+            Channel  = channel,
             Duration = durationMs,
-            Velocity = Mathf.Clamp((int)velocity127, 1, 127),
+            Velocity = Mathf.Clamp(Mathf.RoundToInt(v127), 1, 127),
         };
 
+        Debug.Log($"[MIDIVoice] Playing note {note} on channel {channel} at {noteOn.Velocity} (raw={velocity}).");
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
     }
     public void SetMidiStreamPlayer(MidiPlayerTK.MidiStreamPlayer player)

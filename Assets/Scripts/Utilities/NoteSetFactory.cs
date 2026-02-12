@@ -121,8 +121,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
             rootMidi = rootMidi,
             chordRegion = chordSeq,
             behaviorsSeed = new List<NoteBehavior>(),
-            persistentTemplate = new List<(int step, int note, int duration, float vel)>()
-        };
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()        };
         silent.Initialize(track, totalSteps);
         return silent;
     }
@@ -142,8 +141,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
             rootMidi = rootMidi,
             chordRegion = chordSeq,
             behaviorsSeed = new List<NoteBehavior>(),
-            persistentTemplate = new List<(int step, int note, int duration, float vel)>()
-        };
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()        };
         silent.Initialize(track, totalSteps);
         return silent;
     }
@@ -165,7 +163,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     int delta = targetRoot - riff.authoredRootMidi + (riff.octaveShift * 12);
 
     var ordered = riff.events.OrderBy(e => e.step).ToList();
-    var riffPersistent = new List<(int step, int note, int duration, float vel)>(ordered.Count);
+    var riffPersistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(ordered.Count);
 
     for (int i = 0; i < ordered.Count; i++)
     {
@@ -173,8 +171,8 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
 
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
+        int midi = e.midiNote + (riff.octaveShift * 12);
 
-        int midi = e.midiNote + delta;
         if (riff.clampToTrackRange)
             midi = Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote);
 
@@ -192,7 +190,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
         }
 
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;
-        riffPersistent.Add((step, midi, durTicks, vel127));
+        riffPersistent.Add((step, midi, durTicks, vel127, riff.authoredRootMidi));
     }
 
     var riffNs = new NoteSet
@@ -265,8 +263,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
 
         notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
     }
-
-    var persistent = new List<(int step, int note, int duration, float vel)>(steps.Count);
+    var persistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(steps.Count);
     var proxy = new NoteSet { scale = scale, rhythmStyle = rhythm };
 
     for (int i = 0; i < steps.Count; i++)
@@ -278,8 +275,8 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
         int dur = track.CalculateNoteDuration(step, proxy);
         dur = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
         float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
-
-        persistent.Add((step, midi, dur, vel));
+        persistent.Add((step, midi, dur, vel, int.MinValue));
+        
     }
 
     var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
