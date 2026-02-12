@@ -110,7 +110,7 @@ public class NoteSet
     public ScaleType scaleType => scale;                 // alias for clarity with factory
     public List<Chord> chordRegion;                      // NEW: realized chord region for this loop
     public List<NoteBehavior> behaviorsSeed;             // NEW: candidates to apply via rings/auto-variation
-    public List<(int step,int note,int duration,float vel)> persistentTemplate; // NEW: initial phrase
+    public List<(int step,int note,int duration,float vel,int authoredRootMidi)> persistentTemplate; // NEW: initial phrase
 
     [HideInInspector] public List<int> ghostNoteSequence = new List<int>();
 
@@ -140,10 +140,8 @@ public class NoteSet
         BuildAllowedStepsFromStyle(totalSteps);
     }
     // Riff-authoritative lookup: step -> (note,dur,vel)
-private readonly Dictionary<int, (int note, int dur, float vel)> _templateByStep
-    = new Dictionary<int, (int note, int dur, float vel)>();
-
-private void BuildTemplateLookup(InstrumentTrack track, int totalSteps)
+    private readonly Dictionary<int, (int note, int dur, float vel, int authoredRootMidi)> _templateByStep = new Dictionary<int, (int note, int dur, float vel, int authoredRootMidi)>();
+    private void BuildTemplateLookup(InstrumentTrack track, int totalSteps)
 {
     _templateByStep.Clear();
 
@@ -159,20 +157,22 @@ private void BuildTemplateLookup(InstrumentTrack track, int totalSteps)
         if (track != null)
             note = Mathf.Clamp(note, track.lowestAllowedNote, track.highestAllowedNote);
 
+        int authoredRootMidi = t.authoredRootMidi;
+
         // If multiple notes share a step, keep the "strongest" by velocity.
         if (_templateByStep.TryGetValue(step, out var existing))
         {
             if (t.vel > existing.vel)
-                _templateByStep[step] = (note, t.duration, t.vel);
+                _templateByStep[step] = (note, t.duration, t.vel, authoredRootMidi);
         }
         else
         {
-            _templateByStep.Add(step, (note, t.duration, t.vel));
+            _templateByStep.Add(step, (note, t.duration, t.vel, authoredRootMidi));
         }
     }
 }
 
-private void BuildAllowedStepsFromTemplate(int totalSteps)
+    private void BuildAllowedStepsFromTemplate(int totalSteps)
 {
     _allowedSteps.Clear();
 
@@ -189,7 +189,7 @@ private void BuildAllowedStepsFromTemplate(int totalSteps)
     }
 }
 
-private void BuildNotesFromTemplate(InstrumentTrack track)
+    private void BuildNotesFromTemplate(InstrumentTrack track)
 {
     _notes.Clear();
 
@@ -227,7 +227,23 @@ private void BuildNotesFromTemplate(InstrumentTrack track)
     {
         return _allowedSteps;
     }
-    public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
+    
+    /// <summary>
+    /// Riff-authoritative access: returns the authored template event at an exact step.
+    /// Use this to preserve per-note authoredRootMidi through playback/quantization.
+    /// </summary>
+    public bool TryGetTemplateEventAtStep(int step, out (int note, int dur, float vel, int authoredRootMidi) e)
+    {
+        if (persistentTemplate == null || persistentTemplate.Count == 0)
+        {
+            e = default;
+            return false;
+        }
+
+        return _templateByStep.TryGetValue(step, out e);
+    }
+
+public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
         // Riff-authoritative: step->note comes directly from the template
         if (persistentTemplate != null && persistentTemplate.Count > 0)

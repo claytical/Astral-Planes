@@ -15,16 +15,17 @@ MonoBehaviour:
   motifId: Shifted Echoes
   displayName: Shifted Echoes
   keyRootMidi: 62
-  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
-  phaseProfile: {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
+  entryDrumLoops: []
+  intensityDrumLoops: []
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: 991c67d1ca5c243d6ac378f043d7169a, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 4bbd852585dcf4e419110d159ecc0df3, type: 2}
   - {fileID: 11400000, guid: 128304c745b8c4180ae06e991b9a2ecd, type: 2}
   - {fileID: 11400000, guid: 27d8cef77dcdd411dad8cef6e224500d, type: 2}
   - {fileID: 11400000, guid: 593cedb00dbf04725a66e0244cd58f07, type: 2}
   selectionWeight: 1
-  beatProfileSequence:
-  - {fileID: 11400000, guid: 2640e5487e5e24a62a5b30a635f59875, type: 2}
-  - {fileID: 11400000, guid: 32bc830c41b4a4abb83f77ec6aa7a06a, type: 2}
-  beatIntroCount: 1
+  beatIntroCount: 0
   driveBeatsFromEnergy: 1

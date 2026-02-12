@@ -14,13 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Fracture Drive
   displayName: Fracture Drive
-  beatMood: 0
   keyRootMidi: 59
-  chordProgression: {fileID: 11400000, guid: 176f9fd65132c465e806fba31759994c, type: 2}
-  phaseProfile: {fileID: 11400000, guid: 822ad68eeb79d4918a59621754a34f99, type: 2}
+  entryDrumLoops: []
+  intensityDrumLoops: []
+  entryLoopCount: 1
+  bpm: 120
+  stepsPerLoop: 16
+  chordProgression: {fileID: 11400000, guid: 10120b21a656440b298bd84555f439f6, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 701f9af54f3184d73be39ee952867643, type: 2}
   - {fileID: 11400000, guid: f5f7e5f768a034bc4aa6e98eab5d2ae0, type: 2}
   - {fileID: 11400000, guid: 7272346a169de42e4988ee6a31f096b8, type: 2}
   - {fileID: 11400000, guid: fbaecb3a73f2340088bcb59c12124440, type: 2}
   selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

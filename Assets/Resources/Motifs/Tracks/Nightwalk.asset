@@ -13,14 +13,21 @@ MonoBehaviour:
   m_Name: Nightwalk
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Night Walk
-  displayName: Nighrt Walk
+  displayName: Night Walk
   keyRootMidi: 57
-  entryDrumLoops: []
-  intensityDrumLoops: []
-  entryLoopCount: 1
-  bpm: 120
+  entryDrumLoops:
+  - {fileID: 8300000, guid: 57397ad3d6acb4b5a8eeaaf5cd7707e4, type: 3}
+  - {fileID: 8300000, guid: d34a8a82134ba45068243e69b6815bc6, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: d34a8a82134ba45068243e69b6815bc6, type: 3}
+  - {fileID: 8300000, guid: 49694b6f63941496da78f691f319b675, type: 3}
+  - {fileID: 8300000, guid: d4ee8bb88b09b46089e15bb7855c6c72, type: 3}
+  - {fileID: 8300000, guid: 6cc6e386365c642b7bacd90fb2e386c2, type: 3}
+  - {fileID: 8300000, guid: c7c13fd77a69c4cd7bdca93cc13f3d27, type: 3}
+  entryLoopCount: 4
+  bpm: 65
   stepsPerLoop: 16
-  chordProgression: {fileID: 11400000, guid: 573a1343fbd264c84923bbc53ada2c03, type: 2}
+  chordProgression: {fileID: 11400000, guid: 4fdd9c741ff97417da98b6c762c1a12c, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 420fb848826624ec09d1a00f405bb07a, type: 2}
   - {fileID: 11400000, guid: a72011f25a227483286efd196dc60dd0, type: 2}

@@ -25,8 +25,7 @@ MonoBehaviour:
   entryLoopCount: 1
   bpm: 120
   stepsPerLoop: 16
-  chordProgression: {fileID: 11400000, guid: 8f712aab8f8c14f04822507d0f5f1f86, type: 2}
-  phaseProfile: {fileID: 11400000, guid: c5b0be8620412484a9929b37831ce2fb, type: 2}
+  chordProgression: {fileID: 11400000, guid: 6113f9349c3c04cf78e7417c0f31ebfd, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 3f9cda1515d674c82b6694c3d357feb2, type: 2}
   - {fileID: 11400000, guid: c7991c1bbc59849ff915f90c0fd706ce, type: 2}

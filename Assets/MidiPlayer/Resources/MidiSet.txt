@@ -3,12 +3,26 @@
   <SoundFonts>
     <SoundFontInfo>
       <Name>Moonlight</Name>
-      <PatchCount>14</PatchCount>
-      <WaveCount>28</WaveCount>
-      <WaveSize>11202612</WaveSize>
+      <PatchCount>25</PatchCount>
+      <WaveCount>42</WaveCount>
+      <WaveSize>16916132</WaveSize>
       <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Moonlight.sf2</SF2Path>
     </SoundFontInfo>
+    <SoundFontInfo>
+      <Name>Roland SC-55</Name>
+      <PatchCount>143</PatchCount>
+      <WaveCount>456</WaveCount>
+      <WaveSize>10107886</WaveSize>
+      <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Roland SC-55.sf2</SF2Path>
+    </SoundFontInfo>
+    <SoundFontInfo>
+      <Name>casio sk-200 gm sf2</Name>
+      <PatchCount>129</PatchCount>
+      <WaveCount>232</WaveCount>
+      <WaveSize>15883100</WaveSize>
+      <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/casio sk-200 gm sf2.sf2</SF2Path>
+    </SoundFontInfo>
   </SoundFonts>
-  <IndexSelectedSF>0</IndexSelectedSF>
+  <IndexSelectedSF>1</IndexSelectedSF>
   <MidiFiles />
 </MidiSet>

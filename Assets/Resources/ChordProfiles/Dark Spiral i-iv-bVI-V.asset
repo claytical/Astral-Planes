@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e67ece5ef2df74ddc978b82f3c1fcd6d, type: 3}
+  m_Name: Dark Spiral i-iv-bVI-V
+  m_EditorClassIdentifier: Assembly-CSharp::ChordProgressionProfile
+  progressionName: "Dark \xB7 Spiral \xB7 i\u2013iv\u2013bVI\u2013V"
+  beatsPerChord: 4
+  chordSequence:
+  - label: i
+    rootNote: 60
+    intervals: 000000000300000007000000
+  - label: iv
+    rootNote: 65
+    intervals: 000000000300000007000000
+  - label: bVI
+    rootNote: 68
+    intervals: 000000000400000007000000
+  - label: V
+    rootNote: 67
+    intervals: 000000000400000007000000

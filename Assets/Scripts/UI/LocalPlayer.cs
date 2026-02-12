@@ -35,6 +35,7 @@ public class LocalPlayer : MonoBehaviour
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
     private bool _usingMouse;
+    private InputAction _moveAction;
 
     // --- Dust spawn pocket / keep-clear ---
     // Use CosmicDustGenerator's ref-counted vehicle keep-clear to carve the spawn cell
@@ -182,6 +183,8 @@ public class LocalPlayer : MonoBehaviour
         DontDestroyOnLoad(this);
         GameFlowManager.Instance.RegisterPlayer(this);
         _playerInput = GetComponent<PlayerInput>();
+        _moveAction = _playerInput.actions["Move"]; // must match your action name
+
         CreatePlayerSelect();
         _playerInput.SwitchCurrentActionMap("Selection");
         _confirmAction = _playerInput.actions["Choose"]; // use your actual action name
@@ -219,20 +222,39 @@ public class LocalPlayer : MonoBehaviour
     void FixedUpdate()
     {
         if (plane == null) return;
-        // Exponential decay toward center for the virtual stick
-        // (use fixed dt so it’s stable with physics timing)
+
+        // Poll current move value every physics tick (works for held keys and held stick)
+        Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
+
+        // IMPORTANT: don't Normalize() here or you destroy analog magnitude.
+        // Clamp to unit circle instead.
+        raw = Vector2.ClampMagnitude(raw, 1f);
+
+        // Apply your existing scaling
+        _moveInput = raw * friction;
+
         float dt = Time.fixedDeltaTime;
-        if (_virtualStick.sqrMagnitude > 0f) { 
-            float k = Mathf.Exp(-stickDecayPerSec * dt); 
-            _virtualStick *= k; 
-            if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
-        } 
-        // Choose latest non-zero source, prefer explicit keyboard/gamepad Move over mouse when active
-        Vector2 chosen = (_moveInput.sqrMagnitude >= 0.0001f) ? _moveInput : _virtualStick;
-        // Always feed Vehicle.Move() to avoid Vehicle’s inputTimeout auto-zero
-        plane.Move(chosen);
-        if (_decelerate) _moveInput = Vector2.zero;
+
+        // If we have explicit move input (keyboard/gamepad), treat it as the stick target.
+        if (_moveInput.sqrMagnitude >= 0.0001f)
+        {
+            _virtualStick = _moveInput; // snap while held
+        }
+        else
+        {
+            // Exponential decay toward center for the virtual stick
+            if (_virtualStick.sqrMagnitude > 0f)
+            {
+                float k = Mathf.Exp(-stickDecayPerSec * dt);
+                _virtualStick *= k;
+                if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
+            }
+        }
+
+        // Always feed the smoothed stick
+        plane.Move(_virtualStick);
     }
+
     private void HandleConfirm()
     {
         if (_isReady) return;
@@ -279,13 +301,12 @@ public class LocalPlayer : MonoBehaviour
 
     }
     public void OnMove(InputValue value)
-    { 
-        // Gamepad/keyboard path; keeps working as before
-        _moveInput = value.Get<Vector2>().normalized * friction; 
-        if (_moveInput.sqrMagnitude > 0f) { 
-            _usingMouse = false; // prefer this source until it goes back to 0
-        }
+    {
+        Vector2 v = Vector2.ClampMagnitude(value.Get<Vector2>(), 1f);
+        _moveInput = v * friction;
+        if (_moveInput.sqrMagnitude > 0f) _usingMouse = false;
     }
+
     public void OnMouseMove(InputValue value)
     {
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;

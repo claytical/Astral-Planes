@@ -300,7 +300,7 @@ private void PlayGravityVoidChordPulse(
         track.highestAllowedNote
     );
 
-    int durTicks = 240;   // short, declarative hit
+    int durTicks = 480; 
     float vel127 = 80f;
 
     foreach (int midi in notes)
@@ -546,7 +546,7 @@ public void DespawnGravityVoid()
         int barIndex = Mathf.FloorToInt((float)((dspNow - start) / clipLen));
 
         // Transport must be derived from *committed/audible* leader bins, not visual bins.
-        int leaderBins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
+        int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());
         int playheadBin = ((barIndex % leaderBins) + leaderBins) % leaderBins;
 
         return new TransportFrame
@@ -1056,7 +1056,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
             var loop = t.GetPersistentLoopNotes();
             if (loop == null) return h;
 
-            foreach (var (step, _, _, _) in loop.OrderBy(n => n.Item1))
+            foreach (var (step, _, _, _, _) in loop.OrderBy(n => n.Item1))
                 h = h * 31 + step;
 
             return h;
@@ -1134,10 +1134,9 @@ public int GetBinForNextSpawn(InstrumentTrack track)
             var loopNotes = track.GetPersistentLoopNotes();
             for (int i = 0; i < loopNotes.Count; i++)
             {
-                var (step, note, _, velocity) = loopNotes[i];
+                var (step, note, _, velocity, authoredRootMidi) = loopNotes[i];
                 int longDuration = 1920; // ≈4 beats (1 bar) at 480 ticks per beat
-                loopNotes[i] = (step, note, longDuration, velocity);
-            }
+                loopNotes[i] = (step, note, longDuration, velocity, authoredRootMidi);            }
             // Start fading out this track's MIDI stream
             if (track.midiStreamPlayer != null)
             {

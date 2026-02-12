@@ -1068,11 +1068,51 @@ private Vector3 ComputeCarryOrbitTargetWorld()
             vehicle.CollectEnergy(amount);
             Debug.Log("[COLLECT] Collectable Triggered");
             int stepToReport = (intendedStep >= 0) ? intendedStep : (matchedStep  >= 0) ? matchedStep  : 0; // defensive: never send -1
-            assignedInstrumentTrack.OnCollectableCollected(this, stepToReport, noteDurationTicks, force);
+            float velocity127 = ComputeHitVelocity127(vehicle);
+            assignedInstrumentTrack.OnCollectableCollected(this, stepToReport, noteDurationTicks, velocity127);
 
             if (TryGetComponent(out Collider2D col)) col.enabled = false;
             var explode = GetComponent<Explode>();
             if(explode != null) explode.Permanent(false);
 
     }
+    private float ComputeHitVelocity127(Vehicle vehicle)
+    {
+        if (vehicle == null) return 127f;
+
+        // Vehicle RB must exist.
+        var vRb = vehicle.rb; // use your existing Vehicle.rb reference
+        if (vRb == null) return 127f;
+
+        // Relative velocity (if collectable can move). If collectable has no RB, treat as stationary.
+        Vector2 relVel = vRb.linearVelocity;
+        if (_rb != null)
+            relVel -= _rb.linearVelocity;
+
+        // Direction from vehicle -> collectable.
+        Vector2 to = (Vector2)transform.position - vRb.position;
+        float dist = to.magnitude;
+        if (dist > 0.0001f) to /= dist;
+        else to = Vector2.zero;
+
+        // Only count motion INTO the collectable.
+        float approachSpeed = Mathf.Max(0f, Vector2.Dot(relVel, to));
+
+        // Define what "max hit" means. arcadeMaxSpeed is usually too easy to hit constantly;
+        // use a higher value to avoid pegging.
+        float maxApproach = Mathf.Max(0.01f, vehicle.arcadeMaxSpeed * 1.5f);
+
+        float x = Mathf.Clamp01(approachSpeed / maxApproach);
+
+        // Optional: more resolution at low/mid hits.
+        x = Mathf.Pow(x, 0.7f);
+
+        float v127 = Mathf.Lerp(60f, 120f, x);
+
+        Debug.Log($"[COLLECT:HIT] approach={approachSpeed:F2} maxA={maxApproach:F2} x={x:F2} v127={v127:F1} " +
+                  $"vehSpeed={vRb.linearVelocity.magnitude:F2} arcadeMaxSpeed={vehicle.arcadeMaxSpeed:F2}");
+
+        return v127;
+    }
+
 }

@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: Droning Bass
   role: 0
+  riff: {fileID: 0}
+  useRiffAsAuthoritativeScore: 0
   scales:
   - item: 1
     weight: 0
@@ -27,6 +29,7 @@ MonoBehaviour:
   - item: 
     weight: 0
   chordsPerRegion: 2
+  loopsToAscend: 1
   behaviors:
   - item: 1
     weight: 0

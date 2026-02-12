@@ -166,18 +166,31 @@ public class NoteVisualizer : MonoBehaviour
         _ghostNoteSteps.Clear();
         //_trackStepWorldPositions.Clear();
         _lastObservedCompletedLoops = -1;
-
-        // Destroy existing marker GameObjects so nothing "sticks" into the next motif.
-        if (destroyMarkerGameObjects && noteMarkers != null)
-        {
-            foreach (var kv in noteMarkers)
-            {
-                var tr = kv.Value;
-                if (tr != null)
-                    Destroy(tr.gameObject);
+        if (destroyMarkerGameObjects) { 
+            // 1) Destroy any markers we know about.
+            if (noteMarkers != null) { 
+                foreach (var kv in noteMarkers) { 
+                    var tr = kv.Value; 
+                    if (tr != null)
+                        Destroy(tr.gameObject);
+                } 
+            }
+            
+            // 2) Destroy any remaining marker-tagged objects under the track rows.
+            //    (This catches stragglers that are not present in noteMarkers.)
+            if (trackRows != null) { 
+                for (int r = 0; r < trackRows.Count; r++) { 
+                    var row = trackRows[r]; 
+                    if (!row) continue;
+                    // Snapshot to avoid issues if Destroy affects hierarchy during iteration.
+                    var tags = row.GetComponentsInChildren<MarkerTag>(includeInactive: true); 
+                    for (int i = 0; i < tags.Length; i++) {
+                        if (tags[i] != null && tags[i].gameObject != null) 
+                            Destroy(tags[i].gameObject);
+                    }
+                }
             }
         }
-
         noteMarkers?.Clear();
 
         // Bin strip visuals
@@ -225,7 +238,7 @@ public class NoteVisualizer : MonoBehaviour
     var loopSteps = new HashSet<int>();
     if (loopNotes != null)
     {
-        foreach (var (step, _, _, _) in loopNotes)
+        foreach (var (step, _, _, _, _) in loopNotes)
         {
             if (step >= 0 && step < totalSteps)
                 loopSteps.Add(step);
@@ -350,8 +363,13 @@ public class NoteVisualizer : MonoBehaviour
         // Refresh once per frame; only reassigns when something actually changed.
         if (!RefreshCoreRefs(force: false))
             return;
-        if (_drum.startDspTime <= 0.0)
-            return;        
+        double leaderStartGuard = (_drum != null && _drum.leaderStartDspTime > 0.0)
+            ? _drum.leaderStartDspTime
+            : (_drum != null ? _drum.startDspTime : 0.0);
+
+        if (leaderStartGuard <= 0.0)
+            return;
+      
         // Smooth playhead energy & line charge toward their targets
         _playheadEnergy01 = Mathf.MoveTowards(
             _playheadEnergy01,
