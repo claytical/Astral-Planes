@@ -5,12 +5,39 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 [System.Serializable]
-public struct AscensionCohort
+public class AscensionCohort
 {
     public int windowStartInclusive;
     public int windowEndExclusive;
-    public HashSet<int> stepsRemaining;
+
+    // Unity-visible (optional, for debugging)
+    [SerializeField] private List<int> stepsRemainingSerialized = new();
+
+    // Runtime truth
+    [System.NonSerialized] public HashSet<int> stepsRemaining;
+
     public bool armed;
+
+    public void Clear()
+    {
+        armed = false;
+        stepsRemainingSerialized.Clear();
+        stepsRemaining?.Clear();
+    }
+
+    public void SetSteps(IEnumerable<int> steps)
+    {
+        if (stepsRemaining == null) stepsRemaining = new HashSet<int>();
+        else stepsRemaining.Clear();
+
+        stepsRemainingSerialized.Clear();
+
+        foreach (var s in steps)
+        {
+            if (stepsRemaining.Add(s))
+                stepsRemainingSerialized.Add(s);
+        }
+    }
 }
 
 public class InstrumentTrack : MonoBehaviour
@@ -383,8 +410,19 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         if (controller == null) return;
 
         var tf = controller.GetTransportFrame();
-        int barIndex    = tf.barIndex;
+
+// Defensive clamp: never allow negative barIndex to drive barStart math.
+        int barIndex = tf.barIndex;
         int playheadBin = tf.playheadBin;
+
+        if (barIndex < 0)
+        {
+            // If this ever happens again, do the safest thing:
+            // treat as start of loop so we don't compute barStart in the past.
+            barIndex = 0;
+            playheadBin = 0;
+        }
+
 
 // Normalize playheadBin into [0, leaderBins-1].
 // ----- CLOCK (single authority: DSP) -----
@@ -406,14 +444,16 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         if (start <= 0.0) return;
 
+        if (dspNow < start)
+        {
+            // Don't manufacture a bar/bin; just wait.
+            return;
+        }
+
         double barStart = start + (double)barIndex * clipLen;
+
         double transportStart = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         double localStart     = drumTrack.startDspTime;
-
-        if (System.Math.Abs(transportStart - localStart) > 0.0005) // 0.5ms
-        {
-            Debug.LogWarning($"[TRK:ANCHOR_MISMATCH] track={name} transportStart={transportStart:F6} localStart={localStart:F6} barIndex={barIndex}");
-        }
 
 
 // ----- BAR BOUNDARY COMMIT (cache + step reset) -----
@@ -514,39 +554,34 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                 localStep = local,
                 note = note,
                 duration = duration,
-                velocity = velocity
+                velocity = velocity,
+                authoredRootMidi = authoredRootMidi
             });
+
         }
     }
 
-    private void PlayLoopedNotesInBin(int playheadBin, int localStep, int leaderBins)
+    void PlayLoopedNotesInBin(int playheadBin, int localStep, int leaderBins)
     {
         // LoopPattern owns cache rebuild; InstrumentTrack just requests notes.
         if (loopPattern == null)
         {
-            // Fallback to old path if you want, but I'd rather fail loudly while migrating.
             Debug.LogWarning($"[TRK] loopPattern missing on {name}; cannot play loop notes.");
             return;
         }
 
+        // Simple Case A rule:
+        // - DrumTrack defines the global playheadBin (0..leaderBins-1)
+        // - This track only has content for bins 0..(loopMultiplier-1)
+        // - If playheadBin exceeds that, remain silent until the loop wraps.
         int trackBins = Mathf.Max(1, loopMultiplier);
+        if (playheadBin < 0 || playheadBin >= trackBins)
+            return;
 
-        // Map global playhead bin into an actual bin this track can play.
-        // Never hard-silence undeveloped bins; repeat the last real bin instead.
         int trackBin = playheadBin;
         float gain = 1f;
 
-        if (playheadBin >= trackBins)
-        {
-            // Repeat last real bin (or 0 for single-bin tracks).
-            trackBin = Mathf.Max(0, trackBins - 1);
-
-            // Optional “ghost” behavior: reduced gain. But still audible.
-            if (ghostUndevelopedBins)
-                gain = Mathf.Clamp01(undevelopedBinGhostGain);
-        }
-
-        // Ask LoopPattern for notes at this bin/step (velocity is returned as 0..1 already gain-scaled).
+        // Ask LoopPattern for notes at this bin/step (velocity returned already gain-scaled per your API).
         loopPattern.GetNotesAt(this, trackBin, localStep, gain, _tmpStepNotes);
 
         for (int i = 0; i < _tmpStepNotes.Count; i++)
@@ -554,8 +589,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             var (note, duration, vel127f) = _tmpStepNotes[i];
             int vel127 = Mathf.Clamp(Mathf.RoundToInt(vel127f), 1, 127);
             PlayNote127(note, duration, vel127);
-
-
         }
     }
 
@@ -719,7 +752,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // IMPORTANT: don’t leave the controller stuck because remaining counts still think something is pending.
         // If you track remaining per-burst, clear that too.
         _burstRemaining?.Clear();
-        _burstSteps?.Clear();
         _burstSteps?.Clear();
         return destroyed;
     }
@@ -970,27 +1002,28 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
     {
-        ascensionCohort = new AscensionCohort
-        {
-            windowStartInclusive = windowStartInclusive,
-            windowEndExclusive   = windowEndExclusive,
-            stepsRemaining       = new HashSet<int>(),
-            armed                = true
-        };
+        if (ascensionCohort == null) ascensionCohort = new AscensionCohort();
+
+        ascensionCohort.windowStartInclusive = windowStartInclusive;
+        ascensionCohort.windowEndExclusive   = windowEndExclusive;
 
         var loop = GetPersistentLoopNotes();
-        if (loop != null)
+        if (loop == null)
         {
-            foreach (var (step, _, _, _, _) in loop)
-                if (step >= windowStartInclusive && step < windowEndExclusive)
-                    ascensionCohort.stepsRemaining.Add(step);
+            ascensionCohort.Clear();
+            return;
         }
 
-        if (ascensionCohort.stepsRemaining.Count == 0)
-            ascensionCohort.armed = false;
+        var steps = new List<int>();
+        foreach (var (step, _, _, _, _) in loop)
+            if (step >= windowStartInclusive && step < windowEndExclusive)
+                steps.Add(step);
+
+        ascensionCohort.SetSteps(steps);
+        ascensionCohort.armed = (ascensionCohort.stepsRemaining != null && ascensionCohort.stepsRemaining.Count > 0);
 
         Debug.Log($"[CHORD][ARMED] {name} window=[{windowStartInclusive},{windowEndExclusive}) " +
-                  $"count={ascensionCohort.stepsRemaining.Count} armed={ascensionCohort.armed}");
+                  $"count={(ascensionCohort.stepsRemaining != null ? ascensionCohort.stepsRemaining.Count : 0)} armed={ascensionCohort.armed}");
     }
 
     private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
@@ -2511,7 +2544,8 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
         }
 
         // Keep loop span derived from the highest FILLED bin (not the old multiplier)
-        SyncSpanFromBins();
+      //  SyncSpanFromBins();
+      _totalSteps = loopMultiplier * BinSize();
     }
 
     private void ResetPerfectionFlag() => IsPerfectThisPhase = false;

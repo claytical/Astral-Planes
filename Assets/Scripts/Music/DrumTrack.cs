@@ -226,30 +226,6 @@ public class DrumTrack : MonoBehaviour
         return _intensityLoops[idx];
     }
 
-    public void SetMotifBeatSequence(MotifProfile motif)
-    {
-        if (motif == null)
-        {
-            Debug.LogWarning("[DrumTrack] SetMotifBeatSequence called with null motif.");
-            return;
-        }
-        
-        // If we are already running, schedule the first entry clip on next boundary.
-        if (_started)
-        {
-            var clip = ChooseEntryClip();
-            if (clip != null)
-                ScheduleDrumLoopChange(clip);
-        }
-    }
-    public void SetMotifBeatSequence(MotifProfile motif, bool restartTransport) { 
-        // Default behavior for legacy calls:
-        // - do NOT arm at next boundary (boot-time callers often want immediate setup)
-        // - use a generic "who" for logging
-        SetMotifBeatSequence(motif, armAtNextBoundary: false,
-                    who: "DrumTrack/SetMotifBeatSequence(legacy)",
-                    restartTransport: restartTransport);
-    }
     public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {
         ApplyMotif(motif, armAtNextBoundary, who, restartTransport);
     }
@@ -410,33 +386,37 @@ public class DrumTrack : MonoBehaviour
         // - DrumTrack simply clamps and applies it.
         _binCount = Mathf.Max(1, bins);
     }
-    private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, double effectiveLoopLen) {
-    if (!_pendingDrumLoopArmed || _pendingDrumLoop == null) return;
+private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, double effectiveLoopLen)
+{
+    if (!_pendingDrumLoopArmed || _pendingDrumLoop == null)
+        return;
 
     EnsureDualDrumSources();
-    if (_activeDrum == null || _inactiveDrum == null) return;
+    if (_activeDrum == null || _inactiveDrum == null)
+        return;
 
     double dspNow = AudioSettings.dspTime;
 
     // We *want* to change near the leader boundary, but we must not cut a looping drum clip mid-bar.
     // So: pick a swap time at/after nextBoundaryDsp that lands on a drum-bar boundary (clip boundary).
-    double start = nextBoundaryDsp;
+    double swapDsp = nextBoundaryDsp;
 
     if (_activeDrum.clip != null && _activeDrum.clip.length > 0.0001f)
     {
         double barLen = _activeDrum.clip.length;
 
-        // Anchor bar counting off leaderStartDspTime so swaps stay musically consistent.
-        double t = start - leaderStartDspTime;
+        // Anchor bar counting off the current *leader* start so swaps stay musically consistent.
+        // IMPORTANT: do NOT re-anchor leaderStartDspTime to a FUTURE swap time (that freezes transport).
+        double t = swapDsp - leaderStartDspTime;
         if (t < 0) t = 0;
 
-        double bars = Math.Ceiling(t / barLen);
-        start = leaderStartDspTime + bars * barLen;
+        double bars = System.Math.Ceiling(t / barLen);
+        swapDsp = leaderStartDspTime + bars * barLen;
     }
 
     // Safety: must schedule in the future
-    if (start <= dspNow + 0.01)
-        start = dspNow + 0.05;
+    if (swapDsp <= dspNow + 0.01)
+        swapDsp = dspNow + 0.05;
 
     var newClip = _pendingDrumLoop;
     if (newClip == null)
@@ -453,30 +433,19 @@ public class DrumTrack : MonoBehaviour
     _inactiveDrum.playOnAwake = false;
 
     // Try to end active at the swap boundary (avoids overlaps)
-    try { _activeDrum.SetScheduledEndTime(start); } catch { }
+    try { _activeDrum.SetScheduledEndTime(swapDsp); } catch { }
 
-    _inactiveDrum.PlayScheduled(start);
+    // Schedule the new loop, but DO NOT swap references yet.
+    // The currently-audible deck must remain authoritative until swapDsp arrives.
+    _inactiveDrum.PlayScheduled(swapDsp);
 
-    // Swap decks
-    var prevActive = _activeDrum;
-    _activeDrum = _inactiveDrum;
-    _inactiveDrum = prevActive;
+    _pendingDrumLoopDspStart = swapDsp;
 
-    drumAudioSource = _activeDrum;
-
-    // Cache clip length from the clip now driving the deck
-    _clipLengthSec = Mathf.Max(newClip.length, 0f);
-
-    // Re-anchor startDspTime to keep internal drum timing coherent
-    startDspTime = start;
-    leaderStartDspTime = start;
-
-    _currentDrumClip = newClip;
+    // Keep flags so Update() can finalize the deck swap when DSP reaches swapDsp.
     _pendingDrumLoopArmed = false;
     _pendingDrumLoop = null;
-    _pendingDrumLoopDspStart = start;
 
-    Debug.Log($"[DrumTrack] Scheduled drum loop change at dsp={start:F3} clip={newClip.name}");
+    Debug.Log($"[DRUM] Armed drum loop swap for dsp={swapDsp:F3} clip={newClip.name}");
 }
 
     private void Update()
@@ -585,6 +554,42 @@ public class DrumTrack : MonoBehaviour
             OnBinChanged?.Invoke(_binIdx, bins);
         }
     }
+    if (drumAudioSource == null || !HasValidClipLen || totalSteps <= 0)
+        return;
+// ------------------------------------------------------------
+// Finalize any pending A/B deck swap when the scheduled DSP time arrives.
+// IMPORTANT: the transport anchor (leaderStartDspTime) must never jump into the future.
+// ------------------------------------------------------------
+    if (_pendingDrumLoopDspStart > 0.0)
+    {
+        double dspNow = AudioSettings.dspTime;
+        const double kSwapEps = 0.002; // 2ms guard
+        if (dspNow + kSwapEps >= _pendingDrumLoopDspStart)
+        {
+            // Swap deck references NOW that the new deck is actually audible.
+            var prevActive = _activeDrum;
+            _activeDrum = _inactiveDrum;
+            _inactiveDrum = prevActive;
+
+            drumAudioSource = _activeDrum;
+
+            // Clip length is now driven by the active deck.
+            _clipLengthSec = (_activeDrum != null && _activeDrum.clip != null)
+                ? Mathf.Max(_activeDrum.clip.length, 0f)
+                : 0f;
+
+            // startDspTime is the *bar* anchor for the currently-playing clip;
+            // leaderStartDspTime remains leader-loop anchor.
+            startDspTime = _pendingDrumLoopDspStart;
+
+            _currentDrumClip = (_activeDrum != null) ? _activeDrum.clip : null;
+
+            Debug.Log($"[DRUM] Finalized drum loop swap at dsp={startDspTime:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
+
+            _pendingDrumLoopDspStart = -1.0;
+        }
+    }
+
 // --- Transport watchdog: if scheduling ever fails, don't stay silent ---
     if (_activeDrum != null && _activeDrum.clip != null)
     {
@@ -611,40 +616,6 @@ public class DrumTrack : MonoBehaviour
     // 4) Housekeeping
     if (activeMineNodes != null)
         activeMineNodes.RemoveAll(n => n == null);
-}
-    public bool TryGetNextStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
-{
-    nextStepDsp = 0;
-    stepDurationSec = 0f;
-
-    if (leaderStartDspTime <= 0.0) return false;
-
-    double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
-    int leaderSteps = GetLeaderSteps();
-    if (leaderSteps <= 0) return false;
-
-    stepDurationSec = (float)(effLen / leaderSteps);
-    if (stepDurationSec <= 0f || float.IsInfinity(stepDurationSec)) return false;
-
-    double dspNow = AudioSettings.dspTime;
-    double elapsed = dspNow - leaderStartDspTime;
-    if (elapsed < 0) elapsed = 0;
-
-    double tInLoop = elapsed % effLen;
-
-    // Current step index (same as Update)
-    int curStep = Mathf.FloorToInt((float)(tInLoop / stepDurationSec));
-    int targetStep = curStep + Mathf.Max(1, stepOffset);
-
-    // DSP time at the start of that target step (within the same or next loop)
-    nextStepDsp = leaderStartDspTime + (targetStep * stepDurationSec);
-
-    // Ensure it's in the future (hitch guard)
-    const double kMinLead = 0.005;
-    if (nextStepDsp <= dspNow + kMinLead)
-        nextStepDsp = dspNow + 0.010;
-
-    return true;
 }
     public bool TryGetNextBaseStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
     {
@@ -881,27 +852,7 @@ public class DrumTrack : MonoBehaviour
         }
 
     }
-    private IEnumerator DeferredBootWhenMotifReady() { 
-        float start = Time.time; 
-        const float timeout = 5f; 
-        while (Time.time - start < timeout) { 
-            if (_phaseTransitionManager != null && _phaseTransitionManager.currentMotif != null) { 
-                Debug.Log($"[BOOT] Deferred drum boot: motif ready '{_phaseTransitionManager.currentMotif.motifId}'. Booting now."); 
-                _started = false; // allow ManualStart to run again
-                ManualStart(); 
-                yield break;
-            }
-            yield return null;
-        } 
-        Debug.LogError("[BOOT] Deferred drum boot timed out waiting for PhaseTransitionManager.currentMotif.");
-    }
-    private IEnumerator DeferredInit()
-    {
-        yield return null;          // one frame
-        EnsureCachedRefs();
-        AutoSizeSpawnGridIfEnabled();
-        SyncTileWithScreen();
-    } 
+
     private void AutoSizeSpawnGridIfEnabled() { 
         if (!autoSizeSpawnGridToScreen) return; 
         if (_spawnGrid == null) return;

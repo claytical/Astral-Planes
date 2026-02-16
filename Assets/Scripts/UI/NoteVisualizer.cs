@@ -34,6 +34,8 @@ public class NoteVisualizer : MonoBehaviour
     private GameFlowManager _gfm;
     private InstrumentTrackController _ctrl;
     private DrumTrack _drum;
+    private bool _hasCachedDrumAnchor;
+    private double _cachedLeaderStartDspTime;
     private float _playheadBaseHeight;
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
@@ -355,215 +357,230 @@ public class NoteVisualizer : MonoBehaviour
         RefreshCoreRefs(force: true);
     }
 
-    void Update()
+void Update()
+{
+    if (!isInitialized || playheadLine == null)
+        return;
+
+    // Refresh once per frame; only reassigns when something actually changed.
+    if (!RefreshCoreRefs(force: false))
+        return;
+
+    if (_drum == null)
+        return;
+
+    // ------------------------------------------------------------
+    // Anchor guard (prevents playhead disappearing when drum transport
+    // anchor is briefly unavailable during clip swaps / boot / wiring)
+    // ------------------------------------------------------------
+    double leaderStartDsp =
+        (_drum.leaderStartDspTime > 0.0) ? _drum.leaderStartDspTime :
+        (_drum.startDspTime > 0.0)       ? _drum.startDspTime :
+                                           0.0;
+
+    if (leaderStartDsp <= 0.0)
     {
-        if (!isInitialized || playheadLine == null)
+        // No current anchor. If we've ever had one, keep rendering using the cached anchor.
+        if (!_hasCachedDrumAnchor)
             return;
 
-        // Refresh once per frame; only reassigns when something actually changed.
-        if (!RefreshCoreRefs(force: false))
-            return;
-        double leaderStartGuard = (_drum != null && _drum.leaderStartDspTime > 0.0)
-            ? _drum.leaderStartDspTime
-            : (_drum != null ? _drum.startDspTime : 0.0);
+        leaderStartDsp = _cachedLeaderStartDspTime;
+    }
+    else
+    {
+        // Cache last-known-good anchor so transient gaps don't blank the UI for a full loop.
+        _hasCachedDrumAnchor = true;
+        _cachedLeaderStartDspTime = leaderStartDsp;
+    }
 
-        if (leaderStartGuard <= 0.0)
-            return;
-      
-        // Smooth playhead energy & line charge toward their targets
-        _playheadEnergy01 = Mathf.MoveTowards(
-            _playheadEnergy01,
-            _playheadEnergyTarget01,
-            _playheadEnergyLerpSpeed * Time.deltaTime
-        );
+    // Smooth playhead energy & line charge toward their targets
+    _playheadEnergy01 = Mathf.MoveTowards(
+        _playheadEnergy01,
+        _playheadEnergyTarget01,
+        _playheadEnergyLerpSpeed * Time.deltaTime
+    );
 
-        _lineCharge01 = Mathf.MoveTowards(
-            _lineCharge01,
-            0f,
-            _lineChargeDecaySpeed * Time.deltaTime
-        );
+    _lineCharge01 = Mathf.MoveTowards(
+        _lineCharge01,
+        0f,
+        _lineChargeDecaySpeed * Time.deltaTime
+    );
 
-        // --- Playhead position across the "leader" loop (max loop multiplier) ---
-        int audibleBin = (_gfm.controller != null)
-            ? _gfm.controller.GetTransportFrame().playheadBin
-            : 0;
+    // --- Playhead position across the "leader" loop (max loop multiplier) ---
+    int audibleBin = (_gfm != null && _gfm.controller != null)
+        ? _gfm.controller.GetTransportFrame().playheadBin
+        : 0;
+    _ = audibleBin; // (kept to preserve your original intent; safe no-op if unused)
 
-        float clipLen = Mathf.Max(0.0001f, _drum.GetClipLengthInSeconds()); 
-        int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
-        float stepDuration = clipLen / drumTotalSteps; 
-        float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
-        double leaderStart = (_drum != null && _drum.leaderStartDspTime > 0.0) ? _drum.leaderStartDspTime : _drum.startDspTime; 
-        float globalElapsed = (float)(AudioSettings.dspTime - leaderStart); 
-        float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
-        float canvasWidth = GetScreenWidth();
-        float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
-        playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
-        float drumLoopLength = clipLen; 
-        // Clip time is derived from leader transport so visual bin position and step sampling share the same clock.
-        float leaderT = (float)((AudioSettings.dspTime - leaderStart) % fullVisualLoopDuration); 
-        if (leaderT < 0f) leaderT += fullVisualLoopDuration; 
-        float drumElapsed = leaderT % drumLoopLength;
-        int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % Mathf.Max(1, drumTotalSteps);
+    float clipLen = Mathf.Max(0.0001f, _drum.GetClipLengthInSeconds());
+    int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
+    float stepDuration = clipLen / drumTotalSteps;
 
+    float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
 
-        bool shimmer = false; float maxVelocity = 0f;
-        foreach (var track in GameFlowManager.Instance.controller.tracks)
+    float globalElapsed = (float)(AudioSettings.dspTime - leaderStartDsp);
+    float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
+
+    float canvasWidth = GetScreenWidth();
+    float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
+    playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
+
+    float drumLoopLength = clipLen;
+
+    // Clip time is derived from leader transport so visual bin position and step sampling share the same clock.
+    float leaderT = (float)((AudioSettings.dspTime - leaderStartDsp) % fullVisualLoopDuration);
+    if (leaderT < 0f) leaderT += fullVisualLoopDuration;
+
+    float drumElapsed = leaderT % drumLoopLength;
+    int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % drumTotalSteps;
+
+    bool shimmer = false;
+    float maxVelocity = 0f;
+
+    var controller = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
+    if (controller != null && controller.tracks != null)
+    {
+        foreach (var track in controller.tracks)
         {
+            if (track == null) continue;
+
             float v = track.GetVelocityAtStep(currentStep);
             maxVelocity = Mathf.Max(maxVelocity, v / 127f);
-            if (_ghostNoteSteps.TryGetValue(track, out var steps) && steps.Contains(currentStep))
-            { shimmer = true; break; }
-        }
 
-        if (playheadParticles != null)
-        {
-            var main     = playheadParticles.main;
-            var emission = playheadParticles.emission;
-
-            // Base factors from music (velocity) plus collection/ascension state
-            float velFactor    = Mathf.Clamp01(maxVelocity);
-            float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);   // fills as burst is collected
-            float chargeFactor = 1.0f + 1.5f * _lineCharge01;                 // extra particles as notes hit the top
-
-            main.startSize = Mathf.Lerp(0.3f, 1.2f, velFactor) * energyFactor;
-            emission.rateOverTime = Mathf.Lerp(10f, 50f, velFactor) * energyFactor * chargeFactor;
-            emission.enabled = shimmer || _lineCharge01 > 0.05f || _playheadEnergy01 > 0.05f;
-
-            var col = playheadParticles.colorOverLifetime;
-            if (col.enabled)
+            if (_ghostNoteSteps.TryGetValue(track, out var steps) && steps != null && steps.Contains(currentStep))
             {
-                // Slightly more opaque when highly charged
-                float baseAlpha = 0.4f + velFactor * 0.5f;
-                float topAlpha  = 0.1f;
-                float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01); 
-
-                Gradient g = new Gradient();
-                g.SetKeys(
-                    new[]
-                    {
-                        new GradientColorKey(Color.white, 0f),
-                        new GradientColorKey(Color.cyan, 1f)
-                    },
-                    new[]
-                    {
-                        new GradientAlphaKey(Mathf.Clamp01(baseAlpha + alphaBoost), 0f),
-                        new GradientAlphaKey(topAlpha, 1f)
-                    }
-                );
-                col.color = g;
-            }
-
-            // Fire a short extra burst when a burst completes / drums change
-            if (_pendingReleasePulse)
-            {
-                _pendingReleasePulse = false;
-
-                // Emit a short pop; you can tune this count
-                playheadParticles.Emit(30);
-
-                // Reset energy target so the bar "empties" after release
-                _playheadEnergyTarget01 = 0f;
+                shimmer = true;
+                break;
             }
         }
-
-        // --- Build step → world position maps per row (no lines; direct math) ---
-        var controller = GameFlowManager.Instance.controller;
-        int longestSteps = GetDeclaredLongestSteps();
-/*
-        for (int i = 0; i < controller.tracks.Length && i < trackRows.Count; i++)
-        {
-            InstrumentTrack track = controller.tracks[i];
-            RectTransform row = trackRows[i];
-            Rect rowRect = row.rect;
-
-            int trackSteps = Mathf.Max(1, track.GetTotalSteps());
-
-            // Center Y for markers on this row
-            float yLocal = (rowRect.yMin + rowRect.yMax) * 0.5f;
-
-            // Fraction of the leader’s width this track occupies (its audible window)
-            float localFraction = trackSteps / (float)Mathf.Max(1, longestSteps);
-
-            // Precompute the map of *every* local step for this track
-            var stepMap = new Dictionary<int, Vector3>(trackSteps);
-            for (int step = 0; step < trackSteps; step++)
-            {
-                float xLocal = ComputeXLocalForTrack(rowRect, track, step);
-                Vector3 localPos = new Vector3(xLocal, yLocal, 0f);
-                stepMap[step] = row.TransformPoint(localPos);
-            }
-
-            //_trackStepWorldPositions[track] = stepMap;
-        }
-*/
-        // Move any live markers to their updated step positions
-        UpdateNoteMarkerPositions();
-
-
-        int loopsNow = _drum.completedLoops;
-        if (loopsNow != _lastObservedCompletedLoops)
-        {
-            _lastObservedCompletedLoops = loopsNow;
-            OnLoopBoundary();
-        }        
-        for (int i = _blastTasks.Count - 1; i >= 0; i--)
-        {
-            var task = _blastTasks[i];
-            if (!task.go) { _blastTasks.RemoveAt(i); continue; }
-
-            task.t += Time.deltaTime / Mathf.Max(0.0001f, task.dur);
-            float u = Mathf.Clamp01(task.t);
-
-            // position lerp along a short ray
-            var p = task.startPos + task.dir * u;
-            task.go.transform.position = p;
-
-            // scale down/up as desired
-            float s = Mathf.Lerp(task.startScale, task.endScale, u);
-            task.go.transform.localScale = Vector3.one * s;
-
-            if (u >= 1f)
-            {
-                try { task.onDone?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
-                if (task.go) Destroy(task.go);
-                _blastTasks.RemoveAt(i);
-            }
-            else
-            {
-                _blastTasks[i] = task;
-            }
-        }
-        for (int i = _rushTasks.Count - 1; i >= 0; i--)
-        {
-            var task = _rushTasks[i];
-
-            // If marker or target vanished, drop the task
-            if (!task.go || !task.target)
-            {
-                _rushTasks.RemoveAt(i);
-                continue;
-            }
-
-            task.t += Time.deltaTime / Mathf.Max(0.0001f, task.dur);
-            float u = Mathf.Clamp01(task.t);
-
-            // Lerp in world space
-            var p = Vector3.Lerp(task.startPos, task.target.position, u);
-            task.go.transform.position = p;
-
-            if (u >= 1f)
-            {
-                // Arrived — fire callback, then clean up marker however you do it next
-                try { task.onArrive?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
-                if (task.go) Destroy(task.go); // or return to pool if you pool markers
-                _rushTasks.RemoveAt(i);
-            }
-            else
-            {
-                _rushTasks[i] = task; // write back mutated struct
-            }
-        }    
     }
+
+    if (playheadParticles != null)
+    {
+        var main = playheadParticles.main;
+        var emission = playheadParticles.emission;
+
+        // Base factors from music (velocity) plus collection/ascension state
+        float velFactor = Mathf.Clamp01(maxVelocity);
+        float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);   // fills as burst is collected
+        float chargeFactor = 1.0f + 1.5f * _lineCharge01;                 // extra particles as notes hit the top
+
+        main.startSize = Mathf.Lerp(0.3f, 1.2f, velFactor) * energyFactor;
+        emission.rateOverTime = Mathf.Lerp(10f, 50f, velFactor) * energyFactor * chargeFactor;
+        emission.enabled = shimmer || _lineCharge01 > 0.05f || _playheadEnergy01 > 0.05f;
+
+        var col = playheadParticles.colorOverLifetime;
+        if (col.enabled)
+        {
+            // Slightly more opaque when highly charged
+            float baseAlpha = 0.4f + velFactor * 0.5f;
+            float topAlpha = 0.1f;
+            float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01);
+
+            Gradient g = new Gradient();
+            g.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(Color.cyan, 1f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(Mathf.Clamp01(baseAlpha + alphaBoost), 0f),
+                    new GradientAlphaKey(topAlpha, 1f)
+                }
+            );
+            col.color = g;
+        }
+
+        // Fire a short extra burst when a burst completes / drums change
+        if (_pendingReleasePulse)
+        {
+            _pendingReleasePulse = false;
+
+            // Emit a short pop; you can tune this count
+            playheadParticles.Emit(30);
+
+            // Reset energy target so the bar "empties" after release
+            _playheadEnergyTarget01 = 0f;
+        }
+    }
+
+    // --- Build step → world position maps per row (no lines; direct math) ---
+    // (kept as in your current code: map-building block remains commented out)
+    int longestSteps = GetDeclaredLongestSteps();
+    _ = longestSteps;
+
+    // Move any live markers to their updated step positions
+    UpdateNoteMarkerPositions();
+
+    int loopsNow = _drum.completedLoops;
+    if (loopsNow != _lastObservedCompletedLoops)
+    {
+        _lastObservedCompletedLoops = loopsNow;
+        OnLoopBoundary();
+    }
+
+    for (int i = _blastTasks.Count - 1; i >= 0; i--)
+    {
+        var task = _blastTasks[i];
+        if (!task.go) { _blastTasks.RemoveAt(i); continue; }
+
+        task.t += Time.deltaTime / Mathf.Max(0.0001f, task.dur);
+        float u = Mathf.Clamp01(task.t);
+
+        // position lerp along a short ray
+        var p = task.startPos + task.dir * u;
+        task.go.transform.position = p;
+
+        // scale down/up as desired
+        float s = Mathf.Lerp(task.startScale, task.endScale, u);
+        task.go.transform.localScale = Vector3.one * s;
+
+        if (u >= 1f)
+        {
+            try { task.onDone?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
+            if (task.go) Destroy(task.go);
+            _blastTasks.RemoveAt(i);
+        }
+        else
+        {
+            _blastTasks[i] = task;
+        }
+    }
+
+    for (int i = _rushTasks.Count - 1; i >= 0; i--)
+    {
+        var task = _rushTasks[i];
+
+        // If marker or target vanished, drop the task
+        if (!task.go || !task.target)
+        {
+            _rushTasks.RemoveAt(i);
+            continue;
+        }
+
+        task.t += Time.deltaTime / Mathf.Max(0.0001f, task.dur);
+        float u = Mathf.Clamp01(task.t);
+
+        // Lerp in world space
+        var p = Vector3.Lerp(task.startPos, task.target.position, u);
+        task.go.transform.position = p;
+
+        if (u >= 1f)
+        {
+            // Arrived — fire callback, then clean up marker however you do it next
+            try { task.onArrive?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
+            if (task.go) Destroy(task.go); // or return to pool if you pool markers
+            _rushTasks.RemoveAt(i);
+        }
+        else
+        {
+            _rushTasks[i] = task; // write back mutated struct
+        }
+    }
+}
+
     private void OnLoopBoundary()
 {
     if (_ascendTasks.Count == 0) return;
