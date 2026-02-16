@@ -10666,6 +10666,7 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   preset: 0
   bank: 0
+  authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
   ascendLoopCount: 8
@@ -10724,7 +10725,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 0
-  preset: 38
+  preset: 0
   bank: 0
 --- !u!1 &371718999
 GameObject:
@@ -11217,6 +11218,7 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   preset: 18
   bank: 0
+  authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
   ascendLoopCount: 1
@@ -11290,7 +11292,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 49
+  preset: 89
   bank: 0
 --- !u!1 &652946506
 GameObject:
@@ -11354,6 +11356,7 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   preset: 1
   bank: 0
+  authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
   ascendLoopCount: 1
@@ -11412,7 +11415,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 102
+  preset: 18
   bank: 0
 --- !u!1 &657963290
 GameObject:
@@ -11450,7 +11453,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 10, y: 130}
+  m_SizeDelta: {x: 20, y: 130}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &657963292
 MonoBehaviour:
@@ -11465,7 +11468,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.09411765}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.2}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -13887,6 +13890,7 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   preset: 16
   bank: 0
+  authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
   ascendLoopCount: 1

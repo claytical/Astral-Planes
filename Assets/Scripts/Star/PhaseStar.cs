@@ -1251,8 +1251,8 @@ public class PhaseStar : MonoBehaviour
         }
 
         Color c = ResolvePreviewColor();
-        float highlight = _isArmed ? 0.7f : 0.25f;
-        float veilA     = _isArmed ? 0.25f : 0.55f;
+        float highlight = _isArmed ? 0.7f : 0.06f;
+        float veilA     = _isArmed ? 0.25f : 0.08f;
         // “Dim means busy” is handled elsewhere; this is just the per-petal highlight.
         visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, veilA), activeShardVisual);
         visuals.HighlightActive(activeShardVisual, c, highlight);

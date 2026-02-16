@@ -18,6 +18,10 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 private float alphaDirection = 1f;
     private SpriteRenderer activeSprite;
     private Color _lastShadowTint = new Color(0.08f, 0.08f, 0.08f, 1f);
+    [Header("Dim (Disarmed) Look")]
+    [SerializeField, Range(0f, 1f)] private float dimAlpha = 0.06f;     // very faint
+    [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.08f;    // nearly gray/black
+    [SerializeField] private bool dimUsesFixedTint = true;
 
     public ParticleSystem particles;
 
@@ -29,7 +33,7 @@ private float alphaDirection = 1f;
     [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha = 0.35f;
 
     [Header("Dim / Hidden Shard Tint")]
-    [SerializeField] private Color dimShardTint = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+    [SerializeField] private Color dimShardTint = new Color(0.05f, 0.05f, 0.05f, 0.1f);
 
     PhaseStarBehaviorProfile _profile;
     private Color _lastTint = Color.white;
@@ -126,24 +130,36 @@ private float alphaDirection = 1f;
     {
         ToggleShardRenderers(true);
 
-        // Prefer the provided tint; if it’s default/empty, fall back to cached preview tint.
-        // (Unity Colors are structs; there isn’t a true “null”, so we treat near-black as “unset”.)
-        Color baseTint = tint;
-        if (baseTint.r <= 0.001f && baseTint.g <= 0.001f && baseTint.b <= 0.001f)
-            baseTint = _lastTint;
+        Color c;
 
-        // Role-specific shadow hue if it’s meaningfully set; otherwise derive from base.
-        Color shadow = _lastShadowTint;
-        if (shadow.r <= 0.001f && shadow.g <= 0.001f && shadow.b <= 0.001f)
-            shadow = new Color(baseTint.r * 0.20f, baseTint.g * 0.20f, baseTint.b * 0.20f, 1f);
+        if (dimUsesFixedTint)
+        {
+            // Near-black, barely visible.
+            c = dimShardTint;
+            c.r *= dimRgbMul;
+            c.g *= dimRgbMul;
+            c.b *= dimRgbMul;
+            c.a  = dimAlpha;
+        }
+        else
+        {
+            // Dim the provided tint aggressively.
+            Color baseTint = tint;
+            if (baseTint.r <= 0.001f && baseTint.g <= 0.001f && baseTint.b <= 0.001f)
+                baseTint = _lastTint;
 
-        // Keep dim readable but not “nearly black disappears”
-        shadow.a = Mathf.Clamp01(dimShardTint.a); // reuse your authored alpha knob
+            c = baseTint;
+            c.r *= dimRgbMul;
+            c.g *= dimRgbMul;
+            c.b *= dimRgbMul;
+            c.a  = dimAlpha;
+        }
 
-        SetShardTint(shadow);
+        SetShardTint(c);
 
-        ApplyParticleAlpha(0.25f);
-        if (particles && !particles.isPlaying) particles.Play();
+        // Particles are usually the thing that keeps “dim” feeling alive.
+        ApplyParticleAlpha(0.05f);
+        if (particles && particles.isPlaying) particles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
 

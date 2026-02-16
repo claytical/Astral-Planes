@@ -54,6 +54,16 @@ public class InstrumentTrackController : MonoBehaviour
     private float _gravityVoidDustHardness01;
     private float _gravityVoidGrowSecondsRuntime = -1f;
     private int   _gravityVoidMaxRadiusRuntime   = -1;
+    private bool _hasLastTransportFrame;
+    private TransportFrame _lastTransportFrame;
+    private double _lastTransportDsp;
+    private int _lastPlayheadBin;
+// ------------------------------------------------------------
+// Transport cache + guard against transient future-dated anchors
+// ------------------------------------------------------------
+    private bool _hasLastTransport;
+    private TransportFrame _lastTransport;
+    private GameFlowManager _gfm;
 
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
@@ -526,34 +536,59 @@ public void DespawnGravityVoid()
     /// </summary>
     public TransportFrame GetTransportFrame()
     {
+        
         var drum = GameFlowManager.Instance?.activeDrumTrack;
-        if (drum == null)
-            return default;
+        if (drum == null) return default;
 
         double dspNow = AudioSettings.dspTime;
-        // IMPORTANT: use the *leader-loop* transport anchor when available.
-        // startDspTime is the clip schedule anchor; leaderStartDspTime is rebased when
-        // the effective leader loop length changes (expand/collapse).
-        double start  = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-        if (start <= 0.0)
-            return default;
+
+        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        if (start <= 0.0) return default;
 
         float clipLen = drum.GetClipLengthInSeconds();
-        if (clipLen <= 0f)
-            return default;
+        if (clipLen <= 0f) return default;
 
-        // Each “bin” is one base drum clip.
-        int barIndex = Mathf.FloorToInt((float)((dspNow - start) / clipLen));
+        // --- NEW: tolerate "start is slightly in the future" due to PlayScheduled lead time ---
+        const double kFutureStartEpsilon = 0.050; // 50ms; tune 0.02–0.08 if needed
+        double delta = dspNow - start;
 
-        // Transport must be derived from *committed/audible* leader bins, not visual bins.
-        int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());
-        int playheadBin = ((barIndex % leaderBins) + leaderBins) % leaderBins;
-
-        return new TransportFrame
+        if (delta < 0.0)
         {
-            barIndex   = barIndex,
+            if (delta > -kFutureStartEpsilon)
+            {
+                // We're just a few ms early; treat as "at start" instead of invalid.
+                dspNow = start;
+                delta = 0.0;
+            }
+            else
+            {
+                // Still genuinely not started (eg a big seek); you can either:
+                // 1) return a "pre-roll" frame (barIndex=0, playheadBin=0), or
+                // 2) return default.
+                // Pre-roll tends to look better than disappearing.
+                return new TransportFrame
+                {
+                    barIndex = 0,
+                    playheadBin = 0,
+                    // fill whatever else your struct needs (phaseT, localT, etc) as 0
+                };
+            }
+        }
+        int barIndex = Mathf.FloorToInt((float)(delta / clipLen));
+
+        // IMPORTANT: use committed/audible bins, not "max active" unless you're 100% sure they match.
+        int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());
+
+        int playheadBin = (leaderBins <= 1) ? 0 : (barIndex % leaderBins);
+        var tf = new TransportFrame
+        {
+            barIndex = barIndex,
             playheadBin = playheadBin
         };
+
+        _lastTransport = tf;
+        _hasLastTransport = true;
+        return tf;
     }
 
     /// <summary>
