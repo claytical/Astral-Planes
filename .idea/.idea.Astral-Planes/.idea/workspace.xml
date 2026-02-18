@@ -6,27 +6,19 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/MidiSet.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/MidiSet.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Moonlight/Moonlight_data.bytes" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Moonlight/Moonlight_data.bytes" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Dos/Dos.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Dos/Dos.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Nightwalk.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Nightwalk.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Track List.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Tres/Tres.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Tres/Tres.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Uno/Uno.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Motifs/Tracks/Uno/Uno.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Release Behavior.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Release Behavior.asset.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PhaseTransitionManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStarBehaviorProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStarBehaviorProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/Explode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/Explode.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,6 +42,7 @@
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/PlayerStatsGridAnchor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/ShipMusicalProfileLoader.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Helpers/TracksBundleAnchor.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Music/HarmonyDirector.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifLibrary.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/MotifProfile.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Utilities/PhasePersonalityRegistry.cs" root0="FORCE_HIGHLIGHTING" />
@@ -116,7 +109,7 @@
   </component>
   <component name="RunManager" selected="Attach to Unity Editor.Attach to Unity Editor">
     <configuration name="Standalone Player" type="RunUnityExe" factoryName="Unity Executable">
-      <option name="EXE_PATH" value="$USER_HOME$/Desktop/AstralPlanes_F.app/Contents/MacOS/AstralPlanes" />
+      <option name="EXE_PATH" value="$USER_HOME$/Desktop/amaze_builds/mac/AstralPlanes.app/Contents/MacOS/AstralPlanes" />
       <option name="PROGRAM_PARAMETERS" value="" />
       <option name="WORKING_DIRECTORY" value="$USER_HOME$/Desktop/Astral.app/Contents/MacOS" />
       <option name="PASS_PARENT_ENVS" value="1" />
@@ -289,6 +282,8 @@
       <workItem from="1769617544191" duration="8456000" />
       <workItem from="1769645702699" duration="72926000" />
       <workItem from="1770675809917" duration="42305000" />
+      <workItem from="1770856964247" duration="15926000" />
+      <workItem from="1771341424011" duration="10844000" />
     </task>
     <servers />
   </component>

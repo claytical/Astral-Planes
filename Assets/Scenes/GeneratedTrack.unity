@@ -10657,6 +10657,7 @@ MonoBehaviour:
   ascensionCohort:
     windowStartInclusive: 0
     windowEndExclusive: 0
+    stepsRemainingSerialized: 
     armed: 0
   assignedRole: 0
   lowestAllowedNote: 48
@@ -11209,6 +11210,7 @@ MonoBehaviour:
   ascensionCohort:
     windowStartInclusive: 0
     windowEndExclusive: 0
+    stepsRemainingSerialized: 
     armed: 0
   assignedRole: 1
   lowestAllowedNote: 48
@@ -11347,6 +11349,7 @@ MonoBehaviour:
   ascensionCohort:
     windowStartInclusive: 0
     windowEndExclusive: 0
+    stepsRemainingSerialized: 
     armed: 0
   assignedRole: 3
   lowestAllowedNote: 40
@@ -13881,6 +13884,7 @@ MonoBehaviour:
   ascensionCohort:
     windowStartInclusive: 0
     windowEndExclusive: 0
+    stepsRemainingSerialized: 
     armed: 0
   assignedRole: 2
   lowestAllowedNote: 48

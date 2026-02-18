@@ -574,6 +574,13 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         if (track != null)
             energySprite.color = track.trackColor;
 
+        var explode = GetComponent<Explode>();
+        if (explode != null && track != null)
+        {
+            // Multiply tends to look best if the prefab already has “hot” highlights.
+            explode.SetTint(track.trackColor, multiply: true);
+        }
+
         if (energySprite != null && track != null)
         {
             var c = track.trackColor;

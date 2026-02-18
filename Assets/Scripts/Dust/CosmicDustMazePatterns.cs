@@ -26,6 +26,12 @@ public enum MazeArchetype
 
 public static class CosmicDustMazePatterns
 {
+
+    // ------------------------------------------------------------------
+// NEW: Pattern wiring (calls extracted CosmicDustMazePatterns)
+// ------------------------------------------------------------------
+
+    
     /// <summary>
     /// Cellular Automata fill, matching the legacy Build_CA rule-set currently used by CosmicDustGenerator.
     ///
@@ -35,6 +41,8 @@ public static class CosmicDustMazePatterns
     /// - isCellAvailable(x,y) -> whether the spawn grid cell may be occupied
     /// - includeWorld(world) -> optional world-space veto (screen bounds, hollow radius, star-hole, etc.)
     /// </summary>
+    ///
+    /// 
     public static List<(Vector2Int cell, Vector3 world)> BuildCA(
         int width,
         int height,

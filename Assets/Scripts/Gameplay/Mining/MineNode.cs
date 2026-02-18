@@ -323,7 +323,12 @@ public class MineNode : MonoBehaviour
         _noteSet = noteSet; 
         _lockedColor = tint; 
         _drumTrack = (track != null) ? track.drumTrack : null;
-        
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.SetTint(_lockedColor, multiply: true);
+        }
+
         if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f) {
             _desiredHeading = _rb.linearVelocity.normalized; 
             _smoothedHeading = _desiredHeading;

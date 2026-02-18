@@ -429,7 +429,7 @@ public class GameFlowManager : MonoBehaviour
     // STEP 3: Start drums
     // --------------------
     if (phaseTransitionManager != null) { 
-        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(MazeArchetype.Establish, advanceMotif: false, who: "GFM/HandleTrackSceneSetupAsync");
+        phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(MazeArchetype.Release, advanceMotif: false, who: "GFM/HandleTrackSceneSetupAsync");
     }
     
     Debug.Log("[GFM] [STEP 3] activeDrumTrack.ManualStart BEGIN");

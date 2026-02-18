@@ -531,6 +531,193 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureRegrowController();
         _regrow?.EnqueueStepRegrow(gp);
     }
+private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
+    MazeArchetype phase,
+    Vector2Int starCell,
+    HashSet<Vector2Int> reservedCells)
+{
+    if (drums == null) return new List<(Vector2Int, Vector3)>();
+
+    int w = drums.GetSpawnGridWidth();
+    int h = drums.GetSpawnGridHeight();
+    if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
+
+    // Delegates required by CosmicDustMazePatterns
+    Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
+    Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
+    Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
+
+    // World veto: keep your existing screen cull.
+    Func<Vector3, bool> includeWorld = world => true;
+
+    // Grid veto for BFS-based patterns (ring chokepoints)
+    Func<Vector2Int, bool> includeCellForBfs = cell =>
+    {
+        if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
+
+        // IMPORTANT: allow the BFS seed (starCell) even though it's reserved.
+        // We will still filter it out from emitted growth later.
+        if (cell == starCell) return true;
+
+        if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
+        if (reservedCells != null && reservedCells.Contains(cell)) return false;
+        if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
+        if (IsKeepClearCell(cell)) return false;
+        return true;
+    };
+
+
+    // IMPORTANT: Patterns return the *cells to place dust*.
+    // We apply a final reserved/permanent/keep-clear filter afterward as defense-in-depth.
+    List<(Vector2Int cell, Vector3 world)> growth = null;
+
+    switch (phase)
+    {
+        case MazeArchetype.Establish:
+        {
+            // Legacy behavior: fill everything except reserved.
+            var rect = new List<(Vector2Int, Vector3)>(w * h);
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (!drums.IsSpawnCellAvailable(x, y)) continue;
+                var gp = new Vector2Int(x, y);
+                if (reservedCells != null && reservedCells.Contains(gp)) continue;
+                if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+                if (IsKeepClearCell(gp)) continue;
+
+                var world = drums.GridToWorldPosition(gp);
+                if (!IsWorldPositionInsideScreen(world)) continue;
+                rect.Add((gp, world));
+            }
+            growth = rect;
+            break;
+        }
+
+        case MazeArchetype.Evolve:
+        {
+            // Moderate CA
+            float fillChance = Mathf.Clamp01(GetFillProbability(phase));
+            growth = CosmicDustMazePatterns.BuildCA(
+                width: w,
+                height: h,
+                fillChance: fillChance,
+                iterations: 3,
+                getHexDirectionsByRow: getDirsByRow,
+                gridToWorld: gridToWorld,
+                isCellAvailable: isCellAvailable,
+                includeWorld: includeWorld);
+            break;
+        }
+
+        case MazeArchetype.Intensify:
+        {
+            // Denser CA (slightly higher fill chance + same iteration count)
+            float fillChance = Mathf.Clamp01(GetFillProbability(phase) + 0.15f);
+            growth = CosmicDustMazePatterns.BuildCA(
+                width: w,
+                height: h,
+                fillChance: fillChance,
+                iterations: 3,
+                getHexDirectionsByRow: getDirsByRow,
+                gridToWorld: gridToWorld,
+                isCellAvailable: isCellAvailable,
+                includeWorld: includeWorld);
+            break;
+        }
+
+        case MazeArchetype.Release:
+        {
+            // “Breath / breakdown”: ring chokepoints reads like structure-with-air.
+            // Tunables: spacing larger = fewer rings; thickness smaller = thinner walls.
+            int spacing = 6;
+            int thickness = 1;
+            float jitter = 0.35f;
+
+            growth = CosmicDustMazePatterns.BuildRingChokepoints(
+                center: starCell,
+                width: w,
+                height: h,
+                ringSpacing: spacing,
+                ringThickness: thickness,
+                jitter: jitter,
+                getHexDirectionsByRow: getDirsByRow,
+                gridToWorld: gridToWorld,
+                isCellAvailable: isCellAvailable,
+                includeCellForBfs: includeCellForBfs,
+                includeWorld: includeWorld);
+            break;
+        }
+
+        case MazeArchetype.Wildcard:
+        {
+            // Glitchy scribbles
+            growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
+                width: w,
+                height: h,
+                strokes: 10,
+                maxLen: 18,
+                stepJitter: 0.35f,
+                dilate: 0.30f,
+                getHexDirectionsByRow: getDirsByRow,
+                gridToWorld: gridToWorld,
+                isCellAvailable: isCellAvailable,
+                includeWorld: includeWorld);
+            break;
+        }
+
+        case MazeArchetype.Pop:
+        {
+            // Polka dots / hooky grid mask
+            growth = CosmicDustMazePatterns.BuildPopDots(
+                width: w,
+                height: h,
+                step: 4,
+                phaseOffset: Random.Range(0, 8),
+                gridToWorld: gridToWorld,
+                isCellAvailable: isCellAvailable,
+                includeWorld: includeWorld);
+            break;
+        }
+
+        default:
+        {
+            // Safe fallback: treat as Establish rectangle fill
+            var rect = new List<(Vector2Int, Vector3)>(w * h);
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (!drums.IsSpawnCellAvailable(x, y)) continue;
+                var gp = new Vector2Int(x, y);
+                if (reservedCells != null && reservedCells.Contains(gp)) continue;
+                if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+                if (IsKeepClearCell(gp)) continue;
+
+                var world = drums.GridToWorldPosition(gp);
+                if (!IsWorldPositionInsideScreen(world)) continue;
+                rect.Add((gp, world));
+            }
+            growth = rect;
+            break;
+        }
+    }
+
+    if (growth == null)
+        growth = new List<(Vector2Int, Vector3)>();
+
+    // Final filter: enforce reserved/permanent/keep-clear *even if a pattern emitted them*.
+    var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
+    for (int i = 0; i < growth.Count; i++)
+    {
+        var gp = growth[i].cell;
+        if (reservedCells != null && reservedCells.Contains(gp)) continue;
+        if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+        if (IsKeepClearCell(gp)) continue;
+        filtered.Add((growth[i].cell, growth[i].world));
+    }
+
+    return filtered;
+}
 
     public IEnumerator GenerateMazeForPhaseWithPaths(MazeArchetype phase, Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
     {
@@ -542,19 +729,16 @@ public class CosmicDustGenerator : MonoBehaviour
 
         Debug.Log($"[MAZE] GenerateMazeForPhaseWithPaths START phase={phase} starCell={starCell} vehicleCount={(vehicleCells != null ? vehicleCells.Count : 0)} permCount(before grid wait)={_permanentClearCells.Count}");
 
-        Debug.Log("[MAZE] Waiting for Spawn Grid");
         yield return new WaitUntil(() =>
             drums.HasSpawnGrid() &&
             drums.GetSpawnGridWidth()  > 0 &&
             drums.GetSpawnGridHeight() > 0 &&
             Camera.main != null);
-        Debug.Log("[MAZE] Spawn grid available.");
 
         // 1) Clear any existing dust
-        Debug.Log($"[MAZE] ClearMaze() called from GenerateMazeForPhaseWithPaths; permCount BEFORE ClearMaze={_permanentClearCells.Count}");
         ClearMaze();
-        Debug.Log($"[MAZE] ClearMaze() finished; permCount AFTER ClearMaze={_permanentClearCells.Count}");
-
+        drums.SyncTileWithScreen();
+        EnsureCellGrid();
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
         Debug.Log($"[MAZE] Maze grid size: {w}x{h}");
@@ -570,26 +754,12 @@ public class CosmicDustGenerator : MonoBehaviour
                 var v = vehicleCells[i];
                 reserved.Add(v);
                 _permanentClearCells.Add(v);
-                Debug.Log($"[MAZE] Mark vehicleCell[{i}] permanent: {v} permCount={_permanentClearCells.Count}");
             }
         }
 
-        var cellsToFill = new List<(Vector2Int grid, Vector3 pos)>();
-
-        for (int x = 0; x < w; x++)
-        {
-            for (int y = 0; y < h; y++)
-            {
-                Vector2Int g = new Vector2Int(x, y);
-                if (!reserved.Contains(g))
-                {
-                    Vector3 world = drums.GridToWorldPosition(g);
-                    cellsToFill.Add((g, world));
-                }
-            }
-        }
-
-        Debug.Log($"[MAZE] cellsToFill count={cellsToFill.Count}");
+// Pattern-driven growth list
+        var cellsToFill = BuildMazeGrowthForPhase(phase, starCell, reserved);
+        Debug.Log($"[MAZE] cellsToFill(pattern) count={cellsToFill.Count}");
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
         Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
@@ -1415,12 +1585,20 @@ public int ApplyVoidImprintDiskFromGrid(
         for (int i = 0; i < cells.Count; i++)
             _reservedVehicleCells.Add(cells[i]);
     }
-    private bool IsWorldPositionInsideScreen(Vector3 worldPos) {
-        var cam = Camera.main; 
-        if (!cam) return true; // no camera yet → don't cull
-        Vector3 viewport = cam.WorldToViewportPoint(worldPos); 
-        return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
-    } 
+    private bool IsWorldPositionInsideScreen(Vector3 worldPos)
+    {
+        var cam = Camera.main;
+        if (!cam) return true; // don't cull if camera not ready
+
+        Vector3 viewport = cam.WorldToViewportPoint(worldPos);
+
+        // NEW: if point is behind/at camera plane, don't trust x/y.
+        if (viewport.z <= 0.001f) return false;
+
+        return viewport.x >= 0f && viewport.x <= 1f &&
+               viewport.y >= 0f && viewport.y <= 1f;
+    }
+
     private IEnumerator StaggeredGrowthFitDuration(List<(Vector2Int grid, Vector3 pos)> cells, float totalDuration) {
         // Keep pacing similar, but enforce a per-frame millisecond budget
         float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
