@@ -789,7 +789,7 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
         }
 
         // Establish is the first phase; force motif selection.
-        var boot = MazeArchetype.Establish;
+        var boot = MazeArchetype.Release;
 
         var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
         if (_dust != null && bootProfile != null)
@@ -810,7 +810,7 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
         if (_phaseTransitionManager != null)
         {
             _phaseTransitionManager.InitializeIfNeeded("DrumTrack/ManualStart");
-            _phaseTransitionManager.BootIfNeeded(MazeArchetype.Establish, "DrumTrack/ManualStart");
+            _phaseTransitionManager.BootIfNeeded(MazeArchetype.Release, "DrumTrack/ManualStart");
             if (_phaseTransitionManager.currentMotif != null) 
                 _motif = _phaseTransitionManager.currentMotif;
 

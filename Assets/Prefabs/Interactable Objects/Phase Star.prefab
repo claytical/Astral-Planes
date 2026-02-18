@@ -4922,7 +4922,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   spawnStrategyProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c,
     type: 2}
-  behaviorProfile: {fileID: 11400000, guid: 3397db6e775044b3398628ffa1ccd9d2, type: 2}
+  behaviorProfile: {fileID: 11400000, guid: 56d8541b1799a436ca860fa02d237caf, type: 2}
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
@@ -4956,6 +4956,9 @@ MonoBehaviour:
   diamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000, type: 3}
   activeDiamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
+  dimAlpha: 0.06
+  dimRgbMul: 0.08
+  dimUsesFixedTint: 1
   particles: {fileID: 382306593780773728}
   bubbleRoot: {fileID: 5131073904990169975}
   bubbleSprite: {fileID: 2552610199592648178}

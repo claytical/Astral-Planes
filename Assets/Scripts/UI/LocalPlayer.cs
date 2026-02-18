@@ -32,6 +32,11 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float mouseDeltaSmoothing = 12f; // higher = smoother (EMA rate per second)
     [SerializeField] private float maxPixelsPerFrame = 50f;   // clamp spikes from touchpad/mouse
     [SerializeField] private float angleSmoothTime = 0.08f;   // seconds to smooth heading changes
+    [Header("Keyboard Stick Emulation")]
+    [SerializeField] private float keyboardRisePerSec = .01f;   // how fast it ramps up to target
+    [SerializeField] private float keyboardFallPerSec = 10f;   // optional extra fall control (you can keep stickDecayPerSec)
+    [SerializeField] private float keyboardDeadzone = 1f;  // classify "digital" vs "analog"
+
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
     private bool _usingMouse;
@@ -223,37 +228,61 @@ public class LocalPlayer : MonoBehaviour
     {
         if (plane == null) return;
 
-        // Poll current move value every physics tick (works for held keys and held stick)
-        Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
-
-        // IMPORTANT: don't Normalize() here or you destroy analog magnitude.
-        // Clamp to unit circle instead.
-        raw = Vector2.ClampMagnitude(raw, 1f);
-
-        // Apply your existing scaling
-        _moveInput = raw * friction;
-
         float dt = Time.fixedDeltaTime;
 
-        // If we have explicit move input (keyboard/gamepad), treat it as the stick target.
-        if (_moveInput.sqrMagnitude >= 0.0001f)
+        // Read raw stick/keys
+        Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
+        raw = Vector2.ClampMagnitude(raw, 1f);
+
+        // Identify whether the current move input is coming from keyboard.
+        // (This is much more reliable than magnitude heuristics with 2DVector composites.)
+        bool isKeyboard =
+            _moveAction != null &&
+            _moveAction.activeControl != null &&
+            _moveAction.activeControl.device is Keyboard;
+
+        if (raw.sqrMagnitude > 0.0001f)
         {
-            _virtualStick = _moveInput; // snap while held
+            if (isKeyboard)
+            {
+                // Exponential approach to target: "keyboardRisePerSec" behaves like a rate (bigger = faster).
+                // alpha ~= 0..1 per tick, framerate-independent.
+                float alpha = 1f - Mathf.Exp(-keyboardRisePerSec * dt);
+                _virtualStick = Vector2.Lerp(_virtualStick, raw, alpha);
+            }
+            else
+            {
+                // Gamepad already feels good: follow directly.
+                _virtualStick = raw;
+            }
         }
         else
         {
-            // Exponential decay toward center for the virtual stick
             if (_virtualStick.sqrMagnitude > 0f)
             {
-                float k = Mathf.Exp(-stickDecayPerSec * dt);
-                _virtualStick *= k;
+                if (isKeyboard)
+                {
+                    // Separate fall rate for keyboard so you can tune release feel independently.
+                    float alpha = 1f - Mathf.Exp(-keyboardFallPerSec * dt);
+                    _virtualStick = Vector2.Lerp(_virtualStick, Vector2.zero, alpha);
+                }
+                else
+                {
+                    // Keep your existing exponential decay for analog if you like.
+                    float k = Mathf.Exp(-stickDecayPerSec * dt);
+                    _virtualStick *= k;
+                }
+
                 if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
             }
         }
 
-        // Always feed the smoothed stick
-        plane.Move(_virtualStick);
+        // Apply friction AFTER smoothing, so your smoothing tuning isn't coupled to friction.
+        Vector2 finalMove = _virtualStick * friction;
+
+        plane.Move(finalMove);
     }
+
 
     private void HandleConfirm()
     {
@@ -299,12 +328,6 @@ public class LocalPlayer : MonoBehaviour
         else plane?.TurnOffBoost();
         Debug.Log($"[VEHICLE] Thrusting stopped at {v}");
 
-    }
-    public void OnMove(InputValue value)
-    {
-        Vector2 v = Vector2.ClampMagnitude(value.Get<Vector2>(), 1f);
-        _moveInput = v * friction;
-        if (_moveInput.sqrMagnitude > 0f) _usingMouse = false;
     }
 
     public void OnMouseMove(InputValue value)
@@ -409,40 +432,6 @@ public class LocalPlayer : MonoBehaviour
     {
 //        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
 //            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
-    }
-    public void OnNorth(InputValue value)
-    {
-        _moveInput = Vector2.up * friction;
-        if (!value.isPressed)
-        {
-            _decelerate = true;
-        }
-    }
-    public void OnEast(InputValue value)
-    {
-        _moveInput = Vector2.right * friction;
-        if (!value.isPressed)
-        {
-            _decelerate = true;
-        }
-
-    }
-    public void OnWest(InputValue value)
-    {
-        _moveInput = Vector2.left * friction;
-        if (!value.isPressed)
-        {
-            _decelerate = true;
-        }
-
-    }
-    public void OnSouth(InputValue value)
-    {
-        _moveInput = Vector2.down * friction;
-        if (!value.isPressed)
-        {
-            _decelerate = true;
-        }
     }
     
 }

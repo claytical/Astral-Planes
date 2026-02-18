@@ -280,7 +280,7 @@ public void EnsureMotifInitialized(string who)
         if (_initialized) return;
 
         // Phase defaults
-        if (currentPhase == 0) currentPhase = MazeArchetype.Establish;
+        if (currentPhase == 0) currentPhase = MazeArchetype.Release;
         previousPhase = currentPhase;
 
         // Motif defaults
