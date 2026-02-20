@@ -16,7 +16,7 @@ public class CollectionSoundManager : MonoBehaviour
 
     [Header("FX Program Defaults")]
     [Tooltip("FX voice program preset (used for PlayEffect unless overridden).")]
-    [SerializeField] private SoundEffectPreset defaultFxPreset = SoundEffectPreset.Dust;
+    [SerializeField] private int defaultFxPreset = 12;
 
     // All presets assumed to be in Bank 0
     private const int fxBank = 0;
@@ -58,7 +58,7 @@ public class CollectionSoundManager : MonoBehaviour
         }
 
         // Set default program for FX
-        fxVoice.PlayOneShotMs127(60, 1, 1, (int)defaultFxPreset, fxBank); // "poke" to force channel init
+        fxVoice.PlayOneShotMs127(60, 1, 1, defaultFxPreset, fxBank); // "poke" to force channel init
        // fxVoice.SetProgram((int)defaultFxPreset, fxBank);
 
         Debug.Log("✅ SoundFont ready. CollectionSoundManager FX voice initialized.");

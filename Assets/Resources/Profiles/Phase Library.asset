@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06e2b29f6cb454beeb4ff9412f9f1b5b, type: 3}
+  m_Name: Phase Library
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
+  chapters:
+  - phase: 3
+    motifs:
+    - {fileID: 11400000, guid: 9eeaf2461f71645d3bf232959c99621c, type: 2}
+    - {fileID: 11400000, guid: 3a305243250bf4020aef9d5d3f0320e4, type: 2}
+    loopMotifs: 0
+  - phase: 0
+    motifs:
+    - {fileID: 11400000, guid: 0bc601df3260a4ced88b5418d38584ca, type: 2}
+    - {fileID: 11400000, guid: 6401f559d669148ceb6b302e80d3f0df, type: 2}
+    loopMotifs: 0

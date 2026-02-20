@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: Chokepoints
   m_EditorClassIdentifier: 
   mazeColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
-  nodesPerStar: 16
+  nodesPerStar: 8
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 2
   enableSafetyBubble: 1
   safetyBubbleRadiusCells: 4
   rotateSelectionOnLoopBoundary: 1
-  rotateEveryNLoops: 1
+  rotateEveryNLoops: 2
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
   particlePulseSpeed: 0.5

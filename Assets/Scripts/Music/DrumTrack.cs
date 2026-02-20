@@ -39,6 +39,10 @@ public class DrumTrack : MonoBehaviour
     public GameObject phaseStarPrefab;
     public GameObject mineNodePrefab;
     public PhasePersonalityRegistry phasePersonalityRegistry;
+    private MotifProfile _pendingMotif;
+    private float _pendingBpm;
+    private int _pendingTotalSteps;
+    private bool _pendingTimingValid;
 
     [Header("Play Area Mapping")]
     [Tooltip(
@@ -113,9 +117,7 @@ public class DrumTrack : MonoBehaviour
 
     private int _binIdx = -1;
     private int _binCount = 4; // default; PhaseStar can override per-spawn
-
-
-    // DrumTrack.cs (fields)
+    
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;
     private List<AudioClip> _intensityLoops;
@@ -152,71 +154,7 @@ public class DrumTrack : MonoBehaviour
         int i = UnityEngine.Random.Range(0, _entryLoops.Count);
         return _entryLoops[i];
     }
-    public void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)    {
-        _motif = motif;
-        _entryLoops = (_motif != null) ? _motif.entryDrumLoops : null;
-        _intensityLoops = (_motif != null) ? _motif.intensityDrumLoops : null;
 
-        _entryLoopsRemaining = (_motif != null) ? Mathf.Max(0, _motif.entryLoopCount) : 0; 
-        _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
-        // Motif timing is authoritative.
-        if (_motif != null)
-        {
-            drumLoopBPM = _motif.bpm;
-            totalSteps  = _motif.stepsPerLoop;
-        }
-
-        // Reset intensity sampling for this motif (prevents “stuck at 0” after first motif).
-        _lastSpentTanksSample = -1f;
-        _lastIntensity01 = 0f;
-
-        // Pick an initial clip for this motif.
-        AudioClip clip = ChooseEntryClip();
-
-        Debug.Log(
-            $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
-            $"entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
-            $"entryLoopCount={_entryLoopsRemaining} drive={_driveFromEnergy} bpm={drumLoopBPM} steps={totalSteps} " +
-            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport}"
-        );
-
-        if (clip == null)
-        {
-            Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
-            return;
-        }
-
-        // If we haven't started yet, let ManualStart handle scheduling.
-        if (!_started)
-            return;
-
-        if (restartTransport) {
-            // Hard reset both decks, then schedule fresh.
-            try { if (_activeDrum != null) _activeDrum.Stop(); } catch { }
-            try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
-            _pendingDrumLoop = null;
-            _pendingDrumLoopArmed = false;
-
-            EnsureDualDrumSources();
-            if (_activeDrum == null) return;
-
-            _activeDrum.clip = clip;
-            _activeDrum.loop = true;
-            _clipLengthSec = Mathf.Max(clip.length, 0f);
-
-            double dspStart = AudioSettings.dspTime + 0.05;
-            _activeDrum.PlayScheduled(dspStart);
-            drumAudioSource = _activeDrum;
-            startDspTime = dspStart;
-            leaderStartDspTime = dspStart;
-            _currentDrumClip = clip;
-            return;
-
-}
-        // Normal path: arm a pending clip and let Update() schedule the swap at a safe boundary.
-        _pendingDrumLoop = clip;
-        _pendingDrumLoopArmed = armAtNextBoundary; 
-    }
     private AudioClip ResolveIntensityClip(float intensity01)
     {
         if (_intensityLoops == null || _intensityLoops.Count == 0) return null;
@@ -225,6 +163,126 @@ public class DrumTrack : MonoBehaviour
         int idx = Mathf.Clamp(Mathf.FloorToInt(intensity01 * n), 0, n - 1);
         return _intensityLoops[idx];
     }
+
+public void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)
+{
+    // Capture old timing BEFORE we overwrite _motif.
+    int oldSteps = (_motif != null) ? _motif.stepsPerLoop : totalSteps;
+    float oldBpm = (_motif != null) ? _motif.bpm : drumLoopBPM;
+
+    bool stepsChanged = (_motif != null && motif != null && _motif.stepsPerLoop != motif.stepsPerLoop);
+    bool bpmChanged   = (_motif != null && motif != null && Mathf.Abs(_motif.bpm - motif.bpm) > 0.001f);
+
+    _motif = motif;
+    _entryLoops = (_motif != null) ? _motif.entryDrumLoops : null;
+    _intensityLoops = (_motif != null) ? _motif.intensityDrumLoops : null;
+
+    _entryLoopsRemaining = (_motif != null) ? Mathf.Max(0, _motif.entryLoopCount) : 0;
+    _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
+
+    // Reset intensity sampling for this motif (prevents “stuck at 0” after first motif).
+    _lastSpentTanksSample = -1f;
+    _lastIntensity01 = 0f;
+
+    // Choose clip for this motif (clip choice can be immediate even if timing is pending).
+    AudioClip clip = ChooseEntryClip();
+
+    // If we're already running and steps changed, we must NOT change totalSteps immediately unless we restart now.
+    if (_started && (stepsChanged || bpmChanged) && !restartTransport)
+    {
+        // If caller asked for an armed swap, enforce it (safe boundary).
+        if (!armAtNextBoundary)
+        {
+            Debug.LogWarning(
+                $"[DRUM][MOTIF] Timing changed (steps {oldSteps}->{(motif ? motif.stepsPerLoop : oldSteps)}, " +
+                $"bpm {oldBpm}->{(motif ? motif.bpm : oldBpm)}) but armAtNextBoundary==false and restartTransport==false. " +
+                $"Forcing armAtNextBoundary=true to avoid transport mismatch."
+            );
+            armAtNextBoundary = true;
+        }
+
+        // Defer timing changes until the swap actually commits.
+        _pendingMotif = motif;
+        _pendingBpm = (motif != null) ? motif.bpm : drumLoopBPM;
+        _pendingTotalSteps = (motif != null) ? motif.stepsPerLoop : totalSteps;
+        _pendingTimingValid = true;
+
+        Debug.Log(
+            $"[DRUM][MOTIF] ApplyMotif(DEFERRED TIMING) by {who}: motif={(motif ? motif.motifId : "null")} " +
+            $"steps {oldSteps}->{_pendingTotalSteps} bpm {oldBpm}->{_pendingBpm} " +
+            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport}"
+        );
+    }
+    else
+    {
+        // Safe to apply timing immediately when:
+        // - we haven't started (ManualStart will schedule), OR
+        // - restartTransport==true (immediate reschedule), OR
+        // - no timing change.
+        if (_motif != null)
+        {
+            drumLoopBPM = _motif.bpm;
+            totalSteps  = _motif.stepsPerLoop;
+        }
+
+        _pendingMotif = null;
+        _pendingTimingValid = false;
+
+        Debug.Log(
+            $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
+            $"entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
+            $"entryLoopCount={_entryLoopsRemaining} drive={_driveFromEnergy} bpm={drumLoopBPM} steps={totalSteps} " +
+            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport}"
+        );
+    }
+
+    if (clip == null)
+    {
+        Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
+        return;
+    }
+
+    // If we haven't started yet, let ManualStart handle scheduling.
+    if (!_started)
+        return;
+
+    if (restartTransport)
+    {
+        // Hard reset both decks, then schedule fresh.
+        try { if (_activeDrum != null) _activeDrum.Stop(); } catch { }
+        try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+        _pendingDrumLoop = null;
+        _pendingDrumLoopArmed = false;
+
+        // Since we're restarting, timing must be committed immediately.
+        if (_motif != null)
+        {
+            drumLoopBPM = _motif.bpm;
+            totalSteps  = _motif.stepsPerLoop;
+        }
+        _pendingMotif = null;
+        _pendingTimingValid = false;
+
+        EnsureDualDrumSources();
+        if (_activeDrum == null) return;
+
+        _activeDrum.clip = clip;
+        _activeDrum.loop = true;
+        _clipLengthSec = Mathf.Max(clip.length, 0f);
+
+        double dspStart = AudioSettings.dspTime + 0.05;
+        _activeDrum.PlayScheduled(dspStart);
+        drumAudioSource = _activeDrum;
+        startDspTime = dspStart;
+        leaderStartDspTime = dspStart;
+        _currentDrumClip = clip;
+        return;
+    }
+
+    // Normal path: arm a pending clip and let Update() schedule the swap at a safe boundary.
+    _pendingDrumLoop = clip;
+    _pendingDrumLoopArmed = armAtNextBoundary;
+}
 
     public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {
         ApplyMotif(motif, armAtNextBoundary, who, restartTransport);
@@ -580,13 +638,28 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
 
             // startDspTime is the *bar* anchor for the currently-playing clip;
             // leaderStartDspTime remains leader-loop anchor.
-            startDspTime = _pendingDrumLoopDspStart;
-
             _currentDrumClip = (_activeDrum != null) ? _activeDrum.clip : null;
+
+// ✅ COMMIT PENDING TIMING NOW THAT THE NEW DECK IS AUDIBLE
+            if (_pendingTimingValid)
+            {
+                drumLoopBPM = _pendingBpm;
+                totalSteps  = Mathf.Max(1, _pendingTotalSteps);
+
+                // Clear pending timing so intensity-driven clip swaps don't reapply it.
+                _pendingTimingValid = false;
+
+                Debug.Log(
+                    $"[DRUM][MOTIF] Committed pending timing at swap: bpm={drumLoopBPM} steps={totalSteps} " +
+                    $"dsp={startDspTime:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}"
+                );
+            }
 
             Debug.Log($"[DRUM] Finalized drum loop swap at dsp={startDspTime:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
 
             _pendingDrumLoopDspStart = -1.0;
+
+            
         }
     }
 
@@ -749,109 +822,129 @@ private void ArmPendingDrumLoopForNextLeaderBoundary(double nextBoundaryDsp, dou
         // Keep public field pointing to currently active deck (so other code reads the audible clip)
         drumAudioSource = _activeDrum;
     }
-
-    public void ManualStart()
+    
+public void ManualStart()
+{
+    _gfm = GameFlowManager.Instance;
+    if (_gfm != null)
     {
-        _gfm = GameFlowManager.Instance;
-        if (_gfm != null)
-        {
-            _spawnGrid = _gfm.spawnGrid;
-            _dust = _gfm.dustGenerator;
-            _trackController = _gfm.controller;
-            _phaseTransitionManager = _gfm.phaseTransitionManager;
-        }
-
-        if (_gfm != null && _spawnGrid != null && _dust != null)
-        {
-            float tile = GetTileDiameterWorld();
-            int w = _spawnGrid.gridWidth;
-            float worldW = tile * (w - 1);
-            float scrW = GetScreenWorldWidth();
-            Debug.Log(
-                $"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / scrW:F3}");
-        }
-
-        isPhaseStarActive = false;
-        if (_started) return;
-
-        if (drumAudioSource == null)
-        {
-            Debug.LogError("DrumTrack: No AudioSource assigned!");
-            return;
-        }
-
-        // Ensure dual-deck scheduling is available (A/B decks).
-        EnsureDualDrumSources();
-        if (_activeDrum == null)
-        {
-            Debug.LogError("[BOOT] DrumTrack: dual-drum source init failed (_activeDrum is null).");
-            return;
-        }
-
-        // Establish is the first phase; force motif selection.
-        var boot = MazeArchetype.Release;
-
-        var bootProfile = phasePersonalityRegistry != null ? phasePersonalityRegistry.Get(boot) : null;
-        if (_dust != null && bootProfile != null)
-        {
-            _dust.ApplyProfile(bootProfile);
-            SyncTileWithScreen();
-        }
-
-// ManualStart can occur before any explicit PhaseTransitionManager commit.
-// Ensure PTM has at least a current motif selected (without advancing).
-        if (_phaseTransitionManager != null) { 
-            _phaseTransitionManager.CommitPhaseAndMaybeAdvanceMotif(boot, advanceMotif: false, who: "DrumTrack/ManualStart");
-        }
-
-        // --- Motif-driven drum boot ---
-        AudioClip initialClip = null;
-
-        if (_phaseTransitionManager != null)
-        {
-            _phaseTransitionManager.InitializeIfNeeded("DrumTrack/ManualStart");
-            _phaseTransitionManager.BootIfNeeded(MazeArchetype.Release, "DrumTrack/ManualStart");
-            if (_phaseTransitionManager.currentMotif != null) 
-                _motif = _phaseTransitionManager.currentMotif;
-
-            // Timing from motif is authoritative
-            drumLoopBPM = _motif.bpm;
-            totalSteps = _motif.stepsPerLoop;
-            
-            if (_motif != null) { 
-                // Use the shared “apply” path so boot and later motif changes behave the same.
-                ApplyMotif(_motif, armAtNextBoundary: false, who: "DrumTrack/ManualStart", restartTransport: false); 
-                // ApplyMotif chooses the clip; but ManualStart still needs initialClip for deck scheduling below.
-                initialClip = ChooseEntryClip();
-            } 
-            if (initialClip == null) 
-                initialClip = drumAudioSource != null ? drumAudioSource.clip : null; 
-            if (initialClip == null) { 
-                Debug.LogError("[BOOT] DrumTrack.ManualStart: no initial drum clip available (motif entry clip + AudioSource.clip are null).");
-                return; 
-            } 
-            // Prevent hearing the inspector/default loop.
-            try { if (_activeDrum != null) _activeDrum.Stop(); } catch { } 
-            try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
-            _pendingDrumLoop = null; 
-            _pendingDrumLoopArmed = false;
-            _activeDrum.clip = initialClip; 
-            _activeDrum.loop = true; 
-            _activeDrum.playOnAwake = false;
-            _clipLengthSec = Mathf.Max(initialClip.length, 0f);
-            
-            double dspStart = AudioSettings.dspTime + 0.05; 
-            _activeDrum.PlayScheduled(dspStart);
-            drumAudioSource = _activeDrum; 
-            startDspTime = dspStart;
-            leaderStartDspTime = dspStart; 
-            _currentDrumClip = initialClip; 
-            _started = true;
-            Debug.Log($"[BOOT] Drum transport started: clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
-       
-        }
-
+        _spawnGrid = _gfm.spawnGrid;
+        _dust = _gfm.dustGenerator;
+        _trackController = _gfm.controller;
+        _phaseTransitionManager = _gfm.phaseTransitionManager;
     }
+
+    // Optional debug: grid to screen scale sanity
+    if (_gfm != null && _spawnGrid != null && _dust != null)
+    {
+        float tile = GetTileDiameterWorld();
+        int w = _spawnGrid.gridWidth;
+        float worldW = tile * (w - 1);
+        float scrW = GetScreenWorldWidth();
+        Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / Mathf.Max(0.0001f, scrW):F3}");
+    }
+
+    isPhaseStarActive = false;
+    if (_started) return;
+
+    if (drumAudioSource == null)
+    {
+        Debug.LogError("[BOOT] DrumTrack.ManualStart: No AudioSource assigned (drumAudioSource is null).");
+        return;
+    }
+
+    // Ensure dual-deck scheduling is available (A/B decks).
+    EnsureDualDrumSources();
+    if (_activeDrum == null)
+    {
+        Debug.LogError("[BOOT] DrumTrack.ManualStart: dual-drum source init failed (_activeDrum is null).");
+        return;
+    }
+
+    // -------------------------------
+    // Motif boot: DRIVEN BY PTM
+    // -------------------------------
+    MotifProfile bootMotif = null;
+    if (_phaseTransitionManager != null)
+        bootMotif = _phaseTransitionManager.currentMotif;
+
+    if (bootMotif == null)
+    {
+        Debug.LogWarning(
+            "[BOOT] DrumTrack.ManualStart: PTM.currentMotif is null.\n" +
+            "Expected GameFlowManager to call PTM.StartChapter(...) before ManualStart.\n" +
+            "Falling back to AudioSource.clip timing (may play inspector/default loop)."
+        );
+    }
+
+    AudioClip initialClip = null;
+
+    if (bootMotif != null)
+    {
+        _motif = bootMotif;
+
+        // Timing from motif is authoritative
+        drumLoopBPM = _motif.bpm;
+        totalSteps = _motif.stepsPerLoop;
+
+        // Ensure our internal motif state is applied consistently with later transitions
+        // (ApplyMotif may also choose/setup clip candidates, beat seq, etc.)
+        if (_motif != null)
+        {
+            ApplyMotif(_motif, armAtNextBoundary: false, who: "DrumTrack/ManualStart", restartTransport: false);
+        }
+
+        // ApplyMotif chooses the clip in your system, but ManualStart still needs an explicit initial clip
+        initialClip = ChooseEntryClip();
+    }
+
+    // Fallback: use whatever is on the inspector source
+    if (initialClip == null)
+        initialClip = drumAudioSource.clip;
+
+    if (initialClip == null)
+    {
+        Debug.LogError("[BOOT] DrumTrack.ManualStart: no initial drum clip available (ChooseEntryClip + drumAudioSource.clip are null).");
+        return;
+    }
+
+    // Prevent hearing the inspector/default loop: stop both decks before scheduling.
+    try { _activeDrum.Stop(); } catch { }
+    try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+
+    _pendingDrumLoop = null;
+    _pendingDrumLoopArmed = false;
+
+    // Configure active deck
+    _activeDrum.clip = initialClip;
+    _activeDrum.loop = true;
+    _activeDrum.playOnAwake = false;
+
+    _clipLengthSec = Mathf.Max(initialClip.length, 0f);
+
+    // Start scheduled
+    double dspStart = AudioSettings.dspTime + 0.05;
+    _activeDrum.PlayScheduled(dspStart);
+
+    // Make the active deck the canonical "drumAudioSource" used elsewhere
+    drumAudioSource = _activeDrum;
+
+    startDspTime = dspStart;
+    leaderStartDspTime = dspStart;
+
+    _currentDrumClip = initialClip;
+    _started = true;
+
+    if (_motif != null)
+    {
+        Debug.Log($"[BOOT] Drum transport started (motif): clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
+    }
+    else
+    {
+        // We don't know bpm/steps in fallback mode; keep whatever inspector/default values were set.
+        Debug.Log($"[BOOT] Drum transport started (fallback): clip={initialClip.name} dspStart={dspStart:F3} (PTM motif missing)");
+    }
+}
 
     private void AutoSizeSpawnGridIfEnabled() { 
         if (!autoSizeSpawnGridToScreen) return; 

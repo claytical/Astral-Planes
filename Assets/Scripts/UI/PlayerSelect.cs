@@ -10,6 +10,7 @@ public class PlayerSelect : MonoBehaviour
     public Fuel fuel;
     public Color[] planeColors;
     public GameObject controlsAndStats;
+    public GameObject tutorialControls;
     public Image border;
 
     private int _selectedColor = 0;
