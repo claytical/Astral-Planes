@@ -296,6 +296,7 @@ RectTransform:
   - {fileID: 1736554592}
   - {fileID: 1399474086}
   - {fileID: 1975552307}
+  - {fileID: 244867977}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -590,6 +591,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 203368874}
   m_CullTransparentMesh: 1
+--- !u!1 &244867976
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 244867977}
+  m_Layer: 5
+  m_Name: PrimaryTutorialAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &244867977
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 244867976}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 48689788}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &264452578
 GameObject:
   m_ObjectHideFlags: 0
@@ -12845,14 +12881,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83100461a69a049b79c4f38e4bf15bb0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  previousPhase: 0
-  currentPhase: 0
+  chapterLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
+  loopChapters: 1
+  holdOnLastChapter: 0
   noteSetFactory: {fileID: -4105871785280924453, guid: c4eb69c1639e44822871748faa6b2751,
     type: 3}
-  motifQueue: {fileID: 11400000, guid: 266e8ac30daaa4002b473d9de45ffea5, type: 2}
-  motifLibrary: {fileID: 11400000, guid: 442706371a61147f0b0ad47d1691b5a1, type: 2}
-  loopMotifQueue: 1
-  _hasCommittedFirstMotif: 0
 --- !u!114 &1354683698
 MonoBehaviour:
   m_ObjectHideFlags: 0

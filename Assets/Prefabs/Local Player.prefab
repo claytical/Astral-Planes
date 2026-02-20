@@ -202,6 +202,15 @@ MonoBehaviour:
   mouseDeltaSmoothing: 6
   maxPixelsPerFrame: 50
   angleSmoothTime: 0.08
+  keyboardRisePerSec: 0.01
+  keyboardFallPerSec: 10
+  keyboardDeadzone: 1
+  miniTutorialPrefab: {fileID: 1743201695570324546, guid: 8fbe942bf3e9e427388555fa3d793b4a,
+    type: 3}
+  miniTutorialScale: {x: 0.25, y: 0.25, z: 1}
+  carveSpawnPocket: 1
+  spawnPocketRadiusCells: 0
+  spawnPocketFadeSeconds: 0.02
 --- !u!82 &827239962078650827
 AudioSource:
   m_ObjectHideFlags: 0

@@ -36,6 +36,12 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float keyboardRisePerSec = .01f;   // how fast it ramps up to target
     [SerializeField] private float keyboardFallPerSec = 10f;   // optional extra fall control (you can keep stickDecayPerSec)
     [SerializeField] private float keyboardDeadzone = 1f;  // classify "digital" vs "analog"
+    [Header("Tutorial UI")]
+    [SerializeField] private ControlTutorialHighlight miniTutorialPrefab;
+    [SerializeField] private Vector3 miniTutorialScale = new Vector3(0.65f, 0.65f, 1f);
+
+    private ControlTutorialHighlight _miniTutorial;
+    private bool _hasNavigatedSelectionOnce;
 
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
@@ -66,10 +72,51 @@ public class LocalPlayer : MonoBehaviour
 
     public void CreatePlayerSelect()
     {
+        // If we already had a selection UI from an earlier TrackSelection visit, kill it.
+        if (_selection != null)
+        {
+            Destroy(_selection.gameObject);
+            _selection = null;
+        }
+
+        if (_miniTutorial != null)
+        {
+            Destroy(_miniTutorial.gameObject);
+            _miniTutorial = null;
+        }
+
+        _hasNavigatedSelectionOnce = false;
+
         GameObject ps = Instantiate(playerSelect);
         _selection = ps.GetComponent<PlayerSelect>();
-        StartRumble(.1f,1, .5f);
+
+        StartRumble(.1f, 1, .5f);
+
+        // Spawn mini controller and attach it near the player’s selection UI (exactly once)
+        if (miniTutorialPrefab != null && _selection != null)
+        {
+// Choose a very specific anchor transform inside the PlayerSelectShip prefab.
+            Transform miniAnchor =
+                _selection.tutorialControls
+                    ? _selection.tutorialControls.transform
+                    : _selection.transform;
+
+            _miniTutorial = Instantiate(miniTutorialPrefab); // instantiate unparented
+
+            if (ControlTutorialDirector.Instance != null)
+            {
+                ControlTutorialDirector.Instance.RegisterMini(
+                    lp: this,
+                    mini: _miniTutorial,
+                    parentOverride: miniAnchor,
+                    localPos: Vector3.zero,
+                    localScale: miniTutorialScale,
+                    localRot: Quaternion.identity
+                );
+            }
+        }
     }
+
     public void SetStats()
     {
         _ui?.SetStats(plane);
@@ -84,6 +131,14 @@ public class LocalPlayer : MonoBehaviour
         if (_launched || _launchStarted) return;
         _launchStarted = true;
         StartCoroutine(LaunchWhenReady());
+    }
+    private void NotifySelectionNavigatedOnce()
+    {
+        if (_hasNavigatedSelectionOnce) return;
+        _hasNavigatedSelectionOnce = true;
+
+        if (ControlTutorialDirector.Instance != null)
+            ControlTutorialDirector.Instance.Mini_SetConfirmStage(this);
     }
 
     private IEnumerator LaunchWhenReady()
@@ -187,29 +242,30 @@ public class LocalPlayer : MonoBehaviour
         _suppressChoose = false;
         DontDestroyOnLoad(this);
         GameFlowManager.Instance.RegisterPlayer(this);
-        _playerInput = GetComponent<PlayerInput>();
-        _moveAction = _playerInput.actions["Move"]; // must match your action name
 
-        CreatePlayerSelect();
-        _playerInput.SwitchCurrentActionMap("Selection");
+        _playerInput = GetComponent<PlayerInput>();
+        _moveAction  = _playerInput.actions["Move"]; // must match your action name
+
+        // IMPORTANT: Only create selection UI in TrackSelection.
+        // Main scene should NOT spawn PlayerSelect/minis.
+        var sceneName = SceneManager.GetActiveScene().name;
+        if (sceneName == "TrackSelection")
+        {
+            CreatePlayerSelect();
+            _playerInput.SwitchCurrentActionMap("Selection");
+        }
+
         _confirmAction = _playerInput.actions["Choose"]; // use your actual action name
         _confirmAction.started += ctx =>
         {
-            if (!_confirmEnabled)
-            {
-                // Wait for release before enabling
-                return;
-            }
-
+            if (!_confirmEnabled) return;
             HandleConfirm();
         };
 
         _confirmAction.canceled += ctx =>
         {
-            // Button released — allow confirm on next press
             _confirmEnabled = true;
         };
-
     }
 
     private void OnDisable()
@@ -286,31 +342,50 @@ public class LocalPlayer : MonoBehaviour
 
     private void HandleConfirm()
     {
+        // If we're in the "primary tutorial gate" (post-ready, pre-game), confirm advances it.
+        if (GameFlowManager.Instance != null &&
+            GameFlowManager.Instance.CurrentState == GameState.Selection &&
+            ControlTutorialDirector.Instance != null &&
+            ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)
+        {
+            // Timed tutorial is running; ignore confirm (or treat as "skip" if you want).
+            return;
+        }
+
         if (_isReady) return;
 
         switch (GameFlowManager.Instance.CurrentState)
         {
-  
             case GameState.Selection:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 playerVehicle = _selection.GetChosenPlane();
                 _selection.Confirm();
                 SetColor();
                 _isReady = true;
-                Debug.Log($"Player {name} is ready");
+                IsReady = true;
+                if (ControlTutorialDirector.Instance != null)
+                    ControlTutorialDirector.Instance.Mini_Clear(this);
+
                 GameFlowManager.Instance.CheckAllPlayersReady();
                 break;
 
             case GameState.GameOver:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                
                 Restart();
                 break;
         }
     }
+    public void ResetReady()
+    {
+        _isReady = false;
+        IsReady = false;
+    }
+
     private void Restart()
     {
         _isReady = false;
-
+        
         if (_selection != null)
         {
             Destroy(_selection.gameObject);
@@ -376,44 +451,51 @@ public class LocalPlayer : MonoBehaviour
             Destroy(gameObject);
         }
     }
-
-    
     public void OnNextVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
+
         if (_selection != null)
         {
             _selection.NextVehicle();
-            
+            NotifySelectionNavigatedOnce();
         }
     }
+
     public void OnPreviousVehicle(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
+
         if (_selection != null)
         {
             _selection.PreviousVehicle();
+            NotifySelectionNavigatedOnce();
         }
     }
+
     public void OnNextColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
+
         if (_selection != null)
         {
-
             _selection.NextColor();
+            NotifySelectionNavigatedOnce();
         }
     }
+
     public void OnPreviousColor(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
+
         if (_selection != null)
         {
             _selection.PreviousColor();
+            NotifySelectionNavigatedOnce();
         }
     }
 

@@ -1,313 +1,251 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PhaseTransitionManager : MonoBehaviour
 {
-    public MazeArchetype previousPhase;
-    public MazeArchetype currentPhase;
-    private PhaseStarBehaviorProfile _activeBehaviorProfile;
-    public NoteSetFactory noteSetFactory;
-    private bool _phaseAdvanceArmed;
-    [Header("Motif / BeatMood (motif-based music)")]
-    [SerializeField] private MotifQueue motifQueue;
-    [SerializeField] private MotifLibrary motifLibrary;
-    private bool _initialized = false;
-    private bool _booted = false;
-    private int _motifQueueIndex = -1;  
-    private bool _hasCommittedMotif = false;
-    [SerializeField] private bool loopMotifQueue = true; // optional
-    [SerializeField] private bool _hasCommittedFirstMotif;
-
-    // The motif associated with the currentPhase (if any)
-    public MotifProfile currentMotif { get; private set; }
-
-    public event System.Action<MotifProfile, MotifProfile> OnMotifChanged;
-// Add this near your existing events / public API
-public event System.Action<MazeArchetype, MazeArchetype> OnPhaseChanged;
-
-/// <summary>
-/// Canonical entrypoint for updating phase and/or motif.
-///
-/// Phase: controls maze/gameplay architecture. It may remain constant (e.g., Establish)
-///        while multiple motifs play.
-/// Motif: musical "level". Should advance whenever a PhaseStar completes (out of shards),
-///        and may advance multiple times within the same phase.
-/// </summary>
-
-/// <summary>
-/// Backward-compatible wrapper: treats a true phase change as a motif advance.
-/// (So: new phase => new motif; same phase => no motif advance)
-/// </summary>
-    public void HandlePhaseTransition(MazeArchetype nextPhase, string who)
-    {
-        var oldPrev = previousPhase;
-        var oldCur  = currentPhase;
-        bool advanceMotif = (oldCur != nextPhase);
-        CommitPhaseAndMaybeAdvanceMotif(nextPhase, advanceMotif, who: who);
-    }
-
-        public MotifProfile CommitPhaseAndMaybeAdvanceMotif(MazeArchetype nextPhase, bool advanceMotif, string who) {
-            var oldCur = currentPhase;
-            // Phase commit (always keep these coherent; phase may remain equal in your current Establish-only test)
-            previousPhase = currentPhase;
-            currentPhase  = nextPhase;
-        
-            if (oldCur != currentPhase) { 
-                Debug.Log($"[PHASE] {oldCur}→{currentPhase} by {who}"); 
-                OnPhaseChanged?.Invoke(oldCur, currentPhase);
-            }
-            else{ 
-                Debug.Log($"[PHASE] Same-phase commit ({currentPhase}) by {who}");
-            }
-            // Ensure we have *some* motif selected before any drum boot tries to read it.
-            if (!_hasCommittedFirstMotif || currentMotif == null) {
-                currentMotif = GetCurrentMotifFromQueue(); 
-                _hasCommittedFirstMotif = (currentMotif != null); 
-                Debug.Log($"[MOTIF] Boot select motif={(currentMotif ? currentMotif.motifId : "null")} idx={_motifQueueIndex} by {who}");
-            } 
-            // Optional motif advance (this is what you want when PhaseStar runs out of shards)
-            if (advanceMotif) {
-                currentMotif = GetNextMotifFromQueue(); 
-                _hasCommittedFirstMotif = (currentMotif != null); 
-                Debug.Log($"[MOTIF] Advance by {who}: motif={(currentMotif ? currentMotif.motifId : "null")} idx={_motifQueueIndex}");
-            }
-        
-                    // Drive drums + tracks from the motif (always) — this is motif-level behavior
-            var drums = GameFlowManager.Instance?.activeDrumTrack; 
-            if (drums != null && currentMotif != null) 
-                drums.SetMotifBeatSequence(currentMotif, /*armAtNextBoundary*/ true, who, /*restartTransport*/ false);
-            
-            ConfigureTracksForCurrentPhaseAndMotif(); 
-            return currentMotif;
-        }
-// <summary>
-/// Ensure currentMotif is non-null without advancing the queue.
-/// Useful for DrumTrack boot when ManualStart can fire before any explicit commit.
-/// </summary>
-public void EnsureMotifInitialized(string who)
-{
-    if (currentMotif != null)
-        return;
-
-    var m = GetCurrentMotifFromQueue();
-    currentMotif = m; 
-    Debug.Log($"[MOTIF] Init-only: currentMotif={(currentMotif ? currentMotif.motifId : "null")} (by {who})");
-    if (currentMotif == null) 
-        return;
-    var gfm = GameFlowManager.Instance; 
-    var drums = gfm != null ? gfm.activeDrumTrack : null;
-    // Drive drums from motif (timing + beat selection). No transport restart on init-only.
-    if (drums != null) { 
-        // Use the canonical signature if available:
-        drums.SetMotifBeatSequence(currentMotif, armAtNextBoundary: false, who: $"PTM/EnsureMotifInitialized({who})", restartTransport: false); 
-        // (Alternatively, if you added the overload in DrumTrack.cs, this also works:)
-        // drums.SetMotifBeatSequence(currentMotif, false);
-    }
+    [Header("Chapters (Phase -> Motifs)")]
+    [SerializeField] private PhaseChapterLibrary chapterLibrary;
+    [SerializeField] private bool loopChapters = true;   // "book loops back to chapter 1"
+    [SerializeField] private bool holdOnLastChapter = false; // if not looping, stay on last vs return default
     
-    // Apply motif to instrument tracks via the existing PTM pipeline.
-    // This is the correct replacement for the old controller.SetMotifNoteSets(...)
-    ConfigureTracksForCurrentPhaseAndMotif();    
-}
+    public MazeArchetype previousPhase { get; private set; }
+    public MazeArchetype currentPhase  { get; private set; }
 
+    public MotifProfile currentMotif   { get; private set; }
+    public int currentMotifIndex       { get; private set; } = -1;
 
+    private List<MotifProfile> _chapterMotifs;
+    private bool _chapterLoops = true;
 
-    public void BootIfNeeded(MazeArchetype bootPhase, string who)
+    public event System.Action<MazeArchetype, MazeArchetype> OnPhaseChanged;
+    public event System.Action<MotifProfile, MotifProfile>   OnMotifChanged;
+
+    public NoteSetFactory noteSetFactory;
+
+    // ---------------------------
+    // CHAPTER START (PHASE)
+    // ---------------------------
+
+    // PhaseTransitionManager.cs
+    private bool _chapterLoadedForCurrentPhase = false;
+    public MazeArchetype ResolveNextPhase(MazeArchetype current)
     {
-        if (_booted && currentMotif != null) return;
+        if (chapterLibrary == null || chapterLibrary.chapters == null || chapterLibrary.chapters.Count == 0)
+            return current; // safest fallback: no change
 
-        previousPhase = bootPhase;
-        currentPhase  = bootPhase;
-// Initialize motif pointer to the first motif in MotifQueue order (e.g., tres).
-        if (_motifQueueIndex < 0) _motifQueueIndex = 0; 
-        currentMotif = GetCurrentMotifFromQueue();
-        _booted = (currentMotif != null);
+        // Find current index in authored chapter list
+        int idx = chapterLibrary.chapters.FindIndex(c => c != null && c.phase == current);
 
-        Debug.Log($"[MOTIF][BOOT] phase={currentPhase} motif={(currentMotif ? currentMotif.motifId : "null")} by={who}");
+        // If current isn't in the list, start at first authored chapter
+        if (idx < 0)
+            return chapterLibrary.chapters[0].phase;
 
-        var drums = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null; 
-        if (drums != null && currentMotif != null) 
-            drums.SetMotifBeatSequence(currentMotif, armAtNextBoundary: false, who: $"PTM/BootIfNeeded:{who}"); 
-        ConfigureTracksForCurrentPhaseAndMotif();
-    }
+        int next = idx + 1;
 
-    public MotifProfile AdvanceMotif(string who, bool restartDrumsTransport = false) { 
-        if (!_booted || currentMotif == null)
-            BootIfNeeded(currentPhase, who);
-        currentMotif = GetNextMotifFromQueue(); 
-        Debug.Log($"[MOTIF] AdvanceMotif by {who}: motif={(currentMotif ? currentMotif.motifId : "null")} idx={_motifQueueIndex}");
-        if (currentMotif == null) return null;
-        
-        var drums = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drums != null) 
-            drums.SetMotifBeatSequence(currentMotif, armAtNextBoundary: true, who: $"PTM/AdvanceMotif:{who}", restartTransport: restartDrumsTransport);
-        ConfigureTracksForCurrentPhaseAndMotif();
-                return currentMotif;
-    }
-    // ------------------------------------------------------------
-    // MOTIF TRANSITION (level changes)
-    // ------------------------------------------------------------
-
-
-    public MotifProfile PeekCurrentMotif()
-    {
-        if (!_booted) BootIfNeeded(currentPhase, "PeekCurrentMotif");
-        return currentMotif;
-    }
-
-    private MotifProfile GetNextMotifFromQueue()
-    {
-        if (motifQueue == null || motifQueue.motifs == null || motifQueue.motifs.Count == 0)
+        if (next >= chapterLibrary.chapters.Count)
         {
-            Debug.LogError("[MOTIF] MotifQueue missing/empty.");
-            return null;
+            if (loopChapters)
+                next = 0;
+            else
+                return holdOnLastChapter ? chapterLibrary.chapters[chapterLibrary.chapters.Count - 1].phase : current;
         }
 
-        if (_motifQueueIndex < 0) _motifQueueIndex = 0;
-        else _motifQueueIndex++;
-        if (_motifQueueIndex >= motifQueue.motifs.Count)
-            _motifQueueIndex = 0;
-        return motifQueue.motifs[_motifQueueIndex];
+        return chapterLibrary.chapters[next].phase;
     }
-
-
-  
-    private MotifProfile GetCurrentMotifFromQueue()
+    public void EnsureChapterLoaded(MazeArchetype phase, string who)
     {
-        if (motifQueue == null || motifQueue.motifs == null || motifQueue.motifs.Count == 0)
-            return null;
-
-        _motifQueueIndex = Mathf.Clamp(_motifQueueIndex, 0, motifQueue.motifs.Count - 1);
-        return motifQueue.motifs[_motifQueueIndex];
-    }
-
-    private void AdvanceMotifFromQueue(string who)
-    {
-        if (motifQueue == null || motifQueue.motifs == null || motifQueue.motifs.Count == 0)
+        // Already loaded for this phase? Do nothing. (CRITICAL: do NOT reset motif index.)
+        if (_chapterLoadedForCurrentPhase &&
+            currentPhase == phase &&
+            _chapterMotifs != null &&
+            _chapterMotifs.Count > 0)
         {
-            Debug.LogWarning($"[MOTIF] AdvanceMotif ignored (no motifQueue) by {who}");
             return;
         }
 
-        int prev = _motifQueueIndex;
-        _motifQueueIndex = (_motifQueueIndex + 1) % motifQueue.motifs.Count;
-        currentMotif = motifQueue.motifs[_motifQueueIndex];
+        // We are loading (or re-loading) a chapter. Update phase bookkeeping.
+        previousPhase = currentPhase;
+        currentPhase  = phase;
 
-        Debug.Log($"[MOTIF] AdvanceMotif by {who}: {prev}→{_motifQueueIndex}/{motifQueue.motifs.Count} motif={(currentMotif ? currentMotif.motifId : "null")}");
+        // Load motifs + loop flag from library
+        LoadChapterForPhase(phase);
+        _chapterLoadedForCurrentPhase = (_chapterMotifs != null && _chapterMotifs.Count > 0);
+
+        // Initialize pointer ONLY because we just loaded a chapter (or swapped phases).
+        currentMotifIndex = (_chapterLoadedForCurrentPhase) ? 0 : -1;
+        currentMotif = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
+
+        Debug.Log($"[CHAPTER] EnsureLoaded phase={phase} loaded={_chapterLoadedForCurrentPhase} loop={_chapterLoops} motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
+    }
+
+    public void StartChapter(MazeArchetype phase, string who)
+    {
+        var oldPhase = currentPhase;
+        var oldMotif = currentMotif;
+
+        previousPhase = currentPhase;
+        currentPhase  = phase;
+
+        // Force a reload + reset to paragraph 0
+        _chapterLoadedForCurrentPhase = false;
+
+        LoadChapterForPhase(phase);
+        _chapterLoadedForCurrentPhase = (_chapterMotifs != null && _chapterMotifs.Count > 0);
+
+        currentMotifIndex = (_chapterLoadedForCurrentPhase) ? 0 : -1;
+        currentMotif = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
+
+        if (oldPhase != currentPhase)
+        {
+            Debug.Log($"[CHAPTER] {oldPhase}→{currentPhase} by {who}");
+            OnPhaseChanged?.Invoke(oldPhase, currentPhase);
+        }
+        else
+        {
+            Debug.Log($"[CHAPTER] Re-start {currentPhase} by {who}");
+        }
+
+        Debug.Log($"[MOTIF] Chapter init/apply: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
+
+        ApplyMotifToAudioAndTracks(
+            oldMotif,
+            currentMotif,
+            armAtNextBoundary: false,
+            restartTransport: false,
+            who: $"PTM/StartChapter:{who}"
+        );
+    }
+
+    public MotifProfile AdvanceMotif(string who, bool restartDrumsTransport = false)
+    {
+        if (_chapterMotifs == null || _chapterMotifs.Count == 0)
+        {
+            Debug.LogWarning($"[MOTIF] Advance ignored (no motifs for chapter phase={currentPhase}) by {who}");
+            return null;
+        }
+
+        var oldMotif = currentMotif;
+
+        int next = currentMotifIndex + 1;
+
+        // Exhausted chapter?
+        if (next >= _chapterMotifs.Count)
+        {
+            if (_chapterLoops)
+            {
+                next = 0; // loop back to start
+            }
+            else
+            {
+                // IMPORTANT: signal exhaustion to caller (GFM) so it can start next phase.
+                Debug.Log($"[MOTIF] Exhausted chapter motifs (loop=false) phase={currentPhase} by {who}");
+                return null;
+            }
+        }
+
+        currentMotifIndex = next;
+        currentMotif = _chapterMotifs[currentMotifIndex];
+
+        Debug.Log($"[MOTIF] Advance by {who}: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex}/{_chapterMotifs.Count}");
+
+        ApplyMotifToAudioAndTracks(
+            oldMotif,
+            currentMotif,
+            armAtNextBoundary: true,
+            restartTransport: restartDrumsTransport,
+            who: $"PTM/AdvanceMotif:{who}"
+        );
+
+        return currentMotif;
+    }
+
+    // ---------------------------
+    // INTERNALS
+    // ---------------------------
+    private void LoadChapterForPhase(MazeArchetype phase)
+    {
+        _chapterMotifs = null;
+        _chapterLoops  = true;
+
+        if (chapterLibrary == null)
+        {
+            Debug.LogError("[CHAPTER] No PhaseChapterLibrary assigned.");
+            return;
+        }
+
+        var ch = chapterLibrary.Get(phase);
+        if (ch == null || ch.motifs == null || ch.motifs.Count == 0)
+        {
+            Debug.LogError($"[CHAPTER] Missing/empty chapter for phase={phase}.");
+            return;
+        }
+
+        _chapterMotifs = ch.motifs;
+        _chapterLoops  = ch.loopMotifs;
+    }
+
+    private void ApplyMotifToAudioAndTracks(
+        MotifProfile oldMotif,
+        MotifProfile newMotif,
+        bool armAtNextBoundary,
+        bool restartTransport,
+        string who)
+    {
+        if (newMotif == null) return;
+
+        // Notify motif change
+        if (oldMotif != newMotif)
+            OnMotifChanged?.Invoke(oldMotif, newMotif);
+
+        // Authoritative drums
+        var drums = GameFlowManager.Instance?.activeDrumTrack;
+        if (drums != null)
+            drums.SetMotifBeatSequence(newMotif, armAtNextBoundary, who, restartTransport);
+
+        // Notesets to tracks
+        ConfigureTracksForCurrentPhaseAndMotif();
     }
 
     public void ConfigureTracksForCurrentPhaseAndMotif()
-{
-    var gfm = GameFlowManager.Instance;
-    if (gfm == null)
     {
-        Debug.LogWarning("[MOTIF] GameFlowManager.Instance is null; cannot configure tracks.");
-        return;
-    }
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null || noteSetFactory == null) return;
 
-    if (noteSetFactory == null)
-    {
-        Debug.LogWarning("[MOTIF] NoteSetFactory reference is null on PhaseTransitionManager; cannot configure tracks.");
-        return;
-    }
+        var controller = gfm.controller;
+        if (controller == null || controller.tracks == null) return;
 
-    var controller = gfm.controller;
-    if (controller == null || controller.tracks == null || controller.tracks.Length == 0)
-    {
-        Debug.LogWarning("[MOTIF] No InstrumentTrackController or tracks found; skipping track configuration.");
-        return;
-    }
+        int baseEntropy = 0;
 
-    // Optional: deterministic but per-phase/per-motif entropy base.
-    // You can change this if you want “remix” variations.
-    int baseEntropy = 0;
-
-    foreach (var track in controller.tracks)
-    {
-        if (track == null) continue;
-
-        NoteSet noteSet = null;
-
-        try
+        foreach (var track in controller.tracks)
         {
-            // Prefer motif-based generation when we have a motif defined.
-            if (currentMotif != null)
-            {
-                string keyInfo = $"motif={currentMotif.motifId} role={track.assignedRole}";
-                Debug.Log($"[MOTIF] Generating NoteSet for track '{track.name}' via motif ({keyInfo}).");
-                noteSet = noteSetFactory.Generate(track, currentMotif, baseEntropy);
-                track.authoredRootMidi = currentMotif.keyRootMidi;
-            }
+            if (!track) continue;
+            if (currentMotif == null) continue;
 
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[MOTIF] Exception while generating NoteSet for track '{track.name}': {ex.Message}");
-            noteSet = null;
-        }
+            var noteSet = noteSetFactory.Generate(track, currentMotif, baseEntropy);
+            if (noteSet == null) continue;
 
-        if (noteSet == null)
-        {
-            Debug.LogWarning($"[MOTIF] NoteSetFactory returned null for track '{track.name}'. This track will keep its previous NoteSet (if any).");
-            continue;
+            track.authoredRootMidi = currentMotif.keyRootMidi;
+            track.SetNoteSet(noteSet);
         }
-
-        // Attach NoteSet to track. This ensures GetActiveNoteSet() / GetCurrentNoteSet() sees it.
-        track.SetNoteSet(noteSet);
-        Debug.Log($"[MOTIF] Assigned new NoteSet to track '{track.name}' (role={track.assignedRole}).");
     }
-}
 
-    private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile) {
-
-        // Only update if we're actually changing phases
-        if (phase != currentPhase) {
-            previousPhase = currentPhase;
-            currentPhase  = phase;
-        }
+    // IMPORTANT: Do NOT let DrumTrack/PhaseStar spawn mutate phase or motif here.
+    private PhaseStarBehaviorProfile _activeBehaviorProfile;
+    private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile)
+    {
         _activeBehaviorProfile = profile;
+        // (No phase/motif mutations. That’s GFM’s job: chapter start / paragraph advance.)
     }
 
     void OnEnable()
     {
-        InitializeIfNeeded("PTM/OnEnable");
-        DrumTrack drums = GameFlowManager.Instance.activeDrumTrack;
-        if (drums != null)
-        { 
-            drums.OnPhaseStarSpawned += HandlePhaseStarSpawned;
-        }        
-    }
-    public void InitializeIfNeeded(string who)
-    {
-        if (_initialized) return;
-
-        // Phase defaults
-        if (currentPhase == 0) currentPhase = MazeArchetype.Release;
-        previousPhase = currentPhase;
-
-        // Motif defaults
-        if (motifQueue != null && motifQueue.motifs != null && motifQueue.motifs.Count > 0)
-        {
-            _motifQueueIndex = Mathf.Clamp(_motifQueueIndex, 0, motifQueue.motifs.Count - 1);
-            currentMotif = motifQueue.motifs[_motifQueueIndex];
-            Debug.Log($"[MOTIF] PTM init by {who}: phase={currentPhase} motifIndex={_motifQueueIndex}/{motifQueue.motifs.Count} motif={(currentMotif ? currentMotif.motifId : "null")}");
-        }
-        else
-        {
-            currentMotif = null;
-            Debug.LogWarning($"[MOTIF] PTM init by {who}: motifQueue empty or missing.");
-        }
-
-        _initialized = true;
+        var drums = GameFlowManager.Instance?.activeDrumTrack;
+        if (drums != null) drums.OnPhaseStarSpawned += HandlePhaseStarSpawned;
     }
 
     void OnDisable()
     {
-        DrumTrack drums = GameFlowManager.Instance.activeDrumTrack;
-        if (drums != null)
-        { 
-            drums.OnPhaseStarSpawned -= HandlePhaseStarSpawned;
-        }
+        var drums = GameFlowManager.Instance?.activeDrumTrack;
+        if (drums != null) drums.OnPhaseStarSpawned -= HandlePhaseStarSpawned;
     }
-
-
-
 }

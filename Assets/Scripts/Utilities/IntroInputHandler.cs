@@ -13,6 +13,9 @@ public class IntroInputHandler : MonoBehaviour
     {
         if (inputReceived || !context.performed) return;
         inputReceived = true;
+        if (ControlTutorialDirector.Instance != null)
+            ControlTutorialDirector.Instance.HidePrimary();
+
         // Hide quote
         quoteText.SetActive(false);
         //AUTOSTART THE RIVER
