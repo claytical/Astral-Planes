@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
+  m_Name: 4bar-lead-shift
+  m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
+  id: 4bar-lead
+  role: 2
+  riff: {fileID: 11400000, guid: 1dd84633763b04f0299c7049b12f5e23, type: 2}
+  useRiffAsAuthoritativeScore: 1
+  scales: []
+  patterns: []
+  rhythms: []
+  chordFunctions: []
+  chordsPerRegion: 2
+  loopsToAscend: 1
+  behaviors: []
+  maxBehaviorsStack: 2
+  variation:
+    extensionBias: 0.35
+    passingToneProb: 0.2
+    neighborOrnProb: 0.15
+    minMidi: 36
+    maxMidi: 84
+    leapProb: 0.15
+    octaveMoveProb: 0.1
+    restProb: 0.1
+    humanizeMs: 0.02
+    durJitter: 1
+    mutatePitch: 0.08
+    mutateVelocity: 0.12
+    mutateDuration: 0.1

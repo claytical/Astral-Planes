@@ -488,24 +488,31 @@ public class GameFlowManager : MonoBehaviour
 
     yield break;
 }
-    public float GetMostSpentEnergyTanks() {
-        float best = 0f;
-        if (vehicles != null && vehicles.Count > 0) {
-            for (int i = 0; i < vehicles.Count; i++) {
-                var v = vehicles[i]; 
-                if (v == null || !v.isActiveAndEnabled) continue; 
-                best = Mathf.Max(best, v.GetCumulativeSpentTanks());
-            } 
-            return best;
+    public float GetTotalSpentEnergyTanks()
+    {
+        float total = 0f;
+
+        if (vehicles != null && vehicles.Count > 0)
+        {
+            for (int i = 0; i < vehicles.Count; i++)
+            {
+                var v = vehicles[i];
+                if (v == null || !v.isActiveAndEnabled) continue;
+                total += v.GetCumulativeSpentTanks();
+            }
+            return total;
         }
-    
-                // Fallback: scene scan (consistent with your dust-regrow logic).
-        var vs = FindObjectsOfType<Vehicle>(); 
-        for (int i = 0; i < vs.Length; i++) {
-            var v = vs[i]; 
-            if (v == null || !v.isActiveAndEnabled) continue; 
-            best = Mathf.Max(best, v.GetCumulativeSpentTanks()); }
-        return best;
+
+        // Fallback: scene scan (consistent with your dust-regrow logic).
+        var vs = FindObjectsOfType<Vehicle>();
+        for (int i = 0; i < vs.Length; i++)
+        {
+            var v = vs[i];
+            if (v == null || !v.isActiveAndEnabled) continue;
+            total += v.GetCumulativeSpentTanks();
+        }
+
+        return total;
     }
     public void RegisterVehicle(Vehicle v)
     {

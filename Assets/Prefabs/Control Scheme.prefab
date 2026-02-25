@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2326198307773148161}
   - component: {fileID: 4110581333180556272}
   - component: {fileID: 8806483350426262609}
+  - component: {fileID: 1640874604516882173}
   m_Layer: 5
   m_Name: Instruction
   m_TagString: Untagged
@@ -137,6 +138,18 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!225 &1640874604516882173
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1494566435732768141}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &2004914436917709616
 GameObject:
   m_ObjectHideFlags: 0
@@ -353,7 +366,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.627451}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -667,6 +680,12 @@ MonoBehaviour:
   scaleReturnSpeed: 16
   tutorialSequence: 010000000200000003000000
   pressAnySequence: 0800000003000000040000000600000005000000
+  instructionGroup: {fileID: 1640874604516882173}
+  labelFadeInSeconds: 0.12
+  labelFadeOutSeconds: 0.12
+  labelAttentionScale: 0.06
+  labelScaleLerpSpeed: 14
+  deactivateLabelWhenHidden: 1
   hideTextOnClear: 1
 --- !u!1 &5602812254947766409
 GameObject:

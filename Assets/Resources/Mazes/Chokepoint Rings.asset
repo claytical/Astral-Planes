@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
+  m_Name: Chokepoint Rings
+  m_EditorClassIdentifier: 
+  mazeColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  nodesPerStar: 5
+  starKeepsDustClear: 1
+  starKeepClearRadiusCells: 2
+  enableSafetyBubble: 1
+  safetyBubbleRadiusCells: 4
+  rotateSelectionOnLoopBoundary: 1
+  rotateEveryNLoops: 2
+  collectableClearTimeoutLoops: 2
+  collectableClearTimeoutSeconds: 0
+  particlePulseSpeed: 0.5
+  starAlphaMin: 0.1
+  starAlphaMax: 0.601
+  starDriftSpeed: 1
+  starDriftJitter: 0.1
+  orbitBias: 0
+  teleportChancePerSec: 0
+  ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
+    type: 3}
+  nodeFlightSeconds: 0.6

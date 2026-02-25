@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e5075dc90340c4afbb9feac726c90df5, type: 3}
-  m_Name: Pop Behavior
+  m_Name: Drunken Strokes
   m_EditorClassIdentifier: 
-  personality: 5
-  mazeColor: {r: 0.3921569, g: 0.5843138, b: 0.9294118, a: 1}
-  particlePulseSpeed: 1
+  personality: 4
+  mazeColor: {r: 1, g: 0, b: 1, a: 1}
+  particlePulseSpeed: 1.709
   starAlphaMin: 0.1
-  starAlphaMax: 0.774
-  rolePattern: 03000000010000000000000002000000000000000200000003000000
+  starAlphaMax: 0.807
+  rolePattern: 010000000100000001000000020000000200000002000000
   previewPulseScale: 1.2
   beatsPerRole: 4
   fallbackBPM: 60
@@ -75,11 +75,11 @@ MonoBehaviour:
     m_RotationOrder: 4
   progressionMulRange: 0
   baseCellsPerSecond: 3.8
-  starDriftSpeed: 1.5
-  starDriftJitter: 0.5
-  orbitBias: 0.5
-  teleportChancePerSec: 0.2
-  dustShrinkRadius: 2
+  starDriftSpeed: 3
+  starDriftJitter: 3
+  orbitBias: 0.284
+  teleportChancePerSec: 0.1466
+  dustShrinkRadius: 1
   dustShrinkUnitsPerSec: 1.2
   dustFalloff:
     serializedVersion: 2
@@ -110,7 +110,7 @@ MonoBehaviour:
   ejectionStyle: 1
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
-  nodesPerStar: 6
+  nodesPerStar: 12
   scatterRadius: 1.6
   nodeFlightSeconds: 0.6
   nodeFlightEase:
@@ -207,5 +207,5 @@ MonoBehaviour:
     dustTurbulenceDelta: 0
     wiggleTorqueDelta: 0
     wiggleFreqDelta: 0
-  starHoleRadius: 3
+  starHoleRadius: 4
   darkCleanupMaxLoops: 0

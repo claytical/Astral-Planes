@@ -45,7 +45,105 @@ public class NoteTether : MonoBehaviour
     [SerializeField] private Camera uiCamera;      // optional override for Screen Space - Camera canvas
     [SerializeField] private float worldZOverride = float.NaN; // if set, force the tether's Z
     private Vector3 _lastEndWorld;
-void Update()
+
+    // --- Arc-length cache (add these fields somewhere in the same class) ---
+private float[] _cumDist;   // cumulative distance at each point
+private float   _totalLen;  // total curve length
+private int     _cachedCount = -1;
+private int     _cachedHash  = 0;
+
+private void RebuildArcLengthCacheIfNeeded()
+{
+    int n = _points != null ? _points.Length : 0;
+    if (n < 2)
+    {
+        _cumDist = null;
+        _totalLen = 0f;
+        _cachedCount = n;
+        _cachedHash = 0;
+        return;
+    }
+
+    // Lightweight "did the points change?" hash
+    // (good enough for runtime; avoids rebuilding every call)
+    unchecked
+    {
+        int h = 17;
+        // sample a few points to avoid O(n) hashing every time
+        int step = Mathf.Max(1, n / 8);
+        for (int k = 0; k < n; k += step)
+        {
+            var p = _points[k];
+            h = h * 31 + p.x.GetHashCode();
+            h = h * 31 + p.y.GetHashCode();
+            h = h * 31 + p.z.GetHashCode();
+        }
+
+        if (_cumDist != null && _cachedCount == n && _cachedHash == h && _totalLen > 0.0001f)
+            return; // cache still valid
+
+        _cachedCount = n;
+        _cachedHash = h;
+
+        if (_cumDist == null || _cumDist.Length != n)
+            _cumDist = new float[n];
+
+        _cumDist[0] = 0f;
+        float sum = 0f;
+
+        for (int i = 1; i < n; i++)
+        {
+            sum += Vector3.Distance(_points[i - 1], _points[i]);
+            _cumDist[i] = sum;
+        }
+
+        _totalLen = Mathf.Max(0.0001f, sum);
+    }
+}
+
+public Vector3 EvaluatePosition01(float t)
+{
+    if (_points == null || _points.Length == 0)
+        return (start ? start.position : transform.position);
+
+    if (_points.Length == 1)
+        return _points[0];
+
+    // Catmull-Rom through sampled points for smooth velocity/curvature.
+    // Treat endpoints as clamped.
+    t = Mathf.Clamp01(t);
+
+    float scaled = t * (_points.Length - 1);
+    int i1 = Mathf.FloorToInt(scaled);
+    float u = scaled - i1;
+
+    int i0 = Mathf.Clamp(i1 - 1, 0, _points.Length - 1);
+    int i2 = Mathf.Clamp(i1 + 1, 0, _points.Length - 1);
+    int i3 = Mathf.Clamp(i1 + 2, 0, _points.Length - 1);
+
+    Vector3 p0 = _points[i0];
+    Vector3 p1 = _points[i1];
+    Vector3 p2 = _points[i2];
+    Vector3 p3 = _points[i3];
+
+    // Catmull-Rom spline (uniform)
+    float u2 = u * u;
+    float u3 = u2 * u;
+
+    return 0.5f * (
+        (2f * p1) +
+        (-p0 + p2) * u +
+        (2f * p0 - 5f * p1 + 4f * p2 - p3) * u2 +
+        (-p0 + 3f * p1 - 3f * p2 + p3) * u3
+    );
+}
+public float GetCurveLength()
+{
+    if (_points == null || _points.Length < 2) return 0f;
+    RebuildArcLengthCacheIfNeeded();
+    return _totalLen;
+}
+    void Update()
 {
     // If either endpoint is missing, try to (re)acquire before destroying
     if (!start || !end)
@@ -234,16 +332,6 @@ private Vector3 ResolveEndWorldPosition()
             );
         }
     }
-    public Vector3 EvaluatePosition01(float t)
-    {
-        if (_points == null || _points.Length == 0) return (start ? start.position : transform.position);
-        if (_points.Length == 1) return _points[0];
-        float f = Mathf.Clamp01(t) * (_points.Length - 1);
-        int i = Mathf.FloorToInt(f);
-        int j = Mathf.Min(i + 1, _points.Length - 1);
-        float u = f - i;
-        return Vector3.Lerp(_points[i], _points[j], u);
-    }
 
     private void EnsureShimmer()
     {
@@ -304,40 +392,118 @@ private Vector3 ResolveEndWorldPosition()
             _shimmerPS.Emit(ep, 1);
         }
     }
-    private void RebuildCurve()
+private void RebuildCurve()
+{
+    Vector3 aW = start.position;
+    Vector3 dW = ResolveEndWorldPosition();
+
+    var cam = worldCamera != null ? worldCamera : Camera.main;
+    if (cam == null)
     {
-        Vector3 a = start.position;
- //       Vector3 d = end.position;
-        Vector3 d = ResolveEndWorldPosition();
-        // control points: a slight dip + forward pull toward end
-        Vector3 dir   = (d - a);
-        Vector3 right = Vector3.Cross(dir.normalized, Vector3.forward);
-        float dist    = dir.magnitude;
-
-        Vector3 b = a + 0.33f * dir + Vector3.down * sag * Mathf.Clamp(dist, 0f, 5f);
-        Vector3 c = a + 0.66f * dir + Vector3.down * sag * 0.5f * Mathf.Clamp(dist, 0f, 5f);
-
-        float t, it;
-        float time = Time.time * noiseSpeed;
+        // Fallback: straight line if no camera
         for (int i = 0; i < segments; i++)
         {
-            t  = i / (float)(segments - 1);
-            it = 1f - t;
-
-            // cubic Bezier
-            Vector3 p = it*it*it * a
-                      + 3f*it*it*t * b
-                      + 3f*it*t*t * c
-                      + t*t*t * d;
-
-            // Per-segment small organic wobble (perpendicular)
-            float wob = (Mathf.PerlinNoise(i * 0.17f, time) - 0.5f) * 2f;
-            p += right * wob * noiseAmp;
-
-            _points[i] = p;
+            float t = (segments <= 1) ? 1f : i / (float)(segments - 1);
+            _points[i] = Vector3.Lerp(aW, dW, t);
         }
         _lr.SetPositions(_points);
+        return;
     }
+
+    // Use a stable depth plane for Screen<->World conversion
+    float depth = cam.orthographic
+        ? 0f
+        : Mathf.Abs((aW.z) - cam.transform.position.z);
+
+    Vector3 aS = cam.WorldToScreenPoint(new Vector3(aW.x, aW.y, cam.orthographic ? 0f : aW.z));
+    Vector3 dS = cam.WorldToScreenPoint(new Vector3(dW.x, dW.y, cam.orthographic ? 0f : dW.z));
+    aS.z = depth;
+    dS.z = depth;
+
+    Vector2 delta = (Vector2)(dS - aS);
+    float dist = delta.magnitude;
+    if (dist < 1f) dist = 1f;
+
+    // Tube bend in screen pixels (clamped so it stays in frame)
+    float sagPx = sag * 120f; // sag is in "world feel"; convert to px
+    sagPx = Mathf.Clamp(sagPx, 12f, 160f);
+
+    // Compute a normal direction in screen space
+    Vector2 dir = delta / dist;
+    Vector2 n = new Vector2(-dir.y, dir.x); // perpendicular
+
+    // Choose bend sign that keeps midpoint inside viewport
+    float margin = 24f;
+    float midY = (aS.y + dS.y) * 0.5f;
+
+    // If bending "up" would exceed top, bend down; if bending "down" exceeds bottom, bend up.
+    float upY = midY + sagPx;
+    float dnY = midY - sagPx;
+    float top = Screen.height - margin;
+    float bot = margin;
+
+    float bendSign = 1f;
+    if (upY > top && dnY >= bot) bendSign = -1f;
+    else if (dnY < bot && upY <= top) bendSign = 1f;
+    else
+    {
+        // default: bend toward screen center
+        bendSign = (midY < Screen.height * 0.5f) ? 1f : -1f;
+    }
+
+    Vector2 bend = n * (sagPx * bendSign);
+
+    // Control points in screen space:
+    // - first control stays near start (tube intake)
+    // - second stays near end (tube exhaust)
+    float c1Dist = Mathf.Clamp(dist * 0.10f, 18f, 120f);
+    float c2Dist = Mathf.Clamp(dist * 0.12f, 22f, 160f);
+
+    Vector2 bS = (Vector2)aS + dir * c1Dist + bend;
+    Vector2 cS = (Vector2)dS - dir * c2Dist + bend * 0.35f;
+
+    float time = Time.time * noiseSpeed;
+
+    for (int i = 0; i < segments; i++)
+    {
+        float u = (segments <= 1) ? 1f : i / (float)(segments - 1);
+
+        // Late-commit feel WITHOUT going offscreen (works in screen space)
+        float t = Mathf.Pow(u, 2.2f);
+
+        float it = 1f - t;
+
+        Vector2 pS =
+            it * it * it * (Vector2)aS +
+            3f * it * it * t * bS +
+            3f * it * t * t * cS +
+            t * t * t * (Vector2)dS;
+
+        // Small wobble in screen space (converted from your noiseAmp)
+        float wob = (Mathf.PerlinNoise(i * 0.17f, time) - 0.5f) * 2f;
+        // inside your for-loop, after computing wob:
+        float wobTaper = 1f;
+        const float wobOffAt = 0.80f;
+        if (u > wobOffAt)
+            wobTaper = 1f - Mathf.InverseLerp(wobOffAt, 1f, u);
+
+        pS += n * wob * (noiseAmp * 35f) * wobTaper;
+        // Clamp to screen bounds so we never go offscreen
+        pS.x = Mathf.Clamp(pS.x, margin, Screen.width - margin);
+        pS.y = Mathf.Clamp(pS.y, margin, Screen.height - margin);
+
+        Vector3 pW = cam.ScreenToWorldPoint(new Vector3(pS.x, pS.y, depth));
+
+        // Z discipline
+        if (!float.IsNaN(worldZOverride)) pW.z = worldZOverride;
+        else pW.z = aW.z;
+
+        _points[i] = pW;
+    }
+
+    _lr.positionCount = _points.Length;
+    _lr.SetPositions(_points);
+}
     private void ApplyHeadGlow(float head, float headSpan)
     {
         // Build a gradient that brightens the leading segment [head-headSpan, head]

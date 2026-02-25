@@ -169,7 +169,8 @@ public class InstrumentTrack : MonoBehaviour
     int  _lastCommittedBar = -1;
     [SerializeField] private LayerMask spawnBlockedMask; // set to include Vehicle + PhaseStar
     [SerializeField] private int spawnPickMaxTries = 80;
-// ---- LoopPattern bridge (no state duplication) ----
+
+    // ---- LoopPattern bridge (no state duplication) ----
     internal bool LoopCacheDirtyPending
     {
         get => _loopCacheDirtyPending;
@@ -576,7 +577,10 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // - If playheadBin exceeds that, remain silent until the loop wraps.
         int trackBins = Mathf.Max(1, loopMultiplier);
         if (playheadBin < 0 || playheadBin >= trackBins)
+        {
+            Debug.Log($"[PLAYBACK] playheadBin {playheadBin} trackBins {trackBins}");
             return;
+        }
 
         int trackBin = playheadBin;
         float gain = 1f;
@@ -588,6 +592,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         {
             var (note, duration, vel127f) = _tmpStepNotes[i];
             int vel127 = Mathf.Clamp(Mathf.RoundToInt(vel127f), 1, 127);
+            Debug.Log($"[PLAYBACK] Playing {note} at {duration} with {vel127} velocity");
             PlayNote127(note, duration, vel127);
         }
     }
@@ -1088,7 +1093,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
     public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force) {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
-        controller.NotifyCollected();
+        controller.NotifyCollected(this);
         
         if (collectable.burstId != 0)
         {
@@ -1113,7 +1118,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         // 2) Final target step must be deterministic (never time-based).
         int finalTargetStep = -1;
-
 // Primary: the absolute step decided at spawn.
         if (collectable.intendedStep >= 0)
         {
@@ -1143,8 +1147,8 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                 bin = tf.playheadBin;
                 Debug.LogWarning($"[COLLECT:BASE->ABS:FALLBACK_BIN] {name} missing intendedBin; using playheadBin={bin} (nondeterministic) burstId={collectable.burstId}");
             }
-
             finalTargetStep = bin * binSize + local;
+
 
             Debug.LogWarning($"[COLLECT:BASE->ABS] {name} mapped baseStep={reportedStep} into absStep={finalTargetStep} using intendedBin={collectable.intendedBin}");
         }
@@ -1162,9 +1166,9 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             _burstLeaderBinsBeforeWrite[collectable.burstId] = leaderBinsBeforeWrite; 
             _burstWroteBin[collectable.burstId]              = BinIndexForStep(finalTargetStep);
         }
-        // 4) Write exactly where spawn intended
         int note = collectable.GetNote();
-        CollectNote(finalTargetStep, note, durationTicks, force);
+        // IMPORTANT: this is what feeds the audible loop.
+        CollectNote(finalTargetStep, note, durationTicks, force /*, authoredRootMidi if your CollectNote supports it */);
 
         // Mark bin filled + hooks
         int targetBin = BinIndexForStep(finalTargetStep);
@@ -1269,35 +1273,123 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             if (collectable.tether != null)
                 collectable.tether.SetEndpoints(collectable.transform, collectable.ribbonMarker, this.trackColor, 1f);
         }
-// Schedule deposit to land right on the step.
-        double depositDsp = NextOccurrenceDspForAbsoluteStep(finalTargetStep);
-        const float leadSec = 0.5f; // tune; 80–160ms tends to feel good
+        double loopLen = drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0.0;
+        if (loopLen <= 0.0001) loopLen = drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0.0;
+        if (loopLen <= 0.0001) loopLen = 0.1; // last resort
+        
 
-        collectable.BeginCarryThenDeposit(
-            depositDsp,
-            leadSec,
-            durationTicks,
-            force,
-            onArrived: () =>
-            {
-                if (controller == null || controller.noteVisualizer == null || markerGo == null) return;
+// Hard-coded tuning knobs
+        const float orbitMax  = 0.65f;  // allowable orbit budget
+        const float travelHard = 0.35f; // your desired travel time
+        const float minTravel  = 0.02f;
 
-                // 1) Make this marker the canonical one for (track, step) and mark it lit.
-                controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
+// --- Compute deposit time in LEADER step space (includes bins) ---
+// This prevents "bin expansion" from shifting the particle/confirm timing
+// relative to where the note actually lives in persistentLoopNotes.
 
-                // 2) Force visual lit state on the exact instance we carried (no ambiguity).
-                var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
-                tag.isPlaceholder = false;
-                tag.burstId = collectable.burstId;
+        int leaderSteps = (drumTrack != null) ? drumTrack.GetLeaderSteps() : Mathf.Max(1, binSize);
+        leaderSteps = Mathf.Max(1, leaderSteps);
 
-                var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
-                ml.LightUp(this.trackColor);
+// finalTargetStep is already absolute (bin*binSize + local).
+        int targetLeaderStep = ((finalTargetStep % leaderSteps) + leaderSteps) % leaderSteps;
 
-                // Optional: if VisualNoteMarker has “waiting particles”, switch it to lit visuals.
-                var vnm = markerGo.GetComponent<VisualNoteMarker>();
-                if (vnm != null) vnm.Initialize(this.trackColor);
-            }
+        double depositDsp = 0.0;
+        if (drumTrack != null)
+        {
+            // Compute next occurrence of a specific leader step using the DrumTrack authority.
+            // (inline to avoid needing new DrumTrack API)
+            double effLen = System.Math.Max(0.0001, drumTrack.GetLoopLengthInSeconds());
+            double stepDur = effLen / leaderSteps;
+
+            double dspNow = AudioSettings.dspTime;
+            double elapsed = dspNow - drumTrack.leaderStartDspTime;
+            if (elapsed < 0) elapsed = 0;
+
+            double tInLoop = elapsed % effLen;
+
+            int curLeaderStep = Mathf.FloorToInt((float)(tInLoop / stepDur));
+            int deltaSteps = targetLeaderStep - curLeaderStep;
+
+            // IMPORTANT: if we're already at/past the step this frame, push to NEXT occurrence.
+            // This avoids "one behind" and frame-boundary ambiguity.
+            if (deltaSteps <= 0) deltaSteps += leaderSteps;
+
+            depositDsp = drumTrack.leaderStartDspTime + (curLeaderStep + deltaSteps) * stepDur;
+
+            // safety: ensure future
+            const double kMinLead = 0.005;
+            if (depositDsp <= dspNow + kMinLead)
+                depositDsp = dspNow + 0.010;
+        }
+        else
+        {
+            // Fallback: behave like before (base loop), but this should not happen in your normal flow.
+            depositDsp = AudioSettings.dspTime + 0.05;
+        }
+        Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal(reportedStep)={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={AudioSettings.dspTime:F6} dt={(depositDsp-AudioSettings.dspTime):F4}");
+        double now = AudioSettings.dspTime;
+        float dt = Mathf.Max(0f, (float)(depositDsp - now));
+// IMMINENT: shrink travel so we still land exactly at depositDsp.
+        float travelSec = Mathf.Clamp(Mathf.Min(travelHard, dt), minTravel, travelHard);
+
+// Whatever time remains before travel starts becomes orbit time (capped).
+        float orbitSec = Mathf.Clamp(dt - travelSec, 0f, orbitMax);
+
+// If it’s basically imminent, don’t bother orbiting.
+        if (orbitSec < 0.05f) orbitSec = 0f;
+
+collectable.BeginCarryThenDepositAtDsp(
+    depositDsp,
+    durationTicks: durationTicks,
+    force: force,
+    onArrived: () =>
+    {
+        // -----------------------------------------------------------------
+        // ✅ NOTIFY COMMIT AT DEPOSIT (DSP-authoritative moment)
+        // -----------------------------------------------------------------
+
+        // If your collectable carries authoredRootMidi, use it here.
+        // Otherwise keep int.MinValue (your existing default).
+        int authoredRootMidi = int.MinValue;
+        // authoredRootMidi = collectable.authoredRootMidi; // if you have it
+
+
+        // If NotifyCommitted is part of your causality grammar / stinger,
+        // it should happen AFTER the note exists in the loop.
+        if (controller != null)
+            controller.NotifyCommitted(this, finalTargetStep);
+
+        // -----------------------------------------------------------------
+        // ✅ VISUAL CONFIRM SCHEDULING (still uses depositDsp)
+        // -----------------------------------------------------------------
+        if (controller == null || controller.noteVisualizer == null || markerGo == null)
+            return;
+
+        controller.noteVisualizer.ScheduleFirstPlayConfirm(
+            source: collectable.transform,
+            track: this,
+            step: finalTargetStep,
+            dspTime: depositDsp,
+            color: trackColor
         );
+
+        controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
+
+        var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
+        tag.isPlaceholder = false;
+        tag.burstId = collectable.burstId;
+
+        var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
+        ml.LightUp(this.trackColor);
+
+        var vnm = markerGo.GetComponent<VisualNoteMarker>();
+        if (vnm != null)
+        {
+            vnm.LightUp(this.trackColor);
+            vnm.Initialize(this.trackColor);
+        }
+    }
+);
         if (_currentBurstArmed && _currentBurstRemaining > 0)
         {
             _currentBurstRemaining--;
@@ -1317,45 +1409,61 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return -1;
     }
+    private double GetTransportAnchorDsp()
+    {
+        if (drumTrack == null) return 0.0;
+
+        // Match NoteVisualizer's anchor choice.
+        if (drumTrack.leaderStartDspTime > 0.0) return drumTrack.leaderStartDspTime;
+        if (drumTrack.startDspTime > 0.0)       return drumTrack.startDspTime;
+
+        return 0.0;
+    }
+
     private double NextOccurrenceDspForAbsoluteStep(int absoluteStep)
     {
-        if (drumTrack == null || controller == null) return 0.0;
+        if (drumTrack == null) return AudioSettings.dspTime + 0.01;
 
-        int binSize = Mathf.Max(1, BinSize()); // base steps (e.g., 16)
-        int targetBin = Mathf.FloorToInt(absoluteStep / (float)binSize);
-        int targetLocal = absoluteStep - targetBin * binSize;
+        // Use the SAME step space the DrumTrack transport uses once leader bins expand.
+        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps()); // must exist in DrumTrack
+        double loopLen  = drumTrack.GetLoopLengthInSeconds();
+        if (loopLen <= 0.0001) loopLen = 0.1;
 
-        float clipLen = drumTrack.GetClipLengthInSeconds();
-        if (clipLen <= 0f) return 0.0;
+        double start = drumTrack.leaderStartDspTime; // authoritative loop anchor
+        if (start <= 0.0001) start = drumTrack.startDspTime; // fallback if leader not initialized
+        if (start <= 0.0001) start = AudioSettings.dspTime;  // last resort
 
-        // Must match the transport anchor used by GetTransportFrame()
-        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
-        if (start <= 0.0) return 0.0;
+        // Wrap the absolute step into leader step space
+        int step = ((absoluteStep % leaderSteps) + leaderSteps) % leaderSteps;
 
-        var tf = controller.GetTransportFrame();
-        int barIndexNow = tf.barIndex;
-        int playheadBinNow = tf.playheadBin;
+        double stepDur    = loopLen / leaderSteps;
+        double now        = AudioSettings.dspTime;
+        double elapsed    = now - start;
 
-        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
+        // Normalize elapsed into [0, loopLen)
+        double nowInLoop = elapsed % loopLen;
+        if (nowInLoop < 0) nowInLoop += loopLen;
 
-        // How many bars until the transport is on the bin that owns this note?
-        int barsUntilBin = ((targetBin - playheadBinNow) % leaderBins + leaderBins) % leaderBins;
+        double targetTime = step * stepDur;
+        double dt = targetTime - nowInLoop;
 
-        double dspNow = AudioSettings.dspTime;
-        double barStartNow = start + (double)barIndexNow * clipLen;
-        double tInBarNow = dspNow - barStartNow;
+        // If we're already past it this loop, schedule next loop
+        if (dt <= 0.0) dt += loopLen;
 
-        double stepDur = clipLen / binSize;
-        double targetTInBar = targetLocal * stepDur;
+        // Optional safety: if you need a minimum scheduling lead, enforce it here.
+        // (Otherwise a near-zero dt yields a 1-frame "teleport".)
+        const double minLead = 0.010; // 10ms
+        if (dt < minLead) dt += loopLen;
 
-        // If it's this bin, but we've already passed the step, push to next cycle of that bin
-        const double kEps = 0.002; // 2ms guard
-        if (barsUntilBin == 0 && targetTInBar <= tInBarNow + kEps)
-            barsUntilBin = leaderBins;
-
-        int targetBarIndex = barIndexNow + barsUntilBin;
-        double targetBarStart = start + (double)targetBarIndex * clipLen;
-        return targetBarStart + targetTInBar;
+        return now + dt;
+    }
+    private double NextOccurrenceDspForLocalStep(int localStep)
+    {
+        // WARNING: localStep is ambiguous when leaderBins > 1.
+        // This function maps localStep into bin 0, then schedules in leader step space.
+        int baseSteps = Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : 64);
+        int step0 = ((localStep % baseSteps) + baseSteps) % baseSteps;
+        return NextOccurrenceDspForAbsoluteStep(step0);
     }
     public int GetHighestFilledBin()
     {
@@ -1579,6 +1687,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue)
     {
         int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi); 
+        Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
 
         _loopCacheDirtyPending = true;
@@ -1615,7 +1724,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
         return stepIndex;
     }
-    public float GetVelocityAtStep(int step)
+   public float GetVelocityAtStep(int step)
     {
         float max = 0f;
         foreach (var (noteStep, _, _, velocity, _) in GetPersistentLoopNotes())
@@ -2580,6 +2689,7 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
 
     private int CollectNote(int stepIndex, int note, int durationTicks, float force)
     {
+        Debug.Log($"[COLLECT] Adding Note {note} to Loop at Index {stepIndex} for {durationTicks}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false);
 

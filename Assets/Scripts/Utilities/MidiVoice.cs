@@ -47,7 +47,7 @@ public class MidiVoice : MonoBehaviour
     /// Plays a normal note. Expects duration in TICKS (MPTK convention),
     /// converts to ms using drum BPM, and trims to the remaining audible window.
     /// </summary>
-    public void PlayNoteTicks(int note, int durationTicks, float velocity)
+    public void PlayNoteTicks(int note, int durationTicks, float velocity, bool trimToActiveWindow = true)
     {
         if (midiStreamPlayer == null || drumTrack == null || drumTrack.drumLoopBPM <= 0f)
         {
@@ -58,12 +58,12 @@ public class MidiVoice : MonoBehaviour
             }
             return;
         }
-        
+
         // Convert ticks → ms (480 ticks per quarter note)
         int durationMs = Mathf.RoundToInt(durationTicks * (60000f / (drumTrack.drumLoopBPM * 480f)));
 
         // Trim to remaining audible window (if provided)
-        if (_remainingActiveWindowSec != null)
+        if (trimToActiveWindow && _remainingActiveWindowSec != null)
         {
             float remainSec = _remainingActiveWindowSec();
             if (!float.IsPositiveInfinity(remainSec) && remainSec < float.MaxValue)
@@ -87,8 +87,14 @@ public class MidiVoice : MonoBehaviour
             Velocity = Mathf.Clamp(Mathf.RoundToInt(v127), 1, 127),
         };
 
-        Debug.Log($"[MIDIVoice] Playing note {note} on channel {channel} at {noteOn.Velocity} (raw={velocity}).");
+        Debug.Log($"[MIDIVoice] Playing note {note} on channel {channel} at {noteOn.Velocity} (raw={velocity}). trim={trimToActiveWindow} durMs={durationMs}");
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
+    }
+
+// Keep your old signature working everywhere else:
+    public void PlayNoteTicks(int note, int durationTicks, float velocity)
+    {
+        PlayNoteTicks(note, durationTicks, velocity, trimToActiveWindow: true);
     }
     public void SetMidiStreamPlayer(MidiPlayerTK.MidiStreamPlayer player)
     {

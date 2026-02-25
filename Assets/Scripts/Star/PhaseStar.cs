@@ -832,7 +832,10 @@ public class PhaseStar : MonoBehaviour
 
     private void HandleStepPulse(int step, int n)
     {
-        RotateHighlightedShardNow(1);
+        if (step == n)
+        {
+            RotateHighlightedShardNow(1);
+        }
     }
 
     private void DBG(string msg)
