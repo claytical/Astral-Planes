@@ -64,7 +64,7 @@ public class Collectable : MonoBehaviour
     private bool isInitialized = false;
     private bool reachedDestination = false;
 // Carry-as-child (school run) tuning
-    [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, 0.65f, 0f);
+    [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, -0.65f, 0f);
     [SerializeField] private float carryLocalOffsetJitter = 0.05f; // optional tiny wobble
     private Transform _carryParent;
     // Idempotency flags
@@ -930,125 +930,7 @@ public void BeginCarryThenDepositAtDsp(
     if (_carryRoutine != null) StopCoroutine(_carryRoutine);
     _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
 }
-private IEnumerator CarryThenTravelToDepositDsp(
-    double depositDspTime,
-    int durationTicks,
-    float force,
-    Action onArrived)
-{
-    _inCarry = true;
 
-    // non-physical immediately
-    if (_rb != null) _rb.simulated = false;
-    if (TryGetComponent(out Collider2D col)) col.enabled = false;
-
-    var ps = GetComponentInChildren<ParticleSystem>();
-    if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-    // ----- Parent to vehicle ("children in back seat") -----
-    if (_collector != null)
-    {
-        _carryParent = _collector;
-
-        transform.SetParent(_carryParent, worldPositionStays: true);
-
-        Vector3 jitter = (carryLocalOffsetJitter > 0f)
-            ? (Vector3)(UnityEngine.Random.insideUnitCircle * carryLocalOffsetJitter)
-            : Vector3.zero;
-
-        transform.localPosition = carryLocalOffset + jitter;
-        transform.localRotation = Quaternion.identity;
-    }
-
-    // ---- DSP timing (authoritative) ----
-    const double kMinLead = 0.002;        // 2ms safety to avoid “already passed”
-    const double kWaitEps = 0.0005;       // 0.5ms: close enough for visuals
-
-    double dspNow = AudioSettings.dspTime;
-    if (depositDspTime <= dspNow + kMinLead)
-        depositDspTime = dspNow + kMinLead;
-
-    double timeUntilDeposit = depositDspTime - dspNow;
-
-    // Choose travel time, but never exceed timeUntilDeposit.
-    float desiredTravel = Mathf.Clamp(depositTravelSeconds, minDepositTravelSeconds, maxDepositTravelSeconds);
-    float travelSeconds = Mathf.Clamp(desiredTravel, 0.02f, (float)timeUntilDeposit);
-
-    // Launch moment (DSP)
-    double travelStartDsp = depositDspTime - travelSeconds;
-
-    // If there isn’t enough time to "carry", launch asap.
-    if (travelStartDsp < dspNow + carryMinLeadSeconds)
-        travelStartDsp = dspNow + carryMinLeadSeconds;
-
-    // ----- Hold as child until launch moment -----
-    while (_carryParent != null && AudioSettings.dspTime < travelStartDsp)
-        yield return null;
-
-    // ----- Detach -----
-    transform.SetParent(null, worldPositionStays: true);
-    _carryParent = null;
-
-    // ----- Travel (DSP-progress) -----
-    // If tether is missing, we’ll just wait for DSP and snap at end.
-    double travelEndDsp = depositDspTime;
-
-    while (AudioSettings.dspTime < travelEndDsp)
-    {
-        if (tether != null)
-        {
-            double dsp = AudioSettings.dspTime;
-            double span = System.Math.Max(0.0001, travelEndDsp - travelStartDsp);
-            float lin = Mathf.Clamp01((float)((dsp - travelStartDsp) / span));
-
-            // Ease: linger early, arrive late, but don’t “cap” near end (that causes micro-jitter).
-            float u = lin * lin * lin;
-
-            transform.position = tether.EvaluatePosition01(u);
-        }
-
-        yield return null;
-    }
-
-    // Ensure we are truly at/after the DSP boundary (frame timing can end loop slightly early).
-    while (AudioSettings.dspTime + kWaitEps < depositDspTime)
-        yield return null;
-
-    // Hard snap at the end (authoritative landing moment)
-    if (ribbonMarker) transform.position = ribbonMarker.position;
-
-    onArrived?.Invoke();
-
-    var ml = ribbonMarker ? ribbonMarker.GetComponent<MarkerLight>() : null;
-    if (ml) ml.LightUp(tether != null ? tether.baseColor : Color.white);
-
-    ReportedCollected = true;
-    NotifyDestroyedOnce();
-
-    if (tether) Destroy(tether.gameObject);
-    Destroy(gameObject);
-
-    _inCarry = false;
-}
-// Helper: cheap length estimate from tether samples.
-// Uses your (now smoothed) EvaluatePosition01().
-private float EstimateTetherLengthWorld()
-{
-    if (tether == null) return 0f;
-
-    const int samples = 18; // cheap + stable
-    Vector3 prev = tether.EvaluatePosition01(0f);
-    float sum = 0f;
-
-    for (int i = 1; i <= samples; i++)
-    {
-        float u = i / (float)samples;
-        Vector3 p = tether.EvaluatePosition01(u);
-        sum += Vector3.Distance(prev, p);
-        prev = p;
-    }
-    return sum;
-}
     private IEnumerator PulseEnergySprite()
     {
         Vector3 startScale = transform.localScale;
@@ -1461,30 +1343,32 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
 
     // Leader step duration (seconds)
     double leaderStepDur = loopLen / leaderSteps;
-
-    // Timing window expressed in leader steps (your timingWindowSteps is assumed "base steps")
+    // Window is in *time*, derived from authored step window in *leader steps*.
+    // Compare against STEP CENTERS (not onsets) so collisions inside a step bias toward the step
+    // that is actually "playing" rather than the previous onset.
     double timingWin = leaderStepDur * (drumTrack.timingWindowSteps * mul) * 0.5;
-
-    int matchedStep = -1;
-    double bestErr = timingWin;
-
-    for (int i = 0; i < sharedTargetSteps.Count; i++)
-    {
+    int matchedStep = -1; 
+    double bestAbs = timingWin; 
+    double bestSigned = double.NegativeInfinity; // tie-breaker
+    for (int i = 0; i < sharedTargetSteps.Count; i++) { 
         int baseStep = sharedTargetSteps[i];
-
         // Base step projected into leader timeline.
         int leaderStep = baseStep * mul;
-
-        // Convert to position in seconds within loop.
-        double stepPos = (leaderStep * leaderStepDur) % loopLen;
-
-        double delta = Math.Abs(stepPos - tPos);
-        if (delta > loopLen * 0.5) delta = loopLen - delta;
-
-        if (delta < bestErr)
-        {
-            bestErr = delta;
-            matchedStep = baseStep; // return base index
+        // Center of step window.
+        double stepCenterPos = ((leaderStep + 0.5) * leaderStepDur) % loopLen;
+        
+        // Signed delta wrapped to [-loopLen/2, +loopLen/2]
+        double signed = stepCenterPos - tPos;
+        if (signed > loopLen * 0.5) signed -= loopLen;
+        else if (signed < -loopLen * 0.5) signed += loopLen; 
+        double abs = System.Math.Abs(signed);
+        
+        // Primary: smallest abs delta within window.
+        // // Tie-break: prefer FUTURE (positive signed) so we don’t go “one behind” on boundaries.
+        if (abs < bestAbs || (System.Math.Abs(abs - bestAbs) < 1e-9 && signed > bestSigned)) {
+            bestAbs = abs; 
+            bestSigned = signed; 
+            matchedStep = baseStep;
         }
     }
 
@@ -1558,6 +1442,7 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     loopLen = drumTrack.GetLoopLengthInSeconds();
     if (loopLen <= 0.0)
     {
+        if (_carryRoutine != null) return;
         BeginCarryAndDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         Debug.LogWarning($"[COLLECT] loopLen <= 0 while scheduling deposit; fallback travel. name={name}");
         return;
@@ -1581,6 +1466,7 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     double minNeeded = minDepositTravelSeconds + 0.01;
     while ((depositDsp - dspNow) < minNeeded)
         depositDsp += loopLen;
+    if (_carryRoutine != null) return;
 
     BeginCarryAndDepositAtDsp(depositDsp, noteDurationTicks, force, onArrived: null);
 

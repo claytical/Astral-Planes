@@ -1296,25 +1296,18 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         double depositDsp = 0.0;
         if (drumTrack != null)
         {
-            // Compute next occurrence of a specific leader step using the DrumTrack authority.
-            // (inline to avoid needing new DrumTrack API)
             double effLen = System.Math.Max(0.0001, drumTrack.GetLoopLengthInSeconds());
             double stepDur = effLen / leaderSteps;
 
             double dspNow = AudioSettings.dspTime;
-            double elapsed = dspNow - drumTrack.leaderStartDspTime;
-            if (elapsed < 0) elapsed = 0;
-
-            double tInLoop = elapsed % effLen;
-
-            int curLeaderStep = Mathf.FloorToInt((float)(tInLoop / stepDur));
-            int deltaSteps = targetLeaderStep - curLeaderStep;
-
-            // IMPORTANT: if we're already at/past the step this frame, push to NEXT occurrence.
-            // This avoids "one behind" and frame-boundary ambiguity.
-            if (deltaSteps <= 0) deltaSteps += leaderSteps;
-
-            depositDsp = drumTrack.leaderStartDspTime + (curLeaderStep + deltaSteps) * stepDur;
+            double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime; 
+            if (start <= 0.0) start = dspNow; 
+            double loopsSince = (dspNow - start) / effLen; 
+            long curLoopIndex = (long)System.Math.Floor(loopsSince); 
+            if (curLoopIndex < 0) curLoopIndex = 0;
+            double curLoopStart = start + curLoopIndex * effLen; 
+            double nextLoopStart = curLoopStart + effLen;
+            depositDsp = nextLoopStart + targetLeaderStep * stepDur;
 
             // safety: ensure future
             const double kMinLead = 0.005;
@@ -1370,6 +1363,7 @@ collectable.BeginCarryThenDepositAtDsp(
             track: this,
             step: finalTargetStep,
             dspTime: depositDsp,
+            noteDuration: durationTicks,
             color: trackColor
         );
 

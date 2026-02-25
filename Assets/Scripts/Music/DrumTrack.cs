@@ -74,7 +74,7 @@ public class DrumTrack : MonoBehaviour
     public float drumLoopBPM = 120f;
     public float gridPadding = 0f;
     public int totalSteps = 16;
-    public float timingWindowSteps = 1f; // Can shrink to 0.5 or less as game progresses
+    public float timingWindowSteps = .25f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
     public double startDspTime;
     private AudioSource _drumA; // primary deck

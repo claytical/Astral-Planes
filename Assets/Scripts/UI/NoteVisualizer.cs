@@ -142,6 +142,7 @@ public class NoteVisualizer : MonoBehaviour
         public double dspTime;       // when this step first plays
         public Color color;
         public bool spawned;
+        public float duration;
     }
 
     private struct FirstPlayConfirmTask
@@ -198,7 +199,7 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
     }
-    public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color)
+    public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color, float noteDuration)
     {
         if (track == null || source == null) return;
         Debug.Log($"[CONFIRM_SCHED] track={track.name} step={step} dsp={dspTime:F6} now={AudioSettings.dspTime:F6} dt={(dspTime-AudioSettings.dspTime):F4}");
@@ -209,6 +210,7 @@ public class NoteVisualizer : MonoBehaviour
             step = step,
             dspTime = dspTime,
             color = color,
+            duration = noteDuration,
             spawned = false
         });
     }
@@ -787,7 +789,7 @@ private void ProcessFirstPlayConfirmFx()
             start = startWorld,
             end = endWorld,
             startDsp = now,
-            endDsp = r.dspTime,
+            endDsp = r.duration,
             color = r.color
         });
 
