@@ -37,6 +37,25 @@ public class InstrumentTrackController : MonoBehaviour
     private ParticleSystem[] _gravityVoidParticles;
     // Cache prefab alpha per particle system so alpha doesn't compound.
     private float[] _gravityVoidPrefabStartAlpha;
+// ---------------------------------------------------------------------
+// SFX: Collection "Pickup Tick" (A2)
+// ---------------------------------------------------------------------
+    [Header("SFX: Collection (Pickup Tick)")]
+    [SerializeField] private AudioSource pickupSfxSource;
+
+    [SerializeField, Range(0f, 2f)]
+    private float pickupTickVolume = 1.15f;
+
+    [SerializeField, Range(0f, 0.15f)]
+    private float pickupTickPitchJitter = 0.03f;
+
+    [Tooltip("Fallback clip if role-specific clips are not set.")]
+    [SerializeField] private AudioClip pickupTickDefault;
+
+    [SerializeField] private AudioClip pickupTickBass;
+    [SerializeField] private AudioClip pickupTickLead;
+    [SerializeField] private AudioClip pickupTickHarmony;
+    [SerializeField] private AudioClip pickupTickGroove;
 
 // Optionally track current outer radius for VFX scaling.
     private int _gravityVoidCurrentOuterR;
@@ -64,7 +83,83 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _hasLastTransport;
     private TransportFrame _lastTransport;
     private GameFlowManager _gfm;
+// ---------------------------------------------------------------------
+// SFX: Commit "Placement Stinger" (A3)
+// Fired when the carried note visually lands on the loop / marker lights.
+// ---------------------------------------------------------------------
+[Header("SFX: Commit (Placement Stinger)")]
+[SerializeField] private AudioSource commitSfxSource;
 
+[SerializeField, Range(0f, 2f)]
+private float commitStingerVolume = 1.25f;
+
+[SerializeField, Range(0f, 0.15f)]
+private float commitStingerPitchJitter = 0.02f;
+
+[Tooltip("Fallback clip if role-specific commit clips are not set.")]
+[SerializeField] private AudioClip commitStingerDefault;
+
+[SerializeField] private AudioClip commitStingerBass;
+[SerializeField] private AudioClip commitStingerLead;
+[SerializeField] private AudioClip commitStingerHarmony;
+[SerializeField] private AudioClip commitStingerGroove;
+[SerializeField] private AudioClip commitStingerDrums;
+
+private void EnsureCommitSfxSource()
+{
+    if (commitSfxSource != null) return;
+
+    var go = new GameObject("TrackCommitSFX");
+    go.transform.SetParent(transform, worldPositionStays: false);
+
+    commitSfxSource = go.AddComponent<AudioSource>();
+    commitSfxSource.playOnAwake = false;
+    commitSfxSource.loop = false;
+    commitSfxSource.spatialBlend = 0f; // 2D
+    commitSfxSource.volume = 1f;
+}
+
+private AudioClip GetCommitStingerClip(MusicalRole role)
+{
+    switch (role)
+    {
+        case MusicalRole.Bass:    return commitStingerBass    != null ? commitStingerBass    : commitStingerDefault;
+        case MusicalRole.Lead:    return commitStingerLead    != null ? commitStingerLead    : commitStingerDefault;
+        case MusicalRole.Harmony: return commitStingerHarmony != null ? commitStingerHarmony : commitStingerDefault;
+        case MusicalRole.Groove:  return commitStingerGroove  != null ? commitStingerGroove  : commitStingerDefault;
+        default:                  return commitStingerDefault;
+    }
+}
+
+private void PlayCommitStinger(InstrumentTrack track)
+{
+    if (track == null) return;
+
+    EnsureCommitSfxSource();
+    if (commitSfxSource == null) return;
+
+    var clip = GetCommitStingerClip(track.assignedRole);
+    if (clip == null) return;
+
+    float prevPitch = commitSfxSource.pitch;
+    if (commitStingerPitchJitter > 0f)
+        commitSfxSource.pitch = 1f + UnityEngine.Random.Range(-commitStingerPitchJitter, commitStingerPitchJitter);
+
+    commitSfxSource.PlayOneShot(clip, commitStingerVolume);
+    commitSfxSource.pitch = prevPitch;
+}
+
+/// <summary>
+/// Call this at the *visual deposit / marker light* moment, not at pickup.
+/// stepIndex is optional but useful later if you want per-step UI flashes.
+/// </summary>
+public void NotifyCommitted(InstrumentTrack track, int stepIndex)
+{
+    Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
+    // (Optional) you could track lastCommitTime here if you want.
+    //PlayCommitStinger(track);
+    PlayGravityVoidChordPulse(track, _lastTransportFrame.playheadBin, 3);
+}
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
@@ -81,10 +176,58 @@ public class InstrumentTrackController : MonoBehaviour
         }
         return false;
     }
-    public void NotifyCollected() {
-        lastCollectionTime = Time.time;
-    }
 
+private void EnsurePickupSfxSource()
+{
+    if (pickupSfxSource != null) return;
+
+    // Dedicated 2D one-shot source (never touches drum loop sources).
+    var go = new GameObject("TrackPickupSFX");
+    go.transform.SetParent(transform, worldPositionStays: false);
+
+    pickupSfxSource = go.AddComponent<AudioSource>();
+    pickupSfxSource.playOnAwake = false;
+    pickupSfxSource.loop = false;
+    pickupSfxSource.spatialBlend = 0f; // 2D
+    pickupSfxSource.volume = 1f;       // volume scaled per PlayOneShot call
+}
+
+private AudioClip GetPickupTickClip(MusicalRole role)
+{
+    switch (role)
+    {
+        case MusicalRole.Bass:    return pickupTickBass    != null ? pickupTickBass    : pickupTickDefault;
+        case MusicalRole.Lead:    return pickupTickLead    != null ? pickupTickLead    : pickupTickDefault;
+        case MusicalRole.Harmony: return pickupTickHarmony != null ? pickupTickHarmony : pickupTickDefault;
+        case MusicalRole.Groove:  return pickupTickGroove  != null ? pickupTickGroove  : pickupTickDefault;
+        default:                  return pickupTickDefault;
+    }
+}
+
+private void PlayPickupTick(InstrumentTrack track)
+{
+    if (track == null) return;
+
+    EnsurePickupSfxSource();
+    if (pickupSfxSource == null) return;
+
+    var clip = GetPickupTickClip(track.assignedRole);
+    if (clip == null) return; // nothing configured yet
+
+    float prevPitch = pickupSfxSource.pitch;
+    if (pickupTickPitchJitter > 0f)
+        pickupSfxSource.pitch = 1f + Random.Range(-pickupTickPitchJitter, pickupTickPitchJitter);
+
+    pickupSfxSource.PlayOneShot(clip, pickupTickVolume);
+    pickupSfxSource.pitch = prevPitch;
+}
+
+// New signature: use this for A2 so the tick can be role-aware.
+public void NotifyCollected(InstrumentTrack track)
+{
+    lastCollectionTime = Time.time;
+    PlayPickupTick(track);
+}
 public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
 {
     if (ownerTrack == null) return;
@@ -513,6 +656,7 @@ public void DespawnGravityVoid()
         if (!GameFlowManager.Instance.ReadyToPlay()) return;
         noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
         ResetAllCursorsAndGuards(clearLoops:false);
+        EnsurePickupSfxSource();
         UpdateVisualizer();
         // Subscribe to ascension-complete events
         foreach (var t in tracks)
@@ -941,7 +1085,7 @@ public int GetBinForNextSpawn(InstrumentTrack track)
     /// </summary>
     public void BeginNewMotif(string reason = "BeginNewMotif") {
         Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
-        GameFlowManager.Instance?.activeDrumTrack?.ResetMotifDrumSequencing();
+        GameFlowManager.Instance?.activeDrumTrack.ResetBeatSequencingState("InstrumentTrackController/BeginNewMotif");
         // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.
         ForceDestroyAllCollectablesInFlight(reason);
 

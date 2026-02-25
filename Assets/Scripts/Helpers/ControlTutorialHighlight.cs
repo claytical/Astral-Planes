@@ -72,10 +72,24 @@ public class ControlTutorialHighlight : MonoBehaviour
         ButtonId.West,
         ButtonId.South
     };
+    [Header("Instruction Label Fade + Attention")]
+    [SerializeField] private CanvasGroup instructionGroup; // optional but recommended
+    [SerializeField, Min(0f)] private float labelFadeInSeconds  = 0.12f;
+    [SerializeField, Min(0f)] private float labelFadeOutSeconds = 0.12f;
+    [SerializeField, Range(0f, 0.25f)] private float labelAttentionScale = 0.06f;
+    [SerializeField, Min(0.1f)] private float labelScaleLerpSpeed = 14f;
+    [SerializeField] private bool deactivateLabelWhenHidden = true;
 
+    private Coroutine _labelFadeCo;
     [Header("Behavior")]
     [SerializeField] private bool hideTextOnClear = true;
-
+    // ------------------------------------------------------------
+    // label fade/scale state
+    // ------------------------------------------------------------
+    private float _labelAlpha = 0f;
+    private float _labelTargetAlpha = 0f;
+    private Vector3 _labelBaseScale = Vector3.one;
+    private bool _labelWantsActive;
     // ------------------------------------------------------------
     // state
     // ------------------------------------------------------------
@@ -122,16 +136,132 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         CacheBaseScale(arrowsImage, ref _arrowsBaseScale);
         CacheBaseScale(startImage,  ref _startBaseScale);
+        CacheLabelBaseScale();
 
+        if (instructionText)
+        {
+            _labelBaseScale = instructionText.rectTransform.localScale;
+
+            // If none wired, try auto-find on label object (safe, optional)
+            if (!instructionGroup)
+                instructionGroup = instructionText.GetComponent<CanvasGroup>();
+
+            // If still none, you can add one automatically:
+            if (!instructionGroup)
+                instructionGroup = instructionText.gameObject.AddComponent<CanvasGroup>();
+
+            instructionGroup.alpha = 0f;
+            if (deactivateLabelWhenHidden) instructionText.gameObject.SetActive(false);
+        }
+        ApplyLabelVisuals(immediate: true, forceDeactivateIfHidden: true);
         StopAllModes();
         Clear(immediate: true, hideText: hideTextOnClear);
     }
-
+    private void CacheLabelBaseScale()
+    {
+        if (instructionText)
+            _labelBaseScale = instructionText.rectTransform.localScale;
+    }
     private void OnDisable()
     {
         StopAllModes();
     }
+private void StopLabelFade()
+{
+    if (_labelFadeCo != null) { StopCoroutine(_labelFadeCo); _labelFadeCo = null; }
+}
 
+private void SetLabelAlphaImmediate(float a)
+{
+    if (!instructionText) return;
+    if (!instructionGroup) return;
+
+    instructionGroup.alpha = Mathf.Clamp01(a);
+
+    // scale attention
+    float mul = (a > 0.001f) ? (1f + labelAttentionScale) : 1f;
+    instructionText.rectTransform.localScale = _labelBaseScale * mul;
+
+    if (deactivateLabelWhenHidden && a <= 0.001f)
+        instructionText.gameObject.SetActive(false);
+    else
+        instructionText.gameObject.SetActive(true);
+}
+
+private void FadeLabelTo(float targetAlpha, float seconds)
+{
+    if (!instructionText) return;
+
+    // If we're inactive, we cannot run coroutines or Update.
+    // So we must apply immediately (or just bail).
+    if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+    {
+        // Ensure CanvasGroup exists so alpha can be set deterministically.
+        if (!instructionGroup) instructionGroup = instructionText.GetComponent<CanvasGroup>();
+        if (!instructionGroup) instructionGroup = instructionText.gameObject.AddComponent<CanvasGroup>();
+
+        // If we're "showing" but inactive, we still can't display anyway.
+        // But at least keep internal state consistent, and avoid warnings.
+        if (targetAlpha <= 0.001f)
+        {
+            instructionText.text = "";
+            instructionGroup.alpha = 0f;
+            if (deactivateLabelWhenHidden) instructionText.gameObject.SetActive(false);
+        }
+        else
+        {
+            // We can prep it for next activation.
+            instructionGroup.alpha = 1f;
+            instructionText.gameObject.SetActive(true);
+            instructionText.rectTransform.localScale = _labelBaseScale * (1f + labelAttentionScale);
+        }
+
+        return;
+    }
+
+    // Ensure label is active if fading in
+    if (targetAlpha > 0.001f) instructionText.gameObject.SetActive(true);
+
+    if (!instructionGroup) instructionGroup = instructionText.GetComponent<CanvasGroup>();
+    if (!instructionGroup) instructionGroup = instructionText.gameObject.AddComponent<CanvasGroup>();
+
+    StopLabelFade();
+    _labelFadeCo = StartCoroutine(FadeLabelRoutine(Mathf.Clamp01(targetAlpha), Mathf.Max(0.0001f, seconds)));
+}
+private IEnumerator FadeLabelRoutine(float target, float seconds)
+{
+    float start = instructionGroup.alpha;
+    float t = 0f;
+
+    while (t < 1f && gameObject.activeInHierarchy)
+    {
+        t += Time.unscaledDeltaTime / seconds;
+        float a = Mathf.Lerp(start, target, t);
+        instructionGroup.alpha = a;
+
+        // attention scale easing
+        float mul = (a > 0.001f) ? (1f + labelAttentionScale) : 1f;
+        float s = 1f - Mathf.Exp(-labelScaleLerpSpeed * Time.unscaledDeltaTime);
+        instructionText.rectTransform.localScale = Vector3.Lerp(
+            instructionText.rectTransform.localScale,
+            _labelBaseScale * mul,
+            s
+        );
+
+        yield return null;
+    }
+
+    instructionGroup.alpha = target;
+
+    // final scale snap
+    float finalMul = (target > 0.001f) ? (1f + labelAttentionScale) : 1f;
+    instructionText.rectTransform.localScale = _labelBaseScale * finalMul;
+
+    if (deactivateLabelWhenHidden && target <= 0.001f)
+        instructionText.gameObject.SetActive(false);
+
+    _labelFadeCo = null;
+}
     private void Update()
     {
         _t += Time.unscaledDeltaTime;
@@ -158,8 +288,88 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         ApplyVisuals(arrowsImage, _arrowsBaseScale, _arrowsW);
         ApplyVisuals(startImage,  _startBaseScale,  _startW);
+        UpdateLabelVisuals();
+    }
+    private void UpdateLabelVisuals()
+    {
+        if (!instructionText) return;
+
+        // If we intend to show, ensure active before fading in
+        if (_labelTargetAlpha > 0.001f)
+        {
+            if (!instructionText.gameObject.activeSelf)
+                instructionText.gameObject.SetActive(true);
+        }
+
+        // Fade alpha using unscaled time
+        float dt = Time.unscaledDeltaTime;
+        float fadeSeconds = (_labelTargetAlpha >= _labelAlpha) ? Mathf.Max(0.0001f, labelFadeInSeconds)
+                                                               : Mathf.Max(0.0001f, labelFadeOutSeconds);
+
+        float k = 1f - Mathf.Exp(-(1f / fadeSeconds) * dt);
+        _labelAlpha = Mathf.Lerp(_labelAlpha, _labelTargetAlpha, k);
+
+        // Apply alpha to CanvasGroup or TMP_Text color
+        if (instructionGroup)
+        {
+            instructionGroup.alpha = _labelAlpha;
+        }
+        else
+        {
+            var c = instructionText.color;
+            c.a = _labelAlpha;
+            instructionText.color = c;
+        }
+
+        // Ease scale up slightly when visible
+        float targetScaleMul = (_labelTargetAlpha > 0.001f) ? (1f + labelAttentionScale) : 1f;
+        Vector3 targetScale = _labelBaseScale * targetScaleMul;
+
+        float s = 1f - Mathf.Exp(-labelScaleLerpSpeed * dt);
+        instructionText.rectTransform.localScale = Vector3.Lerp(
+            instructionText.rectTransform.localScale,
+            targetScale,
+            s
+        );
+
+        // Optionally deactivate once fully faded out
+        if (deactivateLabelWhenHidden && _labelTargetAlpha <= 0.001f && _labelAlpha <= 0.01f)
+        {
+            if (instructionText.gameObject.activeSelf)
+                instructionText.gameObject.SetActive(false);
+        }
     }
 
+    private void ApplyLabelVisuals(bool immediate, bool forceDeactivateIfHidden)
+    {
+        if (!instructionText) return;
+
+        if (_labelTargetAlpha > 0.001f)
+        {
+            instructionText.gameObject.SetActive(true);
+        }
+        else if (forceDeactivateIfHidden && deactivateLabelWhenHidden)
+        {
+            instructionText.gameObject.SetActive(false);
+        }
+
+        if (immediate)
+        {
+            _labelAlpha = _labelTargetAlpha;
+
+            if (instructionGroup)
+                instructionGroup.alpha = _labelAlpha;
+            else
+            {
+                var c = instructionText.color;
+                c.a = _labelAlpha;
+                instructionText.color = c;
+            }
+
+            float targetScaleMul = (_labelTargetAlpha > 0.001f) ? (1f + labelAttentionScale) : 1f;
+            instructionText.rectTransform.localScale = _labelBaseScale * targetScaleMul;
+        }
+    }
     // ============================================================
     // Public visibility helpers
     // ============================================================
@@ -172,10 +382,32 @@ public class ControlTutorialHighlight : MonoBehaviour
     public void HideAndClear(bool immediate = true)
     {
         StopAllModes();
-        Clear(immediate: immediate, hideText: true);
-        gameObject.SetActive(false);
+
+        if (immediate)
+        {
+            StopLabelFade();
+            if (instructionText) instructionText.text = "";
+            SetLabelAlphaImmediate(0f);
+
+            Clear(immediate: true, hideText: true);
+            gameObject.SetActive(false);
+            return;
+        }
+
+        // Non-immediate: fade label out and keep this GO alive long enough to see it.
+        if (instructionText) instructionText.text = "";
+        Clear(immediate: false, hideText: true);
+        FadeLabelTo(0f, labelFadeOutSeconds);
+
+        // If you truly want the whole highlight to disappear after the label fades:
+        StartCoroutine(DisableSelfAfterSeconds(labelFadeOutSeconds));
     }
 
+    private IEnumerator DisableSelfAfterSeconds(float seconds)
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(0.0001f, seconds));
+        gameObject.SetActive(false);
+    }
     // ============================================================
     // Tutorial mode (manual step) - kept for compatibility
     // ============================================================
@@ -276,10 +508,9 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instructionText)
         {
-            instructionText.gameObject.SetActive(true);
             instructionText.text = text;
+            FadeLabelTo(1f, labelFadeInSeconds);
         }
-
         if (_pressAnyAutoCo != null) StopCoroutine(_pressAnyAutoCo);
         _pressAnyAutoCo = StartCoroutine(PressAnyAutoRoutine(Mathf.Max(0.05f, stepSeconds), loop, immediateFirst));
     }
@@ -356,8 +587,9 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instructionText)
         {
-            instructionText.gameObject.SetActive(true);
             instructionText.text = overrideText ?? "";
+            if (string.IsNullOrEmpty(instructionText.text)) FadeLabelTo(0f, labelFadeOutSeconds);
+            else FadeLabelTo(1f, labelFadeInSeconds);
         }
 
         Clear(immediate: immediate, hideText: false);
@@ -375,8 +607,8 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instructionText)
         {
-            instructionText.gameObject.SetActive(true);
             instructionText.text = InstructionToString(instruction);
+            FadeLabelTo(1f, labelFadeInSeconds);
         }
 
         Clear(immediate: immediate, hideText: false);
@@ -430,14 +662,9 @@ public class ControlTutorialHighlight : MonoBehaviour
             if (hideText)
             {
                 instructionText.text = "";
-                instructionText.gameObject.SetActive(false);
+                FadeLabelTo(0f, immediate ? 0.0001f : labelFadeOutSeconds);
             }
-            else
-            {
-                // leave it active, but don’t force-empty unless you want to
-                // (your prompts set text explicitly)
-                instructionText.gameObject.SetActive(true);
-            }
+            // else: leave as-is (caller will set text and fade-in explicitly)
         }
     }
 

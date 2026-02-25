@@ -27,7 +27,11 @@ public class NoteVisualizer : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float _lineCharge01 = 0f;
     [SerializeField] private float _lineChargeDecaySpeed = 0.5f;
+    [Header("Playhead Pulse (Color)")]
+    [SerializeField] private float releasePulseSeconds = 0.18f;
+    [SerializeField] private Color releasePulseColor = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
 
+    private float _releasePulseT = 0f; // seconds remaining
     // Flag to fire a short "release" burst when drums change / burst completes.
     private bool _pendingReleasePulse = false;
 // Cached core refs (do not assume stable across scenes)
@@ -66,6 +70,20 @@ public class NoteVisualizer : MonoBehaviour
     private readonly List<Image> _binIndicators = new List<Image>();
     private int _activeBinCount = 0;      // How many bins are currently in use (post-contraction)
     private int _currentTargetBin = -1;  
+    [Header("Playhead Trail (Particles)")]
+    [SerializeField] private bool playheadTrailEnabled = true;
+
+// Particles per world unit traveled (higher = denser trail).
+    [SerializeField] private float playheadTrailEmitPerWorldUnit = 45f;
+
+// Safety cap so a hitch doesn't emit thousands.
+    [SerializeField] private int playheadTrailMaxEmitPerFrame = 160;
+
+// Optional: keep particle Z stable (useful if your world-space canvas depth fights sorting).
+    [SerializeField] private float playheadTrailWorldZOverride = float.NaN;
+
+    private Vector3 _lastPlayheadParticleWorldPos;
+    private bool _hasLastPlayheadParticleWorldPos;
     class AscendTask
     {
         public InstrumentTrack track;
@@ -111,6 +129,35 @@ public class NoteVisualizer : MonoBehaviour
     private readonly HashSet<(InstrumentTrack track, int step)> _animatingSteps = new();
     private readonly List<BlastTask> _blastTasks = new();
     private readonly List<RushTask> _rushTasks = new();
+    [Header("First-Play Confirm FX")]
+    [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
+    [SerializeField] private float firstPlayConfirmTravelSeconds = 2f;
+    [SerializeField] private int firstPlayConfirmEmitCount = 24;
+
+    private struct FirstPlayConfirmRequest
+    {
+        public Transform source;     // vehicle
+        public InstrumentTrack track;
+        public int step;
+        public double dspTime;       // when this step first plays
+        public Color color;
+        public bool spawned;
+    }
+
+    private struct FirstPlayConfirmTask
+    {
+        public ParticleSystem ps;
+        public Vector3 start;
+        public Vector3 end;
+        public double startDsp;
+        public double endDsp;
+        public Color color;
+    }
+
+    private readonly List<FirstPlayConfirmRequest> _firstPlayRequests = new();
+    private readonly List<FirstPlayConfirmTask> _firstPlayTasks = new();
+    private Color stepColor;
+
     public void RegisterCollectedMarker(InstrumentTrack track, int burstId, int step, GameObject markerGo)
     {
         if (!track || !markerGo) return;
@@ -151,7 +198,85 @@ public class NoteVisualizer : MonoBehaviour
             row.offsetMax = new Vector2(0f, row.offsetMax.y);
         }
     }
+    public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color)
+    {
+        if (track == null || source == null) return;
+        Debug.Log($"[CONFIRM_SCHED] track={track.name} step={step} dsp={dspTime:F6} now={AudioSettings.dspTime:F6} dt={(dspTime-AudioSettings.dspTime):F4}");
+        _firstPlayRequests.Add(new FirstPlayConfirmRequest
+        {
+            source = source,
+            track = track,
+            step = step,
+            dspTime = dspTime,
+            color = color,
+            spawned = false
+        });
+    }
+    private void UpdatePlayheadParticleTrailWorld()
+    {
+//        if (!playheadTrailEnabled) return;
+        if (playheadParticles == null || playheadLine == null) return;
 
+        // Ensure "trail" behavior: particles remain in world when emitter moves.
+        var main = playheadParticles.main;
+        if (main.simulationSpace != ParticleSystemSimulationSpace.World)
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        // Emitter should live on the playhead line (it is a child, but we sample world pos anyway).
+        Vector3 now = playheadParticles.transform.position;
+
+        if (!float.IsNaN(playheadTrailWorldZOverride))
+            now.z = playheadTrailWorldZOverride;
+
+        // First frame after enable/reset: just seed the position.
+        if (!_hasLastPlayheadParticleWorldPos)
+        {
+            _hasLastPlayheadParticleWorldPos = true;
+            _lastPlayheadParticleWorldPos = now;
+            return;
+        }
+
+        Vector3 prev = _lastPlayheadParticleWorldPos;
+        if (!float.IsNaN(playheadTrailWorldZOverride))
+            prev.z = playheadTrailWorldZOverride;
+
+        float dist = Vector3.Distance(prev, now);
+        if (dist <= 0.00001f)
+            return;
+
+        // Emit a number of particles proportional to distance traveled.
+        int emitCount = Mathf.Clamp(
+            Mathf.CeilToInt(dist * playheadTrailEmitPerWorldUnit),
+            1,
+            playheadTrailMaxEmitPerFrame
+        );
+
+        // Emit evenly along the traveled segment so the trail is continuous.
+        var emitParams = new ParticleSystem.EmitParams();
+        for (int i = 0; i < emitCount; i++)
+        {
+            float u = (emitCount <= 1) ? 1f : (i / (emitCount - 1f));
+            Vector3 p = Vector3.Lerp(prev, now, u);
+            emitParams.position = p;
+
+            // Optional: tiny jitter can soften "beads on a string" if you want it.
+            // emitParams.position += UnityEngine.Random.insideUnitSphere * 0.01f;
+// Make trail particles inherit the same pulse color immediately.
+            if (_releasePulseT > 0f)
+            {
+                float pulse01 = Mathf.Clamp01(_releasePulseT / Mathf.Max(0.0001f, releasePulseSeconds));
+                emitParams.startColor = Color.Lerp(Color.white, releasePulseColor, pulse01);
+            }
+            else
+            {
+                emitParams.startColor = Color.white; // or omit if you want the system default
+            }
+
+            playheadParticles.Emit(emitParams, 1);
+        }
+
+        _lastPlayheadParticleWorldPos = now;
+    }
     /// <summary>
     /// Hard visual reset for motif boundaries. This should be invoked by the single
     /// motif authority after track data has been cleared, and before the next motif
@@ -166,6 +291,8 @@ public class NoteVisualizer : MonoBehaviour
         _stepBurst.Clear();
         _animatingSteps.Clear();
         _ghostNoteSteps.Clear();
+        _hasLastPlayheadParticleWorldPos = false;
+        _lastPlayheadParticleWorldPos = Vector3.zero;
         //_trackStepWorldPositions.Clear();
         _lastObservedCompletedLoops = -1;
         if (destroyMarkerGameObjects) { 
@@ -338,8 +465,8 @@ public class NoteVisualizer : MonoBehaviour
     public void TriggerPlayheadReleasePulse()
     {
         _pendingReleasePulse = true;
+        _releasePulseT = releasePulseSeconds; // start the color pulse immediately
     }
-
     private void Awake()
     {
         // If Initialize() is called later by GFM, this is still safe.
@@ -412,12 +539,15 @@ void Update()
         : 0;
     _ = audibleBin; // (kept to preserve your original intent; safe no-op if unused)
 
-    float clipLen = Mathf.Max(0.0001f, _drum.GetClipLengthInSeconds());
+// --- Visual clock MUST match playheadLine clock ---
+// Use the leader loop length for both x-position AND step sampling.
     int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
-    float stepDuration = clipLen / drumTotalSteps;
-
     float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
 
+// Seconds per step in the VISUAL loop timeline
+    float stepDuration = fullVisualLoopDuration / drumTotalSteps;
+
+// Position playhead line using the same loop duration
     float globalElapsed = (float)(AudioSettings.dspTime - leaderStartDsp);
     float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
 
@@ -425,14 +555,20 @@ void Update()
     float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
     playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
 
-    float drumLoopLength = clipLen;
+    ProcessFirstPlayConfirmFx();
+    UpdateFirstPlayConfirmTasks();
+    DisableBuiltInEmissionForTrail();
+    UpdatePlayheadParticleTrailWorld();
 
-    // Clip time is derived from leader transport so visual bin position and step sampling share the same clock.
+// Leader time in [0, fullVisualLoopDuration)
     float leaderT = (float)((AudioSettings.dspTime - leaderStartDsp) % fullVisualLoopDuration);
     if (leaderT < 0f) leaderT += fullVisualLoopDuration;
 
-    float drumElapsed = leaderT % drumLoopLength;
-    int currentStep = Mathf.FloorToInt(drumElapsed / stepDuration) % drumTotalSteps;
+// Current step derived from the SAME timeline the playhead uses
+    int currentStep = Mathf.FloorToInt(leaderT / stepDuration);
+    currentStep = ((currentStep % drumTotalSteps) + drumTotalSteps) % drumTotalSteps;
+
+    stepColor = ComputeStepColor(currentStep);
 
     bool shimmer = false;
     float maxVelocity = 0f;
@@ -459,40 +595,52 @@ void Update()
     {
         var main = playheadParticles.main;
         var emission = playheadParticles.emission;
-
         // Base factors from music (velocity) plus collection/ascension state
         float velFactor = Mathf.Clamp01(maxVelocity);
         float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);   // fills as burst is collected
         float chargeFactor = 1.0f + 1.5f * _lineCharge01;                 // extra particles as notes hit the top
 
-        main.startSize = Mathf.Lerp(0.3f, 1.2f, velFactor) * energyFactor;
+        main.startSize = Mathf.Lerp(0.8f, 1.2f, velFactor) * energyFactor;
         emission.rateOverTime = Mathf.Lerp(10f, 50f, velFactor) * energyFactor * chargeFactor;
         emission.enabled = shimmer || _lineCharge01 > 0.05f || _playheadEnergy01 > 0.05f;
+// Decay pulse timer
+        if (_releasePulseT > 0f)
+            _releasePulseT = Mathf.Max(0f, _releasePulseT - Time.deltaTime);
 
+        float pulse01 = (releasePulseSeconds <= 0f) ? 0f : Mathf.Clamp01(_releasePulseT / releasePulseSeconds);
         var col = playheadParticles.colorOverLifetime;
-        if (col.enabled)
+
+        col.enabled = true;
+
+// Build a base gradient (your normal behavior)
+        float baseAlpha = 0.4f + velFactor * 0.5f;
+        float topAlpha = 0.1f;
+        float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01);
+
+        Color c0 = Color.white;
+        Color c1 = Color.cyan;
+
+// Pulse pushes both ends toward releasePulseColor
+        if (pulse01 > 0f)
         {
-            // Slightly more opaque when highly charged
-            float baseAlpha = 0.4f + velFactor * 0.5f;
-            float topAlpha = 0.1f;
-            float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01);
-
-            Gradient g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(Color.white, 0f),
-                    new GradientColorKey(Color.cyan, 1f)
-                },
-                new[]
-                {
-                    new GradientAlphaKey(Mathf.Clamp01(baseAlpha + alphaBoost), 0f),
-                    new GradientAlphaKey(topAlpha, 1f)
-                }
-            );
-            col.color = g;
+            c0 = Color.Lerp(c0, releasePulseColor, pulse01);
+            c1 = Color.Lerp(c1, releasePulseColor, pulse01);
+            alphaBoost += 0.35f * pulse01; // optional: make it “flash” brighter
         }
-
+        Gradient g = new Gradient();
+        g.SetKeys(
+            new[]
+            {
+                new GradientColorKey(stepColor, 0f),
+                new GradientColorKey(stepColor, 1f),
+            },
+            new[]
+            {
+                new GradientAlphaKey(0.85f, 0f),
+                new GradientAlphaKey(0.0f, 1f),
+            }
+        );
+        col.color = g;
         // Fire a short extra burst when a burst completes / drums change
         if (_pendingReleasePulse)
         {
@@ -581,6 +729,149 @@ void Update()
     }
 }
 
+private void ProcessFirstPlayConfirmFx()
+{
+    if (firstPlayConfirmOrbPrefab == null) return;
+    if (_firstPlayRequests.Count == 0) return;
+
+    double now = AudioSettings.dspTime;
+
+    for (int i = 0; i < _firstPlayRequests.Count; i++)
+    {
+        var r = _firstPlayRequests[i];
+        if (r.spawned) continue;
+
+        // If the target moment already passed, do nothing here.
+        // (You may optionally spawn an instant "late" pop instead.)
+        if (r.dspTime <= now + 0.0001)
+        {
+            r.spawned = true;
+            _firstPlayRequests[i] = r;
+            continue;
+        }
+
+        // End position: marker if available, otherwise playhead
+        Vector3 endWorld;
+        if (noteMarkers != null &&
+            noteMarkers.TryGetValue((r.track, r.step), out var markerTr) &&
+            markerTr != null)
+        {
+            endWorld = markerTr.position;
+        }
+        else
+        {
+            endWorld = (playheadLine != null) ? playheadLine.position : transform.position;
+        }
+
+        // Start position: snapshot the source at spawn time
+        Vector3 startWorld = r.source != null ? r.source.position : transform.position;
+
+        // Spawn NOW (not "only when within travel window")
+        var ps = Instantiate(
+            firstPlayConfirmOrbPrefab,
+            startWorld,
+            Quaternion.identity,
+            _uiParent ? _uiParent : transform
+        );
+
+        var main = ps.main;
+        main.startColor = r.color;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        ps.Play(true);
+
+        // IMPORTANT: duration = time remaining until first-play moment
+        _firstPlayTasks.Add(new FirstPlayConfirmTask
+        {
+            ps = ps,
+            start = startWorld,
+            end = endWorld,
+            startDsp = now,
+            endDsp = r.dspTime,
+            color = r.color
+        });
+
+        r.spawned = true;
+        _firstPlayRequests[i] = r;
+    }
+}
+private void UpdateFirstPlayConfirmTasks()
+{
+    if (_firstPlayTasks.Count == 0) return;
+
+    double now = AudioSettings.dspTime;
+
+    for (int i = _firstPlayTasks.Count - 1; i >= 0; i--)
+    {
+        var t = _firstPlayTasks[i];
+        if (t.ps == null)
+        {
+            _firstPlayTasks.RemoveAt(i);
+            continue;
+        }
+
+        double dur = System.Math.Max(0.0001, t.endDsp - t.startDsp);
+
+        // Normalized progress in DSP time
+        float u = (float)((now - t.startDsp) / dur);
+        u = Mathf.Clamp01(u);
+
+        // Smooth movement (prevents “linear snap” feel)
+        float eased = u * u * (3f - 2f * u); // SmoothStep
+
+        // If we spawned late for any reason, don’t force the orb to start at the old "start" point visually.
+        // This makes late spawns appear *already in progress* instead of racing to catch up.
+        Vector3 p = Vector3.Lerp(t.start, t.end, eased);
+        t.ps.transform.position = p;
+
+        if (now >= t.endDsp)
+        {
+            // ARRIVE: burst + cleanup
+            var emitParams = new ParticleSystem.EmitParams
+            {
+                position = t.end,
+                startColor = t.color
+            };
+            t.ps.Emit(emitParams, firstPlayConfirmEmitCount);
+
+            t.ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(t.ps.gameObject, 0.35f);
+
+            _firstPlayTasks.RemoveAt(i);
+        }
+        else
+        {
+            _firstPlayTasks[i] = t;
+        }
+    }
+}
+private Color ComputeStepColor(int step)
+{
+    var controller = _gfm != null ? _gfm.controller : null;
+    if (controller == null || controller.tracks == null) return Color.white;
+
+    float totalW = 0f;
+    Vector3 sum = Vector3.zero;
+
+    foreach (var tr in controller.tracks)
+    {
+        if (tr == null) continue;
+
+        float v = tr.GetVelocityAtStep(step);   // 0..127
+        if (v <= 0f) continue;
+
+        float w = v / 127f;
+        totalW += w;
+
+        Color c = tr.trackColor;
+        sum += new Vector3(c.r, c.g, c.b) * w;
+    }
+
+    if (totalW <= 0.0001f) return Color.white;
+
+    Vector3 rgb = sum / totalW;
+    return new Color(rgb.x, rgb.y, rgb.z, 1f);
+}
     private void OnLoopBoundary()
 {
     if (_ascendTasks.Count == 0) return;
@@ -679,6 +970,16 @@ void Update()
 
         for (int i = 0; i < count; i++)
             set.Add((startStepInclusive + i) % total);
+    }
+    private void DisableBuiltInEmissionForTrail()
+    {
+        if (!playheadParticles) return;
+        var emission = playheadParticles.emission;
+        emission.enabled = false;
+
+        // Defensive: if enabled elsewhere, force it off.
+        emission.rateOverTime = 0f;
+        emission.rateOverDistance = 0f;
     }
     private bool RefreshCoreRefs(bool force = false)
     {

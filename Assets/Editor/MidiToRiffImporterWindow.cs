@@ -74,65 +74,88 @@ public class MidiToRiffImporterWindow : EditorWindow
             MessageType.None);
     }
 
-    private void ImportAndCreateAsset()
+private void ImportAndCreateAsset()
+{
+    string assetPath = AssetDatabase.GetAssetPath(_midiFile);
+    if (string.IsNullOrEmpty(assetPath) || !assetPath.EndsWith(".mid", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException($"Selected asset is not a .mid file: {assetPath}");
+
+    if (_stepsPerBar <= 0)
+        throw new InvalidOperationException("Steps/Bar must be > 0 (e.g., 16).");
+
+    if (!TryLoadMidiEvents(assetPath, out var rawEvents, out int ticksPerQuarter))
+        throw new InvalidOperationException("Could not load MIDI events via MidiPlayerTK reflection. See console log for details.");
+
+    if (ticksPerQuarter <= 0) ticksPerQuarter = 480; // safe fallback; many files use 480
+
+    // --- Option A: assume 4/4 always ---
+    // ticksPerBar = PPQ * 4 quarter-notes
+    // ticksPerStep = ticksPerBar / stepsPerBar
+    float ticksPerStepF = (ticksPerQuarter * 4f) / _stepsPerBar;
+
+    // Convert raw midi events into note pairs.
+    // IMPORTANT: for multi-bar import, ExtractNotePairs must NOT modulo step into one bar.
+    // (You already patched ExtractNotePairs accordingly.)
+    var notes = ExtractNotePairs(rawEvents, ticksPerStepF, _channelFilter, _stepsPerBar, _clampToBar, _verboseLog);
+
+    // --- Determine loopSteps ---
+    // If clampToBar, loop is exactly one bar. Otherwise infer from max(step+dur).
+    int loopSteps = _stepsPerBar;
+
+    if (!_clampToBar && notes != null && notes.Count > 0)
     {
-        string assetPath = AssetDatabase.GetAssetPath(_midiFile);
-        if (string.IsNullOrEmpty(assetPath) || !assetPath.EndsWith(".mid", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Selected asset is not a .mid file: {assetPath}");
-
-        if (_stepsPerBar <= 0 || _beatsPerBar <= 0 || (_stepsPerBar % _beatsPerBar) != 0)
-            throw new InvalidOperationException("Steps/Bar must be divisible by Beats/Bar (e.g., 16/4).");
-
-        if (!TryLoadMidiEvents(assetPath, out var rawEvents, out int ticksPerQuarter))
-            throw new InvalidOperationException("Could not load MIDI events via MidiPlayerTK reflection. See console log for details.");
-
-        if (ticksPerQuarter <= 0) ticksPerQuarter = 480; // safe fallback; many files use 480
-
-        int stepsPerBeat = _stepsPerBar / _beatsPerBar;
-        float ticksPerStepF = ticksPerQuarter / (float)stepsPerBeat;
-
-        // Convert raw midi events into note pairs.
-        var notes = ExtractNotePairs(rawEvents, ticksPerStepF, _channelFilter, _stepsPerBar, _clampToBar, _verboseLog);
-
-        // Optional: clamp duration to next onset per pitch (monophonic-ish articulation)
-        if (_clampDurToNextOnset)
-            ClampDurationsToNextOnset(notes, _stepsPerBar);
-
-        // Optional: dedupe identical (step,note) collisions
-        if (_dedupeSameStepSameNoteKeepLoudest)
-            notes = DedupeSameStepSameNote(notes);
-
-        // Build riff
-        var riff = new Riff
+        int maxEndExclusive = 0;
+        for (int i = 0; i < notes.Count; i++)
         {
-            id = _riffId,
-            authoredRootMidi = _authoredRootMidi,
-            loopSteps = 16, // lock to 16 regardless of UI; your system is 16-step bins
-            events = notes
-                .OrderBy(n => n.step)
-                .ThenBy(n => n.midiNote)
-                .ToList(),
-            overlapPolicy = _clampDurToNextOnset ? RiffOverlapPolicy.ClampToNextOnset : RiffOverlapPolicy.AllowOverlap,
-            clampToTrackRange = false,
-            octaveShift = 0
-        };
+            var n = notes[i];
+            int endExclusive = n.step + Mathf.Max(1, n.durSteps);
+            if (endExclusive > maxEndExclusive) maxEndExclusive = endExclusive;
+        }
 
-        // Create asset next to MIDI file
-        string dir = Path.GetDirectoryName(assetPath)?.Replace("\\", "/") ?? "Assets";
-        string outPath = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{_riffId}.asset");
-
-        var asset = ScriptableObject.CreateInstance<RiffAsset>();
-        asset.riff = riff;
-
-        AssetDatabase.CreateAsset(asset, outPath);
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-
-        Selection.activeObject = asset;
-
-        Debug.Log($"[MIDI→RIFF] Created {outPath} events={riff.events?.Count ?? 0} tq={ticksPerQuarter}");
+        // Round up to whole bars to keep bins aligned.
+        int bars = Mathf.CeilToInt(maxEndExclusive / (float)_stepsPerBar);
+        loopSteps = Mathf.Max(_stepsPerBar, bars * _stepsPerBar);
     }
 
+    // Optional: clamp duration to next onset per pitch (monophonic-ish articulation)
+    // IMPORTANT: this should clamp against the *loop length*, not stepsPerBar, when importing multi-bar.
+    if (_clampDurToNextOnset)
+        ClampDurationsToNextOnset(notes, loopSteps);
+
+    // Optional: dedupe identical (step,note) collisions
+    if (_dedupeSameStepSameNoteKeepLoudest)
+        notes = DedupeSameStepSameNote(notes);
+
+    // Build riff
+    var riff = new Riff
+    {
+        id = _riffId,
+        authoredRootMidi = _authoredRootMidi,
+        loopSteps = loopSteps,
+        events = notes
+            .OrderBy(n => n.step)
+            .ThenBy(n => n.midiNote)
+            .ToList(),
+        overlapPolicy = _clampDurToNextOnset ? RiffOverlapPolicy.ClampToNextOnset : RiffOverlapPolicy.AllowOverlap,
+        clampToTrackRange = false,
+        octaveShift = 0
+    };
+
+    // Create asset next to MIDI file
+    string dir = Path.GetDirectoryName(assetPath)?.Replace("\\", "/") ?? "Assets";
+    string outPath = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{_riffId}.asset");
+
+    var asset = ScriptableObject.CreateInstance<RiffAsset>();
+    asset.riff = riff;
+
+    AssetDatabase.CreateAsset(asset, outPath);
+    AssetDatabase.SaveAssets();
+    AssetDatabase.Refresh();
+
+    Selection.activeObject = asset;
+
+    Debug.Log($"[MIDI→RIFF] Created {outPath} events={riff.events?.Count ?? 0} tq={ticksPerQuarter} stepsPerBar={_stepsPerBar} loopSteps={riff.loopSteps} clampToBar={_clampToBar}");
+}
     // --------------------------------------------------------------------------------------------
     // MIDI loading via MidiPlayerTK reflection
     // --------------------------------------------------------------------------------------------
@@ -547,108 +570,147 @@ private sealed class SmfReader
     // Note pairing + quantization
     // --------------------------------------------------------------------------------------------
 
-    private static List<RiffNoteEvent> ExtractNotePairs(
-        List<MidiEvt> events,
-        float ticksPerStep,
-        int channelFilter,
-        int stepsPerBar,
-        bool clampToBar,
-        bool verbose)
+private static List<RiffNoteEvent> ExtractNotePairs(
+    List<MidiEvt> events,
+    float ticksPerStep,
+    int channelFilter,
+    int stepsPerBar,
+    bool clampToBar,
+    bool verbose)
+{
+    // Sort by tick for deterministic pairing.
+    events.Sort((a, b) => a.tick.CompareTo(b.tick));
+
+    // Active notes keyed by (channel,note) -> stack of start ticks (supports overlapping same note).
+    var active = new Dictionary<(int ch, int note), Stack<(long tick, int vel)>>();
+
+    var output = new List<RiffNoteEvent>();
+
+    int StepFromTick(long tick)
     {
-        // Sort by tick for deterministic pairing.
-        events.Sort((a, b) => a.tick.CompareTo(b.tick));
+        // Quantize to nearest *absolute* step index.
+        // If clampToBar==true, collapse into a single bar [0..stepsPerBar-1].
+        int s = Mathf.RoundToInt((float)tick / ticksPerStep);
 
-        // Active notes keyed by (channel,note) -> stack of start ticks (supports overlapping same note).
-        var active = new Dictionary<(int ch, int note), Stack<(long tick, int vel)>>();
+        if (clampToBar)
+            return Mathf.Clamp(s, 0, stepsPerBar - 1);
 
-        var output = new List<RiffNoteEvent>();
-
-        int StepFromTick(long tick)
-        {
-            // Quantize to nearest step index within bar.
-            int s = Mathf.RoundToInt((float)tick / ticksPerStep);
-            if (clampToBar) s = Mathf.Clamp(s, 0, stepsPerBar - 1);
-            else s = ((s % stepsPerBar) + stepsPerBar) % stepsPerBar;
-            return s;
-        }
-
-        int StepsFromDurTicks(long durTicks)
-        {
-            int ds = Mathf.RoundToInt((float)durTicks / ticksPerStep);
-            return Mathf.Clamp(ds, 1, stepsPerBar); // allow full bar hold
-        }
-
-        foreach (var e in events)
-        {
-            if (channelFilter >= 0 && e.channel != channelFilter) continue;
-
-            var key = (e.channel, e.note);
-
-            if (e.isNoteOn)
-            {
-                if (!active.TryGetValue(key, out var st))
-                {
-                    st = new Stack<(long tick, int vel)>();
-                    active[key] = st;
-                }
-                st.Push((e.tick, e.velocity));
-            }
-            else
-            {
-                // NoteOff: match to most recent NoteOn
-                if (!active.TryGetValue(key, out var st) || st.Count == 0)
-                    continue;
-
-                var (onTick, onVel) = st.Pop();
-                long durTicks = Math.Max(1, e.tick - onTick);
-
-                int step = StepFromTick(onTick);
-                int durSteps = StepsFromDurTicks(durTicks);
-
-                // If clamping to bar and note starts beyond bar, ignore
-                if (clampToBar && (onTick > (long)(ticksPerStep * (stepsPerBar - 0.5f))))
-                    continue;
-
-                output.Add(new RiffNoteEvent
-                {
-                    step = step,
-                    midiNote = e.note,
-                    durSteps = durSteps,
-                    velocity01 = Mathf.Clamp01(onVel / 127f)
-                });
-
-                if (verbose)
-                    Debug.Log($"[MIDI→RIFF] note={e.note} ch={e.channel} onTick={onTick} offTick={e.tick} step={step} durSteps={durSteps} vel={onVel}");
-            }
-        }
-
-        return output;
+        // Multi-bar import: KEEP absolute step index (0..N).
+        return Mathf.Max(0, s);
     }
 
-    private static void ClampDurationsToNextOnset(List<RiffNoteEvent> notes, int stepsPerBar)
+    int StepsFromDurTicks(long durTicks)
     {
-        // Clamp per pitch independently (simple, predictable for bass/lead).
-        // If you want "global monophonic", clamp against next onset regardless of pitch instead.
-        var byNote = notes.GroupBy(n => n.midiNote);
-        foreach (var g in byNote)
+        // Duration in steps (no longer capped to 1 bar).
+        int ds = Mathf.RoundToInt((float)durTicks / ticksPerStep);
+        return Mathf.Max(1, ds);
+    }
+
+    // If importing only 1 bar, ignore any note whose ONSET is beyond bar length.
+    // Bar length in ticks = stepsPerBar * ticksPerStep.
+    long barLenTicks = (long)Mathf.RoundToInt(stepsPerBar * ticksPerStep);
+
+    foreach (var e in events)
+    {
+        if (channelFilter >= 0 && e.channel != channelFilter) continue;
+
+        var key = (e.channel, e.note);
+
+        if (e.isNoteOn)
         {
-            var ordered = g.OrderBy(n => n.step).ToList();
-            for (int i = 0; i < ordered.Count; i++)
+            if (!active.TryGetValue(key, out var st))
             {
-                var n = ordered[i];
-                int nextStep = (i < ordered.Count - 1) ? ordered[i + 1].step : stepsPerBar; // end of bar
-                int maxDur = Mathf.Clamp(nextStep - n.step, 1, stepsPerBar);
-                if (n.durSteps > maxDur)
-                {
-                    n.durSteps = maxDur;
-                    // write back into original list (match by step+note+vel; stable enough for importer use)
-                    int idx = notes.FindIndex(x => x.step == ordered[i].step && x.midiNote == ordered[i].midiNote && Mathf.Approximately(x.velocity01, ordered[i].velocity01));
-                    if (idx >= 0) notes[idx] = n;
-                }
+                st = new Stack<(long tick, int vel)>();
+                active[key] = st;
             }
+            st.Push((e.tick, e.velocity));
+        }
+        else
+        {
+            // NoteOff: match to most recent NoteOn
+            if (!active.TryGetValue(key, out var st) || st.Count == 0)
+                continue;
+
+            var (onTick, onVel) = st.Pop();
+
+            if (clampToBar && onTick >= barLenTicks)
+                continue; // onset outside the first bar
+
+            long durTicks = Math.Max(1, e.tick - onTick);
+
+            int step = StepFromTick(onTick);
+            int durSteps = StepsFromDurTicks(durTicks);
+
+            // If clamping to bar, also clamp duration so it can't exceed remaining bar space.
+            if (clampToBar)
+            {
+                int maxDur = Mathf.Max(1, stepsPerBar - step);
+                durSteps = Mathf.Clamp(durSteps, 1, maxDur);
+            }
+
+            output.Add(new RiffNoteEvent
+            {
+                step = step,
+                midiNote = e.note,
+                durSteps = durSteps,
+                velocity01 = Mathf.Clamp01(onVel / 127f)
+            });
+
+            if (verbose)
+                Debug.Log($"[MIDI→RIFF] note={e.note} ch={e.channel} onTick={onTick} offTick={e.tick} step={step} durSteps={durSteps} vel={onVel}");
         }
     }
 
+    return output;
+}
+private static void ClampDurationsToNextOnset(List<RiffNoteEvent> notes, int loopSteps)
+{
+    if (notes == null || notes.Count == 0) return;
+    if (loopSteps <= 0) return;
+
+    // Build per-pitch lists of indices (stable, unambiguous).
+    var byPitch = new Dictionary<int, List<int>>();
+    for (int i = 0; i < notes.Count; i++)
+    {
+        int pitch = notes[i].midiNote;
+        if (!byPitch.TryGetValue(pitch, out var list))
+        {
+            list = new List<int>();
+            byPitch[pitch] = list;
+        }
+        list.Add(i);
+    }
+
+    foreach (var kv in byPitch)
+    {
+        var idxs = kv.Value;
+
+        // Sort indices by the note's step (stable tie-break by index).
+        idxs.Sort((a, b) =>
+        {
+            int sa = notes[a].step;
+            int sb = notes[b].step;
+            int c = sa.CompareTo(sb);
+            return (c != 0) ? c : a.CompareTo(b);
+        });
+
+        for (int i = 0; i < idxs.Count; i++)
+        {
+            int idx = idxs[i];
+            var n = notes[idx];
+
+            int nextStep = (i < idxs.Count - 1) ? notes[idxs[i + 1]].step : loopSteps; // end of loop
+            int remaining = Mathf.Max(1, loopSteps - n.step);
+            int maxDur = Mathf.Clamp(nextStep - n.step, 1, remaining);
+
+            if (n.durSteps > maxDur)
+            {
+                n.durSteps = maxDur;
+                notes[idx] = n;
+            }
+        }
+    }
+}
     private static List<RiffNoteEvent> DedupeSameStepSameNote(List<RiffNoteEvent> notes)
     {
         // If a MIDI chord has stacked duplicate on same pitch (rare), keep loudest.

@@ -28,6 +28,9 @@ public class MarkerLight : MonoBehaviour
     {
         if (sr == null) return;
         sr.color = trackColor;
+        var vnm = GetComponent<VisualNoteMarker>();
+        if (vnm != null)
+            vnm.ApplyLitColor(trackColor);
         StopAllCoroutines();
         StartCoroutine(Pulse());
     }

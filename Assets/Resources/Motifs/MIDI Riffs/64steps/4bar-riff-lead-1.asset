@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: 4bar-riff-lead-1
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: 4bar-riff-lead-1
+    authoredRootMidi: 60
+    loopSteps: 32
+    events:
+    - step: 0
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 4
+      midiNote: 69
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 8
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 12
+      midiNote: 65
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 16
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 20
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 24
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 28
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 32
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 36
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 40
+      midiNote: 62
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 44
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 48
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 52
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 56
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 60
+      midiNote: 60
+      durSteps: 1
+      velocity01: 0.78740156
+    overlapPolicy: 1
+    clampToTrackRange: 0
+    octaveShift: 0
