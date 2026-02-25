@@ -6,43 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Editor/MidiToRiffImporterWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Editor/MidiToRiffImporterWindow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Notes.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Notes/NoteSet Factory.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Notes/NoteSet Factory.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Chokepoints.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Chokepoints.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Evolve Behavior.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Evolve Behavior.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Intensify Behavior.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Intensify Behavior.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Lattice.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Lattice.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Pop Behavior.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Pop Behavior.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Wildcard Behavior.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Mazes/Wildcard Behavior.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Dos.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Dos.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Phase Library.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Phase Library.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Track List.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Track List.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/VisualNoteMarker.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/VisualNoteMarker.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Star/PhaseStar.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MarkerLight.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MarkerLight.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/NoteTether.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/NoteTether.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -313,7 +280,7 @@
       <workItem from="1771471936832" duration="23005000" />
       <workItem from="1771606456353" duration="26191000" />
       <workItem from="1771726385820" duration="31787000" />
-      <workItem from="1771968986310" duration="3778000" />
+      <workItem from="1771968986310" duration="6809000" />
     </task>
     <servers />
   </component>
