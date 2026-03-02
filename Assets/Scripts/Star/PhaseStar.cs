@@ -115,7 +115,19 @@ public class PhaseStar : MonoBehaviour
     private static bool s_bubbleActive;
     private static Vector2 s_bubbleCenter;
     private static float s_bubbleRadiusWorld;
+    [Header("Charge (PASS 2)")] 
+    [SerializeField] private float passiveChargeDecayPerSec = 0.02f;
+    [SerializeField] private float dustToStarChargeMul = 1.0f;
+    private readonly Dictionary<MusicalRole, float> _starCharge = new();
+    public void AddCharge(MusicalRole role, float dustChargeTaken)
+    {
+        if (role == MusicalRole.None) return;
+        float add = Mathf.Max(0f, dustChargeTaken) * dustToStarChargeMul;
+        if (add <= 0f) return;
 
+            _starCharge.TryGetValue(role, out float cur);
+        _starCharge[role] = Mathf.Min(1f, cur + add);
+    }
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
     {
         if (!s_bubbleActive) return false;
@@ -297,7 +309,7 @@ public class PhaseStar : MonoBehaviour
                 gfm.dustGenerator.SetStarKeepClear(
                     gfm.activeDrumTrack.WorldToGridPosition(transform.position),
                     radiusCells,
-                    phase, true
+                    phase, false
                 );
             }
         }
@@ -310,6 +322,15 @@ public class PhaseStar : MonoBehaviour
             if (!t) continue;
             float dps = _omega.Count > i ? _omega[i] : 0f;
             t.Rotate(Vector3.forward, dps * dt, Space.Self);
+        }
+        if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
+            float dec = passiveChargeDecayPerSec * dt; 
+            // iterate keys snapshot to avoid collection modification issues if AddCharge occurs elsewhere
+            var keys = _starCharge.Keys.ToList(); 
+            for (int i = 0; i < keys.Count; i++) { 
+                var r = keys[i]; 
+                _starCharge[r] = Mathf.Max(0f, _starCharge[r] - dec);
+            }
         }
         
     }

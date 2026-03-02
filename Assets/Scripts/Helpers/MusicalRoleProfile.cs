@@ -6,7 +6,8 @@ public enum MusicalRole
     Bass,
     Harmony,
     Lead,
-    Groove
+    Groove,
+    None
 }
 [System.Serializable]
 public struct DustColorSet
