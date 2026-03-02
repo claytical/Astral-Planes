@@ -25,6 +25,7 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _gravityVoidHasCenterGP;
     public float lastCollectionTime { get; private set; } = -1f;
     private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
+    private readonly List<Vector2Int> _vehicleCellsScratch = new();
     private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
     [Header("Gravity Void (Expansion Waiting)")]
     [Tooltip("Spawned when this track stages an expansion (waiting for expansion). Despawned when expansion commits.")]
@@ -130,7 +131,27 @@ private AudioClip GetCommitStingerClip(MusicalRole role)
         default:                  return commitStingerDefault;
     }
 }
-
+    private float GetSecondsRemainingInCurrentBin() {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return 0f; 
+        
+        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime; 
+        
+        if (start <= 0.0) return 0f; 
+        
+        float clipLen = drum.GetClipLengthInSeconds();
+        
+        if (clipLen <= 0f) return 0f;
+        
+        double delta = AudioSettings.dspTime - start;
+        
+        if (delta < 0.0) return clipLen; 
+        
+        double into = delta % clipLen;
+        float rem = (float)(clipLen - into);
+        
+        return Mathf.Clamp(rem, 0f, clipLen);
+    }
 private void PlayCommitStinger(InstrumentTrack track)
 {
     if (track == null) return;
@@ -382,21 +403,47 @@ private IEnumerator GravityVoidGrowAndImprintRoutine()
 
         // --- STEADY GROWTH MAPPING ---
         // Radius increases by ~1 every secsPerRadius seconds, up to maxR.
-        int targetOuterR = (maxR <= 0)
-            ? 0
-            : Mathf.Clamp(1 + Mathf.FloorToInt(elapsed / Mathf.Max(0.001f, secsPerRadius)), 1, maxR);
+// Map bin count to coverage: 1 bin = 1/4 grid area (disk), 4 bins = full disk.
+        int binCount = Mathf.Clamp(GetTransportFrame().playheadBin + 1, 1, 4);
+
+        int w = dustGen.GridW;
+        int h = dustGen.GridH;
+        int maxPossible = Mathf.Max(1, Mathf.FloorToInt(0.5f * Mathf.Min(w, h)));
+
+// r = maxPossible * sqrt(bin/4)
+        float rF = maxPossible * Mathf.Sqrt(binCount / 4f);
+        int targetOuterR = Mathf.Clamp(Mathf.RoundToInt(rF), 1, maxPossible);
         _gravityVoidCurrentOuterR = targetOuterR;
 
         // If we haven't reached our target radius, do budgeted imprint work toward it.
         if (_gravityVoidHasCenterGP && dustGen != null && targetOuterR > completedOuterR)
         {
             int budget = gravityVoidImprintBudgetPerTick;
-
-            int processed = dustGen.ApplyVoidImprintDiskFromGrid(
-                _gravityVoidCenterGP,
+            budget = -1;
+            float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+            int fillWedges = Mathf.Clamp(1 + playheadBin, 1, 4);
+            fillWedges = 4;
+            // Vehicle snapshot (grid) so void growth doesn't spawn directly on players.
+            _vehicleCellsScratch.Clear();
+            var vs2 = FindObjectsOfType<Vehicle>();
+            for (int i = 0; i < vs2.Length; i++) { 
+                var v = vs2[i]; 
+                if (v == null || !v.isActiveAndEnabled) continue; 
+                var d = GameFlowManager.Instance?.activeDrumTrack; 
+                if (d != null) _vehicleCellsScratch.Add(d.WorldToGridPosition(v.transform.position));
+            }
+            int processed = dustGen.GrowVoidDustDiskFromGrid(
+                centerGP: _gravityVoidCenterGP,
                 outerRadiusCells: targetOuterR,
-                imprintColor: _gravityVoidDustImprintTint,
+                imprintRole: _gravityVoidOwner.assignedRole,
+                hueRgb: _gravityVoidDustImprintTint, 
                 imprintHardness01: _gravityVoidDustHardness01,
+                energyAtCenter01: 1f,
+                falloffExp: 1.6f,
+                growInSeconds: growIn,
+                fillWedges01To4: fillWedges,
+                vehicleCells: _vehicleCellsScratch,
+                vehicleNoSpawnRadiusCells: 1,
                 maxCellsThisCall: budget,
                 innerRadiusCellsExclusive: completedOuterR
             );

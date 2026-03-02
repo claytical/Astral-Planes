@@ -28,6 +28,7 @@ public class CosmicDustGenerator : MonoBehaviour
         public Color color;
         public float healDelay;
         public float hardness01;
+        public MusicalRole role;
     }
     [SerializeField] private CosmicDust.DustVisualTimings dustTimings = new CosmicDust.DustVisualTimings
     {
@@ -55,6 +56,8 @@ public class CosmicDustGenerator : MonoBehaviour
 
     [Header("Tile Sizing")]
     [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox
+    public int GridW => _cellW;
+    public int GridH => _cellH;
     // ------------------------------------------------------------------
     // Authoritative grid (no pooling). The grid is the traffic cop.
     // ------------------------------------------------------------------
@@ -81,6 +84,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Queue<List<Vector2Int>> _pendingCorridorRegrowth = new Queue<List<Vector2Int>>();
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
+    private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
+    private readonly Dictionary<Vector2Int, Coroutine> _voidSolidifyCoroutines = new();
     // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
     private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
@@ -230,8 +235,244 @@ public class CosmicDustGenerator : MonoBehaviour
 
         return false;
     }
+public int GrowVoidDustDiskFromGrid(
+    Vector2Int centerGP,
+    int outerRadiusCells,
+    MusicalRole imprintRole,
+    Color hueRgb,
+    float imprintHardness01,
+    float energyAtCenter01,
+    float falloffExp,
+    float growInSeconds,
+    int fillWedges01To4,
+    List<Vector2Int> vehicleCells,
+    int vehicleNoSpawnRadiusCells,
+    int maxCellsThisCall = -1,
+    int innerRadiusCellsExclusive = -1)
+{
+    EnsureCellGrid();
+    _imprints ??= new Dictionary<Vector2Int, DustImprint>(2048);
 
-    private void SetDustCollision(CosmicDust dust, bool _enabled)
+    if (outerRadiusCells <= 0) return 0;
+
+    imprintHardness01 = Mathf.Clamp01(imprintHardness01);
+    energyAtCenter01 = Mathf.Clamp01(energyAtCenter01);
+    falloffExp = Mathf.Max(0.01f, falloffExp);
+    growInSeconds = Mathf.Max(0.01f, growInSeconds);
+    fillWedges01To4 = Mathf.Clamp(fillWedges01To4, 1, 4);
+
+    int processed = 0;
+    int rOuterSq = outerRadiusCells * outerRadiusCells;
+    int rInnerSq = innerRadiusCellsExclusive >= 0
+        ? innerRadiusCellsExclusive * innerRadiusCellsExclusive
+        : -1;
+
+    bool NearAnyVehicle(Vector2Int gp)
+    {
+        if (vehicleNoSpawnRadiusCells <= 0) return false;
+        if (vehicleCells == null || vehicleCells.Count == 0) return false;
+
+        int rSq = vehicleNoSpawnRadiusCells * vehicleNoSpawnRadiusCells;
+        for (int i = 0; i < vehicleCells.Count; i++)
+        {
+            var vc = vehicleCells[i];
+            int dx = gp.x - vc.x;
+            int dy = gp.y - vc.y;
+            if (dx * dx + dy * dy <= rSq) return true;
+        }
+        return false;
+    }
+
+    bool InFilledWedge(int dx, int dy)
+    {
+        // Quadrant order: 0=NE, 1=NW, 2=SW, 3=SE
+        int quad;
+        if (dy >= 0)
+            quad = (dx >= 0) ? 0 : 1;
+        else
+            quad = (dx < 0) ? 2 : 3;
+
+        return quad < fillWedges01To4;
+    }
+
+    for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
+    {
+        for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
+        {
+            int dSq = dx * dx + dy * dy;
+            if (dSq > rOuterSq) continue;
+            if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
+            if (!InFilledWedge(dx, dy)) continue;
+
+            Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+            if (!IsInBounds(gp)) continue;
+
+            // Budget
+            if (maxCellsThisCall >= 0 && processed >= maxCellsThisCall)
+                return processed;
+// -------------------------------
+// Radiating ring alpha (annulus-local)
+// Strong at inner edge of NEW ring, fades toward outer edge.
+// This matches incremental growth using innerRadiusCellsExclusive.
+// -------------------------------
+            float d = Mathf.Sqrt(dSq);
+
+            float inner = (innerRadiusCellsExclusive >= 0) ? innerRadiusCellsExclusive : 0f;
+            float outer = Mathf.Max(1f, outerRadiusCells);
+            float span  = Mathf.Max(0.0001f, outer - inner);
+
+// u=0 at inner edge of this ring, u=1 at outer edge
+            float u = Mathf.Clamp01((d - inner) / span);
+
+// Energy: bright at u=0, fades toward u=1
+            float energy01 = Mathf.Clamp01(energyAtCenter01 * Mathf.Pow(1f - u, falloffExp));
+
+// IMPORTANT: avoid "invisible SOLID" tiles (especially when logging with F2).
+// This is a *visual* floor; it also prevents sprite alpha=0 tiles that are physically present.
+            const float kMinVisibleAlpha = 0.06f;
+            float visibleAlpha = Mathf.Max(energy01, kMinVisibleAlpha);
+
+            Color c = hueRgb;
+            c.a = visibleAlpha;
+            if (dx == 0 && dy == outerRadiusCells) // pick a consistent sample
+            {
+                Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
+            }            
+            // Always write persistent imprint (so regrow picks it up later)
+            _imprints[gp] = new DustImprint
+            {
+                color = c,
+                hardness01 = imprintHardness01,
+                role = imprintRole
+            };
+            processed++;
+
+// 1) If dust already exists, ALWAYS refresh visuals (even if keep-clear/blocked/etc).
+            if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
+                existingGo.TryGetComponent<CosmicDust>(out var existingDust) && existingDust != null &&
+                HasDustAt(gp))
+            {
+                existingDust.ApplyRoleAndCharge(imprintRole, c, c.a);
+                existingDust.clearing.hardness01 = imprintHardness01;
+                continue;
+            }
+
+// 2) Only after that, decide whether we’re allowed to SPAWN dust into empty space.
+            if (_permanentClearCells.Contains(gp)) continue;
+            if (IsKeepClearCell(gp)) continue;
+            if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
+            if (IsDustSpawnBlocked(gp)) continue;
+            if (NearAnyVehicle(gp)) continue;
+
+// 3) Spawn/regrow if empty
+            if (_voidGrowCoroutines.ContainsKey(gp))
+                continue;
+
+            _voidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
+        }
+    }
+
+    return processed;
+}
+
+private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
+{
+    if (!IsInBounds(gp)) { _voidGrowCoroutines.Remove(gp); yield break; }
+
+    bool veto0_perm        = _permanentClearCells.Contains(gp);
+    bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
+    bool veto0_claim       = (dustClaims != null && dustClaims.IsBlocked(gp));
+    bool veto0_keep        = IsKeepClearCell(gp);
+
+    // Permanent/spawn-block/claim are hard vetoes for even showing visuals.
+    // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
+    if (veto0_perm || veto0_spawnBlocked || veto0_claim)
+    {
+        Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
+        _voidGrowCoroutines.Remove(gp);
+        yield break;
+    }
+
+    var go = GetOrCreateCellGO(gp);
+    if (go == null)
+    {
+        Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
+        _voidGrowCoroutines.Remove(gp);
+        yield break;
+    }
+
+    Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
+
+    SetCellState(gp, DustCellState.Regrowing);
+
+    CosmicDust dust = null;
+    if (go.TryGetComponent(out dust) && dust != null)
+    {
+        dust.PrepareForReuse();
+        dust.SetVisualTimings(dustTimings);
+
+        // void uses remaining-bin time
+        dust.SetGrowInDuration(growInSeconds);
+
+        dust.clearing.hardness01 = hardness01;
+        dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
+        dust.SetFeedbackColors(Color.white, Color.darkGray);
+        dust.Begin();
+
+        // Always non-colliding during grow
+        SetDustCollision(dust, false);
+    }
+    if (dust != null)
+    {
+        var sr = dust.GetComponentInChildren<SpriteRenderer>(true);
+        if (sr != null)
+            Debug.Log($"[VOID_SPR] enabled={sr.enabled} color={sr.color} scale={sr.transform.localScale}");
+    }
+    float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
+    yield return new WaitForSeconds(enableDelay);
+
+    if (!IsInBounds(gp) || _permanentClearCells.Contains(gp))
+    {
+        SetCellState(gp, DustCellState.Empty);
+        FadeAndHideCellGO(go);
+        _voidGrowCoroutines.Remove(gp);
+        yield break;
+    }
+
+    bool veto1_spawnBlocked = IsDustSpawnBlocked(gp);
+    bool veto1_vehicle      = IsVehicleOverlappingCell(gp);
+    bool veto1_claim        = (dustClaims != null && dustClaims.IsBlocked(gp));
+    bool veto1_keep         = IsKeepClearCell(gp);
+
+    // Hard vetoes at end: don't keep visuals if spawn is blocked, vehicle overlaps, or claim blocks.
+    if (veto1_spawnBlocked || veto1_vehicle || veto1_claim)
+    {
+        Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
+        SetCellState(gp, DustCellState.PendingRegrow);
+        FadeAndHideCellGO(go);
+        EnqueueStepRegrow(gp);
+        _voidGrowCoroutines.Remove(gp);
+        yield break;
+    }
+
+    // Keep-clear at end: allow visuals, but never become solid/colliding.
+    if (veto1_keep)
+    {
+        Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
+        SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
+        if (dust != null) SetDustCollision(dust, false);
+        _voidGrowCoroutines.Remove(gp);
+        yield break;
+    }
+
+    // Otherwise: become solid.
+    SetCellState(gp, DustCellState.Solid);
+    if (dust != null) SetDustCollision(dust, true);
+
+    Debug.Log($"[VOID_GROW] SOLID gp={gp}");
+    _voidGrowCoroutines.Remove(gp);
+}
+private void SetDustCollision(CosmicDust dust, bool _enabled)
     {
         if (dust == null) return;
         dust.SetTerrainColliderEnabled(_enabled);
@@ -907,7 +1148,8 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         _cellState[gp.x, gp.y] = blocks ? DustCellState.Solid : DustCellState.Empty;
     }
 }
-    private bool TryGetCellGo(Vector2Int gp, out GameObject go)
+
+    public bool TryGetCellGo(Vector2Int gp, out GameObject go)
     {
         EnsureCellGrid();
         go = null;
@@ -1025,13 +1267,15 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
 /// Center is specified in GRID coordinates.
 /// </summary>
 /// <returns>Number of cells processed</returns>
-public int ApplyVoidImprintDiskFromGrid(
-    Vector2Int centerGP,
-    int outerRadiusCells,
-    Color imprintColor,
-    float imprintHardness01,
-    int maxCellsThisCall = -1,
-    int innerRadiusCellsExclusive = -1)
+
+    public int ApplyVoidImprintDiskFromGrid(
+        Vector2Int centerGP,
+        int outerRadiusCells,
+        MusicalRole imprintRole,
+        Color imprintColor,
+        float imprintHardness01,
+        int maxCellsThisCall = -1,
+        int innerRadiusCellsExclusive = -1)
 {
     if (outerRadiusCells <= 0)
         return 0;
@@ -1053,20 +1297,19 @@ public int ApplyVoidImprintDiskFromGrid(
             if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
 
             Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
-
-            // Persistent imprint (regrow will pick this up).
+            
             _imprints[gp] = new DustImprint
             {
                 color = imprintColor,
-                hardness01 = imprintHardness01
+                hardness01 = imprintHardness01,
+                role = imprintRole
             };
-
             // Live update if the cell GO exists right now.
             if (TryGetCellGo(gp, out GameObject go) && go != null)
             {
                 if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
                 {
-                    dust.SetTint(imprintColor);
+                    dust.ApplyRoleAndCharge(imprintRole, imprintColor, .01f);
                     dust.clearing.hardness01 = imprintHardness01;
                 }
             }

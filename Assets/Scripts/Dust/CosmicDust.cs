@@ -41,7 +41,8 @@ public class CosmicDust : MonoBehaviour {
         fadeOutSeconds = 0.20f
     };
 
-
+    public float Charge01 { get; private set; } = 1f;
+    public MusicalRole Role { get; private set; } = MusicalRole.None;
     public Color CurrentTint => _currentTint;
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
@@ -287,6 +288,7 @@ public class CosmicDust : MonoBehaviour {
         }
 
         visual.sprite.transform.localScale = b;
+        if (to > from) _growInOverride = -1f;
     }
     // Sprite alpha fades are presentation details (eg. regrow), and must respect the authored
     // tint alpha (eg. MusicalRoleProfile.baseColor.a). Do not overwrite _currentTint.a here.
@@ -306,6 +308,25 @@ public class CosmicDust : MonoBehaviour {
         var bounds = terrainCollider.bounds;
         // Use the larger extent to be safe.
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
+    }
+
+    public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge)
+    {
+        Role     = r;
+        Charge01 = Mathf.Clamp01(charge);
+        roleColorRgb.a = Charge01;   // alpha = energy
+        SetTint(roleColorRgb);       // sprite reads hue+alpha correctly
+        // Optional: only call if you re-enable particle tinting.
+    }
+    
+    public float DrainCharge(float amount)
+    {
+        float take = Mathf.Min(Charge01, Mathf.Max(0f, amount));
+        Charge01 -= take;
+        var c = _currentTint;
+        c.a = Charge01;
+        SetTint(c);
+        return take;
     }
     public void ConfigureForPhase(MazeArchetype phase)
     {
@@ -404,36 +425,43 @@ public class CosmicDust : MonoBehaviour {
     }
     public void Begin()
     {
-        // Sprite is the primary "solid" visual. It scales in/out on carve/regrow.
         SetVisualsEnabled(true);
         SetColorVariance();
 
         ApplyParticleFootprint();
         CaptureBaseVisual();
 
-        // Sprite scale-in
+        // Use override if provided (void growth wants bin-remaining time)
+        float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.spriteScaleInSeconds;
+        growSeconds = Mathf.Max(0.01f, growSeconds);
+
+        // Sprite scale-in over growSeconds
         ResetSpriteScaleTo(0f);
-        AnimateSpriteScale(0f, 1f); // uses _timings.spriteScaleInSeconds
+        AnimateSpriteScale(0f, 1f, growSeconds);
 
-        // Particles remain running; regrow restores default emission smoothly.
+        // Particles emission ramp over growSeconds too (keeps "radiating" coherent)
         EnsureParticlesPlaying();
-        SetEmissionMultiplier(1f, seconds: _timings.particleGrowInSeconds);
+        SetEmissionMultiplier(1f, seconds: growSeconds);
 
-        // Ensure particle tint matches our current tint (including alpha).
+        // Ensure particle tint matches our current tint (including alpha) if you use that path.
         if (useWorkShaderParams)
             ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
         else
             SetDustColorAllParticles(_currentTint);
+
+        // Consume override so normal spawns aren't affected later
+        _growInOverride = -1f;
     }
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
         _drumTrack = _drums;
-            }
+    }
+    
     public void SetTint(Color tint)
     {
         _currentTint = tint;
-
+        Charge01 = Mathf.Clamp01(_currentTint.a);
         // Sprite is the dominant visual and is the only thing we tint by default.
         if (visual.sprite != null)
             visual.sprite.color = tint;
@@ -477,7 +505,11 @@ public class CosmicDust : MonoBehaviour {
         main.startColor = pm;
 */
     }
-    public void SetGrowInDuration(float seconds) { _growInOverride = Mathf.Max(0.05f, seconds); }
+
+    public void SetGrowInDuration(float seconds)
+    {
+        _growInOverride = Mathf.Max(0.05f, seconds);
+    }
     private static Color Premultiply(Color c)
     {
         c.r *= c.a;
@@ -875,8 +907,10 @@ public class CosmicDust : MonoBehaviour {
     {
         if (seconds > 0f) return seconds;
 
-        // Default based on direction.
-        // Assumes your struct has these fields; if names differ, align them to your actual DustVisualTimings.
+        // PASS 2: generator overrides regrow duration (bin-time radiance)
+        if (to > from && _growInOverride > 0f)
+            return Mathf.Max(0.01f, _growInOverride);
+
         return (to >= from) ? _timings.spriteScaleInSeconds : _timings.spriteScaleOutSeconds;
     }
 // ------------- SCALE -------------
