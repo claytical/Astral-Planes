@@ -814,6 +814,65 @@ public void DespawnGravityVoid()
     }
 
     /// <summary>
+    /// Quantize a manual release press to the nearest base-step, if it is within a given window.
+    ///
+    /// - windowFrac: 0..0.5 (fraction of a step). Example: 0.20 means +/-20% of a step.
+    /// - quantStep: quantized step (0..baseSteps-1)
+    /// - binDelta: 0 normally; becomes 1 when the press is close enough to "step 0" of the NEXT bar.
+    /// - errorFrac: absolute error in steps (0..0.5)
+    /// </summary>
+    public bool TryGetQuantizedBaseStep(float windowFrac, out int quantStep, out int binDelta, out float errorFrac)
+    {
+        quantStep = 0;
+        binDelta = 0;
+        errorFrac = 1f;
+
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return false;
+
+        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        if (start <= 0.0) return false;
+
+        float clipLen = drum.GetClipLengthInSeconds();
+        if (clipLen <= 0f) return false;
+
+        int baseSteps = Mathf.Max(1, drum.totalSteps);
+        windowFrac = Mathf.Clamp(windowFrac, 0f, 0.5f);
+
+        double dspNow = AudioSettings.dspTime;
+        double delta = dspNow - start;
+        if (delta < 0.0) delta = 0.0;
+
+        double tInBar = delta % clipLen;
+        double stepDur = clipLen / baseSteps;
+        if (stepDur <= 0.0) return false;
+
+        // Continuous step position within this bar.
+        double stepPos = tInBar / stepDur; // [0..baseSteps)
+
+        // Nearest integer step.
+        int nearest = Mathf.RoundToInt((float)stepPos);
+        double err = System.Math.Abs(stepPos - nearest);
+        errorFrac = (float)err;
+
+        if (err > windowFrac)
+            return false;
+
+        // If we rounded to baseSteps, that's "step 0" of the NEXT bar.
+        if (nearest >= baseSteps)
+        {
+            quantStep = 0;
+            binDelta = 1;
+            return true;
+        }
+
+        if (nearest < 0) nearest = 0;
+        quantStep = nearest;
+        binDelta = 0;
+        return true;
+    }
+
+    /// <summary>
     /// Immediate re-sync of drum binning + note grid to the committed leader bins.
     /// Call this when a track commits an expand/collapse mid-frame so the UI/audio
     /// cannot spend a whole loop visually desynchronized.

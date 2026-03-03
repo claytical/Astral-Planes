@@ -1535,6 +1535,27 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     // Called by Vehicle when a manually-released queued note is consumed.
     public void OnManualReleaseConsumed()
     {
+        // Manual release is a different lifecycle than the scheduled deposit.
+        // Ensure we tear down any separate tether GameObject and unregister orbit bookkeeping.
+        try
+        {
+            UnregisterCarryOrbit();
+        }
+        catch { /* best-effort */ }
+
+        if (_carryRoutine != null)
+        {
+            StopCoroutine(_carryRoutine);
+            _carryRoutine = null;
+        }
+
+        if (tether != null)
+        {
+            var tg = tether.gameObject;
+            tether = null;
+            if (tg != null) Destroy(tg);
+        }
+
         // Default: destroy the carried visual orb.
         Destroy(gameObject);
     }

@@ -17,6 +17,10 @@ public class Vehicle : MonoBehaviour
     [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
     [SerializeField] private bool occupiedStepOctaveAccent = true;
 
+    [Tooltip("Manual release quantization window as a fraction of a step (0..0.5). If outside, the note is discarded (still counts as collected).")]
+    [Range(0f, 0.5f)]
+    [SerializeField] private float manualReleaseQuantizeWindowFrac = 0.22f;
+
     public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
 
     public struct PendingCollectedNote
@@ -1193,8 +1197,22 @@ private void DoImpactDig(Collision2D coll)
         var tf = p.track.controller.GetTransportFrame();
         int playheadBin = tf.playheadBin;
 
-        int releaseBaseStep = p.track.controller.GetCurrentBaseStep();
-        int releaseAbsStep = playheadBin * binSize + releaseBaseStep;
+        // Quantize to nearest step within a window; otherwise discard.
+        if (!p.track.controller.TryGetQuantizedBaseStep(manualReleaseQuantizeWindowFrac, out int releaseBaseStep, out int binDelta, out float errFrac))
+        {
+            // Still consumed (counts were already credited on pickup), but don't commit into the loop.
+            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+            return false;
+        }
+
+        int releaseBin = playheadBin + binDelta;
+        int leaderBins = Mathf.Max(1, p.track.drumTrack.GetCommittedBinCount());
+        if (leaderBins > 1)
+            releaseBin = ((releaseBin % leaderBins) + leaderBins) % leaderBins;
+        else
+            releaseBin = 0;
+
+        int releaseAbsStep = releaseBin * binSize + releaseBaseStep;
 
         bool match = (releaseBaseStep == p.authoredLocalStep);
         int chosenMidi = match ? p.collectedMidi : p.authoredRootMidi;
