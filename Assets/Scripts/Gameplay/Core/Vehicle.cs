@@ -1,6 +1,9 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
+
 public class Vehicle : MonoBehaviour
 {
 
@@ -17,9 +20,6 @@ public class Vehicle : MonoBehaviour
     [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
     [SerializeField] private bool occupiedStepOctaveAccent = true;
 
-    [Tooltip("Manual release quantization window as a fraction of a step (0..0.5). If outside, the note is discarded (still counts as collected).")]
-    [Range(0f, 0.5f)]
-    [SerializeField] private float manualReleaseQuantizeWindowFrac = 0.22f;
 
     public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
 
@@ -136,7 +136,11 @@ public class Vehicle : MonoBehaviour
     [Header("Scale Calibration (Debug)")] 
     [SerializeField] private bool logScaleCalibrationOnAssign = true;
     private bool _scaleCalibrationLogged = false;
-       void Start()
+// Replace the frac field with steps
+    [Header("Manual Release Timing")]
+    [Range(0f, 2f)]
+    public float manualReleaseWindowSteps = 1f; // 1 step grace by default
+    void Start()
         {
             rb = GetComponent<Rigidbody2D>();
             gfm = GameFlowManager.Instance;
@@ -1171,7 +1175,7 @@ private void DoImpactDig(Collision2D coll)
         {
             var dropped = _pendingNotes.Dequeue();
             if (dropped.collectable != null)
-                dropped.collectable.OnManualReleaseConsumed();
+                dropped.collectable.OnManualReleaseDiscarded();
         }
 
         _pendingNotes.Enqueue(p);
@@ -1180,71 +1184,81 @@ private void DoImpactDig(Collision2D coll)
 
     public int GetPendingNoteCount() => _pendingNotes.Count;
 
-    // Called by LocalPlayer input. Dequeues 1 note and commits it at the current playhead step.
-    public bool TryReleaseQueuedNote()
+public bool TryReleaseQueuedNote()
+{
+    if (!enableManualNoteRelease) return false;
+    if (_pendingNotes.Count <= 0) return false;
+
+    var p = _pendingNotes.Dequeue();
+    if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
     {
-        if (!enableManualNoteRelease) return false;
-        if (_pendingNotes.Count <= 0) return false;
-
-        var p = _pendingNotes.Dequeue();
-        if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
-        {
-            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
-            return false;
-        }
-
-        int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
-        var tf = p.track.controller.GetTransportFrame();
-        int playheadBin = tf.playheadBin;
-
-        // Quantize to nearest step within a window; otherwise discard.
-        if (!p.track.controller.TryGetQuantizedBaseStep(manualReleaseQuantizeWindowFrac, out int releaseBaseStep, out int binDelta, out float errFrac))
-        {
-            // Still consumed (counts were already credited on pickup), but don't commit into the loop.
-            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
-            return false;
-        }
-
-        int releaseBin = playheadBin + binDelta;
-        int leaderBins = Mathf.Max(1, p.track.drumTrack.GetCommittedBinCount());
-        if (leaderBins > 1)
-            releaseBin = ((releaseBin % leaderBins) + leaderBins) % leaderBins;
-        else
-            releaseBin = 0;
-
-        int releaseAbsStep = releaseBin * binSize + releaseBaseStep;
-
-        bool match = (releaseBaseStep == p.authoredLocalStep);
-        int chosenMidi = match ? p.collectedMidi : p.authoredRootMidi;
-
-        bool occupied = p.track.IsPersistentStepOccupied(releaseAbsStep);
-
-        float commitVel = p.velocity127;
-        if (occupied)
-            commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
-
-        // Commit (replace-or-add at step).
-        p.track.CommitManualReleasedNote(
-            stepAbs: releaseAbsStep,
-            midiNote: chosenMidi,
-            durationTicks: p.durationTicks,
-            velocity127: commitVel,
-            authoredRootMidi: p.authoredRootMidi,
-            burstId: p.burstId,
-            lightMarkerNow: true
-        );
-
-        // Reward: octave accent one-shot if occupied.
-        if (occupied && occupiedStepOctaveAccent)
-        {
-            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
-        }
-
-        // Consume the carried visual.
         if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
-
-        return true;
+        return false;
     }
 
+    var gfm = GameFlowManager.Instance;
+    var viz = (gfm != null) ? gfm.noteViz : null;
+
+    // 1) Find raw playhead abs-step
+    if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps))
+    {
+        // Can't evaluate timing → treat as discard with feedback
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        return false;
+    }
+
+    // 2) Find next unlit placeholder step for this track
+    int targetAbsStep;
+    if (viz == null || !viz.TryGetNextUnlitStep(p.track, floorAbs, totalSteps, out targetAbsStep))    {
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        return false;
+    }
+
+    // 3) Window test relative to *that* target
+    double dist = Math.Abs(rawAbs - targetAbsStep);
+    dist = Math.Min(dist, totalSteps - dist); // wrap
+    Debug.Log($"[RELEASE] rawAbs={rawAbs:F2} floor={floorAbs} target={targetAbsStep} dist={dist:F2} winSteps={manualReleaseWindowSteps:F2} total={totalSteps}");
+    if (dist > manualReleaseWindowSteps)
+    {
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        return false;
+    }
+    // 4) Choose authored vs root substitution (your composer/player boundary rule)
+    int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
+    int targetLocal = ((targetAbsStep % binSize) + binSize) % binSize;
+
+    bool match = (targetLocal == p.authoredLocalStep);
+    int chosenMidi = match ? p.collectedMidi : p.authoredRootMidi;
+
+    bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
+
+    float commitVel = p.velocity127;
+    if (occupied)
+        commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
+
+    // 5) Commit
+    p.track.CommitManualReleasedNote(
+        stepAbs: targetAbsStep,
+        midiNote: chosenMidi,
+        durationTicks: p.durationTicks,
+        velocity127: commitVel,
+        authoredRootMidi: p.authoredRootMidi,
+        burstId: p.burstId,
+        lightMarkerNow: true
+    );
+
+    // 6) HARD FIX: snap marker placement from stepAbs so X is correct
+    if (viz != null)
+        viz.PlacePersistentNoteMarker(p.track, targetAbsStep, lit: true, burstId: p.burstId);
+
+    // 7) Occupied-step reward accent
+    if (occupied && occupiedStepOctaveAccent)
+        p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
+
+    // 8) Consume carried visual
+    if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+
+    return true;
+}
 
 }

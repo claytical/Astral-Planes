@@ -409,9 +409,8 @@ public class GameFlowManager : MonoBehaviour
               $"\n  PTM : {phaseTransitionManager}" +
               $"\n  Grid: {spawnGrid}" +
               $"\n  UI  : {playerStatsGrid}");
-
     currentState = GameState.Playing;
-
+    controller.SetGameFlowManager(this);
     // Precompute ship profiles for logging
     var shipProfiles = localPlayers
         .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))

@@ -17,6 +17,12 @@ public class Collectable : MonoBehaviour
     private bool _hasDesiredGridTarget; 
     public int intendedBin = -1;
     private Vector2Int _desiredGridTarget;
+    [Header("Manual Release Feedback")]
+    [SerializeField] private float manualDiscardFeedbackSeconds = 0.16f;
+    [SerializeField] private float manualDiscardShrinkTo = 0.40f;
+    [SerializeField] private Color manualDiscardTint = new Color(1f, 0.30f, 0.30f, 1f);
+
+    private bool _manualDiscarding = false;
 // ---- Dust pocket (collectable visibility) ----
     [Header("Dust Pocket (Visibility)")]
     [SerializeField] private bool keepDustPocketOpen = true;
@@ -155,6 +161,129 @@ public class Collectable : MonoBehaviour
     public void SetCollector(Transform collector)
     {
         _collector = collector;
+    }
+// Collectable.cs
+    public void OnManualReleaseDiscarded()
+    {
+        // stop being "carried"
+        try { UnregisterCarryOrbit(); } catch {}
+
+        if (_carryRoutine != null) { StopCoroutine(_carryRoutine); _carryRoutine = null; }
+
+        // kill tether if any
+        if (tether != null)
+        {
+            var tg = tether.gameObject;
+            tether = null;
+            if (tg) Destroy(tg);
+        }
+
+        // quick red flash + pop (use what you already have)
+        var ex = GetComponent<Explode>();
+        if (ex != null)
+        {
+            // If your Explode supports tinting, do it; otherwise just pop.
+            ex.Permanent(false);
+//            ex.Pop(); // replace with whatever your one-shot is called
+        }
+
+        if (energySprite != null)
+            energySprite.color = new Color(1f, 0.2f, 0.2f, 0.85f);
+
+        Destroy(gameObject);
+    }
+    private IEnumerator Co_DiscardFeedbackThenDestroy()
+    {
+        if (energySprite != null)
+        {
+            var old = energySprite.color;
+            energySprite.color = new Color(1f, 0.15f, 0.15f, 1f);
+            transform.localScale *= 1.15f;
+            yield return new WaitForSeconds(0.10f);
+            energySprite.color = old;
+        }
+        Destroy(gameObject); // InstrumentTrack “lost” handler will still decrement burst remaining
+    }
+private IEnumerator Co_DiscardFlashThenDestroy()
+{
+    Vector3 start = transform.localScale;
+    Vector3 peak = start * 1.35f;
+
+    float t = 0f;
+    const float up = 0.07f;
+    const float down = 0.10f;
+
+    // Punch up
+    while (t < up)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.Clamp01(t / up);
+        transform.localScale = Vector3.Lerp(start, peak, u);
+        yield return null;
+    }
+
+    // Fade down quickly (keep it readable, not subtle)
+    t = 0f;
+    while (t < down)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.Clamp01(t / down);
+
+        transform.localScale = Vector3.Lerp(peak, start * 0.85f, u);
+
+        if (energySprite != null)
+        {
+            var c = energySprite.color;
+            c.a = Mathf.Lerp(0.95f, 0f, u);
+            energySprite.color = c;
+        }
+
+        yield return null;
+    }
+
+    Destroy(gameObject);
+}
+    private IEnumerator Co_ManualDiscardFeedbackThenConsume()
+    {
+        float dur = Mathf.Max(0.05f, manualDiscardFeedbackSeconds);
+
+        Vector3 startScale = transform.localScale;
+
+        Color startColor = Color.white;
+        bool hasSprite = (energySprite != null);
+        if (hasSprite) startColor = energySprite.color;
+
+        // Tint immediately so the player reads “miss”
+        if (hasSprite)
+        {
+            var c = manualDiscardTint;
+            c.a = startColor.a;
+            energySprite.color = c;
+        }
+
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / dur);
+
+            // Shrink
+            float s = Mathf.Lerp(1f, manualDiscardShrinkTo, u);
+            transform.localScale = startScale * s;
+
+            // Fade out
+            if (hasSprite)
+            {
+                var c = energySprite.color;
+                c.a = Mathf.Lerp(startColor.a, 0f, u);
+                energySprite.color = c;
+            }
+
+            yield return null;
+        }
+
+        // Final teardown (destroys tether GO too)
+        OnManualReleaseConsumed();
     }
   private void TryBindLoopBoundary()
 {
