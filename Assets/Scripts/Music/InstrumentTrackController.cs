@@ -782,6 +782,37 @@ public void DespawnGravityVoid()
         return tf;
     }
 
+
+    /// <summary>
+    /// Returns the current base-step index (0..drum.totalSteps-1) within the currently-audible bar/bin.
+    /// Used for manual release timing ("play the moment").
+    /// </summary>
+    public int GetCurrentBaseStep()
+    {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return 0;
+
+        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        if (start <= 0.0) return 0;
+
+        float clipLen = drum.GetClipLengthInSeconds();
+        if (clipLen <= 0f) return 0;
+
+        int baseSteps = Mathf.Max(1, drum.totalSteps);
+
+        double dspNow = AudioSettings.dspTime;
+        double delta = dspNow - start;
+        if (delta < 0.0) delta = 0.0;
+
+        double tInBar = delta % clipLen;
+        double stepDur = clipLen / baseSteps;
+
+        int step = Mathf.FloorToInt((float)(tInBar / stepDur));
+        if (step < 0) step = 0;
+        if (step >= baseSteps) step = baseSteps - 1;
+        return step;
+    }
+
     /// <summary>
     /// Immediate re-sync of drum binning + note grid to the committed leader bins.
     /// Call this when a track commits an expand/collapse mid-frame so the UI/audio

@@ -64,7 +64,7 @@ public class Collectable : MonoBehaviour
     private bool isInitialized = false;
     private bool reachedDestination = false;
 // Carry-as-child (school run) tuning
-    [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, -0.65f, 0f);
+    [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, 0.65f, 0f);
     [SerializeField] private float carryLocalOffsetJitter = 0.05f; // optional tiny wobble
     private Transform _carryParent;
     // Idempotency flags
@@ -1343,32 +1343,30 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
 
     // Leader step duration (seconds)
     double leaderStepDur = loopLen / leaderSteps;
-    // Window is in *time*, derived from authored step window in *leader steps*.
-    // Compare against STEP CENTERS (not onsets) so collisions inside a step bias toward the step
-    // that is actually "playing" rather than the previous onset.
+
+    // Timing window expressed in leader steps (your timingWindowSteps is assumed "base steps")
     double timingWin = leaderStepDur * (drumTrack.timingWindowSteps * mul) * 0.5;
-    int matchedStep = -1; 
-    double bestAbs = timingWin; 
-    double bestSigned = double.NegativeInfinity; // tie-breaker
-    for (int i = 0; i < sharedTargetSteps.Count; i++) { 
+
+    int matchedStep = -1;
+    double bestErr = timingWin;
+
+    for (int i = 0; i < sharedTargetSteps.Count; i++)
+    {
         int baseStep = sharedTargetSteps[i];
+
         // Base step projected into leader timeline.
         int leaderStep = baseStep * mul;
-        // Center of step window.
-        double stepCenterPos = ((leaderStep + 0.5) * leaderStepDur) % loopLen;
-        
-        // Signed delta wrapped to [-loopLen/2, +loopLen/2]
-        double signed = stepCenterPos - tPos;
-        if (signed > loopLen * 0.5) signed -= loopLen;
-        else if (signed < -loopLen * 0.5) signed += loopLen; 
-        double abs = System.Math.Abs(signed);
-        
-        // Primary: smallest abs delta within window.
-        // // Tie-break: prefer FUTURE (positive signed) so we don’t go “one behind” on boundaries.
-        if (abs < bestAbs || (System.Math.Abs(abs - bestAbs) < 1e-9 && signed > bestSigned)) {
-            bestAbs = abs; 
-            bestSigned = signed; 
-            matchedStep = baseStep;
+
+        // Convert to position in seconds within loop.
+        double stepPos = (leaderStep * leaderStepDur) % loopLen;
+
+        double delta = Math.Abs(stepPos - tPos);
+        if (delta > loopLen * 0.5) delta = loopLen - delta;
+
+        if (delta < bestErr)
+        {
+            bestErr = delta;
+            matchedStep = baseStep; // return base index
         }
     }
 
@@ -1420,6 +1418,26 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     // Confirm should happen at collision point (immediate), not at deposit.
     OnCollected?.Invoke(noteDurationTicks, force);
 
+    // Manual-release path: enqueue onto the vehicle and do NOT auto-write/deposit.
+    if (vehicle != null && vehicle.ManualNoteReleaseEnabled)
+    {
+        assignedInstrumentTrack.OnCollectablePickedUpForManualRelease(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
+
+        // Carry-only: disable physics/collider; the vehicle will consume/destroy this on release.
+        if (_rb == null) TryGetComponent(out _rb);
+        if (_rb != null) _rb.simulated = false;
+        if (TryGetComponent(out Collider2D c2d)) c2d.enabled = false;
+
+        var ex = GetComponent<Explode>();
+        if (ex != null) ex.Permanent(false);
+
+        // Keep it visually attached to the collector.
+        transform.SetParent(vehicle.transform, worldPositionStays: true);
+
+        return;
+    }
+
+
     // Write to the track immediately (so loop state updates now).
     assignedInstrumentTrack.OnCollectableCollected(this, stepToReportBase, noteDurationTicks, velocity127);
     Debug.Log($"[WRITE_TRACE] track={name} got stepBase={stepToReportBase} totalSteps={drumTrack.totalSteps} " +
@@ -1442,7 +1460,6 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     loopLen = drumTrack.GetLoopLengthInSeconds();
     if (loopLen <= 0.0)
     {
-        if (_carryRoutine != null) return;
         BeginCarryAndDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         Debug.LogWarning($"[COLLECT] loopLen <= 0 while scheduling deposit; fallback travel. name={name}");
         return;
@@ -1466,7 +1483,6 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     double minNeeded = minDepositTravelSeconds + 0.01;
     while ((depositDsp - dspNow) < minNeeded)
         depositDsp += loopLen;
-    if (_carryRoutine != null) return;
 
     BeginCarryAndDepositAtDsp(depositDsp, noteDurationTicks, force, onArrived: null);
 
@@ -1515,5 +1531,14 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
 
         return v127;
     }
+
+    // Called by Vehicle when a manually-released queued note is consumed.
+    public void OnManualReleaseConsumed()
+    {
+        // Default: destroy the carried visual orb.
+        Destroy(gameObject);
+    }
+
+
 
 }

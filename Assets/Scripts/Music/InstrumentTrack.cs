@@ -1296,18 +1296,25 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         double depositDsp = 0.0;
         if (drumTrack != null)
         {
+            // Compute next occurrence of a specific leader step using the DrumTrack authority.
+            // (inline to avoid needing new DrumTrack API)
             double effLen = System.Math.Max(0.0001, drumTrack.GetLoopLengthInSeconds());
             double stepDur = effLen / leaderSteps;
 
             double dspNow = AudioSettings.dspTime;
-            double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime; 
-            if (start <= 0.0) start = dspNow; 
-            double loopsSince = (dspNow - start) / effLen; 
-            long curLoopIndex = (long)System.Math.Floor(loopsSince); 
-            if (curLoopIndex < 0) curLoopIndex = 0;
-            double curLoopStart = start + curLoopIndex * effLen; 
-            double nextLoopStart = curLoopStart + effLen;
-            depositDsp = nextLoopStart + targetLeaderStep * stepDur;
+            double elapsed = dspNow - drumTrack.leaderStartDspTime;
+            if (elapsed < 0) elapsed = 0;
+
+            double tInLoop = elapsed % effLen;
+
+            int curLeaderStep = Mathf.FloorToInt((float)(tInLoop / stepDur));
+            int deltaSteps = targetLeaderStep - curLeaderStep;
+
+            // IMPORTANT: if we're already at/past the step this frame, push to NEXT occurrence.
+            // This avoids "one behind" and frame-boundary ambiguity.
+            if (deltaSteps <= 0) deltaSteps += leaderSteps;
+
+            depositDsp = drumTrack.leaderStartDspTime + (curLeaderStep + deltaSteps) * stepDur;
 
             // safety: ensure future
             const double kMinLead = 0.005;
@@ -1393,6 +1400,169 @@ collectable.BeginCarryThenDepositAtDsp(
             }
         }
 }
+
+
+    // ---------------------------------------------------------------------
+    // Manual Note Release integration
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Manual-release pickup path: frees the spawn cell and enqueues a note onto the vehicle,
+    /// but does NOT commit anything to the loop yet.
+    /// </summary>
+    public void OnCollectablePickedUpForManualRelease(Vehicle vehicle, Collectable collectable, int reportedBaseStep, int durationTicks, float velocity127)
+    {
+        if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
+
+        // Free the vacated grid cell (same as normal pickup path).
+        if (drumTrack != null)
+        {
+            Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
+            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+            drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
+        }
+
+        // Remove from spawned list now (the physical object becomes the carried orb).
+        spawnedCollectables?.Remove(collectable.gameObject);
+
+        int binSize = Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : BinSize());
+
+        // Determine authored abs/local step identity.
+        int authoredAbs = -1;
+        if (collectable.intendedStep >= 0)
+            authoredAbs = collectable.intendedStep;
+        else if (collectable.intendedBin >= 0 && reportedBaseStep >= 0)
+            authoredAbs = collectable.intendedBin * binSize + (((reportedBaseStep % binSize) + binSize) % binSize);
+
+        int authoredLocal = (authoredAbs >= 0) ? (((authoredAbs % binSize) + binSize) % binSize) : (((reportedBaseStep % binSize) + binSize) % binSize);
+
+        int collectedMidi = collectable.GetNote();
+        int rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi);
+
+        var pending = new Vehicle.PendingCollectedNote
+        {
+            track = this,
+            collectable = collectable,
+            authoredAbsStep = authoredAbs,
+            authoredLocalStep = authoredLocal,
+            collectedMidi = collectedMidi,
+            durationTicks = durationTicks,
+            velocity127 = Mathf.Clamp(velocity127, 1f, 127f),
+            authoredRootMidi = rootInRegister,
+            burstId = collectable.burstId
+        };
+
+        vehicle.EnqueuePendingNote(pending);
+    }
+
+    /// <summary>
+    /// Commit a released note into the persistent loop at an absolute step. This is where burst
+    /// completion and bin fill logic occurs for manual release.
+    /// </summary>
+    public void CommitManualReleasedNote(int stepAbs, int midiNote, int durationTicks, float velocity127, int authoredRootMidi, int burstId, bool lightMarkerNow)
+    {
+        if (drumTrack == null) return;
+
+        controller?.NotifyCollected(this);
+
+        // Burst energy meter: count at COMMIT time (release), not pickup time.
+        if (burstId != 0)
+        {
+            if (_burstCollected.TryGetValue(burstId, out var c))
+                _burstCollected[burstId] = c + 1;
+            else
+                _burstCollected[burstId] = 1;
+
+            if (controller != null && controller.noteVisualizer != null &&
+                _burstTotalSpawned.TryGetValue(burstId, out var total) && total > 0)
+            {
+                float frac = Mathf.Clamp01(_burstCollected[burstId] / (float)total);
+                controller.noteVisualizer.SetPlayheadEnergy01(frac);
+            }
+        }
+
+        // Snapshot leader bins BEFORE we write (used for cross-track nudge later)
+        int leaderBinsBeforeWrite = (controller != null) ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
+        if (burstId != 0 && !_burstLeaderBinsBeforeWrite.ContainsKey(burstId))
+        {
+            _burstLeaderBinsBeforeWrite[burstId] = leaderBinsBeforeWrite;
+            _burstWroteBin[burstId] = BinIndexForStep(stepAbs);
+        }
+
+        // Replace-or-add: enforce one persistent note per (track, stepAbs) for stability.
+        persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
+
+        AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi);
+
+        int targetBin = BinIndexForStep(stepAbs);
+        RegisterBurstStep(burstId, stepAbs);
+
+        // Per-burst decrement + completion (mirrors OnCollectableCollected, but keyed off release).
+        if (burstId != 0 && _burstRemaining.TryGetValue(burstId, out var rem))
+        {
+            rem--;
+            if (rem <= 0)
+            {
+                int filledBin = targetBin;
+                if (_burstWroteBin.TryGetValue(burstId, out var b))
+                    filledBin = b;
+
+                SetBinFilled(filledBin, true);
+
+                // VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately
+                if (controller != null && controller.noteVisualizer != null && drumTrack != null)
+                {
+                    int bSize = Mathf.Max(1, drumTrack.totalSteps);
+                    int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
+                    int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
+                    controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * bSize);
+                }
+
+                // This track is now eligible to push the global frontier forward by 1 bin on its next burst.
+                if (controller != null)
+                    controller.AllowAdvanceNextBurst(this);
+
+                _burstRemaining.Remove(burstId);
+                _burstLeaderBinsBeforeWrite.Remove(burstId);
+                _burstWroteBin.Remove(burstId);
+            }
+            else
+            {
+                _burstRemaining[burstId] = rem;
+            }
+        }
+    }
+
+    /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>
+    public bool IsPersistentStepOccupied(int stepAbs)
+    {
+        for (int i = 0; i < persistentLoopNotes.Count; i++)
+            if (persistentLoopNotes[i].stepIndex == stepAbs) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns this track's authored root, transposed into the same register as referenceMidi and clamped to allowed range.
+    /// </summary>
+    private int GetAuthoredRootMidiInRegister(int referenceMidi)
+    {
+        int root = authoredRootMidi;
+        if (root <= 0) root = referenceMidi; // defensive fallback
+
+        // bring root close to reference register
+        while (root < referenceMidi - 6) root += 12;
+        while (root > referenceMidi + 6) root -= 12;
+
+        root = Mathf.Clamp(root, lowestAllowedNote, highestAllowedNote);
+        return root;
+    }
+
+    public void PlayOneShotMidi(int midiNote, float velocity127, int durationTicks = -1)
+    {
+        int dur = (durationTicks > 0) ? durationTicks : 120;
+        PlayNote127(midiNote, dur, velocity127);
+    }
+
     public int GetHighestAllocatedBin()
     {
         if (binAllocated == null) return -1;
