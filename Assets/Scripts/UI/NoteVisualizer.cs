@@ -44,6 +44,15 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
+
+    [Header("Manual Release Cue")]
+    [Tooltip("Prefab for the ghost/cue that travels between the vehicle and the next unlit placeholder marker.")]
+    public GameObject releaseCuePrefab;
+    [Tooltip("How many steps ahead (max) the cue starts moving toward the target. Beyond this distance it stays near the vehicle.")]
+    [Min(1)] public int releaseCueLookaheadSteps = 8;
+    [Tooltip("World-space arc height for the cue path (0 = straight line).")]
+    public float releaseCueArcHeight = 0.8f;
+
     private int _forcedLeaderSteps = -1;
     private int _forcedLeaderBins = -1;
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
@@ -129,6 +138,8 @@ public class NoteVisualizer : MonoBehaviour
     private readonly HashSet<(InstrumentTrack track, int step)> _animatingSteps = new();
     private readonly List<BlastTask> _blastTasks = new();
     private readonly List<RushTask> _rushTasks = new();
+
+    private readonly Dictionary<int, GameObject> _releaseCuesByVehicle = new();
     [Header("First-Play Confirm FX")]
     [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
     [SerializeField] private float firstPlayConfirmTravelSeconds = 2f;
@@ -158,65 +169,7 @@ public class NoteVisualizer : MonoBehaviour
     private readonly List<FirstPlayConfirmRequest> _firstPlayRequests = new();
     private readonly List<FirstPlayConfirmTask> _firstPlayTasks = new();
     private Color stepColor;
-    public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
-    {
-        targetAbsStep = -1;
-        if (track == null) return false;
-        if (noteMarkers == null || noteMarkers.Count == 0) return false;
 
-        totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-
-        int bestForward = int.MaxValue;
-        int bestStep = -1;
-
-        foreach (var kvp in noteMarkers)
-        {
-            var keyTrack = kvp.Key.Item1;
-            int step = kvp.Key.Item2;
-
-            if (keyTrack != track) continue;
-
-            var tr = kvp.Value;
-            if (!tr) continue;
-
-            var tag = tr.GetComponent<MarkerTag>();
-            if (tag == null) continue;
-
-            // We want "unlit placeholders" as timing targets
-            if (!tag.isPlaceholder) continue;
-            if (tag.isAscending) continue;
-
-            // Forward distance in [0..totalAbsSteps)
-            int forward = step - fromAbsStep;
-            forward %= totalAbsSteps;
-            if (forward < 0) forward += totalAbsSteps;
-
-            if (forward < bestForward)
-            {
-                bestForward = forward;
-                bestStep = step;
-            }
-        }
-
-        if (bestStep < 0) return false;
-
-        targetAbsStep = bestStep;
-        return true;
-    }
-    public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
-    {
-        if (track == null) return;
-
-        if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null)
-            return;
-
-        var ml = tr.GetComponent<MarkerLight>();
-        if (ml == null) ml = tr.gameObject.AddComponent<MarkerLight>();
-
-        // You can implement “PingSpecial” as a short coroutine in MarkerLight,
-        // or just re-LightUp + optional scale bump here.
-        ml.LightUp(track.trackColor);
-    }
     public void RegisterCollectedMarker(InstrumentTrack track, int burstId, int step, GameObject markerGo)
     {
         if (!track || !markerGo) return;
@@ -242,7 +195,126 @@ public class NoteVisualizer : MonoBehaviour
         var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>(); 
         ml.LightUp(track.trackColor);
     }
-    public void Initialize()
+    
+
+/// <summary>
+/// Finds the next closest *unlit* placeholder step for the given track, scanning forward from a given step.
+/// We interpret "next closest" as the smallest positive forward distance in the leader loop timeline.
+/// </summary>
+public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
+{
+    targetAbsStep = -1;
+    if (track == null) return false;
+    if (noteMarkers == null || noteMarkers.Count == 0) return false;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+    fromAbsStep = ((fromAbsStep % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+
+    int bestStep = -1;
+    int bestForward = int.MaxValue;
+
+    foreach (var kv in noteMarkers)
+    {
+        if (kv.Key.Item1 != track) continue;
+        int step = kv.Key.Item2;
+        if (step < 0) continue;
+        step = ((step % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+
+        var tr = kv.Value;
+        if (!tr) continue;
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag == null) continue;
+        if (!tag.isPlaceholder) continue;
+
+        int fwd = (step - fromAbsStep + totalAbsSteps) % totalAbsSteps;
+        if (fwd == 0) fwd = totalAbsSteps;
+
+        if (fwd < bestForward)
+        {
+            bestForward = fwd;
+            bestStep = step;
+        }
+    }
+
+    if (bestStep < 0) return false;
+    targetAbsStep = bestStep;
+    return true;
+}
+
+/// <summary>
+/// Continuously updates (or spawns) a cue between the vehicle and the next placeholder marker.
+/// Call every frame while the vehicle has a queued note.
+/// </summary>
+public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, double rawAbsStep, int floorAbsStep, int totalAbsSteps)
+{
+    if (releaseCuePrefab == null) return;
+    if (vehicle == null || track == null) return;
+    if (!isActiveAndEnabled) return;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+    int targetAbs;
+    if (!TryGetNextUnlitStep(track, floorAbsStep, totalAbsSteps, out targetAbs))
+    {
+        ClearManualReleaseCue(vehicle);
+        return;
+    }
+
+    Vector3 a = vehicle.position;
+    Vector3 b;
+    if (noteMarkers != null && noteMarkers.TryGetValue((track, targetAbs), out var markerTr) && markerTr != null)
+        b = markerTr.position;
+    else
+        b = a;
+
+    double fwd = (targetAbs - rawAbsStep) % totalAbsSteps;
+    if (fwd < 0) fwd += totalAbsSteps;
+
+    int lookahead = Mathf.Clamp(releaseCueLookaheadSteps, 1, totalAbsSteps);
+    float u = 1f - Mathf.Clamp01((float)(fwd / lookahead));
+    u = Mathf.SmoothStep(0f, 1f, u);
+
+    Vector3 p = Vector3.Lerp(a, b, u);
+    if (releaseCueArcHeight != 0f)
+    {
+        float hump = 4f * u * (1f - u);
+        p.y += releaseCueArcHeight * hump;
+    }
+
+    int id = vehicle.GetInstanceID();
+    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
+    {
+        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
+        _releaseCuesByVehicle[id] = cue;
+    }
+    else
+    {
+        cue.transform.position = p;
+    }
+}
+
+public void ClearManualReleaseCue(Transform vehicle)
+{
+    if (vehicle == null) return;
+    int id = vehicle.GetInstanceID();
+    if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
+        Destroy(cue);
+    _releaseCuesByVehicle.Remove(id);
+}
+
+public void BlastManualReleaseCue(Transform vehicle)
+{
+    ClearManualReleaseCue(vehicle);
+}
+
+public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
+{
+    if (track == null) return;
+    if (noteMarkers == null) return;
+    if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null) return;
+    var ml = tr.GetComponent<MarkerLight>();
+    if (ml != null) ml.LightUp(track.trackColor);
+}
+public void Initialize()
     {
         isInitialized = true;
         _uiParent = transform.parent;
@@ -544,7 +616,7 @@ public class NoteVisualizer : MonoBehaviour
         RefreshCoreRefs(force: true);
     }
 
-    void Update()
+void Update()
 {
     if (!isInitialized || playheadLine == null)
         return;
@@ -789,7 +861,7 @@ public class NoteVisualizer : MonoBehaviour
     }
 }
 
-    private void ProcessFirstPlayConfirmFx()
+private void ProcessFirstPlayConfirmFx()
 {
     if (firstPlayConfirmOrbPrefab == null) return;
     if (_firstPlayRequests.Count == 0) return;
@@ -855,7 +927,7 @@ public class NoteVisualizer : MonoBehaviour
         _firstPlayRequests[i] = r;
     }
 }
-    private void UpdateFirstPlayConfirmTasks()
+private void UpdateFirstPlayConfirmTasks()
 {
     if (_firstPlayTasks.Count == 0) return;
 
@@ -905,7 +977,7 @@ public class NoteVisualizer : MonoBehaviour
         }
     }
 }
-    private Color ComputeStepColor(int step)
+private Color ComputeStepColor(int step)
 {
     var controller = _gfm != null ? _gfm.controller : null;
     if (controller == null || controller.tracks == null) return Color.white;
@@ -1821,7 +1893,7 @@ public class NoteVisualizer : MonoBehaviour
             img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor;
         }
     }
-    public void TriggerNoteBlastOff(InstrumentTrack track)
+     public void TriggerNoteBlastOff(InstrumentTrack track)
     {
         var gos = GetNoteMarkers(track);
         var keys = new List<(InstrumentTrack,int)>();
@@ -2166,6 +2238,12 @@ public class NoteVisualizer : MonoBehaviour
          foreach (var t in _ctrl.tracks) 
              if (t) RecomputeTrackLayout(t);
          //UpdateNoteMarkerPositions(true);
+    }
+    private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
+        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
+        int binSize    = Mathf.Max(1, track.BinSize()); 
+        int leaderBins = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
+        return ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBins);
     }
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {

@@ -782,6 +782,7 @@ public void DespawnGravityVoid()
         return tf;
     }
 
+/// <summary>
 
     /// <summary>
     /// Returns the current base-step index (0..drum.totalSteps-1) within the currently-audible bar/bin.
@@ -809,12 +810,7 @@ public void DespawnGravityVoid()
 
         int step = Mathf.FloorToInt((float)(tInBar / stepDur));
         if (step < 0) step = 0;
-        if (step >= baseSteps) step = baseSteps - 1;
-        return step;
-    }
 
-    /// <summary>
-    /// Quantize a manual release press to the nearest base-step, if it is within a given window.
     ///
     /// - windowFrac: 0..0.5 (fraction of a step). Example: 0.20 means +/-20% of a step.
     /// - quantStep: quantized step (0..baseSteps-1)
