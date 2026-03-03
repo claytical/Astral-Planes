@@ -297,6 +297,7 @@ public class Vehicle : MonoBehaviour
         UpdateSafeAnchor();
         RecoverIfNeeded();
     }
+    
 }
     private void UpdateSafeAnchor()
 {
@@ -568,12 +569,7 @@ private bool IsCellEmpty(Vector2Int gp)
         rb.linearDamping  = arcadeLinearDamping;
         rb.angularDamping = arcadeAngularDamping;
     }
-    public void SetColor(Color newColor)
-    {
-        if (baseSprite != null)
-            baseSprite.color = newColor;
 
-    }
     public void SyncEnergyUI()
         {
             if (playerStatsUI != null)
