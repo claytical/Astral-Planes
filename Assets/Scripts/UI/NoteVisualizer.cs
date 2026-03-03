@@ -158,7 +158,65 @@ public class NoteVisualizer : MonoBehaviour
     private readonly List<FirstPlayConfirmRequest> _firstPlayRequests = new();
     private readonly List<FirstPlayConfirmTask> _firstPlayTasks = new();
     private Color stepColor;
+    public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
+    {
+        targetAbsStep = -1;
+        if (track == null) return false;
+        if (noteMarkers == null || noteMarkers.Count == 0) return false;
 
+        totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+
+        int bestForward = int.MaxValue;
+        int bestStep = -1;
+
+        foreach (var kvp in noteMarkers)
+        {
+            var keyTrack = kvp.Key.Item1;
+            int step = kvp.Key.Item2;
+
+            if (keyTrack != track) continue;
+
+            var tr = kvp.Value;
+            if (!tr) continue;
+
+            var tag = tr.GetComponent<MarkerTag>();
+            if (tag == null) continue;
+
+            // We want "unlit placeholders" as timing targets
+            if (!tag.isPlaceholder) continue;
+            if (tag.isAscending) continue;
+
+            // Forward distance in [0..totalAbsSteps)
+            int forward = step - fromAbsStep;
+            forward %= totalAbsSteps;
+            if (forward < 0) forward += totalAbsSteps;
+
+            if (forward < bestForward)
+            {
+                bestForward = forward;
+                bestStep = step;
+            }
+        }
+
+        if (bestStep < 0) return false;
+
+        targetAbsStep = bestStep;
+        return true;
+    }
+    public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
+    {
+        if (track == null) return;
+
+        if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null)
+            return;
+
+        var ml = tr.GetComponent<MarkerLight>();
+        if (ml == null) ml = tr.gameObject.AddComponent<MarkerLight>();
+
+        // You can implement “PingSpecial” as a short coroutine in MarkerLight,
+        // or just re-LightUp + optional scale bump here.
+        ml.LightUp(track.trackColor);
+    }
     public void RegisterCollectedMarker(InstrumentTrack track, int burstId, int step, GameObject markerGo)
     {
         if (!track || !markerGo) return;
@@ -486,7 +544,7 @@ public class NoteVisualizer : MonoBehaviour
         RefreshCoreRefs(force: true);
     }
 
-void Update()
+    void Update()
 {
     if (!isInitialized || playheadLine == null)
         return;
@@ -731,7 +789,7 @@ void Update()
     }
 }
 
-private void ProcessFirstPlayConfirmFx()
+    private void ProcessFirstPlayConfirmFx()
 {
     if (firstPlayConfirmOrbPrefab == null) return;
     if (_firstPlayRequests.Count == 0) return;
@@ -797,7 +855,7 @@ private void ProcessFirstPlayConfirmFx()
         _firstPlayRequests[i] = r;
     }
 }
-private void UpdateFirstPlayConfirmTasks()
+    private void UpdateFirstPlayConfirmTasks()
 {
     if (_firstPlayTasks.Count == 0) return;
 
@@ -847,7 +905,7 @@ private void UpdateFirstPlayConfirmTasks()
         }
     }
 }
-private Color ComputeStepColor(int step)
+    private Color ComputeStepColor(int step)
 {
     var controller = _gfm != null ? _gfm.controller : null;
     if (controller == null || controller.tracks == null) return Color.white;
@@ -1763,7 +1821,7 @@ private Color ComputeStepColor(int step)
             img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor;
         }
     }
-     public void TriggerNoteBlastOff(InstrumentTrack track)
+    public void TriggerNoteBlastOff(InstrumentTrack track)
     {
         var gos = GetNoteMarkers(track);
         var keys = new List<(InstrumentTrack,int)>();
@@ -2108,12 +2166,6 @@ private Color ComputeStepColor(int step)
          foreach (var t in _ctrl.tracks) 
              if (t) RecomputeTrackLayout(t);
          //UpdateNoteMarkerPositions(true);
-    }
-    private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
-        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
-        int binSize    = Mathf.Max(1, track.BinSize()); 
-        int leaderBins = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
-        return ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBins);
     }
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {
