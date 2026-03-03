@@ -140,7 +140,6 @@ MonoBehaviour:
   manualReleaseQueueCapacity: 9
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
-  manualReleaseQuantizeWindowFrac: 0.5
   maxDigCellsSoft: 10
   minDigCellsWhenBoosting: 1
   impactDigCooldownSeconds: 0.12
@@ -187,6 +186,7 @@ MonoBehaviour:
   spawnRestPocketFadeSeconds: 0.05
   spawnRestPocketDelaySeconds: 0
   logScaleCalibrationOnAssign: 1
+  manualReleaseWindowSteps: 1.25
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0

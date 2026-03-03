@@ -190,6 +190,10 @@ MonoBehaviour:
     type: 3}
   noteTetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
     type: 3}
+  releaseCuePrefab: {fileID: 1316711709889716, guid: 8ebf85a8692064c7b81417bf7bbcc9e6,
+    type: 3}
+  releaseCueLookaheadSteps: 8
+  releaseCueArcHeight: 0.8
   trackRows:
   - {fileID: 728040985}
   - {fileID: 1373048478}
