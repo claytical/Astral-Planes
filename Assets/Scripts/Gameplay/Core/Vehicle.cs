@@ -1,7 +1,38 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 public class Vehicle : MonoBehaviour
 {
+
+    // ---------------------------------------------------------------------
+    // Manual Note Release (FIFO queue)
+    // ---------------------------------------------------------------------
+    [Header("Manual Note Release")]
+    [SerializeField] private bool enableManualNoteRelease = false;
+    [SerializeField] private int manualReleaseQueueCapacity = 9;
+
+    [Tooltip("When releasing onto an already-occupied step, multiply committed velocity by this factor.")]
+    [SerializeField] private float occupiedStepVelocityMultiplier = 1.25f;
+
+    [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
+    [SerializeField] private bool occupiedStepOctaveAccent = true;
+
+    public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
+
+    public struct PendingCollectedNote
+    {
+        public InstrumentTrack track;
+        public Collectable collectable;
+        public int authoredAbsStep;      // authored/assigned absolute step at pickup (may be -1 if unknown)
+        public int authoredLocalStep;    // authored step within bin (0..binSize-1)
+        public int collectedMidi;        // collectable.GetNote()
+        public int durationTicks;
+        public float velocity127;
+        public int authoredRootMidi;     // root in the same register as collectedMidi (used for mismatch substitution)
+        public int burstId;              // used for decrement/completion logic at commit
+    }
+
+    private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
     [Header("Impact Dig Tuning")]
     [Tooltip("Maximum trench length (cells) for the best ship at top speed when digging the softest dust.")]
     [SerializeField] private int maxDigCellsSoft = 10;
@@ -1124,4 +1155,78 @@ private void DoImpactDig(Collision2D coll)
             isFlickering = false;
             flickerPulseRoutine = null;
         }
+    // Enqueue a collected note for manual release. Returns true if queued.
+    public bool EnqueuePendingNote(PendingCollectedNote p)
+    {
+        if (!enableManualNoteRelease) return false;
+
+        int cap = Mathf.Max(1, manualReleaseQueueCapacity);
+
+        // If full, drop oldest (and clean up its visual carrier if still around)
+        while (_pendingNotes.Count >= cap)
+        {
+            var dropped = _pendingNotes.Dequeue();
+            if (dropped.collectable != null)
+                dropped.collectable.OnManualReleaseConsumed();
+        }
+
+        _pendingNotes.Enqueue(p);
+        return true;
+    }
+
+    public int GetPendingNoteCount() => _pendingNotes.Count;
+
+    // Called by LocalPlayer input. Dequeues 1 note and commits it at the current playhead step.
+    public bool TryReleaseQueuedNote()
+    {
+        if (!enableManualNoteRelease) return false;
+        if (_pendingNotes.Count <= 0) return false;
+
+        var p = _pendingNotes.Dequeue();
+        if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
+        {
+            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+            return false;
+        }
+
+        int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
+        var tf = p.track.controller.GetTransportFrame();
+        int playheadBin = tf.playheadBin;
+
+        int releaseBaseStep = p.track.controller.GetCurrentBaseStep();
+        int releaseAbsStep = playheadBin * binSize + releaseBaseStep;
+
+        bool match = (releaseBaseStep == p.authoredLocalStep);
+        int chosenMidi = match ? p.collectedMidi : p.authoredRootMidi;
+
+        bool occupied = p.track.IsPersistentStepOccupied(releaseAbsStep);
+
+        float commitVel = p.velocity127;
+        if (occupied)
+            commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
+
+        // Commit (replace-or-add at step).
+        p.track.CommitManualReleasedNote(
+            stepAbs: releaseAbsStep,
+            midiNote: chosenMidi,
+            durationTicks: p.durationTicks,
+            velocity127: commitVel,
+            authoredRootMidi: p.authoredRootMidi,
+            burstId: p.burstId,
+            lightMarkerNow: true
+        );
+
+        // Reward: octave accent one-shot if occupied.
+        if (occupied && occupiedStepOctaveAccent)
+        {
+            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
+        }
+
+        // Consume the carried visual.
+        if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+
+        return true;
+    }
+
+
 }

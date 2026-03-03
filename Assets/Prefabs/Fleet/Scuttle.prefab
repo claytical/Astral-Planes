@@ -137,13 +137,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  debugDustGenerator: {fileID: 0}
-  boostCarveRequiredFloor01: 0.35
-  boostCarveDamageFloor01: 0.35
-  dustCarveMode: 1
+  enableManualNoteRelease: 1
+  manualReleaseQueueCapacity: 9
+  occupiedStepVelocityMultiplier: 1.25
+  occupiedStepOctaveAccent: 1
+  maxDigCellsSoft: 10
+  minDigCellsWhenBoosting: 1
+  impactDigCooldownSeconds: 0.12
+  digBaseCellCost: 1
+  digHardnessCost: 1
   profile: {fileID: 11400000, guid: 7343449aa16af45f0940599fa5ece9fa, type: 2}
   capacity: 60
-  dustExitGraceSeconds: 0.2
   arcadeMaxSpeed: 14
   arcadeAccel: 40
   arcadeBoostAccel: 80
@@ -153,32 +157,35 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
-  carveTickHz: 20
-  envScale: 1
   inputDeadzone: 0.2
   inputTimeout: 0.15
+  enableRecovery: 1
+  viewportOobMargin: 0.15
+  minSecondsBetweenRecoveries: 0.75
+  respawnSearchRadiusCells: 8
+  stuckSpeedThreshold: 0.35
+  stuckSecondsInVoid: 0.6
+  gravityVoidMask:
+    serializedVersion: 2
+    m_Bits: 0
+  gravityVoidTag: GravityVoid
+  voidProbeRadiusWorld: 0.6
   energyLevel: 60
-  remixParticleEffect: {fileID: 0}
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: ae1d684c553f50e4da4037ae2b6369fe, type: 3}
   thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
-  soulSprite: {fileID: 0}
-  profileColor: {r: 0, g: 0, b: 0, a: 0}
-  minAlpha: 0.2
-  maxAlpha: 1
+  rb: {fileID: 0}
   isLocked: 0
-  shipRenderer: {fileID: 0}
-  remixRingHolder: {fileID: 0}
-  harmony: {fileID: 0}
-  shipProfile: {fileID: 0}
   keepDustClearAroundVehicle: 1
   vehicleKeepClearRadiusCells: 1
   vehicleKeepClearRefreshSeconds: 0.1
-  dustImpactDrainPerSecondMax: 8
-  dustImpactForceVelScale: 0.02
-  dustImpactOppositionWeight: 1
+  carveSpawnRestPocket: 1
+  spawnRestPocketAutoRadius: 1
+  spawnRestPocketRadiusCells: 1
+  spawnRestPocketFadeSeconds: 0.05
+  spawnRestPocketDelaySeconds: 0
   logScaleCalibrationOnAssign: 1
 --- !u!114 &964252887607637339
 MonoBehaviour:
@@ -197,6 +204,10 @@ MonoBehaviour:
   preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
+  tintExplosions: 1
+  explosionTint: {r: 1, g: 1, b: 1, a: 1}
+  multiplyWithAuthoredColor: 1
+  tintTrails: 1
 --- !u!82 &8149024708097562625
 AudioSource:
   m_ObjectHideFlags: 0

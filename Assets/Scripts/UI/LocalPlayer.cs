@@ -23,6 +23,9 @@ public class LocalPlayer : MonoBehaviour
     private PlayerStats _ui;
     private PlayerInput _playerInput;
     private InputAction _confirmAction;
+    private InputAction _releaseAction;
+    [Header("Gameplay Input")]
+    [SerializeField] private string releaseActionName = "ReleaseNote";
     private Vector2 _virtualStick;      // accumulated, clamped to radius 1
     [Header("Mouse/Touchpad Virtual Stick")]
     [SerializeField] private float mouseSensitivity = 0.015f; // px -> stick units per frame
@@ -266,6 +269,17 @@ public class LocalPlayer : MonoBehaviour
         {
             _confirmEnabled = true;
         };
+
+        // Optional: manual note release action
+        _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);
+        if (_releaseAction != null)
+        {
+            _releaseAction.performed += ctx =>
+            {
+                if (plane != null)
+                    plane.TryReleaseQueuedNote();
+            };
+        }
     }
 
     private void OnDisable()

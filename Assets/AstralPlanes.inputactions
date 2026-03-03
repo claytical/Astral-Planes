@@ -362,6 +362,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "ReleaseNote",
+                    "type": "Button",
+                    "id": "325eea82-9759-4f0b-98ba-fd35178c0aae",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -494,17 +503,6 @@
                     "processors": "",
                     "groups": ";Keyboard and Mouse",
                     "action": "MouseMove",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "Hold",
-                    "processors": "",
-                    "groups": ";Switch",
-                    "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -714,6 +712,28 @@
                     "processors": "",
                     "groups": ";Keyboard and Mouse",
                     "action": "South",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "Hold",
+                    "processors": "",
+                    "groups": ";Switch",
+                    "action": "ReleaseNote",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d794aacf-ec6d-4c3f-8ee7-d03ea365e824",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReleaseNote",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
