@@ -227,7 +227,6 @@ public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int tota
         if (!tag.isPlaceholder) continue;
 
         int fwd = (step - fromAbsStep + totalAbsSteps) % totalAbsSteps;
-        if (fwd == 0) fwd = totalAbsSteps;
 
         if (fwd < bestForward)
         {
@@ -270,6 +269,13 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
     if (fwd < 0) fwd += totalAbsSteps;
 
     int lookahead = Mathf.Clamp(releaseCueLookaheadSteps, 1, totalAbsSteps);
+    if (fwd > lookahead)
+    {
+        // Too early — hide so we don't imply every step is a valid target.
+        ClearManualReleaseCue(vehicle);
+        return;
+    }
+
     float u = 1f - Mathf.Clamp01((float)(fwd / lookahead));
     u = Mathf.SmoothStep(0f, 1f, u);
 
@@ -291,7 +297,30 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
         cue.transform.position = p;
     }
 }
+public void RemoveAllPlaceholdersForTrack(InstrumentTrack track)
+{
+    if (track == null || noteMarkers == null) return;
 
+    var keys = noteMarkers.Keys.ToList();
+    foreach (var k in keys)
+    {
+        if (k.Item1 != track) continue;
+
+        var tr = noteMarkers[k];
+        if (!tr) { noteMarkers.Remove(k); continue; }
+
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag != null && tag.isPlaceholder)
+        {
+            Destroy(tr.gameObject);
+            noteMarkers.Remove(k);
+        }
+    }
+
+    // optional: also prune row children that are placeholders but not in dict
+    // (if you still see stragglers)
+    RecomputeTrackLayout(track);
+}
 public void ClearManualReleaseCue(Transform vehicle)
 {
     if (vehicle == null) return;

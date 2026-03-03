@@ -783,90 +783,46 @@ public void DespawnGravityVoid()
     }
 
 /// <summary>
+/// Returns the current playhead position as an absolute step within the current leader loop.
+/// This is a continuous value (rawAbsStep) plus its floor (floorAbsStep) and total length (totalAbsSteps).
+/// Safe to call during transient transport re-wiring; returns false if timing can't be resolved.
+/// </summary>
+public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep, out int totalAbsSteps)
+{
+    rawAbsStep = 0;
+    floorAbsStep = 0;
+    totalAbsSteps = 0;
 
-    /// <summary>
-    /// Returns the current base-step index (0..drum.totalSteps-1) within the currently-audible bar/bin.
-    /// Used for manual release timing ("play the moment").
-    /// </summary>
-    public int GetCurrentBaseStep()
-    {
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
-        if (drum == null) return 0;
+    var drum = GameFlowManager.Instance?.activeDrumTrack;
+    if (drum == null) return false;
 
-        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-        if (start <= 0.0) return 0;
+    double loopLen = drum.GetLoopLengthInSeconds();
+    if (loopLen <= 0.0) return false;
 
-        float clipLen = drum.GetClipLengthInSeconds();
-        if (clipLen <= 0f) return 0;
+    double dspNow = AudioSettings.dspTime;
 
-        int baseSteps = Mathf.Max(1, drum.totalSteps);
+    double transportStart = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+    if (transportStart <= 0.0) return false;
 
-        double dspNow = AudioSettings.dspTime;
-        double delta = dspNow - start;
-        if (delta < 0.0) delta = 0.0;
+    // Effective loop boundary (leader loop)
+    double loops = System.Math.Floor((dspNow - transportStart) / loopLen);
+    double loopStart = transportStart + loops * loopLen;
+    if (loopStart > dspNow) loopStart -= loopLen;
 
-        double tInBar = delta % clipLen;
-        double stepDur = clipLen / baseSteps;
+    double tPos = (dspNow - loopStart) % loopLen;
+    if (tPos < 0) tPos += loopLen;
 
-        int step = Mathf.FloorToInt((float)(tInBar / stepDur));
-        if (step < 0) step = 0;
+    int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
+    totalAbsSteps = leaderSteps;
 
-    ///
-    /// - windowFrac: 0..0.5 (fraction of a step). Example: 0.20 means +/-20% of a step.
-    /// - quantStep: quantized step (0..baseSteps-1)
-    /// - binDelta: 0 normally; becomes 1 when the press is close enough to "step 0" of the NEXT bar.
-    /// - errorFrac: absolute error in steps (0..0.5)
-    /// </summary>
-    public bool TryGetQuantizedBaseStep(float windowFrac, out int quantStep, out int binDelta, out float errorFrac)
-    {
-        quantStep = 0;
-        binDelta = 0;
-        errorFrac = 1f;
+    double stepDur = loopLen / totalAbsSteps;
+    rawAbsStep = tPos / stepDur;
+    floorAbsStep = (int)System.Math.Floor(rawAbsStep) % totalAbsSteps;
+    if (floorAbsStep < 0) floorAbsStep += totalAbsSteps;
 
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
-        if (drum == null) return false;
+    return true;
+}
 
-        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-        if (start <= 0.0) return false;
-
-        float clipLen = drum.GetClipLengthInSeconds();
-        if (clipLen <= 0f) return false;
-
-        int baseSteps = Mathf.Max(1, drum.totalSteps);
-        windowFrac = Mathf.Clamp(windowFrac, 0f, 0.5f);
-
-        double dspNow = AudioSettings.dspTime;
-        double delta = dspNow - start;
-        if (delta < 0.0) delta = 0.0;
-
-        double tInBar = delta % clipLen;
-        double stepDur = clipLen / baseSteps;
-        if (stepDur <= 0.0) return false;
-
-        // Continuous step position within this bar.
-        double stepPos = tInBar / stepDur; // [0..baseSteps)
-
-        // Nearest integer step.
-        int nearest = Mathf.RoundToInt((float)stepPos);
-        double err = System.Math.Abs(stepPos - nearest);
-        errorFrac = (float)err;
-
-        if (err > windowFrac)
-            return false;
-
-        // If we rounded to baseSteps, that's "step 0" of the NEXT bar.
-        if (nearest >= baseSteps)
-        {
-            quantStep = 0;
-            binDelta = 1;
-            return true;
-        }
-
-        if (nearest < 0) nearest = 0;
-        quantStep = nearest;
-        binDelta = 0;
-        return true;
-    }
 
     /// <summary>
     /// Immediate re-sync of drum binning + note grid to the committed leader bins.
@@ -972,6 +928,7 @@ public void DespawnGravityVoid()
     }
 
     Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId}");
+    _gfm.noteViz.RemoveAllPlaceholdersForTrack(track);
     star.NotifyCollectableBurstCleared();
 }
     private void UnsubscribeChordEvents()

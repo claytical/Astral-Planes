@@ -297,8 +297,47 @@ public class Vehicle : MonoBehaviour
         UpdateSafeAnchor();
         RecoverIfNeeded();
     }
+
+    TickManualReleaseCue();
     
 }
+    private void TickManualReleaseCue()
+    {
+        if (!enableManualNoteRelease) return;
+
+        var gfm = GameFlowManager.Instance;
+        var viz = (gfm != null) ? gfm.noteViz : null;
+        if (viz == null) return;
+
+        // Nothing queued → no cue
+        if (_pendingNotes == null || _pendingNotes.Count == 0)
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        // Peek (do NOT dequeue) so the cue always corresponds to what will be released next
+        var p = _pendingNotes.Peek();
+        if (p.track == null || p.track.controller == null)
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps))
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        viz.UpdateManualReleaseCue(
+            vehicle: transform,
+            track: p.track,
+            rawAbsStep: rawAbs,
+            floorAbsStep: floorAbs,
+            totalAbsSteps: totalSteps
+        );
+    }
     private void UpdateSafeAnchor()
 {
     if (rb == null || drumTrack == null) return;
@@ -569,7 +608,12 @@ private bool IsCellEmpty(Vector2Int gp)
         rb.linearDamping  = arcadeLinearDamping;
         rb.angularDamping = arcadeAngularDamping;
     }
+    public void SetColor(Color newColor)
+    {
+        if (baseSprite != null)
+            baseSprite.color = newColor;
 
+    }
     public void SyncEnergyUI()
         {
             if (playerStatsUI != null)
@@ -680,6 +724,39 @@ private bool IsCellEmpty(Vector2Int gp)
         {
             activeTrail.GetComponent<TrailRenderer>().emitting = false;
         }
+    }
+    private void UpdateManualReleaseCueVfx()
+    {
+        if (!enableManualNoteRelease) return;
+
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) return;
+
+        var viz = gfm.noteViz;
+        if (viz == null) return;
+
+        // If nothing queued, hide cue.
+        if (_pendingNotes == null || _pendingNotes.Count == 0)
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        // Peek (don’t dequeue) so the cue corresponds to what will release next.
+        var p = _pendingNotes.Peek();
+        if (p.track == null || p.track.controller == null)
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalAbs))
+        {
+            viz.ClearManualReleaseCue(transform);
+            return;
+        }
+
+        viz.UpdateManualReleaseCue(transform, p.track, rawAbs, floorAbs, totalAbs);
     }
     public float GetCumulativeSpentTanks() {
         if (capacity <= 0f) return 0f; 
@@ -1185,15 +1262,16 @@ public bool TryReleaseQueuedNote()
     if (!enableManualNoteRelease) return false;
     if (_pendingNotes.Count <= 0) return false;
 
+    var gfm = GameFlowManager.Instance;
+    var viz = (gfm != null) ? gfm.noteViz : null;
     var p = _pendingNotes.Dequeue();
     if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
     {
         if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+        viz?.BlastManualReleaseCue(transform);
         return false;
     }
 
-    var gfm = GameFlowManager.Instance;
-    var viz = (gfm != null) ? gfm.noteViz : null;
 
     // 1) Find raw playhead abs-step
     if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps))
@@ -1211,8 +1289,11 @@ public bool TryReleaseQueuedNote()
     }
 
     // 3) Window test relative to *that* target
-    double dist = Math.Abs(rawAbs - targetAbsStep);
-    dist = Math.Min(dist, totalSteps - dist); // wrap
+    double delta = rawAbs - targetAbsStep;
+    // circular distance in step units
+    delta = (delta % totalSteps + totalSteps) % totalSteps; // [0,total)
+    if (delta > totalSteps * 0.5) delta = totalSteps - delta;
+    double dist = Math.Abs(delta);
     Debug.Log($"[RELEASE] rawAbs={rawAbs:F2} floor={floorAbs} target={targetAbsStep} dist={dist:F2} winSteps={manualReleaseWindowSteps:F2} total={totalSteps}");
     if (dist > manualReleaseWindowSteps)
     {
