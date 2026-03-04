@@ -796,26 +796,35 @@ public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep
     var drum = GameFlowManager.Instance?.activeDrumTrack;
     if (drum == null) return false;
 
-    double loopLen = drum.GetLoopLengthInSeconds();
-    if (loopLen <= 0.0) return false;
+    // NOTE: Manual release timing must be evaluated on the *leader* loop timeline.
+    // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
+    // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
+    // advances 4x too fast, effectively shrinking your window.
+    double baseLoopLen = drum.GetLoopLengthInSeconds();
+    if (baseLoopLen <= 0.0) return false;
 
     double dspNow = AudioSettings.dspTime;
 
     double transportStart = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
     if (transportStart <= 0.0) return false;
 
-    // Effective loop boundary (leader loop)
-    double loops = System.Math.Floor((dspNow - transportStart) / loopLen);
-    double loopStart = transportStart + loops * loopLen;
-    if (loopStart > dspNow) loopStart -= loopLen;
-
-    double tPos = (dspNow - loopStart) % loopLen;
-    if (tPos < 0) tPos += loopLen;
-
     int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
     totalAbsSteps = leaderSteps;
 
-    double stepDur = loopLen / totalAbsSteps;
+    int binSize = Mathf.Max(1, drum.totalSteps);
+    int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
+    double leaderLoopLen = baseLoopLen * leaderBins;
+
+    // Effective loop boundary (leader loop)
+    double loops = System.Math.Floor((dspNow - transportStart) / leaderLoopLen);
+    double loopStart = transportStart + loops * leaderLoopLen;
+    if (loopStart > dspNow) loopStart -= leaderLoopLen;
+
+    double tPos = (dspNow - loopStart) % leaderLoopLen;
+    if (tPos < 0) tPos += leaderLoopLen;
+
+    // leaderLoopLen/leaderSteps == baseLoopLen/binSize
+    double stepDur = leaderLoopLen / totalAbsSteps;
     rawAbsStep = tPos / stepDur;
     floorAbsStep = (int)System.Math.Floor(rawAbsStep) % totalAbsSteps;
     if (floorAbsStep < 0) floorAbsStep += totalAbsSteps;
@@ -928,7 +937,6 @@ public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep
     }
 
     Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId}");
-    _gfm.noteViz.RemoveAllPlaceholdersForTrack(track);
     star.NotifyCollectableBurstCleared();
 }
     private void UnsubscribeChordEvents()

@@ -40,7 +40,8 @@ public class AscensionCohort
     }
 }
 
-public class InstrumentTrack : MonoBehaviour
+public class 
+    InstrumentTrack : MonoBehaviour
 {
     [Header("Track Settings")]
     public Color trackColor;
@@ -68,6 +69,7 @@ public class InstrumentTrack : MonoBehaviour
     public int ascendLoopCount = 4;
     [SerializeField]
     private int ascensionLoopsPerExtraBin = 2;
+    private NoteSet[] _binNoteSets;
     [Header("Undeveloped Bin Playback ")]
     [Tooltip("If true, when the global leader width is wider than this track, this track's notes will 'ghost repeat' into undeveloped bins at reduced velocity.")]
     [SerializeField] private bool ghostUndevelopedBins = true; 
@@ -223,6 +225,35 @@ public class InstrumentTrack : MonoBehaviour
     private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
     public int BinSize() => drumTrack != null ? drumTrack.totalSteps : 16;
     private int BinIndexForStep(int step) => Mathf.Clamp(step / BinSize(), 0, Mathf.Max(0, maxLoopMultiplier - 1));
+    /// <summary>
+    /// Store the pre-generated NoteSet for a specific bin.
+    /// Called by PhaseTransitionManager during motif setup.
+    /// </summary>
+    public void SetNoteSetForBin(int binIndex, NoteSet noteSet){
+        if (_binNoteSets == null || _binNoteSets.Length != maxLoopMultiplier)
+            _binNoteSets = new NoteSet[maxLoopMultiplier];
+
+        if (binIndex >= 0 && binIndex < _binNoteSets.Length)
+            _binNoteSets[binIndex] = noteSet;
+    }
+
+    /// <summary>
+    /// Returns the pre-generated NoteSet for binIndex, falling back to _currentNoteSet.
+    /// </summary>
+    public NoteSet GetNoteSetForBin(int binIndex){
+        if (_binNoteSets != null && binIndex >= 0 && binIndex < _binNoteSets.Length)
+        {
+            var ns = _binNoteSets[binIndex];
+            if (ns != null) return ns;
+        }
+        return _currentNoteSet;
+    }
+
+    /// <summary>
+    /// Returns all pre-assigned bin NoteSets (may contain nulls for ungenerated bins).
+    /// </summary>
+    public NoteSet[] GetAllBinNoteSets() => _binNoteSets;
+
     public bool IsStepInFilledBin(int step)
     {
         EnsureBinList();
@@ -245,7 +276,6 @@ public class InstrumentTrack : MonoBehaviour
         private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells) {
     if (bufferCells <= 0) return true;
 
-    // Treat edges as "open" so we don't place on borders of the maze.
     for (int dx = -bufferCells; dx <= bufferCells; dx++)
     {
         for (int dy = -bufferCells; dy <= bufferCells; dy++)
@@ -253,8 +283,8 @@ public class InstrumentTrack : MonoBehaviour
             int x = gp.x + dx;
             int y = gp.y + dy;
 
-            if (x < 0 || y < 0 || x >= gridW || y >= gridH)
-                return false;
+            if (x < 0 || y < 0 || x >= gridW || y >= gridH) 
+                continue;
 
             if (IsOpenOrPermanentCell(dustGen, new Vector2Int(x, y)))
                 return false;
@@ -1031,16 +1061,22 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                   $"count={(ascensionCohort.stepsRemaining != null ? ascensionCohort.stepsRemaining.Count : 0)} armed={ascensionCohort.armed}");
     }
 
-    private int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
+    public int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
     {
         List<int> allowedSteps = noteSet.GetStepList();
         int totalSteps = GetTotalSteps();
 
-        // Find the next step after this one
-        int nextStep = allowedSteps
-            .Where(s => s > stepIndex)
-            .DefaultIfEmpty(allowedSteps.First()) // wraparound
-            .First();
+        if (allowedSteps == null || allowedSteps.Count == 0) { 
+            int fallbackTicksPerStep = Mathf.RoundToInt(480f / (Mathf.Max(1, totalSteps) / 4f)); 
+            Debug.LogWarning($"[TRK:DURATION] {name} CalculateNoteDurationFromSteps: empty step list for noteSet={noteSet}, stepIndex={stepIndex}. Returning single-step fallback duration."); 
+            return Mathf.Max(fallbackTicksPerStep / 2, 60);
+        }
+        // Find the next onset after stepIndex. If none exists (stepIndex is past the last
+        // step), wrap around to the first step in the next loop.
+        int nextStep = -1; 
+        for (int i = 0; i < allowedSteps.Count; i++) { 
+            if (allowedSteps[i] > stepIndex) { nextStep = allowedSteps[i]; break; }
+        } if (nextStep < 0) nextStep = allowedSteps[0]; // wraparound — safe because Count > 0
 
         int stepsUntilNext = (nextStep - stepIndex + totalSteps) % totalSteps;
         if (stepsUntilNext == 0) stepsUntilNext = totalSteps;
@@ -1338,12 +1374,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 // If it’s basically imminent, don’t bother orbiting.
         if (orbitSec < 0.05f) orbitSec = 0f;
 
-collectable.BeginCarryThenDepositAtDsp(
-    depositDsp,
-    durationTicks: durationTicks,
-    force: force,
-    onArrived: () =>
-    {
+        collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>  {
         // -----------------------------------------------------------------
         // ✅ NOTIFY COMMIT AT DEPOSIT (DSP-authoritative moment)
         // -----------------------------------------------------------------
@@ -1391,13 +1422,10 @@ collectable.BeginCarryThenDepositAtDsp(
         }
     }
 );
-        if (_currentBurstArmed && _currentBurstRemaining > 0)
-        {
-            _currentBurstRemaining--;
-            if (_currentBurstRemaining == 0)
-            {
+        if (_currentBurstArmed && collectable.burstId == currentBurstId) { 
+            _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1); 
+            if (_currentBurstRemaining == 0) 
                 _currentBurstArmed = false;
-            }
         }
 }
 
@@ -1675,7 +1703,7 @@ collectable.BeginCarryThenDepositAtDsp(
         loopMultiplier = 1;
 
         // If you track bin-fill flags, clear them here (only if you added it)
-        // _filledBins?.Clear();
+         _binFilled.Clear();
 
         // Burst/cursor snapshots (if present)
         _burstLeaderBinsBeforeWrite?.Clear();
@@ -1697,6 +1725,7 @@ collectable.BeginCarryThenDepositAtDsp(
     /// </summary>
     public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
     {
+        _binNoteSets = null;
         Debug.LogWarning(
             $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
             $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
@@ -1816,37 +1845,6 @@ collectable.BeginCarryThenDepositAtDsp(
     public int GetNoteDensity()
     {
         return persistentLoopNotes.Count;
-    }
-    public int CalculateNoteDuration(int stepIndex, NoteSet noteSet)
-    {
-        List<int> allowedSteps = noteSet.GetStepList();
-
-        // Find the next allowed step greater than the current stepIndex.
-        int nextStep = allowedSteps
-            .Where(step => step > stepIndex)
-            .DefaultIfEmpty(stepIndex + _totalSteps) // Wrap around if no further step is found
-            .First();
-
-        // Calculate how many steps between the current and next step, looping around if necessary
-        int stepsUntilNext = (nextStep - stepIndex + _totalSteps) % _totalSteps;
-        if (stepsUntilNext == 0)
-            stepsUntilNext = _totalSteps; // Ensure a full loop duration if the next step wraps to itself.
-
-        // Calculate the number of MIDI ticks per musical step.
-        int ticksPerStep = Mathf.RoundToInt(480f / (_totalSteps / 4f)); // 480 ticks per quarter note.
-
-        // Base duration is steps multiplied by ticks per step.
-        int baseDurationTicks = ticksPerStep * stepsUntilNext;
-
-        // Retrieve the rhythm pattern for the current note set and apply duration multiplier.
-        RhythmPattern pattern = RhythmPatterns.Patterns[noteSet.rhythmStyle];
-        int chosenDurationTicks = Mathf.RoundToInt(baseDurationTicks * pattern.DurationMultiplier);
-
-        // Enforce a minimum duration for audibility.
-        chosenDurationTicks = Mathf.Max(chosenDurationTicks, ticksPerStep / 2);
-
-
-        return chosenDurationTicks;
     }
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue)
     {
@@ -1971,7 +1969,6 @@ collectable.BeginCarryThenDepositAtDsp(
         Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=controller_or_noteVisualizer_null controllerNull={(controller == null)} noteVizNull={(controller != null && controller.noteVisualizer == null)} noteSet={noteSet} maxToSpawn={maxToSpawn}");
         return;
     }
-    if (_currentNoteSet != noteSet) SetNoteSet(noteSet);
 
     // ------------------------------------------------------------
     // BURST ID: choose exactly once; never change it mid-function.
@@ -2481,33 +2478,31 @@ public float GetSecondsUntilNextLoopBoundaryDSP()
 
     return (float)secs;
 }
-public bool IsSaturatedForNoteSet(NoteSet noteSet)
-{
-    if (noteSet == null) return false;
-
-    // Defensive init, since ApplyNoteSet does this elsewhere.
-    int steps = (drumTrack != null) ? drumTrack.totalSteps : 16;
-    noteSet.Initialize(this, steps);
-
-    var allowed = noteSet.GetStepList();
-    if (allowed == null || allowed.Count == 0) return false;
-
-    if (persistentLoopNotes == null || persistentLoopNotes.Count == 0)
-        return false;
-
-    var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
-    for (int i = 0; i < allowed.Count; i++)
-        if (!occupied.Contains(allowed[i]))
-            return false;
-
-    return true;
-}
 
 public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
 {
-    if (incoming == null || _currentNoteSet == null) return false;
-    if (!ReferenceEquals(incoming, _currentNoteSet)) return false;
-    return IsSaturatedForNoteSet(incoming);
+    if (incoming == null) return false; 
+    if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return false;
+    int activeBins = Mathf.Max(1, loopMultiplier); 
+    int bSz        = Mathf.Max(1, BinSize()); 
+    bool anyBinChecked = false;
+    var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
+    
+    for (int b = 0; b < activeBins; b++) { 
+        if (!IsBinFilled(b)) continue;  // bin exists but player hasn't harvested it yet — skip
+        var binNoteSet = GetNoteSetForBin(b) ?? incoming; 
+        binNoteSet.Initialize(this, bSz); 
+        var allowed = binNoteSet.GetStepList(); 
+        if (allowed == null || allowed.Count == 0) continue;
+        
+        foreach (int localStep in allowed) { 
+            int absStep = b * bSz + (localStep % bSz); 
+            if (!occupied.Contains(absStep)) return false;
+        } 
+        anyBinChecked = true;
+    }
+    // If no filled bins exist yet, we are not saturated.
+    return anyBinChecked;
 }
 
 
@@ -2515,8 +2510,6 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
         if (c == null) return; 
         if (c.assignedInstrumentTrack != this) return;
         if (c.burstId == 0) return;
-        // If it already reported collection, OnCollectableCollected will handle the decrement.
-        // We only handle "lost" collectables here.
         if (c.ReportedCollected) return;
         if (_destroyHandlers.TryGetValue(c, out var h) && h != null)
         {
@@ -2527,19 +2520,37 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
         // Decrement remaining just like a collection would, so the burst can clear.
         if (_burstRemaining.TryGetValue(c.burstId, out var rem)) {
             rem--; 
-            if (rem <= 0) { // We did not write notes for this step, but we still want the burst to resolve
-                // so bin/cursor/frontier progression does not deadlock.
+            if (rem <= 0) { 
                 _burstRemaining.Remove(c.burstId); 
                 _burstTotalSpawned.Remove(c.burstId); 
+//                _burstCollected.Remove(c.burstId);
+                // Check whether any notes were actually written for this burst.
+                int collected = 0; 
+                _burstCollected.TryGetValue(c.burstId, out collected); 
                 _burstCollected.Remove(c.burstId);
-                
-                // IMPORTANT: do NOT call SetBinFilled here (no successful harvest),
-                // but DO allow future bursts to progress rather than deadlocking.
-                // If you want a softer rule, we can require at least one collected in the burst.
-                if (controller != null) controller.AllowAdvanceNextBurst(this);
-                // Cursor advance is safe: cursor is allocation intent, not harvest proof.
-                AdvanceBinCursor(1); 
-                OnCollectableBurstCleared?.Invoke(this, c.burstId);
+                if (collected > 0) { 
+                    // At least one note was harvested — treat bin as partially filled
+                    // and let the normal progression continue.
+                    if (_burstWroteBin.TryGetValue(c.burstId, out var filledBin)) 
+                        SetBinFilled(filledBin, true);
+                    if (controller != null) controller.AllowAdvanceNextBurst(this); 
+                    AdvanceBinCursor(1); 
+                    OnCollectableBurstCleared?.Invoke(this, c.burstId);
+                } 
+                else { 
+                    // Zero notes collected: the entire burst was lost.
+                    // Do NOT mark the bin filled, do NOT advance the cursor, and do NOT
+                    // fire OnCollectableBurstCleared — the star should re-arm for this
+                    // bin rather than bridging on an empty loop.
+                    Debug.LogWarning($"[COLLECT:LOST_BURST] {name} burstId={c.burstId} all collectables lost with zero notes written. Bin will not be marked filled; star will re-arm.");
+                    // Clean up remaining burst tracking state.
+                    _burstWroteBin.Remove(c.burstId); 
+                    _burstLeaderBinsBeforeWrite.Remove(c.burstId);
+                    // Notify controller that collectables are cleared so the star can
+                    // re-arm, but do not advance bin state.
+                    if (controller != null) controller.AllowAdvanceNextBurst(this); 
+                    OnCollectableBurstCleared?.Invoke(this, c.burstId);
+                }
             }
             else { 
                 _burstRemaining[c.burstId] = rem;

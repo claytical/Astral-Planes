@@ -30,7 +30,7 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Playhead Pulse (Color)")]
     [SerializeField] private float releasePulseSeconds = 0.18f;
     [SerializeField] private Color releasePulseColor = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
-
+    private readonly Dictionary<int, int> _releaseCuePinnedTarget = new Dictionary<int, int>();
     private float _releasePulseT = 0f; // seconds remaining
     // Flag to fire a short "release" burst when drums change / burst completes.
     private bool _pendingReleasePulse = false;
@@ -216,25 +216,21 @@ public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int tota
     foreach (var kv in noteMarkers)
     {
         if (kv.Key.Item1 != track) continue;
-        int step = kv.Key.Item2;
-        if (step < 0) continue;
-        step = ((step % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+        int step = kv.Key.Item2;  // do NOT wrap this
+        if (step < 0 || step >= totalAbsSteps) continue;  // just bounds-check instead
 
         var tr = kv.Value;
         if (!tr) continue;
         var tag = tr.GetComponent<MarkerTag>();
-        if (tag == null) continue;
-        if (!tag.isPlaceholder) continue;
+        if (tag == null || !tag.isPlaceholder) continue;
 
         int fwd = (step - fromAbsStep + totalAbsSteps) % totalAbsSteps;
 
-        if (fwd < bestForward)
-        {
+        if (fwd > 0 && fwd < bestForward)        {
             bestForward = fwd;
             bestStep = step;
         }
     }
-
     if (bestStep < 0) return false;
     targetAbsStep = bestStep;
     return true;
@@ -251,11 +247,22 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
     if (!isActiveAndEnabled) return;
 
     totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+    int id = vehicle.GetInstanceID();
+
+    // Use pinned target if we have one, otherwise find the next unlit step.
     int targetAbs;
-    if (!TryGetNextUnlitStep(track, floorAbsStep, totalAbsSteps, out targetAbs))
+    if (_releaseCuePinnedTarget.TryGetValue(id, out int pinned))
     {
-        ClearManualReleaseCue(vehicle);
-        return;
+        targetAbs = pinned;
+    }
+    else
+    {
+        if (!TryGetNextUnlitStep(track, floorAbsStep, totalAbsSteps, out targetAbs))
+        {
+            ClearManualReleaseCue(vehicle);
+            return;
+        }
+        _releaseCuePinnedTarget[id] = targetAbs;
     }
 
     Vector3 a = vehicle.position;
@@ -268,10 +275,12 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
     double fwd = (targetAbs - rawAbsStep) % totalAbsSteps;
     if (fwd < 0) fwd += totalAbsSteps;
 
-    int lookahead = Mathf.Clamp(releaseCueLookaheadSteps, 1, totalAbsSteps);
+    int binSize = Mathf.Max(1, track.drumTrack != null ? track.drumTrack.totalSteps : 16);
+    int leaderBins = Mathf.Max(1, totalAbsSteps / binSize);
+    int effectiveLookahead = Mathf.Max(releaseCueLookaheadSteps, binSize / 2);
+    int lookahead = Mathf.Clamp(effectiveLookahead * leaderBins, 1, totalAbsSteps);
     if (fwd > lookahead)
     {
-        // Too early — hide so we don't imply every step is a valid target.
         ClearManualReleaseCue(vehicle);
         return;
     }
@@ -286,7 +295,6 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
         p.y += releaseCueArcHeight * hump;
     }
 
-    int id = vehicle.GetInstanceID();
     if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
     {
         cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
@@ -297,34 +305,11 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
         cue.transform.position = p;
     }
 }
-public void RemoveAllPlaceholdersForTrack(InstrumentTrack track)
-{
-    if (track == null || noteMarkers == null) return;
-
-    var keys = noteMarkers.Keys.ToList();
-    foreach (var k in keys)
-    {
-        if (k.Item1 != track) continue;
-
-        var tr = noteMarkers[k];
-        if (!tr) { noteMarkers.Remove(k); continue; }
-
-        var tag = tr.GetComponent<MarkerTag>();
-        if (tag != null && tag.isPlaceholder)
-        {
-            Destroy(tr.gameObject);
-            noteMarkers.Remove(k);
-        }
-    }
-
-    // optional: also prune row children that are placeholders but not in dict
-    // (if you still see stragglers)
-    RecomputeTrackLayout(track);
-}
 public void ClearManualReleaseCue(Transform vehicle)
 {
     if (vehicle == null) return;
     int id = vehicle.GetInstanceID();
+    _releaseCuePinnedTarget.Remove(id);
     if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
         Destroy(cue);
     _releaseCuesByVehicle.Remove(id);
@@ -332,6 +317,9 @@ public void ClearManualReleaseCue(Transform vehicle)
 
 public void BlastManualReleaseCue(Transform vehicle)
 {
+    if (vehicle == null) return;
+    int id = vehicle.GetInstanceID();
+    _releaseCuePinnedTarget.Remove(id);
     ClearManualReleaseCue(vehicle);
 }
 
@@ -1821,7 +1809,50 @@ private Color ComputeStepColor(int step)
             yield return new WaitForSeconds(waitSec);
 
         track.ClearBinNotesKeepAllocated(binIdx);
+        RemovePlaceholdersInBin(track, binIdx);
         CanonicalizeTrackMarkers(track, burstId);
+    }
+
+    private void RemovePlaceholdersInBin(InstrumentTrack track, int binIdx)
+    {
+        if (track == null) return;
+        if (noteMarkers == null || noteMarkers.Count == 0) return;
+
+        int totalAbsSteps = 1;
+        if (track.drumTrack != null)
+            totalAbsSteps = Mathf.Max(1, track.drumTrack.totalSteps * Mathf.Max(1, track.loopMultiplier));
+
+        int bins = 1;
+        if (track.controller != null)
+            bins = Mathf.Max(1, track.controller.GetGlobalVisualBins());
+
+        int stepsPerBin = Mathf.Max(1, Mathf.RoundToInt(totalAbsSteps / (float)bins));
+        int start = binIdx * stepsPerBin;
+        int endExclusive = start + stepsPerBin;
+
+        var keysToRemove = new List<(InstrumentTrack, int)>();
+        foreach (var kv in noteMarkers)
+        {
+            if (kv.Key.Item1 != track) continue;
+            int stepAbs = kv.Key.Item2;
+            if (stepAbs < start || stepAbs >= endExclusive) continue;
+
+            var tr = kv.Value;
+            if (!tr)
+            {
+                keysToRemove.Add(kv.Key);
+                continue;
+            }
+
+            var tag = tr.GetComponent<MarkerTag>();
+            if (tag == null || !tag.isPlaceholder) continue;
+
+            Destroy(tr.gameObject);
+            keysToRemove.Add(kv.Key);
+        }
+
+        foreach (var k in keysToRemove)
+            noteMarkers.Remove(k);
     }
     public void ConfigureBinStrip(int activeBinCount)
 {

@@ -221,8 +221,28 @@ public class GameFlowManager : MonoBehaviour
 
     public NoteSet GenerateNotes(InstrumentTrack track, int entropy = 0)
     {
-        var ns = phaseTransitionManager.noteSetFactory.Generate(track, phaseTransitionManager.currentMotif, entropy);
-        return ns;
+        if (track == null) return null;
+
+        // Primary path: return the pre-generated NoteSet for the bin this track is
+        // about to fill. This is deterministic and consistent with what
+        // ConfigureTracksForCurrentPhaseAndMotif already authored.
+        int targetBin = track.GetBinCursor();
+        // Clamp to valid range defensively.
+        targetBin = Mathf.Clamp(targetBin, 0, track.maxLoopMultiplier - 1);
+
+        var prebuilt = track.GetNoteSetForBin(targetBin);
+        if (prebuilt != null)
+        {
+            Debug.Log($"[GFM:GenerateNotes] track={track.name} bin={targetBin} -> returning prebuilt NoteSet (cfg deterministic)");
+            return prebuilt;
+        }
+
+        // Fallback: bin was not pre-generated (e.g. hot-reload in editor, missing motif).
+        // Generate on the fly for this specific bin so behavior remains correct.
+        Debug.LogWarning($"[GFM:GenerateNotes] track={track.name} bin={targetBin} prebuilt missing, generating on-the-fly.");
+        return phaseTransitionManager.noteSetFactory.GenerateForBin(
+            track, phaseTransitionManager.currentMotif, targetBin, entropy);
+
     }
     void Start()
     {

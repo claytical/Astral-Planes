@@ -18,7 +18,11 @@ public class NoteSetFactory : MonoBehaviour
 {
 
     public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy = 0)
-{
+    {
+        return GenerateForBin(track, motif, binIndex: 0, entropy: entropy);
+    }
+    public NoteSet GenerateForBin(InstrumentTrack track, MotifProfile motif, int binIndex, int entropy = 0)
+    {
     if (track == null)
     {
         Debug.LogWarning("[NoteSetFactory] Motif-based Generate called with null track.");
@@ -31,18 +35,14 @@ public class NoteSetFactory : MonoBehaviour
         Debug.LogWarning("[NoteSetFactory] Motif is null; cannot generate motif-based NoteSet.");
         return null;
     }
-
-    // Look up the motif config for this role
-    var cfg = motif.GetConfigForRole(track.assignedRole);
+    var cfg = motif.GetConfigForRoleAtBin(track.assignedRole, binIndex, track.maxLoopMultiplier);
     if (cfg == null)
     {
         Debug.LogWarning($"[NoteSetFactory] No RoleMotifNoteSetConfig for role {track.assignedRole} in motif {motif.name}. Cannot generate motif-based NoteSet.");
         return null;
     }
 
-    var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-n{entropy}");
-    string key = $"{motif.name}/{track.assignedRole}";
-
+    var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-b{binIndex}-n{entropy}"); string key = $"{motif.name}/{track.assignedRole}/bin{binIndex}";
     return GenerateFromMotifConfig(track, motif, cfg, rng, key);
 }
 private NoteSet GenerateFromMotifConfig(
@@ -272,7 +272,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
         int midi = notes[i];
         if (midi == int.MinValue) continue;
 
-        int dur = track.CalculateNoteDuration(step, proxy);
+        int dur = track.CalculateNoteDurationFromSteps(step, proxy);
         dur = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
         float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
         persistent.Add((step, midi, dur, vel, int.MinValue));

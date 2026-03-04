@@ -214,18 +214,27 @@ public class PhaseTransitionManager : MonoBehaviour
         var controller = gfm.controller;
         if (controller == null || controller.tracks == null) return;
 
-        int baseEntropy = 0;
 
         foreach (var track in controller.tracks)
         {
             if (!track) continue;
             if (currentMotif == null) continue;
 
-            var noteSet = noteSetFactory.Generate(track, currentMotif, baseEntropy);
-            if (noteSet == null) continue;
+            NoteSet bin0NoteSet = null;
+            for (int b = 0; b < track.maxLoopMultiplier; b++)
+            {
+                var noteSet = noteSetFactory.GenerateForBin(track, currentMotif, binIndex: b, entropy: 0);
+                if (noteSet == null) continue;
 
+                track.SetNoteSetForBin(b, noteSet);
+
+                if (b == 0) bin0NoteSet = noteSet;
+            }
+
+            if (bin0NoteSet == null) continue;
+ 
             track.authoredRootMidi = currentMotif.keyRootMidi;
-            track.SetNoteSet(noteSet);
+            track.SetNoteSet(bin0NoteSet);
         }
     }
 
