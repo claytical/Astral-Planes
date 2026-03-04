@@ -58,12 +58,24 @@ public class MotifProfile : ScriptableObject
     {
         if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
             return null;
-
-        // Collect all configs matching this role
+        return GetConfigForRoleAtBin(role, 0, 1);
+    }
+    /// <summary>
+    /// Returns the config to use for a given role and bin index.
+    ///
+    /// One config  → same config for every bin (only harmonic shift varies between bins).
+    /// N configs   → configs[binIndex % N] so each bin gets a distinct variation in round-robin order.
+    ///
+    /// This is deterministic: given the same binIndex you always get the same config,
+    /// which is essential for saturation detection and for MineNode re-spawns being
+    /// consistent with what was originally placed.
+    /// </summary>
+    public RoleMotifNoteSetConfig GetConfigForRoleAtBin(MusicalRole role, int binIndex, int totalBins)
+    {
+        if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
+            return null;
         List<RoleMotifNoteSetConfig> matches = null;
-
-        for (int i = 0; i < roleNoteConfigs.Count; i++)
-        {
+        for (int i = 0; i < roleNoteConfigs.Count; i++)        {
             var cfg = roleNoteConfigs[i];
             if (cfg != null && cfg.role == role)
             {
@@ -71,12 +83,15 @@ public class MotifProfile : ScriptableObject
                 matches.Add(cfg);
             }
         }
+ 
+        if (matches == null || matches.Count == 0) return null;
 
-        if (matches == null || matches.Count == 0)
-            return null;
+        // Single config: same pattern every bin (root-shift via chord progression handles variation).
+        if (matches.Count == 1) return matches[0];
 
-        // Pick one at random
-        return matches[UnityEngine.Random.Range(0, matches.Count)];
+        // Multiple configs: deterministic round-robin so bin 0 → cfg[0], bin 1 → cfg[1], etc.
+        int idx = Mathf.Abs(binIndex) % matches.Count;
+        return matches[idx];
     }
-
+ 
 }
