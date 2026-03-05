@@ -278,7 +278,6 @@ public void UpdateManualReleaseCueExcluding(
     int id = vehicle.GetInstanceID();
     if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
     {
-        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
         _releaseCuesByVehicle[id] = cue;
     }
     else
@@ -306,18 +305,31 @@ public bool TryGetNextUnlitStepExcluding(
         if (kv.Key.Item1 != track) continue;
         int step = kv.Key.Item2;
         if (step < 0) continue;
+        int effectiveTotal = track != null
+            ? Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()))
+            : totalAbsSteps;
+        if (step >= effectiveTotal)
+        {
+            continue;
+        }
 
-        // Skip steps already claimed by an in-flight armed release.
-        if (excludedSteps != null && excludedSteps.Contains(step)) continue;
-
-        int stepNorm = ((step % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+        if (excludedSteps != null && excludedSteps.Contains(step))
+        {
+            continue;
+        }
 
         var tr = kv.Value;
-        if (!tr) continue;
+        if (!tr)
+        {
+            Debug.Log($"[UNLIT_SEARCH] track={track.name} step={step} SKIP: null transform");
+            continue;
+        }
         var tag = tr.GetComponent<MarkerTag>();
+        bool isPlaceholder = tag != null && tag.isPlaceholder;
+        Debug.Log($"[UNLIT_SEARCH] track={track.name} step={step} tag={(tag!=null?"present":"NULL")} isPlaceholder={isPlaceholder} burstId={(tag!=null?tag.burstId:-999)}");
         if (tag == null || !tag.isPlaceholder) continue;
 
-        double fwd = (stepNorm - from + totalAbsSteps) % totalAbsSteps;
+        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
         if (fwd < bestForward)
         {
             bestForward = fwd;
@@ -325,6 +337,7 @@ public bool TryGetNextUnlitStepExcluding(
         }
     }
 
+    Debug.Log($"[UNLIT_SEARCH] track={track.name} rawAbs={rawAbsStep:F2} totalAbsSteps={totalAbsSteps} bestStep={bestStep} bestFwd={bestForward:F2}");
     if (bestStep < 0) return false;
     targetAbsStep = bestStep;
     return true;
