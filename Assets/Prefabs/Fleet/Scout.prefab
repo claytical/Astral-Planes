@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: -4889963663756425899}
   - component: {fileID: 1318993829032619801}
   - component: {fileID: 1956106007061599226}
+  - component: {fileID: -8569570063324372405}
   m_Layer: 0
   m_Name: Scout
   m_TagString: Vehicle
@@ -35,8 +36,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: -4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 3602618148336215777}
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1970310610805977373
@@ -187,6 +187,13 @@ MonoBehaviour:
   spawnRestPocketDelaySeconds: 0
   logScaleCalibrationOnAssign: 1
   manualReleaseWindowSteps: 1.25
+  manualReleaseUseArmLock: 1
+  manualReleaseArmAheadSteps: 6
+  manualReleaseAutoCommitEpsSteps: 0.35
+  trailSlotSpacing: 0.55
+  trailFirstSlotOffset: 0.7
+  trailHistoryCapacity: 48
+  trailReleasePulseSteps: 4
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -416,97 +423,21 @@ PolygonCollider2D:
       - {x: 0.06, y: 0.015}
       - {x: -0.049999997, y: 0.015}
   m_UseDelaunayMesh: 0
---- !u!1001 &1216071074975112973
-PrefabInstance:
+--- !u!114 &-8569570063324372405
+MonoBehaviour:
   m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 2614095863033673403}
-    m_Modifications:
-    - target: {fileID: 1334155109623550780, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1528607137962838868, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_Name
-      value: Remix Ring Holder
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -0.02
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4354799938014065834, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7974318172923793714, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7985258123911630334, guid: 104807bce3bab423897191eedb7f28c9,
-        type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 104807bce3bab423897191eedb7f28c9, type: 3}
---- !u!4 &3602618148336215777 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2386705686939597292, guid: 104807bce3bab423897191eedb7f28c9,
-    type: 3}
-  m_PrefabInstance: {fileID: 1216071074975112973}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
+  ringSprite: {fileID: 0}
+  ringFillLerpSpeed: 8
+  dotPrefab: {fileID: 0}
+  dotRadius: 0.5
+  dotActiveColor: {r: 1, g: 1, b: 1, a: 1}
+  dotSpentColor: {r: 1, g: 1, b: 1, a: 0.15}

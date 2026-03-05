@@ -178,7 +178,7 @@ public void NotifyCommitted(InstrumentTrack track, int stepIndex)
 {
     Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
     // (Optional) you could track lastCommitTime here if you want.
-    //PlayCommitStinger(track);
+    PlayCommitStinger(track);
     PlayGravityVoidChordPulse(track, _lastTransportFrame.playheadBin, 3);
 }
     public void AllowAdvanceNextBurst(InstrumentTrack track)
