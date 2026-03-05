@@ -228,20 +228,6 @@ public class NoteSet
         return _allowedSteps;
     }
     
-    /// <summary>
-    /// Riff-authoritative access: returns the authored template event at an exact step.
-    /// Use this to preserve per-note authoredRootMidi through playback/quantization.
-    /// </summary>
-    public bool TryGetTemplateEventAtStep(int step, out (int note, int dur, float vel, int authoredRootMidi) e)
-    {
-        if (persistentTemplate == null || persistentTemplate.Count == 0)
-        {
-            e = default;
-            return false;
-        }
-
-        return _templateByStep.TryGetValue(step, out e);
-    }
 
 public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
@@ -285,32 +271,10 @@ public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
                 return GetNextArpeggiatedNote(step);
         }
     }
-    public void AdvanceChord()
-    {
-        List<ChordPattern> allPatterns = Enum.GetValues(typeof(ChordPattern)).Cast<ChordPattern>().ToList();
-        int currentIndex = allPatterns.IndexOf(chordPattern);
-        chordPattern = allPatterns[(currentIndex + 1) % allPatterns.Count]; // Cycle through all chords
-
-        Debug.Log($"Chord progression updated: {chordPattern}");
-    }
-    public int[] GetRandomChordOffsets()
-    {
-        return ChordLibrary.GetRandomChord();
-    }
-    public void ShiftRoot(InstrumentTrack track, int semitoneDelta)
-    {
-        rootMidi += semitoneDelta;
-        rootMidi = Mathf.Clamp(rootMidi, track.lowestAllowedNote, track.highestAllowedNote);
-        BuildNotesFromKey(track); // rebuild scale
-    }
     public void ChangeNoteBehavior(InstrumentTrack track, NoteBehavior newBehavior)
     {
         noteBehavior = newBehavior;
         BuildNotesFromKey(track); // may change octave/root
-    }
-    public int GetClosestVoiceLeadingNote(int currentNote, List<int> nextChordNotes)
-    {
-        return nextChordNotes.OrderBy(n => Mathf.Abs(n - currentNote)).First();
     }
     public int GetNextArpeggiatedNote(int stepIndex)
     {

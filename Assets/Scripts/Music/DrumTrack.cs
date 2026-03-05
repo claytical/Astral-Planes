@@ -1194,51 +1194,7 @@ public void ResetBeatSequencingState(string who)
 
     Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
 }
-    private void AutoSizeSpawnGridIfEnabled() { 
-        if (!autoSizeSpawnGridToScreen) return; 
-        if (_spawnGrid == null) return;
-        int sw = Mathf.Max(1, Screen.width); 
-        int sh = Mathf.Max(1, Screen.height);
-        // Usable height excludes the bottom UI padding.
-        int usableH = Mathf.Max(1, sh - Mathf.Max(0, uiBottomPaddingPx));
-        // Derive a stable cell pixel size from your historical assumption.
-        float cellPx = 0f;
-        if (referenceWidthPx > 0 && referenceColumns > 0) 
-            cellPx = referenceWidthPx / (float)referenceColumns; // ~53.33 at 1920/36
-        
-        if (cellPx <= 1f) cellPx = 50f; // safe fallback
-        int cols = Mathf.Max(1, Mathf.RoundToInt(sw / cellPx));
-        int rows = Mathf.Max(1, Mathf.RoundToInt(usableH / cellPx));
-        
-        // Keep UI reserve consistent with the pixel padding.
-        uiReserveBottomViewport = Mathf.Clamp01(uiBottomPaddingPx / (float)sh);
-        
-        // Apply
-        _spawnGrid.ResizeGrid(cols, rows);
-        _hasLockedPlayArea = false;
-        
-        // Any cached world mapping based on old grid dims must be invalidated.
-        InvalidateGridWorldCache();
-        
-        Debug.Log($"[GridAutoSize] screen={sw}x{sh} usableH={usableH} cellPx={cellPx:F2} -> grid={cols}x{rows} uiBottomV={uiReserveBottomViewport:F3}");
-    }   
-    public void CarveTemporaryCellFromVehicle(
-        Vector3 worldPos,
-        float healDelaySeconds,
-        int resolveRadiusCells = 0)
-    {
-        if (_dust == null) return;
 
-        MazeArchetype phase = GetCurrentPhaseSafe();
-
-        _dust.CarveTemporaryCellFromVehicle(
-            worldPos,
-            phase,
-            healDelaySeconds,
-            resolveRadiusCells
-        );
-    }
-    
 
     public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     {
@@ -1585,21 +1541,6 @@ public void ResetBeatSequencingState(string who)
     public int GetSpawnGridHeight()
     {
         return _spawnGrid.gridHeight;
-    }
-    private IEnumerator InitializeDrumLoop()
-    {
-        // ✅ Wait until the AudioSource has a valid clip
-        while (drumAudioSource.clip == null)
-        {
-            yield return null; // Wait until the next frame
-        }
-        _clipLengthSec = Mathf.Max(drumAudioSource.clip.length, 0f); 
-        if (!HasValidClipLen)
-        { 
-            Debug.LogError("DrumTrack: Clip length is zero/invalid; aborting loop init."); 
-            yield break;
-        }
-        drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
     }
     private void ScheduleDrumLoopChange(AudioClip newLoop)
     {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,12 +17,7 @@ public class Collectable : MonoBehaviour
     private bool _hasDesiredGridTarget; 
     public int intendedBin = -1;
     private Vector2Int _desiredGridTarget;
-    [Header("Manual Release Feedback")]
-    [SerializeField] private float manualDiscardFeedbackSeconds = 0.16f;
-    [SerializeField] private float manualDiscardShrinkTo = 0.40f;
-    [SerializeField] private Color manualDiscardTint = new Color(1f, 0.30f, 0.30f, 1f);
 
-    private bool _manualDiscarding = false;
 // ---- Dust pocket (collectable visibility) ----
     [Header("Dust Pocket (Visibility)")]
     [SerializeField] private bool keepDustPocketOpen = true;
@@ -131,8 +126,35 @@ public class Collectable : MonoBehaviour
     private Transform _collector;
     private Coroutine _carryRoutine;
     private bool _inCarry;
+
+// ---- Note Trail (Manual Release) ----
+    [Header("Note Trail (Manual Release)")]
+    [Tooltip("How quickly the note lerps toward its trail slot position (world space).")]
+    [SerializeField] private float trailFollowLerp = 12f;
+
+    [Tooltip("Scale pulse min when idle in trail.")]
+    [SerializeField] private float trailIdleScaleMin = 0.85f;
+
+    [Tooltip("Scale pulse max at full release-ready glow.")]
+    [SerializeField] private float trailReadyScaleMax = 1.25f;
+
+    [Tooltip("Glow pulse speed (radians/sec) when release window is near.")]
+    [SerializeField] private float trailReadyPulseSpeed = 6f;
+
+    private Vector3 _trailWorldTarget;
+    private bool _trailFollowActive;
+    private float _trailReleasePulse01; // 0=idle, 1=release imminent
+    private Coroutine _trailFollowRoutine;
+    private Vector3 _trailBaseScale;
+    private bool _trailBaseScaleCaptured;
     bool _hasReservation;
     public bool ReportedCollected { get; private set; }
+
+    /// <summary>
+    /// Call before manually consuming a collectable so OnCollectableDestroyed does not
+    /// double-decrement _burstRemaining. The commit path already handles burst accounting.
+    /// </summary>
+    public void MarkAsReportedCollected() => ReportedCollected = true;
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
@@ -165,6 +187,10 @@ public class Collectable : MonoBehaviour
 // Collectable.cs
     public void OnManualReleaseDiscarded()
     {
+        // stop trail follow
+        _trailFollowActive = false;
+        if (_trailFollowRoutine != null) { StopCoroutine(_trailFollowRoutine); _trailFollowRoutine = null; }
+
         // stop being "carried"
         try { UnregisterCarryOrbit(); } catch {}
 
@@ -192,99 +218,7 @@ public class Collectable : MonoBehaviour
 
         Destroy(gameObject);
     }
-    private IEnumerator Co_DiscardFeedbackThenDestroy()
-    {
-        if (energySprite != null)
-        {
-            var old = energySprite.color;
-            energySprite.color = new Color(1f, 0.15f, 0.15f, 1f);
-            transform.localScale *= 1.15f;
-            yield return new WaitForSeconds(0.10f);
-            energySprite.color = old;
-        }
-        Destroy(gameObject); // InstrumentTrack “lost” handler will still decrement burst remaining
-    }
-private IEnumerator Co_DiscardFlashThenDestroy()
-{
-    Vector3 start = transform.localScale;
-    Vector3 peak = start * 1.35f;
 
-    float t = 0f;
-    const float up = 0.07f;
-    const float down = 0.10f;
-
-    // Punch up
-    while (t < up)
-    {
-        t += Time.deltaTime;
-        float u = Mathf.Clamp01(t / up);
-        transform.localScale = Vector3.Lerp(start, peak, u);
-        yield return null;
-    }
-
-    // Fade down quickly (keep it readable, not subtle)
-    t = 0f;
-    while (t < down)
-    {
-        t += Time.deltaTime;
-        float u = Mathf.Clamp01(t / down);
-
-        transform.localScale = Vector3.Lerp(peak, start * 0.85f, u);
-
-        if (energySprite != null)
-        {
-            var c = energySprite.color;
-            c.a = Mathf.Lerp(0.95f, 0f, u);
-            energySprite.color = c;
-        }
-
-        yield return null;
-    }
-
-    Destroy(gameObject);
-}
-    private IEnumerator Co_ManualDiscardFeedbackThenConsume()
-    {
-        float dur = Mathf.Max(0.05f, manualDiscardFeedbackSeconds);
-
-        Vector3 startScale = transform.localScale;
-
-        Color startColor = Color.white;
-        bool hasSprite = (energySprite != null);
-        if (hasSprite) startColor = energySprite.color;
-
-        // Tint immediately so the player reads “miss”
-        if (hasSprite)
-        {
-            var c = manualDiscardTint;
-            c.a = startColor.a;
-            energySprite.color = c;
-        }
-
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.Clamp01(t / dur);
-
-            // Shrink
-            float s = Mathf.Lerp(1f, manualDiscardShrinkTo, u);
-            transform.localScale = startScale * s;
-
-            // Fade out
-            if (hasSprite)
-            {
-                var c = energySprite.color;
-                c.a = Mathf.Lerp(startColor.a, 0f, u);
-                energySprite.color = c;
-            }
-
-            yield return null;
-        }
-
-        // Final teardown (destroys tether GO too)
-        OnManualReleaseConsumed();
-    }
   private void TryBindLoopBoundary()
 {
     if (!useLoopBoundaryIdea) return;
@@ -585,16 +519,6 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         return true;
     }
 
-    void CommitArrival(Vector2Int arrivedCell)
-    {
-        // Move occupancy
-        UnregisterOccupant();
-        RegisterOccupant(arrivedCell);
-
-        // If we reserved this cell, release that reservation
-        if (_hasReservation && _reservedCell == arrivedCell)
-            ClearReservation();
-    }
     // Small helper: normalize duration ticks (large => slow)
     private float Duration01()
     {
@@ -1267,6 +1191,46 @@ private Vector3 ComputeCarryOrbitTargetWorld()
 /// Compute normalized ribbon X (0..1) for the ribbonMarker against the ribbon UI width.
 /// This is the “visual truth” that the playhead line is moving across.
 /// </summary>
+// ---- Note Trail API (called each frame by Vehicle) ----
+
+/// <summary>Sets the world-space target position for this note in the vehicle trail.</summary>
+public void SetTrailTarget(Vector3 worldPos)
+{
+    _trailWorldTarget = worldPos;
+}
+
+/// <summary>
+/// Drives the visual urgency of this note (0 = just collected, 1 = release imminent).
+/// The note pulses and brightens as the value approaches 1.
+/// </summary>
+public void SetReleasePulse(float pulse01)
+{
+    _trailReleasePulse01 = Mathf.Clamp01(pulse01);
+}
+
+private IEnumerator TrailFollowRoutine()
+{
+    while (_trailFollowActive)
+    {
+        float lerp = Mathf.Clamp01(trailFollowLerp * Time.deltaTime);
+        transform.position = Vector3.Lerp(transform.position, _trailWorldTarget, lerp);
+
+        if (_trailBaseScaleCaptured && energySprite != null)
+        {
+            float pulse = _trailReleasePulse01;
+            float breathe = Mathf.Sin(Time.time * trailReadyPulseSpeed * (1f + pulse * 2f)) * 0.5f + 0.5f;
+            float scaleTarget = Mathf.Lerp(trailIdleScaleMin, trailReadyScaleMax, pulse * breathe);
+            transform.localScale = _trailBaseScale * scaleTarget;
+
+            var col = energySprite.color;
+            col.a = Mathf.Lerp(col.a, Mathf.Lerp(0.45f, 0.95f, pulse), 0.15f);
+            energySprite.color = col;
+        }
+
+        yield return null;
+    }
+}
+
 private bool TryGetRibbonU01(out double u01)
 {
     u01 = 0.0;
@@ -1560,8 +1524,14 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
         var ex = GetComponent<Explode>();
         if (ex != null) ex.Permanent(false);
 
-        // Keep it visually attached to the collector.
-        transform.SetParent(vehicle.transform, worldPositionStays: true);
+        // Trail follow: stay in world space, lerp toward the vehicle-managed trail slot.
+        transform.SetParent(null, worldPositionStays: true);
+        _trailWorldTarget = transform.position;
+        _trailFollowActive = true;
+        _trailReleasePulse01 = 0f;
+        if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
+        if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
+        _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
 
         return;
     }
@@ -1664,6 +1634,10 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
     // Called by Vehicle when a manually-released queued note is consumed.
     public void OnManualReleaseConsumed()
     {
+        // Stop trail follow
+        _trailFollowActive = false;
+        if (_trailFollowRoutine != null) { StopCoroutine(_trailFollowRoutine); _trailFollowRoutine = null; }
+
         // Manual release is a different lifecycle than the scheduled deposit.
         // Ensure we tear down any separate tether GameObject and unregister orbit bookkeeping.
         try

@@ -30,7 +30,7 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Playhead Pulse (Color)")]
     [SerializeField] private float releasePulseSeconds = 0.18f;
     [SerializeField] private Color releasePulseColor = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
-    private readonly Dictionary<int, int> _releaseCuePinnedTarget = new Dictionary<int, int>();
+
     private float _releasePulseT = 0f; // seconds remaining
     // Flag to fire a short "release" burst when drums change / burst completes.
     private bool _pendingReleasePulse = false;
@@ -201,39 +201,198 @@ public class NoteVisualizer : MonoBehaviour
 /// Finds the next closest *unlit* placeholder step for the given track, scanning forward from a given step.
 /// We interpret "next closest" as the smallest positive forward distance in the leader loop timeline.
 /// </summary>
-public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
+public bool TryGetNextUnlitStep(InstrumentTrack track, double rawAbsStep, int totalAbsSteps, out int targetAbsStep)
 {
     targetAbsStep = -1;
     if (track == null) return false;
     if (noteMarkers == null || noteMarkers.Count == 0) return false;
 
     totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    fromAbsStep = ((fromAbsStep % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+    double from = rawAbsStep % totalAbsSteps;
+    if (from < 0) from += totalAbsSteps;
 
     int bestStep = -1;
-    int bestForward = int.MaxValue;
+    double bestForward = double.MaxValue;
 
     foreach (var kv in noteMarkers)
     {
         if (kv.Key.Item1 != track) continue;
-        int step = kv.Key.Item2;  // do NOT wrap this
-        if (step < 0 || step >= totalAbsSteps) continue;  // just bounds-check instead
+        int step = kv.Key.Item2;
+        if (step < 0) continue;
+
+        // FIX BUG 4: skip steps that are outside the current leader loop entirely —
+        // they belong to a stale/previous bin epoch and wrapping them causes ghost commits.
+        if (step >= totalAbsSteps) continue;
 
         var tr = kv.Value;
         if (!tr) continue;
         var tag = tr.GetComponent<MarkerTag>();
         if (tag == null || !tag.isPlaceholder) continue;
 
-        int fwd = (step - fromAbsStep + totalAbsSteps) % totalAbsSteps;
+        // No normalisation needed: step is already guaranteed to be in [0, totalAbsSteps).
+        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
 
-        if (fwd > 0 && fwd < bestForward)        {
+        if (fwd < bestForward)
+        {
             bestForward = fwd;
             bestStep = step;
         }
     }
+
     if (bestStep < 0) return false;
     targetAbsStep = bestStep;
     return true;
+}
+public void UpdateManualReleaseCueExcluding(
+    Transform vehicle, InstrumentTrack track,
+    double rawAbsStep, int floorAbsStep, int totalAbsSteps,
+    HashSet<int> excludedSteps)
+{
+    if (releaseCuePrefab == null || vehicle == null || track == null) return;
+    if (!isActiveAndEnabled) return;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+
+    if (!TryGetNextUnlitStepExcluding(track, rawAbsStep, totalAbsSteps, excludedSteps, out int targetAbs))
+    {
+        ClearManualReleaseCue(vehicle);
+        return;
+    }
+
+    // Reuse the existing arc/cue positioning logic from UpdateManualReleaseCue
+    Vector3 a = vehicle.position;
+    Vector3 b = (noteMarkers != null &&
+                 noteMarkers.TryGetValue((track, targetAbs), out var markerTr) && markerTr != null)
+        ? markerTr.position : a;
+
+    double fwd = (targetAbs - rawAbsStep + totalAbsSteps) % totalAbsSteps;
+    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
+    int lookahead = Mathf.Clamp(Mathf.Max(releaseCueLookaheadSteps, binSize), 1, totalAbsSteps);
+
+    if (fwd > lookahead) { ClearManualReleaseCue(vehicle); return; }
+
+    float u = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Clamp01((float)(fwd / lookahead)));
+    Vector3 p = Vector3.Lerp(a, b, u);
+    if (releaseCueArcHeight != 0f) p.y += releaseCueArcHeight * 4f * u * (1f - u);
+
+    int id = vehicle.GetInstanceID();
+    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
+    {
+        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
+        _releaseCuesByVehicle[id] = cue;
+    }
+    else
+    {
+        cue.transform.position = p;
+    }
+}
+public bool TryGetNextUnlitStepExcluding(
+    InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
+    HashSet<int> excludedSteps, out int targetAbsStep)
+{
+    targetAbsStep = -1;
+    if (track == null) return false;
+    if (noteMarkers == null || noteMarkers.Count == 0) return false;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+    double from = rawAbsStep % totalAbsSteps;
+    if (from < 0) from += totalAbsSteps;
+
+    int bestStep = -1;
+    double bestForward = double.MaxValue;
+
+    foreach (var kv in noteMarkers)
+    {
+        if (kv.Key.Item1 != track) continue;
+        int step = kv.Key.Item2;
+        if (step < 0) continue;
+
+        // Skip steps already claimed by an in-flight armed release.
+        if (excludedSteps != null && excludedSteps.Contains(step)) continue;
+
+        int stepNorm = ((step % totalAbsSteps) + totalAbsSteps) % totalAbsSteps;
+
+        var tr = kv.Value;
+        if (!tr) continue;
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag == null || !tag.isPlaceholder) continue;
+
+        double fwd = (stepNorm - from + totalAbsSteps) % totalAbsSteps;
+        if (fwd < bestForward)
+        {
+            bestForward = fwd;
+            bestStep = step;
+        }
+    }
+
+    if (bestStep < 0) return false;
+    targetAbsStep = bestStep;
+    return true;
+}
+// Integer overload for call sites that only have floorAbsStep.
+public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
+    => TryGetNextUnlitStep(track, (double)fromAbsStep, totalAbsSteps, out targetAbsStep);
+
+/// <summary>
+/// Draws the arc ghost cue directly toward a specific known target step.
+/// Used by the armed-release path where the target is already resolved.
+/// The cue appears when the playhead is within <see cref="releaseCueLookaheadSteps"/>
+/// of the target and travels to the marker at a steady rate.
+/// </summary>
+public void UpdateManualReleaseCueToStep(Transform vehicle, InstrumentTrack track, int targetAbsStep, double rawAbsStep, int totalAbsSteps)
+{
+    if (releaseCuePrefab == null) return;
+    if (vehicle == null || track == null) return;
+    if (!isActiveAndEnabled) return;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+
+    // Forward distance from playhead to target, wrapping correctly around the loop.
+    double fwd = (targetAbsStep - rawAbsStep) % totalAbsSteps;
+    if (fwd < 0) fwd += totalAbsSteps;
+
+    // Window: show the cue once within lookahead steps of the target.
+    // Use at least one full bin so expansion-bin targets are always visible.
+    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
+    int lookahead = Mathf.Max(releaseCueLookaheadSteps, binSize);
+    lookahead = Mathf.Clamp(lookahead, 1, totalAbsSteps);
+
+    if (fwd > lookahead)
+    {
+        // Outside the window — hide the cue but do NOT clear it if it already exists,
+        // because this can happen momentarily at the loop boundary when fwd wraps to
+        // a large value. We only hide; the cue reappears next frame once fwd comes back.
+        // Do nothing — just return without updating position.
+        // (If no cue has been spawned yet this is a no-op.)
+        return;
+    }
+
+    // u goes 0→1 as the playhead closes in on the target step.
+    float u = 1f - Mathf.Clamp01((float)(fwd / lookahead));
+    u = Mathf.SmoothStep(0f, 1f, u);
+
+    Vector3 a = vehicle.position;
+    Vector3 b = a;
+    if (noteMarkers != null && noteMarkers.TryGetValue((track, targetAbsStep), out var markerTr) && markerTr != null)
+        b = markerTr.position;
+
+    Vector3 p = Vector3.Lerp(a, b, u);
+    if (releaseCueArcHeight != 0f)
+    {
+        float hump = 4f * u * (1f - u);
+        p.y += releaseCueArcHeight * hump;
+    }
+
+    int id = vehicle.GetInstanceID();
+    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
+    {
+        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
+        _releaseCuesByVehicle[id] = cue;
+    }
+    else
+    {
+        cue.transform.position = p;
+    }
 }
 
 /// <summary>
@@ -247,22 +406,13 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
     if (!isActiveAndEnabled) return;
 
     totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    int id = vehicle.GetInstanceID();
 
-    // Use pinned target if we have one, otherwise find the next unlit step.
-    int targetAbs;
-    if (_releaseCuePinnedTarget.TryGetValue(id, out int pinned))
+    // Use continuous rawAbsStep so the nearest-forward search matches the live playhead,
+    // not the floor — avoids the ghost jumping forward one step early.
+    if (!TryGetNextUnlitStep(track, rawAbsStep, totalAbsSteps, out int targetAbs))
     {
-        targetAbs = pinned;
-    }
-    else
-    {
-        if (!TryGetNextUnlitStep(track, floorAbsStep, totalAbsSteps, out targetAbs))
-        {
-            ClearManualReleaseCue(vehicle);
-            return;
-        }
-        _releaseCuePinnedTarget[id] = targetAbs;
+        ClearManualReleaseCue(vehicle);
+        return;
     }
 
     Vector3 a = vehicle.position;
@@ -272,13 +422,11 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
     else
         b = a;
 
-    double fwd = (targetAbs - rawAbsStep) % totalAbsSteps;
-    if (fwd < 0) fwd += totalAbsSteps;
+    double fwd = (targetAbs - rawAbsStep + totalAbsSteps) % totalAbsSteps;
 
-    int binSize = Mathf.Max(1, track.drumTrack != null ? track.drumTrack.totalSteps : 16);
-    int leaderBins = Mathf.Max(1, totalAbsSteps / binSize);
-    int effectiveLookahead = Mathf.Max(releaseCueLookaheadSteps, binSize / 2);
-    int lookahead = Mathf.Clamp(effectiveLookahead * leaderBins, 1, totalAbsSteps);
+    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
+    int lookahead = Mathf.Max(releaseCueLookaheadSteps, binSize);
+    lookahead = Mathf.Clamp(lookahead, 1, totalAbsSteps);
     if (fwd > lookahead)
     {
         ClearManualReleaseCue(vehicle);
@@ -295,6 +443,7 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
         p.y += releaseCueArcHeight * hump;
     }
 
+    int id = vehicle.GetInstanceID();
     if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
     {
         cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
@@ -305,11 +454,11 @@ public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, dou
         cue.transform.position = p;
     }
 }
+
 public void ClearManualReleaseCue(Transform vehicle)
 {
     if (vehicle == null) return;
     int id = vehicle.GetInstanceID();
-    _releaseCuePinnedTarget.Remove(id);
     if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
         Destroy(cue);
     _releaseCuesByVehicle.Remove(id);
@@ -317,9 +466,6 @@ public void ClearManualReleaseCue(Transform vehicle)
 
 public void BlastManualReleaseCue(Transform vehicle)
 {
-    if (vehicle == null) return;
-    int id = vehicle.GetInstanceID();
-    _releaseCuePinnedTarget.Remove(id);
     ClearManualReleaseCue(vehicle);
 }
 
@@ -1356,7 +1502,11 @@ private Color ComputeStepColor(int step)
 
     bool inFilledBin = SafeIsStepInFilledBin(track, stepIndex);
     bool isLoopOwned = (burstId < 0);
-    bool shouldLight = isLoopOwned ? lit : (lit && inFilledBin);
+    // shouldLight: if the caller explicitly asks for lit=true (e.g. a manual-release commit),
+    // always honour it — do NOT gate on inFilledBin.  The inFilledBin guard was only meant to
+    // prevent placeholder markers from prematurely lighting in un-filled expansion bins, which
+    // only ever happens on lit=false spawns.
+    bool shouldLight = lit;
 
     Debug.Log($"[PLACE] {stepIndex} on {track.name} index: {trackIndex} Filled bin: {inFilledBin} Loop Owned: {isLoopOwned} Lit: {shouldLight}");
 

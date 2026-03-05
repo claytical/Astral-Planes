@@ -425,69 +425,6 @@ private static void LogCfgRiffState(RoleMotifNoteSetConfig cfg, InstrumentTrack 
         if (k == 0) return new List<NoteBehavior>();
         return PickK(list, k, rng);
     }
-    public static void AppendRiffToPersistentLoop(
-        List<(int stepIndex, int note, int duration, float velocity)> loop,
-        Riff riff,
-        int binIndex,
-        int stepsPerBin,              // should be 16
-        int motifKeyRootMidi,
-        int[] progressionOffsets,     // e.g. I–II–III → {0, +2, +4}
-        float motifBpm,
-        int trackMinNote,
-        int trackMaxNote
-    )
-    {
-        if (riff.events == null || riff.events.Count == 0)
-            return;
-
-        // --- Resolve this bin’s chord root ---
-        int progIdx = Mathf.Clamp(binIndex, 0, progressionOffsets.Length - 1);
-        int binChordRoot = motifKeyRootMidi + progressionOffsets[progIdx];
-
-        int transposeDelta =
-            binChordRoot - riff.authoredRootMidi + (riff.octaveShift * 12);
-
-        // --- Timing ---
-        float msPerBeat = 60000f / motifBpm;
-        float msPerStep = msPerBeat / 4f; // 16 steps / bar, 4 beats
-
-        // Sort by step for overlap logic
-        var ordered = riff.events.OrderBy(e => e.step).ToList();
-
-        for (int i = 0; i < ordered.Count; i++)
-        {
-            var e = ordered[i];
-
-            int stepIndex = binIndex * stepsPerBin + e.step;
-
-            int note = e.midiNote + transposeDelta;
-            if (riff.clampToTrackRange)
-                note = Mathf.Clamp(note, trackMinNote, trackMaxNote);
-
-            int durationMs = Mathf.RoundToInt(e.durSteps * msPerStep);
-
-            // --- Optional overlap clamp (monophonic safety) ---
-            if (riff.overlapPolicy == RiffOverlapPolicy.ClampToNextOnset &&
-                i < ordered.Count - 1)
-            {
-                int nextStep = ordered[i + 1].step;
-                int maxDurSteps = Mathf.Max(1, nextStep - e.step);
-                int maxDurMs = Mathf.RoundToInt(maxDurSteps * msPerStep);
-                durationMs = Mathf.Min(durationMs, maxDurMs);
-            }
-
-            loop.Add((
-                stepIndex,
-                note,
-                durationMs,
-                Mathf.Clamp01(e.velocity01)
-            ));
-        }
-    }
-    NoteSet TrackToNoteSetProxy(ScaleType scale, RhythmStyle rhythm) { 
-        // minimal proxy NoteSet so CalculateNoteDuration can read rhythmStyle
-        return new NoteSet { scale = scale, rhythmStyle = rhythm };
-    }
     /// <summary>
     /// Expands a rhythm offset pattern authored in a 16-step reference grid into the current step domain.
     /// - If totalSteps == 16: offsets are used directly.
