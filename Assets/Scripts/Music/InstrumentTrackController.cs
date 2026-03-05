@@ -800,7 +800,7 @@ public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep
     // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
     // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
     // advances 4x too fast, effectively shrinking your window.
-    double baseLoopLen = drum.GetLoopLengthInSeconds();
+    double baseLoopLen = drum.GetClipLengthInSeconds();
     if (baseLoopLen <= 0.0) return false;
 
     double dspNow = AudioSettings.dspTime;
