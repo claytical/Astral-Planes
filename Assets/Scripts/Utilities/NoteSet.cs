@@ -97,7 +97,35 @@ public static class RhythmPatterns
                 Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
         };
 }
+public enum RhythmStyle
+{
+    FourOnTheFloor,
+    Syncopated,
+    Swing,
+    Sparse,
+    Dense,
+    Steady,
+    Triplet,
+    PulseBuild,
+    Stutter,
+    Scatter,
+    StaccatoEighths,
+    DroneFade,
+    TripletFlare,
+    CallResponse,
+    PulseBuild2Bar,    
+    Breakbeat,
+    Straight
+}
 
+public enum ChordPattern
+{
+    RootTriad,
+    SeventhChord,
+    Fifths,
+    Sus4,
+    Arpeggiated
+}
 public class NoteSet
 {
     public int rootMidi;             // e.g. 24 for C1

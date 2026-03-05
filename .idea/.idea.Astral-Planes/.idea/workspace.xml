@@ -5,25 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/VehicleReleaseCue.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/VehicleReleaseCue.cs.meta" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Drifter.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Drifter.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/HeartDrive.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/HeartDrive.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Remix Ring Holder.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Remix Ring Holder.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Sandwave.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Sandwave.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scout.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scout.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/NoteVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Debug.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Debug/PhaseDebugDisplay.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MineRoleTuning.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MineRoleTuning.cs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSet.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/NoteSetFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RemixMatrixLibrary.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RemixMatrixLibrary.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RemixRingHolder.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RemixRingHolder.cs.meta" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -297,7 +288,7 @@
       <workItem from="1771968986310" duration="7311000" />
       <workItem from="1772311595527" duration="48669000" />
       <workItem from="1772643123635" duration="5695000" />
-      <workItem from="1772717968670" duration="2302000" />
+      <workItem from="1772717968670" duration="2806000" />
     </task>
     <servers />
   </component>
