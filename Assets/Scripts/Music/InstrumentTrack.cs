@@ -1561,48 +1561,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         }
     }
 
-    /// <summary>
-    /// Counts a manually-released note as discarded: decrements burst accounting and
-    /// triggers burst completion if this was the last note, but does NOT write to the
-    /// persistent loop or play any audio.
-    /// </summary>
-    public void DiscardManualReleasedNote(int burstId)
-    {
-        if (burstId == 0) return;
-
-        // Per-burst decrement + completion, identical to CommitManualReleasedNote
-        // but without touching persistentLoopNotes or playing audio.
-        if (!_burstRemaining.TryGetValue(burstId, out var rem)) return;
-
-        rem--;
-        if (rem <= 0)
-        {
-            // Use the bin already recorded for this burst, or fall back to bin 0.
-            int filledBin = _burstWroteBin.TryGetValue(burstId, out var b) ? b : 0;
-
-            SetBinFilled(filledBin, true);
-
-            if (controller != null && controller.noteVisualizer != null && drumTrack != null)
-            {
-                int bSize = Mathf.Max(1, drumTrack.totalSteps);
-                int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
-                int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
-                controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * bSize);
-            }
-
-            if (controller != null)
-                controller.AllowAdvanceNextBurst(this);
-
-            _burstRemaining.Remove(burstId);
-            _burstLeaderBinsBeforeWrite.Remove(burstId);
-            _burstWroteBin.Remove(burstId);
-        }
-        else
-        {
-            _burstRemaining[burstId] = rem;
-        }
-    }
-
     /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>
     public bool IsPersistentStepOccupied(int stepAbs)
     {
@@ -2026,6 +1984,19 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         burstId = ++_nextBurstId;
     }
     currentBurstId = burstId;
+
+    // When a new burst fires on this track, placeholders on OTHER tracks that
+    // belonged to their own prior bursts won't be cleaned up by this track's
+    // canonicalization pass — each track only sweeps itself. Force a canonicalize
+    // pass on every sibling track now so stale placeholders don't linger.
+    if (controller?.tracks != null && controller.noteVisualizer != null)
+    {
+        foreach (var sibling in controller.tracks)
+        {
+            if (sibling == null || sibling == this) continue;
+            controller.noteVisualizer.CanonicalizeTrackMarkers(sibling, sibling.currentBurstId);
+        }
+    }
 
     Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
               $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
