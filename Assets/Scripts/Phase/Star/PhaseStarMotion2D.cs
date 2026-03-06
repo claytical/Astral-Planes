@@ -104,6 +104,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private float _rechooseTimer;
     private Camera _cam;
 
+    /// <summary>
+    /// Optional craving navigator. When set, its waypoint direction is blended into
+    /// the steering each FixedUpdate (dynamic mode) or drives MovePosition (kinematic mode).
+    /// Set via SetCravingNavigator() from PhaseStar.Initialize.
+    /// </summary>
+    private PhaseStarCravingNavigator _navigator;
+
     // ============================================================
     // Unity
     // ============================================================
@@ -131,6 +138,15 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     }
 
     public void SetFocusMode(bool on) => _focus = on;
+
+    /// <summary>
+    /// Wire the craving navigator so its waypoint pull is blended into steering each tick.
+    /// Call from PhaseStar.Initialize after constructing the navigator.
+    /// </summary>
+    public void SetCravingNavigator(PhaseStarCravingNavigator navigator)
+    {
+        _navigator = navigator;
+    }
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
@@ -224,8 +240,26 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             ? Vector2.Perpendicular(avoid).normalized * Mathf.Clamp01(_profile.orbitBias)
             : Vector2.zero;
 
+        // --- Craving navigator waypoint pull (maze navigation) -----------
+        // When the navigator has a waypoint, blend its direction in strongly,
+        // suppressing the generic edge-seek in favour of role-targeted movement.
+        Vector2 waypointDir = Vector2.zero;
+        float waypointWeight = 0f;
+        if (_navigator != null && _navigator.HasWaypoint)
+        {
+            waypointDir    = _navigator.GetWaypointSteerDir(_rb.position);
+            waypointWeight = _navigator.WaypointPull;
+        }
+
         // Weighted blend in direction space
-        Vector2 desiredDir = drift + avoid * avoidance.strength + edge * edgeSeek.strength + avoidTangent;
+        // When waypointWeight > 0, edge-seek is suppressed proportionally so the
+        // craving pull takes precedence without completely overriding avoidance.
+        float edgeWeight = edgeSeek.strength * (1f - waypointWeight);
+        Vector2 desiredDir = drift
+            + avoid      * avoidance.strength
+            + edge       * edgeWeight
+            + avoidTangent
+            + waypointDir * waypointWeight * 2f; // ×2 so it dominates drift at full pull
         if (desiredDir.sqrMagnitude < 0.0001f) desiredDir = drift;
         else desiredDir.Normalize();
 
