@@ -4,8 +4,8 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody2D))]
 public class MineNodeDustInteractor : MonoBehaviour
 {
-    private bool InsideDust { get; set; }
-    private CosmicDust CurrentDust { get; set; }
+    // NOTE: InsideDust / CurrentDust were removed – dust state is determined
+    // authoritatively from the grid in FixedUpdate, not from collision events.
     public int dustPhysicsLayer = -1;
 
     [Header("Multipliers while in dust (node-specific)")]
@@ -40,7 +40,6 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [Tooltip("Appetite multiplier passed into CosmicDustGenerator.ErodeDustDisk.")]
     public float carveAppetiteMul = 1.0f;
-    private bool _ignoredDustCollisions = false;
     [Header("Dust Collision Ignore (MineNode only)")]
     [SerializeField] private LayerMask dustTerrainMask;   // should include CosmicDust (layer 7)
     [SerializeField] private float dustIgnoreQueryRadiusWorld = 2.0f;
@@ -260,11 +259,10 @@ void FixedUpdate()
 
     private void OnCollisionExit2D(Collision2D coll)
     {
-        if (!InsideDust || CurrentDust == null) return;
-        if (!TryGetDustFromCollision(coll, out var dust) || dust != CurrentDust) return;
-
-        InsideDust  = false;
-        CurrentDust = null;
+        // Dust state is authoritative from the grid (FixedUpdate), not from collision events.
+        // Any dust collider we exit should still be ignored – ensure it stays in the ignore set.
+        if (coll == null || coll.collider == null) return;
+        TryIgnoreDustCollider(coll.collider);
     }
     private bool TryIgnoreDustCollider(Collider2D dustCol)
     {

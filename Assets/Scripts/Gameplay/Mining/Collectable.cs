@@ -86,6 +86,8 @@ public class Collectable : MonoBehaviour
     static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
     private int _dustClaimOwnerId;
+    // Cached reference – avoids O(n) FindObjectOfType in OnDestroy/OnDisable hot paths.
+    private DustClaimManager _cachedDustClaims;
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
     // ---- Autonomy (Loop Boundary "Idea") ----
@@ -625,7 +627,14 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         if (dustGen != null && dt != null)
             insideDust = IsInsideDustStable(cur, dt, dustGen);
         else
-            insideDust = IsPositionInsideDust(cur); // fallback
+        {
+            // Grid authority is unavailable. Default to "not in dust" so the note
+            // can still move rather than silently blocking. Physics-based dust queries
+            // (IsPositionInsideDust) are NOT used here: MineNodes ignore dust colliders
+            // via Physics2D.IgnoreCollision, making physics results unreliable for this check.
+            // The grid will be available on the next frame once DrumTrack is assigned.
+            insideDust = false;
+        }
         if (isTrappedInDust && insideDust)
         {
             // If trapped, do not drift; wait until the player/minenode carves a path.
@@ -727,9 +736,10 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
             // Prefer CellOf if present; otherwise your existing WorldToGridPosition is fine.
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
-            var dustClaims = FindObjectOfType<DustClaimManager>();
-            if (dustClaims != null)
-                dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
+            // Cache once at init – avoids O(n) FindObjectOfType in every OnDestroy/OnDisable call.
+            _cachedDustClaims = FindObjectOfType<DustClaimManager>();
+            if (_cachedDustClaims != null)
+                _cachedDustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
         }
         Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }
@@ -1034,7 +1044,8 @@ public void BeginCarryThenDepositAtDsp(
         UnregisterOccupant();
         UnregisterCarryOrbit();
         StopDustPocket();
-        var dustClaims = FindObjectOfType<DustClaimManager>();
+        // Use cached reference; fall back to scene search only if cache is missing (e.g. pooled re-init).
+        var dustClaims = _cachedDustClaims != null ? _cachedDustClaims : FindObjectOfType<DustClaimManager>();
         if (dustClaims != null)
             dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
         NotifyDestroyedOnce();
@@ -1048,7 +1059,8 @@ public void BeginCarryThenDepositAtDsp(
         UnregisterOccupant();
         StopDustPocket();
         ReleaseDustPocket();
-        var dustClaims = FindObjectOfType<DustClaimManager>();
+        // Use cached reference; fall back to scene search only if cache is missing (e.g. pooled re-init).
+        var dustClaims = _cachedDustClaims != null ? _cachedDustClaims : FindObjectOfType<DustClaimManager>();
         if (dustClaims != null)
             dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
 
