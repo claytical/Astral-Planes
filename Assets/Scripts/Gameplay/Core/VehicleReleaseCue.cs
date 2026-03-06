@@ -2,56 +2,77 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Vehicle-local release cue: a radial ring fill (driven by pulse 0→1) and a
-/// ring of beat dots that count down remaining steps to the armed target.
+/// Vehicle-local release cue: a sprite that scales up as the playhead approaches
+/// the target step (pulse 0→1), and a ring of beat dots that count down remaining
+/// steps to the armed target.
+///
+/// Velocity semantics: striking at the earliest moment of the window (~pulse 0)
+/// commits at <see cref="velocityAtWindowOpen"/> (~50). Striking at the exact
+/// step moment (pulse 1) commits at maximum velocity (127). The mapping is linear
+/// so the player has full expressive control through placement timing.
 ///
 /// Setup — add this component to the vehicle GameObject (or a child).
 /// Assign the <see cref="releaseCue"/> field on Vehicle to this component.
-///
-/// The ring is drawn procedurally via LineRenderer so no sprite/shader asset
-/// is required.  Each beat dot is a small SpriteRenderer quad spawned at
-/// runtime from a configurable sprite (or Unity's built-in circle if left null).
+/// Assign a circle/glow sprite to <see cref="cueSprite"/> in the Inspector.
 /// </summary>
 [DisallowMultipleComponent]
 public class VehicleReleaseCue : MonoBehaviour
 {
     // ------------------------------------------------------------------
-    // Inspector
+    // Inspector — Scale Cue
     // ------------------------------------------------------------------
-    [Header("Ring")]
-    [Tooltip("Radius of the countdown ring in world units.")]
-    [SerializeField] private float ringRadius = 0.55f;
+    [Header("Scale Cue")]
+    [Tooltip("Sprite used for the scale cue indicator. Assign a soft circle or glow sprite.")]
+    [SerializeField] private Sprite cueSprite;
 
-    [Tooltip("Width of the ring line in world units.")]
-    [SerializeField] private float ringLineWidth = 0.06f;
+    [Tooltip("World-space scale of the cue when pulse is 0 (window just opened).")]
+    [SerializeField] private float cueScaleMin = 0.20f;
 
-    [Tooltip("Number of vertices used to approximate the full circle (higher = smoother).")]
-    [Range(16, 64)]
-    [SerializeField] private int ringSegments = 40;
+    [Tooltip("World-space scale of the cue at pulse = 1 (exact step, max velocity).")]
+    [SerializeField] private float cueScaleMax = 0.80f;
 
-    [Tooltip("Color of the ring at low urgency (pulse ≈ 0).")]
-    [SerializeField] private Color ringColorIdle  = new Color(1f, 1f, 1f, 0.15f);
+    [Tooltip("Color of the cue at low urgency (pulse ≈ 0).")]
+    [SerializeField] private Color cueColorIdle  = new Color(1f, 1f, 1f, 0.20f);
 
-    [Tooltip("Color of the ring at full urgency (pulse ≈ 1).")]
-    [SerializeField] private Color ringColorReady = new Color(1f, 0.85f, 0.2f, 0.90f);
+    [Tooltip("Color of the cue at full urgency (pulse ≈ 1).")]
+    [SerializeField] private Color cueColorReady = new Color(1f, 0.85f, 0.2f, 0.90f);
 
-    [Tooltip("How quickly the ring fill lerps toward its target value.")]
-    [SerializeField] private float ringFillLerpSpeed = 10f;
+    [Tooltip("How quickly the displayed scale lerps toward its target value.")]
+    [SerializeField] private float scaleLerpSpeed = 12f;
 
+    [Tooltip("Sorting layer name shared with the vehicle sprite.")]
+    [SerializeField] private string cueSortingLayer = "Default";
+
+    [Tooltip("Sorting order for the cue sprite (drawn below beat dots).")]
+    [SerializeField] private int cueSortingOrder = 1;
+
+    // ------------------------------------------------------------------
+    // Inspector — Velocity Mapping
+    // ------------------------------------------------------------------
+    [Header("Velocity Mapping")]
+    [Tooltip("MIDI velocity (0–127) committed when the player releases at the very start of the timing window (pulse ≈ 0).")]
+    [Range(1f, 126f)]
+    [SerializeField] private float velocityAtWindowOpen = 50f;
+
+    // Max velocity is always 127 at pulse = 1 (no inspector field needed).
+
+    // ------------------------------------------------------------------
+    // Inspector — Beat Dots
+    // ------------------------------------------------------------------
     [Header("Beat Dots")]
     [Tooltip("Sprite for each beat dot. Leave null to use a procedural circle.")]
     [SerializeField] private Sprite dotSprite;
 
-    [Tooltip("World-space radius at which dots are placed (should be slightly larger than ringRadius).")]
+    [Tooltip("World-space radius at which dots are placed.")]
     [SerializeField] private float dotOrbitRadius = 0.70f;
 
     [Tooltip("World-space scale of each dot.")]
     [SerializeField] private float dotSize = 0.10f;
 
-    [Tooltip("Sorting layer name shared with the vehicle sprite.")]
+    [Tooltip("Sorting layer name for dots.")]
     [SerializeField] private string dotSortingLayer = "Default";
 
-    [Tooltip("Sorting order for dots (drawn on top of ring).")]
+    [Tooltip("Sorting order for dots (drawn on top of cue sprite).")]
     [SerializeField] private int dotSortingOrder = 2;
 
     [Tooltip("Color for a beat that has NOT yet passed (remaining).")]
@@ -60,15 +81,12 @@ public class VehicleReleaseCue : MonoBehaviour
     [Tooltip("Color for a beat that HAS already passed (spent).")]
     [SerializeField] private Color dotColorSpent  = new Color(1f, 1f, 1f, 0.15f);
 
-    [Tooltip("Sorting order for the ring LineRenderer.")]
-    [SerializeField] private int ringSortingOrder = 1;
-
     // ------------------------------------------------------------------
     // Runtime state
     // ------------------------------------------------------------------
-    private LineRenderer   _ring;
-    private float          _currentFill;   // 0→1, smoothed
-    private float          _targetFill;
+    private SpriteRenderer _cueRenderer;
+    private float          _currentScale;   // smoothed display scale
+    private float          _targetPulse;    // raw 0→1 from Vehicle
 
     private readonly List<SpriteRenderer> _dots = new List<SpriteRenderer>();
     private int _lastTotalBeats = -1;
@@ -78,20 +96,28 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     private void Awake()
     {
-        BuildRing();
+        BuildCue();
         SetVisible(false);
     }
 
     private void Update()
     {
-        // Smooth the fill toward target.
-        _currentFill = Mathf.Lerp(_currentFill, _targetFill, ringFillLerpSpeed * Time.deltaTime);
-
-        bool active = _targetFill > 0.01f || _currentFill > 0.01f;
+        bool active = _targetPulse > 0.01f;
         SetVisible(active);
 
         if (active)
-            UpdateRingMesh(_currentFill);
+        {
+            float targetScale = Mathf.Lerp(cueScaleMin, cueScaleMax, _targetPulse);
+            _currentScale = Mathf.Lerp(_currentScale, targetScale, scaleLerpSpeed * Time.deltaTime);
+
+            _cueRenderer.transform.localScale = Vector3.one * _currentScale;
+            _cueRenderer.color = Color.Lerp(cueColorIdle, cueColorReady, _targetPulse);
+        }
+        else
+        {
+            // Reset scale so it starts fresh next time.
+            _currentScale = cueScaleMin;
+        }
     }
 
     private void OnDestroy()
@@ -104,12 +130,22 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Set the ring fill amount. 0 = empty (idle), 1 = full (release imminent).
+    /// Set the pulse amount. 0 = idle / window just opened, 1 = exact step moment.
     /// Called every frame from Vehicle.TickNoteTrail.
     /// </summary>
     public void SetFill(float pulse01)
     {
-        _targetFill = Mathf.Clamp01(pulse01);
+        _targetPulse = Mathf.Clamp01(pulse01);
+    }
+
+    /// <summary>
+    /// Returns the MIDI velocity (50→127) that corresponds to the current pulse.
+    /// Call this at commit time to replace the old impact-velocity approach.
+    /// </summary>
+    public float ComputeVelocity(float pulse01)
+    {
+        float t = Mathf.Clamp01(pulse01);
+        return Mathf.Lerp(velocityAtWindowOpen, 127f, t);
     }
 
     /// <summary>
@@ -133,57 +169,23 @@ public class VehicleReleaseCue : MonoBehaviour
     }
 
     // ------------------------------------------------------------------
-    // Ring (LineRenderer)
+    // Cue sprite
     // ------------------------------------------------------------------
-    private void BuildRing()
+    private void BuildCue()
     {
-        var go = new GameObject("ReleaseCueRing");
+        var go = new GameObject("ReleaseCueScale");
         go.transform.SetParent(transform, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localScale    = Vector3.one * cueScaleMin;
 
-        _ring = go.AddComponent<LineRenderer>();
-        _ring.useWorldSpace       = false;
-        _ring.loop                = false;
-        _ring.widthMultiplier     = ringLineWidth;
-        _ring.positionCount       = 2;   // minimum; UpdateRingMesh overrides this immediately
-        _ring.shadowCastingMode   = UnityEngine.Rendering.ShadowCastingMode.Off;
-        _ring.receiveShadows      = false;
-        _ring.sortingLayerName    = dotSortingLayer;
-        _ring.sortingOrder        = ringSortingOrder;
-        _ring.material            = new Material(Shader.Find("Sprites/Default"));
-        _ring.enabled             = false; // hidden until first real fill
-    }
+        _cueRenderer = go.AddComponent<SpriteRenderer>();
+        _cueRenderer.sprite           = cueSprite;
+        _cueRenderer.color            = cueColorIdle;
+        _cueRenderer.sortingLayerName = cueSortingLayer;
+        _cueRenderer.sortingOrder     = cueSortingOrder;
+        _cueRenderer.enabled          = false;
 
-    /// <summary>
-    /// Rebuilds the LineRenderer positions to represent a filled arc from
-    /// 12 o'clock clockwise, covering <paramref name="fill"/> fraction of the circle.
-    /// positionCount is set to exactly the number of points needed for the arc,
-    /// so there are never any zero-collapsed vertices.
-    /// </summary>
-    private void UpdateRingMesh(float fill)
-    {
-        if (_ring == null) return;
-
-        // Minimum 2 points so the LineRenderer doesn't complain; disable via enabled flag instead.
-        int pointCount = Mathf.Max(2, Mathf.RoundToInt(fill * ringSegments));
-        pointCount = Mathf.Clamp(pointCount, 2, ringSegments);
-
-        _ring.positionCount = pointCount;
-        _ring.loop = false; // only loop when fill == 1 (full circle)
-
-        Color col = Color.Lerp(ringColorIdle, ringColorReady, fill);
-        _ring.startColor = col;
-        _ring.endColor   = col;
-
-        for (int i = 0; i < pointCount; i++)
-        {
-            // Map i across the filled fraction of the full circle, starting at 12 o'clock.
-            float t     = (float)i / Mathf.Max(1, pointCount - 1); // 0..1 along the arc
-            float angle = t * fill * Mathf.PI * 2f - Mathf.PI * 0.5f;
-            _ring.SetPosition(i, new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * ringRadius);
-        }
-
-        // Close the loop only when visually complete.
-        _ring.loop = fill >= 0.99f;
+        _currentScale = cueScaleMin;
     }
 
     // ------------------------------------------------------------------
@@ -208,10 +210,10 @@ public class VehicleReleaseCue : MonoBehaviour
             go.transform.localScale = Vector3.one * dotSize;
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite       = dotSprite; // null = Unity renders nothing; assign a circle sprite in inspector
-            sr.color        = dotColorSpent;
+            sr.sprite           = dotSprite;
+            sr.color            = dotColorSpent;
             sr.sortingLayerName = dotSortingLayer;
-            sr.sortingOrder = dotSortingOrder;
+            sr.sortingOrder     = dotSortingOrder;
 
             _dots.Add(sr);
         }
@@ -233,10 +235,8 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     private void SetVisible(bool visible)
     {
-        // Ring only renders when fill is above a small threshold — avoids a
-        // degenerate 2-point stub at the top of the circle when pulse is near zero.
-        if (_ring != null)
-            _ring.enabled = visible && _currentFill > 0.03f;
+        if (_cueRenderer != null)
+            _cueRenderer.enabled = visible;
 
         foreach (var sr in _dots)
             if (sr != null) sr.gameObject.SetActive(visible);
