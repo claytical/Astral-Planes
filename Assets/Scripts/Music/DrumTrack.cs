@@ -1194,7 +1194,60 @@ public void ResetBeatSequencingState(string who)
 
     Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
 }
+    private void AutoSizeSpawnGridIfEnabled() { 
+        if (!autoSizeSpawnGridToScreen) return; 
+        if (_spawnGrid == null) return;
 
+        // Grid dimensions are fixed to the reference resolution so that dust tile world-size
+        // stays uniform across all devices.  What changes per-device is only the camera's
+        // orthographic size / world-space extents — not the number of grid cells.
+        //
+        // Previously cols/rows were derived from actual screen pixels, which caused dust to
+        // appear spaced out on high-res laptops (more cells → larger tile world size) and
+        // packed on the Steam Deck (fewer cells → smaller tile world size).
+        if (referenceWidthPx <= 0 || referenceColumns <= 0)
+        {
+            Debug.LogWarning("[GridAutoSize] referenceWidthPx or referenceColumns not set; skipping auto-size.");
+            return;
+        }
+
+        float cellPx  = referenceWidthPx / (float)referenceColumns; // e.g. 1920/36 ≈ 53.33
+        int   refCols = referenceColumns;
+        // Derive reference row count from the reference height (1080) minus the reference UI padding.
+        int   refUsableH = 1080 - Mathf.Max(0, uiBottomPaddingPx);
+        int   refRows    = Mathf.Max(1, Mathf.RoundToInt(refUsableH / cellPx));
+
+        // UI viewport reserve must still be expressed in terms of the *actual* screen height
+        // so the world-space UI boundary lands in the right place on every device.
+        int sh = Mathf.Max(1, Screen.height);
+        uiReserveBottomViewport = Mathf.Clamp01(uiBottomPaddingPx / (float)sh);
+
+        // Apply fixed reference grid — same on every device.
+        _spawnGrid.ResizeGrid(refCols, refRows);
+        _hasLockedPlayArea = false;
+        
+        // Any cached world mapping based on old grid dims must be invalidated.
+        InvalidateGridWorldCache();
+        
+        Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked) uiBottomV={uiReserveBottomViewport:F3}");
+    }   
+    public void CarveTemporaryCellFromVehicle(
+        Vector3 worldPos,
+        float healDelaySeconds,
+        int resolveRadiusCells = 0)
+    {
+        if (_dust == null) return;
+
+        MazeArchetype phase = GetCurrentPhaseSafe();
+
+        _dust.CarveTemporaryCellFromVehicle(
+            worldPos,
+            phase,
+            healDelaySeconds,
+            resolveRadiusCells
+        );
+    }
+    
 
     public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     {
@@ -1541,6 +1594,21 @@ public void ResetBeatSequencingState(string who)
     public int GetSpawnGridHeight()
     {
         return _spawnGrid.gridHeight;
+    }
+    private IEnumerator InitializeDrumLoop()
+    {
+        // ✅ Wait until the AudioSource has a valid clip
+        while (drumAudioSource.clip == null)
+        {
+            yield return null; // Wait until the next frame
+        }
+        _clipLengthSec = Mathf.Max(drumAudioSource.clip.length, 0f); 
+        if (!HasValidClipLen)
+        { 
+            Debug.LogError("DrumTrack: Clip length is zero/invalid; aborting loop init."); 
+            yield break;
+        }
+        drumAudioSource.loop = true; // ✅ Ensure the loop setting is applied
     }
     private void ScheduleDrumLoopChange(AudioClip newLoop)
     {

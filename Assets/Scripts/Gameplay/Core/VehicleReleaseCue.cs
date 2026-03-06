@@ -2,77 +2,63 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Vehicle-local release cue: a sprite that scales up as the playhead approaches
-/// the target step (pulse 0→1), and a ring of beat dots that count down remaining
-/// steps to the armed target.
-///
-/// Velocity semantics: striking at the earliest moment of the window (~pulse 0)
-/// commits at <see cref="velocityAtWindowOpen"/> (~50). Striking at the exact
-/// step moment (pulse 1) commits at maximum velocity (127). The mapping is linear
-/// so the player has full expressive control through placement timing.
+/// Vehicle-local release cue: a filled circle that grows behind the vehicle,
+/// colored with the pending note's track color, plus a ring of beat dots that
+/// count down remaining steps to the armed target.
 ///
 /// Setup — add this component to the vehicle GameObject (or a child).
 /// Assign the <see cref="releaseCue"/> field on Vehicle to this component.
-/// Assign a circle/glow sprite to <see cref="cueSprite"/> in the Inspector.
+///
+/// The growing circle is a SpriteRenderer drawn BEHIND the vehicle (lower
+/// sorting order), so white-outline vehicles remain visible on top of it.
+/// Each beat dot is a small SpriteRenderer quad spawned at runtime from a
+/// configurable sprite (or Unity's built-in circle if left null).
 /// </summary>
 [DisallowMultipleComponent]
 public class VehicleReleaseCue : MonoBehaviour
 {
     // ------------------------------------------------------------------
-    // Inspector — Scale Cue
+    // Inspector
     // ------------------------------------------------------------------
-    [Header("Scale Cue")]
-    [Tooltip("Sprite used for the scale cue indicator. Assign a soft circle or glow sprite.")]
-    [SerializeField] private Sprite cueSprite;
+    [Header("Growing Circle")]
+    [Tooltip("Maximum world-space radius of the filled circle at pulse = 1.")]
+    [SerializeField] private float circleMaxRadius = 0.65f;
 
-    [Tooltip("World-space scale of the cue when pulse is 0 (window just opened).")]
-    [SerializeField] private float cueScaleMin = 0.20f;
+    [Tooltip("Minimum world-space radius when the circle first becomes visible.")]
+    [SerializeField] private float circleMinRadius = 0.10f;
 
-    [Tooltip("World-space scale of the cue at pulse = 1 (exact step, max velocity).")]
-    [SerializeField] private float cueScaleMax = 0.80f;
+    [Tooltip("Alpha of the circle at pulse = 0 (just appeared).")]
+    [SerializeField] private float circleAlphaMin = 0.10f;
 
-    [Tooltip("Color of the cue at low urgency (pulse ≈ 0).")]
-    [SerializeField] private Color cueColorIdle  = new Color(1f, 1f, 1f, 0.20f);
+    [Tooltip("Alpha of the circle at pulse = 1 (fully grown).")]
+    [SerializeField] private float circleAlphaMax = 0.70f;
 
-    [Tooltip("Color of the cue at full urgency (pulse ≈ 1).")]
-    [SerializeField] private Color cueColorReady = new Color(1f, 0.85f, 0.2f, 0.90f);
+    [Tooltip("Sorting layer shared with the vehicle sprite.")]
+    [SerializeField] private string circleSortingLayer = "Default";
 
-    [Tooltip("How quickly the displayed scale lerps toward its target value.")]
-    [SerializeField] private float scaleLerpSpeed = 12f;
+    [Tooltip("Sorting order for the circle — must be LOWER than the vehicle sprite's order so it renders behind.")]
+    [SerializeField] private int circleSortingOrder = -1;
 
-    [Tooltip("Sorting layer name shared with the vehicle sprite.")]
-    [SerializeField] private string cueSortingLayer = "Default";
+    [Tooltip("How quickly the circle size lerps toward its target value.")]
+    [SerializeField] private float circleLerpSpeed = 10f;
 
-    [Tooltip("Sorting order for the cue sprite (drawn below beat dots).")]
-    [SerializeField] private int cueSortingOrder = 1;
+    [Tooltip("Sprite to use for the filled circle. Assign Unity's built-in 'Knob' or any filled circle sprite. Leave null for a white quad fallback (less round).")]
+    [SerializeField] private Sprite circleSprite;
 
-    // ------------------------------------------------------------------
-    // Inspector — Velocity Mapping
-    // ------------------------------------------------------------------
-    [Header("Velocity Mapping")]
-    [Tooltip("MIDI velocity (0–127) committed when the player releases at the very start of the timing window (pulse ≈ 0).")]
-    [Range(1f, 126f)]
-    [SerializeField] private float velocityAtWindowOpen = 50f;
-
-    // Max velocity is always 127 at pulse = 1 (no inspector field needed).
-
-    // ------------------------------------------------------------------
-    // Inspector — Beat Dots
-    // ------------------------------------------------------------------
     [Header("Beat Dots")]
-    [Tooltip("Sprite for each beat dot. Leave null to use a procedural circle.")]
+    [Tooltip("Sprite for each beat dot. Leave null for a plain quad.")]
     [SerializeField] private Sprite dotSprite;
 
     [Tooltip("World-space radius at which dots are placed.")]
-    [SerializeField] private float dotOrbitRadius = 0.70f;
+    [SerializeField] private float dotOrbitRadius = 0.75f;
 
     [Tooltip("World-space scale of each dot.")]
     [SerializeField] private float dotSize = 0.10f;
 
-    [Tooltip("Sorting layer name for dots.")]
+    [Tooltip("Sorting layer name shared with the vehicle sprite.")]
     [SerializeField] private string dotSortingLayer = "Default";
 
-    [Tooltip("Sorting order for dots (drawn on top of cue sprite).")]
+    [Tooltip("Sorting order for dots (drawn on top of circle, ideally on top of vehicle too).")]
     [SerializeField] private int dotSortingOrder = 2;
 
     [Tooltip("Color for a beat that has NOT yet passed (remaining).")]
@@ -84,9 +70,10 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     // Runtime state
     // ------------------------------------------------------------------
-    private SpriteRenderer _cueRenderer;
-    private float          _currentScale;   // smoothed display scale
-    private float          _targetPulse;    // raw 0→1 from Vehicle
+    private SpriteRenderer  _circle;
+    private float           _currentPulse;   // 0→1, smoothed
+    private float           _targetPulse;
+    private Color           _trackColor = Color.white;
 
     private readonly List<SpriteRenderer> _dots = new List<SpriteRenderer>();
     private int _lastTotalBeats = -1;
@@ -96,28 +83,19 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     private void Awake()
     {
-        BuildCue();
+        BuildCircle();
         SetVisible(false);
     }
 
     private void Update()
     {
-        bool active = _targetPulse > 0.01f;
+        _currentPulse = Mathf.Lerp(_currentPulse, _targetPulse, circleLerpSpeed * Time.deltaTime);
+
+        bool active = _targetPulse > 0.01f || _currentPulse > 0.01f;
         SetVisible(active);
 
         if (active)
-        {
-            float targetScale = Mathf.Lerp(cueScaleMin, cueScaleMax, _targetPulse);
-            _currentScale = Mathf.Lerp(_currentScale, targetScale, scaleLerpSpeed * Time.deltaTime);
-
-            _cueRenderer.transform.localScale = Vector3.one * _currentScale;
-            _cueRenderer.color = Color.Lerp(cueColorIdle, cueColorReady, _targetPulse);
-        }
-        else
-        {
-            // Reset scale so it starts fresh next time.
-            _currentScale = cueScaleMin;
-        }
+            UpdateCircle(_currentPulse);
     }
 
     private void OnDestroy()
@@ -130,7 +108,7 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Set the pulse amount. 0 = idle / window just opened, 1 = exact step moment.
+    /// Set the fill/growth amount. 0 = hidden, 1 = fully grown (release imminent).
     /// Called every frame from Vehicle.TickNoteTrail.
     /// </summary>
     public void SetFill(float pulse01)
@@ -139,13 +117,12 @@ public class VehicleReleaseCue : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns the MIDI velocity (50→127) that corresponds to the current pulse.
-    /// Call this at commit time to replace the old impact-velocity approach.
+    /// Set the track color so the circle matches the note's destination track.
+    /// Call this whenever the pending/armed track changes (or every frame alongside SetFill).
     /// </summary>
-    public float ComputeVelocity(float pulse01)
+    public void SetTrackColor(Color trackColor)
     {
-        float t = Mathf.Clamp01(pulse01);
-        return Mathf.Lerp(velocityAtWindowOpen, 127f, t);
+        _trackColor = trackColor;
     }
 
     /// <summary>
@@ -169,23 +146,33 @@ public class VehicleReleaseCue : MonoBehaviour
     }
 
     // ------------------------------------------------------------------
-    // Cue sprite
+    // Growing circle (SpriteRenderer)
     // ------------------------------------------------------------------
-    private void BuildCue()
+    private void BuildCircle()
     {
-        var go = new GameObject("ReleaseCueScale");
+        var go = new GameObject("ReleaseCueCircle");
         go.transform.SetParent(transform, false);
         go.transform.localPosition = Vector3.zero;
-        go.transform.localScale    = Vector3.one * cueScaleMin;
 
-        _cueRenderer = go.AddComponent<SpriteRenderer>();
-        _cueRenderer.sprite           = cueSprite;
-        _cueRenderer.color            = cueColorIdle;
-        _cueRenderer.sortingLayerName = cueSortingLayer;
-        _cueRenderer.sortingOrder     = cueSortingOrder;
-        _cueRenderer.enabled          = false;
+        _circle = go.AddComponent<SpriteRenderer>();
+        _circle.sprite           = circleSprite;   // assign a filled circle sprite in the Inspector
+        _circle.sortingLayerName = circleSortingLayer;
+        _circle.sortingOrder     = circleSortingOrder;
+        _circle.color            = new Color(1f, 1f, 1f, 0f);
+        _circle.enabled          = false;
+    }
 
-        _currentScale = cueScaleMin;
+    private void UpdateCircle(float pulse)
+    {
+        if (_circle == null) return;
+
+        float radius = Mathf.Lerp(circleMinRadius, circleMaxRadius, pulse);
+        // Scale the GameObject so the sprite fills 'radius' world units.
+        // A default Unity sprite is 1 unit wide at scale 1, so diameter = radius * 2.
+        _circle.transform.localScale = Vector3.one * (radius * 2f);
+
+        float alpha = Mathf.Lerp(circleAlphaMin, circleAlphaMax, pulse);
+        _circle.color = new Color(_trackColor.r, _trackColor.g, _trackColor.b, alpha);
     }
 
     // ------------------------------------------------------------------
@@ -235,8 +222,8 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     private void SetVisible(bool visible)
     {
-        if (_cueRenderer != null)
-            _cueRenderer.enabled = visible;
+        if (_circle != null)
+            _circle.enabled = visible && _currentPulse > 0.03f;
 
         foreach (var sr in _dots)
             if (sr != null) sr.gameObject.SetActive(visible);
