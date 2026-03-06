@@ -316,6 +316,11 @@ public class MineNode : MonoBehaviour
         // high note -> soft / fast-healing
         return Mathf.Clamp01(1f - _lastNote01);
     }
+
+    public MusicalRole GetImprintRole()
+    {
+        return _role;
+    }
     public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
         _track = track; 
         _spawnCell = spawnCell; 

@@ -6,12 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -285,7 +285,7 @@
       <workItem from="1771968986310" duration="7311000" />
       <workItem from="1772311595527" duration="48669000" />
       <workItem from="1772643123635" duration="5695000" />
-      <workItem from="1772717968670" duration="20130000" />
+      <workItem from="1772717968670" duration="21582000" />
     </task>
     <servers />
   </component>
