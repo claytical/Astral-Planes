@@ -29,8 +29,8 @@ private float alphaDirection = 1f;
     [SerializeField] private Transform bubbleRoot;               // child: "Bubble Root"
     [SerializeField] private SpriteRenderer bubbleSprite;        // circle sprite on Bubble Root
     [SerializeField] private ParticleSystem bubbleEdgeParticles; // shimmer particles on Bubble Root
-    [SerializeField, Range(0f, 1f)] private float bubbleFillAlpha = 0.08f;
-    [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha = 0.35f;
+    [SerializeField, Range(0f, 1f)] private float bubbleFillAlpha  = 0.14f;  // soft interior glow
+    [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha  = 0.65f;  // crisp ring so it reads as a boundary
 
     [Header("Dim / Hidden Shard Tint")]
     [SerializeField] private Color dimShardTint = new Color(0.05f, 0.05f, 0.05f, 0.1f);
@@ -217,17 +217,22 @@ private float alphaDirection = 1f;
             bubbleEdgeParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
+    /// <summary>
+    /// Call every frame while the bubble is active to keep the bubble root
+    /// anchored to the star's world position (guards against any parent-transform drift).
+    /// </summary>
+    public void UpdateBubblePosition(Vector2 worldPos)
+    {
+        if (!bubbleRoot || !bubbleRoot.gameObject.activeSelf) return;
+        // The bubble root is a child — keep its local position at zero so it
+        // stays centred on the star even if the star's RB was frozen mid-frame.
+        bubbleRoot.localPosition = Vector3.zero;
+    }
+
     private void Update()
     {
-        if (activeSprite != null)
-        {
-            Color currentColor = activeSprite.color;
-            currentColor.a = Mathf.Lerp(currentColor.a, __pulseAlphaMax, Time.deltaTime * alphaDirection * _pulseSpeed);
-            activeSprite.color = currentColor;
-
-            if (currentColor.a <= __pulseAlphaMax || currentColor.a >= __pulseAlphaMax)
-                alphaDirection *= -1;
-        }
+        // Per-shard alpha is now driven by charge accumulation in PhaseStar.Update.
+        // The old single-sprite pulse is retired.
     }
 
     public void HighlightActive(Transform active, Color c, float alpha = 0.95f)

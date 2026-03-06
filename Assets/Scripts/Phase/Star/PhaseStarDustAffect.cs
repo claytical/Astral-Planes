@@ -16,6 +16,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [SerializeField] private float carveThreshold = 0.05f;      // begin carving when charge <= threshold
     [SerializeField] private float carveHoldSec = 0.50f;        // require sustained contact under threshold
     private PhaseStar _star;
+    private PhaseStarCravingNavigator _navigator;
     private readonly Dictionary<Vector2Int, float> _underThresholdTime = new();
 
 // Reused buffers to avoid allocations
@@ -84,7 +85,12 @@ for (int dy = -radiusCells; dy <= radiusCells; dy++)
         // Drain alpha-charge
         float taken = dust.DrainCharge(drainAmount);
         if (taken > 0f && _star != null)
+        {
             _star.AddCharge(dust.Role, taken);
+            // Tell the craving navigator what role was just eaten.
+            // If it differs from the current craving, the navigator will pivot.
+            _navigator?.NotifyDustEaten(dust.Role);
+        }
 
         // Carve only after sustained depleted contact
         if (dust.Charge01 <= carveThreshold)
@@ -124,20 +130,12 @@ if (_underThresholdTime.Count > 0)
 }
     }
 
-    public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
+    public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star, PhaseStarCravingNavigator navigator = null)
      {
          _profile = profile;
          _star = star;
+         _navigator = navigator;
 
-        // Eagerly capture the current phase so OnDisarmed has a valid value
-        // even if this object has never ticked through Update (e.g. armed immediately).
-        var gfmEarly = GameFlowManager.Instance;
-        var phaseMgrEarly = gfmEarly != null ? gfmEarly.phaseTransitionManager : null;
-        if (phaseMgrEarly != null)
-        {
-            _lastPhase = phaseMgrEarly.currentPhase;
-            _hasLastPhase = true;
-        }
 
         // Keep the simple drum flag wiring you already had
         star.OnArmed += s =>
@@ -153,13 +151,6 @@ if (_underThresholdTime.Count > 0)
 
             var gen = gfm != null ? gfm.dustGenerator : null;
             if (gen == null) return;
-
-            if (!_hasLastPhase)
-            {
-                // Last-ditch attempt: read phase directly before clearing.
-                var pm = gfm.phaseTransitionManager;
-                if (pm != null) { _lastPhase = pm.currentPhase; _hasLastPhase = true; }
-            }
 
             // Release the keep-clear pocket so those cells can regrow normally.
             gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Establish);

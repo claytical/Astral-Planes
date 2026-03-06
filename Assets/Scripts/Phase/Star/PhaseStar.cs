@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Random = UnityEngine.Random;
+
 public enum PhaseStarState
 {
     WaitingForPoke = 0,
@@ -71,6 +73,7 @@ public class PhaseStar : MonoBehaviour
 
     [SerializeField] private PhaseStarMotion2D motion;
     [SerializeField] private PhaseStarDustAffect dust;
+    [SerializeField] private PhaseStarCravingNavigator cravingNavigator;
     [SerializeField] private float _progressionMul = 1f;
     private List<float> _petalStartAngles = new();
     private List<float> _petalTargetAngles = new();
@@ -119,6 +122,18 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private float passiveChargeDecayPerSec = 0.02f;
     [SerializeField] private float dustToStarChargeMul = 1.0f;
     private readonly Dictionary<MusicalRole, float> _starCharge = new();
+
+    [Header("Shard Visuals (Charge-Alpha + Sniffer)")]
+    [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
+    [SerializeField, Range(0f, 0.5f)] private float shardMinAlpha = 0.08f;
+    [Tooltip("Alpha ceiling while disarmed (collectables resolving). Keeps star de-emphasised.")]
+    [SerializeField, Range(0f, 1f)]   private float shardDisarmedAlphaCeil = 0.22f;
+    [Tooltip("How quickly shard alpha lerps toward its charge value each frame.")]
+    [SerializeField, Range(1f, 20f)]  private float shardAlphaLerpSpeed = 6f;
+    [Tooltip("How quickly each diamond rotates to face its sniffer direction (deg/sec).")]
+    [SerializeField] private float shardSnifferTurnSpeed = 180f;
+    [Tooltip("Duration of the shed-fly animation when a shard is ejected (seconds).")]
+    [SerializeField] private float shardShedDuration = 0.35f;
     public void AddCharge(MusicalRole role, float dustChargeTaken)
     {
         if (role == MusicalRole.None) return;
@@ -221,8 +236,8 @@ public class PhaseStar : MonoBehaviour
 
     private void HandleBinChanged(int idx, int bins)
     {
-        // Each bin ≈ one base clip duration in the expanded leader loop.
-        RotateHighlightedShardNow(1);
+        // Selection rotation is now driven by charge accumulation, not bin changes.
+        // Kept as subscription stub to avoid breaking DrumTrack event wiring.
     }
 
     public void Initialize(
@@ -270,9 +285,23 @@ public class PhaseStar : MonoBehaviour
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
         if (!dust) dust = GetComponentInChildren<PhaseStarDustAffect>(true);
+        if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
         if (visuals) visuals.Initialize(behaviorProfile, this);
         if (motion) motion.Initialize(behaviorProfile, this);
-        if (dust) dust.Initialize(behaviorProfile, this);
+
+        // Resolve initial craving from profile's dominant role (always present, defaults to Bass)
+        MusicalRole initialCraving = behaviorProfile != null
+            ? behaviorProfile.dominantRole
+            : MusicalRole.Bass;
+
+        if (cravingNavigator)
+        {
+            cravingNavigator.Initialize(this, motion, initialCraving, behaviorProfile);
+            cravingNavigator.OnCravingChanged += NotifyCravingChanged;
+            if (motion) motion.SetCravingNavigator(cravingNavigator);
+        }
+
+        if (dust) dust.Initialize(behaviorProfile, this, cravingNavigator);
         if (drum != null && !_subscribedLoopBoundary)
         {
             drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded;
@@ -314,14 +343,62 @@ public class PhaseStar : MonoBehaviour
             }
         }
 
-        // rotate all petals continuously with harmonic ladder speeds
-        float dt = Time.deltaTime;
-        for (int i = 0; i < _petals.Count; i++)
+        // ---- Keep bubble center locked to star world position every frame ----
+        // This prevents the visual circle from lagging behind when the star is frozen-in-place.
+        if (_bubbleActive)
         {
-            var t = _petals[i];
-            if (!t) continue;
-            float dps = _omega.Count > i ? _omega[i] : 0f;
-            t.Rotate(Vector3.forward, dps * dt, Space.Self);
+            s_bubbleCenter = transform.position;
+            // Also nudge the bubble root so its shimmer particles stay centred.
+            visuals?.UpdateBubblePosition(transform.position);
+        }
+
+        // ---- Charge-alpha: each shard's opacity = its role's accumulated charge ----
+        // ---- Sniffer facing: each shard points toward the nearest dust of its role ----
+        float dt = Time.deltaTime;
+
+        // When disarmed the star de-emphasises: shards are muted, not broadcasting.
+        // alphaScale ramps down to shardDisarmedAlphaCeil while collectables are resolving,
+        // and back up to 1 once armed again.
+        float alphaScale = _isArmed ? 1f : shardDisarmedAlphaCeil;
+
+        if (previewRing != null && previewRing.Count > 0)
+        {
+            for (int i = 0; i < previewRing.Count; i++)
+            {
+                var shard = previewRing[i];
+                if (!shard.visual) continue;
+
+                var sr = shard.visual.GetComponent<SpriteRenderer>();
+
+                // --- Alpha from charge, scaled by armed state ---
+                if (sr != null)
+                {
+                    _starCharge.TryGetValue(shard.role, out float charge);
+                    // Full range [shardMinAlpha..alphaScale] — disarmed clamps the ceiling
+                    float targetAlpha = Mathf.Lerp(shardMinAlpha, alphaScale, Mathf.Clamp01(charge));
+                    Color c = sr.color;
+                    c.a = Mathf.Lerp(c.a, targetAlpha, shardAlphaLerpSpeed * dt);
+                    sr.color = c;
+                }
+
+                // --- Sniffer facing: rotate diamond toward nearest dust of its role ---
+                if (cravingNavigator != null)
+                {
+                    Vector2 sniffDir = cravingNavigator.GetSnifferDir(shard.role);
+                    if (sniffDir.sqrMagnitude > 0.0001f)
+                    {
+                        float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
+                        float curAngle    = shard.visual.localEulerAngles.z;
+                        // MoveTowardsAngle handles 360-wrap correctly
+                        float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle,
+                                                                  shardSnifferTurnSpeed * dt);
+                        shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
+                    }
+                }
+            }
+
+            // --- Sorting order: highest charge on top ---
+            UpdateShardSortingByCharge();
         }
         if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
             float dec = passiveChargeDecayPerSec * dt; 
@@ -346,6 +423,8 @@ public class PhaseStar : MonoBehaviour
                 _subscribedLoopBoundary = false;
             }
         }
+        if (cravingNavigator != null)
+            cravingNavigator.OnCravingChanged -= NotifyCravingChanged;
     }
 
     bool AnyExpansionPendingGlobal()
@@ -569,14 +648,7 @@ public class PhaseStar : MonoBehaviour
             _loopDuration = 2f;
             _lastLoopSeen = 0;
         }
-
-        // Build/refresh ω[i] from harmonic ladder
-        _omega.Clear();
-        for (int i = 0; i < _turns.Count; i++)
-        {
-            float w = (360f * _turns[i]) / _loopDuration; // deg/sec
-            _omega.Add(Mathf.Min(maxActiveDps, w));
-        }
+        // _omega / harmonic spin ladder is retired; shard facing is now sniffer-driven.
     }
 
     private bool CanAdvancePhaseNow()
@@ -853,10 +925,8 @@ public class PhaseStar : MonoBehaviour
 
     private void HandleStepPulse(int step, int n)
     {
-        if (step == n)
-        {
-            RotateHighlightedShardNow(1);
-        }
+        // Step-pulse rotation replaced by charge-driven shard selection.
+        // Kept as stub to avoid breaking DrumTrack event wiring.
     }
 
     private void DBG(string msg)
@@ -876,20 +946,13 @@ public class PhaseStar : MonoBehaviour
 
     private void RotateHighlightedShardNow(int steps)
     {
-        if (previewRing == null || previewRing.Count == 0) return;
-        currentShardIndex = Mod(currentShardIndex + steps, previewRing.Count);
-        activeShardVisual = previewRing[currentShardIndex].visual;
-
-        // Visual + cached directive must update together (WYSIWYG selection).
-        UpdateLayering();
-        UpdatePreviewTint();
-        HighlightActive();
-        PrepareNextDirective();
+        // No-op: shard selection is now driven by charge accumulation.
+        // currentShardIndex is updated by UpdateShardSortingByCharge() in Update.
     }
 
     void BuildOrRefreshPreviewRing()
     {
-        // 1) Collect petal transforms from your PreviewShard list
+        // Collect petal transforms from previewRing
         _petals.Clear();
         foreach (var shard in previewRing)
             if (shard.visual)
@@ -898,36 +961,26 @@ public class PhaseStar : MonoBehaviour
         int N = _petals.Count;
         if (N == 0) return;
 
-        // 2) Base angles (0..90° evenly spaced)
-        _baseAngles.Clear();
-        float step = 90f / Mathf.Max(1, N - 1);
-        for (int i = 0; i < N; i++) _baseAngles.Add(step * i);
-
-        // 3) Harmonic ladder r[i] = 1/(i+1)
-        _turns.Clear();
-        for (int i = 0; i < N; i++) _turns.Add(1f / (i + 1f));
-
-        // 4) Timing/speeds
-        InitializeTimingAndSpeeds();
-
-        // 5) Apply base rotation & deterministic layering
+        // Set each shard's initial rotation to point upward (sniffers will take over in Update).
+        // Apply sorting order by ascending index; UpdateShardSortingByCharge() in Update will reorder by charge.
         for (int i = 0; i < N; i++)
         {
             var t = _petals[i];
             if (!t) continue;
-            t.localRotation = Quaternion.Euler(0, 0, _baseAngles[i]);
+            t.localRotation = Quaternion.Euler(0f, 0f, 0f); // face up initially
             var sr = t.GetComponent<SpriteRenderer>();
-            if (sr) sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
+            if (sr)
+            {
+                sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
+                // Start at minimum alpha; will lerp up as charge accumulates
+                var c = sr.color;
+                c.a = shardMinAlpha;
+                sr.color = c;
+            }
         }
 
-        // Put currentShardIndex on top & set highlights/veil
-        UpdateLayering();
-
-        if (visuals && activeShardVisual)
-        {
-            visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, 0.25f), activeShardVisual);
-            visuals.HighlightActive(activeShardVisual, ResolvePreviewColor(), .7f);
-        }
+        // Initialise timing (still needed for _loopDuration etc.)
+        InitializeTimingAndSpeeds();
     }
 
     private void EnsurePreviewRing()
@@ -1199,6 +1252,79 @@ public class PhaseStar : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Re-sorts shard sorting orders so the highest-charge role sits on top.
+    /// Called every frame from Update after alpha is applied.
+    /// </summary>
+    private void UpdateShardSortingByCharge()
+    {
+        if (previewRing == null || previewRing.Count == 0) return;
+        if (_baseSortingOrder == 0 && previewRing.Count > 0)
+        {
+            var baseSr = GetComponentInChildren<SpriteRenderer>(true);
+            _baseSortingOrder = baseSr ? baseSr.sortingOrder : 2000;
+            if (_perPetalLayerStep <= 0) _perPetalLayerStep = 1;
+        }
+
+        // Build a charge-sorted index list (descending: highest charge = lowest list index = highest sort order)
+        // We only need to sort once per frame, and previewRing is small (≤4 items).
+        int n = previewRing.Count;
+        // Simple insertion sort on small N
+        var order = new int[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        for (int i = 1; i < n; i++)
+        {
+            int key = order[i];
+            _starCharge.TryGetValue(previewRing[key].role, out float keyCharge);
+            int j = i - 1;
+            while (j >= 0)
+            {
+                _starCharge.TryGetValue(previewRing[order[j]].role, out float jCharge);
+                if (jCharge <= keyCharge) break;
+                order[j + 1] = order[j];
+                j--;
+            }
+            order[j + 1] = key;
+        }
+        // order[n-1] = index of highest-charge shard → gets top sorting order
+        for (int rank = 0; rank < n; rank++)
+        {
+            int shardIdx = order[rank];
+            var sr = previewRing[shardIdx].visual?.GetComponent<SpriteRenderer>();
+            if (sr == null) continue;
+            sr.sortingOrder = _baseSortingOrder + (rank * _perPetalLayerStep);
+        }
+
+        // Keep currentShardIndex aligned to highest-charge shard (= the craving)
+        int topIdx = order[n - 1];
+        if (topIdx != currentShardIndex)
+        {
+            currentShardIndex = topIdx;
+            activeShardVisual = previewRing[currentShardIndex].visual;
+        }
+    }
+
+    /// <summary>
+    /// Called by PhaseStarCravingNavigator.OnCravingChanged when the star tastes a new role.
+    /// Snaps the active shard to the matching diamond and refreshes the directive.
+    /// </summary>
+    public void NotifyCravingChanged(MusicalRole newCraving)
+    {
+        if (previewRing == null || previewRing.Count == 0) return;
+
+        // Find the shard for this role
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            if (previewRing[i].role != newCraving) continue;
+            currentShardIndex = i;
+            activeShardVisual = previewRing[i].visual;
+            break;
+        }
+
+        PrepareNextDirective();
+        Trace($"NotifyCravingChanged → newCraving={newCraving} shardIndex={currentShardIndex}");
+    }
+
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         var controller = GameFlowManager.Instance?.controller;
@@ -1223,9 +1349,18 @@ public class PhaseStar : MonoBehaviour
         if (previewRing == null || previewRing.Count == 0) return;
         idx = Mathf.Clamp(idx, 0, previewRing.Count - 1);
 
-        // destroy visual (if still alive)
         var s = previewRing[idx];
-        if (s.visual) Destroy(s.visual.gameObject);
+
+        // Animate the shed shard flying outward instead of hard-destroying it
+        if (s.visual)
+        {
+            Vector2 flyDir = _lastImpactDir.sqrMagnitude > 0.0001f
+                ? _lastImpactDir
+                : Random.insideUnitCircle.normalized;
+            StartCoroutine(ShedShardAnimation(s.visual.gameObject, flyDir, shardShedDuration));
+            // Detach from parent so it survives while the ring rebuilds
+            s.visual.SetParent(null);
+        }
 
         // Remove from preview ring
         previewRing.RemoveAt(idx);
@@ -1250,6 +1385,42 @@ public class PhaseStar : MonoBehaviour
         UpdateLayering();
         UpdatePreviewTint();
         HighlightActive();
+    }
+
+    /// <summary>
+    /// Flies the shed shard outward in flyDir, fading alpha to zero, then destroys it.
+    /// </summary>
+    private IEnumerator ShedShardAnimation(GameObject shardGO, Vector2 flyDir, float duration)
+    {
+        if (!shardGO) yield break;
+
+        var sr  = shardGO.GetComponent<SpriteRenderer>();
+        float t = 0f;
+        Vector3 startPos  = shardGO.transform.position;
+        float   flyDist   = 1.5f; // world units to travel
+        float   startAlpha = sr ? sr.color.a : 1f;
+
+        while (t < duration)
+        {
+            if (!shardGO) yield break;
+            t += Time.deltaTime;
+            float frac = Mathf.Clamp01(t / duration);
+
+            // Move outward
+            shardGO.transform.position = startPos + (Vector3)(flyDir * (flyDist * frac));
+
+            // Fade to zero
+            if (sr)
+            {
+                var c = sr.color;
+                c.a = Mathf.Lerp(startAlpha, 0f, frac);
+                sr.color = c;
+            }
+
+            yield return null;
+        }
+
+        if (shardGO) Destroy(shardGO);
     }
     
     void UpdatePreviewTint()

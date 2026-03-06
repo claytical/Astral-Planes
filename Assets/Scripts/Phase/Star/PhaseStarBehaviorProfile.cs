@@ -80,6 +80,22 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Chance per second to teleport a small amount (Wildcard spice). 0 disables.")]
     public float teleportChancePerSec = 0f;
 
+    [Header("Craving Navigation (PhaseStarCravingNavigator)")]
+    [Tooltip("Seconds between BFS replans. Lower = more responsive direction changes; higher = cheaper. " +
+             "Typical range: 0.3–1.0s.")]
+    [Min(0.1f)]
+    public float mazeNavReplanInterval = 0.5f;
+
+    [Tooltip("Max grid cells visited per BFS replan. Keep ≤ 200 for frame-budget safety.")]
+    [Min(10)]
+    public int mazeNavBfsBudget = 150;
+
+    [Range(0f, 1f)]
+    [Tooltip("How strongly the craving waypoint overrides free drift. " +
+             "0 = star ignores maze corridors; 1 = fully committed to craving path. " +
+             "0.85 is a good default — leaves room for vehicle avoidance to still read clearly.")]
+    public float mazeNavWaypointPull = 0.85f;
+
     
     [Tooltip("Optional prefab used for ejection VFX/markers.")]
     public GameObject ejectionPrefab;
