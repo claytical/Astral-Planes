@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
@@ -69,6 +69,14 @@ public class DrumTrack : MonoBehaviour
 
     [SerializeField] private float uiReserveBottomInsetWorld = 0f; // optional fine-tune in world units
     [SerializeField] private float uiReserveTopInsetWorld = 0f;
+
+    [Header("Grid Position Tuning")]
+    [Tooltip("Shifts the entire play area up (+) or down (-) as a fraction of screen height. " +
+             "Use this to recentre the dust grid when UI reserves cause it to sit too high or low. " +
+             "Changing this at runtime calls InvalidateAndResync() automatically.")]
+    [Range(-0.3f, 0.3f)]
+    [SerializeField] private float gridVerticalOffsetViewport = 0f;
+    private float _lastGridVerticalOffset = float.NaN; // detect Inspector changes
     private double _lastApplyMotifDsp = -1.0;
     private string _lastApplyMotifId = "";
     public float drumLoopBPM = 120f;
@@ -501,6 +509,19 @@ public void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, b
             bottom = Mathf.Max(bottom, Mathf.Min(w0.y, w1.y)); 
             top    = Mathf.Min(top,    Mathf.Max(w0.y, w1.y) - Mathf.Max(0f, dustBandTopInsetWorld));
         }
+
+        // Vertical offset: shift the whole play area up/down without changing its size.
+        // This lets you recentre the grid when UI reserves create asymmetric padding.
+        if (gridVerticalOffsetViewport != 0f)
+        {
+            float screenH = top - bottom + (uiBotV > 0f ? cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y - (camPos.y - (cam.orthographic ? cam.orthographicSize : 0f)) : 0f);
+            // Simpler: just convert the viewport fraction directly to a world-unit shift.
+            float worldShift = gridVerticalOffsetViewport * (cam.orthographic
+                ? cam.orthographicSize * 2f
+                : (cam.ViewportToWorldPoint(new Vector3(0f, 1f, z)).y - cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)).y));
+            bottom += worldShift;
+            top    += worldShift;
+        }
 		// Validate.
 		if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
 		if (right <= left || top <= bottom) return false;
@@ -618,6 +639,15 @@ private void Update()
     // 0) Manager may exist but not be ready (or still wiring scenes)
     if (_gfm == null || !_gfm.ReadyToPlay())
         return;
+
+    // Detect Inspector changes to gridVerticalOffsetViewport and resync immediately.
+    // This makes the slider feel live in the Editor without needing a full scene reload.
+    if (!Mathf.Approximately(_lastGridVerticalOffset, gridVerticalOffsetViewport))
+    {
+        _lastGridVerticalOffset = gridVerticalOffsetViewport;
+        SyncTileWithScreen();
+        if (_dust != null) _dust.ResyncAllCellPositions();
+    }
 
     // ---------------------------------------------------------------------
     // 0.5) Motif late-bind (recovery) — ONE SHOT ONLY, only if we truly have no motif.
@@ -1692,6 +1722,11 @@ public void ResetBeatSequencingState(string who)
         int gridW = _spawnGrid.gridWidth;
         int gridH = _spawnGrid.gridHeight;
         if (gridW <= 0 || gridH <= 0) return;
+
+        // Invalidate the cached play area so TryGetPlayAreaWorld recomputes from current
+        // Inspector values (uiReserve, gridVerticalOffsetViewport, dustBand, etc.)
+        _hasLockedPlayArea = false;
+        InvalidateGridWorldCache();
 
         PlayArea area = GetPlayAreaWorld();
         if (area.width <= 0f || area.height <= 0f) return;

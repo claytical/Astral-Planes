@@ -127,6 +127,21 @@ public class CosmicDustGenerator : MonoBehaviour
 
     [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual “grow in” time per hex
     private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
+
+    // ---------------------------------------------------------------------------
+    // Role density tracking
+    // Counts how many Solid cells are currently imprinted with each MusicalRole.
+    // Updated in SetCellState when a cell becomes or leaves Solid.
+    // Used by CommitRegrowCell to pick the least-represented role when a cell
+    // has no role imprint (e.g. vehicle-carved cells whose imprint was removed).
+    // ---------------------------------------------------------------------------
+    private readonly Dictionary<MusicalRole, int> _solidCountByRole = new Dictionary<MusicalRole, int>
+    {
+        { MusicalRole.Bass,    0 },
+        { MusicalRole.Harmony, 0 },
+        { MusicalRole.Lead,    0 },
+        { MusicalRole.Groove,  0 },
+    };
     public float TileDiameterWorld
     {
         get => tileDiameterWorld;
@@ -679,6 +694,33 @@ private void SetDustCollision(CosmicDust dust, bool _enabled)
                 GetCellVisualColor);
         
     }
+
+    /// <summary>
+    /// Repositions and rescales all existing dust cell GOs to match the current play area.
+    /// Call this after changing grid offset or cell size at runtime (e.g. from DrumTrack.SyncTileWithScreen).
+    /// </summary>
+    public void ResyncAllCellPositions()
+    {
+        if (drums == null || _cellGo == null) return;
+
+        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
+
+        for (int x = 0; x < _cellW; x++)
+        {
+            for (int y = 0; y < _cellH; y++)
+            {
+                var go = _cellGo[x, y];
+                if (go == null) continue;
+
+                var gp = new Vector2Int(x, y);
+                go.transform.position = (Vector3)drums.GridToWorldPosition(gp);
+
+                var dust = _cellDust[x, y];
+                if (dust != null)
+                    dust.SetCellSizeDrivenScale(cellSize, dustFootprintMul, cellClearanceWorld);
+            }
+        }
+    }
     private bool IsDustSpawnBlocked(Vector2Int cell)
     {
         return dustClaims != null && dustClaims.IsBlocked(cell);
@@ -737,21 +779,39 @@ private void SetDustCollision(CosmicDust dust, bool _enabled)
             dust.PrepareForReuse();
             dust.SetVisualTimings(dustTimings);
             dust.SetGrowInDuration(dustTimings.particleGrowInSeconds);
-            dust.clearing.hardness01 = GetCellHardness01(gp);
-            Color regrowTint = GetCellVisualColor(gp);
-            dust.SetTint(regrowTint);
+
+            // --- Role resolution ---
+            // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
+            // Priority 2: no imprint (vehicle-carved or PhaseStar-drained) → least-dense role,
+            //             so the maze self-balances toward equal representation of all four roles.
+            MusicalRole regrowRole = MusicalRole.None;
+            if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
+                regrowRole = imp.role;
+            else
+                regrowRole = GetLeastDenseRole();
+
+            // --- Color from role profile (authoritative source) ---
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
+            Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
+
+            // Write / update the imprint so future regrows of this cell remember the role.
+            _imprints ??= new Dictionary<Vector2Int, DustImprint>();
+            _imprints[gp] = new DustImprint
+            {
+                color      = regrowTint,
+                hardness01 = roleProfile != null ? roleProfile.GetDustHardness01() : defaultMazeHardness01,
+                role       = regrowRole,
+                healDelay  = 0f
+            };
+
+            dust.clearing.hardness01 = _imprints[gp].hardness01;
+            dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a);
 
             Color denyColor = Color.darkGray;
-            if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
+            if (roleProfile != null)
             {
-                var rp = MusicalRoleProfileLibrary.GetProfile(imp.role);
-                if (rp != null)
-                {
-                    var shadow = rp.dustColors.shadowColor;
-                    denyColor = (shadow != Color.clear && shadow != Color.magenta)
-                        ? shadow
-                        : Color.darkGray;
-                }
+                var shadow = roleProfile.dustColors.shadowColor;
+                denyColor = (shadow != Color.clear && shadow != Color.magenta) ? shadow : Color.darkGray;
             }
             dust.SetFeedbackColors(Color.white, denyColor);
 
@@ -759,7 +819,7 @@ private void SetDustCollision(CosmicDust dust, bool _enabled)
             SetDustCollision(dust, false);
         }
 
-        // Let the visual read before collisions are reintroduced.
+        // Let the visual settle before collisions are reintroduced.
         if (regrowColliderEnableDelaySeconds > 0f)
             yield return new WaitForSeconds(regrowColliderEnableDelaySeconds);
 
@@ -1249,7 +1309,18 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         EnsureCellGrid();
         if (_cellState == null) return;
         if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return;
+
+        // Track role density when a cell enters or leaves Solid state.
+        DustCellState prev = _cellState[gp.x, gp.y];
         _cellState[gp.x, gp.y] = st;
+
+        if (prev != st)
+        {
+            if (st == DustCellState.Solid)
+                TrackRoleDensityChange(gp, becomesSolid: true);
+            else if (prev == DustCellState.Solid)
+                TrackRoleDensityChange(gp, becomesSolid: false);
+        }
     }
     /// <summary>
     /// Called by CosmicDust when its fade-out completes. Finalizes the
@@ -1750,6 +1821,56 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         return Mathf.Clamp01(defaultMazeHardness01);
     }
 
+    // ---------------------------------------------------------------------------
+    // Role density helpers
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Call when a cell's Solid state changes so role density stays current.
+    /// Pass the cell's imprinted role (MusicalRole.None = untracked).
+    /// </summary>
+    private void TrackRoleDensityChange(Vector2Int gp, bool becomesSolid)
+    {
+        MusicalRole role = MusicalRole.None;
+        if (_imprints != null && _imprints.TryGetValue(gp, out var imp))
+            role = imp.role;
+        // Also check the live dust object in case the imprint was removed but Role was set.
+        if (role == MusicalRole.None && TryGetDustAt(gp, out var d) && d != null)
+            role = d.Role;
+
+        if (role == MusicalRole.None) return;
+        if (!_solidCountByRole.ContainsKey(role)) return;
+
+        if (becomesSolid)
+            _solidCountByRole[role] = Mathf.Max(0, _solidCountByRole[role] + 1);
+        else
+            _solidCountByRole[role] = Mathf.Max(0, _solidCountByRole[role] - 1);
+    }
+
+    /// <summary>
+    /// Returns the playable role with the fewest solid cells.
+    /// Falls back to a random role if all counts are equal (avoids deterministic bias).
+    /// </summary>
+    private MusicalRole GetLeastDenseRole()
+    {
+        MusicalRole best = MusicalRole.Bass;
+        int bestCount = int.MaxValue;
+        // Stable iteration order; tie-break randomly so all roles are equally likely.
+        var roles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+        // Shuffle order for tie-breaking
+        for (int i = roles.Length - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (roles[i], roles[j]) = (roles[j], roles[i]);
+        }
+        foreach (var r in roles)
+        {
+            int cnt = _solidCountByRole.TryGetValue(r, out var c) ? c : 0;
+            if (cnt < bestCount) { bestCount = cnt; best = r; }
+        }
+        return best;
+    }
+
     private Color BlendImprintWithNeighbors(Vector2Int cell, Color target, int radius, float neighborWeight)
     {
         radius = Mathf.Max(0, radius);
@@ -1827,6 +1948,14 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
                     if (d == null) continue;
                     if (!d.isActiveAndEnabled) continue;
 
+                    // Skip cells that carry a role imprint — their color is authoritative
+                    // (set by BuildMazeRoleImprints / MineNode carve). Overwriting them with
+                    // _mazeTint (a flat gray) would erase the 4-color Voronoi layout.
+                    var gp = new Vector2Int(x, y);
+                    if (_imprints != null && _imprints.TryGetValue(gp, out var imp)
+                        && imp.role != MusicalRole.None)
+                        continue;
+
                     StartCoroutine(d.RetintOver(seconds, _mazeTint));
                 }
             }
@@ -1843,6 +1972,10 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
                 var d = dusts[i];
                 if (d == null) continue;
                 if (!d.isActiveAndEnabled) continue;
+
+                // In the fallback path we don't have grid coords, but we can check dust.Role.
+                if (d.Role != MusicalRole.None) continue;
+
                 StartCoroutine(d.RetintOver(seconds, _mazeTint));
             }
         }
@@ -1993,8 +2126,21 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
                         // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
                         // GetCellHardness01 reads hardness01 from _imprints if available.
                         Color cellColor = GetCellVisualColor(grid);
-                        dust.SetTint(cellColor);
                         dust.clearing.hardness01 = GetCellHardness01(grid);
+
+                        // Apply role AND color together so dust.Role is set from birth.
+                        // SetTint alone leaves dust.Role = None, which means RetintExisting
+                        // cannot distinguish role-colored cells from plain maze cells and
+                        // would overwrite them with the flat _mazeTint (gray).
+                        if (_imprints != null && _imprints.TryGetValue(grid, out var spawnImprint)
+                            && spawnImprint.role != MusicalRole.None)
+                        {
+                            dust.ApplyRoleAndCharge(spawnImprint.role, cellColor, cellColor.a);
+                        }
+                        else
+                        {
+                            dust.SetTint(cellColor);
+                        }
 
                         // Use the role's shadow color as the deny feedback color.
                         // dustColors.denyColor may be unset on assets; shadowColor is the
@@ -2228,7 +2374,8 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         Color imprintShadowColor,
         float imprintHardness01,
         int resolveRadiusCells,
-        float appetiteMul = 1f) {
+        float appetiteMul = 1f,
+        MusicalRole imprintRole = MusicalRole.None) {
         if (drums == null) return 0;
 
         EnsureImprints();
@@ -2261,12 +2408,14 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
                 if (IsKeepClearCell(gp)) continue;
 
                 // Record/refresh MineNode imprint for regrowth semantics.
+                // Include the MineNode's role so CommitRegrowCell can restore it.
                 Color blendedImprint = BlendImprintWithNeighbors(gp, imprintColor, imprintBlendRadius, imprintNeighborWeight);
                 _imprints[gp] = new DustImprint
                 {
                     color       = blendedImprint,
                     healDelay   = regrowDelaySeconds,
-                    hardness01  = hardness01
+                    hardness01  = hardness01,
+                    role        = imprintRole   // ← was always left as default (Bass); now explicit
                 };
 
                 MarkTintDirty(gp, tintDirtyMarkRadius);
@@ -2318,8 +2467,25 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         // Open corridor immediately
         if (HasDustAt(cell))
             ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds: 0.20f, scheduleRegrow: true, phase: phase, regrowDelaySeconds: healDelaySeconds);
-        // Vehicle carving explicitly removes any MineNode imprint
-        _imprints.Remove(cell);
+
+        // Vehicle carving does NOT own the role — it's purely a physical interaction.
+        // If a Voronoi or MineNode role imprint exists, preserve the role so the cell
+        // remembers its musical identity when it regrows.
+        // If there is no imprint (or no role), CommitRegrowCell will assign the
+        // least-dense role automatically, keeping the maze balanced.
+        if (_imprints != null && _imprints.TryGetValue(cell, out var existingImp)
+            && existingImp.role != MusicalRole.None)
+        {
+            // Keep the imprint role intact; just refresh the heal delay.
+            _imprints[cell] = new DustImprint
+            {
+                color      = existingImp.color,
+                hardness01 = existingImp.hardness01,
+                role       = existingImp.role,
+                healDelay  = healDelaySeconds
+            };
+        }
+        // else: no imprint → CommitRegrowCell will use least-dense role on regrowth.
 
         // Schedule normal dust regrow
         RequestRegrowCellAt(

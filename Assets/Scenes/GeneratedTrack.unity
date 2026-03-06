@@ -160,7 +160,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 20}
-  m_SizeDelta: {x: 1920, y: 120}
+  m_SizeDelta: {x: 1920, y: 140}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &45202786
 MonoBehaviour:
@@ -10853,7 +10853,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 120}
+  m_AnchoredPosition: {x: 0, y: 140}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1001 &480221059
@@ -11510,7 +11510,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 20, y: 130}
+  m_SizeDelta: {x: 20, y: 150}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &657963292
 MonoBehaviour:
@@ -11806,7 +11806,7 @@ MonoBehaviour:
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   cellClearanceWorld: 0
-  defaultMazeHardness01: 0.2
+  defaultMazeHardness01: 1
   dustTimings:
     spriteScaleInSeconds: 1
     spriteScaleOutSeconds: 1
@@ -11816,7 +11816,7 @@ MonoBehaviour:
   vehicleErodePerTick: 5
   mineNodeErodeRadius: 1
   mineNodeErodePerTick: 10
-  dustFootprintMul: 1
+  dustFootprintMul: 1.3
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
@@ -12673,6 +12673,7 @@ MonoBehaviour:
   uiReserveTopViewport: 0
   uiReserveBottomInsetWorld: 0
   uiReserveTopInsetWorld: 0
+  gridVerticalOffsetViewport: 0.037
   drumLoopBPM: 120
   gridPadding: 1
   totalSteps: 32
@@ -12686,8 +12687,8 @@ MonoBehaviour:
   dustBandMaxY: 1
   dustBandTopInsetWorld: 0
   referenceWidthPx: 1920
-  referenceColumns: 36
-  uiBottomPaddingPx: 180
+  referenceColumns: 64
+  uiBottomPaddingPx: 270
   autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
   stepPulseEveryN: 4
@@ -14293,7 +14294,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 5, y: 0}
-  m_SizeDelta: {x: -10, y: 120}
+  m_SizeDelta: {x: -10, y: 130}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1758545869
 MonoBehaviour:

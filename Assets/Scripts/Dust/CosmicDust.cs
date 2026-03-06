@@ -166,6 +166,9 @@ public class CosmicDust : MonoBehaviour {
     private float _nonBoostClearSeconds;
     private float _cellWorldSize = 1f;
     private float _cellClearanceWorld = 0f;
+    // The sprite animates to this scale (1.0 = exactly fills cell, >1.0 = overlap, <1.0 = gap).
+    // Set by SetCellSizeDrivenScale via the generator's dustFootprintMul.
+    private float _spriteScaleTarget = 1f;
     private Color _baseColor;
     private float _baseSize;
     private float _baseAlpha;
@@ -435,9 +438,9 @@ public class CosmicDust : MonoBehaviour {
         float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.spriteScaleInSeconds;
         growSeconds = Mathf.Max(0.01f, growSeconds);
 
-        // Sprite scale-in over growSeconds
+        // Sprite scale-in over growSeconds — target is footprintMul (>1 = overlap, <1 = gap)
         ResetSpriteScaleTo(0f);
-        AnimateSpriteScale(0f, 1f, growSeconds);
+        AnimateSpriteScale(0f, _spriteScaleTarget, growSeconds);
 
         // Particles emission ramp over growSeconds too (keeps "radiating" coherent)
         EnsureParticlesPlaying();
@@ -1196,7 +1199,9 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
     {
         _cellWorldSize       = Mathf.Max(0.001f, cellWorldSize);
         _cellClearanceWorld  = Mathf.Max(0f, clearanceWorld);
-//        transform.localScale = Vector3.one;
+        // footprintMul drives how large the sprite is relative to the cell tile.
+        // 1.0 = exactly touches neighbour, >1.0 = overlaps, <1.0 = gap.
+        _spriteScaleTarget   = Mathf.Max(0.01f, footprintMul);
         ApplyParticleFootprint();
         RebuildColliderForCurrentScale();
         SyncParticlesToCollider();
