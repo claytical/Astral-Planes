@@ -342,13 +342,6 @@ public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
         );
         return;
     }
-
-    Debug.Log(
-        $"[VOID] END track={(_gravityVoidOwner ? _gravityVoidOwner.name : "null")} " +
-        $"caller={(ownerTrack ? ownerTrack.name : "null")} " +
-        $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
-    );
-
     _gravityVoidOwner = null;
     _gravityVoidHasCenterGP = false;
 

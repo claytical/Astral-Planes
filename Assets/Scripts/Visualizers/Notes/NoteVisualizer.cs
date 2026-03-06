@@ -326,7 +326,6 @@ public bool TryGetNextUnlitStepExcluding(
         }
         var tag = tr.GetComponent<MarkerTag>();
         bool isPlaceholder = tag != null && tag.isPlaceholder;
-        Debug.Log($"[UNLIT_SEARCH] track={track.name} step={step} tag={(tag!=null?"present":"NULL")} isPlaceholder={isPlaceholder} burstId={(tag!=null?tag.burstId:-999)}");
         if (tag == null || !tag.isPlaceholder) continue;
 
         double fwd = (step - from + totalAbsSteps) % totalAbsSteps;

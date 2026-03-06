@@ -630,6 +630,13 @@ private IEnumerator StartMazeAndStarForPhase_NoChapterReset(MazeArchetype phase)
         }
     }
 
+    // Apply phase profile before maze generation (same guarantee as StartNextPhaseMazeAndStar).
+    var profileForPhase2 = drums.phasePersonalityRegistry != null
+        ? drums.phasePersonalityRegistry.Get(phase)
+        : null;
+    if (profileForPhase2 != null)
+        dust.ApplyProfile(profileForPhase2);
+
     // Build maze
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
@@ -1021,6 +1028,9 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
 
         if (activeDrumTrack != null)
             activeDrumTrack.SetBinCount(1);
+
+        if (viz != null)
+            viz.ConfigureBinStrip(1);
 
 //        if (coral != null) coral.gameObject.SetActive(false);
             // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
@@ -1422,7 +1432,18 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
     // Keep regrowth veto consistent immediately (not one frame later in Update()).
     dust.SetReservedVehicleCells(_vehicleCellsScratch);
 
-    // 3) Build maze (dust fill + carve star pocket + carve vehicle pockets)
+    // 3) Apply phase profile to dust generator BEFORE maze generation so that
+    //    BuildMazeRoleImprints can read _activeProfile.dominantRole.
+    //    (HandleChapterChanged fires after StartChapter above, but GenerateMaze
+    //    runs synchronously in a coroutine and may execute before the event
+    //    propagates — apply explicitly here to guarantee ordering.)
+    var profileForPhase = drums.phasePersonalityRegistry != null
+        ? drums.phasePersonalityRegistry.Get(nextPhase)
+        : null;
+    if (profileForPhase != null)
+        dust.ApplyProfile(profileForPhase);
+
+    // 4) Build maze (dust fill + carve star pocket + carve vehicle pockets)
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
             nextPhase,
