@@ -208,16 +208,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
-  cueSprite: {fileID: -6231044458718751821, guid: e9907d5bd26194518b167230e5ec93d3,
+  circleMaxRadius: 0.65
+  circleMinRadius: 0.1
+  circleAlphaMin: 0.1
+  circleAlphaMax: 0.7
+  circleSortingLayer: Default
+  circleSortingOrder: -1
+  circleLerpSpeed: 10
+  circleSprite: {fileID: -6231044458718751821, guid: e9907d5bd26194518b167230e5ec93d3,
     type: 3}
-  cueScaleMin: 0.5
-  cueScaleMax: 1
-  cueColorIdle: {r: 1, g: 1, b: 1, a: 0.12156863}
-  cueColorReady: {r: 1, g: 1, b: 1, a: 0.9490196}
-  scaleLerpSpeed: 10
-  cueSortingLayer: Default
-  cueSortingOrder: 1
-  velocityAtWindowOpen: 50
   dotSprite: {fileID: 21300000, guid: 3d28f1aad50e6439e88e811bb53c9cee, type: 3}
   dotOrbitRadius: 0.7
   dotSize: 0.1

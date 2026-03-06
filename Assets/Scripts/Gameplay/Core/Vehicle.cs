@@ -165,10 +165,7 @@ public class Vehicle : MonoBehaviour
         int chosenMidi = (matchesAuthored || localMatch) ? p.collectedMidi : p.authoredRootMidi;
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
-        // Velocity is driven by placement timing: pulse 0 (window open) → ~50, pulse 1 (exact step) → 127.
-        float commitVel = releaseCue != null
-            ? releaseCue.ComputeVelocity(_lastPulse01)
-            : Mathf.Lerp(50f, 127f, _lastPulse01);
+        float commitVel = p.velocity127;
         if (occupied)
             commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
 
@@ -350,9 +347,25 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        // Drive the vehicle-local release cue ring.
-        _lastPulse01 = pulse01;
-        releaseCue?.SetFill(pulse01);
+        // Drive the vehicle-local release cue ring, tinted with the active track color.
+        if (releaseCue != null)
+        {
+            releaseCue.SetFill(pulse01);
+
+            // Resolve track color: armed note takes priority, then pending.
+            Color cueColor = Color.white;
+            if (_armedReleases.Count > 0)
+            {
+                var aTrack = _armedReleases.Peek().note.track;
+                if (aTrack != null) cueColor = aTrack.trackColor;
+            }
+            else if (_pendingNotes.Count > 0)
+            {
+                var pTrack = _pendingNotes.Peek().track;
+                if (pTrack != null) cueColor = pTrack.trackColor;
+            }
+            releaseCue.SetTrackColor(cueColor);
+        }
 
         // Armed notes: fly orb toward its target marker.
         int armedSlot = 0;
@@ -582,10 +595,6 @@ public class Vehicle : MonoBehaviour
     private readonly Queue<ArmedRelease> _armedReleases = new Queue<ArmedRelease>(8);
     private double _lastRawAbsStep = 0.0;
     private bool _hasLastRawAbsStep = false;
-
-    // Pulse at the most recent TickNoteTrail frame — used to derive commit velocity.
-    // pulse01 = 0 → window just opened (~velocity 50); pulse01 = 1 → exact step (velocity 127).
-    private float _lastPulse01 = 0f;
 
     [Header("Release Cue")]
     [Tooltip("Optional VehicleReleaseCue component on this vehicle (or a child). Drives the ring fill and beat-dot countdown.")]

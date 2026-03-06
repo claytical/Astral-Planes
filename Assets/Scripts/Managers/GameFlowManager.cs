@@ -1022,9 +1022,6 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
         if (activeDrumTrack != null)
             activeDrumTrack.SetBinCount(1);
 
-        if (viz != null)
-            viz.ConfigureBinStrip(1);
-
 //        if (coral != null) coral.gameObject.SetActive(false);
             // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
 

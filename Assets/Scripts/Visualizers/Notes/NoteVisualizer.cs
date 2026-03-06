@@ -2053,7 +2053,7 @@ private Color ComputeStepColor(int step)
         if (img == null)
         {
             img = go.AddComponent<Image>();
-            img.color = binInactiveColor;
+//            img.sprite.color = binInactiveColor;
         }
 
         _binIndicators.Add(img);
@@ -2091,7 +2091,7 @@ private Color ComputeStepColor(int step)
             var img = _binIndicators[i];
             if (img == null) continue;
 
-            var rt = img.rectTransform;
+            var rt = img.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0f);
             rt.anchorMax = new Vector2(0f, 0f);
             rt.pivot     = new Vector2(0.5f, 0.5f);
@@ -2112,8 +2112,7 @@ private Color ComputeStepColor(int step)
         {
             var img = _binIndicators[i];
             if (img == null) continue;
-
-            img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor;
+            //img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor);
         }
     }
      public void TriggerNoteBlastOff(InstrumentTrack track)

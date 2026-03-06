@@ -329,7 +329,8 @@ public int GrowVoidDustDiskFromGrid(
 
 // IMPORTANT: avoid "invisible SOLID" tiles (especially when logging with F2).
 // This is a *visual* floor; it also prevents sprite alpha=0 tiles that are physically present.
-            const float kMinVisibleAlpha = 0.06f;
+// Set high enough that the role color reads clearly even at the outer edge of a burst.
+            const float kMinVisibleAlpha = 0.55f;
             float visibleAlpha = Mathf.Max(energy01, kMinVisibleAlpha);
 
             Color c = hueRgb;
@@ -1399,8 +1400,10 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     {
         if (drums == null) return;
 
-        // 1) Actually carve/hold the pocket (this despawns dust and schedules regrow)
-        CarveTemporaryDiskFromCollectable(centerWorld, radiusWorld, phase, holdSeconds);
+        // 1) Actually carve/hold the pocket (this despawns dust and schedules regrow).
+        // Pass ownerId so the PeekHole claim uses the same owner string as the TemporaryCarve
+        // claim below — both will be released together by ReleaseOwner("Collectable#{ownerId}").
+        CarveTemporaryDiskFromCollectable(centerWorld, radiusWorld, phase, holdSeconds, ownerId);
 
         // 2) Also claim cells in DustClaimManager so regrow attempts self-delay while the pocket is maintained
         //    (DustPocketRoutine refreshes this periodically, so expiry behaves as a "keep alive".)
@@ -1439,7 +1442,8 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         Vector3 centerWorld,
         float radiusWorld,
         MazeArchetype phase,
-        float holdSeconds)
+        float holdSeconds,
+        int ownerId = 0)
     {
         if (drums == null) return;
 
@@ -1459,7 +1463,9 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         int despawned = 0;
 
         float hold = Mathf.Max(0.05f, holdSeconds);
-        const string owner = "CollectablePocket";
+        // Use the same per-instance owner string as ClaimTemporaryDiskForCollectable so that
+        // ReleaseOwner("Collectable#{id}") clears BOTH the PeekHole and TemporaryCarve claims.
+        string owner = ownerId != 0 ? $"Collectable#{ownerId}" : "CollectablePocket";
 
         for (int gx = c.x - rCells; gx <= c.x + rCells; gx++)
         {
@@ -2404,5 +2410,3 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         return growth;
     }
 }
-    
-   

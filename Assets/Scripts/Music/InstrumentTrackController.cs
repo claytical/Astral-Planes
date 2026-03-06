@@ -178,7 +178,7 @@ public void NotifyCommitted(InstrumentTrack track, int stepIndex)
 {
     Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
     // (Optional) you could track lastCommitTime here if you want.
-    PlayCommitStinger(track);
+    //PlayCommitStinger(track);
     PlayGravityVoidChordPulse(track, _lastTransportFrame.playheadBin, 3);
 }
     public void AllowAdvanceNextBurst(InstrumentTrack track)
@@ -369,109 +369,131 @@ private IEnumerator GravityVoidGrowAndImprintRoutine()
     if (dustGen == null)
         yield break;
 
-    float dur  = Mathf.Max(0.01f, (_gravityVoidGrowSecondsRuntime > 0f) ? _gravityVoidGrowSecondsRuntime : gravityVoidGrowSeconds);
     float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
-    int maxR   = Mathf.Max(0, (_gravityVoidMaxRadiusRuntime >= 0) ? _gravityVoidMaxRadiusRuntime : gravityVoidMaxRadiusCells);
 
-    // We track the OUTER radius we've actually completed imprinting up to.
+    // Tracks the outermost radius already committed to the grid so we only ever
+    // pass new annuli to GrowVoidDustDiskFromGrid (innerRadiusCellsExclusive).
     int completedOuterR = 0;
 
-    float startTime = Time.time;
-    float nextTickTime = startTime; // immediate first tick
+    // Which bin boundary we have already fired a burst for. Prevents re-firing
+    // multiple times within the same bin while the routine ticks faster than a bin.
+    int lastBurstBin = -1;
 
-    // How long each radius step should take to feel like constant outward growth.
-    float secsPerRadius = (maxR > 0) ? (dur / maxR) : dur;
+    // How many total bins this expansion spans (1, 2, or more).
+    // Resolved once from the owner at routine start; stable for its lifetime.
+    int totalExpansionBins = (_gravityVoidOwner != null)
+        ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier)
+        : 1;
 
     while (_gravityVoidOwner != null)
     {
-        // Always keep VFX positioned (and potentially scaled in SpawnOrUpdate)
+        // Keep VFX positioned and scaled.
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
-        float now = Time.time;
-        float elapsed = now - startTime;
-// ------------------------------------------------------------
-// Gravity Void chord pulse: fire ONCE at each bin boundary
-// ------------------------------------------------------------
         int playheadBin = GetTransportFrame().playheadBin;
+
+        // ---------------------------------------------------------------
+        // Chord pulse — fire once per bin boundary (unchanged behaviour).
+        // ---------------------------------------------------------------
         if (playheadBin != _lastGravityVoidChordBin)
         {
             _lastGravityVoidChordBin = playheadBin;
-
             int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
             PlayGravityVoidChordPulse(_gravityVoidOwner, playheadBin, chordSize);
         }
 
-        // --- STEADY GROWTH MAPPING ---
-        // Radius increases by ~1 every secsPerRadius seconds, up to maxR.
-// Map bin count to coverage: 1 bin = 1/4 grid area (disk), 4 bins = full disk.
-        int binCount = Mathf.Clamp(GetTransportFrame().playheadBin + 1, 1, 4);
-
-        int w = dustGen.GridW;
-        int h = dustGen.GridH;
-        int maxPossible = Mathf.Max(1, Mathf.FloorToInt(0.5f * Mathf.Min(w, h)));
-
-// r = maxPossible * sqrt(bin/4)
-        float rF = maxPossible * Mathf.Sqrt(binCount / 4f);
-        int targetOuterR = Mathf.Clamp(Mathf.RoundToInt(rF), 1, maxPossible);
-        _gravityVoidCurrentOuterR = targetOuterR;
-
-        // If we haven't reached our target radius, do budgeted imprint work toward it.
-        if (_gravityVoidHasCenterGP && dustGen != null && targetOuterR > completedOuterR)
+        // ---------------------------------------------------------------
+        // Bin-boundary dust burst.
+        //
+        // Coverage targets (playheadBin is 0-based within the expansion):
+        //   Bin 0 — first bin:    30 % of grid area  (r = sqrt(0.30 * w*h / π))
+        //   Bin 1 — middle bins:  50 % of grid area  (r = sqrt(0.50 * w*h / π))
+        //   Final bin:            80 % of grid area  (r = sqrt(0.80 * w*h / π))
+        //
+        // Each burst fires once per bin crossing and grows only the new
+        // annulus from completedOuterR outward to the new target radius.
+        // MusicalRole is set per-cell by GrowVoidDustDiskFromGrid via imprintRole.
+        // ---------------------------------------------------------------
+        if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
         {
-            int budget = gravityVoidImprintBudgetPerTick;
-            budget = -1;
-            float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
-            int fillWedges = Mathf.Clamp(1 + playheadBin, 1, 4);
-            fillWedges = 4;
-            // Vehicle snapshot (grid) so void growth doesn't spawn directly on players.
-            _vehicleCellsScratch.Clear();
-            var vs2 = FindObjectsOfType<Vehicle>();
-            for (int i = 0; i < vs2.Length; i++) { 
-                var v = vs2[i]; 
-                if (v == null || !v.isActiveAndEnabled) continue; 
-                var d = GameFlowManager.Instance?.activeDrumTrack; 
-                if (d != null) _vehicleCellsScratch.Add(d.WorldToGridPosition(v.transform.position));
-            }
-            int processed = dustGen.GrowVoidDustDiskFromGrid(
-                centerGP: _gravityVoidCenterGP,
-                outerRadiusCells: targetOuterR,
-                imprintRole: _gravityVoidOwner.assignedRole,
-                hueRgb: _gravityVoidDustImprintTint, 
-                imprintHardness01: _gravityVoidDustHardness01,
-                energyAtCenter01: 1f,
-                falloffExp: 1.6f,
-                growInSeconds: growIn,
-                fillWedges01To4: fillWedges,
-                vehicleCells: _vehicleCellsScratch,
-                vehicleNoSpawnRadiusCells: 1,
-                maxCellsThisCall: budget,
-                innerRadiusCellsExclusive: completedOuterR
-            );
+            lastBurstBin = playheadBin;
 
-            // Budget semantics:
-            // - If budget < 0 => unlimited, treat as fully completed.
-            // - If processed < budget => likely finished the requested annulus this tick.
-            // - If processed == budget => likely capped, keep working this annulus next tick.
-            if (budget < 0)
+            int w = dustGen.GridW;
+            int h = dustGen.GridH;
+
+            // Half-diagonal so bursts can reach every corner of the grid.
+            int maxPossibleR = Mathf.CeilToInt(Mathf.Sqrt(w * w + h * h) * 0.5f);
+
+            int targetOuterR;
+            bool isFinalBin = (playheadBin >= totalExpansionBins - 1);
+
+            if (playheadBin == 0)
             {
-                completedOuterR = targetOuterR;
+                // First burst: 30 % of grid area — immediately visible spread.
+                float r30 = Mathf.Sqrt(0.30f * w * h / Mathf.PI);
+                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r30), 1, maxPossibleR);
             }
-            else if (processed > 0 && processed < budget)
+            else if (!isFinalBin)
             {
-                completedOuterR = targetOuterR;
+                // Intermediate burst: ~50 % of grid area.  r = sqrt(0.50 * w*h / π)
+                float r50 = Mathf.Sqrt(0.5f * w * h / Mathf.PI);
+                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r50), completedOuterR + 1, maxPossibleR);
             }
             else
             {
-                // processed == 0 or processed == budget: do not advance completedOuterR.
-                // This keeps us filling the same annulus over multiple ticks rather than skipping ahead.
+                // Final burst: ~80 % of grid area.  r = sqrt(0.80 * w*h / π)
+                float r80 = Mathf.Sqrt(0.80f * w * h / Mathf.PI);
+                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r80), completedOuterR + 1, maxPossibleR);
+            }
+
+            _gravityVoidCurrentOuterR = targetOuterR;
+
+            if (targetOuterR > completedOuterR)
+            {
+                // Grow-in time spans the remainder of this bin so cells finish
+                // solidifying before the next bin crosses.
+                float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+
+                // Vehicle positions — avoid spawning directly on players.
+                _vehicleCellsScratch.Clear();
+                var vehicles = FindObjectsOfType<Vehicle>();
+                for (int i = 0; i < vehicles.Length; i++)
+                {
+                    var v = vehicles[i];
+                    if (v == null || !v.isActiveAndEnabled) continue;
+                    var drum = gfm?.activeDrumTrack;
+                    if (drum != null)
+                        _vehicleCellsScratch.Add(drum.WorldToGridPosition(v.transform.position));
+                }
+
+                // Unlimited budget — burst commits the whole annulus at once.
+                // energyAtCenter01 = 1f with a near-flat falloffExp (0.3) keeps the
+                // role color vivid and immediately readable across the whole annulus.
+                // kMinVisibleAlpha in GrowVoidDustDiskFromGrid floors at 0.06, but
+                // with falloffExp this low the outer-edge energy stays well above it.
+                dustGen.GrowVoidDustDiskFromGrid(
+                    centerGP:                  _gravityVoidCenterGP,
+                    outerRadiusCells:          targetOuterR,
+                    imprintRole:               _gravityVoidOwner.assignedRole,
+                    hueRgb:                    _gravityVoidDustImprintTint,
+                    imprintHardness01:         _gravityVoidDustHardness01,
+                    energyAtCenter01:          1f,
+                    falloffExp:                0.3f,   // near-flat — role color stays vivid to the edge
+                    growInSeconds:             growIn,
+                    fillWedges01To4:           4,      // always full 360°
+                    vehicleCells:              _vehicleCellsScratch,
+                    vehicleNoSpawnRadiusCells: 1,
+                    maxCellsThisCall:          -1,     // unlimited — commit whole annulus now
+                    innerRadiusCellsExclusive: completedOuterR
+                );
+
+                completedOuterR = targetOuterR;
             }
         }
 
-        // After we reach max radius, we keep running (VFX stays) until EndGravityVoid... clears owner.
-        // That matches "keeps moving outward until the void disappears."
-        nextTickTime += tick;
-        float wait = Mathf.Max(0.001f, nextTickTime - Time.time);
-        yield return new WaitForSeconds(wait);
+        // Keep ticking so VFX stays live and chord pulses keep firing until
+        // EndGravityVoidForPendingExpand clears the owner.
+        yield return new WaitForSeconds(tick);
     }
 
     _gravityVoidRoutine = null;
