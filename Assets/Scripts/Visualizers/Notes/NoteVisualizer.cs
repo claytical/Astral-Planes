@@ -337,7 +337,6 @@ public bool TryGetNextUnlitStepExcluding(
         }
     }
 
-    Debug.Log($"[UNLIT_SEARCH] track={track.name} rawAbs={rawAbsStep:F2} totalAbsSteps={totalAbsSteps} bestStep={bestStep} bestFwd={bestForward:F2}");
     if (bestStep < 0) return false;
     targetAbsStep = bestStep;
     return true;
