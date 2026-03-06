@@ -89,6 +89,7 @@ public class CosmicDustGenerator : MonoBehaviour
     // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
     private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
+    private PhaseStarBehaviorProfile _activeProfile;
     [Header("Tint Blending (Neighborhood)")]
     [Tooltip("When MineNodes imprint dust colors, blend the imprint toward nearby cell tints to avoid sharp grid seams.")]
     [Range(0, 3)] [SerializeField] private int imprintBlendRadius = 1;
@@ -739,9 +740,24 @@ private void SetDustCollision(CosmicDust dust, bool _enabled)
             dust.clearing.hardness01 = GetCellHardness01(gp);
             Color regrowTint = GetCellVisualColor(gp);
             dust.SetTint(regrowTint);
-            dust.SetFeedbackColors(Color.white, Color.darkGray);
+
+            Color denyColor = Color.darkGray;
+            if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
+            {
+                var rp = MusicalRoleProfileLibrary.GetProfile(imp.role);
+                if (rp != null)
+                {
+                    var shadow = rp.dustColors.shadowColor;
+                    denyColor = (shadow != Color.clear && shadow != Color.magenta)
+                        ? shadow
+                        : Color.darkGray;
+                }
+            }
+            dust.SetFeedbackColors(Color.white, denyColor);
+
             dust.Begin();
-            SetDustCollision(dust, false);        }
+            SetDustCollision(dust, false);
+        }
 
         // Let the visual read before collisions are reintroduced.
         if (regrowColliderEnableDelaySeconds > 0f)
@@ -961,6 +977,59 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     return filtered;
 }
 
+    /// <summary>
+    /// Assigns a MusicalRole to every cell in the growth list via Voronoi (or a future
+    /// archetype-specific layout), then writes a DustImprint for each cell so that
+    /// GetCellHardness01 and GetCellVisualColor return per-cell role values during spawn.
+    /// </summary>
+    private void BuildMazeRoleImprints(
+        MazeArchetype phase,
+        Vector2Int starCell,
+        List<(Vector2Int cell, Vector3 world)> cells)
+    {
+        if (cells == null || cells.Count == 0) return;
+        if (drums == null) return;
+
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>(cells.Count * 2);
+
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+
+        // Resolve dominant role from the active profile; fall back to Bass.
+        MusicalRole dominant = (_activeProfile != null)
+            ? _activeProfile.dominantRole
+            : MusicalRole.Bass;
+
+        // --- Role assignment: currently Voronoi for all archetypes.
+        // Future: switch on phase to use archetype-specific distributions
+        // (e.g. radial wedges for Release, striped for Pop, noise blobs for Wildcard).
+        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, dominant);
+
+        // --- Write imprints ---
+        for (int i = 0; i < cells.Count; i++)
+        {
+            var gp   = cells[i].cell;
+            if (!roleMap.TryGetValue(gp, out var role)) continue;
+
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+            if (roleProfile == null) continue;
+
+            // Base color carries alpha = baseAlpha from the role profile.
+            // This makes hardness directly readable: Bass cells are more opaque than Lead cells.
+            Color baseColor = roleProfile.GetBaseColor();
+
+            _imprints[gp] = new DustImprint
+            {
+                color      = baseColor,
+                hardness01 = roleProfile.GetDustHardness01(),
+                role       = role,
+                healDelay  = 0f   // maze cells use phase-default regrow delay
+            };
+        }
+
+        Debug.Log($"[MAZE] BuildMazeRoleImprints: phase={phase} dominant={dominant} cells={cells.Count} imprinted={roleMap.Count}");
+    }
+
     public IEnumerator GenerateMazeForPhaseWithPaths(MazeArchetype phase, Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
     {
         if (drums == null)
@@ -1002,6 +1071,13 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
 // Pattern-driven growth list
         var cellsToFill = BuildMazeGrowthForPhase(phase, starCell, reserved);
         Debug.Log($"[MAZE] cellsToFill(pattern) count={cellsToFill.Count}");
+
+        // --- Voronoi role imprint pass ---
+        // Write a DustImprint for every cell before StaggeredGrowthFitDuration spawns them.
+        // GetOrCreateCellGO reads GetCellHardness01(gp) and GetCellVisualColor(gp) which
+        // consult _imprints, so each cell spawns with the correct role color + hardness
+        // without any further per-cell logic in the spawn loop.
+        BuildMazeRoleImprints(phase, starCell, cellsToFill);
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
         Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
@@ -1226,8 +1302,22 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
             dust.PrepareForReuse();
             dust.SetGrowInDuration(hexGrowInSeconds);
             dust.clearing.hardness01 = GetCellHardness01(gp);
-            dust.SetTint(_mazeTint);
-            dust.SetFeedbackColors(Color.white, Color.darkGray);
+            dust.SetTint(GetCellVisualColor(gp));
+
+            Color denyColorGo = Color.darkGray;
+            if (_imprints != null && _imprints.TryGetValue(gp, out var impGo) && impGo.role != MusicalRole.None)
+            {
+                var rpGo = MusicalRoleProfileLibrary.GetProfile(impGo.role);
+                if (rpGo != null)
+                {
+                    var shadow = rpGo.dustColors.shadowColor;
+                    denyColorGo = (shadow != Color.clear && shadow != Color.magenta)
+                        ? shadow
+                        : Color.darkGray;
+                }
+            }
+            dust.SetFeedbackColors(Color.white, denyColorGo);
+
             dust.Begin();
             SetDustCollision(dust, false);
         }
@@ -1701,6 +1791,8 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     {
         if (profile == null) return;
 
+        _activeProfile = profile;
+
         // Authoritative default: phase-authored maze tint.
         _mazeTint = profile.mazeColor;
 
@@ -1897,9 +1989,31 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
 
                         dust.PrepareForReuse();
                         dust.SetGrowInDuration(hexGrowInSeconds);
-                        dust.SetTint(_mazeTint);
-                        dust.SetFeedbackColors(Color.white, Color.darkGray);
+
+                        // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
+                        // GetCellHardness01 reads hardness01 from _imprints if available.
+                        Color cellColor = GetCellVisualColor(grid);
+                        dust.SetTint(cellColor);
                         dust.clearing.hardness01 = GetCellHardness01(grid);
+
+                        // Use the role's shadow color as the deny feedback color.
+                        // dustColors.denyColor may be unset on assets; shadowColor is the
+                        // authored "darkened role memory" hue and is more reliably set.
+                        Color denyColor = Color.darkGray;
+                        if (_imprints != null && _imprints.TryGetValue(grid, out var imp) && imp.role != MusicalRole.None)
+                        {
+                            var rp = MusicalRoleProfileLibrary.GetProfile(imp.role);
+                            if (rp != null)
+                            {
+                                var shadow = rp.dustColors.shadowColor;
+                                // Only use shadow if it's meaningfully dark (not unset black or magenta).
+                                denyColor = (shadow != Color.clear && shadow != Color.magenta)
+                                    ? shadow
+                                    : Color.darkGray;
+                            }
+                        }
+                        dust.SetFeedbackColors(Color.white, denyColor);
+
                         dust.ConfigureForPhase(phaseNow);
                         dust.Begin();
 

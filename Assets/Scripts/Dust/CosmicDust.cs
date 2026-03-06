@@ -934,35 +934,106 @@ public class CosmicDust : MonoBehaviour {
         if (gen == null || _drumTrack == null) return;
 
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
-        if (vehicle == null) return; 
-        // --- Clearing rules ---
-        // Not boosting: grind timer (wall-like behavior), scaled by hardness.
-        // Not boosting: dust denies energy.
-        // Harder dust drains more and “denies” more strongly.
-        float hardnessMul = Mathf.Lerp(1.0f, 2.25f, clearing.hardness01);
+        if (vehicle == null) return;
 
-        // Accumulate “grind” time for severity only (not for breaking).
-        _nonBoostClearSeconds += Time.fixedDeltaTime;
+        float h  = Mathf.Clamp01(clearing.hardness01);
+        float dt = Time.fixedDeltaTime;
 
-        // Drain rate (energy/sec) scaled by hardness.
-        float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-        float drain = drainPerSec * hardnessMul * Time.fixedDeltaTime;
+        if (vehicle.boosting)
+        {
+            // ---------------------------------------------------------------
+            // BOOST PATH: vehicle bleaches this cell's charge.
+            //
+            // The vehicle invests its own energy to sap dust charge so the
+            // PhaseStar gains little or nothing from cells already worked.
+            //
+            // Drain rate is inversely scaled by hardness:
+            //   soft (h=0) -> drains at full rate  (resistMul = 1.0)
+            //   hard (h=1) -> drains at 1/3 rate   (resistMul = 0.33)
+            //
+            // Vehicle energy cost mirrors hardness in the other direction --
+            // hard-role dust costs proportionally more boost to neutralize.
+            // ---------------------------------------------------------------
+            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
+            float resistMul   = Mathf.Lerp(1.0f, 0.33f, h);
+            float chargeDrain = drainPerSec * resistMul * dt;
 
-        vehicle.DrainEnergy(drain);
+            float taken = DrainCharge(chargeDrain); // lowers alpha visually
 
-        // Severity is based on “how long you keep denying energy” on this tile.
-        // We can normalize by your existing nonBoostSecondsToBreak as a convenient tuning knob.
-        float denom = Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak);
-        float severity01 = Mathf.Clamp01(_nonBoostClearSeconds / denom);
+            // Hard dust fights back -- pay more boost energy to bleach it.
+            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, h);
+            vehicle.DrainEnergy(drainPerSec * hardnessCost * dt);
 
-// Visual denial shift
-        // Non-carve bump feedback: quick tint pulse, then return to base.
-        if (_nonBoostClearSeconds <= Time.fixedDeltaTime * 1.5f)
-            TriggerDenyTintPulse(Mathf.Lerp(0.12f, 0.35f, severity01));
+            // Flash charge color so the player sees the cell losing its color.
+            if (taken > 0.001f)
+                TriggerChargeTintPulse();
+        }
+        else
+        {
+            // ---------------------------------------------------------------
+            // NON-BOOST PATH: dust denies the vehicle (wall resistance).
+            // Harder dust is more punishing.
+            // ---------------------------------------------------------------
+            float hardnessMul = Mathf.Lerp(1.0f, 2.25f, h);
 
-// IMPORTANT: no breaking/clearing here.
+            _nonBoostClearSeconds += dt;
 
+            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
+            vehicle.DrainEnergy(drainPerSec * hardnessMul * dt);
+
+            float denom    = Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak);
+            float severity = Mathf.Clamp01(_nonBoostClearSeconds / denom);
+
+            if (_nonBoostClearSeconds <= dt * 1.5f)
+                TriggerDenyTintPulse(Mathf.Lerp(0.12f, 0.35f, severity));
+
+            // IMPORTANT: no breaking/clearing here.
+        }
     }
+
+    // Brief brightening pulse to signal active boost drain on this cell.
+    private void TriggerChargeTintPulse()
+    {
+        _denyPulseToken++;
+        int token = _denyPulseToken;
+        StartCoroutine(ChargeTintPulseRoutine(token));
+    }
+
+    private IEnumerator ChargeTintPulseRoutine(int token)
+    {
+        const float kFadeIn  = 0.03f;
+        const float kFadeOut = 0.05f;
+
+        Color baseColor   = _currentTint;
+        Color chargeColor = _hasFeedbackColors ? _chargeColor : Color.white;
+        // Match alpha so the pulse doesn't fight the drain animation.
+        chargeColor.a = baseColor.a;
+
+        // Fade toward charge color
+        float t = 0f;
+        while (t < kFadeIn)
+        {
+            if (token != _denyPulseToken) yield break;
+            t += Time.deltaTime;
+            SetTint(Color.Lerp(baseColor, chargeColor, Mathf.Clamp01(t / kFadeIn)));
+            yield return null;
+        }
+
+        // Fade back -- target live _currentTint so we track ongoing drain
+        Color startOut = _currentTint;
+        t = 0f;
+        while (t < kFadeOut)
+        {
+            if (token != _denyPulseToken) yield break;
+            t += Time.deltaTime;
+            SetTint(Color.Lerp(startOut, _currentTint, Mathf.Clamp01(t / kFadeOut)));
+            yield return null;
+        }
+
+        if (token == _denyPulseToken)
+            _denyPulseRoutine = null;
+    }
+
 private void TriggerDenyTintPulse(float seconds = -1f)
 {
     float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;

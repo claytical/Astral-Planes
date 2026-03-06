@@ -323,6 +323,124 @@ public static class CosmicDustMazePatterns
 
         return growth;
     }
+    /// <summary>
+    /// Assigns a MusicalRole to every cell in <paramref name="cells"/> using a 4-seed Voronoi
+    /// partition, one seed per non-None role (Lead, Harmony, Groove, Bass).
+    ///
+    /// The dominant role's seed is placed farthest from the star, giving it the largest territory.
+    /// The remaining three seeds are distributed at roughly equal angular offsets around the star
+    /// so each role occupies a distinct spatial region.
+    ///
+    /// Role → hardness tier (via MusicalRoleProfile.dustHardness01):
+    ///   Lead ≈ 0.15 (softest)  →  Harmony ≈ 0.35  →  Groove ≈ 0.55  →  Bass ≈ 0.75 (hardest)
+    /// Authors set the exact values in the MusicalRoleProfile assets.
+    /// </summary>
+    /// <param name="cells">Growth cells produced by the maze pattern builder.</param>
+    /// <param name="starCell">Grid-space position of the PhaseStar spawn.</param>
+    /// <param name="gridW">Grid width in cells.</param>
+    /// <param name="gridH">Grid height in cells.</param>
+    /// <param name="dominantRole">The role that receives the largest territory.</param>
+    /// <returns>Dictionary mapping each cell to its assigned MusicalRole.</returns>
+    public static Dictionary<Vector2Int, MusicalRole> AssignRolesVoronoi(
+        IReadOnlyList<(Vector2Int cell, Vector3 world)> cells,
+        Vector2Int starCell,
+        int gridW,
+        int gridH,
+        MusicalRole dominantRole)
+    {
+        var result = new Dictionary<Vector2Int, MusicalRole>(cells.Count);
+        if (cells == null || cells.Count == 0) return result;
+
+        // All four playable roles in hardness order (soft → hard).
+        // This order is purely for seed placement logic — the actual hardness
+        // values come from MusicalRoleProfile assets at spawn time.
+        var roles = new MusicalRole[]
+        {
+            MusicalRole.Lead,
+            MusicalRole.Harmony,
+            MusicalRole.Groove,
+            MusicalRole.Bass
+        };
+
+        // --- Seed placement ---
+        // The grid center and the star position anchor the layout.
+        // Each seed sits at a fixed fraction of the grid's half-diagonal from the star,
+        // at evenly distributed angles.  The dominant role's seed is pushed farther out
+        // (0.75 × half-diagonal) so BFS/Voronoi naturally gives it more cells.
+        // The other three seeds sit at 0.45 × half-diagonal, 120° apart from each other.
+
+        float halfDiag   = Mathf.Sqrt(gridW * gridW + gridH * gridH) * 0.5f;
+        float domRadius  = halfDiag * 0.75f;
+        float restRadius = halfDiag * 0.45f;
+
+        // Find the dominant role's index so we can skip it in the secondary pass.
+        int domIdx = System.Array.IndexOf(roles, dominantRole);
+        if (domIdx < 0) domIdx = 3; // fallback to Bass if role not found
+
+        // Place dominant seed directly opposite the star relative to grid center,
+        // then offset by a fixed angle so it doesn't always land at a border edge.
+        Vector2 gridCenter = new Vector2(gridW * 0.5f, gridH * 0.5f);
+        Vector2 starF      = new Vector2(starCell.x, starCell.y);
+        Vector2 starToCenter = (gridCenter - starF);
+        float baseAngle = (starToCenter.sqrMagnitude > 0.0001f)
+            ? Mathf.Atan2(starToCenter.y, starToCenter.x)
+            : Mathf.PI * 0.5f; // fallback: straight up
+
+        var seeds = new Vector2Int[4];
+
+        // Dominant seed: pushed away from the star along the star→center axis.
+        seeds[domIdx] = ClampToGrid(
+            starF + new Vector2(Mathf.Cos(baseAngle), Mathf.Sin(baseAngle)) * domRadius,
+            gridW, gridH);
+
+        // Remaining three seeds: 120°-separated, closer in.
+        float angleStep  = Mathf.PI * 2f / 3f;
+        float angleStart = baseAngle + Mathf.PI * 0.6f; // offset so they don't mirror dominant
+        int   secondary  = 0;
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (i == domIdx) continue;
+            float a = angleStart + secondary * angleStep;
+            seeds[i] = ClampToGrid(
+                starF + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * restRadius,
+                gridW, gridH);
+            secondary++;
+        }
+
+        // --- Voronoi assignment: each cell takes the role of its nearest seed ---
+        for (int i = 0; i < cells.Count; i++)
+        {
+            var gp = cells[i].cell;
+            int   bestDist = int.MaxValue;
+            MusicalRole bestRole = roles[0];
+
+            for (int s = 0; s < 4; s++)
+            {
+                int dx = gp.x - seeds[s].x;
+                int dy = gp.y - seeds[s].y;
+                int d  = dx * dx + dy * dy; // squared distance — no sqrt needed for comparison
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestRole = roles[s];
+                }
+            }
+
+            result[gp] = bestRole;
+        }
+
+        return result;
+    }
+
+    // Clamps a float-space grid position to valid integer cell coordinates.
+    private static Vector2Int ClampToGrid(Vector2 pos, int w, int h)
+    {
+        return new Vector2Int(
+            Mathf.Clamp(Mathf.RoundToInt(pos.x), 0, w - 1),
+            Mathf.Clamp(Mathf.RoundToInt(pos.y), 0, h - 1));
+    }
+
     private static int CountFilledNeighbors(
         Vector2Int cell,
         Dictionary<Vector2Int, bool> fillMap,

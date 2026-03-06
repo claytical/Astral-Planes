@@ -11,6 +11,10 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Primary color associated with this profile (used for maze tinting / UI).")]
     public Color mazeColor = Color.white;
 
+    [Tooltip("The role whose dust dominates this phase. Determines the largest Voronoi territory " +
+             "and the highest hardness region in the maze. Lead = softest, Bass = hardest.")]
+    public MusicalRole dominantRole = MusicalRole.Bass;
+
     // =====================================================================
     // Core star gameplay levers (PhaseStar.cs)
     // =====================================================================
