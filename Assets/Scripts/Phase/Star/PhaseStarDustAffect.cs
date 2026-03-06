@@ -129,6 +129,15 @@ if (_underThresholdTime.Count > 0)
          _profile = profile;
          _star = star;
 
+        // Eagerly capture the current phase so OnDisarmed has a valid value
+        // even if this object has never ticked through Update (e.g. armed immediately).
+        var gfmEarly = GameFlowManager.Instance;
+        var phaseMgrEarly = gfmEarly != null ? gfmEarly.phaseTransitionManager : null;
+        if (phaseMgrEarly != null)
+        {
+            _lastPhase = phaseMgrEarly.currentPhase;
+            _hasLastPhase = true;
+        }
 
         // Keep the simple drum flag wiring you already had
         star.OnArmed += s =>
@@ -144,6 +153,13 @@ if (_underThresholdTime.Count > 0)
 
             var gen = gfm != null ? gfm.dustGenerator : null;
             if (gen == null) return;
+
+            if (!_hasLastPhase)
+            {
+                // Last-ditch attempt: read phase directly before clearing.
+                var pm = gfm.phaseTransitionManager;
+                if (pm != null) { _lastPhase = pm.currentPhase; _hasLastPhase = true; }
+            }
 
             // Release the keep-clear pocket so those cells can regrow normally.
             gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Establish);

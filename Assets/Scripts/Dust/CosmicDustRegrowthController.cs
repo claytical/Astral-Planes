@@ -130,7 +130,10 @@ public sealed class CosmicDustRegrowthController
         if (stepNow != _lastStepGateStep)
         {
             _lastStepGateStep = stepNow;
-            _stepGateBudget = Mathf.Max(0, _getRegrowCellsPerStep());
+            // Accumulate: add the new step's allocation on top of any unspent budget
+            // rather than discarding it. This prevents waste when the queue is momentarily
+            // empty but fills later in the same step window.
+            _stepGateBudget += Mathf.Max(0, _getRegrowCellsPerStep());
         }
 
         while (_stepGateBudget > 0 && _pendingStepRegrow.Count > 0)
@@ -150,6 +153,9 @@ public sealed class CosmicDustRegrowthController
             }
 
             // Vetoes: keep PendingRegrow and retry later by re-enqueue.
+            // NOTE: _isKeepClearCell (ExclusionMap) and _isDustSpawnBlocked (DustClaimManager)
+            // are two independent blocking systems. Both must pass before we commit.
+            // If a cell is released from one but not the other it will correctly stay blocked here.
             if (_isKeepClearCell(gp)) { EnqueueStepRegrow(gp); continue; }
             if (_isDustSpawnBlocked(gp)) { EnqueueStepRegrow(gp); continue; }
             if (!_isCollectableCellFree(gp)) { EnqueueStepRegrow(gp); continue; }
@@ -218,6 +224,8 @@ public sealed class CosmicDustRegrowthController
             }
 
             // Other vetoes: retry with backoff.
+            // NOTE: _isDustSpawnBlocked (DustClaimManager) and _isSpawnCellAvailable (ExclusionMap/SpawnGrid)
+            // are two independent systems – both must pass.
             if (_isDustSpawnBlocked(gridPos) ||
                 !_isSpawnCellAvailable(gridPos) ||
                 _isVehicleOverlappingCell(gridPos) ||
