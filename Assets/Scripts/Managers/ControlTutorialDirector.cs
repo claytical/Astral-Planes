@@ -288,6 +288,13 @@ public class ControlTutorialDirector : MonoBehaviour
 
     /// Compatibility method: if something still calls this, it will attempt to step manually.
     /// With timed tutorial, this is normally unnecessary, but it won’t break anything.
+    /// Called by input to skip the current step's wait and advance immediately.
+    public void SkipCurrentTutorialStep()
+    {
+        if (!_primaryTutorialRunning || !primaryInstance) return;
+        primaryInstance.SkipCurrentTimedStep();
+    }
+
     public bool AdvancePrimaryTutorial()
     {
         if (!_primaryTutorialRunning || !primaryInstance) return true;

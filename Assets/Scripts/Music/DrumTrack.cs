@@ -1375,7 +1375,7 @@ public void ResetBeatSequencingState(string who)
         Color imprintShadowColor,
         float imprintHardness01,
         int resolveRadiusCells = 0,
-        float appetiteMul = 1f)
+        float appetiteMul = 1f, MusicalRole imprintRole = MusicalRole.None)
     {
         if (_dust == null) return 0;
 
@@ -1387,7 +1387,8 @@ public void ResetBeatSequencingState(string who)
             imprintShadowColor,
             imprintHardness01,
             resolveRadiusCells,
-            appetiteMul
+            appetiteMul, 
+            imprintRole
         );
     }
 

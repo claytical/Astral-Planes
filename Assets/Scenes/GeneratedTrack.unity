@@ -11816,7 +11816,7 @@ MonoBehaviour:
   vehicleErodePerTick: 5
   mineNodeErodeRadius: 1
   mineNodeErodePerTick: 10
-  dustFootprintMul: 1.3
+  dustFootprintMul: 1.1
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2

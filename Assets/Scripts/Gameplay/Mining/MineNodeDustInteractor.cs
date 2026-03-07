@@ -213,15 +213,16 @@ void FixedUpdate()
 
     // Width in CELLS, not world radius
     int resolveRadiusCells = Mathf.Max(0, (carveWidthCells - 1) / 2);
-
     _drumTrack.CarveTemporaryCellFromMineNode(
         carveWorld,
         phase,
         healDelay,
         imprintColor,
-        imprintShadowColor,
-        hardness01,
-        resolveRadiusCells
+        imprintHardness01: hardness01, 
+        imprintShadowColor: imprintShadowColor, 
+        resolveRadiusCells: resolveRadiusCells,
+        appetiteMul:1, 
+        imprintRole: imprintRole
     );
 
     if (_node != null)
