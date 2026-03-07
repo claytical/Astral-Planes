@@ -6,7 +6,7 @@ using TMPro;
 
 public class ControlTutorialHighlight : MonoBehaviour
 {
-    public enum Instruction { None, Drift, Boost, Charge }
+    public enum Instruction { None, Drift, Boost, Release }
 
     public enum ButtonId
     {
@@ -43,7 +43,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     [Header("Copy (Instruction -> Label)")]
     [SerializeField] private string driftText  = "Drift";
     [SerializeField] private string boostText  = "Boost";
-    [SerializeField] private string chargeText = "Charge";
+    [SerializeField] private string releaseText = "Release";
 
     [Header("Tint")]
     [SerializeField] private Color baseTint      = new Color(1f, 1f, 1f, 0.55f);
@@ -60,7 +60,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     {
         Instruction.Drift,
         Instruction.Boost,
-        Instruction.Charge
+        Instruction.Release
     };
 
     [Header("Press-Any-Button Guide (singular highlights)")]
@@ -80,7 +80,6 @@ public class ControlTutorialHighlight : MonoBehaviour
     [SerializeField, Min(0.1f)] private float labelScaleLerpSpeed = 14f;
     [SerializeField] private bool deactivateLabelWhenHidden = true;
 
-    private Coroutine _labelFadeCo;
     [Header("Behavior")]
     [SerializeField] private bool hideTextOnClear = true;
     // ------------------------------------------------------------
@@ -166,11 +165,6 @@ public class ControlTutorialHighlight : MonoBehaviour
     {
         StopAllModes();
     }
-private void StopLabelFade()
-{
-    if (_labelFadeCo != null) { StopCoroutine(_labelFadeCo); _labelFadeCo = null; }
-}
-
 private void SetLabelAlphaImmediate(float a)
 {
     if (!instructionText) return;
@@ -192,75 +186,15 @@ private void FadeLabelTo(float targetAlpha, float seconds)
 {
     if (!instructionText) return;
 
-    // If we're inactive, we cannot run coroutines or Update.
-    // So we must apply immediately (or just bail).
-    if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
-    {
-        // Ensure CanvasGroup exists so alpha can be set deterministically.
-        if (!instructionGroup) instructionGroup = instructionText.GetComponent<CanvasGroup>();
-        if (!instructionGroup) instructionGroup = instructionText.gameObject.AddComponent<CanvasGroup>();
-
-        // If we're "showing" but inactive, we still can't display anyway.
-        // But at least keep internal state consistent, and avoid warnings.
-        if (targetAlpha <= 0.001f)
-        {
-            instructionText.text = "";
-            instructionGroup.alpha = 0f;
-            if (deactivateLabelWhenHidden) instructionText.gameObject.SetActive(false);
-        }
-        else
-        {
-            // We can prep it for next activation.
-            instructionGroup.alpha = 1f;
-            instructionText.gameObject.SetActive(true);
-            instructionText.rectTransform.localScale = _labelBaseScale * (1f + labelAttentionScale);
-        }
-
-        return;
-    }
-
-    // Ensure label is active if fading in
-    if (targetAlpha > 0.001f) instructionText.gameObject.SetActive(true);
-
+    // Ensure CanvasGroup is wired
     if (!instructionGroup) instructionGroup = instructionText.GetComponent<CanvasGroup>();
     if (!instructionGroup) instructionGroup = instructionText.gameObject.AddComponent<CanvasGroup>();
 
-    StopLabelFade();
-    _labelFadeCo = StartCoroutine(FadeLabelRoutine(Mathf.Clamp01(targetAlpha), Mathf.Max(0.0001f, seconds)));
-}
-private IEnumerator FadeLabelRoutine(float target, float seconds)
-{
-    float start = instructionGroup.alpha;
-    float t = 0f;
+    _labelTargetAlpha = Mathf.Clamp01(targetAlpha);
 
-    while (t < 1f && gameObject.activeInHierarchy)
-    {
-        t += Time.unscaledDeltaTime / seconds;
-        float a = Mathf.Lerp(start, target, t);
-        instructionGroup.alpha = a;
-
-        // attention scale easing
-        float mul = (a > 0.001f) ? (1f + labelAttentionScale) : 1f;
-        float s = 1f - Mathf.Exp(-labelScaleLerpSpeed * Time.unscaledDeltaTime);
-        instructionText.rectTransform.localScale = Vector3.Lerp(
-            instructionText.rectTransform.localScale,
-            _labelBaseScale * mul,
-            s
-        );
-
-        yield return null;
-    }
-
-    instructionGroup.alpha = target;
-
-    // final scale snap
-    float finalMul = (target > 0.001f) ? (1f + labelAttentionScale) : 1f;
-    instructionText.rectTransform.localScale = _labelBaseScale * finalMul;
-
-    if (deactivateLabelWhenHidden && target <= 0.001f)
-        instructionText.gameObject.SetActive(false);
-
-    _labelFadeCo = null;
+    // Activate immediately when fading in so UpdateLabelVisuals can write to it
+    if (_labelTargetAlpha > 0.001f)
+        instructionText.gameObject.SetActive(true);
 }
     private void Update()
     {
@@ -385,7 +319,7 @@ private IEnumerator FadeLabelRoutine(float target, float seconds)
 
         if (immediate)
         {
-            StopLabelFade();
+            _labelTargetAlpha = 0f;
             if (instructionText) instructionText.text = "";
             SetLabelAlphaImmediate(0f);
 
@@ -454,15 +388,58 @@ private IEnumerator FadeLabelRoutine(float target, float seconds)
     // ============================================================
     // Tutorial mode (TIMED)
     // ============================================================
+    /// Aborts the current step's wait timer and advances to the next step immediately.
+    public void SkipCurrentTimedStep()
+    {
+        if (!_tutorialActive) return;
+
+        // Stop the running timed coroutine
+        if (_timedTutorialCo != null)
+        {
+            StopCoroutine(_timedTutorialCo);
+            _timedTutorialCo = null;
+        }
+
+        // Advance one step now, then re-launch the timed loop to wait for the next
+        bool done = AdvanceTutorial(immediate: true);
+        if (!done)
+        {
+            _timedTutorialCo = StartCoroutine(TimedTutorialRoutineWaitOnly(_lastStepSeconds));
+        }
+    }
+
+    // Stores the step duration so SkipCurrentTimedStep can re-use it
+    private float _lastStepSeconds = 1.2f;
+
     public void StartTimedTutorial(float stepSeconds = 1.2f, bool immediateFirst = true)
     {
         StopAllModes();
+        _lastStepSeconds = Mathf.Max(0.05f, stepSeconds);
 
         _tutorialActive = true;
         _tutorialIndex = -1;
 
         if (_timedTutorialCo != null) StopCoroutine(_timedTutorialCo);
-        _timedTutorialCo = StartCoroutine(TimedTutorialRoutine(Mathf.Max(0.05f, stepSeconds), immediateFirst));
+        _timedTutorialCo = StartCoroutine(TimedTutorialRoutine(_lastStepSeconds, immediateFirst));
+    }
+
+    /// Runs the timed loop starting from the current index (step already shown), just waiting before advancing.
+    private IEnumerator TimedTutorialRoutineWaitOnly(float stepSeconds)
+    {
+        while (_tutorialActive && gameObject.activeInHierarchy)
+        {
+            if (_tutorialIndex >= (tutorialSequence?.Length ?? 0))
+                break;
+
+            yield return new WaitForSecondsRealtime(stepSeconds);
+
+            if (!_tutorialActive) break;
+
+            bool done = AdvanceTutorial(immediate: false);
+            if (done) break;
+        }
+
+        _timedTutorialCo = null;
     }
 
     private IEnumerator TimedTutorialRoutine(float stepSeconds, bool immediateFirst)
@@ -611,7 +588,8 @@ private IEnumerator FadeLabelRoutine(float target, float seconds)
             FadeLabelTo(1f, labelFadeInSeconds);
         }
 
-        Clear(immediate: immediate, hideText: false);
+        // Always snap-clear previous highlights so the old step doesn't bleed into the new one
+        Clear(immediate: true, hideText: false);
 
         switch (instruction)
         {
@@ -619,11 +597,11 @@ private IEnumerator FadeLabelRoutine(float target, float seconds)
                 HighlightButton(ButtonId.Stick, immediate);
                 break;
             case Instruction.Boost:
-                HighlightButton(ButtonId.Boost, immediate);
-                break;
-            case Instruction.Charge:
                 HighlightButton(ButtonId.Stick, immediate);
                 HighlightButton(ButtonId.Boost, immediate);
+                break;
+            case Instruction.Release:
+                HighlightButton(ButtonId.South, immediate);
                 break;
         }
     }
@@ -747,7 +725,7 @@ private IEnumerator FadeLabelRoutine(float target, float seconds)
         {
             Instruction.Drift  => driftText,
             Instruction.Boost  => boostText,
-            Instruction.Charge => chargeText,
+            Instruction.Release => releaseText,
             _ => ""
         };
     }

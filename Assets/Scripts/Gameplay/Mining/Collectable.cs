@@ -86,8 +86,6 @@ public class Collectable : MonoBehaviour
     static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
     private int _dustClaimOwnerId;
-    // Cached reference – avoids O(n) FindObjectOfType in OnDestroy/OnDisable hot paths.
-    private DustClaimManager _cachedDustClaims;
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
     // ---- Autonomy (Loop Boundary "Idea") ----
@@ -143,12 +141,27 @@ public class Collectable : MonoBehaviour
     [Tooltip("Glow pulse speed (radians/sec) when release window is near.")]
     [SerializeField] private float trailReadyPulseSpeed = 6f;
 
+    [Header("Trail Drift (Autonomous Motion)")]
+    [Tooltip("Max world-space radius of idle drift orbit around the slot position.")]
+    [SerializeField] private float trailDriftRadius = 0.18f;
+
+    [Tooltip("Speed of the drift orbit (radians/sec). Each collectable gets a random phase.")]
+    [SerializeField] private float trailDriftSpeed = 1.1f;
+
+    [Tooltip("How strongly the energy is pulled toward its tether's far-end (the note world). 0 = no pull.")]
+    [SerializeField] private float trailTetherPull = 0.06f;
+
+    [Tooltip("Drift radius shrinks to this fraction as release pulse approaches 1 (energy focuses).")]
+    [SerializeField] private float trailDriftFocusMul = 0.15f;
+
     private Vector3 _trailWorldTarget;
     private bool _trailFollowActive;
     private float _trailReleasePulse01; // 0=idle, 1=release imminent
     private Coroutine _trailFollowRoutine;
     private Vector3 _trailBaseScale;
     private bool _trailBaseScaleCaptured;
+    private float _trailDriftPhase;      // randomised per-instance so collectables don't orbit in sync
+    private Vector3 _trailDriftVelocity; // soft-body spring velocity for the drift offset
     bool _hasReservation;
     public bool ReportedCollected { get; private set; }
 
@@ -627,14 +640,7 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         if (dustGen != null && dt != null)
             insideDust = IsInsideDustStable(cur, dt, dustGen);
         else
-        {
-            // Grid authority is unavailable. Default to "not in dust" so the note
-            // can still move rather than silently blocking. Physics-based dust queries
-            // (IsPositionInsideDust) are NOT used here: MineNodes ignore dust colliders
-            // via Physics2D.IgnoreCollision, making physics results unreliable for this check.
-            // The grid will be available on the next frame once DrumTrack is assigned.
-            insideDust = false;
-        }
+            insideDust = IsPositionInsideDust(cur); // fallback
         if (isTrappedInDust && insideDust)
         {
             // If trapped, do not drift; wait until the player/minenode carves a path.
@@ -736,10 +742,9 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
             // Prefer CellOf if present; otherwise your existing WorldToGridPosition is fine.
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
-            // Cache once at init – avoids O(n) FindObjectOfType in every OnDestroy/OnDisable call.
-            _cachedDustClaims = FindObjectOfType<DustClaimManager>();
-            if (_cachedDustClaims != null)
-                _cachedDustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
+            var dustClaims = FindObjectOfType<DustClaimManager>();
+            if (dustClaims != null)
+                dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
         }
         Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }
@@ -1044,8 +1049,7 @@ public void BeginCarryThenDepositAtDsp(
         UnregisterOccupant();
         UnregisterCarryOrbit();
         StopDustPocket();
-        // Use cached reference; fall back to scene search only if cache is missing (e.g. pooled re-init).
-        var dustClaims = _cachedDustClaims != null ? _cachedDustClaims : FindObjectOfType<DustClaimManager>();
+        var dustClaims = FindObjectOfType<DustClaimManager>();
         if (dustClaims != null)
             dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
         NotifyDestroyedOnce();
@@ -1059,8 +1063,7 @@ public void BeginCarryThenDepositAtDsp(
         UnregisterOccupant();
         StopDustPocket();
         ReleaseDustPocket();
-        // Use cached reference; fall back to scene search only if cache is missing (e.g. pooled re-init).
-        var dustClaims = _cachedDustClaims != null ? _cachedDustClaims : FindObjectOfType<DustClaimManager>();
+        var dustClaims = FindObjectOfType<DustClaimManager>();
         if (dustClaims != null)
             dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
 
@@ -1224,12 +1227,43 @@ private IEnumerator TrailFollowRoutine()
 {
     while (_trailFollowActive)
     {
-        float lerp = Mathf.Clamp01(trailFollowLerp * Time.deltaTime);
-        transform.position = Vector3.Lerp(transform.position, _trailWorldTarget, lerp);
+        float dt = Time.deltaTime;
+        float pulse = _trailReleasePulse01;
 
+        // --- Drift orbit around the slot target ---
+        // Radius shrinks as release approaches, focusing the energy like a coiling spring.
+        float focusedRadius = Mathf.Lerp(trailDriftRadius, trailDriftRadius * trailDriftFocusMul, pulse);
+        _trailDriftPhase += trailDriftSpeed * dt;
+
+        // Lissajous-ish figure: x and y use slightly different frequencies so it
+        // never quite repeats, giving an organic "restless" feel.
+        Vector3 driftOffset = new Vector3(
+            Mathf.Sin(_trailDriftPhase) * focusedRadius,
+            Mathf.Cos(_trailDriftPhase * 0.73f) * focusedRadius * 0.6f,
+            0f
+        );
+
+        // --- Tether-world pull ---
+        // If this collectable has a tether, bias the drift toward the tether's far end
+        // so the energy visually strains toward the note world it's destined for.
+        Vector3 tetherBias = Vector3.zero;
+        if (tether != null && tether.end != null)
+        {
+            Vector3 toEnd = tether.end.position - _trailWorldTarget;
+            // Only the direction matters; we don't want it to escape the slot.
+            if (toEnd.sqrMagnitude > 0.0001f)
+                tetherBias = toEnd.normalized * trailTetherPull;
+        }
+
+        // --- Compose target and follow ---
+        Vector3 desiredPos = _trailWorldTarget + driftOffset + tetherBias;
+        float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
+        transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
+
+        // --- Scale / alpha ---
         if (_trailBaseScaleCaptured && energySprite != null)
         {
-            float pulse = _trailReleasePulse01;
+            // Breathe faster and larger as release nears.
             float breathe = Mathf.Sin(Time.time * trailReadyPulseSpeed * (1f + pulse * 2f)) * 0.5f + 0.5f;
             float scaleTarget = Mathf.Lerp(trailIdleScaleMin, trailReadyScaleMax, pulse * breathe);
             transform.localScale = _trailBaseScale * scaleTarget;
@@ -1541,6 +1575,8 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
         _trailWorldTarget = transform.position;
         _trailFollowActive = true;
         _trailReleasePulse01 = 0f;
+        _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+        _trailDriftVelocity = Vector3.zero;
         if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
         if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
         _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());

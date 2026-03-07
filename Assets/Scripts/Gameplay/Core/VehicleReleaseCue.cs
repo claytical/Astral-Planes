@@ -25,13 +25,13 @@ public class VehicleReleaseCue : MonoBehaviour
     [SerializeField] private float circleMaxRadius = 0.65f;
 
     [Tooltip("Minimum world-space radius when the circle first becomes visible.")]
-    [SerializeField] private float circleMinRadius = 0.10f;
+    [SerializeField] private float circleMinRadius = 0.35f;
 
     [Tooltip("Alpha of the circle at pulse = 0 (just appeared).")]
-    [SerializeField] private float circleAlphaMin = 0.10f;
+    [SerializeField] private float circleAlphaMin = 0.50f;
 
     [Tooltip("Alpha of the circle at pulse = 1 (fully grown).")]
-    [SerializeField] private float circleAlphaMax = 0.70f;
+    [SerializeField] private float circleAlphaMax = 0.90f;
 
     [Tooltip("Sorting layer shared with the vehicle sprite.")]
     [SerializeField] private string circleSortingLayer = "Default";
@@ -89,9 +89,15 @@ public class VehicleReleaseCue : MonoBehaviour
 
     private void Update()
     {
-        _currentPulse = Mathf.Lerp(_currentPulse, _targetPulse, circleLerpSpeed * Time.deltaTime);
+        // Snap off immediately when the cue is cleared — no fizzle/linger.
+        if (_targetPulse <= 0f)
+            _currentPulse = 0f;
+        else
+            _currentPulse = Mathf.Lerp(_currentPulse, _targetPulse, circleLerpSpeed * Time.deltaTime);
 
-        bool active = _targetPulse > 0.01f || _currentPulse > 0.01f;
+        // Use _targetPulse for visibility so the circle appears/disappears on musical time,
+        // not on the lagged smoothed value.
+        bool active = _targetPulse > 0.01f;
         SetVisible(active);
 
         if (active)
@@ -223,7 +229,7 @@ public class VehicleReleaseCue : MonoBehaviour
     private void SetVisible(bool visible)
     {
         if (_circle != null)
-            _circle.enabled = visible && _currentPulse > 0.03f;
+            _circle.enabled = visible;
 
         foreach (var sr in _dots)
             if (sr != null) sr.gameObject.SetActive(visible);

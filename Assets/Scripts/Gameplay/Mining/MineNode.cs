@@ -152,7 +152,25 @@ public class MineNode : MonoBehaviour
 
         _carveDir = Rotate(_carveDir, delta).normalized;
     }
-
+// In FixedUpdate, after the step-based turn:
+    var vehicles = GameFlowManager.Instance?.localPlayers;
+    if (vehicles != null)
+    {
+        Vector2 myPos = _rb.position;
+        Vector2 flee = Vector2.zero;
+        float fleeRadiusSq = 25f; // 5 units
+        foreach (var lp in vehicles)
+        {
+            var v = lp?.plane;
+            if (v == null) continue;
+            Vector2 away = myPos - (Vector2)v.transform.position;
+            float dSq = away.sqrMagnitude;
+            if (dSq < fleeRadiusSq && dSq > 0.001f)
+                flee += away / dSq; // inverse-square falloff
+        }
+        if (flee.sqrMagnitude > 0.001f)
+            _carveDir = Vector2.Lerp(_carveDir, flee.normalized, 0.25f).normalized;
+    }
     // --- NOTE-DRIVEN SPEED ---
     int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
 
@@ -218,7 +236,15 @@ public class MineNode : MonoBehaviour
         Vector2 fwd = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
         Vector2 left  = new Vector2(-fwd.y, fwd.x);
         Vector2 right = new Vector2(fwd.y, -fwd.x);
+        Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
+        int w = _drumTrack.GetSpawnGridWidth();
+        int h = _drumTrack.GetSpawnGridHeight();
+        Vector2 toCenter = new Vector2(w * 0.5f - myCell.x, h * 0.5f - myCell.y);
+        if (toCenter.sqrMagnitude > 0.001f) toCenter.Normalize();
 
+        float lDot = Vector2.Dot(left, toCenter);
+        float rDot = Vector2.Dot(right, toCenter);
+        _carveDir = (lDot > rDot) ? left : right;
         // If we have velocity, choose the side that reduces alignment with the blocked motion
         if (vMag > 0.05f)
         {

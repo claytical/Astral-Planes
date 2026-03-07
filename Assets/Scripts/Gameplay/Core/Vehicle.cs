@@ -218,6 +218,8 @@ public class Vehicle : MonoBehaviour
         Vector3 cur = transform.position;
         float moved = Vector3.Distance(cur, _posHistoryLast);
         _posHistoryAccum += moved;
+        if (moved > 0.001f)
+            _lastTravelDir = (cur - _posHistoryLast).normalized;
         _posHistoryLast = cur;
 
         // Record at a density of ~4 samples per slot-spacing so we have smooth curve data
@@ -237,32 +239,47 @@ public class Vehicle : MonoBehaviour
     /// </summary>
     private Vector3 SampleTrailPosition(float distance)
     {
+        Vector3 vehiclePos = transform.position;
+
         if (_posHistory == null || _posHistoryCount < 2)
-            return transform.position - (Vector3)(rb ? rb.linearVelocity.normalized * distance : Vector2.up * distance);
+            return vehiclePos - _lastTravelDir * distance;
 
         float remaining = distance;
-        // Start from the newest entry (head-1) and walk backwards
+        // Start from the newest entry (head-1) and walk backwards.
+        // The newest entry may lag behind the actual vehicle position if it hasn't
+        // moved far enough to trigger a new sample, so we prepend a virtual segment
+        // from vehiclePos to the newest history point.
         int idx = (_posHistoryHead - 1 + _posHistory.Length) % _posHistory.Length;
-        Vector3 prev = _posHistory[idx];
+        Vector3 prev = vehiclePos; // always start from the live vehicle position
+        Vector3 newest = _posHistory[idx];
 
-        for (int i = 1; i < _posHistoryCount; i++)
+        // Walk: vehiclePos → newest → older samples
+        for (int i = 0; i <= _posHistoryCount; i++)
         {
-            int nextIdx = (idx - 1 + _posHistory.Length) % _posHistory.Length;
-            Vector3 next = _posHistory[nextIdx];
+            Vector3 next = (i == 0) ? newest : default;
+            if (i > 0)
+            {
+                int nextIdx = (idx - 1 + _posHistory.Length) % _posHistory.Length;
+                next = _posHistory[nextIdx];
+                idx = nextIdx;
+            }
 
             float seg = Vector3.Distance(prev, next);
-            if (seg <= 0f) { idx = nextIdx; prev = next; continue; }
+            if (seg <= 0f) { prev = next; continue; }
 
             if (remaining <= seg)
                 return Vector3.Lerp(prev, next, remaining / seg);
 
             remaining -= seg;
-            idx = nextIdx;
             prev = next;
+
+            if (i == _posHistoryCount - 1)
+                break;
         }
 
-        // Ran out of history — extrapolate from last known direction
-        return prev;
+        // Ran out of history — extrapolate straight back from the last known point
+        // along the last travel direction so the tail keeps hanging naturally.
+        return prev - _lastTravelDir * remaining;
     }
 
     private void TickNoteTrail()
@@ -620,6 +637,7 @@ public class Vehicle : MonoBehaviour
     private int _posHistoryCount;
     private float _posHistoryAccum; // distance accumulator for spacing
     private Vector3 _posHistoryLast;
+    private Vector3 _lastTravelDir = Vector3.down; // fallback tail direction when stationary
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
