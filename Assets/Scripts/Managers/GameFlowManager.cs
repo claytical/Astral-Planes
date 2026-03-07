@@ -71,6 +71,7 @@ public class GameFlowManager : MonoBehaviour
     private bool _setupInFlight, _setupDone;
     private CoralVisualizer _coralInstance;
     private readonly List<PhaseSnapshot> _motifSnapshots = new();
+    private float _motifStartTime = 0f; // stamped when each motif begins, used for coral branch height
     private GameState currentState = GameState.Begin;
     private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
@@ -169,6 +170,10 @@ public class GameFlowManager : MonoBehaviour
 
             // Skip anything belonging to the coral instance (if it already exists)
             if (_coralInstance != null && r.transform.IsChildOf(_coralInstance.transform))
+                continue;
+
+            // Skip the motif coral visualizer so it stays visible during the motif bridge
+            if (motifCoralVisualizer != null && r.transform.IsChildOf(motifCoralVisualizer.transform))
                 continue;
 
             // Skip UI canvases (they’re already handled by SetBridgeVisualMode)
@@ -564,6 +569,7 @@ public class GameFlowManager : MonoBehaviour
         GhostCycleInProgress = true;
         BridgePending = true;
         FreezeGameplayForBridge();
+        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
 
         // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
         var allTracks = (controller?.tracks != null)
@@ -603,6 +609,7 @@ public class GameFlowManager : MonoBehaviour
         // Advance motif — this calls BeginNewMotif() which clears track state.
         yield return StartCoroutine(StartNextMotifInPhase(phaseToRestart));
 
+        SetBridgeCinematicMode(false); // restore maze, dust, vehicles
         GhostCycleInProgress = false;
         BridgePending = false;
     }
@@ -698,6 +705,7 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
     // ============================================================
 
     // 0) Hard reset only ONCE per motif boundary
+    _motifStartTime = Time.time; // stamp before clearing tracks so coral height is correct
     controller?.BeginNewMotif($"MotifStart {phase}");
     noteViz?.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
 
@@ -1213,7 +1221,7 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
 
         if (retained == null || retained.Count == 0) return snapshot;
 
-        float motifStartTime = snapshot.Timestamp; // approximate — bin durations are relative to this
+        float motifStartTime = _motifStartTime > 0f ? _motifStartTime : snapshot.Timestamp;
 
         foreach (var track in retained)
         {

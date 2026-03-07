@@ -366,7 +366,8 @@ public class LocalPlayer : MonoBehaviour
             ControlTutorialDirector.Instance != null &&
             ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)
         {
-            // Timed tutorial is running; ignore confirm (or treat as "skip" if you want).
+            // Advance (skip wait) to the next tutorial step
+            ControlTutorialDirector.Instance.SkipCurrentTutorialStep();
             return;
         }
 
