@@ -35,6 +35,8 @@ public class GameFlowManager : MonoBehaviour
     [Tooltip("Max extra loops to wait for collectables to clear before starting the bridge.")]
     public int phaseBridgeWaitMaxLoops = 64;
     [Header("Coral (New Spiral)")]
+    [SerializeField] private MotifCoralVisualizer motifCoralVisualizer;
+    [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [SerializeField] private bool useSpiralCoralDuringBridge = true;
     [SerializeField] private Transform coralRoot; // scene object root
     [SerializeField] private SpiralCoralBaseBuilder spiralCoralBase;
@@ -111,6 +113,12 @@ public class GameFlowManager : MonoBehaviour
         this.spiralCoralGrower = trackGrower;
 
         Debug.Log($"[CORAL:RIG] Registered rig root={this.coralRoot?.name} base={this.spiralCoralBase!=null} grower={this.spiralCoralGrower!=null}");
+    }
+
+    public void RegisterMotifCoralVisualizer(MotifCoralVisualizer vis)
+    {
+        motifCoralVisualizer = vis;
+        Debug.Log($"[CORAL:MOTIF] Registered MotifCoralVisualizer: {vis?.name}");
     }
 
     private bool HasSpiralRig()
@@ -553,16 +561,46 @@ public class GameFlowManager : MonoBehaviour
 
     private IEnumerator PlayMotifBridgeAndRestart(MazeArchetype phaseToRestart)
     {
-        // Reuse your existing bridge gating flags so PhaseStar waits correctly.
         GhostCycleInProgress = true;
         BridgePending = true;
+        FreezeGameplayForBridge();
 
-        FreezeGameplayForBridge(); // you already have this
+        // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
+        var allTracks = (controller?.tracks != null)
+            ? controller.tracks.Where(t => t != null).ToList()
+            : new List<InstrumentTrack>();
 
-        // Optional: short accent / bridge audio here (or reuse sig.includeDrums logic)
-        yield return null;
+        var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
+        motifSnap.Pattern = phaseTransitionManager != null
+            ? phaseTransitionManager.currentPhase
+            : MazeArchetype.Establish;
 
-        // IMPORTANT: This is the real "new level"
+        _motifSnapshots.Add(motifSnap);
+        ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
+
+        Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
+                  $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
+
+        // Show MotifCoralVisualizer for the hold duration.
+        // If no visualizer is assigned, still hold so the motif boundary feels intentional.
+        if (motifCoralVisualizer != null)
+        {
+            motifCoralVisualizer.gameObject.SetActive(true);
+            yield return StartCoroutine(
+                motifCoralVisualizer.GrowMotifCoral(
+                    motifSnap,
+                    motifBridgeHoldSeconds,
+                    ReadAveragedSteer)
+            );
+            motifCoralVisualizer.gameObject.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning("[MOTIF-BRIDGE] No MotifCoralVisualizer assigned — holding without visual.");
+            yield return new WaitForSeconds(motifBridgeHoldSeconds);
+        }
+
+        // Advance motif — this calls BeginNewMotif() which clears track state.
         yield return StartCoroutine(StartNextMotifInPhase(phaseToRestart));
 
         GhostCycleInProgress = false;
@@ -770,6 +808,24 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
         StartCoroutine(TransitionToScene("TrackFinished"));
     }
     
+    /// <summary>
+    /// Averages the stick input from all active LocalPlayers for use in coral bridge steering.
+    /// Returns Vector2.zero if no players are present. Result is clamped to magnitude 1.
+    /// </summary>
+    private Vector2 ReadAveragedSteer()
+    {
+        if (localPlayers == null || localPlayers.Count == 0) return Vector2.zero;
+        Vector2 sum = Vector2.zero;
+        int n = 0;
+        foreach (var lp in localPlayers)
+        {
+            if (lp == null) continue;
+            sum += lp.GetMoveInput();
+            n++;
+        }
+        return n > 0 ? Vector2.ClampMagnitude(sum / n, 1f) : Vector2.zero;
+    }
+
     private IEnumerator FadeSpiralCoralAlpha(Transform root, float target, float seconds)
     {
         if (root == null) yield break;
@@ -975,30 +1031,44 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
         spiralCoralGrower.Clear();
 
         spiralCoralBase.BuildBase(motifSnapshot);
-        spiralCoralGrower.BuildTracks(motifSnapshot);
+
+        // Animated grow: notes bloom one by one in step order, player stick steers the sculpture.
+        // This coroutine holds for exactly bridgeOnceSec internally, so we do NOT add a separate
+        // WaitForSeconds — the timing below still anchors the outer fade correctly.
         if (fadeSpiralCoralDuringBridge && coralRoot != null)
         {
-            // Fade to a readable alpha (Standard shader needs _Color.a)
             yield return StartCoroutine(
                 FadeSpiralCoralAlpha(coralRoot, spiralCoralFadeTarget, Mathf.Min(0.25f, bridgeOnceSec * 0.25f))
             );
         }
+
+        yield return StartCoroutine(
+            spiralCoralGrower.GrowTracksAnimated(motifSnapshot, bridgeOnceSec, ReadAveragedSteer)
+        );
     }
-
-    // No coral visualizer available; still hold for exactly one loop and fade audio.
+    else
+    {
+        // No spiral rig — still hold for exactly one loop so audio completes.
         float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
-
         yield return new WaitForSeconds(Mathf.Max(0f, bridgeOnceSec - fadeOutSec));
         yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
+    }
 
-        // --- Spiral coral: fade out + hide after bridge ---
-        if (useSpiralCoralDuringBridge && sig.growCoral && coralRoot != null)
-        {
-            if (fadeSpiralCoralDuringBridge)
-                yield return StartCoroutine(FadeSpiralCoralAlpha(coralRoot, 0f, Mathf.Min(0.25f, bridgeOnceSec * 0.25f)));
+    // After GrowTracksAnimated (or the plain wait), fade audio if we used the coral path.
+    if (useSpiralCoralDuringBridge && HasSpiralRig())
+    {
+        float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
+        yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
+    }
 
-            coralRoot.gameObject.SetActive(false);
-        }
+    // --- Spiral coral: fade out + hide after bridge ---
+    if (useSpiralCoralDuringBridge && sig.growCoral && coralRoot != null)
+    {
+        if (fadeSpiralCoralDuringBridge)
+            yield return StartCoroutine(FadeSpiralCoralAlpha(coralRoot, 0f, Mathf.Min(0.25f, bridgeOnceSec * 0.25f)));
+
+        coralRoot.gameObject.SetActive(false);
+    }
 
 
     // ----------------------------------------------------------------------
@@ -1133,7 +1203,17 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
         snapshot.Color = dustGenerator.MazeColor();   // Color (maze/dust/phase tint)
         // ---------------------------------------------------------------
 
+        // Coral animation timing: normalise step → bridge time using the live drum totalSteps.
+        snapshot.TotalSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 16;
+
+        // Root-note highlight: used to give distinct visual treatment to key-root notes.
+        snapshot.MotifKeyRootMidi = (phaseTransitionManager != null && phaseTransitionManager.currentMotif != null)
+            ? phaseTransitionManager.currentMotif.keyRootMidi
+            : 60;
+
         if (retained == null || retained.Count == 0) return snapshot;
+
+        float motifStartTime = snapshot.Timestamp; // approximate — bin durations are relative to this
 
         foreach (var track in retained)
         {
@@ -1142,23 +1222,79 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
             var notes = track.GetPersistentLoopNotes();
             if (notes == null || notes.Count == 0) continue;
 
-            var c = QuantizeToColor32(ResolveTrackColor(track));
+            Color c       = QuantizeToColor32(ResolveTrackColor(track));
+            int   binSize = Mathf.Max(1, track.BinSize());
 
-            // notes: List<(int stepIndex, int note, int duration, float velocity)>
+            // Build per-bin template step sets so we can classify each collected note as matched/unmatched.
+            // Key: binIndex → HashSet of local steps (0..binSize-1) that are authored in the template.
+            var templateStepsByBin = new Dictionary<int, HashSet<int>>();
+            for (int b = 0; b < track.maxLoopMultiplier; b++)
+            {
+                var ns = track.GetNoteSetForBin(b);
+                if (ns?.persistentTemplate == null) continue;
+                var set = new HashSet<int>();
+                foreach (var t in ns.persistentTemplate)
+                    set.Add(t.step); // template steps are bin-local (0..binSize-1)
+                templateStepsByBin[b] = set;
+            }
+
+            // Emit NoteEntries with BinIndex and IsMatched populated.
             foreach (var n in notes.OrderBy(n => n.stepIndex))
             {
-                snapshot.CollectedNotes.Add(
-                    new PhaseSnapshot.NoteEntry(
-                        step: n.stepIndex,
-                        note: n.note,
-                        velocity: n.velocity,
-                        trackColor: c
-                    )
-                );
+                int binIndex  = n.stepIndex / binSize;
+                int localStep = n.stepIndex % binSize;
+                bool isMatched = templateStepsByBin.TryGetValue(binIndex, out var templateSet)
+                                 && templateSet.Contains(localStep);
+
+                snapshot.CollectedNotes.Add(new PhaseSnapshot.NoteEntry(
+                    step:       n.stepIndex,
+                    note:       n.note,
+                    velocity:   n.velocity,
+                    trackColor: c,
+                    binIndex:   binIndex,
+                    isMatched:  isMatched
+                ));
+            }
+
+            // Emit TrackBinData entries — one per allocated bin on this track.
+            int allocatedBins = Mathf.Max(1, track.loopMultiplier);
+            for (int b = 0; b < allocatedBins; b++)
+            {
+                // Collect steps for this bin from persistentLoopNotes
+                var binNotes = notes.Where(n => n.stepIndex / binSize == b).ToList();
+                templateStepsByBin.TryGetValue(b, out var tplSet);
+
+                int matched   = 0;
+                int unmatched = 0;
+                var collectedSteps = new List<int>();
+                foreach (var n in binNotes)
+                {
+                    int localStep = n.stepIndex % binSize;
+                    collectedSteps.Add(localStep);
+                    if (tplSet != null && tplSet.Contains(localStep)) matched++;
+                    else unmatched++;
+                }
+
+                snapshot.TrackBins.Add(new PhaseSnapshot.TrackBinData
+                {
+                    TrackColor         = c,
+                    Role               = track.assignedRole,
+                    BinIndex           = b,
+                    IsFilled           = track.IsBinFilled(b),
+                    CompletionTime     = track.GetBinCompletionTime(b),
+                    MotifStartTime     = motifStartTime,
+                    MatchedNoteCount   = matched,
+                    UnmatchedNoteCount = unmatched,
+                    CollectedSteps     = collectedSteps,
+                });
             }
         }
 
-        Debug.Log($"[PHASE SNAPSHOT FINALIZE] phase={snapshot.Pattern} notes={snapshot.CollectedNotes.Count}");
+        int matchedTotal   = snapshot.CollectedNotes.Count(n => n.IsMatched);
+        int unmatchedTotal = snapshot.CollectedNotes.Count - matchedTotal;
+        Debug.Log($"[PHASE SNAPSHOT FINALIZE] phase={snapshot.Pattern} notes={snapshot.CollectedNotes.Count} " +
+                  $"matched={matchedTotal} unmatched={unmatchedTotal} bins={snapshot.TrackBins.Count} " +
+                  $"totalSteps={snapshot.TotalSteps} rootMidi={snapshot.MotifKeyRootMidi}");
         return snapshot;
     }
 

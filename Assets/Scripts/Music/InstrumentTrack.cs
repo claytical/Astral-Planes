@@ -111,6 +111,9 @@ public class
     private int? _pendingLoopMultiplier;   // supports expand or collapse
     public int currentBurstId;
     [SerializeField] private List<bool> _binFilled = new();
+    // Wall-clock time (Time.time) at which each bin was marked filled.
+    // -1 means not yet filled. Sized and reset in parallel with _binFilled.
+    private float[] _binCompletionTime;
     private bool _waitingForDrumReady;
     [SerializeField] private int _maxBins = 4;                // keep in sync with your loop multiplier
     [SerializeField] private List<int> _binFillOrder = null;  // 0 = unfilled; 1,2,3,... = ordinal it was filled
@@ -645,6 +648,16 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         if (_binFilled.Count > want)
             _binFilled.RemoveRange(want, _binFilled.Count - want); 
+
+        // Keep _binCompletionTime in sync with _binFilled size.
+        if (_binCompletionTime == null || _binCompletionTime.Length != want)
+        {
+            var old = _binCompletionTime;
+            _binCompletionTime = new float[want];
+            for (int i = 0; i < want; i++)
+                _binCompletionTime[i] = (old != null && i < old.Length) ? old[i] : -1f;
+        }
+
         if (binAllocated == null || binAllocated.Length != maxLoopMultiplier) {
             var old = binAllocated; 
             binAllocated = new bool[maxLoopMultiplier]; 
@@ -742,6 +755,10 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         if (_binFilled[bin] == filled) return;
 
         _binFilled[bin] = filled;
+
+        // Record wall-clock completion time for the coral visualizer.
+        if (filled && _binCompletionTime != null && bin < _binCompletionTime.Length)
+            _binCompletionTime[bin] = Time.time;
 
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
@@ -850,6 +867,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             {
                 SetBinAllocated(b, false);
                 if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
+                if (_binCompletionTime != null && b < _binCompletionTime.Length) _binCompletionTime[b] = -1f;
                 Harmony_OnBinEmptied(b);
             }
 
@@ -1118,6 +1136,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         if (binIdx >= 0 && binIdx < _binFilled.Count)
         {
             _binFilled[binIdx] = false;
+            if (_binCompletionTime != null && binIdx < _binCompletionTime.Length) _binCompletionTime[binIdx] = -1f;
             Harmony_OnBinEmptied(binIdx);
         }
 
@@ -1677,12 +1696,24 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                && binIndex < _binFilled.Count
                && _binFilled[binIndex];
     }
+
+    /// <summary>
+    /// Returns the Time.time value at which the given bin was marked filled,
+    /// or -1 if the bin has not been filled yet.
+    /// </summary>
+    public float GetBinCompletionTime(int binIndex)
+    {
+        if (_binCompletionTime == null || binIndex < 0 || binIndex >= _binCompletionTime.Length)
+            return -1f;
+        return _binCompletionTime[binIndex];
+    }
     public void ResetBinsForPhase()
     {
         // Hard reset of bin span + allocation for a clean new phase/motif.
         int want = Mathf.Max(1, maxLoopMultiplier);
 
         _binFilled = Enumerable.Repeat(false, want).ToList();
+        _binCompletionTime = Enumerable.Repeat(-1f, want).ToArray();
 
         // Allocation drives span (EffectiveLoopBins). Ensure we clear it too.
         binAllocated = new bool[want];
@@ -2832,12 +2863,21 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
     private void RecomputeBinsFromLoop()
     {
         EnsureBinList();
-        for (int i = 0; i < _binFilled.Count; i++) _binFilled[i] = false;
+        for (int i = 0; i < _binFilled.Count; i++)
+        {
+            bool wasFilled = _binFilled[i];
+            _binFilled[i] = false;
+            // If we're clearing a bin that was previously filled, also clear its completion time.
+            if (wasFilled && _binCompletionTime != null && i < _binCompletionTime.Length)
+                _binCompletionTime[i] = -1f;
+        }
 
         foreach (var (step, _, _, _, _) in persistentLoopNotes)
         {
             int b = BinIndexForStep(step);
             if (b >= 0 && b < _binFilled.Count) _binFilled[b] = true;
+            // Note: completion time is not re-stamped here — recompute is a structural pass,
+            // not a new fill event. Times from the original fill are preserved if bin stays filled.
         }
 
         // Keep loop span derived from the highest FILLED bin (not the old multiplier)

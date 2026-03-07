@@ -234,6 +234,10 @@ public class LocalPlayer : MonoBehaviour
         return plane?.energyLevel ?? 0f;
     }
 
+    /// <summary>Returns the current smoothed stick input (magnitude 0–1).
+    /// Used by the coral bridge animation to steer the sculpture in real time.</summary>
+    public Vector2 GetMoveInput() => _virtualStick;
+
     public string GetSelectedShipName()
     {
         return _selection?.GetCurrentShipName();
@@ -362,8 +366,7 @@ public class LocalPlayer : MonoBehaviour
             ControlTutorialDirector.Instance != null &&
             ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)
         {
-            // Advance (skip wait) to the next tutorial step
-            ControlTutorialDirector.Instance.SkipCurrentTutorialStep();
+            // Timed tutorial is running; ignore confirm (or treat as "skip" if you want).
             return;
         }
 
