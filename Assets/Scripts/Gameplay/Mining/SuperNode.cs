@@ -12,7 +12,6 @@ public class SuperNode : MonoBehaviour
 
     private float _spawnTime;
     private bool _sawFirstBoundary;
-
     private bool _triggered;
 
     private void Awake()
@@ -31,19 +30,16 @@ public class SuperNode : MonoBehaviour
                 drumTrack = FindAnyObjectByType<DrumTrack>();
         }
     }
-
     public void Initialize(SoloVoice sv, DrumTrack drum)
     {
         soloVoice = sv;
         drumTrack = drum;
     }
-
     private void OnEnable()
     {
         _spawnTime = Time.time;
         TrySubscribeToBoundary();
     }
-
     private void OnDisable()
     {
         if (drumTrack != null)
@@ -65,8 +61,6 @@ public class SuperNode : MonoBehaviour
             drumTrack.OnLoopBoundary += OnLoopBoundary;
         }
     }
-
-
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (_triggered) return;
@@ -95,7 +89,6 @@ public class SuperNode : MonoBehaviour
             soloVoice.PlayImmediateQuantizedLickFromTracks(tracks);    
         
     }
-
     private void OnLoopBoundary()
     {
         // First boundary after spawn: arm despawn
@@ -113,8 +106,6 @@ public class SuperNode : MonoBehaviour
         if (_triggered)
             Destroy(gameObject);
     }
-
-
     private IEnumerable<InstrumentTrack> ResolveTracks()
     {
         var gfm = GameFlowManager.Instance;

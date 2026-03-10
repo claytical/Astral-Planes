@@ -149,7 +149,7 @@ MonoBehaviour:
   profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
   capacity: 85
   arcadeMaxSpeed: 14
-  arcadeAccel: 40
+  arcadeAccel: 10
   arcadeBoostAccel: 80
   arcadeLinearDamping: 2
   arcadeAngularDamping: 0.5

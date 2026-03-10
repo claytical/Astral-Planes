@@ -54,12 +54,6 @@ public class MotifProfile : ScriptableObject
         if (beatIntroCount > entryDrumLoops.Count) beatIntroCount = entryDrumLoops.Count; 
     }
 
-    public RoleMotifNoteSetConfig GetConfigForRole(MusicalRole role)
-    {
-        if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
-            return null;
-        return GetConfigForRoleAtBin(role, 0, 1);
-    }
     /// <summary>
     /// Returns the config to use for a given role and bin index.
     ///

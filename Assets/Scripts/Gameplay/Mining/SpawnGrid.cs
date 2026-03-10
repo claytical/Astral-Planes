@@ -1,17 +1,17 @@
 using UnityEngine;
 using System.Collections.Generic;
-public class GridCell {
+    public class GridCell {
     public bool IsOccupied;
     public GridObjectType ObjectType = GridObjectType.Empty;
 }
 
-public enum GridObjectType {
+    public enum GridObjectType {
     Note,
     Node,
     Empty,
     Dust
 }
-public class SpawnGrid : MonoBehaviour
+    public class SpawnGrid : MonoBehaviour
 {
     public int gridWidth = 8;
     public int gridHeight = 12;

@@ -74,35 +74,8 @@ public class MineNodeDustInteractor : MonoBehaviour
             Physics2D.IgnoreLayerCollision(gameObject.layer, dustPhysicsLayer, true);
 
     }
-    private void IgnoreDustCollidersNearNode()
-    {
-        if (_myColliders == null || _myColliders.Length == 0) return;
 
-        Vector2 p = _rb != null ? _rb.position : (Vector2)transform.position;
-
-        int n = Physics2D.OverlapCircleNonAlloc(p, dustIgnoreQueryRadiusWorld, _dustIgnoreHits, dustTerrainMask);
-        if (n <= 0) return;
-
-        for (int i = 0; i < n; i++)
-        {
-            var dustCol = _dustIgnoreHits[i];
-            if (dustCol == null) continue;
-
-            int id = dustCol.GetInstanceID();
-            if (_ignoredDustColliderIds.Contains(id)) continue;
-
-            for (int c = 0; c < _myColliders.Length; c++)
-            {
-                var my = _myColliders[c];
-                if (my == null) continue;
-                Physics2D.IgnoreCollision(my, dustCol, true);
-            }
-
-            _ignoredDustColliderIds.Add(id);
-        }
-    }
-    
-void FixedUpdate()
+    void FixedUpdate()
 {
     if (_rb == null) return;
     if (_drumTrack == null) return;
@@ -228,14 +201,12 @@ void FixedUpdate()
     if (_node != null)
         _node.NotifyDustErodedAt(carveWorld);
 }
-
     private bool TryGetDustFromCollision(Collision2D coll, out CosmicDust dust)
     {
         // Colliders are often on a child under a CosmicDust parent.
         dust = coll.collider != null ? coll.collider.GetComponentInParent<CosmicDust>() : null;
         return dust != null;
     }
-
     private void OnCollisionEnter2D(Collision2D coll)
     {
         Debug.Log($"[MN:DUST_HIT] self={coll.collider.name} other={coll.otherCollider.name} otherLayer={coll.otherCollider.gameObject.layer} otherGO={coll.otherCollider.gameObject.name}");
@@ -254,14 +225,11 @@ void FixedUpdate()
 
         // Non-dust collisions (Vehicle, walls, etc.) proceed normally.
     }
-
     private void OnCollisionStay2D(Collision2D coll)
     {
         if (coll == null || coll.collider == null) return;
         TryIgnoreDustCollider(coll.collider);
     }
-
-
     private void OnCollisionExit2D(Collision2D coll)
     {
         if (!InsideDust || CurrentDust == null) return;
@@ -291,22 +259,18 @@ void FixedUpdate()
         _ignoredDustColliderIds.Add(id);
         return true;
     }
-
     public void SetLevelAuthority(DrumTrack drumTrack)
     {
         _drumTrack = drumTrack;
     }
-
     public void SetDesiredSpeed(float desiredSpeed)
     {
         _desiredSpeed = Mathf.Max(0f, desiredSpeed);
     }
-    
     public void ConfigureCarving(float intervalSeconds, float appetiteMul)
     {
         carveIntervalSeconds = Mathf.Max(0.01f, intervalSeconds);
         carveAppetiteMul     = Mathf.Max(0.05f, appetiteMul);
     }
-
-
+    
 }

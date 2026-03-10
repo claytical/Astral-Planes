@@ -8,7 +8,6 @@ public sealed class TracksBundleAnchor : MonoBehaviour
     public InstrumentTrackController controller;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
-    public GlitchManager glitchManager;
 
     bool _cached;
     bool _setupRequested;
@@ -51,9 +50,8 @@ public sealed class TracksBundleAnchor : MonoBehaviour
         controller             = controller             ?? GetComponentInChildren<InstrumentTrackController>(true);
         dustGenerator          = dustGenerator          ?? GetComponentInChildren<CosmicDustGenerator>(true);
         spawnGrid              = spawnGrid              ?? GetComponentInChildren<SpawnGrid>(true);
-        glitchManager          = glitchManager          ?? GetComponentInChildren<GlitchManager>(true);
         _cached = phaseTransitionManager && drumTrack && controller && dustGenerator &&
-                  spawnGrid && glitchManager;
+                  spawnGrid;
     }
     
 }

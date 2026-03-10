@@ -14,7 +14,7 @@ public class ShipMusicalProfile : ScriptableObject
     [Header("Movement (Arcade RB2D)")]
     public float arcadeMaxSpeed = 14f;
     public float arcadeAccel = 10f;
-    public float arcadeBoostAccel = 80f;
+    public float arcadeBoostAccel = 70f;
     public float arcadeLinearDamping = 0.10f;
     public float arcadeAngularDamping = 0.50f;
     public bool  requireBoostForThrust = false;

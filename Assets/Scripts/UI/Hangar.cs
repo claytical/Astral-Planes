@@ -17,12 +17,7 @@ public class Hangar : MonoBehaviour
             planeInUseMap[plane] = false;
         }
     }
-
-    public void OnJoin(PlayerInput playerInput)
-    {
-        // Reserved for player join logic if needed
-    }
-
+    
     public GameObject FirstAvailablePlane()
     {
         foreach (var kvp in planeInUseMap)
@@ -81,9 +76,5 @@ public class Hangar : MonoBehaviour
             planeInUseMap[plane] = inUse;
         }
     }
-
-    public bool IsPlaneInUse(GameObject plane)
-    {
-        return planeInUseMap.ContainsKey(plane) && planeInUseMap[plane];
-    }
+    
 }

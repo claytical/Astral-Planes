@@ -22,12 +22,6 @@ public sealed class CosmicDustExclusionMap
     // PhaseStar pocket
     private readonly HashSet<Vector2Int> _starCells = new HashSet<Vector2Int>();
 
-    public bool IsKeepClearCell(Vector2Int cell)
-    {
-        if (_starCells.Contains(cell)) return true;
-        return _vehicleRefCountByCell.TryGetValue(cell, out int rc) && rc > 0;
-    }
-
     // ------------------------
     // Vehicle footprint API
     // ------------------------

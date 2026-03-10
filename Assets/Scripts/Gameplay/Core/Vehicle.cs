@@ -19,472 +19,6 @@ public class Vehicle : MonoBehaviour
 
     [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
     [SerializeField] private bool occupiedStepOctaveAccent = true;
-
-
-    public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
-
-    public struct PendingCollectedNote
-    {
-        public InstrumentTrack track;
-        public Collectable collectable;
-        public int authoredAbsStep;      // authored/assigned absolute step at pickup (may be -1 if unknown)
-        public int authoredLocalStep;    // authored step within bin (0..binSize-1)
-        public int collectedMidi;        // collectable.GetNote()
-        public int durationTicks;
-        public float velocity127;
-        public int authoredRootMidi;     // root in the same register as collectedMidi (used for mismatch substitution)
-        public int burstId;              // used for decrement/completion logic at commit
-    }
-
-    private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
-
-    // ------------------------------------------------------------
-    // Manual-release cue (visual guidance)
-    // ------------------------------------------------------------
-    private void Update()
-    {
-        RecordPositionHistory();
-        TickManualReleaseCue();
-        TickNoteTrail();
-    }
-
- private void TickManualReleaseCue()
-{
-    if (!enableManualNoteRelease) return;
-
-    var gfm = GameFlowManager.Instance;
-    var viz = (gfm != null) ? gfm.noteViz : null;
-    if (viz == null) return;
-
-    // Build spoken-for set from all currently armed releases.
-    // This is cheap (queue is tiny) and must happen before any cue update.
-    var spokenFor = new HashSet<int>();
-    foreach (var ar in _armedReleases)
-        spokenFor.Add(ar.targetAbsStep);
-
-    // -----------------------------------------------------------------
-    // ARMED: check for playhead crossing and auto-commit the front note.
-    // The cue shows where the NEXT press will land, not the armed target.
-    // -----------------------------------------------------------------
-    if (_armedReleases.Count > 0)
-    {
-        var a = _armedReleases.Peek();
-        var armed = a.note;
-
-        if (armed.track == null || armed.track.controller == null)
-        {
-            _armedReleases.Dequeue();
-            return;
-        }
-
-        if (!armed.track.controller.TryGetRawPlayheadAbsStep(
-                out double rawAbs, out int floorAbs, out int totalStepsLive))
-            return;
-
-        // Crossing check uses live totalSteps (Bug 2 fix).
-        int totalSteps = Mathf.Max(1, totalStepsLive);
-        double fwd = (a.targetAbsStep - rawAbs) % totalSteps;
-        if (fwd < 0) fwd += totalSteps;
-
-        bool crossed = false;
-        if (_hasLastRawAbsStep)
-        {
-            double last = (_lastRawAbsStep % totalSteps + totalSteps) % totalSteps;
-            double now  = (rawAbs          % totalSteps + totalSteps) % totalSteps;
-            if (last <= now)
-                crossed = (last <= a.targetAbsStep && a.targetAbsStep <= now);
-            else
-                crossed = (a.targetAbsStep >= last) || (a.targetAbsStep <= now);
-        }
-
-        if (crossed || fwd <= manualReleaseAutoCommitEpsSteps)
-        {
-            CommitManualReleaseAtStep(armed, a.targetAbsStep);
-            _armedReleases.Dequeue();
-            spokenFor.Remove(a.targetAbsStep); // it's committed now, free it for cue
-        }
-
-        _lastRawAbsStep = rawAbs;
-        _hasLastRawAbsStep = true;
-
-        // Show the cue pointing at the next AVAILABLE step (skipping all armed ones).
-        // If nothing is pending, clear the cue.
-        if (_pendingNotes.Count > 0)
-            viz.UpdateManualReleaseCueExcluding(transform, armed.track, rawAbs, floorAbs, totalStepsLive, spokenFor);
-        else
-            viz.ClearManualReleaseCue(transform);
-
-        return;
-    }
-
-    // -----------------------------------------------------------------
-    // PENDING only: show cue toward next unlit step (none spoken for).
-    // -----------------------------------------------------------------
-    if (_pendingNotes.Count <= 0)
-    {
-        viz.ClearManualReleaseCue(transform);
-        return;
-    }
-
-    var queued = _pendingNotes.Peek();
-    if (queued.track == null || queued.track.controller == null)
-    {
-        viz.ClearManualReleaseCue(transform);
-        return;
-    }
-
-    if (!queued.track.controller.TryGetRawPlayheadAbsStep(
-            out double rawAbsQ, out int floorAbsQ, out int totalStepsQ))
-    {
-        viz.ClearManualReleaseCue(transform);
-        return;
-    }
-
-    // spokenFor is empty here (no armed releases), so this is equivalent to
-    // the old UpdateManualReleaseCue call but routed through the unified method.
-    viz.UpdateManualReleaseCueExcluding(transform, queued.track, rawAbsQ, floorAbsQ, totalStepsQ, spokenFor);
-
-    _lastRawAbsStep = rawAbsQ;
-    _hasLastRawAbsStep = true;
-}
-    private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep)
-    {
-        var gfm = GameFlowManager.Instance;
-        var viz = (gfm != null) ? gfm.noteViz : null;
-
-        if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
-        {
-            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
-            return;
-        }
-
-        int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
-        int targetLocal = ((targetAbsStep % binSize) + binSize) % binSize;
-        bool matchesAuthored = (p.authoredAbsStep < 0) || (targetAbsStep == p.authoredAbsStep);
-        bool localMatch = (targetLocal == p.authoredLocalStep);
-        int chosenMidi = (matchesAuthored || localMatch) ? p.collectedMidi : p.authoredRootMidi;
-
-        bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
-        float commitVel = p.velocity127;
-        if (occupied)
-            commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
-
-        // Write the note to the loop (lights the marker via AddNoteToLoop reuse path).
-        p.track.CommitManualReleasedNote(
-            stepAbs: targetAbsStep,
-            midiNote: chosenMidi,
-            durationTicks: p.durationTicks,
-            velocity127: commitVel,
-            authoredRootMidi: p.authoredRootMidi,
-            burstId: p.burstId,
-            lightMarkerNow: true
-        );
-
-        // Play the note immediately — the playhead is at this step right now.
-        // Without this, the note only sounds the next time the loop passes this step.
-        p.track.PlayOneShotMidi(chosenMidi, commitVel, p.durationTicks);
-
-        // Visual feedback: pulse the marker and emit the track-color particle burst.
-        if (viz != null)
-        {
-            viz.PulseMarkerSpecial(p.track, targetAbsStep);
-            viz.TriggerPlayheadReleasePulse();
-        }
-
-        // Occupied-step reward accent.
-        if (occupied && occupiedStepOctaveAccent)
-            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
-
-        // Mark as collected BEFORE destroying so OnCollectableDestroyed skips the
-        // "lost note" branch and does not double-decrement _burstRemaining.
-        if (p.collectable != null) p.collectable.MarkAsReportedCollected();
-        if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
-    }
-    // ---- Note Trail Management ----
-
-    private void RecordPositionHistory()
-    {
-        if (!enableManualNoteRelease) return;
-
-        int cap = Mathf.Max(8, trailHistoryCapacity);
-        if (_posHistory == null || _posHistory.Length != cap)
-        {
-            _posHistory = new Vector3[cap];
-            _posHistoryHead = 0;
-            _posHistoryCount = 0;
-            _posHistoryLast = transform.position;
-        }
-
-        Vector3 cur = transform.position;
-        float moved = Vector3.Distance(cur, _posHistoryLast);
-        _posHistoryAccum += moved;
-        if (moved > 0.001f)
-            _lastTravelDir = (cur - _posHistoryLast).normalized;
-        _posHistoryLast = cur;
-
-        // Record at a density of ~4 samples per slot-spacing so we have smooth curve data
-        float sampleDist = Mathf.Max(0.01f, trailSlotSpacing * 0.25f);
-        if (_posHistoryAccum >= sampleDist)
-        {
-            _posHistoryAccum -= sampleDist;
-            _posHistory[_posHistoryHead] = cur;
-            _posHistoryHead = (_posHistoryHead + 1) % cap;
-            if (_posHistoryCount < cap) _posHistoryCount++;
-        }
-    }
-
-    /// <summary>
-    /// Walks back through the position history to find a world point at arc-length <paramref name="distance"/>
-    /// behind the vehicle head. Returns the vehicle position if history is too short.
-    /// </summary>
-    private Vector3 SampleTrailPosition(float distance)
-    {
-        Vector3 vehiclePos = transform.position;
-
-        if (_posHistory == null || _posHistoryCount < 2)
-            return vehiclePos - _lastTravelDir * distance;
-
-        float remaining = distance;
-        // Start from the newest entry (head-1) and walk backwards.
-        // The newest entry may lag behind the actual vehicle position if it hasn't
-        // moved far enough to trigger a new sample, so we prepend a virtual segment
-        // from vehiclePos to the newest history point.
-        int idx = (_posHistoryHead - 1 + _posHistory.Length) % _posHistory.Length;
-        Vector3 prev = vehiclePos; // always start from the live vehicle position
-        Vector3 newest = _posHistory[idx];
-
-        // Walk: vehiclePos → newest → older samples
-        for (int i = 0; i <= _posHistoryCount; i++)
-        {
-            Vector3 next = (i == 0) ? newest : default;
-            if (i > 0)
-            {
-                int nextIdx = (idx - 1 + _posHistory.Length) % _posHistory.Length;
-                next = _posHistory[nextIdx];
-                idx = nextIdx;
-            }
-
-            float seg = Vector3.Distance(prev, next);
-            if (seg <= 0f) { prev = next; continue; }
-
-            if (remaining <= seg)
-                return Vector3.Lerp(prev, next, remaining / seg);
-
-            remaining -= seg;
-            prev = next;
-
-            if (i == _posHistoryCount - 1)
-                break;
-        }
-
-        // Ran out of history — extrapolate straight back from the last known point
-        // along the last travel direction so the tail keeps hanging naturally.
-        return prev - _lastTravelDir * remaining;
-    }
-
-    private void TickNoteTrail()
-    {
-        if (!enableManualNoteRelease) return;
-
-        var gfm = GameFlowManager.Instance;
-        var viz = gfm != null ? gfm.noteViz : null;
-
-        // When both queues are empty, explicitly zero the cue and exit.
-        if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
-        {
-            releaseCue?.SetFill(0f);
-            return;
-        }
-
-        // ------------------------------------------------------------------
-        // Compute pulse01 — how close the playhead is to the next target step.
-        // Armed note takes priority over pending; both use the same approach:
-        // remaining DSP time / gap DSP time, so the ramp is gap-normalised and
-        // stable across bin expansions.
-        // ------------------------------------------------------------------
-        float pulse01 = 0f;
-
-        if (_armedReleases.Count > 0)
-        {
-            var a = _armedReleases.Peek();
-            if (a.note.track != null && a.note.track.controller != null &&
-                a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsA, out _, out int totalA))
-            {
-                int total = Mathf.Max(1, totalA);
-                double fwdSteps = (a.targetAbsStep - rawAbsA) % total;
-                if (fwdSteps < 0) fwdSteps += total;
-
-                var aDrum         = a.note.track.drumTrack;
-                int aBinSize      = Mathf.Max(1, aDrum != null ? aDrum.totalSteps : total);
-                int aLeaderBins   = Mathf.Max(1, Mathf.CeilToInt(total / (float)aBinSize));
-                double aLoopLen   = (aDrum != null ? aDrum.GetLoopLengthInSeconds() : 1f) * aLeaderBins;
-                double stepDur    = aLoopLen / total;
-                double fwdDsp     = fwdSteps * stepDur;
-
-                pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, a.gapDurationDsp)));
-
-                if (a.note.track.IsExpansionPending)
-                    pulse01 = Mathf.Min(pulse01, 0.3f);
-            }
-        }
-        else if (_pendingNotes.Count > 0)
-        {
-            // Use the same next-unlit-step the ghost cue is pointing at, so the
-            // ring tracks the real release window rather than the authored step.
-            var p = _pendingNotes.Peek();
-            if (p.track != null && p.track.controller != null && p.track.drumTrack != null &&
-                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
-            {
-                int total = Mathf.Max(1, totalP);
-
-                // Reuse the spoken-for set so we agree with the ghost cue.
-                var spokenFor = new HashSet<int>();
-                foreach (var ar in _armedReleases)
-                    spokenFor.Add(ar.targetAbsStep);
-
-                if (viz != null && viz.TryGetNextUnlitStepExcluding(
-                        p.track, rawAbsP, total, spokenFor, out int nextStep))
-                {
-                    double fwdSteps = (nextStep - rawAbsP + total) % total;
-
-                    var pDrum       = p.track.drumTrack;
-                    int pBinSize    = Mathf.Max(1, pDrum.totalSteps);
-                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
-                    double pLoopLen = pDrum.GetLoopLengthInSeconds() * pLeaderBins;
-                    double pStepDur = pLoopLen / total;
-                    double fwdDsp   = fwdSteps * pStepDur;
-
-                    // Ring window is always manualReleaseArmAheadSteps wide regardless of
-                    // whether the target is in an expansion bin. The +lead gives a visible
-                    // heads-up before the commit gate opens.
-                    const float ringWindowLead = 1.5f;
-                    double windowDsp = (manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
-                    pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
-                }
-            }
-        }
-
-        // Drive the vehicle-local release cue ring, tinted with the active track color.
-        if (releaseCue != null)
-        {
-            releaseCue.SetFill(pulse01);
-
-            // Resolve track color: armed note takes priority, then pending.
-            Color cueColor = Color.white;
-            if (_armedReleases.Count > 0)
-            {
-                var aTrack = _armedReleases.Peek().note.track;
-                if (aTrack != null) cueColor = aTrack.trackColor;
-            }
-            else if (_pendingNotes.Count > 0)
-            {
-                var pTrack = _pendingNotes.Peek().track;
-                if (pTrack != null) cueColor = pTrack.trackColor;
-            }
-            releaseCue.SetTrackColor(cueColor);
-        }
-
-        // Armed notes: fly orb toward its target marker.
-        int armedSlot = 0;
-        foreach (var ar in _armedReleases)
-        {
-            if (ar.note.collectable == null) { armedSlot++; continue; }
-
-            Vector3 markerWorld = Vector3.zero;
-            bool hasMarkerPos = false;
-            if (viz != null && ar.note.track != null &&
-                viz.noteMarkers != null &&
-                viz.noteMarkers.TryGetValue((ar.note.track, ar.targetAbsStep), out var markerTr) && markerTr != null)
-            {
-                markerWorld = markerTr.position;
-                hasMarkerPos = true;
-            }
-
-            if (hasMarkerPos)
-                ar.note.collectable.SetTrailTarget(markerWorld);
-            else
-            {
-                float dist = trailFirstSlotOffset + armedSlot * trailSlotSpacing;
-                ar.note.collectable.SetTrailTarget(SampleTrailPosition(dist));
-            }
-
-            ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
-            armedSlot++;
-        }
-
-        // Pending notes: trail behind vehicle.
-        int slot = armedSlot;
-        foreach (var p in _pendingNotes)
-        {
-            if (p.collectable == null) { slot++; continue; }
-
-            float dist = trailFirstSlotOffset + slot * trailSlotSpacing;
-            p.collectable.SetTrailTarget(SampleTrailPosition(dist));
-            p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
-            slot++;
-        }
-    }
-
-    /// <summary>
-    /// Called on every musical step tick. Drives the beat-dot countdown.
-    /// Works for both armed and pending states.
-    /// </summary>
-    private void OnStepTickForReleaseCue(int stepIndex, int leaderSteps)
-    {
-        if (releaseCue == null) return;
-
-        // Determine target step — armed takes priority, otherwise use next unlit placeholder.
-        int targetStep = -1;
-        double gapDsp  = 0;
-        DrumTrack drum = null;
-
-        if (_armedReleases.Count > 0)
-        {
-            var a  = _armedReleases.Peek();
-            targetStep = a.targetAbsStep;
-            gapDsp     = a.gapDurationDsp;
-            drum       = a.note.track?.drumTrack;
-        }
-        else if (_pendingNotes.Count > 0)
-        {
-            var p = _pendingNotes.Peek();
-            drum = p.track?.drumTrack;
-            if (p.track?.controller != null &&
-                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
-            {
-                var spokenFor = new HashSet<int>();
-                var gfm = GameFlowManager.Instance;
-                var viz = gfm?.noteViz;
-                if (viz != null && viz.TryGetNextUnlitStepExcluding(
-                        p.track, rawAbsP, totalP, spokenFor, out int nextStep))
-                {
-                    targetStep = nextStep;
-                    // Gap for pending: distance from now to target, in DSP seconds.
-                    int pBinSize    = Mathf.Max(1, drum != null ? drum.totalSteps : leaderSteps);
-                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)pBinSize));
-                    double pLoopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1f) * pLeaderBins;
-                    double pStepDur = pLoopLen / Mathf.Max(1, leaderSteps);
-                    double fwdSteps = (nextStep - rawAbsP + totalP) % totalP;
-                    gapDsp = Math.Max(0.001, fwdSteps * pStepDur);
-                }
-            }
-        }
-
-        if (targetStep < 0 || drum == null) return;
-
-        int binSize    = Mathf.Max(1, drum.totalSteps);
-        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
-        double loopLen = drum.GetLoopLengthInSeconds() * leaderBins;
-        double stepDur = loopLen / Mathf.Max(1, leaderSteps);
-
-        int gapStepsNow = Mathf.Max(1, Mathf.RoundToInt((float)(gapDsp / stepDur)));
-
-        double fwd      = (targetStep - stepIndex + (double)leaderSteps) % leaderSteps;
-        int stepsLeft   = Mathf.Max(0, Mathf.RoundToInt((float)fwd));
-
-        releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
-    }
-
     [Header("Impact Dig Tuning")]
     [Tooltip("Maximum trench length (cells) for the best ship at top speed when digging the softest dust.")]
     [SerializeField] private int maxDigCellsSoft = 10;
@@ -599,7 +133,6 @@ public class Vehicle : MonoBehaviour
     [Tooltip("How close (in steps) the playhead must be to the armed target for auto-commit. Keep small; this is NOT the player timing window.")]
     [Range(0.05f, 1.0f)]
     [SerializeField] private float manualReleaseAutoCommitEpsSteps = 0.35f;
-
     private struct ArmedRelease
     {
         public PendingCollectedNote note;
@@ -638,6 +171,27 @@ public class Vehicle : MonoBehaviour
     private float _posHistoryAccum; // distance accumulator for spacing
     private Vector3 _posHistoryLast;
     private Vector3 _lastTravelDir = Vector3.down; // fallback tail direction when stationary
+
+    public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
+
+    public struct PendingCollectedNote
+    {
+        public InstrumentTrack track;
+        public Collectable collectable;
+        public int authoredAbsStep;      // authored/assigned absolute step at pickup (may be -1 if unknown)
+        public int authoredLocalStep;    // authored step within bin (0..binSize-1)
+        public int collectedMidi;        // collectable.GetNote()
+        public int durationTicks;
+        public float velocity127;
+        public int authoredRootMidi;     // root in the same register as collectedMidi (used for mismatch substitution)
+        public int burstId;              // used for decrement/completion logic at commit
+    }
+
+    private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
+
+    // ------------------------------------------------------------
+    // Manual-release cue (visual guidance)
+    // ------------------------------------------------------------
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -804,6 +358,446 @@ public class Vehicle : MonoBehaviour
     }
     
 }
+
+    private void Update()
+    {
+        RecordPositionHistory();
+        TickManualReleaseCue();
+        TickNoteTrail();
+    }
+
+    private void TickManualReleaseCue()
+{
+    if (!enableManualNoteRelease) return;
+
+    var gfm = GameFlowManager.Instance;
+    var viz = (gfm != null) ? gfm.noteViz : null;
+    if (viz == null) return;
+
+    // Build spoken-for set from all currently armed releases.
+    // This is cheap (queue is tiny) and must happen before any cue update.
+    var spokenFor = new HashSet<int>();
+    foreach (var ar in _armedReleases)
+        spokenFor.Add(ar.targetAbsStep);
+
+    // -----------------------------------------------------------------
+    // ARMED: check for playhead crossing and auto-commit the front note.
+    // The cue shows where the NEXT press will land, not the armed target.
+    // -----------------------------------------------------------------
+    if (_armedReleases.Count > 0)
+    {
+        var a = _armedReleases.Peek();
+        var armed = a.note;
+
+        if (armed.track == null || armed.track.controller == null)
+        {
+            _armedReleases.Dequeue();
+            return;
+        }
+
+        if (!armed.track.controller.TryGetRawPlayheadAbsStep(
+                out double rawAbs, out int floorAbs, out int totalStepsLive))
+            return;
+
+        // Crossing check uses live totalSteps (Bug 2 fix).
+        int totalSteps = Mathf.Max(1, totalStepsLive);
+        double fwd = (a.targetAbsStep - rawAbs) % totalSteps;
+        if (fwd < 0) fwd += totalSteps;
+
+        bool crossed = false;
+        if (_hasLastRawAbsStep)
+        {
+            double last = (_lastRawAbsStep % totalSteps + totalSteps) % totalSteps;
+            double now  = (rawAbs          % totalSteps + totalSteps) % totalSteps;
+            if (last <= now)
+                crossed = (last <= a.targetAbsStep && a.targetAbsStep <= now);
+            else
+                crossed = (a.targetAbsStep >= last) || (a.targetAbsStep <= now);
+        }
+
+        if (crossed || fwd <= manualReleaseAutoCommitEpsSteps)
+        {
+            CommitManualReleaseAtStep(armed, a.targetAbsStep);
+            _armedReleases.Dequeue();
+            spokenFor.Remove(a.targetAbsStep); // it's committed now, free it for cue
+        }
+
+        _lastRawAbsStep = rawAbs;
+        _hasLastRawAbsStep = true;
+
+        // Show the cue pointing at the next AVAILABLE step (skipping all armed ones).
+        // If nothing is pending, clear the cue.
+        if (_pendingNotes.Count > 0)
+            viz.UpdateManualReleaseCueExcluding(transform, armed.track, rawAbs, floorAbs, totalStepsLive, spokenFor);
+        else
+            viz.ClearManualReleaseCue(transform);
+
+        return;
+    }
+
+    // -----------------------------------------------------------------
+    // PENDING only: show cue toward next unlit step (none spoken for).
+    // -----------------------------------------------------------------
+    if (_pendingNotes.Count <= 0)
+    {
+        viz.ClearManualReleaseCue(transform);
+        return;
+    }
+
+    var queued = _pendingNotes.Peek();
+    if (queued.track == null || queued.track.controller == null)
+    {
+        viz.ClearManualReleaseCue(transform);
+        return;
+    }
+
+    if (!queued.track.controller.TryGetRawPlayheadAbsStep(
+            out double rawAbsQ, out int floorAbsQ, out int totalStepsQ))
+    {
+        viz.ClearManualReleaseCue(transform);
+        return;
+    }
+
+    // spokenFor is empty here (no armed releases), so this is equivalent to
+    // the old UpdateManualReleaseCue call but routed through the unified method.
+    viz.UpdateManualReleaseCueExcluding(transform, queued.track, rawAbsQ, floorAbsQ, totalStepsQ, spokenFor);
+
+    _lastRawAbsStep = rawAbsQ;
+    _hasLastRawAbsStep = true;
+}
+    private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep)
+    {
+        var gfm = GameFlowManager.Instance;
+        var viz = (gfm != null) ? gfm.noteViz : null;
+
+        if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
+        {
+            if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+            return;
+        }
+
+        int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
+        int targetLocal = ((targetAbsStep % binSize) + binSize) % binSize;
+        bool matchesAuthored = (p.authoredAbsStep < 0) || (targetAbsStep == p.authoredAbsStep);
+        bool localMatch = (targetLocal == p.authoredLocalStep);
+        int chosenMidi = (matchesAuthored || localMatch) ? p.collectedMidi : p.authoredRootMidi;
+
+        bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
+        float commitVel = p.velocity127;
+        if (occupied)
+            commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
+
+        // Write the note to the loop (lights the marker via AddNoteToLoop reuse path).
+        p.track.CommitManualReleasedNote(
+            stepAbs: targetAbsStep,
+            midiNote: chosenMidi,
+            durationTicks: p.durationTicks,
+            velocity127: commitVel,
+            authoredRootMidi: p.authoredRootMidi,
+            burstId: p.burstId,
+            lightMarkerNow: true
+        );
+
+        // Play the note immediately — the playhead is at this step right now.
+        // Without this, the note only sounds the next time the loop passes this step.
+        p.track.PlayOneShotMidi(chosenMidi, commitVel, p.durationTicks);
+
+        // Visual feedback: pulse the marker and emit the track-color particle burst.
+        if (viz != null)
+        {
+            viz.PulseMarkerSpecial(p.track, targetAbsStep);
+            viz.TriggerPlayheadReleasePulse();
+        }
+
+        // Occupied-step reward accent.
+        if (occupied && occupiedStepOctaveAccent)
+            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
+
+        // Mark as collected BEFORE destroying so OnCollectableDestroyed skips the
+        // "lost note" branch and does not double-decrement _burstRemaining.
+        if (p.collectable != null) p.collectable.MarkAsReportedCollected();
+        if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+    }
+    // ---- Note Trail Management ----
+    private void RecordPositionHistory()
+    {
+        if (!enableManualNoteRelease) return;
+
+        int cap = Mathf.Max(8, trailHistoryCapacity);
+        if (_posHistory == null || _posHistory.Length != cap)
+        {
+            _posHistory = new Vector3[cap];
+            _posHistoryHead = 0;
+            _posHistoryCount = 0;
+            _posHistoryLast = transform.position;
+        }
+
+        Vector3 cur = transform.position;
+        float moved = Vector3.Distance(cur, _posHistoryLast);
+        _posHistoryAccum += moved;
+        if (moved > 0.001f)
+            _lastTravelDir = (cur - _posHistoryLast).normalized;
+        _posHistoryLast = cur;
+
+        // Record at a density of ~4 samples per slot-spacing so we have smooth curve data
+        float sampleDist = Mathf.Max(0.01f, trailSlotSpacing * 0.25f);
+        if (_posHistoryAccum >= sampleDist)
+        {
+            _posHistoryAccum -= sampleDist;
+            _posHistory[_posHistoryHead] = cur;
+            _posHistoryHead = (_posHistoryHead + 1) % cap;
+            if (_posHistoryCount < cap) _posHistoryCount++;
+        }
+    }
+    /// <summary>
+    /// Walks back through the position history to find a world point at arc-length <paramref name="distance"/>
+    /// behind the vehicle head. Returns the vehicle position if history is too short.
+    /// </summary>
+    private Vector3 SampleTrailPosition(float distance)
+    {
+        Vector3 vehiclePos = transform.position;
+
+        if (_posHistory == null || _posHistoryCount < 2)
+            return vehiclePos - _lastTravelDir * distance;
+
+        float remaining = distance;
+        // Start from the newest entry (head-1) and walk backwards.
+        // The newest entry may lag behind the actual vehicle position if it hasn't
+        // moved far enough to trigger a new sample, so we prepend a virtual segment
+        // from vehiclePos to the newest history point.
+        int idx = (_posHistoryHead - 1 + _posHistory.Length) % _posHistory.Length;
+        Vector3 prev = vehiclePos; // always start from the live vehicle position
+        Vector3 newest = _posHistory[idx];
+
+        // Walk: vehiclePos → newest → older samples
+        for (int i = 0; i <= _posHistoryCount; i++)
+        {
+            Vector3 next = (i == 0) ? newest : default;
+            if (i > 0)
+            {
+                int nextIdx = (idx - 1 + _posHistory.Length) % _posHistory.Length;
+                next = _posHistory[nextIdx];
+                idx = nextIdx;
+            }
+
+            float seg = Vector3.Distance(prev, next);
+            if (seg <= 0f) { prev = next; continue; }
+
+            if (remaining <= seg)
+                return Vector3.Lerp(prev, next, remaining / seg);
+
+            remaining -= seg;
+            prev = next;
+
+            if (i == _posHistoryCount - 1)
+                break;
+        }
+
+        // Ran out of history — extrapolate straight back from the last known point
+        // along the last travel direction so the tail keeps hanging naturally.
+        return prev - _lastTravelDir * remaining;
+    }
+    private void TickNoteTrail()
+    {
+        if (!enableManualNoteRelease) return;
+
+        var gfm = GameFlowManager.Instance;
+        var viz = gfm != null ? gfm.noteViz : null;
+
+        // When both queues are empty, explicitly zero the cue and exit.
+        if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
+        {
+            releaseCue?.SetFill(0f);
+            return;
+        }
+
+        // ------------------------------------------------------------------
+        // Compute pulse01 — how close the playhead is to the next target step.
+        // Armed note takes priority over pending; both use the same approach:
+        // remaining DSP time / gap DSP time, so the ramp is gap-normalised and
+        // stable across bin expansions.
+        // ------------------------------------------------------------------
+        float pulse01 = 0f;
+
+        if (_armedReleases.Count > 0)
+        {
+            var a = _armedReleases.Peek();
+            if (a.note.track != null && a.note.track.controller != null &&
+                a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsA, out _, out int totalA))
+            {
+                int total = Mathf.Max(1, totalA);
+                double fwdSteps = (a.targetAbsStep - rawAbsA) % total;
+                if (fwdSteps < 0) fwdSteps += total;
+
+                var aDrum         = a.note.track.drumTrack;
+                int aBinSize      = Mathf.Max(1, aDrum != null ? aDrum.totalSteps : total);
+                int aLeaderBins   = Mathf.Max(1, Mathf.CeilToInt(total / (float)aBinSize));
+                double aLoopLen   = (aDrum != null ? aDrum.GetLoopLengthInSeconds() : 1f) * aLeaderBins;
+                double stepDur    = aLoopLen / total;
+                double fwdDsp     = fwdSteps * stepDur;
+
+                pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, a.gapDurationDsp)));
+
+                if (a.note.track.IsExpansionPending)
+                    pulse01 = Mathf.Min(pulse01, 0.3f);
+            }
+        }
+        else if (_pendingNotes.Count > 0)
+        {
+            // Use the same next-unlit-step the ghost cue is pointing at, so the
+            // ring tracks the real release window rather than the authored step.
+            var p = _pendingNotes.Peek();
+            if (p.track != null && p.track.controller != null && p.track.drumTrack != null &&
+                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
+            {
+                int total = Mathf.Max(1, totalP);
+
+                // Reuse the spoken-for set so we agree with the ghost cue.
+                var spokenFor = new HashSet<int>();
+                foreach (var ar in _armedReleases)
+                    spokenFor.Add(ar.targetAbsStep);
+
+                if (viz != null && viz.TryGetNextUnlitStepExcluding(
+                        p.track, rawAbsP, total, spokenFor, out int nextStep))
+                {
+                    double fwdSteps = (nextStep - rawAbsP + total) % total;
+
+                    var pDrum       = p.track.drumTrack;
+                    int pBinSize    = Mathf.Max(1, pDrum.totalSteps);
+                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
+                    double pLoopLen = pDrum.GetLoopLengthInSeconds() * pLeaderBins;
+                    double pStepDur = pLoopLen / total;
+                    double fwdDsp   = fwdSteps * pStepDur;
+
+                    // Ring window is always manualReleaseArmAheadSteps wide regardless of
+                    // whether the target is in an expansion bin. The +lead gives a visible
+                    // heads-up before the commit gate opens.
+                    const float ringWindowLead = 1.5f;
+                    double windowDsp = (manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
+                    pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
+                }
+            }
+        }
+
+        // Drive the vehicle-local release cue ring, tinted with the active track color.
+        if (releaseCue != null)
+        {
+            releaseCue.SetFill(pulse01);
+
+            // Resolve track color: armed note takes priority, then pending.
+            Color cueColor = Color.white;
+            if (_armedReleases.Count > 0)
+            {
+                var aTrack = _armedReleases.Peek().note.track;
+                if (aTrack != null) cueColor = aTrack.trackColor;
+            }
+            else if (_pendingNotes.Count > 0)
+            {
+                var pTrack = _pendingNotes.Peek().track;
+                if (pTrack != null) cueColor = pTrack.trackColor;
+            }
+            releaseCue.SetTrackColor(cueColor);
+        }
+
+        // Armed notes: fly orb toward its target marker.
+        int armedSlot = 0;
+        foreach (var ar in _armedReleases)
+        {
+            if (ar.note.collectable == null) { armedSlot++; continue; }
+
+            Vector3 markerWorld = Vector3.zero;
+            bool hasMarkerPos = false;
+            if (viz != null && ar.note.track != null &&
+                viz.noteMarkers != null &&
+                viz.noteMarkers.TryGetValue((ar.note.track, ar.targetAbsStep), out var markerTr) && markerTr != null)
+            {
+                markerWorld = markerTr.position;
+                hasMarkerPos = true;
+            }
+
+            if (hasMarkerPos)
+                ar.note.collectable.SetTrailTarget(markerWorld);
+            else
+            {
+                float dist = trailFirstSlotOffset + armedSlot * trailSlotSpacing;
+                ar.note.collectable.SetTrailTarget(SampleTrailPosition(dist));
+            }
+
+            ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
+            armedSlot++;
+        }
+
+        // Pending notes: trail behind vehicle.
+        int slot = armedSlot;
+        foreach (var p in _pendingNotes)
+        {
+            if (p.collectable == null) { slot++; continue; }
+
+            float dist = trailFirstSlotOffset + slot * trailSlotSpacing;
+            p.collectable.SetTrailTarget(SampleTrailPosition(dist));
+            p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
+            slot++;
+        }
+    }
+    /// <summary>
+    /// Called on every musical step tick. Drives the beat-dot countdown.
+    /// Works for both armed and pending states.
+    /// </summary>
+    private void OnStepTickForReleaseCue(int stepIndex, int leaderSteps)
+    {
+        if (releaseCue == null) return;
+
+        // Determine target step — armed takes priority, otherwise use next unlit placeholder.
+        int targetStep = -1;
+        double gapDsp  = 0;
+        DrumTrack drum = null;
+
+        if (_armedReleases.Count > 0)
+        {
+            var a  = _armedReleases.Peek();
+            targetStep = a.targetAbsStep;
+            gapDsp     = a.gapDurationDsp;
+            drum       = a.note.track?.drumTrack;
+        }
+        else if (_pendingNotes.Count > 0)
+        {
+            var p = _pendingNotes.Peek();
+            drum = p.track?.drumTrack;
+            if (p.track?.controller != null &&
+                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
+            {
+                var spokenFor = new HashSet<int>();
+                var gfm = GameFlowManager.Instance;
+                var viz = gfm?.noteViz;
+                if (viz != null && viz.TryGetNextUnlitStepExcluding(
+                        p.track, rawAbsP, totalP, spokenFor, out int nextStep))
+                {
+                    targetStep = nextStep;
+                    // Gap for pending: distance from now to target, in DSP seconds.
+                    int pBinSize    = Mathf.Max(1, drum != null ? drum.totalSteps : leaderSteps);
+                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)pBinSize));
+                    double pLoopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1f) * pLeaderBins;
+                    double pStepDur = pLoopLen / Mathf.Max(1, leaderSteps);
+                    double fwdSteps = (nextStep - rawAbsP + totalP) % totalP;
+                    gapDsp = Math.Max(0.001, fwdSteps * pStepDur);
+                }
+            }
+        }
+
+        if (targetStep < 0 || drum == null) return;
+
+        int binSize    = Mathf.Max(1, drum.totalSteps);
+        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
+        double loopLen = drum.GetLoopLengthInSeconds() * leaderBins;
+        double stepDur = loopLen / Mathf.Max(1, leaderSteps);
+
+        int gapStepsNow = Mathf.Max(1, Mathf.RoundToInt((float)(gapDsp / stepDur)));
+
+        double fwd      = (targetStep - stepIndex + (double)leaderSteps) % leaderSteps;
+        int stepsLeft   = Mathf.Max(0, Mathf.RoundToInt((float)fwd));
+
+        releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
+    }
     private void UpdateSafeAnchor()
 {
     if (rb == null || drumTrack == null) return;
@@ -1074,12 +1068,7 @@ private bool IsCellEmpty(Vector2Int gp)
         rb.linearDamping  = arcadeLinearDamping;
         rb.angularDamping = arcadeAngularDamping;
     }
-    public void SetColor(Color newColor)
-    {
-        if (baseSprite != null)
-            baseSprite.color = newColor;
 
-    }
     public void SyncEnergyUI()
         {
             if (playerStatsUI != null)
@@ -1116,10 +1105,6 @@ private bool IsCellEmpty(Vector2Int gp)
         }
     public float GetForceAsMidiVelocity()
     {
-        
-        
-        
-        
         float speed = rb.linearVelocity.magnitude;
 
         // Make sure this reflects *true* achievable speed (including boost),
@@ -1182,7 +1167,6 @@ private bool IsCellEmpty(Vector2Int gp)
             audioManager.StopSound();
         }
         boosting = false;
-//        _remixController.ResetRemixVisuals();
         _burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
         // Disable the trail's emission when boosting stops
@@ -1697,36 +1681,8 @@ private void DoImpactDig(Collision2D coll)
 
     // Back-compat with earlier patches / external callers.
     public bool EnqueuePendingNote(PendingCollectedNote p) => EnqueuePendingCollectedNote(p);
-
-    // Convenience overload (common call-site shape).
-    public bool EnqueuePendingNote(
-        InstrumentTrack track,
-        Collectable collectable,
-        int collectedMidi,
-        int authoredRootMidi,
-        int authoredLocalStep,
-        int durationTicks,
-        float velocity127,
-        int burstId)
-    {
-        var pending = new PendingCollectedNote
-        {
-            track = track,
-            collectable = collectable,
-            collectedMidi = collectedMidi,
-            authoredRootMidi = authoredRootMidi,
-            authoredLocalStep = authoredLocalStep,
-            durationTicks = durationTicks,
-            velocity127 = velocity127,
-            burstId = burstId
-        };
-        return EnqueuePendingCollectedNote(pending);
-    }
-
-
-    public int GetPendingCollectedNoteCount() => _pendingNotes.Count;
-
-public bool TryReleaseQueuedNote()
+    
+    public bool TryReleaseQueuedNote()
 {
     if (!enableManualNoteRelease) return false;
     if (_pendingNotes.Count <= 0) return false;

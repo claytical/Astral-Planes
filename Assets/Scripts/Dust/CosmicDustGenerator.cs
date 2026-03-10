@@ -251,249 +251,248 @@ public class CosmicDustGenerator : MonoBehaviour
 
         return false;
     }
-public int GrowVoidDustDiskFromGrid(
-    Vector2Int centerGP,
-    int outerRadiusCells,
-    MusicalRole imprintRole,
-    Color hueRgb,
-    float imprintHardness01,
-    float energyAtCenter01,
-    float falloffExp,
-    float growInSeconds,
-    int fillWedges01To4,
-    List<Vector2Int> vehicleCells,
-    int vehicleNoSpawnRadiusCells,
-    int maxCellsThisCall = -1,
-    int innerRadiusCellsExclusive = -1)
-{
-    EnsureCellGrid();
-    _imprints ??= new Dictionary<Vector2Int, DustImprint>(2048);
-
-    if (outerRadiusCells <= 0) return 0;
-
-    imprintHardness01 = Mathf.Clamp01(imprintHardness01);
-    energyAtCenter01 = Mathf.Clamp01(energyAtCenter01);
-    falloffExp = Mathf.Max(0.01f, falloffExp);
-    growInSeconds = Mathf.Max(0.01f, growInSeconds);
-    fillWedges01To4 = Mathf.Clamp(fillWedges01To4, 1, 4);
-
-    int processed = 0;
-    int rOuterSq = outerRadiusCells * outerRadiusCells;
-    int rInnerSq = innerRadiusCellsExclusive >= 0
-        ? innerRadiusCellsExclusive * innerRadiusCellsExclusive
-        : -1;
-
-    bool NearAnyVehicle(Vector2Int gp)
+    public int GrowVoidDustDiskFromGrid(
+        Vector2Int centerGP,
+        int outerRadiusCells,
+        MusicalRole imprintRole,
+        Color hueRgb,
+        float imprintHardness01,
+        float energyAtCenter01,
+        float falloffExp,
+        float growInSeconds,
+        int fillWedges01To4,
+        List<Vector2Int> vehicleCells,
+        int vehicleNoSpawnRadiusCells,
+        int maxCellsThisCall = -1,
+        int innerRadiusCellsExclusive = -1)
     {
-        if (vehicleNoSpawnRadiusCells <= 0) return false;
-        if (vehicleCells == null || vehicleCells.Count == 0) return false;
+        EnsureCellGrid();
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>(2048);
 
-        int rSq = vehicleNoSpawnRadiusCells * vehicleNoSpawnRadiusCells;
-        for (int i = 0; i < vehicleCells.Count; i++)
+        if (outerRadiusCells <= 0) return 0;
+
+        imprintHardness01 = Mathf.Clamp01(imprintHardness01);
+        energyAtCenter01 = Mathf.Clamp01(energyAtCenter01);
+        falloffExp = Mathf.Max(0.01f, falloffExp);
+        growInSeconds = Mathf.Max(0.01f, growInSeconds);
+        fillWedges01To4 = Mathf.Clamp(fillWedges01To4, 1, 4);
+
+        int processed = 0;
+        int rOuterSq = outerRadiusCells * outerRadiusCells;
+        int rInnerSq = innerRadiusCellsExclusive >= 0
+            ? innerRadiusCellsExclusive * innerRadiusCellsExclusive
+            : -1;
+
+        bool NearAnyVehicle(Vector2Int gp)
         {
-            var vc = vehicleCells[i];
-            int dx = gp.x - vc.x;
-            int dy = gp.y - vc.y;
-            if (dx * dx + dy * dy <= rSq) return true;
-        }
-        return false;
-    }
+            if (vehicleNoSpawnRadiusCells <= 0) return false;
+            if (vehicleCells == null || vehicleCells.Count == 0) return false;
 
-    bool InFilledWedge(int dx, int dy)
-    {
-        // Quadrant order: 0=NE, 1=NW, 2=SW, 3=SE
-        int quad;
-        if (dy >= 0)
-            quad = (dx >= 0) ? 0 : 1;
-        else
-            quad = (dx < 0) ? 2 : 3;
-
-        return quad < fillWedges01To4;
-    }
-
-    for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
-    {
-        for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
-        {
-            int dSq = dx * dx + dy * dy;
-            if (dSq > rOuterSq) continue;
-            if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
-            if (!InFilledWedge(dx, dy)) continue;
-
-            Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
-            if (!IsInBounds(gp)) continue;
-
-            // Budget
-            if (maxCellsThisCall >= 0 && processed >= maxCellsThisCall)
-                return processed;
-// -------------------------------
-// Radiating ring alpha (annulus-local)
-// Strong at inner edge of NEW ring, fades toward outer edge.
-// This matches incremental growth using innerRadiusCellsExclusive.
-// -------------------------------
-            float d = Mathf.Sqrt(dSq);
-
-            float inner = (innerRadiusCellsExclusive >= 0) ? innerRadiusCellsExclusive : 0f;
-            float outer = Mathf.Max(1f, outerRadiusCells);
-            float span  = Mathf.Max(0.0001f, outer - inner);
-
-// u=0 at inner edge of this ring, u=1 at outer edge
-            float u = Mathf.Clamp01((d - inner) / span);
-
-// Energy: bright at u=0, fades toward u=1
-            float energy01 = Mathf.Clamp01(energyAtCenter01 * Mathf.Pow(1f - u, falloffExp));
-
-// IMPORTANT: avoid "invisible SOLID" tiles (especially when logging with F2).
-// This is a *visual* floor; it also prevents sprite alpha=0 tiles that are physically present.
-// Set high enough that the role color reads clearly even at the outer edge of a burst.
-            const float kMinVisibleAlpha = 0.55f;
-            float visibleAlpha = Mathf.Max(energy01, kMinVisibleAlpha);
-
-            Color c = hueRgb;
-            c.a = visibleAlpha;
-            if (dx == 0 && dy == outerRadiusCells) // pick a consistent sample
+            int rSq = vehicleNoSpawnRadiusCells * vehicleNoSpawnRadiusCells;
+            for (int i = 0; i < vehicleCells.Count; i++)
             {
-                Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
-            }            
-            // Always write persistent imprint (so regrow picks it up later)
-            _imprints[gp] = new DustImprint
-            {
-                color = c,
-                hardness01 = imprintHardness01,
-                role = imprintRole
-            };
-            processed++;
-
-// 1) If dust already exists, ALWAYS refresh visuals (even if keep-clear/blocked/etc).
-            if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
-                existingGo.TryGetComponent<CosmicDust>(out var existingDust) && existingDust != null &&
-                HasDustAt(gp))
-            {
-                existingDust.ApplyRoleAndCharge(imprintRole, c, c.a);
-                existingDust.clearing.hardness01 = imprintHardness01;
-                continue;
+                var vc = vehicleCells[i];
+                int dx = gp.x - vc.x;
+                int dy = gp.y - vc.y;
+                if (dx * dx + dy * dy <= rSq) return true;
             }
-
-// 2) Only after that, decide whether we’re allowed to SPAWN dust into empty space.
-            if (_permanentClearCells.Contains(gp)) continue;
-            if (IsKeepClearCell(gp)) continue;
-            if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
-            if (IsDustSpawnBlocked(gp)) continue;
-            if (NearAnyVehicle(gp)) continue;
-
-// 3) Spawn/regrow if empty
-            if (_voidGrowCoroutines.ContainsKey(gp))
-                continue;
-
-            _voidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
+            return false;
         }
+
+        bool InFilledWedge(int dx, int dy)
+        {
+            // Quadrant order: 0=NE, 1=NW, 2=SW, 3=SE
+            int quad;
+            if (dy >= 0)
+                quad = (dx >= 0) ? 0 : 1;
+            else
+                quad = (dx < 0) ? 2 : 3;
+
+            return quad < fillWedges01To4;
+        }
+
+        for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
+        {
+            for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
+            {
+                int dSq = dx * dx + dy * dy;
+                if (dSq > rOuterSq) continue;
+                if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
+                if (!InFilledWedge(dx, dy)) continue;
+
+                Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+                if (!IsInBounds(gp)) continue;
+
+                // Budget
+                if (maxCellsThisCall >= 0 && processed >= maxCellsThisCall)
+                    return processed;
+    // -------------------------------
+    // Radiating ring alpha (annulus-local)
+    // Strong at inner edge of NEW ring, fades toward outer edge.
+    // This matches incremental growth using innerRadiusCellsExclusive.
+    // -------------------------------
+                float d = Mathf.Sqrt(dSq);
+
+                float inner = (innerRadiusCellsExclusive >= 0) ? innerRadiusCellsExclusive : 0f;
+                float outer = Mathf.Max(1f, outerRadiusCells);
+                float span  = Mathf.Max(0.0001f, outer - inner);
+
+    // u=0 at inner edge of this ring, u=1 at outer edge
+                float u = Mathf.Clamp01((d - inner) / span);
+
+    // Energy: bright at u=0, fades toward u=1
+                float energy01 = Mathf.Clamp01(energyAtCenter01 * Mathf.Pow(1f - u, falloffExp));
+
+    // IMPORTANT: avoid "invisible SOLID" tiles (especially when logging with F2).
+    // This is a *visual* floor; it also prevents sprite alpha=0 tiles that are physically present.
+    // Set high enough that the role color reads clearly even at the outer edge of a burst.
+                const float kMinVisibleAlpha = 0.55f;
+                float visibleAlpha = Mathf.Max(energy01, kMinVisibleAlpha);
+
+                Color c = hueRgb;
+                c.a = visibleAlpha;
+                if (dx == 0 && dy == outerRadiusCells) // pick a consistent sample
+                {
+                    Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
+                }            
+                // Always write persistent imprint (so regrow picks it up later)
+                _imprints[gp] = new DustImprint
+                {
+                    color = c,
+                    hardness01 = imprintHardness01,
+                    role = imprintRole
+                };
+                processed++;
+
+    // 1) If dust already exists, ALWAYS refresh visuals (even if keep-clear/blocked/etc).
+                if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
+                    existingGo.TryGetComponent<CosmicDust>(out var existingDust) && existingDust != null &&
+                    HasDustAt(gp))
+                {
+                    existingDust.ApplyRoleAndCharge(imprintRole, c, c.a);
+                    existingDust.clearing.hardness01 = imprintHardness01;
+                    continue;
+                }
+
+    // 2) Only after that, decide whether we’re allowed to SPAWN dust into empty space.
+                if (_permanentClearCells.Contains(gp)) continue;
+                if (IsKeepClearCell(gp)) continue;
+                if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
+                if (IsDustSpawnBlocked(gp)) continue;
+                if (NearAnyVehicle(gp)) continue;
+
+    // 3) Spawn/regrow if empty
+                if (_voidGrowCoroutines.ContainsKey(gp))
+                    continue;
+
+                _voidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
+            }
+        }
+
+        return processed;
     }
-
-    return processed;
-}
-
-private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
-{
-    if (!IsInBounds(gp)) { _voidGrowCoroutines.Remove(gp); yield break; }
-
-    bool veto0_perm        = _permanentClearCells.Contains(gp);
-    bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
-    bool veto0_claim       = (dustClaims != null && dustClaims.IsBlocked(gp));
-    bool veto0_keep        = IsKeepClearCell(gp);
-
-    // Permanent/spawn-block/claim are hard vetoes for even showing visuals.
-    // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
-    if (veto0_perm || veto0_spawnBlocked || veto0_claim)
+    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
     {
-        Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
+        if (!IsInBounds(gp)) { _voidGrowCoroutines.Remove(gp); yield break; }
+
+        bool veto0_perm        = _permanentClearCells.Contains(gp);
+        bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
+        bool veto0_claim       = (dustClaims != null && dustClaims.IsBlocked(gp));
+        bool veto0_keep        = IsKeepClearCell(gp);
+
+        // Permanent/spawn-block/claim are hard vetoes for even showing visuals.
+        // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
+        if (veto0_perm || veto0_spawnBlocked || veto0_claim)
+        {
+            Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
+            _voidGrowCoroutines.Remove(gp);
+            yield break;
+        }
+
+        var go = GetOrCreateCellGO(gp);
+        if (go == null)
+        {
+            Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
+            _voidGrowCoroutines.Remove(gp);
+            yield break;
+        }
+
+        Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
+
+        SetCellState(gp, DustCellState.Regrowing);
+
+        CosmicDust dust = null;
+        if (go.TryGetComponent(out dust) && dust != null)
+        {
+            dust.PrepareForReuse();
+            dust.SetVisualTimings(dustTimings);
+
+            // void uses remaining-bin time
+            dust.SetGrowInDuration(growInSeconds);
+
+            dust.clearing.hardness01 = hardness01;
+            dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
+            dust.SetFeedbackColors(Color.white, Color.darkGray);
+            dust.Begin();
+
+            // Always non-colliding during grow
+            SetDustCollision(dust, false);
+        }
+        if (dust != null)
+        {
+            var sr = dust.GetComponentInChildren<SpriteRenderer>(true);
+            if (sr != null)
+                Debug.Log($"[VOID_SPR] enabled={sr.enabled} color={sr.color} scale={sr.transform.localScale}");
+        }
+        float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
+        yield return new WaitForSeconds(enableDelay);
+
+        if (!IsInBounds(gp) || _permanentClearCells.Contains(gp))
+        {
+            SetCellState(gp, DustCellState.Empty);
+            FadeAndHideCellGO(go);
+            _voidGrowCoroutines.Remove(gp);
+            yield break;
+        }
+
+        bool veto1_spawnBlocked = IsDustSpawnBlocked(gp);
+        bool veto1_vehicle      = IsVehicleOverlappingCell(gp);
+        bool veto1_claim        = (dustClaims != null && dustClaims.IsBlocked(gp));
+        bool veto1_keep         = IsKeepClearCell(gp);
+
+        // Hard vetoes at end: don't keep visuals if spawn is blocked, vehicle overlaps, or claim blocks.
+        if (veto1_spawnBlocked || veto1_vehicle || veto1_claim)
+        {
+            Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
+            SetCellState(gp, DustCellState.PendingRegrow);
+            FadeAndHideCellGO(go);
+            EnqueueStepRegrow(gp);
+            _voidGrowCoroutines.Remove(gp);
+            yield break;
+        }
+
+        // Keep-clear at end: allow visuals, but never become solid/colliding.
+        if (veto1_keep)
+        {
+            Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
+            SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
+            if (dust != null) SetDustCollision(dust, false);
+            _voidGrowCoroutines.Remove(gp);
+            yield break;
+        }
+
+        // Otherwise: become solid.
+        SetCellState(gp, DustCellState.Solid);
+        if (dust != null) SetDustCollision(dust, true);
+
+        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
         _voidGrowCoroutines.Remove(gp);
-        yield break;
     }
-
-    var go = GetOrCreateCellGO(gp);
-    if (go == null)
-    {
-        Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
-        _voidGrowCoroutines.Remove(gp);
-        yield break;
-    }
-
-    Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
-
-    SetCellState(gp, DustCellState.Regrowing);
-
-    CosmicDust dust = null;
-    if (go.TryGetComponent(out dust) && dust != null)
-    {
-        dust.PrepareForReuse();
-        dust.SetVisualTimings(dustTimings);
-
-        // void uses remaining-bin time
-        dust.SetGrowInDuration(growInSeconds);
-
-        dust.clearing.hardness01 = hardness01;
-        dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
-        dust.SetFeedbackColors(Color.white, Color.darkGray);
-        dust.Begin();
-
-        // Always non-colliding during grow
-        SetDustCollision(dust, false);
-    }
-    if (dust != null)
-    {
-        var sr = dust.GetComponentInChildren<SpriteRenderer>(true);
-        if (sr != null)
-            Debug.Log($"[VOID_SPR] enabled={sr.enabled} color={sr.color} scale={sr.transform.localScale}");
-    }
-    float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
-    yield return new WaitForSeconds(enableDelay);
-
-    if (!IsInBounds(gp) || _permanentClearCells.Contains(gp))
-    {
-        SetCellState(gp, DustCellState.Empty);
-        FadeAndHideCellGO(go);
-        _voidGrowCoroutines.Remove(gp);
-        yield break;
-    }
-
-    bool veto1_spawnBlocked = IsDustSpawnBlocked(gp);
-    bool veto1_vehicle      = IsVehicleOverlappingCell(gp);
-    bool veto1_claim        = (dustClaims != null && dustClaims.IsBlocked(gp));
-    bool veto1_keep         = IsKeepClearCell(gp);
-
-    // Hard vetoes at end: don't keep visuals if spawn is blocked, vehicle overlaps, or claim blocks.
-    if (veto1_spawnBlocked || veto1_vehicle || veto1_claim)
-    {
-        Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
-        SetCellState(gp, DustCellState.PendingRegrow);
-        FadeAndHideCellGO(go);
-        EnqueueStepRegrow(gp);
-        _voidGrowCoroutines.Remove(gp);
-        yield break;
-    }
-
-    // Keep-clear at end: allow visuals, but never become solid/colliding.
-    if (veto1_keep)
-    {
-        Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
-        SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
-        if (dust != null) SetDustCollision(dust, false);
-        _voidGrowCoroutines.Remove(gp);
-        yield break;
-    }
-
-    // Otherwise: become solid.
-    SetCellState(gp, DustCellState.Solid);
-    if (dust != null) SetDustCollision(dust, true);
-
-    Debug.Log($"[VOID_GROW] SOLID gp={gp}");
-    _voidGrowCoroutines.Remove(gp);
-}
-private void SetDustCollision(CosmicDust dust, bool _enabled)
-    {
-        if (dust == null) return;
-        dust.SetTerrainColliderEnabled(_enabled);
-    }
+    private void SetDustCollision(CosmicDust dust, bool _enabled)
+        {
+            if (dust == null) return;
+            dust.SetTerrainColliderEnabled(_enabled);
+        }
     private void EnsureImprints()
     {
         if (_imprints == null)
@@ -849,193 +848,193 @@ private void SetDustCollision(CosmicDust dust, bool _enabled)
         EnsureRegrowController();
         _regrow?.EnqueueStepRegrow(gp);
     }
-private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
-    MazeArchetype phase,
-    Vector2Int starCell,
-    HashSet<Vector2Int> reservedCells)
-{
-    if (drums == null) return new List<(Vector2Int, Vector3)>();
-
-    int w = drums.GetSpawnGridWidth();
-    int h = drums.GetSpawnGridHeight();
-    if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
-
-    // Delegates required by CosmicDustMazePatterns
-    Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
-    Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
-    Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
-
-    // World veto: keep your existing screen cull.
-    Func<Vector3, bool> includeWorld = world => true;
-
-    // Grid veto for BFS-based patterns (ring chokepoints)
-    Func<Vector2Int, bool> includeCellForBfs = cell =>
+    private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
+        MazeArchetype phase,
+        Vector2Int starCell,
+        HashSet<Vector2Int> reservedCells)
     {
-        if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
+        if (drums == null) return new List<(Vector2Int, Vector3)>();
 
-        // IMPORTANT: allow the BFS seed (starCell) even though it's reserved.
-        // We will still filter it out from emitted growth later.
-        if (cell == starCell) return true;
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
 
-        if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
-        if (reservedCells != null && reservedCells.Contains(cell)) return false;
-        if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
-        if (IsKeepClearCell(cell)) return false;
-        return true;
-    };
+        // Delegates required by CosmicDustMazePatterns
+        Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
+        Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
+        Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
 
+        // World veto: keep your existing screen cull.
+        Func<Vector3, bool> includeWorld = world => true;
 
-    // IMPORTANT: Patterns return the *cells to place dust*.
-    // We apply a final reserved/permanent/keep-clear filter afterward as defense-in-depth.
-    List<(Vector2Int cell, Vector3 world)> growth = null;
-
-    switch (phase)
-    {
-        case MazeArchetype.Establish:
+        // Grid veto for BFS-based patterns (ring chokepoints)
+        Func<Vector2Int, bool> includeCellForBfs = cell =>
         {
-            // Legacy behavior: fill everything except reserved.
-            var rect = new List<(Vector2Int, Vector3)>(w * h);
-            for (int x = 0; x < w; x++)
-            for (int y = 0; y < h; y++)
+            if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
+
+            // IMPORTANT: allow the BFS seed (starCell) even though it's reserved.
+            // We will still filter it out from emitted growth later.
+            if (cell == starCell) return true;
+
+            if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
+            if (reservedCells != null && reservedCells.Contains(cell)) return false;
+            if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
+            if (IsKeepClearCell(cell)) return false;
+            return true;
+        };
+
+
+        // IMPORTANT: Patterns return the *cells to place dust*.
+        // We apply a final reserved/permanent/keep-clear filter afterward as defense-in-depth.
+        List<(Vector2Int cell, Vector3 world)> growth = null;
+
+        switch (phase)
+        {
+            case MazeArchetype.Establish:
             {
-                if (!drums.IsSpawnCellAvailable(x, y)) continue;
-                var gp = new Vector2Int(x, y);
-                if (reservedCells != null && reservedCells.Contains(gp)) continue;
-                if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-                if (IsKeepClearCell(gp)) continue;
+                // Legacy behavior: fill everything except reserved.
+                var rect = new List<(Vector2Int, Vector3)>(w * h);
+                for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                {
+                    if (!drums.IsSpawnCellAvailable(x, y)) continue;
+                    var gp = new Vector2Int(x, y);
+                    if (reservedCells != null && reservedCells.Contains(gp)) continue;
+                    if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+                    if (IsKeepClearCell(gp)) continue;
 
-                var world = drums.GridToWorldPosition(gp);
-                if (!IsWorldPositionInsideScreen(world)) continue;
-                rect.Add((gp, world));
+                    var world = drums.GridToWorldPosition(gp);
+                    if (!IsWorldPositionInsideScreen(world)) continue;
+                    rect.Add((gp, world));
+                }
+                growth = rect;
+                break;
             }
-            growth = rect;
-            break;
-        }
 
-        case MazeArchetype.Evolve:
-        {
-            // Moderate CA
-            float fillChance = Mathf.Clamp01(GetFillProbability(phase));
-            growth = CosmicDustMazePatterns.BuildCA(
-                width: w,
-                height: h,
-                fillChance: fillChance,
-                iterations: 3,
-                getHexDirectionsByRow: getDirsByRow,
-                gridToWorld: gridToWorld,
-                isCellAvailable: isCellAvailable,
-                includeWorld: includeWorld);
-            break;
-        }
-
-        case MazeArchetype.Intensify:
-        {
-            // Denser CA (slightly higher fill chance + same iteration count)
-            float fillChance = Mathf.Clamp01(GetFillProbability(phase) + 0.15f);
-            growth = CosmicDustMazePatterns.BuildCA(
-                width: w,
-                height: h,
-                fillChance: fillChance,
-                iterations: 3,
-                getHexDirectionsByRow: getDirsByRow,
-                gridToWorld: gridToWorld,
-                isCellAvailable: isCellAvailable,
-                includeWorld: includeWorld);
-            break;
-        }
-
-        case MazeArchetype.Release:
-        {
-            // “Breath / breakdown”: ring chokepoints reads like structure-with-air.
-            // Tunables: spacing larger = fewer rings; thickness smaller = thinner walls.
-            int spacing = 6;
-            int thickness = 1;
-            float jitter = 0.35f;
-
-            growth = CosmicDustMazePatterns.BuildRingChokepoints(
-                center: starCell,
-                width: w,
-                height: h,
-                ringSpacing: spacing,
-                ringThickness: thickness,
-                jitter: jitter,
-                getHexDirectionsByRow: getDirsByRow,
-                gridToWorld: gridToWorld,
-                isCellAvailable: isCellAvailable,
-                includeCellForBfs: includeCellForBfs,
-                includeWorld: includeWorld);
-            break;
-        }
-
-        case MazeArchetype.Wildcard:
-        {
-            // Glitchy scribbles
-            growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
-                width: w,
-                height: h,
-                strokes: 10,
-                maxLen: 18,
-                stepJitter: 0.35f,
-                dilate: 0.30f,
-                getHexDirectionsByRow: getDirsByRow,
-                gridToWorld: gridToWorld,
-                isCellAvailable: isCellAvailable,
-                includeWorld: includeWorld);
-            break;
-        }
-
-        case MazeArchetype.Pop:
-        {
-            // Polka dots / hooky grid mask
-            growth = CosmicDustMazePatterns.BuildPopDots(
-                width: w,
-                height: h,
-                step: 4,
-                phaseOffset: Random.Range(0, 8),
-                gridToWorld: gridToWorld,
-                isCellAvailable: isCellAvailable,
-                includeWorld: includeWorld);
-            break;
-        }
-
-        default:
-        {
-            // Safe fallback: treat as Establish rectangle fill
-            var rect = new List<(Vector2Int, Vector3)>(w * h);
-            for (int x = 0; x < w; x++)
-            for (int y = 0; y < h; y++)
+            case MazeArchetype.Evolve:
             {
-                if (!drums.IsSpawnCellAvailable(x, y)) continue;
-                var gp = new Vector2Int(x, y);
-                if (reservedCells != null && reservedCells.Contains(gp)) continue;
-                if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-                if (IsKeepClearCell(gp)) continue;
-
-                var world = drums.GridToWorldPosition(gp);
-                if (!IsWorldPositionInsideScreen(world)) continue;
-                rect.Add((gp, world));
+                // Moderate CA
+                float fillChance = Mathf.Clamp01(GetFillProbability(phase));
+                growth = CosmicDustMazePatterns.BuildCA(
+                    width: w,
+                    height: h,
+                    fillChance: fillChance,
+                    iterations: 3,
+                    getHexDirectionsByRow: getDirsByRow,
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
+                break;
             }
-            growth = rect;
-            break;
+
+            case MazeArchetype.Intensify:
+            {
+                // Denser CA (slightly higher fill chance + same iteration count)
+                float fillChance = Mathf.Clamp01(GetFillProbability(phase) + 0.15f);
+                growth = CosmicDustMazePatterns.BuildCA(
+                    width: w,
+                    height: h,
+                    fillChance: fillChance,
+                    iterations: 3,
+                    getHexDirectionsByRow: getDirsByRow,
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
+                break;
+            }
+
+            case MazeArchetype.Release:
+            {
+                // “Breath / breakdown”: ring chokepoints reads like structure-with-air.
+                // Tunables: spacing larger = fewer rings; thickness smaller = thinner walls.
+                int spacing = 6;
+                int thickness = 1;
+                float jitter = 0.35f;
+
+                growth = CosmicDustMazePatterns.BuildRingChokepoints(
+                    center: starCell,
+                    width: w,
+                    height: h,
+                    ringSpacing: spacing,
+                    ringThickness: thickness,
+                    jitter: jitter,
+                    getHexDirectionsByRow: getDirsByRow,
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeCellForBfs: includeCellForBfs,
+                    includeWorld: includeWorld);
+                break;
+            }
+
+            case MazeArchetype.Wildcard:
+            {
+                // Glitchy scribbles
+                growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
+                    width: w,
+                    height: h,
+                    strokes: 10,
+                    maxLen: 18,
+                    stepJitter: 0.35f,
+                    dilate: 0.30f,
+                    getHexDirectionsByRow: getDirsByRow,
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
+                break;
+            }
+
+            case MazeArchetype.Pop:
+            {
+                // Polka dots / hooky grid mask
+                growth = CosmicDustMazePatterns.BuildPopDots(
+                    width: w,
+                    height: h,
+                    step: 4,
+                    phaseOffset: Random.Range(0, 8),
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
+                break;
+            }
+
+            default:
+            {
+                // Safe fallback: treat as Establish rectangle fill
+                var rect = new List<(Vector2Int, Vector3)>(w * h);
+                for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                {
+                    if (!drums.IsSpawnCellAvailable(x, y)) continue;
+                    var gp = new Vector2Int(x, y);
+                    if (reservedCells != null && reservedCells.Contains(gp)) continue;
+                    if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+                    if (IsKeepClearCell(gp)) continue;
+
+                    var world = drums.GridToWorldPosition(gp);
+                    if (!IsWorldPositionInsideScreen(world)) continue;
+                    rect.Add((gp, world));
+                }
+                growth = rect;
+                break;
+            }
         }
+
+        if (growth == null)
+            growth = new List<(Vector2Int, Vector3)>();
+
+        // Final filter: enforce reserved/permanent/keep-clear *even if a pattern emitted them*.
+        var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
+        for (int i = 0; i < growth.Count; i++)
+        {
+            var gp = growth[i].cell;
+            if (reservedCells != null && reservedCells.Contains(gp)) continue;
+            if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
+            if (IsKeepClearCell(gp)) continue;
+            filtered.Add((growth[i].cell, growth[i].world));
+        }
+
+        return filtered;
     }
-
-    if (growth == null)
-        growth = new List<(Vector2Int, Vector3)>();
-
-    // Final filter: enforce reserved/permanent/keep-clear *even if a pattern emitted them*.
-    var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
-    for (int i = 0; i < growth.Count; i++)
-    {
-        var gp = growth[i].cell;
-        if (reservedCells != null && reservedCells.Contains(gp)) continue;
-        if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-        if (IsKeepClearCell(gp)) continue;
-        filtered.Add((growth[i].cell, growth[i].world));
-    }
-
-    return filtered;
-}
 
     /// <summary>
     /// Assigns a MusicalRole to every cell in the growth list via Voronoi (or a future
@@ -1196,15 +1195,6 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         return !HasDustAt(gp);
     }
     
-    public bool IsEffectivelyDustCell(Vector2Int gp)
-    {
-        // If it must be treated as open, it’s not dust (even if a dust GO exists due to timing)
-        if (IsEffectivelyOpenCell(gp)) return false;
-
-        // Otherwise, it’s dust only if there’s an active dust cell in the map
-        return HasDustAt(gp);
-    }
-
     // ------------------------------------------------------------------
     // Authoritative cell grid helpers
     // ------------------------------------------------------------------
@@ -1425,82 +1415,12 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     }
 
     
-    /// Imprints color + hardness onto dust cells in a disk (does NOT clear dust).
-/// Center is specified in GRID coordinates.
-/// </summary>
-/// <returns>Number of cells processed</returns>
-
-    public int ApplyVoidImprintDiskFromGrid(
-        Vector2Int centerGP,
-        int outerRadiusCells,
-        MusicalRole imprintRole,
-        Color imprintColor,
-        float imprintHardness01,
-        int maxCellsThisCall = -1,
-        int innerRadiusCellsExclusive = -1)
-{
-    if (outerRadiusCells <= 0)
-        return 0;
-
-    imprintHardness01 = Mathf.Clamp01(imprintHardness01);
-
-    int processed = 0;
-    int rOuterSq = outerRadiusCells * outerRadiusCells;
-    int rInnerSq = innerRadiusCellsExclusive >= 0
-        ? innerRadiusCellsExclusive * innerRadiusCellsExclusive
-        : -1;
-
-    for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
-    {
-        for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
-        {
-            int dSq = dx * dx + dy * dy;
-            if (dSq > rOuterSq) continue;
-            if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
-
-            Vector2Int gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
-            
-            _imprints[gp] = new DustImprint
-            {
-                color = imprintColor,
-                hardness01 = imprintHardness01,
-                role = imprintRole
-            };
-            // Live update if the cell GO exists right now.
-            if (TryGetCellGo(gp, out GameObject go) && go != null)
-            {
-                if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
-                {
-                    dust.ApplyRoleAndCharge(imprintRole, imprintColor, .01f);
-                    dust.clearing.hardness01 = imprintHardness01;
-                }
-            }
-
-            processed++;
-            if (maxCellsThisCall > 0 && processed >= maxCellsThisCall)
-                return processed;
-        }
-    }
-
-    return processed;
-}
     public float SampleDensity01(Vector3 worldPos)
     {
         if (drums == null) return 0f;
 
         Vector2Int cell = drums.WorldToGridPosition(worldPos);
         return HasDustAt(cell) ? 1f : 0f;
-    }
-    public void SetStarKeepClearWorld(Vector2 centerWorld, float radiusWorld, MazeArchetype phase)
-    {
-        if (drums == null) return;
-
-        Vector2Int center = drums.WorldToGridPosition(centerWorld);
-        float cellWorld = Mathf.Max(0.001f, drums.GetCellWorldSize());
-        int radiusCells = Mathf.CeilToInt(radiusWorld / cellWorld);
-
-        // Star pocket updates over time; replace the previous set for this phase.
-        SetStarKeepClear(center, radiusCells, phase, forceRemoveExisting: true);
     }
 
     private void RequestRegrowCellAt(Vector2Int gridPos, MazeArchetype phase, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
@@ -1741,20 +1661,6 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     public bool IsPermanentlyClearCell(Vector2Int gridPos)
     {
         return _permanentClearCells.Contains(gridPos);
-    }
-    private List<(Vector2Int grid, Vector3 world)> FilterOutPermanent(
-        List<(Vector2Int, Vector3)> source)
-    {
-        if (source == null || source.Count == 0 || _permanentClearCells.Count == 0)
-            return source;
-
-        var result = new List<(Vector2Int, Vector3)>(source.Count);
-        foreach (var (grid, world) in source)
-        {
-            if (_permanentClearCells.Contains(grid)) continue;
-            result.Add((grid, world));
-        }
-        return result;
     }
     private void DespawnDustAtAndMarkPermanent(Vector2Int gridPos)
     {
@@ -2322,8 +2228,9 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
     {
         TryEnsureRefs();
         return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MazeArchetype.Establish;
-    }  
-    public void DespawnDustAt(Vector2Int gridPos)
+    }
+
+    private void DespawnDustAt(Vector2Int gridPos)
     {
         if (_permanentClearCells.Contains(gridPos)) return;
 
@@ -2507,186 +2414,5 @@ private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
             MazeArchetype.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
             _ => 0.35f
         };
-    }
-    private List<(Vector2Int, Vector3)> Build_CA(Vector2Int center, float hollowRadius, bool avoidStarHole)
-    {
-        List<(Vector2Int, Vector3)> growth = new();
-        _fillMap.Clear();
-
-        Vector3 centerWorld = drums.GridToWorldPosition(center);
-        float fillChance = GetFillProbability(MazeArchetype.Establish);
-        int W = drums.GetSpawnGridWidth();
-        int H = drums.GetSpawnGridHeight();
-
-        for (int x = 0; x < W; x++)
-        for (int y = 0; y < H; y++)
-        {
-            var pos = new Vector2Int(x, y);
-            if (!drums.IsSpawnCellAvailable(x, y)) continue;
-
-            if (avoidStarHole && hollowRadius > 0f)
-            {
-                float d = Vector3.Distance(drums.GridToWorldPosition(pos), centerWorld);
-                if (d < hollowRadius) continue;
-            }
-
-            _fillMap[pos] = Random.value < fillChance;
-        }
-
-        for (int i = 0; i < 3; i++)
-        {
-            var next = new Dictionary<Vector2Int, bool>();
-            foreach (var cell in _fillMap.Keys)
-            {
-                int n = CountFilledNeighbors(cell);
-                bool cur = _fillMap[cell];
-                if (cur && (n < 2 || n > 4)) next[cell] = false;
-                else if (!cur && n == 3)     next[cell] = true;
-                else                         next[cell] = cur;
-            }
-            _fillMap = next;
-        }
-
-        foreach (var kv in _fillMap)
-        {
-            if (!kv.Value) continue;
-            var grid = kv.Key;
-            var world = drums.GridToWorldPosition(grid);
-            if (!IsWorldPositionInsideScreen(world)) continue;
-            growth.Add((grid, world));
-        }
-        return growth;
-    }
-    private List<(Vector2Int, Vector3)> Build_RingChokepoints(Vector2Int center, int ringSpacing, int ringThickness, float jitter, float hollowRadius, bool avoidStarHole) {
-        var growth = new List<(Vector2Int, Vector3)>();
-        int W = drums.GetSpawnGridWidth();
-        int H = drums.GetSpawnGridHeight();
-        Vector3 centerW = drums.GridToWorldPosition(center);
-
-        // BFS distance by hex steps (avoids axial conversion headaches)
-        var dist = new Dictionary<Vector2Int, int>();
-        var q = new Queue<Vector2Int>();
-        var seen = new HashSet<Vector2Int>();
-        q.Enqueue(center); dist[center] = 0; seen.Add(center);
-
-        while (q.Count > 0)
-        {
-            var p = q.Dequeue();
-            int row = p.y;
-            foreach (var d in GetHexDirections(row))
-            {
-                var n = p + d;
-                if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) continue;
-                if (!drums.IsSpawnCellAvailable(n.x, n.y)) continue;
-                if (seen.Contains(n)) continue;
-
-                // optional star hole
-                if (avoidStarHole && hollowRadius > 0f)
-                {
-                    float dd = Vector3.Distance(drums.GridToWorldPosition(n), centerW);
-                    if (dd < hollowRadius) continue;
-                }
-
-                seen.Add(n);
-                dist[n] = dist[p] + 1;
-                q.Enqueue(n);
-            }
-        }
-
-        // Place dust on certain rings (distance bands)
-        foreach (var kv in dist)
-        {
-            int d = kv.Value;
-            // ring test with jitter: e.g., (d % spacing) < thickness (+/- jitter)
-            float r = d % ringSpacing;
-            bool onRing = r < ringThickness + Random.Range(-jitter, jitter);
-            if (!onRing) continue;
-
-            var grid = kv.Key;
-            var world = drums.GridToWorldPosition(grid);
-            if (!IsWorldPositionInsideScreen(world)) continue;
-            growth.Add((grid, world));
-        }
-
-        return growth;
-    }
-    private List<(Vector2Int, Vector3)> Build_DrunkenStrokes(int strokes, int maxLen, float stepJitter, float dilate)
-    {
-        var growth = new HashSet<Vector2Int>();
-        int W = drums.GetSpawnGridWidth();
-        int H = drums.GetSpawnGridHeight();
-
-        for (int s = 0; s < strokes; s++)
-        {
-            // random start on-screen & available
-            Vector2Int p = new(
-                Random.Range(0, W),
-                Random.Range(0, H)
-            );
-            int safety = 0;
-            while (safety++ < 100 &&
-                   (!drums.IsSpawnCellAvailable(p.x, p.y) ||
-                    !IsWorldPositionInsideScreen(drums.GridToWorldPosition(p))))
-            {
-                p = new(Random.Range(0, W), Random.Range(0, H));
-            }
-
-            if (safety >= 100) continue;
-
-            int len = Random.Range(maxLen / 2, maxLen + 1);
-            Vector2Int cur = p;
-            for (int i = 0; i < len; i++)
-            {
-                growth.Add(cur);
-
-                // jittered random neighbor
-                var dirs = GetHexDirections(cur.y);
-                var nxt = dirs[Random.Range(0, dirs.Count)];
-                if (Random.value < stepJitter) nxt = dirs[Random.Range(0, dirs.Count)];
-                var n = cur + nxt;
-
-                if ((uint)n.x >= (uint)W || (uint)n.y >= (uint)H) break;
-                if (!drums.IsSpawnCellAvailable(n.x, n.y)) break;
-                if (!IsWorldPositionInsideScreen(drums.GridToWorldPosition(n))) break;
-
-                cur = n;
-            }
-        }
-
-        // Optional dilation to thicken strokes
-        if (dilate > 0f)
-        {
-            var thick = new HashSet<Vector2Int>(growth);
-            foreach (var c in growth)
-            foreach (var n in GetHexDirections(c.y))
-                if (Random.value < dilate) thick.Add(c + n);
-            growth = thick;
-        }
-
-        // Pack into list
-        var list = new List<(Vector2Int, Vector3)>();
-        foreach (var g in growth)
-            list.Add((g, drums.GridToWorldPosition(g)));
-        return list;
-    }
-    private List<(Vector2Int, Vector3)> Build_PopDots(int step, int phaseOffset) {
-        var growth = new List<(Vector2Int, Vector3)>();
-        int W = drums.GetSpawnGridWidth();
-        int H = drums.GetSpawnGridHeight();
-
-        for (int x = 0; x < W; x++)
-        for (int y = 0; y < H; y++)
-        {
-            if (!drums.IsSpawnCellAvailable(x, y)) continue;
-            // simple periodic mask → polka dots
-            if (((x + (y * 2) + phaseOffset) % step) != 0) continue;
-
-            var grid = new Vector2Int(x, y);
-            var world = drums.GridToWorldPosition(grid);
-            if (!IsWorldPositionInsideScreen(world)) continue;
-
-            growth.Add((grid, world));
-        }
-        return growth;
     }
 }

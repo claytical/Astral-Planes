@@ -108,12 +108,5 @@ public static class NoteBehaviorPolicy
                 return new[] { NoteBehavior.None };
         }
     }
-
-    // Convenience: primary default (first item)
-    public static NoteBehavior GetDefault(MazeArchetype phase, MusicalRole role)
-    {
-        var list = GetDefaults(phase, role);
-        return (list != null && list.Count > 0) ? list[0] : NoteBehavior.None;
-    }
-
+        
 }

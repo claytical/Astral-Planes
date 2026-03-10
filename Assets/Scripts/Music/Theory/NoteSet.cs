@@ -4,29 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
 
-public static class ChordLibrary
-{
-    private static readonly Dictionary<string, int[]> Formulas = new()
-    {
-        { "Major", new[] { 0, 4, 7 } },
-        { "Minor", new[] { 0, 3, 7 } },
-        { "Minor7", new[] { 0, 3, 7, 10 } },
-        { "Major7", new[] { 0, 4, 7, 11 } },
-        { "Sus4", new[] { 0, 5, 7 } },
-        { "Fifths", new[] { 0, 7 } },
-        { "Diminished", new[] { 0, 3, 6 } },
-    };
-
-    public static int[] GetRandomChord()
-    {
-        var keys = Formulas.Keys.ToList();
-        string key = keys[Random.Range(0, keys.Count)];
-        Debug.Log($"🎵 Random chord selected: {key}");
-        return Formulas[key];
-    }
-}
-
-public enum ScaleType
+    public enum ScaleType
 {
     Major,
     Minor,
@@ -37,88 +15,87 @@ public enum ScaleType
     Locrian
 }
 
-public static class ScalePatterns
-{
-    public static readonly Dictionary<ScaleType, int[]> Patterns = new Dictionary<ScaleType, int[]>
+    public static class ScalePatterns
     {
-        { ScaleType.Major,      new [] {0, 2, 4, 5, 7, 9, 11} },
-        { ScaleType.Minor,      new [] {0, 2, 3, 5, 7, 8, 10} },
-        { ScaleType.Mixolydian, new [] {0, 2, 4, 5, 7, 9, 10} },
-        { ScaleType.Dorian,     new [] {0, 2, 3, 5, 7, 9, 10} },
-        { ScaleType.Phrygian,   new [] {0, 1, 3, 5, 7, 8, 10} },
-        { ScaleType.Lydian,     new [] {0, 2, 4, 6, 7, 9, 11} },
-        { ScaleType.Locrian,    new [] {0, 1, 3, 5, 6, 8, 10} },
-    };
-}
-
-public class RhythmPattern {
-    public int[] Offsets;           // The allowed onset offsets (within a measure)
-    public float DurationMultiplier; // Multiplier to extend (or shorten) the note duration
-    public int LoopMultiplier;       // Multiplier to extend the overall loop length
-}
-
-public static class RhythmPatterns
-{
-    public static readonly Dictionary<RhythmStyle, RhythmPattern> Patterns =
-        new Dictionary<RhythmStyle, RhythmPattern>
+        public static readonly Dictionary<ScaleType, int[]> Patterns = new Dictionary<ScaleType, int[]>
         {
-            { RhythmStyle.FourOnTheFloor, new RhythmPattern {
-                Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Syncopated,     new RhythmPattern {
-                Offsets = new[] { 2, 3, 6, 7, 10, 11, 14, 15 }, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
-            { RhythmStyle.Swing,          new RhythmPattern {
-                Offsets = new[] { 0, 3, 4, 7, 8, 11, 12, 15 }, DurationMultiplier = 1f, LoopMultiplier = 1 } }, 
-            { RhythmStyle.Sparse,         new RhythmPattern {
-                Offsets = new[] { 0, 8 }, DurationMultiplier = 2f, LoopMultiplier = 2 } },
-            { RhythmStyle.Dense,          new RhythmPattern {
-                Offsets = Enumerable.Range(0, 16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } },
-            { RhythmStyle.Steady,         new RhythmPattern {
-                Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.Triplet,        new RhythmPattern {
-                Offsets = new[] { 0, 5, 10, 15 }, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
-            { RhythmStyle.PulseBuild,     new RhythmPattern {
-                Offsets = new[] { 0, 8, 4, 12, 2, 10 }, DurationMultiplier = 1.2f, LoopMultiplier = 1 } },
-            { RhythmStyle.Stutter,        new RhythmPattern {
-                Offsets = new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, DurationMultiplier = 0.6f, LoopMultiplier = 1 } },
-            { RhythmStyle.Scatter,        new RhythmPattern {
-                Offsets = new[] { 1, 5, 7, 10, 13, 14 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
-            { RhythmStyle.StaccatoEighths, new RhythmPattern {
-                Offsets = new[] {0,2,4,6,8,10,12,14}, DurationMultiplier = 0.5f, LoopMultiplier = 1 } },
-            { RhythmStyle.DroneFade, new RhythmPattern {
-                Offsets = new[] {0}, DurationMultiplier = 4.0f, LoopMultiplier = 1 } },
-            { RhythmStyle.TripletFlare, new RhythmPattern {
-                Offsets = new[] {0,5,10,15}, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
-            { RhythmStyle.CallResponse, new RhythmPattern {
-                Offsets = new[] {0,4,8,12}, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
-            { RhythmStyle.PulseBuild2Bar, new RhythmPattern {
-                Offsets = new[] {0,8,4,12,2,6,10,14}, DurationMultiplier = 0.9f, LoopMultiplier = 2 } },
-            { RhythmStyle.Breakbeat,      new RhythmPattern
-            {
-                Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
+            { ScaleType.Major,      new [] {0, 2, 4, 5, 7, 9, 11} },
+            { ScaleType.Minor,      new [] {0, 2, 3, 5, 7, 8, 10} },
+            { ScaleType.Mixolydian, new [] {0, 2, 4, 5, 7, 9, 10} },
+            { ScaleType.Dorian,     new [] {0, 2, 3, 5, 7, 9, 10} },
+            { ScaleType.Phrygian,   new [] {0, 1, 3, 5, 7, 8, 10} },
+            { ScaleType.Lydian,     new [] {0, 2, 4, 6, 7, 9, 11} },
+            { ScaleType.Locrian,    new [] {0, 1, 3, 5, 6, 8, 10} },
         };
-}
-public enum RhythmStyle
-{
-    FourOnTheFloor,
-    Syncopated,
-    Swing,
-    Sparse,
-    Dense,
-    Steady,
-    Triplet,
-    PulseBuild,
-    Stutter,
-    Scatter,
-    StaccatoEighths,
-    DroneFade,
-    TripletFlare,
-    CallResponse,
-    PulseBuild2Bar,    
-    Breakbeat,
-    Straight
-}
+    }
 
-public enum ChordPattern
+    public class RhythmPattern {
+        public int[] Offsets;           // The allowed onset offsets (within a measure)
+        public float DurationMultiplier; // Multiplier to extend (or shorten) the note duration
+        public int LoopMultiplier;       // Multiplier to extend the overall loop length
+    }
+    public static class RhythmPatterns
+    {
+        public static readonly Dictionary<RhythmStyle, RhythmPattern> Patterns =
+            new Dictionary<RhythmStyle, RhythmPattern>
+            {
+                { RhythmStyle.FourOnTheFloor, new RhythmPattern {
+                    Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+                { RhythmStyle.Syncopated,     new RhythmPattern {
+                    Offsets = new[] { 2, 3, 6, 7, 10, 11, 14, 15 }, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
+                { RhythmStyle.Swing,          new RhythmPattern {
+                    Offsets = new[] { 0, 3, 4, 7, 8, 11, 12, 15 }, DurationMultiplier = 1f, LoopMultiplier = 1 } }, 
+                { RhythmStyle.Sparse,         new RhythmPattern {
+                    Offsets = new[] { 0, 8 }, DurationMultiplier = 2f, LoopMultiplier = 2 } },
+                { RhythmStyle.Dense,          new RhythmPattern {
+                    Offsets = Enumerable.Range(0, 16).ToArray(), DurationMultiplier = 0.7f, LoopMultiplier = 1 } },
+                { RhythmStyle.Steady,         new RhythmPattern {
+                    Offsets = new[] { 0, 4, 8, 12 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+                { RhythmStyle.Triplet,        new RhythmPattern {
+                    Offsets = new[] { 0, 5, 10, 15 }, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
+                { RhythmStyle.PulseBuild,     new RhythmPattern {
+                    Offsets = new[] { 0, 8, 4, 12, 2, 10 }, DurationMultiplier = 1.2f, LoopMultiplier = 1 } },
+                { RhythmStyle.Stutter,        new RhythmPattern {
+                    Offsets = new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, DurationMultiplier = 0.6f, LoopMultiplier = 1 } },
+                { RhythmStyle.Scatter,        new RhythmPattern {
+                    Offsets = new[] { 1, 5, 7, 10, 13, 14 }, DurationMultiplier = 1f, LoopMultiplier = 1 } },
+                { RhythmStyle.StaccatoEighths, new RhythmPattern {
+                    Offsets = new[] {0,2,4,6,8,10,12,14}, DurationMultiplier = 0.5f, LoopMultiplier = 1 } },
+                { RhythmStyle.DroneFade, new RhythmPattern {
+                    Offsets = new[] {0}, DurationMultiplier = 4.0f, LoopMultiplier = 1 } },
+                { RhythmStyle.TripletFlare, new RhythmPattern {
+                    Offsets = new[] {0,5,10,15}, DurationMultiplier = 0.9f, LoopMultiplier = 1 } },
+                { RhythmStyle.CallResponse, new RhythmPattern {
+                    Offsets = new[] {0,4,8,12}, DurationMultiplier = 0.8f, LoopMultiplier = 1 } },
+                { RhythmStyle.PulseBuild2Bar, new RhythmPattern {
+                    Offsets = new[] {0,8,4,12,2,6,10,14}, DurationMultiplier = 0.9f, LoopMultiplier = 2 } },
+                { RhythmStyle.Breakbeat,      new RhythmPattern
+                {
+                    Offsets = new[] { 0, 2, 5, 9, 11, 14 }, DurationMultiplier = 1.1f, LoopMultiplier = 1 } }
+            };
+    }
+    public enum RhythmStyle
+    {
+        FourOnTheFloor,
+        Syncopated,
+        Swing,
+        Sparse,
+        Dense,
+        Steady,
+        Triplet,
+        PulseBuild,
+        Stutter,
+        Scatter,
+        StaccatoEighths,
+        DroneFade,
+        TripletFlare,
+        CallResponse,
+        PulseBuild2Bar,    
+        Breakbeat,
+        Straight
+    }
+
+    public enum ChordPattern
 {
     RootTriad,
     SeventhChord,
@@ -126,7 +103,7 @@ public enum ChordPattern
     Sus4,
     Arpeggiated
 }
-public class NoteSet
+    public class NoteSet
 {
     public int rootMidi;             // e.g. 24 for C1
     public ScaleType scale;          // e.g. Major or Minor

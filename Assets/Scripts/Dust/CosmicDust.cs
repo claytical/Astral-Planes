@@ -17,12 +17,6 @@ public class CosmicDust : MonoBehaviour {
         [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
         
         public SpriteRenderer sprite;
-        [Header("PhaseStar Proximity")]
-        public bool  starRemovesWithoutRegrow; // if false, it will regrow via generator
-        public float starAlphaFadeBias;        // keep a little glow as it shrinks
-
-        [Header("Fade")]
-        [Min(0.01f)] public float fadeSeconds;
     }
     [System.Serializable]
     public struct DustVisualTimings
@@ -50,13 +44,8 @@ public class CosmicDust : MonoBehaviour {
     [Serializable]
     public struct DustInteractionSettings
     {
-        [Header("Vehicle Interaction")]
-        [Range(0.4f, 1f)] public float speedScale; // cap scale
-        [Range(0.4f, 1f)] public float accelScale; // thrust scale
-
-        [Header("Energy Drain (Deterrent)")]
+        [Header("Energy Drain")]
         [Min(0f)] public float energyDrainPerSecond;
-        public bool noDrainWhileBoosting;
     }
     [Serializable]
     public struct DustClearingSettings
@@ -66,34 +55,22 @@ public class CosmicDust : MonoBehaviour {
 
         [Header("Dust Clearing")]
         [Min(0.05f)] public float nonBoostSecondsToBreak;
-
-        [Tooltip("Override delay (seconds) before temporary regrow into the SAME cell. -1 uses the phase default.")]
-        public float temporaryRegrowDelaySeconds;
     }
     private readonly struct PhaseDustConfig
     {
-        public readonly float scaleMul;
         public readonly float drainMul;
         public readonly DustBehavior behavior;
-        public readonly float slowFactor;
-        public readonly float slowDur;
         public readonly float lateral;
         public readonly float turb;
 
         public PhaseDustConfig(
-            float scaleMul,
             float drainMul,
             DustBehavior behavior,
-            float slowFactor,
-            float slowDur,
             float lateral,
             float turb)
         {
-            this.scaleMul   = scaleMul;
             this.drainMul   = drainMul;
             this.behavior   = behavior;
-            this.slowFactor = slowFactor;
-            this.slowDur    = slowDur;
             this.lateral    = lateral;
             this.turb       = turb;
         }
@@ -101,32 +78,23 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private DustVisualSettings visual = new DustVisualSettings
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
-        particleFootprintMul   = 0.85f,
-        starRemovesWithoutRegrow = false,
-        starAlphaFadeBias      = 0.9f,
-        fadeSeconds            = 1f
+        particleFootprintMul   = 0.85f
     };
 
     [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
     {
-        speedScale            = 0.8f,
-        accelScale            = 0.8f,
-        energyDrainPerSecond  = 0.25f,
-        noDrainWhileBoosting  = true
+        energyDrainPerSecond  = 0.25f
     };
 
     [SerializeField] public DustClearingSettings clearing = new DustClearingSettings
     {
         hardness01                = 0f,
-        nonBoostSecondsToBreak    = 2.5f,
-        temporaryRegrowDelaySeconds = -1f
+        nonBoostSecondsToBreak    = 2.5f
+      
     };
     [Header("Shader Params")]
     [SerializeField] private bool useWorkShaderParams = true;
-    private static readonly int _RoleColorId = Shader.PropertyToID("_RoleColor");
-    private static readonly int _WorkId = Shader.PropertyToID("_Work");
     private MaterialPropertyBlock _mpb;
-    private ParticleSystemRenderer _psRenderer;
     private float _workSigned01 = 0f;
     private float _baseDrainPerSecond;
     [Header("Work / Preview (Boost Path)")]
@@ -138,8 +106,6 @@ public class CosmicDust : MonoBehaviour {
     public enum DustBehavior { ViscousSlow, SiltDissipate, StaticCling, CrossCurrent, Turbulent }
     [Header("Behavior")]
     public DustBehavior behavior = DustBehavior.ViscousSlow; // NEW
-    [Range(0.2f,1f)] public float slowFactor = 0.7f;         // NEW (velocity multiplier while inside)
-    [Range(0f,2f)]   public float slowDuration = 0.35f;       // NEW (seconds)
     [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
     [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
     private Vector3 _baseLocalScale = Vector3.one;
@@ -210,8 +176,6 @@ public class CosmicDust : MonoBehaviour {
 // Cache renderer + MPB for shader parameters (avoid material instancing).
         if (_mpb == null) _mpb = new MaterialPropertyBlock();
         
-        if (visual.particleSystem != null) 
-            _psRenderer = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
         // If the prefab has PlayOnAwake accidentally enabled, force idle so pool/prewarm won't explode.
 // --- Particles: always visible/running, default emission on boot ---
         if (visual.particleSystem != null)
@@ -295,7 +259,7 @@ public class CosmicDust : MonoBehaviour {
     }
     // Sprite alpha fades are presentation details (eg. regrow), and must respect the authored
     // tint alpha (eg. MusicalRoleProfile.baseColor.a). Do not overwrite _currentTint.a here.
-    public float GetWorldRadius()
+    private float GetWorldRadius()
     {
         if (!terrainCollider)
             return 1f; // sane fallback
@@ -337,71 +301,50 @@ public class CosmicDust : MonoBehaviour {
         var cfg = phase switch
         {
             MazeArchetype.Establish => new PhaseDustConfig(
-                scaleMul:   0.25f,
                 drainMul:   0.50f,
                 behavior:   DustBehavior.SiltDissipate,
-                slowFactor: 0.8f,
-                slowDur:    0.25f,
                 lateral:    0f,
                 turb:       0f
             ),
 
             MazeArchetype.Evolve => new PhaseDustConfig(
-                scaleMul:   1.00f,
                 drainMul:   1.00f,
                 behavior:   DustBehavior.CrossCurrent,
-                slowFactor: 0.9f,
-                slowDur:    0.2f,
                 lateral:    2.5f,
                 turb:       0.25f
             ),
 
             MazeArchetype.Intensify => new PhaseDustConfig(
-                scaleMul:   1.20f,
                 drainMul:   1.60f,
                 behavior:   DustBehavior.StaticCling,
-                slowFactor: 0.5f,
-                slowDur:    0.5f,
                 lateral:    0.5f,
                 turb:       0.4f
             ),
 
             MazeArchetype.Release => new PhaseDustConfig(
-                scaleMul:   1.00f,
                 drainMul:   0.90f,
                 behavior:   DustBehavior.SiltDissipate,
-                slowFactor: 0.85f,
-                slowDur:    0.2f,
                 lateral:    0f,
                 turb:       0f
             ),
 
             MazeArchetype.Wildcard => new PhaseDustConfig(
-                scaleMul:   1.10f,
                 drainMul:   1.25f,
                 behavior:   DustBehavior.Turbulent,
-                slowFactor: 0.7f,
-                slowDur:    0.4f,
                 lateral:    1.2f,
                 turb:       2.0f
             ),
 
             MazeArchetype.Pop => new PhaseDustConfig(
-                scaleMul:   0.95f,
                 drainMul:   0.75f,
                 behavior:   DustBehavior.ViscousSlow,
-                slowFactor: 0.6f,
-                slowDur:    0.3f,
                 lateral:    0f,
                 turb:       0.2f
             ),
 
             _ => new PhaseDustConfig(
-                scaleMul:   1.0f,
                 drainMul:   1.0f,
                 behavior:   DustBehavior.SiltDissipate,
-                slowFactor: 0.85f,
-                slowDur:    0.2f,
                 lateral:    0f,
                 turb:       0f
             )
@@ -415,14 +358,9 @@ public class CosmicDust : MonoBehaviour {
 
         RebuildColliderForCurrentScale();
         SyncParticlesToCollider();
-
-// IMPORTANT: do not compound drain each time ConfigureForPhase runs
         interaction.energyDrainPerSecond = _baseDrainPerSecond * cfg.drainMul;
-
         // Motion / feel
         behavior       = cfg.behavior;
-        slowFactor     = cfg.slowFactor;
-        slowDuration   = cfg.slowDur;
         lateralForce   = cfg.lateral;
         turbulence     = cfg.turb;
     }
@@ -512,13 +450,6 @@ public class CosmicDust : MonoBehaviour {
     public void SetGrowInDuration(float seconds)
     {
         _growInOverride = Mathf.Max(0.05f, seconds);
-    }
-    private static Color Premultiply(Color c)
-    {
-        c.r *= c.a;
-        c.g *= c.a;
-        c.b *= c.a;
-        return c;
     }
     public void SetTerrainColliderEnabled(bool enabled)
     {
@@ -993,15 +924,12 @@ public class CosmicDust : MonoBehaviour {
             // IMPORTANT: no breaking/clearing here.
         }
     }
-
-    // Brief brightening pulse to signal active boost drain on this cell.
     private void TriggerChargeTintPulse()
     {
         _denyPulseToken++;
         int token = _denyPulseToken;
         StartCoroutine(ChargeTintPulseRoutine(token));
     }
-
     private IEnumerator ChargeTintPulseRoutine(int token)
     {
         const float kFadeIn  = 0.03f;
@@ -1036,8 +964,7 @@ public class CosmicDust : MonoBehaviour {
         if (token == _denyPulseToken)
             _denyPulseRoutine = null;
     }
-
-private void TriggerDenyTintPulse(float seconds = -1f)
+    private void TriggerDenyTintPulse(float seconds = -1f)
 {
     float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
     if (dur <= 0f) return;
@@ -1050,8 +977,7 @@ private void TriggerDenyTintPulse(float seconds = -1f)
     // Start a new pulse; it will smoothly lerp from current tint.
     _denyPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
 }
-
-private IEnumerator DenyTintPulseRoutine(int token, float seconds)
+    private IEnumerator DenyTintPulseRoutine(int token, float seconds)
 {
     if (seconds <= 0f) yield break;
 
@@ -1113,7 +1039,6 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
         _denyPulseRoutine = null;
     }
 }
-
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {
         // Shader is retired; interpret workSigned01 as:
@@ -1174,8 +1099,7 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
         // If you have a known base tint, restore it here:
         // SetTint(_baseTint);
     }
-
-    public void ResetVisualToBase()
+    private void ResetVisualToBase()
     {
         // Reset shader param #2 back to neutral.
         SetWorkSigned01(0f);

@@ -26,11 +26,6 @@ public enum MazeArchetype
 
 public static class CosmicDustMazePatterns
 {
-
-    // ------------------------------------------------------------------
-// NEW: Pattern wiring (calls extracted CosmicDustMazePatterns)
-// ------------------------------------------------------------------
-
     
     /// <summary>
     /// Cellular Automata fill, matching the legacy Build_CA rule-set currently used by CosmicDustGenerator.
