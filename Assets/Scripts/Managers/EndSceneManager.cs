@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class EndSceneManager : MonoBehaviour
 { 
-    public CoralVisualizer coralVisualizer;
     void Start()
     {
         List<PhaseSnapshot> data = ConstellationMemoryStore.RetrieveSnapshot();
