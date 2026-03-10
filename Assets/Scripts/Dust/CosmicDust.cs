@@ -34,10 +34,36 @@ public class CosmicDust : MonoBehaviour {
         particleGrowInSeconds = 1.00f,
         fadeOutSeconds = 0.20f
     };
+    [SerializeField] private float dustPluckInitialCooldown = 1f;
+    [SerializeField] private float dustPluckMinCooldown = 0.5f;
+    [SerializeField] private int dustPluckInitialDurationTicks = 180;
+    [SerializeField] private int dustPluckMaxStage = 6;
 
+    private float _nextDustPluckTime = -999f;
+    private int _dustPluckStage = 0;
+    private Vehicle _currentPluckVehicle = null;
     public float Charge01 { get; private set; } = 1f;
     public MusicalRole Role { get; private set; } = MusicalRole.None;
+
+// Authoritative/resting tint of this dust cell.
+// This is what retinting, charge drain, role assignment, etc. should modify.
     public Color CurrentTint => _currentTint;
+
+// Currently displayed tint on the sprite.
+// Temporary pulses modify this, but must not overwrite _currentTint.
+    private Color _displayTint = Color.white;
+    [Header("Dust Musical Swell")]
+    [SerializeField] private float dustPluckSwellSeconds = 1.4f;
+
+    [SerializeField] private int dustPluckMinDurationTicks = 70;
+    [SerializeField] private int dustPluckMaxDurationTicks = 720;
+
+    [SerializeField] private float dustPluckMinVelocity127 = 10f;
+    [SerializeField] private float dustPluckMaxVelocity127 = 58f;
+
+    [SerializeField] private float dustPluckMinCooldownSeconds = 0.10f;
+    [SerializeField] private float dustPluckMaxCooldownSeconds = 0.55f;
+
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
@@ -121,8 +147,35 @@ public class CosmicDust : MonoBehaviour {
     private bool _baseEmissionCurveCaptured;
 
     [SerializeField] public Collider2D terrainCollider;
+// ------------------------------------------------------------
+// Vehicle nose compression (visual only)
+// ------------------------------------------------------------
+    [Header("Vehicle Nose Compression")]
+    [SerializeField] private bool enableVehicleCompression = true;
+    [SerializeField, Range(0f, 0.75f)] private float noseCompressAmount = 0.22f;
+    [SerializeField, Range(0f, 0.5f)] private float noseBulgeAmount = 0.10f;
+    [SerializeField] private float noseCompressEnterLerp = 18f;
+    [SerializeField] private float noseCompressExitLerp = 8f;
+    [SerializeField] private float noseCompressMaxOffsetWorld = 0.16f;
+    [SerializeField] private float noseProbeWorld = 0.55f;
+    [SerializeField] private float noseCompressSpeedForFull = 10f;
+    [SerializeField] private float noseCompressBoostBonus = 0.20f;
+    [SerializeField] private float noseCompressHoldSeconds = 0.06f;
+    private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
+    private Vector3 _dustSpriteBaseLocalPos;
+    private Vector3 _noseVisualScale = Vector3.one;
+    private Vector3 _noseVisualOffsetLocal = Vector3.zero;
+    private Vector2 _noseCompressDirWorld = Vector2.up;
+    private float _noseCompressTarget01 = 0f;
+    private float _noseCompressCurrent01 = 0f;
+    private float _lastNoseContactTime = -999f;
+    private float _noseVisibleUntil = -999f;    // Some prefab variants ended up with colliders on children (or multiple colliders).
+    [SerializeField] private float noseContactGraceSeconds = 0.075f;
+    [SerializeField] private float noseMinimumVisibleSeconds = 0.050f;
 
-    // Some prefab variants ended up with colliders on children (or multiple colliders).
+// Lower = slower, more cushioned. Higher = snappier.
+    [SerializeField] private float noseCompressAttackSharpness = 10f;
+    [SerializeField] private float noseCompressReleaseSharpness = 16f;
     // Carve/disable must be authoritative, so we cache all colliders in the hierarchy.
     private Collider2D[] _cachedColliders;
     [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
@@ -149,7 +202,10 @@ public class CosmicDust : MonoBehaviour {
     private DrumTrack _drumTrack;
     private CosmicDustGenerator gen;
     private float _growInOverride = -1f;
+
+// Canonical/rest tint.
     private Color _currentTint = Color.white;
+
     [SerializeField] private int epochId;
     [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
@@ -159,10 +215,13 @@ public class CosmicDust : MonoBehaviour {
     private float _emissionMulCurrent = 1f;
     private Coroutine _emissionMulRoutine;
 
-    [Header("Deny Feedback")]
-    [SerializeField] private float denyPulseDefaultSeconds = 0.25f;
-    private Coroutine _denyPulseRoutine;
-    private int _denyPulseToken = 0;
+[Header("Deny Feedback")]
+[SerializeField] private float denyPulseDefaultSeconds = 0.25f;
+
+// Single managed tint pulse lane (charge + deny both use this).
+private Coroutine _tintPulseRoutine;
+private int _tintPulseToken = 0;
+private bool _tintPulseActive = false;
     void Awake() {
         if (!_cachedInitialScale)
         {
@@ -188,8 +247,12 @@ public class CosmicDust : MonoBehaviour {
             // Establish initial tint BEFORE emission so the first spawned particles aren't black.
             // Prefer authored sprite color if present.
             if (visual.sprite != null)
+            {
                 _currentTint = visual.sprite.color;
-
+                _displayTint = _currentTint;
+                _dustSpriteBaseLocalPos = visual.sprite.transform.localPosition;
+            }
+            
             // Apply tint to sprite + particle material/gradient.
             SetTint(_currentTint);
 
@@ -227,6 +290,141 @@ public class CosmicDust : MonoBehaviour {
         ApplyParticleFootprint();
         ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
     }
+
+    void Update()
+    {
+        TickVehicleCompression();
+    }
+    private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
+    {
+        if (!enableVehicleCompression || vehicle == null || visual.sprite == null)
+            return;
+        if (_isDespawned)
+            return;
+        if (_dustSpriteBaseVisualScale.sqrMagnitude <= 0.000001f)
+            return;
+        Vector2 dustCenter = visual.sprite.bounds.center;
+
+        Vector2 noseWorld = (Vector2)vehicle.transform.position + (Vector2)vehicle.transform.up * noseProbeWorld;
+
+        Vector2 dir = Vector2.zero;
+
+        // Prefer a direction from dust center toward the inferred nose point.
+        Vector2 toNose = noseWorld - dustCenter;
+        if (toNose.sqrMagnitude > 0.0001f)
+        {
+            dir = toNose.normalized;
+        }
+        else if (collision != null && collision.contactCount > 0)
+        {
+            Vector2 contact = collision.GetContact(0).point;
+            Vector2 toContact = contact - dustCenter;
+            if (toContact.sqrMagnitude > 0.0001f)
+                dir = toContact.normalized;
+        }
+
+        if (dir.sqrMagnitude > 0.0001f)
+            _noseCompressDirWorld = dir;
+
+        float speed01 = 0f;
+        if (vehicle.rb != null)
+            speed01 = Mathf.Clamp01(vehicle.rb.linearVelocity.magnitude / Mathf.Max(0.01f, noseCompressSpeedForFull));
+
+        float boostBonus = vehicle.boosting ? noseCompressBoostBonus : 0f;
+
+        // Let very small glancing touches still read visually.
+        float floor = 0.18f;
+        _noseCompressTarget01 = Mathf.Clamp01(Mathf.Max(floor, speed01 + boostBonus));
+
+        // Contact gets refreshed every stay tick.
+        _lastNoseContactTime = Time.time;
+
+        // Prevent micro-taps from appearing as a single-frame flash.
+        _noseVisibleUntil = Mathf.Max(_noseVisibleUntil, Time.time + noseMinimumVisibleSeconds);
+    }
+    private void SetBaseSpriteScale(Vector3 scale)
+    {
+        _dustSpriteBaseVisualScale = scale;
+
+        if (visual.sprite != null)
+            visual.sprite.transform.localScale = scale;
+    }
+
+    private void TickVehicleCompression()
+{
+    if (!enableVehicleCompression || visual.sprite == null)
+        return;
+
+    Transform srt = visual.sprite.transform;
+    float now = Time.time;
+
+    bool recentlyTouched = (now - _lastNoseContactTime) <= noseContactGraceSeconds;
+    bool stillVisible = now <= _noseVisibleUntil;
+
+    float desired01 = (recentlyTouched || stillVisible) ? _noseCompressTarget01 : 0f;
+
+    float sharpness = (desired01 > _noseCompressCurrent01)
+        ? noseCompressAttackSharpness
+        : noseCompressReleaseSharpness;
+
+    float lerp = 1f - Mathf.Exp(-sharpness * Time.deltaTime);
+    _noseCompressCurrent01 = Mathf.Lerp(_noseCompressCurrent01, desired01, lerp);
+
+    if (desired01 <= 0.0001f && _noseCompressCurrent01 <= 0.001f)
+        _noseCompressCurrent01 = 0f;
+
+    // IMPORTANT:
+    // Restore to lifecycle-owned base scale/position, not hardcoded visible scale.
+    if (_noseCompressCurrent01 <= 0.0001f)
+    {
+        _noseVisualScale = _dustSpriteBaseVisualScale;
+        _noseVisualOffsetLocal = Vector3.zero;
+        srt.localScale = _dustSpriteBaseVisualScale;
+        srt.localPosition = _dustSpriteBaseLocalPos;
+        return;
+    }
+
+    // If the dust is currently visually absent, do not reintroduce it via compression.
+    float baseMag = _dustSpriteBaseVisualScale.sqrMagnitude;
+    if (baseMag <= 0.000001f)
+    {
+        srt.localScale = _dustSpriteBaseVisualScale;
+        srt.localPosition = _dustSpriteBaseLocalPos;
+        return;
+    }
+
+    Vector2 dirLocal2 = transform.InverseTransformDirection(_noseCompressDirWorld.normalized);
+    if (dirLocal2.sqrMagnitude < 0.0001f)
+        dirLocal2 = Vector2.up;
+    dirLocal2.Normalize();
+
+    Vector2 perpLocal2 = new Vector2(-dirLocal2.y, dirLocal2.x);
+
+    float squash = noseCompressAmount * _noseCompressCurrent01;
+    float bulge  = noseBulgeAmount * _noseCompressCurrent01;
+
+    Vector2 basisX = Vector2.right;
+    Vector2 basisY = Vector2.up;
+
+    float sx =
+        1f
+        - squash * Mathf.Abs(Vector2.Dot(dirLocal2, basisX))
+        + bulge  * Mathf.Abs(Vector2.Dot(perpLocal2, basisX));
+
+    float sy =
+        1f
+        - squash * Mathf.Abs(Vector2.Dot(dirLocal2, basisY))
+        + bulge  * Mathf.Abs(Vector2.Dot(perpLocal2, basisY));
+
+    Vector3 deformationScale = new Vector3(Mathf.Max(0.1f, sx), Mathf.Max(0.1f, sy), 1f);
+
+    Vector3 worldOffset = (Vector3)(_noseCompressDirWorld.normalized * (noseCompressMaxOffsetWorld * _noseCompressCurrent01));
+    _noseVisualOffsetLocal = transform.InverseTransformVector(worldOffset);
+
+    // Apply deformation relative to current gameplay-owned scale.
+    srt.localScale = Vector3.Scale(_dustSpriteBaseVisualScale, deformationScale);
+    srt.localPosition = _dustSpriteBaseLocalPos + _noseVisualOffsetLocal;
+}
     public void SetVisualTimings(DustVisualTimings t)
     {
         // Defensive clamps so bad inspector values can’t break everything.
@@ -244,17 +442,18 @@ public class CosmicDust : MonoBehaviour {
         float t = 0f;
         seconds = Mathf.Max(0.01f, seconds);
 
-        visual.sprite.transform.localScale = a;
+        SetBaseSpriteScale(a);
 
         while (t < seconds)
         {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / seconds);
-            visual.sprite.transform.localScale = Vector3.Lerp(a, b, u);
+            SetBaseSpriteScale(Vector3.Lerp(a, b, u));
             yield return null;
         }
 
-        visual.sprite.transform.localScale = b;
+        SetBaseSpriteScale(b);
+
         if (to > from) _growInOverride = -1f;
     }
     // Sprite alpha fades are presentation details (eg. regrow), and must respect the authored
@@ -281,7 +480,8 @@ public class CosmicDust : MonoBehaviour {
     {
         Role     = r;
         Charge01 = Mathf.Clamp01(charge);
-        roleColorRgb.a = Charge01;   // alpha = energy
+        float visibleAlpha = Mathf.Lerp(0.55f, 1f, Charge01);
+        roleColorRgb.a = visibleAlpha;
         SetTint(roleColorRgb);       // sprite reads hue+alpha correctly
         // Optional: only call if you re-enable particle tinting.
     }
@@ -290,9 +490,11 @@ public class CosmicDust : MonoBehaviour {
     {
         float take = Mathf.Min(Charge01, Mathf.Max(0f, amount));
         Charge01 -= take;
+
         var c = _currentTint;
-        c.a = Charge01;
-        SetTint(c);
+        float visibleAlpha = Mathf.Lerp(0.55f, 1f, Charge01);
+        c.a = visibleAlpha;
+        SetBaseTint(c, applyImmediatelyIfNoPulse: false);
         return take;
     }
     public void ConfigureForPhase(MazeArchetype phase)
@@ -384,7 +586,6 @@ public class CosmicDust : MonoBehaviour {
         EnsureParticlesPlaying();
         SetEmissionMultiplier(1f, seconds: growSeconds);
 
-        // Ensure particle tint matches our current tint (including alpha) if you use that path.
         if (useWorkShaderParams)
             ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
         else
@@ -398,14 +599,47 @@ public class CosmicDust : MonoBehaviour {
         gen = _dustGenerator;
         _drumTrack = _drums;
     }
-    
-    public void SetTint(Color tint)
+    private void ApplyDisplayedTint(Color tint)
+    {
+        _displayTint = tint;
+
+        if (visual.sprite != null)
+            visual.sprite.color = tint;
+    }
+
+    private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
         _currentTint = tint;
         Charge01 = Mathf.Clamp01(_currentTint.a);
-        // Sprite is the dominant visual and is the only thing we tint by default.
-        if (visual.sprite != null)
-            visual.sprite.color = tint;
+
+        if (!_tintPulseActive || applyImmediatelyIfNoPulse)
+            ApplyDisplayedTint(_currentTint);
+    }
+
+    private void RestoreDisplayToBaseTint()
+    {
+        _tintPulseActive = false;
+        ApplyDisplayedTint(_currentTint);
+    }
+
+    private void CancelTintPulse(bool restoreToBase)
+    {
+        _tintPulseToken++;
+
+        if (_tintPulseRoutine != null)
+        {
+            StopCoroutine(_tintPulseRoutine);
+            _tintPulseRoutine = null;
+        }
+
+        _tintPulseActive = false;
+
+        if (restoreToBase)
+            RestoreDisplayToBaseTint();
+    }
+    public void SetTint(Color tint)
+    {
+        SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
 
         // Particles: leave authored color/gradient/material alone.
         // (If you later want particle tinting, do it as an explicit opt-in path.)
@@ -537,9 +771,7 @@ public class CosmicDust : MonoBehaviour {
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
-        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
-        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
-
+        CancelTintPulse(restoreToBase: false);
         _isBreaking = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
@@ -561,9 +793,7 @@ public class CosmicDust : MonoBehaviour {
         EnsureParticlesPlaying();
         ApplyEmissionMultiplierImmediate(0f);
 
-        // Don’t stomp tint alpha; just ensure sprite matches _currentTint.
-        if (visual.sprite != null) visual.sprite.color = _currentTint;
-
+        RestoreDisplayToBaseTint();
         clearing.hardness01 = 0f;
     }
     public IEnumerator RetintOver(float seconds, Color toTint)
@@ -581,12 +811,10 @@ public class CosmicDust : MonoBehaviour {
             t += Time.deltaTime;
             float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
             Color now = Color.Lerp(from, toTint, u);
-            // Apply each step (affects new and in-flight particles)
-            SetTint(now);
+            SetBaseTint(now, applyImmediatelyIfNoPulse: false);
             yield return null;
         }
-        SetTint(toTint);
-    }    
+        SetBaseTint(toTint, applyImmediatelyIfNoPulse: true);    }    
     private ParticleSystem[] GetAllParticleSystems()
 {
     if (visual.particleSystem == null) return null;
@@ -752,7 +980,6 @@ public class CosmicDust : MonoBehaviour {
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
-        if (_denyPulseRoutine != null) { StopCoroutine(_denyPulseRoutine); _denyPulseRoutine = null; }
 
         // Disable collisions immediately.
         SetTerrainColliderEnabled(false);
@@ -813,6 +1040,142 @@ public class CosmicDust : MonoBehaviour {
             shape.scale = new Vector3(size.x, size.y, 1f);
   */
     }
+    private void TriggerChargeTintPulse()
+{
+    const float kFadeIn  = 0.03f;
+    const float kFadeOut = 0.05f;
+
+    CancelTintPulse(restoreToBase: false);
+
+    _tintPulseToken++;
+    int token = _tintPulseToken;
+    _tintPulseRoutine = StartCoroutine(ChargeTintPulseRoutine(token, kFadeIn, kFadeOut));
+}
+
+private IEnumerator ChargeTintPulseRoutine(int token, float fadeIn, float fadeOut)
+{
+    _tintPulseActive = true;
+
+    Color chargeTint = _hasFeedbackColors ? _chargeColor : Color.white;
+    chargeTint.a = _currentTint.a;
+
+    Color startTint = _displayTint;
+    float t = 0f;
+
+    while (t < fadeIn)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
+
+        // Rebuild target each frame so live drain alpha is respected.
+        Color liveChargeTint = chargeTint;
+        liveChargeTint.a = _currentTint.a;
+
+        ApplyDisplayedTint(Color.Lerp(startTint, liveChargeTint, a));
+        yield return null;
+    }
+
+    startTint = _displayTint;
+    t = 0f;
+
+    while (t < fadeOut)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
+
+        // Fade back toward live base tint so ongoing charge drain is respected.
+        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
+        yield return null;
+    }
+
+    if (token == _tintPulseToken)
+    {
+        RestoreDisplayToBaseTint();
+        _tintPulseRoutine = null;
+    }
+}
+
+private void TriggerDenyTintPulse(float seconds = -1f)
+{
+    float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
+    if (dur <= 0f) return;
+
+    CancelTintPulse(restoreToBase: false);
+
+    _tintPulseToken++;
+    int token = _tintPulseToken;
+    _tintPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
+}
+
+private IEnumerator DenyTintPulseRoutine(int token, float seconds)
+{
+    if (seconds <= 0f) yield break;
+
+    _tintPulseActive = true;
+
+    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
+    denyTint.a = _currentTint.a;
+
+    float fadeIn  = Mathf.Clamp(seconds * 0.25f, 0.03f, 0.10f);
+    float fadeOut = Mathf.Clamp(seconds * 0.35f, 0.05f, 0.14f);
+    float hold    = Mathf.Max(0f, seconds - fadeIn - fadeOut);
+
+    Color startTint = _displayTint;
+    float t = 0f;
+
+    while (t < fadeIn)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
+
+        Color liveDenyTint = denyTint;
+        liveDenyTint.a = _currentTint.a;
+
+        ApplyDisplayedTint(Color.Lerp(startTint, liveDenyTint, a));
+        yield return null;
+    }
+
+    if (hold > 0f)
+    {
+        float end = Time.time + hold;
+        while (Time.time < end)
+        {
+            if (token != _tintPulseToken) yield break;
+
+            Color liveDenyTint = denyTint;
+            liveDenyTint.a = _currentTint.a;
+
+            ApplyDisplayedTint(liveDenyTint);
+            yield return null;
+        }
+    }
+
+    startTint = _displayTint;
+    t = 0f;
+
+    while (t < fadeOut)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
+
+        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
+        yield return null;
+    }
+
+    if (token == _tintPulseToken)
+    {
+        RestoreDisplayToBaseTint();
+        _tintPulseRoutine = null;
+    }
+}
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
@@ -860,7 +1223,7 @@ public class CosmicDust : MonoBehaviour {
     private void ResetSpriteScaleTo(float s)
     {
         if (visual.sprite == null) return;
-        visual.sprite.transform.localScale = Vector3.one * s; // your current semantics are fine
+        SetBaseSpriteScale(Vector3.one * s);
     }
     private void OnCollisionStay2D(Collision2D collision)
     {
@@ -869,7 +1232,7 @@ public class CosmicDust : MonoBehaviour {
 
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return;
-
+        DriveVehicleCompression(vehicle, collision);
         float h  = Mathf.Clamp01(clearing.hardness01);
         float dt = Time.fixedDeltaTime;
 
@@ -904,10 +1267,6 @@ public class CosmicDust : MonoBehaviour {
         }
         else
         {
-            // ---------------------------------------------------------------
-            // NON-BOOST PATH: dust denies the vehicle (wall resistance).
-            // Harder dust is more punishing.
-            // ---------------------------------------------------------------
             float hardnessMul = Mathf.Lerp(1.0f, 2.25f, h);
 
             _nonBoostClearSeconds += dt;
@@ -918,127 +1277,60 @@ public class CosmicDust : MonoBehaviour {
             float denom    = Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak);
             float severity = Mathf.Clamp01(_nonBoostClearSeconds / denom);
 
-            if (_nonBoostClearSeconds <= dt * 1.5f)
-                TriggerDenyTintPulse(Mathf.Lerp(0.12f, 0.35f, severity));
+            if (_currentPluckVehicle != vehicle)
+            {
+                _currentPluckVehicle = vehicle;
+                _nextDustPluckTime = Time.time;
+            }
 
-            // IMPORTANT: no breaking/clearing here.
+            if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
+            {
+                TriggerDenyTintPulse(Mathf.Lerp(0.08f, 0.28f, severity));
+
+                float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
+
+                // Slow emergence, then bloom.
+                float bloom01 = hold01 * hold01;
+
+                int durTicks = Mathf.RoundToInt(Mathf.Lerp(
+                    dustPluckMinDurationTicks,
+                    dustPluckMaxDurationTicks,
+                    bloom01
+                ));
+
+                float vel127 = Mathf.Lerp(
+                    dustPluckMinVelocity127,
+                    dustPluckMaxVelocity127,
+                    bloom01
+                );
+
+                // Starts sparse, gets denser as the dust “sings.”
+                float cooldown = Mathf.Lerp(
+                    dustPluckMaxCooldownSeconds,
+                    dustPluckMinCooldownSeconds,
+                    bloom01
+                );
+
+                var controller = GameFlowManager.Instance?.controller;
+                if (controller != null)
+                {
+                    // Phrase index into the chord also grows with hold.
+                    controller.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
+                }
+
+                // Space future triggers as a fraction of phrase length so it feels cohesive.
+                float durSecApprox = TicksToSecondsApprox(durTicks);
+                _nextDustPluckTime = Time.time + Mathf.Max(cooldown, durSecApprox * 0.28f);
+            }
         }
     }
-    private void TriggerChargeTintPulse()
+    private float TicksToSecondsApprox(int ticks)
     {
-        _denyPulseToken++;
-        int token = _denyPulseToken;
-        StartCoroutine(ChargeTintPulseRoutine(token));
+        if (_drumTrack == null || _drumTrack.drumLoopBPM <= 0f)
+            return 0.12f;
+
+        return ticks * (60f / (_drumTrack.drumLoopBPM * 480f));
     }
-    private IEnumerator ChargeTintPulseRoutine(int token)
-    {
-        const float kFadeIn  = 0.03f;
-        const float kFadeOut = 0.05f;
-
-        Color baseColor   = _currentTint;
-        Color chargeColor = _hasFeedbackColors ? _chargeColor : Color.white;
-        // Match alpha so the pulse doesn't fight the drain animation.
-        chargeColor.a = baseColor.a;
-
-        // Fade toward charge color
-        float t = 0f;
-        while (t < kFadeIn)
-        {
-            if (token != _denyPulseToken) yield break;
-            t += Time.deltaTime;
-            SetTint(Color.Lerp(baseColor, chargeColor, Mathf.Clamp01(t / kFadeIn)));
-            yield return null;
-        }
-
-        // Fade back -- target live _currentTint so we track ongoing drain
-        Color startOut = _currentTint;
-        t = 0f;
-        while (t < kFadeOut)
-        {
-            if (token != _denyPulseToken) yield break;
-            t += Time.deltaTime;
-            SetTint(Color.Lerp(startOut, _currentTint, Mathf.Clamp01(t / kFadeOut)));
-            yield return null;
-        }
-
-        if (token == _denyPulseToken)
-            _denyPulseRoutine = null;
-    }
-    private void TriggerDenyTintPulse(float seconds = -1f)
-{
-    float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
-    if (dur <= 0f) return;
-
-    // Invalidate any currently-running pulse without force-stopping it
-    // so it doesn't "freeze" the tint mid-pulse.
-    _denyPulseToken++;
-    int token = _denyPulseToken;
-
-    // Start a new pulse; it will smoothly lerp from current tint.
-    _denyPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
-}
-    private IEnumerator DenyTintPulseRoutine(int token, float seconds)
-{
-    if (seconds <= 0f) yield break;
-
-    // Capture the tint we want to return to.
-    // IMPORTANT: this should represent your "base" at the moment of denial.
-    // If you have a more canonical base tint variable than _currentTint, use that instead.
-    Color baseTint = _currentTint;
-
-    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
-    denyTint.a = baseTint.a;
-
-    // Pulse shape: fade in -> brief hold -> fade out
-    // Tuned to avoid flicker when spam-triggered.
-    float fadeIn  = Mathf.Clamp(seconds * 0.25f, 0.03f, 0.10f);
-    float fadeOut = Mathf.Clamp(seconds * 0.35f, 0.05f, 0.14f);
-    float hold    = Mathf.Max(0f, seconds - fadeIn - fadeOut);
-
-    // Fade IN: from whatever tint is currently applied (smooth on retrigger)
-    Color startTint = _currentTint;
-    float t = 0f;
-    while (t < fadeIn)
-    {
-        if (token != _denyPulseToken) yield break;
-        t += Time.deltaTime;
-        float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
-        SetTint(Color.Lerp(startTint, denyTint, a));
-        yield return null;
-    }
-
-    // Hold
-    if (hold > 0f)
-    {
-        float end = Time.time + hold;
-        while (Time.time < end)
-        {
-            if (token != _denyPulseToken) yield break;
-            // Keep it pinned (in case other systems tug tint)
-            SetTint(denyTint);
-            yield return null;
-        }
-    }
-
-    // Fade OUT: again start from current (handles other tint changes gracefully)
-    startTint = _currentTint;
-    t = 0f;
-    while (t < fadeOut)
-    {
-        if (token != _denyPulseToken) yield break;
-        t += Time.deltaTime;
-        float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
-        SetTint(Color.Lerp(startTint, baseTint, a));
-        yield return null;
-    }
-
-    // Final snap to base (only if still the active pulse)
-    if (token == _denyPulseToken)
-    {
-        SetTint(baseTint);
-        _denyPulseRoutine = null;
-    }
-}
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {
         // Shader is retired; interpret workSigned01 as:
@@ -1084,32 +1376,36 @@ public class CosmicDust : MonoBehaviour {
         _denyColor = denyColor;
         _hasFeedbackColors = true;
     }
-    private void OnCollisionExit2D(Collision2D collision) {
-        // Reset grind timer when the vehicle stops pressing this tile.
+    private void OnCollisionExit2D(Collision2D collision)
+    {
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return;
-
         _nonBoostClearSeconds = 0f;
         ResetVisualToBase();
+
+        if (_currentPluckVehicle == vehicle)
+        {
+            _currentPluckVehicle = null;
+            _nextDustPluckTime = -999f;
+        }
     }
     private void OnDisable()
     {
-        _denyPulseToken++;           // invalidate any running routine
-        _denyPulseRoutine = null;
-        // If you have a known base tint, restore it here:
-        // SetTint(_baseTint);
+        CancelTintPulse(restoreToBase: true);
     }
     private void ResetVisualToBase()
     {
+        CancelTintPulse(restoreToBase: true);
+
         // Reset shader param #2 back to neutral.
         SetWorkSigned01(0f);
-        if (visual.sprite != null) 
-            visual.sprite.color = _currentTint;
+
         if (visual.particleSystem == null) return;
         if (!_baseCaptured) return;
+
         var main = visual.particleSystem.main;
         main.startSize = _baseSize;
-        
+
         // Restore emission if we captured it.
         var emission = visual.particleSystem.emission;
         EnsureBaseParticleEmissionCaptured();
@@ -1117,6 +1413,7 @@ public class CosmicDust : MonoBehaviour {
             emission.rateOverTime = _baseEmissionCurve;
         else
             emission.rateOverTime = _baseEmission;
+
         Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
     public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f, float clearanceWorld = 0f)

@@ -5,6 +5,9 @@ using Random = System.Random;
 
 public class MineNode : MonoBehaviour
 {
+    [Header("Dust Affinity")]
+    [SerializeField, Range(0f, 1f)] private float sameRoleDustAffinityStrength = 0.25f; // medium
+    [SerializeField, Min(1)] private int sameRoleDustAffinityRadiusCells = 2;            // moderate
     public event System.Action<MineNode> OnResolved;
     public SpriteRenderer coreSprite;
     public int maxStrength = 100;
@@ -133,7 +136,6 @@ public class MineNode : MonoBehaviour
 
         _carveDir = Rotate(_carveDir, delta).normalized;
     }
-// In FixedUpdate, after the step-based turn:
     var vehicles = GameFlowManager.Instance?.localPlayers;
     if (vehicles != null)
     {
@@ -159,7 +161,7 @@ public class MineNode : MonoBehaviour
         _track.lowestAllowedNote,
         _track.highestAllowedNote,
         currentNote);
-
+    ApplyLocalDustAffinity();
     float targetSpeed = Mathf.Lerp(carveSpeedMin, carveSpeedMax, speed01);
     targetSpeed = Mathf.Max(targetSpeed, minDesiredSpeedFloor);
 
@@ -247,6 +249,54 @@ public class MineNode : MonoBehaviour
         _rb.linearVelocity *= 0.5f;
     }
 }
+    private Vector2 ComputeLocalSameRoleAffinityDir(int radiusCells)
+    {
+        if (_drumTrack == null) return Vector2.zero;
+
+        Vector2Int center = _drumTrack.CellOf(_rb.position);
+        Vector2 accum = Vector2.zero;
+
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        {
+            for (int dy = -radiusCells; dy <= radiusCells; dy++)
+            {
+                if (dx == 0 && dy == 0) continue;
+
+                Vector2Int gp = new Vector2Int(center.x + dx, center.y + dy);
+
+                if (!_drumTrack.TryGetDustAt(gp, out var dust) || dust == null)
+                    continue;
+
+                if (dust.Role != _role)
+                    continue;
+
+                Vector2 world = _drumTrack.GridToWorldPosition(gp);
+                Vector2 to = world - _rb.position;
+                float dist = to.magnitude;
+                if (dist <= 0.0001f) continue;
+
+                // same-role only, inverse-distance weighted
+                float weight = 1f / (1f + dist);
+                accum += to.normalized * weight;
+            }
+        }
+
+        return accum.sqrMagnitude > 0.0001f ? accum.normalized : Vector2.zero;
+    }
+
+    private void ApplyLocalDustAffinity()
+    {
+        if (sameRoleDustAffinityStrength <= 0f) return;
+
+        Vector2 affinityDir = ComputeLocalSameRoleAffinityDir(
+            Mathf.Max(1, sameRoleDustAffinityRadiusCells));
+
+        if (affinityDir.sqrMagnitude <= 0.0001f)
+            return;
+
+        float authoredWeight = 1f - sameRoleDustAffinityStrength;
+        _carveDir = (authoredWeight * _carveDir + sameRoleDustAffinityStrength * affinityDir).normalized;
+    }
     private void EnsureTurnStepsCached()
 {
     if (_noteSet == null) return;

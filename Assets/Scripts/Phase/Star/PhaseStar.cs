@@ -27,6 +27,7 @@ public class PhaseStar : MonoBehaviour
     // -------------------- Serialized config --------------------
     [Header("Profiles & Prefs")] [SerializeField]
     private SpawnStrategyProfile spawnStrategyProfile;
+    [SerializeField, Range(0f, 0.5f)] private float dominantRoleSwitchDelta = 0.10f;
 
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
 
@@ -35,7 +36,9 @@ public class PhaseStar : MonoBehaviour
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
-
+    [Header("Charge Readiness")]
+    [SerializeField, Range(0f, 4f)] private float pokeChargeThreshold = 1.0f;
+    [SerializeField, Range(0f, 1f)] private float preReadyGrayFloor = 0.15f;
     private bool _cachedIsSuperNode = false;
 
     private bool StarKeepsDustClear => !behaviorProfile || behaviorProfile.starKeepsDustClear;
@@ -148,7 +151,10 @@ public class PhaseStar : MonoBehaviour
     private List<float> _baseAngles = new(); // 0..90° spread
     private List<float> _turns = new(); // r[i] = 1/(i+1)
     private List<float> _omega = new(); // deg/sec = 360*r/T_loop
-
+    public bool IsChargeReady()
+    {
+        return GetTotalCharge() >= pokeChargeThreshold;
+    }
     public enum DisarmReason
     {
         None = 0,
@@ -231,7 +237,47 @@ public class PhaseStar : MonoBehaviour
         // Selection rotation is now driven by charge accumulation, not bin changes.
         // Kept as subscription stub to avoid breaking DrumTrack event wiring.
     }
+    private float GetTotalCharge()
+    {
+        float total = 0f;
+        foreach (var kv in _starCharge)
+            total += kv.Value;
+        return total;
+    }
 
+    private bool TryGetDominantRole(out MusicalRole role, out int shardIndex, out float charge)
+    {
+        role = MusicalRole.None;
+        shardIndex = -1;
+        charge = 0f;
+
+        if (previewRing == null || previewRing.Count == 0)
+            return false;
+
+        float best = float.MinValue;
+        int bestIdx = -1;
+        MusicalRole bestRole = MusicalRole.None;
+
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            var r = previewRing[i].role;
+            _starCharge.TryGetValue(r, out float c);
+            if (c > best)
+            {
+                best = c;
+                bestIdx = i;
+                bestRole = r;
+            }
+        }
+
+        if (bestIdx < 0)
+            return false;
+
+        role = bestRole;
+        shardIndex = bestIdx;
+        charge = Mathf.Max(0f, best);
+        return true;
+    }
     public void Initialize(
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
@@ -285,15 +331,7 @@ public class PhaseStar : MonoBehaviour
         MusicalRole initialCraving = behaviorProfile != null
             ? behaviorProfile.dominantRole
             : MusicalRole.Bass;
-
-        if (cravingNavigator)
-        {
-            cravingNavigator.Initialize(this, motion, initialCraving, behaviorProfile);
-            cravingNavigator.OnCravingChanged += NotifyCravingChanged;
-            if (motion) motion.SetCravingNavigator(cravingNavigator);
-        }
-
-        if (dust) dust.Initialize(behaviorProfile, this, cravingNavigator);
+        if (dust) dust.Initialize(behaviorProfile, this);
         if (drum != null && !_subscribedLoopBoundary)
         {
             drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded;
@@ -303,7 +341,28 @@ public class PhaseStar : MonoBehaviour
         ArmNext();
         LogState("Initialized+Armed");
     }
+    private float GetChargeReady01()
+    {
+        return Mathf.Clamp01(GetTotalCharge() / Mathf.Max(0.001f, pokeChargeThreshold));
+    }
 
+    private Color ResolvePreviewColorByReadiness()
+    {
+        if (previewRing == null || previewRing.Count == 0) return Color.gray;
+
+        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        Color role = previewRing[idx].color;
+
+        float ready01 = GetChargeReady01();
+
+        // start near neutral gray, then reveal the role color as charge rises
+        Color gray = Color.Lerp(Color.black, Color.gray, 0.65f);
+        Color c = Color.Lerp(gray, role, ready01);
+
+        // preserve role alpha if you want, but color identity should emerge with readiness
+        c.a = Mathf.Lerp(0.15f, role.a <= 0f ? 1f : role.a, ready01);
+        return c;
+    }
     private float ComputeCellWorldSize()
     {
         var drums = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
@@ -314,7 +373,42 @@ public class PhaseStar : MonoBehaviour
         var b = drums.GridToWorldPosition(new Vector2Int(1, 0));
         return Mathf.Max(0.0001f, Vector3.Distance(a, b));
     }
+    private Vector2 GetNearestDustDirForRole(MusicalRole role, int radiusCells = 8)
+    {
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        var drum = gfm != null ? gfm.activeDrumTrack : null;
+        if (gen == null || drum == null) return Vector2.zero;
 
+        Vector2Int center = drum.WorldToGridPosition(transform.position);
+
+        float bestDistSq = float.MaxValue;
+        Vector2 bestDir = Vector2.zero;
+
+        for (int dy = -radiusCells; dy <= radiusCells; dy++)
+        {
+            for (int dx = -radiusCells; dx <= radiusCells; dx++)
+            {
+                Vector2Int gp = new Vector2Int(center.x + dx, center.y + dy);
+
+                if (!gen.TryGetDustAt(gp, out var dust) || dust == null) continue;
+                if (dust.Role != role) continue;
+
+                Vector2 world = drum.GridToWorldPosition(gp);
+                Vector2 dir = world - (Vector2)transform.position;
+                float dSq = dir.sqrMagnitude;
+                if (dSq < 0.0001f) continue;
+
+                if (dSq < bestDistSq)
+                {
+                    bestDistSq = dSq;
+                    bestDir = dir.normalized;
+                }
+            }
+        }
+
+        return bestDir;
+    }
     void Update()
     {
         if (StarKeepsDustClear)
@@ -335,8 +429,8 @@ public class PhaseStar : MonoBehaviour
             }
         }
 
-        // ---- Keep bubble center locked to star world position every frame ----
-        // This prevents the visual circle from lagging behind when the star is frozen-in-place.
+// ---- Keep bubble center locked to star world position every frame ----
+// Bubble is a gravity-void refuge zone and should track the drifting star cleanly.
         if (_bubbleActive)
         {
             s_bubbleCenter = transform.position;
@@ -355,6 +449,9 @@ public class PhaseStar : MonoBehaviour
 
         if (previewRing != null && previewRing.Count > 0)
         {
+            if (TryGetDominantRole(out var dominantRole, out var dominantIdx, out _))
+                currentShardIndex = dominantIdx;
+            
             for (int i = 0; i < previewRing.Count; i++)
             {
                 var shard = previewRing[i];
@@ -366,32 +463,39 @@ public class PhaseStar : MonoBehaviour
                 if (sr != null)
                 {
                     _starCharge.TryGetValue(shard.role, out float charge);
-                    // Full range [shardMinAlpha..alphaScale] — disarmed clamps the ceiling
-                    float targetAlpha = Mathf.Lerp(shardMinAlpha, alphaScale, Mathf.Clamp01(charge));
+                    float t = Mathf.Clamp01(charge);
+
+                    Color targetColor = Color.Lerp(
+                        new Color(0.45f, 0.45f, 0.45f, 1f),
+                        shard.color,
+                        t
+                    );
+
+                    float targetAlpha = Mathf.Lerp(shardMinAlpha, alphaScale, t);
+
                     Color c = sr.color;
+                    c.r = Mathf.Lerp(c.r, targetColor.r, shardAlphaLerpSpeed * dt);
+                    c.g = Mathf.Lerp(c.g, targetColor.g, shardAlphaLerpSpeed * dt);
+                    c.b = Mathf.Lerp(c.b, targetColor.b, shardAlphaLerpSpeed * dt);
                     c.a = Mathf.Lerp(c.a, targetAlpha, shardAlphaLerpSpeed * dt);
                     sr.color = c;
                 }
-
+ 
                 // --- Sniffer facing: rotate diamond toward nearest dust of its role ---
-                if (cravingNavigator != null)
+                Vector2 sniffDir = GetNearestDustDirForRole(shard.role, 8);
+                if (sniffDir.sqrMagnitude > 0.0001f)
                 {
-                    Vector2 sniffDir = cravingNavigator.GetSnifferDir(shard.role);
-                    if (sniffDir.sqrMagnitude > 0.0001f)
-                    {
-                        float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
-                        float curAngle    = shard.visual.localEulerAngles.z;
-                        // MoveTowardsAngle handles 360-wrap correctly
-                        float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle,
-                                                                  shardSnifferTurnSpeed * dt);
-                        shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
-                    }
+                    float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
+                    float curAngle = shard.visual.localEulerAngles.z;
+                    float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle, shardSnifferTurnSpeed * dt);
+                    shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
                 }
             }
 
             // --- Sorting order: highest charge on top ---
             UpdateShardSortingByCharge();
         }
+        
         if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
             float dec = passiveChargeDecayPerSec * dt; 
             // iterate keys snapshot to avoid collection modification issues if AddCharge occurs elsewhere
@@ -401,6 +505,7 @@ public class PhaseStar : MonoBehaviour
                 _starCharge[r] = Mathf.Max(0f, _starCharge[r] - dec);
             }
         }
+        
         
     }
 
@@ -440,7 +545,6 @@ public class PhaseStar : MonoBehaviour
 
     public void NotifyCollectableBurstCleared()
     {
-        DeactivateSafetyBubble();
         // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
         // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
         if (_advanceStarted || _state == PhaseStarState.BridgeInProgress)
@@ -585,27 +689,28 @@ public class PhaseStar : MonoBehaviour
 
         _disarmReason = DisarmReason.None;
         _isArmed = true;
-        SetRootPhysicsFrozen(false);
-        PrepareNextDirective();
+
+        // Pokeability no longer controls locomotion.
         EnableColliders();
-        SetVisual(VisualMode.Bright, ResolvePreviewColor());
+        SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
     }
-
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
         _disarmReason = reason;
         Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
-        DisableColliders();
-        SetRootPhysicsFrozen(true);
 
-        var tint = tintOverride ?? ResolvePreviewColor();
+        DisableColliders();
+
+        var tint = tintOverride ?? ResolvePreviewColorByReadiness();
 
         switch (reason)
         {
             case DisarmReason.AwaitBridge:
             case DisarmReason.Bridge:
+                // True shutdown states may hide / stop later in bridge completion flow,
+                // but ordinary disarm no longer freezes ecological drift.
                 SetVisual(VisualMode.Hidden, tint);
                 break;
 
@@ -619,7 +724,6 @@ public class PhaseStar : MonoBehaviour
 
         OnDisarmed?.Invoke(this);
     }
-
     void InitializeTimingAndSpeeds()
     {
         // Prefer the DrumTrack that actually spawned this star.
@@ -1169,7 +1273,8 @@ public class PhaseStar : MonoBehaviour
 
 // Prefer the MusicalRoleProfile authority when available.
 // Fallback to baked trackColor to preserve legacy behavior.
-            Color c   = track != null ? track.trackColor : Color.white;
+            Color startGray = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
+            
             Color shadow = track != null ? track.TrackShadowColor : new Color(0.08f,0.08f,0.08f,1f);
 
 
@@ -1182,12 +1287,15 @@ public class PhaseStar : MonoBehaviour
 
             var sr = shardGO.AddComponent<SpriteRenderer>();
             sr.sprite = visuals.diamond;
-            sr.color = c;
-            sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
 
+// Keep previewRing.color as the true target role color,
+// but start the visible shard in gray.
+            sr.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
+            sr.sortingOrder = _baseSortingOrder + (i * _perPetalLayerStep);
+            
             previewRing.Add(new PreviewShard
             {
-                color = c,
+                color = startGray,
                 shadowColor = shadow,
                 collected = false,
                 visual = shardGO.transform,
@@ -1301,7 +1409,7 @@ public class PhaseStar : MonoBehaviour
     {
         if (visuals == null) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (visuals == null) return;
-        var color = ResolvePreviewColor();
+        var color = ResolvePreviewColorByReadiness();
         var shadow = ResolvePreviewShadowColor();
         visuals.SetPreviewTint(color, shadow);
         
@@ -1318,19 +1426,55 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        Color c = ResolvePreviewColor();
-        float highlight = _isArmed ? 0.7f : 0.06f;
-        float veilA     = _isArmed ? 0.25f : 0.08f;
+        Color c = ResolvePreviewColorByReadiness();
+        float ready01 = Mathf.Clamp01(GetTotalCharge() / Mathf.Max(0.001f, pokeChargeThreshold));
+        float highlight = Mathf.Lerp(0.06f, 0.7f, ready01);
+        float veilA     = Mathf.Lerp(0.08f, 0.25f, ready01);
         // “Dim means busy” is handled elsewhere; this is just the per-petal highlight.
         visuals.SetVeilOnNonActive(new Color(1f, 1f, 1f, veilA), activeShardVisual);
         visuals.HighlightActive(activeShardVisual, c, highlight);
     }
-    private Color ResolvePreviewColor()
+
+    private void ResolveDominantRoleFromCharge()
     {
-        if (previewRing == null || previewRing.Count == 0) return Color.white;
-        int idx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
-        return previewRing[idx].color;
+        if (previewRing == null || previewRing.Count == 0) return;
+
+        int bestIdx = -1;
+        float bestCharge = -1f;
+
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            _starCharge.TryGetValue(previewRing[i].role, out float c);
+            if (c > bestCharge)
+            {
+                bestCharge = c;
+                bestIdx = i;
+            }
+        }
+
+        if (bestIdx < 0) return;
+
+        if (currentShardIndex < 0 || currentShardIndex >= previewRing.Count)
+        {
+            currentShardIndex = bestIdx;
+            activeShardVisual = previewRing[currentShardIndex].visual;
+            return;
+        }
+
+        _starCharge.TryGetValue(previewRing[currentShardIndex].role, out float curCharge);
+
+        if (bestIdx != currentShardIndex && bestCharge >= curCharge + dominantRoleSwitchDelta)
+        {
+            currentShardIndex = bestIdx;
+            activeShardVisual = previewRing[currentShardIndex].visual;
+        }
     }
+    public void SetGravityVoidSafetyBubbleActive(bool active)
+    {
+        if (active) ActivateSafetyBubble();
+        else DeactivateSafetyBubble();
+    }
+
     private Color ResolvePreviewShadowColor()
     {
         if (previewRing == null || previewRing.Count == 0) return new Color(0.08f, 0.08f, 0.08f, 1f);
@@ -1374,7 +1518,11 @@ public class PhaseStar : MonoBehaviour
             Trace("OnCollisionEnter2D: ignored poke because star is not armed");
             return;
         }
-
+        if (!IsChargeReady())
+        {
+            Trace("OnCollisionEnter2D: ignored poke because charge threshold not met");
+            return;
+        }
         if (_activeNode != null)
         {
             Trace("OnCollision: ignored, activeNode != null");
@@ -1812,9 +1960,10 @@ public class PhaseStar : MonoBehaviour
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
-        // While the safety bubble is active, the star should not drift.
-        motion?.Enable(false);
-        SetRootPhysicsFrozen(true);
+
+        // IMPORTANT:
+        // Safety bubble is now a gravity-void refuge zone only.
+        // It does NOT freeze PhaseStar motion or root physics.
     }
     private void DeactivateSafetyBubble()
     {
@@ -1827,7 +1976,6 @@ public class PhaseStar : MonoBehaviour
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.HideSafetyBubble();
     }
-    
 }
     
 

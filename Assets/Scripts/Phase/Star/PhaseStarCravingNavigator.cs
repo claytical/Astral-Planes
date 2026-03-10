@@ -131,7 +131,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         _currentCraving = eatenRole;
         _replanTimer    = 0f; // replan immediately after craving shift
         _hasWaypoint    = false;
-        OnCravingChanged?.Invoke(_currentCraving);
+//        OnCravingChanged?.Invoke(_currentCraving);
     }
 
     // ----------------------------------------------------------------

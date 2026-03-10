@@ -982,8 +982,6 @@ MonoBehaviour:
   motifBridgeHoldSeconds: 4
   useSpiralCoralDuringBridge: 1
   coralRoot: {fileID: 0}
-  spiralCoralBase: {fileID: 0}
-  spiralCoralGrower: {fileID: 0}
   fadeSpiralCoralDuringBridge: 1
   spiralCoralFadeTarget: 0.65
   demoMode: 0
@@ -992,9 +990,7 @@ MonoBehaviour:
   activeDrumTrack: {fileID: 0}
   dustGenerator: {fileID: 0}
   spawnGrid: {fileID: 0}
-  disableCoralDuringBridge: 1
   noteViz: {fileID: 0}
-  glitch: {fileID: 0}
   phaseTransitionManager: {fileID: 0}
   localPlayers: []
   playerStatsGrid: {fileID: 0}
@@ -1179,56 +1175,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1241868050}
   m_CullTransparentMesh: 1
---- !u!1 &1491357361
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1491357363}
-  - component: {fileID: 1491357364}
-  m_Layer: 0
-  m_Name: Coral Loader
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1491357363
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1491357361}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1491357364
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1491357361}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86b3208712f34e0c87057c95e9c9a571, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CoralGardenRenderer
-  columnsPerRow: 8
-  cellSize: {x: 4, y: 3}
-  patchGap: {x: 2, y: 3}
-  coralPrefab: {fileID: -4676709209624449764, guid: 8d387e67775794007ba96dfadbea003d,
-    type: 3}
-  defaultState: 1
 --- !u!1 &1657299815
 GameObject:
   m_ObjectHideFlags: 0
@@ -1671,5 +1617,4 @@ SceneRoots:
   - {fileID: 3032964157223298668}
   - {fileID: 1725700397}
   - {fileID: 1151719977}
-  - {fileID: 1491357363}
   - {fileID: 63749558}

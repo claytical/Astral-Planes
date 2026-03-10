@@ -425,7 +425,6 @@ public class DrumTrack : MonoBehaviour
     _intensityLoops = (_motif != null) ? _motif.intensityDrumLoops : null;
 
     _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
-
     // Only (re)open the entry window and reset intensity sampling when motif actually changed,
     // OR when we explicitly restart transport (hard reset semantics).
     if (motifChanged || restartTransport)
@@ -1349,25 +1348,18 @@ public class DrumTrack : MonoBehaviour
         Vector3 worldPos,
         MazeArchetype phase,
         float healDelaySeconds,
-        Color imprintColor,
-        Color imprintShadowColor,
-        float imprintHardness01,
+        MusicalRole removedRoleOverride = MusicalRole.None,
         int resolveRadiusCells = 0,
-        float appetiteMul = 1f,
-        MusicalRole imprintRole = MusicalRole.None)
+        float appetiteMul = 1f)
     {
         if (_dust == null) return 0;
 
         return _dust.CarveTemporaryCellFromMineNode(
             worldPos,
             phase,
-            healDelaySeconds,
-            imprintColor,
-            imprintShadowColor,
-            imprintHardness01,
+            healDelaySeconds, removedRoleOverride,
             resolveRadiusCells,
-            appetiteMul,
-            imprintRole
+            appetiteMul
         );
     }
 

@@ -30,14 +30,13 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Radius in grid cells for the keep-clear pocket when the star is idle/armed.")]
     public int starKeepClearRadiusCells = 2;
 
-    [Header("Safety Bubble (on poke)")]
-    [Tooltip("If enabled, the star spawns a temporary safety bubble on poke (used to let players escape / carve fairly).")]
+    [Header("Safety Bubble (gravity void only)")]
+    [Tooltip("If enabled, the star can display a temporary refuge bubble during gravity void expansion.")]
     public bool enableSafetyBubble = true;
 
     [Min(0)]
-    [Tooltip("Bubble radius in grid cells. Primary beginner-friendliness lever.")]
+    [Tooltip("Bubble radius in grid cells for the gravity-void refuge zone.")]
     public int safetyBubbleRadiusCells = 4;
-
     [Header("Selection Rotation (agency)")]
     [Tooltip("If true, the highlighted preview shard rotates by 1 at each loop boundary while the star is idle/armed.")]
     public bool rotateSelectionOnLoopBoundary = true;

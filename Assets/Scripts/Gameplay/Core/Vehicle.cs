@@ -48,6 +48,29 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float stopSpeed         = 0.05f; // snap-to-rest threshold (m/s)
     [SerializeField] private float stopAngularSpeed  = 5f;   // deg/s
     private float _cumulativeEnergySpent = 0f;
+
+    [Tooltip("Child SpriteRenderer clone of the vehicle art. Normally hidden. Scales up as placement becomes available.")]
+    [SerializeField] private SpriteRenderer soulSprite;
+
+
+    [Tooltip("Local scale for the hidden soul sprite when inactive.")]
+    [SerializeField] private float soulMinScale = 0.3f;
+
+    [Tooltip("Local scale for the soul sprite at full placement readiness.")]
+    [SerializeField] private float soulMaxScale = 1.2f;
+
+    [Tooltip("How quickly the soul sprite scale follows the pulse.")]
+    [SerializeField] private float soulScaleLerpSpeed = 14f;
+
+    [Tooltip("Soul alpha at the first visible hint of placement availability.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float soulAlphaMin = 0.0f;
+
+    [Tooltip("Soul alpha at full placement readiness.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float soulAlphaMax = 0.85f;
+
+    private Color _soulDefaultColor = Color.white;
     [Header("Input Filtering")]
     [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
     [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
@@ -102,7 +125,24 @@ public class Vehicle : MonoBehaviour
     private float _nextVehicleKeepClearRefreshAt = 0f;
 
     private Coroutine _spawnRestPocketCo;
+    [Header("Vehicle Placement Resonance")]
+    [SerializeField] private bool useVehiclePlacementResonance = true;
 
+    [Tooltip("How quickly the vehicle sprite color moves toward the target color.")]
+    [SerializeField] private float vehiclePlacementColorLerpSpeed = 10f;
+
+    [Tooltip("Minimum tint amount once a valid placement window exists.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float vehiclePlacementMinTint = 0.08f;
+
+    [Tooltip("Extra rhythmic breathing layered on top of the placement pulse.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float vehiclePlacementOscillation = 0.18f;
+
+    [Tooltip("Oscillation speed multiplier.")]
+    [SerializeField] private float vehiclePlacementOscillationSpeed = 1f;
+
+    private Color _vehicleDefaultColor = Color.white;
     [Header("Dust Spawn Rest Pocket")]
     [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
     [SerializeField] private bool carveSpawnRestPocket = true;
@@ -205,6 +245,19 @@ public class Vehicle : MonoBehaviour
             );
        
             baseSprite = GetComponent<SpriteRenderer>();
+            if (baseSprite != null)
+                _vehicleDefaultColor = baseSprite.color;
+
+            if (soulSprite != null)
+            {
+                _soulDefaultColor = soulSprite.color;
+                soulSprite.transform.localScale = Vector3.one * soulMinScale;
+
+                var c = soulSprite.color;
+                c.a = 0f;
+                soulSprite.color = c;
+                soulSprite.enabled = false;
+            }
             audioManager = GetComponent<AudioManager>();
             loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
             ApplyShipProfile(profile);
@@ -604,10 +657,9 @@ public class Vehicle : MonoBehaviour
         var gfm = GameFlowManager.Instance;
         var viz = gfm != null ? gfm.noteViz : null;
 
-        // When both queues are empty, explicitly zero the cue and exit.
         if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
         {
-            releaseCue?.SetFill(0f);
+            UpdateVehiclePlacementResonance(0f, null);
             return;
         }
 
@@ -679,26 +731,13 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        // Drive the vehicle-local release cue ring, tinted with the active track color.
-        if (releaseCue != null)
-        {
-            releaseCue.SetFill(pulse01);
+        InstrumentTrack cueTrack = null;
+        if (_armedReleases.Count > 0)
+            cueTrack = _armedReleases.Peek().note.track;
+        else if (_pendingNotes.Count > 0)
+            cueTrack = _pendingNotes.Peek().track;
 
-            // Resolve track color: armed note takes priority, then pending.
-            Color cueColor = Color.white;
-            if (_armedReleases.Count > 0)
-            {
-                var aTrack = _armedReleases.Peek().note.track;
-                if (aTrack != null) cueColor = aTrack.trackColor;
-            }
-            else if (_pendingNotes.Count > 0)
-            {
-                var pTrack = _pendingNotes.Peek().track;
-                if (pTrack != null) cueColor = pTrack.trackColor;
-            }
-            releaseCue.SetTrackColor(cueColor);
-        }
-
+        UpdateVehiclePlacementResonance(pulse01, cueTrack);
         // Armed notes: fly orb toward its target marker.
         int armedSlot = 0;
         foreach (var ar in _armedReleases)
@@ -798,7 +837,82 @@ public class Vehicle : MonoBehaviour
 
         releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
     }
-    private void UpdateSafeAnchor()
+        private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack)
+    {
+        if (!useVehiclePlacementResonance)
+            return;
+
+        Color roleColor = _vehicleDefaultColor;
+        if (cueTrack != null)
+            roleColor = cueTrack.trackColor;
+
+        float tint01 = 0f;
+        if (cueTrack != null && pulse01 > 0f)
+            tint01 = Mathf.Clamp01(Mathf.Max(vehiclePlacementMinTint, pulse01));
+
+        // -----------------------------------------------------------------
+        // Root vehicle sprite: color resonance only
+        // -----------------------------------------------------------------
+        if (baseSprite != null)
+        {
+            Color targetVehicleColor = Color.Lerp(_vehicleDefaultColor, roleColor, tint01);
+            baseSprite.color = Color.Lerp(
+                baseSprite.color,
+                targetVehicleColor,
+                vehiclePlacementColorLerpSpeed * Time.deltaTime
+            );
+        }
+
+        // -----------------------------------------------------------------
+        // Soul clone: hidden by default, scales outward as readiness grows
+        // -----------------------------------------------------------------
+        if (soulSprite != null)
+        {
+            bool active = cueTrack != null && pulse01 > 0.001f;
+
+            if (!active)
+            {
+                soulSprite.transform.localScale = Vector3.Lerp(
+                    soulSprite.transform.localScale,
+                    Vector3.one * soulMinScale,
+                    soulScaleLerpSpeed * Time.deltaTime
+                );
+
+                Color soulFade = soulSprite.color;
+                soulFade.r = roleColor.r;
+                soulFade.g = roleColor.g;
+                soulFade.b = roleColor.b;
+                soulFade.a = Mathf.Lerp(soulFade.a, 0f, soulScaleLerpSpeed * Time.deltaTime);
+                soulSprite.color = soulFade;
+
+                if (soulFade.a <= 0.01f)
+                    soulSprite.enabled = false;
+
+                return;
+            }
+
+            soulSprite.enabled = true;
+
+            float soulScale = Mathf.Lerp(soulMinScale, soulMaxScale, pulse01);
+            soulSprite.transform.localScale = Vector3.Lerp(
+                soulSprite.transform.localScale,
+                Vector3.one * soulScale,
+                soulScaleLerpSpeed * Time.deltaTime
+            );
+
+            float soulAlpha = Mathf.Lerp(soulAlphaMin, soulAlphaMax, pulse01);
+
+            Color targetSoulColor = roleColor;
+            targetSoulColor.a = soulAlpha;
+
+            soulSprite.color = Color.Lerp(
+                soulSprite.color,
+                targetSoulColor,
+                soulScaleLerpSpeed * Time.deltaTime
+            );
+        }
+    }
+      private void UpdateSafeAnchor()
 {
     if (rb == null || drumTrack == null) return;
 
@@ -1390,7 +1504,6 @@ private bool IsCellEmpty(Vector2Int gp)
         {
             TriggerThud(coll.contacts[0].point);
         }
-
         // ---- Impact dig (dust maze) ----
         // Design intent: a single strike on collision entry triggers a chain reaction trench down a grid line.
         if (!boosting) return;

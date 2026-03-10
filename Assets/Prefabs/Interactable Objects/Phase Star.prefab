@@ -4884,7 +4884,6 @@ GameObject:
   - component: {fileID: 6224665215610089654}
   - component: {fileID: 1335835332103871931}
   - component: {fileID: 7872104301369236207}
-  - component: {fileID: 3276094430744205779}
   m_Layer: 0
   m_Name: Phase Star
   m_TagString: Untagged
@@ -4927,10 +4926,12 @@ MonoBehaviour:
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
+  pokeChargeThreshold: 1
+  preReadyGrayFloor: 0.15
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
-  cravingNavigator: {fileID: 3276094430744205779}
+  cravingNavigator: {fileID: 0}
   _progressionMul: 1
   _isInFocusMode: 0
   syncRotationToLoop: 1
@@ -4939,6 +4940,11 @@ MonoBehaviour:
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   passiveChargeDecayPerSec: 0.02
   dustToStarChargeMul: 1
+  shardMinAlpha: 0.08
+  shardDisarmedAlphaCeil: 0.22
+  shardAlphaLerpSpeed: 6
+  shardSnifferTurnSpeed: 180
+  shardShedDuration: 0.35
   maxActiveDps: 360
   _assignedMotif: {fileID: 0}
   _perPetalLayerStep: 0
@@ -4984,8 +4990,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
   keepClearTick: 0.1
   drainRatePerSec: 0.6
-  carveThreshold: 0.05
-  carveHoldSec: 0.5
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5078,24 +5082,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &3276094430744205779
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312498068821558259}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 687ec4739b9ad4c0da0976e45b7d5a84, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
-  replanIntervalSeconds: 0.5
-  bfsBudget: 150
-  waypointPull: 0.85
-  waypointArrivalRadius: 0.35
-  navigationSpeed: 3.5
-  verbose: 0
 --- !u!1 &6090321477331913616
 GameObject:
   m_ObjectHideFlags: 0
