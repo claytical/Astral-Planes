@@ -39,8 +39,6 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [SerializeField] private bool useSpiralCoralDuringBridge = true;
     [SerializeField] private Transform coralRoot; // scene object root
-    [SerializeField] private SpiralCoralBaseBuilder spiralCoralBase;
-    [SerializeField] private SpiralCoralTrackGrower spiralCoralGrower;
     private float _bridgeDrumStartVolume = 1f;
 // Optional: fade using renderer alpha (Standard shader)
     [SerializeField] private bool fadeSpiralCoralDuringBridge = true;
@@ -66,7 +64,6 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
     private bool _setupInFlight, _setupDone;
-    private CoralVisualizer _coralInstance;
     private readonly List<PhaseSnapshot> _motifSnapshots = new();
     private float _motifStartTime = 0f; // stamped when each motif begins, used for coral branch height
     private GameState currentState = GameState.Begin;
@@ -90,27 +87,11 @@ public class GameFlowManager : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
     public bool GhostCycleInProgress { get; private set; }
     
-    public void RegisterSpiralCoralRig(
-        Transform rigRoot,
-        SpiralCoralBaseBuilder baseBuilder,
-        SpiralCoralTrackGrower trackGrower)
-    {
-        // assign to FIELDS (avoid shadowing)
-        this.coralRoot = rigRoot;
-        this.spiralCoralBase = baseBuilder;
-        this.spiralCoralGrower = trackGrower;
-
-        Debug.Log($"[CORAL:RIG] Registered rig root={this.coralRoot?.name} base={this.spiralCoralBase!=null} grower={this.spiralCoralGrower!=null}");
-    }
-
     public void RegisterMotifCoralVisualizer(MotifCoralVisualizer vis)
     {
         motifCoralVisualizer = vis;
         Debug.Log($"[CORAL:MOTIF] Registered MotifCoralVisualizer: {vis?.name}");
     }
-
-    private bool HasSpiralRig()
-        => coralRoot != null && spiralCoralBase != null && spiralCoralGrower != null;
 
     public GameState CurrentState
     {
@@ -154,11 +135,7 @@ public class GameFlowManager : MonoBehaviour
         foreach (var r in FindObjectsOfType<Renderer>(includeInactive: true))
         {
             if (!r) continue;
-
-            // Skip anything belonging to the coral instance (if it already exists)
-            if (_coralInstance != null && r.transform.IsChildOf(_coralInstance.transform))
-                continue;
-
+            
             // Skip the motif coral visualizer so it stays visible during the motif bridge
             if (motifCoralVisualizer != null && r.transform.IsChildOf(motifCoralVisualizer.transform))
                 continue;
