@@ -178,29 +178,4 @@ public class CollectableParticles : MonoBehaviour
         limit.dampen  = 0.6f; // keeps them hugging the line
     }
 
-    public void SetEmissionActive(bool isActive)
-    {
-        if (particleSystem == null) return;
-
-        if (isActive)
-        {
-            _emission.rateOverTime = 10f; // or whatever suits your looped look
-            if (!particleSystem.isPlaying)
-                particleSystem.Play();
-        }
-        else
-        {
-            _emission.rateOverTime = 0f;
-            // This combination forces emission to halt while allowing particles to fade naturally
-            particleSystem.Stop(withChildren: false, ParticleSystemStopBehavior.StopEmitting);
-        }
-    }
-    public void SetGravityForBeat(bool isOnBeat)
-    {
-        if (particleSystem == null) return;
-
-        var main = particleSystem.main;
-        main.gravityModifier = isOnBeat ? 0f : 2.5f; // tweak the gravity value to taste
-    }
-
 }

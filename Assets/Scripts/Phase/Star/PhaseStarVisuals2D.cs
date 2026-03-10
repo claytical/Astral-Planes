@@ -14,10 +14,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     private float __pulseAlphaMax = 1f;
     private float __pulseAlphaMin = 0.5f;
-    private float _pulseSpeed = 1f;
 private float alphaDirection = 1f;
-    private SpriteRenderer activeSprite;
-    private Color _lastShadowTint = new Color(0.08f, 0.08f, 0.08f, 1f);
     [Header("Dim (Disarmed) Look")]
     [SerializeField, Range(0f, 1f)] private float dimAlpha = 0.06f;     // very faint
     [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.08f;    // nearly gray/black
@@ -48,7 +45,6 @@ private float alphaDirection = 1f;
         // Pulse tuning (driven by profile; sensible fallbacks)
         if (_profile != null)
         {
-            _pulseSpeed    = Mathf.Max(0.01f, _profile.particlePulseSpeed);
             __pulseAlphaMin = Mathf.Clamp01(_profile.starAlphaMin);
             __pulseAlphaMax = Mathf.Clamp01(_profile.starAlphaMax);
             if (__pulseAlphaMax < __pulseAlphaMin)
@@ -111,8 +107,7 @@ private float alphaDirection = 1f;
     public void SetPreviewTint(Color c, Color shadowC)
     {
         _lastTint = c;
-        _lastShadowTint = shadowC;
-    }
+            }
 
     public void ShowBright(Color c)
     {
@@ -239,7 +234,6 @@ private float alphaDirection = 1f;
     {
         if (!active) return;
         var sr = active.GetComponent<SpriteRenderer>();
-        activeSprite = sr;
         if (!sr) return;
 
         sr.sprite = activeDiamond;

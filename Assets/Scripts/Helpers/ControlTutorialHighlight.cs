@@ -165,7 +165,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     {
         StopAllModes();
     }
-private void SetLabelAlphaImmediate(float a)
+    private void SetLabelAlphaImmediate(float a)
 {
     if (!instructionText) return;
     if (!instructionGroup) return;
@@ -182,7 +182,7 @@ private void SetLabelAlphaImmediate(float a)
         instructionText.gameObject.SetActive(true);
 }
 
-private void FadeLabelTo(float targetAlpha, float seconds)
+    private void FadeLabelTo(float targetAlpha, float seconds)
 {
     if (!instructionText) return;
 

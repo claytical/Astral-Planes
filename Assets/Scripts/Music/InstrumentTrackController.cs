@@ -84,53 +84,28 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _hasLastTransport;
     private TransportFrame _lastTransport;
     private GameFlowManager _gfm;
-// ---------------------------------------------------------------------
-// SFX: Commit "Placement Stinger" (A3)
-// Fired when the carried note visually lands on the loop / marker lights.
-// ---------------------------------------------------------------------
-[Header("SFX: Commit (Placement Stinger)")]
-[SerializeField] private AudioSource commitSfxSource;
+    // ---------------------------------------------------------------------
+    // SFX: Commit "Placement Stinger" (A3)
+    // Fired when the carried note visually lands on the loop / marker lights.
+    // ---------------------------------------------------------------------
+    [Header("SFX: Commit (Placement Stinger)")]
+    [SerializeField] private AudioSource commitSfxSource;
 
-[SerializeField, Range(0f, 2f)]
-private float commitStingerVolume = 1.25f;
+    [SerializeField, Range(0f, 2f)]
+    private float commitStingerVolume = 1.25f;
 
-[SerializeField, Range(0f, 0.15f)]
-private float commitStingerPitchJitter = 0.02f;
+    [SerializeField, Range(0f, 0.15f)]
+    private float commitStingerPitchJitter = 0.02f;
 
-[Tooltip("Fallback clip if role-specific commit clips are not set.")]
-[SerializeField] private AudioClip commitStingerDefault;
+    [Tooltip("Fallback clip if role-specific commit clips are not set.")]
+    [SerializeField] private AudioClip commitStingerDefault;
 
-[SerializeField] private AudioClip commitStingerBass;
-[SerializeField] private AudioClip commitStingerLead;
-[SerializeField] private AudioClip commitStingerHarmony;
-[SerializeField] private AudioClip commitStingerGroove;
-[SerializeField] private AudioClip commitStingerDrums;
-
-private void EnsureCommitSfxSource()
-{
-    if (commitSfxSource != null) return;
-
-    var go = new GameObject("TrackCommitSFX");
-    go.transform.SetParent(transform, worldPositionStays: false);
-
-    commitSfxSource = go.AddComponent<AudioSource>();
-    commitSfxSource.playOnAwake = false;
-    commitSfxSource.loop = false;
-    commitSfxSource.spatialBlend = 0f; // 2D
-    commitSfxSource.volume = 1f;
-}
-
-private AudioClip GetCommitStingerClip(MusicalRole role)
-{
-    switch (role)
-    {
-        case MusicalRole.Bass:    return commitStingerBass    != null ? commitStingerBass    : commitStingerDefault;
-        case MusicalRole.Lead:    return commitStingerLead    != null ? commitStingerLead    : commitStingerDefault;
-        case MusicalRole.Harmony: return commitStingerHarmony != null ? commitStingerHarmony : commitStingerDefault;
-        case MusicalRole.Groove:  return commitStingerGroove  != null ? commitStingerGroove  : commitStingerDefault;
-        default:                  return commitStingerDefault;
-    }
-}
+    [SerializeField] private AudioClip commitStingerBass;
+    [SerializeField] private AudioClip commitStingerLead;
+    [SerializeField] private AudioClip commitStingerHarmony;
+    [SerializeField] private AudioClip commitStingerGroove;
+    [SerializeField] private AudioClip commitStingerDrums;
+    
     private float GetSecondsRemainingInCurrentBin() {
         var drum = GameFlowManager.Instance?.activeDrumTrack;
         if (drum == null) return 0f; 
@@ -152,29 +127,11 @@ private AudioClip GetCommitStingerClip(MusicalRole role)
         
         return Mathf.Clamp(rem, 0f, clipLen);
     }
-private void PlayCommitStinger(InstrumentTrack track)
-{
-    if (track == null) return;
-
-    EnsureCommitSfxSource();
-    if (commitSfxSource == null) return;
-
-    var clip = GetCommitStingerClip(track.assignedRole);
-    if (clip == null) return;
-
-    float prevPitch = commitSfxSource.pitch;
-    if (commitStingerPitchJitter > 0f)
-        commitSfxSource.pitch = 1f + UnityEngine.Random.Range(-commitStingerPitchJitter, commitStingerPitchJitter);
-
-    commitSfxSource.PlayOneShot(clip, commitStingerVolume);
-    commitSfxSource.pitch = prevPitch;
-}
-
-/// <summary>
-/// Call this at the *visual deposit / marker light* moment, not at pickup.
-/// stepIndex is optional but useful later if you want per-step UI flashes.
-/// </summary>
-public void NotifyCommitted(InstrumentTrack track, int stepIndex)
+    /// <summary>
+    /// Call this at the *visual deposit / marker light* moment, not at pickup.
+    /// stepIndex is optional but useful later if you want per-step UI flashes.
+    /// </summary>
+    public void NotifyCommitted(InstrumentTrack track, int stepIndex)
 {
     Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
     // (Optional) you could track lastCommitTime here if you want.
@@ -198,7 +155,7 @@ public void NotifyCommitted(InstrumentTrack track, int stepIndex)
         return false;
     }
 
-private void EnsurePickupSfxSource()
+    private void EnsurePickupSfxSource()
 {
     if (pickupSfxSource != null) return;
 
@@ -213,7 +170,7 @@ private void EnsurePickupSfxSource()
     pickupSfxSource.volume = 1f;       // volume scaled per PlayOneShot call
 }
 
-private AudioClip GetPickupTickClip(MusicalRole role)
+    private AudioClip GetPickupTickClip(MusicalRole role)
 {
     switch (role)
     {
@@ -225,414 +182,410 @@ private AudioClip GetPickupTickClip(MusicalRole role)
     }
 }
 
-private void PlayPickupTick(InstrumentTrack track)
-{
-    if (track == null) return;
-
-    EnsurePickupSfxSource();
-    if (pickupSfxSource == null) return;
-
-    var clip = GetPickupTickClip(track.assignedRole);
-    if (clip == null) return; // nothing configured yet
-
-    float prevPitch = pickupSfxSource.pitch;
-    if (pickupTickPitchJitter > 0f)
-        pickupSfxSource.pitch = 1f + Random.Range(-pickupTickPitchJitter, pickupTickPitchJitter);
-
-    pickupSfxSource.PlayOneShot(clip, pickupTickVolume);
-    pickupSfxSource.pitch = prevPitch;
-}
-
-// New signature: use this for A2 so the tick can be role-aware.
-public void NotifyCollected(InstrumentTrack track)
-{
-    lastCollectionTime = Time.time;
-    PlayPickupTick(track);
-}
-public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
-{
-    if (ownerTrack == null) return;
-
-    // Is this a repeat Begin for the same owner while already active?
-    bool sameOwner = (_gravityVoidOwner != null && ownerTrack == _gravityVoidOwner);
-    bool routineRunning = (_gravityVoidRoutine != null);
-    bool instanceAlive = (_gravityVoidInstance != null);
-
-    // Update owner + center every time (Begin acts as "refresh" too).
-    _gravityVoidOwner = ownerTrack;
-    _gravityVoidCenterWorld = centerWorld;
-    _gravityVoidCenterGP = centerGP;
-    _gravityVoidHasCenterGP = true;
-
-    // Resolve tint/hardness from role profile (or fallback).
-    var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
-    if (roleProfile != null)
+    private void PlayPickupTick(InstrumentTrack track)
     {
-        _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
-        _gravityVoidDustHardness01 = roleProfile.GetDustHardness01();
+        if (track == null) return;
 
-        _gravityVoidParticleTint = roleProfile.GetBaseColor();
-        _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
+        EnsurePickupSfxSource();
+        if (pickupSfxSource == null) return;
+
+        var clip = GetPickupTickClip(track.assignedRole);
+        if (clip == null) return; // nothing configured yet
+
+        float prevPitch = pickupSfxSource.pitch;
+        if (pickupTickPitchJitter > 0f)
+            pickupSfxSource.pitch = 1f + Random.Range(-pickupTickPitchJitter, pickupTickPitchJitter);
+
+        pickupSfxSource.PlayOneShot(clip, pickupTickVolume);
+        pickupSfxSource.pitch = prevPitch;
     }
-    else
+    public void NotifyCollected(InstrumentTrack track)
     {
-        _gravityVoidDustImprintTint = ownerTrack.trackColor;
-        _gravityVoidDustHardness01 = 0.5f;
-
-        _gravityVoidParticleTint = ownerTrack.trackColor;
-        _gravityVoidParticleTint.a = 1f;
+        lastCollectionTime = Time.time;
+        PlayPickupTick(track);
     }
-
-    // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
-    SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
-
-    // Recompute runtime parameters; these can change while pending.
-    _gravityVoidGrowSecondsRuntime = gravityVoidGrowSeconds;
-    _gravityVoidMaxRadiusRuntime = gravityVoidMaxRadiusCells;
-
-    if (_gravityVoidOwner != null)
+    public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
     {
-        // Drive dur by DSP time-to-commit, so the final radius happens at the commit point.
-        float secsToCommit = _gravityVoidOwner.GetSecondsUntilNextLoopBoundaryDSP();
-        if (secsToCommit > 0.01f)
-            _gravityVoidGrowSecondsRuntime = secsToCommit;
+        if (ownerTrack == null) return;
 
-        // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
-        int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
-        _gravityVoidMaxRadiusRuntime = targetRadius;
-    }
+        // Is this a repeat Begin for the same owner while already active?
+        bool sameOwner = (_gravityVoidOwner != null && ownerTrack == _gravityVoidOwner);
+        bool routineRunning = (_gravityVoidRoutine != null);
+        bool instanceAlive = (_gravityVoidInstance != null);
 
-    // --- CRITICAL: don't restart the coroutine if it's already running for this owner. ---
-    // Restarting here is what looks like "respawn at the boundary".
-    if (sameOwner && routineRunning)
-    {
-        Debug.Log(
-            $"[VOID] REFRESH (no-restart) track={ownerTrack.name} " +
-            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} " +
-            $"pos={centerWorld} gp={centerGP} grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
-        );
-        return;
-    }
+        // Update owner + center every time (Begin acts as "refresh" too).
+        _gravityVoidOwner = ownerTrack;
+        _gravityVoidCenterWorld = centerWorld;
+        _gravityVoidCenterGP = centerGP;
+        _gravityVoidHasCenterGP = true;
 
-    // If owner changed, or routine is missing, (re)start cleanly.
-    if (_gravityVoidRoutine != null)
-    {
-        StopCoroutine(_gravityVoidRoutine);
-        _gravityVoidRoutine = null;
-    }
+        // Resolve tint/hardness from role profile (or fallback).
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
+        if (roleProfile != null)
+        {
+            _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
+            _gravityVoidDustHardness01 = roleProfile.GetDustHardness01();
 
-    Debug.Log(
-        $"[VOID] BEGIN (start) track={ownerTrack.name} " +
-        $"prevOwner={(sameOwner ? "same" : "changed")} routineWas={routineRunning} instWas={instanceAlive} " +
-        $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} pos={centerWorld} gp={centerGP} " +
-        $"grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
-    );
+            _gravityVoidParticleTint = roleProfile.GetBaseColor();
+            _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
+        }
+        else
+        {
+            _gravityVoidDustImprintTint = ownerTrack.trackColor;
+            _gravityVoidDustHardness01 = 0.5f;
 
-    _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
-}
+            _gravityVoidParticleTint = ownerTrack.trackColor;
+            _gravityVoidParticleTint.a = 1f;
+        }
 
-public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
-{
-    // If caller provides an owner, only allow the owner to end it.
-    if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
-    {
-        Debug.LogWarning(
-            $"[VOID] END ignored (wrong owner) caller={ownerTrack.name} owner={_gravityVoidOwner.name} " +
-            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
-        );
-        return;
-    }
-    _gravityVoidOwner = null;
-    _gravityVoidHasCenterGP = false;
-
-    if (_gravityVoidRoutine != null)
-    {
-        StopCoroutine(_gravityVoidRoutine);
-        _gravityVoidRoutine = null;
-    }
-
-    DespawnGravityVoid();
-}
-
-private IEnumerator GravityVoidGrowAndImprintRoutine()
-{
-    int _lastGravityVoidChordBin = -1;
-    var gfm = GameFlowManager.Instance;
-    var dustGen = (gfm != null) ? gfm.dustGenerator : null;
-    if (dustGen == null)
-        yield break;
-
-    float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
-
-    // Tracks the outermost radius already committed to the grid so we only ever
-    // pass new annuli to GrowVoidDustDiskFromGrid (innerRadiusCellsExclusive).
-    int completedOuterR = 0;
-
-    // Which bin boundary we have already fired a burst for. Prevents re-firing
-    // multiple times within the same bin while the routine ticks faster than a bin.
-    int lastBurstBin = -1;
-
-    // How many total bins this expansion spans (1, 2, or more).
-    // Resolved once from the owner at routine start; stable for its lifetime.
-    int totalExpansionBins = (_gravityVoidOwner != null)
-        ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier)
-        : 1;
-
-    while (_gravityVoidOwner != null)
-    {
-        // Keep VFX positioned and scaled.
+        // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
-        int playheadBin = GetTransportFrame().playheadBin;
+        // Recompute runtime parameters; these can change while pending.
+        _gravityVoidGrowSecondsRuntime = gravityVoidGrowSeconds;
+        _gravityVoidMaxRadiusRuntime = gravityVoidMaxRadiusCells;
 
-        // ---------------------------------------------------------------
-        // Chord pulse — fire once per bin boundary (unchanged behaviour).
-        // ---------------------------------------------------------------
-        if (playheadBin != _lastGravityVoidChordBin)
+        if (_gravityVoidOwner != null)
         {
-            _lastGravityVoidChordBin = playheadBin;
-            int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
-            PlayGravityVoidChordPulse(_gravityVoidOwner, playheadBin, chordSize);
+            // Drive dur by DSP time-to-commit, so the final radius happens at the commit point.
+            float secsToCommit = _gravityVoidOwner.GetSecondsUntilNextLoopBoundaryDSP();
+            if (secsToCommit > 0.01f)
+                _gravityVoidGrowSecondsRuntime = secsToCommit;
+
+            // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
+            int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
+            _gravityVoidMaxRadiusRuntime = targetRadius;
         }
 
-        // ---------------------------------------------------------------
-        // Bin-boundary dust burst.
-        //
-        // Coverage targets (playheadBin is 0-based within the expansion):
-        //   Bin 0 — first bin:    30 % of grid area  (r = sqrt(0.30 * w*h / π))
-        //   Bin 1 — middle bins:  50 % of grid area  (r = sqrt(0.50 * w*h / π))
-        //   Final bin:            80 % of grid area  (r = sqrt(0.80 * w*h / π))
-        //
-        // Each burst fires once per bin crossing and grows only the new
-        // annulus from completedOuterR outward to the new target radius.
-        // MusicalRole is set per-cell by GrowVoidDustDiskFromGrid via imprintRole.
-        // ---------------------------------------------------------------
-        if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
+        // --- CRITICAL: don't restart the coroutine if it's already running for this owner. ---
+        // Restarting here is what looks like "respawn at the boundary".
+        if (sameOwner && routineRunning)
         {
-            lastBurstBin = playheadBin;
+            Debug.Log(
+                $"[VOID] REFRESH (no-restart) track={ownerTrack.name} " +
+                $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} " +
+                $"pos={centerWorld} gp={centerGP} grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
+            );
+            return;
+        }
 
-            int w = dustGen.GridW;
-            int h = dustGen.GridH;
+        // If owner changed, or routine is missing, (re)start cleanly.
+        if (_gravityVoidRoutine != null)
+        {
+            StopCoroutine(_gravityVoidRoutine);
+            _gravityVoidRoutine = null;
+        }
 
-            // Half-diagonal so bursts can reach every corner of the grid.
-            int maxPossibleR = Mathf.CeilToInt(Mathf.Sqrt(w * w + h * h) * 0.5f);
+        Debug.Log(
+            $"[VOID] BEGIN (start) track={ownerTrack.name} " +
+            $"prevOwner={(sameOwner ? "same" : "changed")} routineWas={routineRunning} instWas={instanceAlive} " +
+            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} pos={centerWorld} gp={centerGP} " +
+            $"grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
+        );
 
-            int targetOuterR;
-            bool isFinalBin = (playheadBin >= totalExpansionBins - 1);
+        _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
+    }
+    public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
+    {
+        // If caller provides an owner, only allow the owner to end it.
+        if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
+        {
+            Debug.LogWarning(
+                $"[VOID] END ignored (wrong owner) caller={ownerTrack.name} owner={_gravityVoidOwner.name} " +
+                $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
+            );
+            return;
+        }
+        _gravityVoidOwner = null;
+        _gravityVoidHasCenterGP = false;
 
-            if (playheadBin == 0)
+        if (_gravityVoidRoutine != null)
+        {
+            StopCoroutine(_gravityVoidRoutine);
+            _gravityVoidRoutine = null;
+        }
+
+        DespawnGravityVoid();
+    }
+    private IEnumerator GravityVoidGrowAndImprintRoutine()
+    {
+        int _lastGravityVoidChordBin = -1;
+        var gfm = GameFlowManager.Instance;
+        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+        if (dustGen == null)
+            yield break;
+
+        float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
+
+        // Tracks the outermost radius already committed to the grid so we only ever
+        // pass new annuli to GrowVoidDustDiskFromGrid (innerRadiusCellsExclusive).
+        int completedOuterR = 0;
+
+        // Which bin boundary we have already fired a burst for. Prevents re-firing
+        // multiple times within the same bin while the routine ticks faster than a bin.
+        int lastBurstBin = -1;
+
+        // How many total bins this expansion spans (1, 2, or more).
+        // Resolved once from the owner at routine start; stable for its lifetime.
+        int totalExpansionBins = (_gravityVoidOwner != null)
+            ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier)
+            : 1;
+
+        while (_gravityVoidOwner != null)
+        {
+            // Keep VFX positioned and scaled.
+            SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
+
+            int playheadBin = GetTransportFrame().playheadBin;
+
+            // ---------------------------------------------------------------
+            // Chord pulse — fire once per bin boundary (unchanged behaviour).
+            // ---------------------------------------------------------------
+            if (playheadBin != _lastGravityVoidChordBin)
             {
-                // First burst: 30 % of grid area — immediately visible spread.
-                float r30 = Mathf.Sqrt(0.30f * w * h / Mathf.PI);
-                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r30), 1, maxPossibleR);
+                _lastGravityVoidChordBin = playheadBin;
+                int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
+                PlayGravityVoidChordPulse(_gravityVoidOwner, playheadBin, chordSize);
             }
-            else if (!isFinalBin)
-            {
-                // Intermediate burst: ~50 % of grid area.  r = sqrt(0.50 * w*h / π)
-                float r50 = Mathf.Sqrt(0.5f * w * h / Mathf.PI);
-                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r50), completedOuterR + 1, maxPossibleR);
-            }
-            else
-            {
-                // Final burst: ~80 % of grid area.  r = sqrt(0.80 * w*h / π)
-                float r80 = Mathf.Sqrt(0.80f * w * h / Mathf.PI);
-                targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r80), completedOuterR + 1, maxPossibleR);
-            }
 
-            _gravityVoidCurrentOuterR = targetOuterR;
-
-            if (targetOuterR > completedOuterR)
+            // ---------------------------------------------------------------
+            // Bin-boundary dust burst.
+            //
+            // Coverage targets (playheadBin is 0-based within the expansion):
+            //   Bin 0 — first bin:    30 % of grid area  (r = sqrt(0.30 * w*h / π))
+            //   Bin 1 — middle bins:  50 % of grid area  (r = sqrt(0.50 * w*h / π))
+            //   Final bin:            80 % of grid area  (r = sqrt(0.80 * w*h / π))
+            //
+            // Each burst fires once per bin crossing and grows only the new
+            // annulus from completedOuterR outward to the new target radius.
+            // MusicalRole is set per-cell by GrowVoidDustDiskFromGrid via imprintRole.
+            // ---------------------------------------------------------------
+            if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
             {
-                // Grow-in time spans the remainder of this bin so cells finish
-                // solidifying before the next bin crosses.
-                float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+                lastBurstBin = playheadBin;
 
-                // Vehicle positions — avoid spawning directly on players.
-                _vehicleCellsScratch.Clear();
-                var vehicles = FindObjectsOfType<Vehicle>();
-                for (int i = 0; i < vehicles.Length; i++)
+                int w = dustGen.GridW;
+                int h = dustGen.GridH;
+
+                // Half-diagonal so bursts can reach every corner of the grid.
+                int maxPossibleR = Mathf.CeilToInt(Mathf.Sqrt(w * w + h * h) * 0.5f);
+
+                int targetOuterR;
+                bool isFinalBin = (playheadBin >= totalExpansionBins - 1);
+
+                if (playheadBin == 0)
                 {
-                    var v = vehicles[i];
-                    if (v == null || !v.isActiveAndEnabled) continue;
-                    var drum = gfm?.activeDrumTrack;
-                    if (drum != null)
-                        _vehicleCellsScratch.Add(drum.WorldToGridPosition(v.transform.position));
+                    // First burst: 30 % of grid area — immediately visible spread.
+                    float r30 = Mathf.Sqrt(0.30f * w * h / Mathf.PI);
+                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r30), 1, maxPossibleR);
+                }
+                else if (!isFinalBin)
+                {
+                    // Intermediate burst: ~50 % of grid area.  r = sqrt(0.50 * w*h / π)
+                    float r50 = Mathf.Sqrt(0.5f * w * h / Mathf.PI);
+                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r50), completedOuterR + 1, maxPossibleR);
+                }
+                else
+                {
+                    // Final burst: ~80 % of grid area.  r = sqrt(0.80 * w*h / π)
+                    float r80 = Mathf.Sqrt(0.80f * w * h / Mathf.PI);
+                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r80), completedOuterR + 1, maxPossibleR);
                 }
 
-                // Unlimited budget — burst commits the whole annulus at once.
-                // energyAtCenter01 = 1f with a near-flat falloffExp (0.3) keeps the
-                // role color vivid and immediately readable across the whole annulus.
-                // kMinVisibleAlpha in GrowVoidDustDiskFromGrid floors at 0.06, but
-                // with falloffExp this low the outer-edge energy stays well above it.
-                dustGen.GrowVoidDustDiskFromGrid(
-                    centerGP:                  _gravityVoidCenterGP,
-                    outerRadiusCells:          targetOuterR,
-                    imprintRole:               _gravityVoidOwner.assignedRole,
-                    hueRgb:                    _gravityVoidDustImprintTint,
-                    imprintHardness01:         _gravityVoidDustHardness01,
-                    energyAtCenter01:          1f,
-                    falloffExp:                0.3f,   // near-flat — role color stays vivid to the edge
-                    growInSeconds:             growIn,
-                    fillWedges01To4:           4,      // always full 360°
-                    vehicleCells:              _vehicleCellsScratch,
-                    vehicleNoSpawnRadiusCells: 1,
-                    maxCellsThisCall:          -1,     // unlimited — commit whole annulus now
-                    innerRadiusCellsExclusive: completedOuterR
-                );
+                _gravityVoidCurrentOuterR = targetOuterR;
 
-                completedOuterR = targetOuterR;
+                if (targetOuterR > completedOuterR)
+                {
+                    // Grow-in time spans the remainder of this bin so cells finish
+                    // solidifying before the next bin crosses.
+                    float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+
+                    // Vehicle positions — avoid spawning directly on players.
+                    _vehicleCellsScratch.Clear();
+                    var vehicles = FindObjectsOfType<Vehicle>();
+                    for (int i = 0; i < vehicles.Length; i++)
+                    {
+                        var v = vehicles[i];
+                        if (v == null || !v.isActiveAndEnabled) continue;
+                        var drum = gfm?.activeDrumTrack;
+                        if (drum != null)
+                            _vehicleCellsScratch.Add(drum.WorldToGridPosition(v.transform.position));
+                    }
+
+                    // Unlimited budget — burst commits the whole annulus at once.
+                    // energyAtCenter01 = 1f with a near-flat falloffExp (0.3) keeps the
+                    // role color vivid and immediately readable across the whole annulus.
+                    // kMinVisibleAlpha in GrowVoidDustDiskFromGrid floors at 0.06, but
+                    // with falloffExp this low the outer-edge energy stays well above it.
+                    dustGen.GrowVoidDustDiskFromGrid(
+                        centerGP:                  _gravityVoidCenterGP,
+                        outerRadiusCells:          targetOuterR,
+                        imprintRole:               _gravityVoidOwner.assignedRole,
+                        hueRgb:                    _gravityVoidDustImprintTint,
+                        imprintHardness01:         _gravityVoidDustHardness01,
+                        energyAtCenter01:          1f,
+                        falloffExp:                0.3f,   // near-flat — role color stays vivid to the edge
+                        growInSeconds:             growIn,
+                        fillWedges01To4:           4,      // always full 360°
+                        vehicleCells:              _vehicleCellsScratch,
+                        vehicleNoSpawnRadiusCells: 1,
+                        maxCellsThisCall:          -1,     // unlimited — commit whole annulus now
+                        innerRadiusCellsExclusive: completedOuterR
+                    );
+
+                    completedOuterR = targetOuterR;
+                }
             }
+
+            // Keep ticking so VFX stays live and chord pulses keep firing until
+            // EndGravityVoidForPendingExpand clears the owner.
+            yield return new WaitForSeconds(tick);
         }
 
-        // Keep ticking so VFX stays live and chord pulses keep firing until
-        // EndGravityVoidForPendingExpand clears the owner.
-        yield return new WaitForSeconds(tick);
+        _gravityVoidRoutine = null;
+    }
+    private void PlayGravityVoidChordPulse(
+        InstrumentTrack track,
+        int playheadBin,
+        int chordSize)
+    {
+        if (track == null) return;
+
+        var harmony = GameFlowManager.Instance?.harmony;
+        if (harmony == null) return;
+
+        int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
+        if (chordIdx < 0) return;
+
+        if (!harmony.TryGetChordAt(chordIdx, out var chord))
+            return;
+
+        var notes = BuildGravityVoidVoicing(
+            track.assignedRole,
+            chord,
+            chordSize,
+            track.lowestAllowedNote,
+            track.highestAllowedNote
+        );
+
+        int durTicks = 480; 
+        float vel127 = 80f;
+
+        foreach (int midi in notes)
+            track.PlayNote127(midi, durTicks, vel127);
+    }
+    private List<int> BuildGravityVoidVoicing(
+        MusicalRole role,
+        Chord chord,
+        int targetCount,
+        int low,
+        int high)
+    {
+        // Build pitch classes from chord
+        var pcs = chord.intervals
+            .Select(i => (chord.rootNote + i) % 12)
+            .Distinct()
+            .ToList();
+
+        int rootPC  = chord.rootNote % 12;
+        int thirdPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 3 or 4);
+        int fifthPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 == 7);
+        int seventhPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 10 or 11);
+
+        List<int> priorityPCs = role switch
+        {
+            // --------------------------------------------------
+            // Bass: guide tones first, avoid root dominance
+            // --------------------------------------------------
+            MusicalRole.Bass => new()
+            {
+                thirdPC,
+                seventhPC,
+                fifthPC,
+                rootPC,
+                thirdPC
+            },
+
+            // --------------------------------------------------
+            // Harmony: classic shell → full stack
+            // --------------------------------------------------
+            MusicalRole.Harmony => new()
+            {
+                thirdPC,
+                seventhPC,
+                rootPC,
+                fifthPC,
+                seventhPC
+            },
+
+            // --------------------------------------------------
+            // Lead: color tones, higher tension
+            // --------------------------------------------------
+            MusicalRole.Lead => new()
+            {
+                seventhPC,
+                thirdPC,
+                fifthPC,
+                rootPC,
+                seventhPC
+            },
+
+            // --------------------------------------------------
+            // Groove / mid-perc tonal
+            // --------------------------------------------------
+            MusicalRole.Groove => new()
+            {
+                thirdPC,
+                fifthPC,
+                seventhPC,
+                rootPC,
+                thirdPC
+            },
+
+            _ => pcs
+        };
+
+        var result = new List<int>();
+        int octaveAnchor = (low + high) / 2;
+
+        foreach (int pc in priorityPCs)
+        {
+            if (result.Count >= targetCount) break;
+
+            int note = FitPitchClassToRange(pc, octaveAnchor, low, high);
+            if (!result.Contains(note))
+                result.Add(note);
+        }
+
+        return result;
+    }
+    private int FitPitchClassToRange(int pc, int anchor, int low, int high)
+    {
+        int note = anchor - ((anchor - pc + 120) % 12);
+        while (note < low)  note += 12;
+        while (note > high) note -= 12;
+        return Mathf.Clamp(note, low, high);
     }
 
-    _gravityVoidRoutine = null;
-}
-private void PlayGravityVoidChordPulse(
-    InstrumentTrack track,
-    int playheadBin,
-    int chordSize)
-{
-    if (track == null) return;
-
-    var harmony = GameFlowManager.Instance?.harmony;
-    if (harmony == null) return;
-
-    int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
-    if (chordIdx < 0) return;
-
-    if (!harmony.TryGetChordAt(chordIdx, out var chord))
-        return;
-
-    var notes = BuildGravityVoidVoicing(
-        track.assignedRole,
-        chord,
-        chordSize,
-        track.lowestAllowedNote,
-        track.highestAllowedNote
-    );
-
-    int durTicks = 480; 
-    float vel127 = 80f;
-
-    foreach (int midi in notes)
-        track.PlayNote127(midi, durTicks, vel127);
-}
-private List<int> BuildGravityVoidVoicing(
-    MusicalRole role,
-    Chord chord,
-    int targetCount,
-    int low,
-    int high)
-{
-    // Build pitch classes from chord
-    var pcs = chord.intervals
-        .Select(i => (chord.rootNote + i) % 12)
-        .Distinct()
-        .ToList();
-
-    int rootPC  = chord.rootNote % 12;
-    int thirdPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 3 or 4);
-    int fifthPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 == 7);
-    int seventhPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 10 or 11);
-
-    List<int> priorityPCs = role switch
+    public void DespawnGravityVoid()
     {
-        // --------------------------------------------------
-        // Bass: guide tones first, avoid root dominance
-        // --------------------------------------------------
-        MusicalRole.Bass => new()
-        {
-            thirdPC,
-            seventhPC,
-            fifthPC,
-            rootPC,
-            thirdPC
-        },
+        if (_gravityVoidInstance == null)
+            return;
 
-        // --------------------------------------------------
-        // Harmony: classic shell → full stack
-        // --------------------------------------------------
-        MusicalRole.Harmony => new()
-        {
-            thirdPC,
-            seventhPC,
-            rootPC,
-            fifthPC,
-            seventhPC
-        },
+        Destroy(_gravityVoidInstance);
 
-        // --------------------------------------------------
-        // Lead: color tones, higher tension
-        // --------------------------------------------------
-        MusicalRole.Lead => new()
-        {
-            seventhPC,
-            thirdPC,
-            fifthPC,
-            rootPC,
-            seventhPC
-        },
+        _gravityVoidInstance = null;
+        _gravityVoidParticles = null;
 
-        // --------------------------------------------------
-        // Groove / mid-perc tonal
-        // --------------------------------------------------
-        MusicalRole.Groove => new()
-        {
-            thirdPC,
-            fifthPC,
-            seventhPC,
-            rootPC,
-            thirdPC
-        },
+        // Clear cached prefab alpha so the next spawn re-captures it
+        _gravityVoidPrefabStartAlpha = null;
 
-        _ => pcs
-    };
+        // Reset VFX growth state
+        _gravityVoidCurrentOuterR = 0;
 
-    var result = new List<int>();
-    int octaveAnchor = (low + high) / 2;
-
-    foreach (int pc in priorityPCs)
-    {
-        if (result.Count >= targetCount) break;
-
-        int note = FitPitchClassToRange(pc, octaveAnchor, low, high);
-        if (!result.Contains(note))
-            result.Add(note);
+        // Clear center bookkeeping (defensive; owner is cleared elsewhere)
+        _gravityVoidHasCenterGP = false;
     }
-
-    return result;
-}
-private int FitPitchClassToRange(int pc, int anchor, int low, int high)
-{
-    int note = anchor - ((anchor - pc + 120) % 12);
-    while (note < low)  note += 12;
-    while (note > high) note -= 12;
-    return Mathf.Clamp(note, low, high);
-}
-
-public void DespawnGravityVoid()
-{
-    if (_gravityVoidInstance == null)
-        return;
-
-    Destroy(_gravityVoidInstance);
-
-    _gravityVoidInstance = null;
-    _gravityVoidParticles = null;
-
-    // Clear cached prefab alpha so the next spawn re-captures it
-    _gravityVoidPrefabStartAlpha = null;
-
-    // Reset VFX growth state
-    _gravityVoidCurrentOuterR = 0;
-
-    // Clear center bookkeeping (defensive; owner is cleared elsewhere)
-    _gravityVoidHasCenterGP = false;
-}
 
     public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
 {
@@ -797,57 +750,56 @@ public void DespawnGravityVoid()
         return tf;
     }
 
-/// <summary>
-/// Returns the current playhead position as an absolute step within the current leader loop.
-/// This is a continuous value (rawAbsStep) plus its floor (floorAbsStep) and total length (totalAbsSteps).
-/// Safe to call during transient transport re-wiring; returns false if timing can't be resolved.
-/// </summary>
-public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep, out int totalAbsSteps)
-{
-    rawAbsStep = 0;
-    floorAbsStep = 0;
-    totalAbsSteps = 0;
+    /// <summary>
+    /// Returns the current playhead position as an absolute step within the current leader loop.
+    /// This is a continuous value (rawAbsStep) plus its floor (floorAbsStep) and total length (totalAbsSteps).
+    /// Safe to call during transient transport re-wiring; returns false if timing can't be resolved.
+    /// </summary>
+    public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep, out int totalAbsSteps)
+    {
+        rawAbsStep = 0;
+        floorAbsStep = 0;
+        totalAbsSteps = 0;
 
-    var drum = GameFlowManager.Instance?.activeDrumTrack;
-    if (drum == null) return false;
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return false;
 
-    // NOTE: Manual release timing must be evaluated on the *leader* loop timeline.
-    // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
-    // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
-    // advances 4x too fast, effectively shrinking your window.
-    double baseLoopLen = drum.GetClipLengthInSeconds();
-    if (baseLoopLen <= 0.0) return false;
+        // NOTE: Manual release timing must be evaluated on the *leader* loop timeline.
+        // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
+        // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
+        // advances 4x too fast, effectively shrinking your window.
+        double baseLoopLen = drum.GetClipLengthInSeconds();
+        if (baseLoopLen <= 0.0) return false;
 
-    double dspNow = AudioSettings.dspTime;
+        double dspNow = AudioSettings.dspTime;
 
-    double transportStart = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-    if (transportStart <= 0.0) return false;
+        double transportStart = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        if (transportStart <= 0.0) return false;
 
-    int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
-    totalAbsSteps = leaderSteps;
+        int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
+        totalAbsSteps = leaderSteps;
 
-    int binSize = Mathf.Max(1, drum.totalSteps);
-    int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
-    double leaderLoopLen = baseLoopLen * leaderBins;
+        int binSize = Mathf.Max(1, drum.totalSteps);
+        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
+        double leaderLoopLen = baseLoopLen * leaderBins;
 
-    // Effective loop boundary (leader loop)
-    double loops = System.Math.Floor((dspNow - transportStart) / leaderLoopLen);
-    double loopStart = transportStart + loops * leaderLoopLen;
-    if (loopStart > dspNow) loopStart -= leaderLoopLen;
+        // Effective loop boundary (leader loop)
+        double loops = System.Math.Floor((dspNow - transportStart) / leaderLoopLen);
+        double loopStart = transportStart + loops * leaderLoopLen;
+        if (loopStart > dspNow) loopStart -= leaderLoopLen;
 
-    double tPos = (dspNow - loopStart) % leaderLoopLen;
-    if (tPos < 0) tPos += leaderLoopLen;
+        double tPos = (dspNow - loopStart) % leaderLoopLen;
+        if (tPos < 0) tPos += leaderLoopLen;
 
-    // leaderLoopLen/leaderSteps == baseLoopLen/binSize
-    double stepDur = leaderLoopLen / totalAbsSteps;
-    rawAbsStep = tPos / stepDur;
-    floorAbsStep = (int)System.Math.Floor(rawAbsStep) % totalAbsSteps;
-    if (floorAbsStep < 0) floorAbsStep += totalAbsSteps;
+        // leaderLoopLen/leaderSteps == baseLoopLen/binSize
+        double stepDur = leaderLoopLen / totalAbsSteps;
+        rawAbsStep = tPos / stepDur;
+        floorAbsStep = (int)System.Math.Floor(rawAbsStep) % totalAbsSteps;
+        if (floorAbsStep < 0) floorAbsStep += totalAbsSteps;
 
-    return true;
-}
-
-
+        return true;
+    }
+    
     /// <summary>
     /// Immediate re-sync of drum binning + note grid to the committed leader bins.
     /// Call this when a track commits an expand/collapse mid-frame so the UI/audio
@@ -1029,7 +981,7 @@ public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep
                       $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
         }
     }
-public int GetBinForNextSpawn(InstrumentTrack track)
+    public int GetBinForNextSpawn(InstrumentTrack track)
 {
     if (track == null)
         return 0;
@@ -1176,7 +1128,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         return any;
     }
-
     public int ForceDestroyAllCollectablesInFlight(string reason)
     {
         int destroyed = 0;
@@ -1190,7 +1141,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         return destroyed;
     }
-
     /// <summary>
     /// Single authority entry point for motif boundaries.
     /// This should be called exactly once when a new motif begins (after any bridge/ghost cycle),
@@ -1223,7 +1173,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
         if (noteVisualizer != null)
             noteVisualizer.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
     }
-
     public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
     {
         if (tracks == null) return;
@@ -1264,24 +1213,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
         } 
         return tracks.FirstOrDefault(x => x != null && x.HasNoteSet()) ?? tracks[0];
     }
-    public NoteSet GetGlobalContextNoteSet(){ var t = GetAmbientContextTrack(); 
-        return t != null ? t.GetActiveNoteSet() : null;
-        }
-    public InstrumentTrack FindTrackByRole(MusicalRole role)
-    {
-        Debug.Log("Configured roles: " + 
-                  string.Join(", ", tracks.Select(t => t.assignedRole)));
-        return tracks.FirstOrDefault(t => t.assignedRole == role);
-    }
-    public void ApplySeedVisibility(List<InstrumentTrack> seeds)
-    {
-        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
-        foreach (var t in tracks)
-        {
-            bool on = seedSet.Contains(t);
-        }
-        // Optionally fade unmuted ones back in over ~0.5s
-    }
     private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
     {
         float startVolume = player.MPTK_Volume;
@@ -1295,25 +1226,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
         }
 
         player.MPTK_Volume = 0f;
-    }
-    public void ApplyPhaseSeedOutcome(MazeArchetype nextPhase, List<InstrumentTrack> seeds)
-    {
-        var seedSet = new HashSet<InstrumentTrack>(seeds ?? new List<InstrumentTrack>());
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-            if (seedSet.Contains(t))
-                RemixSeedForPhase(t, nextPhase);     // keep + lightly remix for the new phase
-            else
-                ClearTrackForNewPhase(t);            // silence + clear objects so the new star can rebuild
-        }
-        ResetAllCursorsAndGuards(false);
-    }
-    public InstrumentTrack GetTrackByRole(MusicalRole role)
-    {
-        foreach (var t in tracks)
-            if (t.assignedRole == role) return t;
-        return null;
     }
     public void UpdateVisualizer()
     {
@@ -1334,7 +1246,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
             noteVisualizer.ForceSyncMarkersToPersistentLoop(track);
         }
     }
-
     private static int ComputeLoopHash(InstrumentTrack t)
     {
         if (t == null) return 0;
@@ -1354,7 +1265,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
             return h;
         }
     }
-
     public int GetMaxActiveLoopMultiplier()
     {
         if (tracks == null || tracks.Length == 0) return 1;
@@ -1416,7 +1326,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         return maxBins;
     }
-    
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)
@@ -1438,50 +1347,6 @@ public int GetBinForNextSpawn(InstrumentTrack track)
 
         
     }
-    private void ClearTrackForNewPhase(InstrumentTrack t)
-{
-    
-    // 2) Despawn/clear any lingering collectables/mined objects on this track
-    //    (prevents "already perfect" and stale rot artifacts)
-    if (t.spawnedCollectables != null)
-    {
-        for (int i = t.spawnedCollectables.Count - 1; i >= 0; i--)
-        {
-            var go = t.spawnedCollectables[i];
-            if (go) Destroy(go);
-            t.spawnedCollectables.RemoveAt(i);
-        }
-    }
-    
-    // 4) Optional: visual nudge (e.g., dim ribbon color for this track)
-    // NoteVisualizer can read t.IsMuted to dim rows, if you want.
-}
-    private void RemixSeedForPhase(InstrumentTrack t, MazeArchetype phase) {
-
-    // Nudge its pattern/behavior so the new phase has a recognizable seed
-    var ns = t.GetActiveNoteSet();
-    if (ns != null)
-    {
-        var (behavior, rhythm) = GetDefaultStyleForPhaseAndRole(phase, t.assignedRole);
-        ns.ChangeNoteBehavior(t, behavior);
-        ns.rhythmStyle = rhythm;
-
-        // Optional: quick spice if you’re re-integrating “remix boost”
-        // ns.RandomizeArpOrder();
-        // ns.ShiftOctave(phase == MazeArchetype.Intensify ? +1 : 0);
-    }
-
-    // Also clear old collectables to avoid stale rot on seeds
-    if (t.spawnedCollectables != null)
-    {
-        for (int i = t.spawnedCollectables.Count - 1; i >= 0; i--)
-        {
-            var go = t.spawnedCollectables[i];
-            if (go) Destroy(go);
-            t.spawnedCollectables.RemoveAt(i);
-        }
-    }
-}
     private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MazeArchetype phase, MusicalRole role) {
     switch (phase)
     {

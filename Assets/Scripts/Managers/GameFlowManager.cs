@@ -58,10 +58,7 @@ public class GameFlowManager : MonoBehaviour
     public DrumTrack activeDrumTrack;
     public CosmicDustGenerator dustGenerator;
     public SpawnGrid spawnGrid;
-      
-    public bool disableCoralDuringBridge = true;
     public NoteVisualizer noteViz;    // assign in scene
-    public GlitchManager glitch; // Assign dynamically if needed
     public PhaseTransitionManager phaseTransitionManager;
     
     public List<LocalPlayer> localPlayers = new();
@@ -93,16 +90,6 @@ public class GameFlowManager : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
     public bool GhostCycleInProgress { get; private set; }
     
-    // Bridge suppression: when true, tracks should not spawn collectables during bridge pending/in-progress.
-    public static bool ShouldSuppressCollectableSpawns
-    {
-        get
-        {
-            var gfm = Instance;
-            if (gfm == null) return false;
-            return gfm.suppressCollectableSpawnsDuringBridge && (gfm.BridgePending || gfm.GhostCycleInProgress);
-        }
-    }
     public void RegisterSpiralCoralRig(
         Transform rigRoot,
         SpiralCoralBaseBuilder baseBuilder,
@@ -198,40 +185,7 @@ public class GameFlowManager : MonoBehaviour
         }
         _bridgeHiddenRenderers.Clear();
     }
-    private void BuildSpiralCoralFromSnapshot(PhaseSnapshot snap)
-    {
-        if (snap == null) return;
-        if (!RefreshSpiralCoralRefs(force:false)) return;
-
-        // Make sure root is active before spawning
-        coralRoot.gameObject.SetActive(true);
-
-        // Optional clear if your scripts support it
-        spiralCoralBase.Clear();
-        spiralCoralGrower.Clear();
-
-        spiralCoralBase.BuildBase(snap);
-        spiralCoralGrower.BuildTracks(snap);
-    }
-
-    private bool RefreshSpiralCoralRefs(bool force = false)
-    {
-        if (!useSpiralCoralDuringBridge) return false;
-
-        if (!force && coralRoot != null && spiralCoralBase != null && spiralCoralGrower != null)
-            return true;
-
-        if (coralRoot == null) return false;
-
-        if (spiralCoralBase == null)
-            spiralCoralBase = coralRoot.GetComponentInChildren<SpiralCoralBaseBuilder>(true);
-
-        if (spiralCoralGrower == null)
-            spiralCoralGrower = coralRoot.GetComponentInChildren<SpiralCoralTrackGrower>(true);
-
-        return (spiralCoralBase != null && spiralCoralGrower != null);
-    }
-
+    
     public NoteSet GenerateNotes(InstrumentTrack track, int entropy = 0)
     {
         if (track == null) return null;
@@ -313,12 +267,6 @@ public class GameFlowManager : MonoBehaviour
         // No need to call PlayerInput.Instantiate — joining is handled by PlayerInputManager
         Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
     }
-    public void BeginPhaseBridge(MazeArchetype to, List<InstrumentTrack> perfectTracks, Color nextStarColor)
-{
-    Debug.Log($"[BRIDGE] Starting bridge for nextPhase={to.ToString() ?? "<null>"} at t={AudioSettings.dspTime:0.00}");
-    var sig = BridgeLibrary.For(phaseTransitionManager.currentPhase, to);
-    StartCoroutine(PlayPhaseBridge(sig, to));
-}
     public void CheckAllPlayersOutOfEnergy()
     {
         if (hasGameOverStarted) return;
@@ -365,7 +313,6 @@ public class GameFlowManager : MonoBehaviour
         controller             = null;
         dustGenerator          = null;
         spawnGrid              = null;
-        glitch                 = null;
         playerStatsGrid        = null;
 
         // 5) Load Main (Intro/Selection) scene.
@@ -587,15 +534,34 @@ public class GameFlowManager : MonoBehaviour
         Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
                   $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
 
-        // Show MotifCoralVisualizer for the hold duration.
-        // If no visualizer is assigned, still hold so the motif boundary feels intentional.
+        // Derive bridge duration from the actual musical loop length — same pattern as PlayPhaseBridge.
+        // This makes the coral grow animation span exactly one full loop replay.
+        float motifBridgeSec = (controller != null)
+            ? Mathf.Max(1f, controller.GetEffectiveLoopLengthInSeconds())
+            : Mathf.Max(1f, motifBridgeHoldSeconds);
+
+        Debug.Log($"[MOTIF-BRIDGE] Bridge duration: {motifBridgeSec:F2}s (motifBridgeHoldSeconds fallback={motifBridgeHoldSeconds})");
+
+        // Show MotifCoralVisualizer — grows over exactly one musical loop.
         if (motifCoralVisualizer != null)
         {
             motifCoralVisualizer.gameObject.SetActive(true);
+
+            // Fit coral to the live play area so it stays within the visible game space.
+            if (activeDrumTrack != null && activeDrumTrack.TryGetPlayAreaWorld(out var playArea))
+            {
+                motifCoralVisualizer.FitToPlayArea(
+                    playArea.width,
+                    playArea.height,
+                    (playArea.left + playArea.right) * 0.5f,
+                    (playArea.bottom + playArea.top) * 0.5f
+                );
+            }
+
             yield return StartCoroutine(
                 motifCoralVisualizer.GrowMotifCoral(
                     motifSnap,
-                    motifBridgeHoldSeconds,
+                    motifBridgeSec,
                     ReadAveragedSteer)
             );
             motifCoralVisualizer.gameObject.SetActive(false);
@@ -603,7 +569,7 @@ public class GameFlowManager : MonoBehaviour
         else
         {
             Debug.LogWarning("[MOTIF-BRIDGE] No MotifCoralVisualizer assigned — holding without visual.");
-            yield return new WaitForSeconds(motifBridgeHoldSeconds);
+            yield return new WaitForSeconds(motifBridgeSec);
         }
 
         // Advance motif — this calls BeginNewMotif() which clears track state.
@@ -613,92 +579,8 @@ public class GameFlowManager : MonoBehaviour
         GhostCycleInProgress = false;
         BridgePending = false;
     }
-
-private IEnumerator StartMazeAndStarForPhase_NoChapterReset(MazeArchetype phase)
-{
-    var drums = activeDrumTrack;
-    var dust  = dustGenerator;
-
-    if (drums == null)
-    {
-        Debug.LogWarning("[GFM] Cannot start maze: no DrumTrack.");
-        yield break;
-    }
-    if (dust == null)
-    {
-        Debug.LogWarning("[GFM] Cannot start maze: no CosmicDustGenerator.");
-        yield break;
-    }
-
-    // IMPORTANT:
-    // We intentionally DO NOT call phaseTransitionManager.StartChapter(...) here.
-    // We also intentionally DO NOT call PTM Apply/Commit functions here.
-    // The already-advanced PTM.currentMotif is the source of truth.
-
-    ResetPhaseBinStateAndGrid();
-
-    // Wait until SpawnGrid + camera exist (matches dust generator assumptions)
-    yield return new WaitUntil(() =>
-        drums.HasSpawnGrid() &&
-        drums.GetSpawnGridWidth() > 0 &&
-        drums.GetSpawnGridHeight() > 0 &&
-        Camera.main != null);
-
-    // Pick star cell
-    var starCell = drums.GetRandomAvailableCell();
-    if (starCell.x < 0)
-    {
-        Debug.LogWarning("[GFM] No available spawn cell for PhaseStar; aborting maze+star start.");
-        yield break;
-    }
-
-    // Gather vehicle cells (you already maintain _vehicleCellsScratch in Update)
-    // We still need a local snapshot of current cells for carving.
-    _vehicleCellsScratch.Clear();
-    if (vehicles != null && vehicles.Count > 0)
-    {
-        for (int i = 0; i < vehicles.Count; i++)
-        {
-            var v = vehicles[i];
-            if (v == null || !v.isActiveAndEnabled) continue;
-            _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
-        }
-    }
-    else
-    {
-        var vs = FindObjectsOfType<Vehicle>();
-        for (int i = 0; i < vs.Length; i++)
-        {
-            var v = vs[i];
-            if (v == null || !v.isActiveAndEnabled) continue;
-            _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
-        }
-    }
-
-    // Apply phase profile before maze generation (same guarantee as StartNextPhaseMazeAndStar).
-    var profileForPhase2 = drums.phasePersonalityRegistry != null
-        ? drums.phasePersonalityRegistry.Get(phase)
-        : null;
-    if (profileForPhase2 != null)
-        dust.ApplyProfile(profileForPhase2);
-
-    // Build maze
-    yield return StartCoroutine(
-        dust.GenerateMazeForPhaseWithPaths(
-            phase,
-            starCell,
-            _vehicleCellsScratch,
-            totalSpawnDuration: 1.0f
-        )
-    );
-
-    // Spawn PhaseStar (DrumTrack will read PTM.currentMotif when wiring the star)
-    drums.RequestPhaseStar(phase, starCell);
-
-    Debug.Log($"[GFM] Maze+Star (NO CHAPTER RESET): phase={phase} starCell={starCell} vehicles={_vehicleCellsScratch.Count} motif={(phaseTransitionManager && phaseTransitionManager.currentMotif ? phaseTransitionManager.currentMotif.motifId : "null")}");
-}
-
-private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
+    
+    private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
 {
     // ============================================================
     // RESPONSIBILITY: motif-level reset + motif advance decision
@@ -930,238 +812,6 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
         }
         return list;
     }
-
-    private IEnumerator PlayPhaseBridge(PhaseBridgeSignature sig, MazeArchetype nextPhase)
-{
-    // ===== Lock gameplay & prep =====
-    GhostCycleInProgress = true;
-    BridgePending = true;
-    FreezeGameplayForBridge();                      // despawn collectables, gate input
-
-    var drum = activeDrumTrack;
-    var viz  = noteViz;
-    var ctrl = controller;
-
-    float drumLoopSec = drum ? Mathf.Max(0.05f, drum.GetLoopLengthInSeconds()) : 4f;
-
-    // Stage harmony for NEXT phase silently (no audible retune yet)
-    var nextProf = GetProfileForPhase(nextPhase);
-    harmony?.SetActiveProfile(nextProf, applyImmediately: false);
-
-    if (sig.includeDrums && drum) drum.SetBridgeAccent(true);
-
-    // Snapshot track list
-    var allTracks = (ctrl && ctrl.tracks != null)
-        ? ctrl.tracks.Where(t => t != null).ToList()
-       : new List<InstrumentTrack>();
-    // ----------------------------------------------------------------------
-    // COMMIT MOTIF SNAPSHOT (for coral garden) BEFORE remix/drop/clear.
-    // This represents the completed motif that just ended.
-    // ----------------------------------------------------------------------
-    var motifSnapshot = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
-    // Preserve semantic phase identity for storage and later browsing.
-    motifSnapshot.Pattern = phaseTransitionManager != null ? phaseTransitionManager.currentPhase : MazeArchetype.Establish;
-    // Color is optional; set if you have a motif/phase color source.
-    // motifSnapshot.Color = <your phase color>;
-    _motifSnapshots.Add(motifSnapshot); 
-    ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
-    Debug.Log(
-        $"[CORAL STORE] snapshots={_motifSnapshots.Count} " +
-        $"totalNotes={_motifSnapshots.Sum(s => s.CollectedNotes.Count)}"
-    );
-
-    // Utility to compute how long "one full loop" is for a set of tracks
-    
-    int ComputeLeaderMulFor(IEnumerable<InstrumentTrack> set)
-    {
-        int maxMul = 1;
-        bool any = false;
-        foreach (var t in set)
-        {
-            if (!t) continue;
-            var notes = t.GetPersistentLoopNotes();
-            if (notes != null && notes.Count > 0)
-            {
-                any = true;
-                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
-            }
-        }
-        if (any) return maxMul;
-
-        // fallbacks (same as before)
-        foreach (var t in allTracks)
-        {
-            if (!t) continue;
-            var notes = t.GetPersistentLoopNotes();
-            if (notes != null && notes.Count > 0)
-                maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
-        }
-        return Mathf.Max(1, maxMul);
-    }
-    float LeaderLoopSecondsFor(IEnumerable<InstrumentTrack> set) => drumLoopSec * ComputeLeaderMulFor(set);
-
-    // A) Start bridge immediately on the long-loop boundary (no extra lap).
-    var activeNow = allTracks.Where(t => t.GetPersistentLoopNotes()?.Count > 0).ToList();
-
-    // ----------------------------------------------------------------------
-    // ----------------------------------------------------------------------
-    // B) No remixing: play the completed motif loop ONCE in cinematic mode
-    // ----------------------------------------------------------------------
-    activeNow = allTracks.Where(t => t != null && t.GetPersistentLoopNotes()?.Count > 0).ToList();
-
-    // "One full loop" is authoritative to the audio system's leader steps.
-    // Prefer controller.GetEffectiveLoopLengthInSeconds() (uses DrumTrack clip length + leaderSteps).
-    float bridgeOnceSec = (ctrl != null)
-        ? Mathf.Max(0.05f, ctrl.GetEffectiveLoopLengthInSeconds())
-        : LeaderLoopSecondsFor(activeNow.Count > 0 ? activeNow : allTracks);
-
-    SetBridgeCinematicMode(true);
-
-    // ----------------------------------------------------------------------
-    // C) Play the REMIXED bridge ONCE while showing only CORAL
-    // ----------------------------------------------------------------------
-    if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(false);
-// --- Spiral Coral: show completed motif sculpture during the bridge ---
-    PhaseSnapshot bridgeSnap = null;
-
-    if (useSpiralCoralDuringBridge && HasSpiralRig())
-    {
-        // Use the motif snapshot you just committed (represents the completed motif that ended).
-        bridgeSnap = motifSnapshot;
-
-        // IMPORTANT: ensure Color is set if you want phase tint.
-        // Right now you're setting Pattern below; set Color from whatever your phase palette is.
-        // bridgeSnap.Color = <phase/maze dust color for bridgeSnap.Pattern>;
-
-        coralRoot.gameObject.SetActive(true);
-
-        spiralCoralBase.Clear();
-        spiralCoralGrower.Clear();
-
-        spiralCoralBase.BuildBase(motifSnapshot);
-
-        // Animated grow: notes bloom one by one in step order, player stick steers the sculpture.
-        // This coroutine holds for exactly bridgeOnceSec internally, so we do NOT add a separate
-        // WaitForSeconds — the timing below still anchors the outer fade correctly.
-        if (fadeSpiralCoralDuringBridge && coralRoot != null)
-        {
-            yield return StartCoroutine(
-                FadeSpiralCoralAlpha(coralRoot, spiralCoralFadeTarget, Mathf.Min(0.25f, bridgeOnceSec * 0.25f))
-            );
-        }
-
-        yield return StartCoroutine(
-            spiralCoralGrower.GrowTracksAnimated(motifSnapshot, bridgeOnceSec, ReadAveragedSteer)
-        );
-    }
-    else
-    {
-        // No spiral rig — still hold for exactly one loop so audio completes.
-        float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
-        yield return new WaitForSeconds(Mathf.Max(0f, bridgeOnceSec - fadeOutSec));
-        yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
-    }
-
-    // After GrowTracksAnimated (or the plain wait), fade audio if we used the coral path.
-    if (useSpiralCoralDuringBridge && HasSpiralRig())
-    {
-        float fadeOutSec = Mathf.Clamp(phaseBridgeFadeOutSeconds, 0.05f, bridgeOnceSec);
-        yield return StartCoroutine(FadeOutBridgeAudio(allTracks, drum, fadeOutSec));
-    }
-
-    // --- Spiral coral: fade out + hide after bridge ---
-    if (useSpiralCoralDuringBridge && sig.growCoral && coralRoot != null)
-    {
-        if (fadeSpiralCoralDuringBridge)
-            yield return StartCoroutine(FadeSpiralCoralAlpha(coralRoot, 0f, Mathf.Min(0.25f, bridgeOnceSec * 0.25f)));
-
-        coralRoot.gameObject.SetActive(false);
-    }
-
-
-    // ----------------------------------------------------------------------
-    // D) Clear all tracks, then EITHER:
-    //    - In demoMode: return to Main (no next phase),
-    //    - Or in full game: seed & start next phase as before.
-    // ----------------------------------------------------------------------
-    var stillActive = new List<InstrumentTrack>();
-    foreach (var t in allTracks)
-    {
-        var notes = t.GetPersistentLoopNotes();
-        if (notes != null && notes.Count > 0) stillActive.Add(t);
-    }
-    foreach (var t in stillActive)
-        t.ClearLoopedNotes();
-
-        // Reset bin/loop-width state so the next motif does not inherit multi-bin UI/loop spans.
-        // (We keep note content cleared above; this is strictly about loopMultiplier/bin cursors/fill flags.)
-        if (controller != null)
-            controller.ResetControllerBinGuards(); 
-        
-        controller.BeginNewMotif();
-        
-        foreach (var t in allTracks)
-            if (t != null)
-                t.ResetBinsForPhase();
-
-        if (activeDrumTrack != null)
-            activeDrumTrack.SetBinCount(1);
-
-        if (viz != null)
-            viz.ConfigureBinStrip(1);
-
-//        if (coral != null) coral.gameObject.SetActive(false);
-            // Keep cinematic mode active until the next phase maze/star are ready to avoid visual flash.
-
-            // ========= DEMO SHORT-CIRCUIT =========
-    if (demoMode) {
-        // tidy up bridge accent / flags
-        if (sig.includeDrums && drum) drum.SetBridgeAccent(false);
-        GhostCycleInProgress = false;
-        BridgePending = false;
-        SetBridgeVisualMode(false);
-        // Go back to the starting screen (Main) and clear players.
-        // This uses your existing path.
-        QuitToSelection(); 
-        yield break;
-    }
-            // ========= END DEMO SHORT-CIRCUIT =========
-
-            
-            // Commit the staged harmony profile now that the outgoing motif has faded.
-            // This ensures the next phase begins with the correct progression without an audible retune mid-bridge.
-        harmony?.CommitNextChordNow(); // commit staged motif chord profile on next downbeat
-    // Seeds / visibility for the next phase (full game path)
-        var seeds = PickSeeds(allTracks, sig.seedTrackCountNextPhase, sig.preferredSeedRoles);
-        controller?.ApplyPhaseSeedOutcome(nextPhase, seeds);
-        controller?.ApplySeedVisibility(seeds);
-        ResetPhaseBinStateAndGrid();
-
-        if (activeDrumTrack != null)
-        {
-            // New path: start next phase maze & PhaseStar, carving corridors from
-    // the current Vehicle positions to the star cell.
-    dustGenerator.activeDustRoot.gameObject.SetActive(true);
-    yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase));
-    // Now that the new phase geometry/star exist, we can safely restore visuals without a flash.
-    SetBridgeCinematicMode(false);
-   if (viz && viz.GetUIParent()) viz.GetUIParent().gameObject.SetActive(true);
-        // Bring audio back for the new motif.
-        StartCoroutine(FadeInBridgeAudio(allTracks, drum, phaseBridgeFadeInSeconds)); 
-        }
-        else {
-                Debug.LogWarning("[BRIDGE] No DrumTrack available after bridge; cannot start next phase star."); 
-        } 
-        if (sig.includeDrums && drum) drum.SetBridgeAccent(false); 
-    GhostCycleInProgress = false;
-    BridgePending = false;
-    SetBridgeVisualMode(false);
-}
-    /// <summary>
-    /// Scene authority pass: ensure any standalone MidiVoice (e.g., SoloVoice FX) has an active DrumTrack reference.
-    /// InstrumentTrack already binds its own MidiVoice in Awake; this is for voices outside that pipeline.
-    /// </summary>
-
     private void BindSceneVoicesToTimingAuthority()
     {
         if (activeDrumTrack == null) return;
@@ -1194,9 +844,7 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
             // (If drumTrack is [SerializeField], you can add a setter later if needed.)
         }
     }
-
-    
-       private static Color QuantizeToColor32(Color c)
+    private static Color QuantizeToColor32(Color c)
     {
         Color32 cc = (Color32)c;
         return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
@@ -1233,26 +881,28 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
             Color c       = QuantizeToColor32(ResolveTrackColor(track));
             int   binSize = Mathf.Max(1, track.BinSize());
 
-            // Build per-bin template step sets so we can classify each collected note as matched/unmatched.
-            // Key: binIndex → HashSet of local steps (0..binSize-1) that are authored in the template.
-            var templateStepsByBin = new Dictionary<int, HashSet<int>>();
+            // Build per-bin template: step → authored note (for full matched check).
+            // A note is "matched" only if the player hit the correct beat AND the correct pitch.
+            var templateNoteByBinStep = new Dictionary<int, Dictionary<int, int>>(); // binIndex → (localStep → note)
             for (int b = 0; b < track.maxLoopMultiplier; b++)
             {
                 var ns = track.GetNoteSetForBin(b);
                 if (ns?.persistentTemplate == null) continue;
-                var set = new HashSet<int>();
+                var stepNoteMap = new Dictionary<int, int>();
                 foreach (var t in ns.persistentTemplate)
-                    set.Add(t.step); // template steps are bin-local (0..binSize-1)
-                templateStepsByBin[b] = set;
+                    stepNoteMap[t.step] = t.note; // template steps are bin-local (0..binSize-1)
+                templateNoteByBinStep[b] = stepNoteMap;
             }
 
             // Emit NoteEntries with BinIndex and IsMatched populated.
+            // IsMatched = player hit the authored step AND played the authored note at that step.
             foreach (var n in notes.OrderBy(n => n.stepIndex))
             {
                 int binIndex  = n.stepIndex / binSize;
                 int localStep = n.stepIndex % binSize;
-                bool isMatched = templateStepsByBin.TryGetValue(binIndex, out var templateSet)
-                                 && templateSet.Contains(localStep);
+                bool isMatched = templateNoteByBinStep.TryGetValue(binIndex, out var stepNoteMap)
+                                 && stepNoteMap.TryGetValue(localStep, out int authoredNote)
+                                 && n.note == authoredNote;
 
                 snapshot.CollectedNotes.Add(new PhaseSnapshot.NoteEntry(
                     step:       n.stepIndex,
@@ -1268,9 +918,8 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
             int allocatedBins = Mathf.Max(1, track.loopMultiplier);
             for (int b = 0; b < allocatedBins; b++)
             {
-                // Collect steps for this bin from persistentLoopNotes
                 var binNotes = notes.Where(n => n.stepIndex / binSize == b).ToList();
-                templateStepsByBin.TryGetValue(b, out var tplSet);
+                templateNoteByBinStep.TryGetValue(b, out var tplMap);
 
                 int matched   = 0;
                 int unmatched = 0;
@@ -1279,7 +928,10 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
                 {
                     int localStep = n.stepIndex % binSize;
                     collectedSteps.Add(localStep);
-                    if (tplSet != null && tplSet.Contains(localStep)) matched++;
+                    bool noteMatched = tplMap != null
+                                       && tplMap.TryGetValue(localStep, out int authoredNote)
+                                       && n.note == authoredNote;
+                    if (noteMatched) matched++;
                     else unmatched++;
                 }
 
@@ -1305,179 +957,10 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
                   $"totalSteps={snapshot.TotalSteps} rootMidi={snapshot.MotifKeyRootMidi}");
         return snapshot;
     }
-
-    private IEnumerator AnimateCoralBridge(CoralVisualizer coral, PhaseSnapshot snapshot, float bridgeDurationSec)
-    {
-        // Always hold exactly one loop worth of time (audio is authoritative)
-        float dur = Mathf.Max(0.05f, bridgeDurationSec);
-
-        if (!coral)
-        {
-            yield return new WaitForSeconds(dur);
-            yield break;
-        }
-
-        // If there are no notes, still show the coral object (core) and rotate for the loop.
-        bool hasNotes = snapshot != null &&
-                        snapshot.CollectedNotes != null &&
-                        snapshot.CollectedNotes.Count > 0;
-
-        // 1) Force the coral growth animation to span the entire bridge loop.
-        // This is the main fix for “animation is really fast.”
-        if (coral.style != null)
-            coral.style.growSeconds = dur;
-
-        // 2) Start the growth render
-        if (hasNotes)
-            coral.RenderPhaseCoral(snapshot, CoralState.Drawing);
-        else
-            coral.RenderPhaseCoral(snapshot, CoralState.Rendered);
-
-        // 3) Rotate only the coral for the entire loop
-        // (rotation speed can be tuned; start with something readable and calm)
-        float degPerSec = 28f;
-
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-
-            // rotate around world Y so it reads as a sculpture turning on display
-            coral.transform.Rotate(0f, degPerSec * Time.deltaTime, 0f, Space.World);
-
-            yield return null;
-        }
-    }
-
-    private IEnumerator FadeOutBridgeAudio(List<InstrumentTrack> tracks, DrumTrack drum, float durationSeconds)
-    {
-        float dur = Mathf.Max(0.01f, durationSeconds);
-
-        // Cache starting volumes so we can restore/fade-in for the next motif.
-        _bridgeMidiStartVolumes.Clear();
-
-        if (tracks != null)
-        {
-            foreach (var t in tracks)
-            {
-                if (t == null) continue;
-                var player = t.midiStreamPlayer;
-                if (player == null) continue;
-
-                // Note: MPTK_Volume is expected to be 0..1.
-                _bridgeMidiStartVolumes[t] = player.MPTK_Volume;
-            }
-        }
-
-        float drumStart = 1f;
-        if (drum != null && drum.drumAudioSource != null)
-            drumStart = drum.drumAudioSource.volume;
-        _bridgeDrumStartVolume = drumStart;
-        float elapsed = 0f;
-        while (elapsed < dur)
-        {
-            elapsed += Time.deltaTime;
-            float k = Mathf.Clamp01(elapsed / dur);
-
-            // Instruments
-            foreach (var kvp in _bridgeMidiStartVolumes)
-            {
-                var t = kvp.Key;
-                if (t == null) continue;
-                var player = t.midiStreamPlayer;
-                if (player == null) continue;
-
-                player.MPTK_Volume = Mathf.Lerp(kvp.Value, 0f, k);
-            }
-
-            // Drums
-            if (drum != null && drum.drumAudioSource != null)
-                drum.drumAudioSource.volume = Mathf.Lerp(drumStart, 0f, k);
-
-            yield return null;
-        }
-
-        // Hard-set to silence to avoid residual.
-        foreach (var kvp in _bridgeMidiStartVolumes)
-        {
-            var t = kvp.Key;
-            if (t == null) continue;
-            var player = t.midiStreamPlayer;
-            if (player != null) player.MPTK_Volume = 0f;
-        }
-        if (drum != null && drum.drumAudioSource != null)
-            drum.drumAudioSource.volume = 0f;
-    }
-
-    private IEnumerator FadeInBridgeAudio(List<InstrumentTrack> tracks, DrumTrack drum, float durationSeconds)
-    {
-        float dur = Mathf.Max(0.01f, durationSeconds);
-// Use cached pre-fade value so we don't fade back to 0 forever.
-        float drumTarget = Mathf.Max(0f, _bridgeDrumStartVolume);
-        if (drumTarget <= 0.0001f) drumTarget = 1f;
-
-        // Determine per-track targets.
-        var targets = new Dictionary<InstrumentTrack, float>();
-        if (tracks != null)
-        {
-            foreach (var t in tracks)
-            {
-                if (t == null) continue;
-                var player = t.midiStreamPlayer;
-                if (player == null) continue;
-
-                float target = 1f;
-                if (_bridgeMidiStartVolumes.TryGetValue(t, out var cached))
-                    target = cached;
-
-                targets[t] = target;
-
-                // Ensure we're starting at silence.
-                player.MPTK_Volume = 0f;
-            }
-        }
-
-        // Ensure drums start at silence.
-        if (drum != null && drum.drumAudioSource != null)
-            drum.drumAudioSource.volume = 0f;
-
-        float elapsed = 0f;
-        while (elapsed < dur)
-        {
-            elapsed += Time.deltaTime;
-            float k = Mathf.Clamp01(elapsed / dur);
-
-            foreach (var kvp in targets)
-            {
-                var t = kvp.Key;
-                if (t == null) continue;
-                var player = t.midiStreamPlayer;
-                if (player == null) continue;
-
-                player.MPTK_Volume = Mathf.Lerp(0f, kvp.Value, k);
-            }
-
-            if (drum != null && drum.drumAudioSource != null)
-                drum.drumAudioSource.volume = Mathf.Lerp(0f, drumTarget, k);
-
-            yield return null;
-        }
-
-        foreach (var kvp in targets)
-        {
-            var t = kvp.Key;
-            if (t == null) continue;
-            var player = t.midiStreamPlayer;
-            if (player != null) player.MPTK_Volume = kvp.Value;
-        }
-        if (drum != null && drum.drumAudioSource != null)
-            drum.drumAudioSource.volume = drumTarget;
-    }
-
-
-/// <summary>
-/// Adapter to obtain the per-track color for snapshot entries.
-/// </summary>
+    
+    /// <summary>
+    /// Adapter to obtain the per-track color for snapshot entries.
+    /// </summary>
     private Color ResolveTrackColor(InstrumentTrack t)
 {
     // Per your API: InstrumentTrack.trackColor
@@ -1504,7 +987,7 @@ private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
     {
         StartCoroutine(StartNextPhaseMazeAndStar(phase));
     }
-private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHardReset = true)
+    private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHardReset = true)
 {
     // ============================================================
     // RESPONSIBILITY: chapter wiring + maze rebuild + PhaseStar spawn
@@ -1703,7 +1186,6 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
         controller             = a.controller;
         dustGenerator          = a.dustGenerator;
         spawnGrid              = a.spawnGrid;          // <- now reliably assigned
-        glitch                 = a.glitchManager;      // <- now reliably assigned
         Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
         BindSceneVoicesToTimingAuthority();
     }
@@ -1717,10 +1199,8 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
         if (controller             == a.controller)             controller             = null;
         if (dustGenerator          == a.dustGenerator)          dustGenerator          = null;
         if (spawnGrid              == a.spawnGrid)              spawnGrid              = null;
-        if (glitch                 == a.glitchManager)          glitch                 = null;
     }
     
-
     // Destroys any lingering note tether GameObjects (including inactive) so they never persist across phases.
     // We key off name and component type to be resilient to prefab/script renames.
     private void CleanupAllNoteTethers()

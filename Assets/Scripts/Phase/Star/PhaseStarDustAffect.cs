@@ -5,7 +5,7 @@ using UnityEngine.Pool;
 [DisallowMultipleComponent]
 public sealed class PhaseStarDustAffect : MonoBehaviour
 {
-    [Header("Star Keep-Clear (Option A: no destruction)")]
+    [Header("Star Keep-Clear")]
     [SerializeField] private float keepClearTick = 0.10f; // seconds between updates (cheap)
 
     private float _timer;

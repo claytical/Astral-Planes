@@ -30,13 +30,7 @@ public sealed class CosmicDustTintDiffusionSystem
         _getDustOrNull = getDustOrNull ?? throw new ArgumentNullException(nameof(getDustOrNull));
         _getCellVisualColor = getCellVisualColor ?? throw new ArgumentNullException(nameof(getCellVisualColor));
     }
-
-    public void Clear()
-    {
-        _dirtyQueue.Clear();
-        _dirtySet.Clear();
-        _accum = 0f;
-    }
+    
 
     public void MarkDirty(Vector2Int center, int radius)
     {

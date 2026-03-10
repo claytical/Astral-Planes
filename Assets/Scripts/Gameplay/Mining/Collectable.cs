@@ -12,11 +12,8 @@ public class Collectable : MonoBehaviour
     // ---- Dust collision tuning ----
     public float dustCollisionEnterImpulse = 0.85f;
     public float dustCollisionStayForce = 2.25f;
-    public float dustEscapeCooldownSeconds = 0.35f;
-    private float _dustEscapeCooldown;
     private bool _hasDesiredGridTarget; 
     public int intendedBin = -1;
-    private Vector2Int _desiredGridTarget;
 
 // ---- Dust pocket (collectable visibility) ----
     [Header("Dust Pocket (Visibility)")]
@@ -59,11 +56,9 @@ public class Collectable : MonoBehaviour
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
     public NoteTether tether;               // runtime
-    private bool awaitingPulse = false;
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
     private bool isInitialized = false;
-    private bool reachedDestination = false;
 // Carry-as-child (school run) tuning
     [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, 0.65f, 0f);
     [SerializeField] private float carryLocalOffsetJitter = 0.05f; // optional tiny wobble
@@ -118,7 +113,6 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float carryOrbitVerticalBias = 0.05f; // small upward bias so it reads above vehicle
 
     private int _carryOrbitIndex = -1;
-    private float _carryOrbitPhaseOffset;
     private bool _registeredInCarryOrbit;
 
 // Vehicle transform -> carried collectables (for spacing)
@@ -161,7 +155,6 @@ public class Collectable : MonoBehaviour
     private Vector3 _trailBaseScale;
     private bool _trailBaseScaleCaptured;
     private float _trailDriftPhase;      // randomised per-instance so collectables don't orbit in sync
-    private Vector3 _trailDriftVelocity; // soft-body spring velocity for the drift offset
     bool _hasReservation;
     public bool ReportedCollected { get; private set; }
 
@@ -190,16 +183,6 @@ public class Collectable : MonoBehaviour
     private float _speed;
     private System.Random _rng;       // deterministic per-track/per-note
 
-    static bool IsCellOccupiedByOther(Vector2Int cell, Collectable self)
-    {
-        if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null && occ != self) return true;
-        return false;
-    }
-    public void SetCollector(Transform collector)
-    {
-        _collector = collector;
-    }
-// Collectable.cs
     public void OnManualReleaseDiscarded()
     {
         // stop trail follow
@@ -234,7 +217,7 @@ public class Collectable : MonoBehaviour
         Destroy(gameObject);
     }
 
-  private void TryBindLoopBoundary()
+    private void TryBindLoopBoundary()
 {
     if (!useLoopBoundaryIdea) return;
     if (assignedInstrumentTrack == null) return;
@@ -252,82 +235,82 @@ public class Collectable : MonoBehaviour
     _boundDrumTrack.OnLoopBoundary += HandleLoopBoundaryIdea;
 }
 
-private void UnbindLoopBoundary()
-{
-    if (_boundDrumTrack != null)
-        _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
+    private void UnbindLoopBoundary()
+    {
+        if (_boundDrumTrack != null)
+            _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
 
-    _boundDrumTrack = null;
-}
+        _boundDrumTrack = null;
+    }
 
-private void HandleLoopBoundaryIdea()
-{
-    if (!useLoopBoundaryIdea) return;
-    if (_inCarry) return;
+    private void HandleLoopBoundaryIdea()
+    {
+        if (!useLoopBoundaryIdea) return;
+        if (_inCarry) return;
 
-    var gfm = GameFlowManager.Instance;
-    var dustGen = (gfm != null) ? gfm.dustGenerator : null;
-    var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
-    if (dustGen == null || dt == null) return;
+        var gfm = GameFlowManager.Instance;
+        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+        var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
+        if (dustGen == null || dt == null) return;
 
-    Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
+        Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
 
-    _ideaDir = ChooseIdeaDirection(cur, dt, dustGen, Mathf.Max(1, ideaLookaheadCells));
-    if (_ideaDir.sqrMagnitude < 0.0001f)
-        _ideaDir = UnityEngine.Random.insideUnitCircle.normalized;
-}
+        _ideaDir = ChooseIdeaDirection(cur, dt, dustGen, Mathf.Max(1, ideaLookaheadCells));
+        if (_ideaDir.sqrMagnitude < 0.0001f)
+            _ideaDir = UnityEngine.Random.insideUnitCircle.normalized;
+    }
 
-private static readonly Vector2Int[] kDirs8 = new Vector2Int[]
-{
-    new Vector2Int( 1, 0),
-    new Vector2Int(-1, 0),
-    new Vector2Int( 0, 1),
-    new Vector2Int( 0,-1),
-    new Vector2Int( 1, 1),
-    new Vector2Int( 1,-1),
-    new Vector2Int(-1, 1),
-    new Vector2Int(-1,-1),
-};
+    private static readonly Vector2Int[] kDirs8 = new Vector2Int[]
+    {
+        new Vector2Int( 1, 0),
+        new Vector2Int(-1, 0),
+        new Vector2Int( 0, 1),
+        new Vector2Int( 0,-1),
+        new Vector2Int( 1, 1),
+        new Vector2Int( 1,-1),
+        new Vector2Int(-1, 1),
+        new Vector2Int(-1,-1),
+    };
 
-private static double NextDepositDspForBaseStep(
-    double loopStartDsp,
-    double loopLen,
-    int baseSteps,
-    int targetBaseStep,
-    double dspNow,
-    double eps = 0.010)
-{
-    baseSteps = Mathf.Max(1, baseSteps);
-    targetBaseStep = ((targetBaseStep % baseSteps) + baseSteps) % baseSteps;
+    private static double NextDepositDspForBaseStep(
+        double loopStartDsp,
+        double loopLen,
+        int baseSteps,
+        int targetBaseStep,
+        double dspNow,
+        double eps = 0.010)
+    {
+        baseSteps = Mathf.Max(1, baseSteps);
+        targetBaseStep = ((targetBaseStep % baseSteps) + baseSteps) % baseSteps;
 
-    // Which loop are we currently in since loopStart?
-    double loopsSince = (dspNow - loopStartDsp) / loopLen;
-    long curLoopIndex = (long)Math.Floor(loopsSince);
-    if (curLoopIndex < 0) curLoopIndex = 0;
+        // Which loop are we currently in since loopStart?
+        double loopsSince = (dspNow - loopStartDsp) / loopLen;
+        long curLoopIndex = (long)Math.Floor(loopsSince);
+        if (curLoopIndex < 0) curLoopIndex = 0;
 
-    // Position inside current loop [0..loopLen)
-    double tPos = (dspNow - loopStartDsp) - (curLoopIndex * loopLen);
-    tPos %= loopLen;
-    if (tPos < 0) tPos += loopLen;
+        // Position inside current loop [0..loopLen)
+        double tPos = (dspNow - loopStartDsp) - (curLoopIndex * loopLen);
+        tPos %= loopLen;
+        if (tPos < 0) tPos += loopLen;
 
-    double stepDur = loopLen / baseSteps;
+        double stepDur = loopLen / baseSteps;
 
-    // Current step index (floor)
-    int curStep = (int)Math.Floor(tPos / stepDur);
-    curStep = Math.Clamp(curStep, 0, baseSteps - 1);
+        // Current step index (floor)
+        int curStep = (int)Math.Floor(tPos / stepDur);
+        curStep = Math.Clamp(curStep, 0, baseSteps - 1);
 
-    // If target step is still ahead in this loop, use this loop; otherwise next loop.
-    long depositLoopIndex = curLoopIndex + ((targetBaseStep <= curStep) ? 1 : 0);
+        // If target step is still ahead in this loop, use this loop; otherwise next loop.
+        long depositLoopIndex = curLoopIndex + ((targetBaseStep <= curStep) ? 1 : 0);
 
-    double deposit = loopStartDsp + depositLoopIndex * loopLen + targetBaseStep * stepDur;
+        double deposit = loopStartDsp + depositLoopIndex * loopLen + targetBaseStep * stepDur;
 
-    // Ensure it's safely in the future
-    while (deposit <= dspNow + eps)
-        deposit += loopLen;
+        // Ensure it's safely in the future
+        while (deposit <= dspNow + eps)
+            deposit += loopLen;
 
-    return deposit;
-}
-private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen, int lookaheadCells)
+        return deposit;
+    }
+    private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen, int lookaheadCells)
 {
     int w = dt.GetSpawnGridWidth();
     int h = dt.GetSpawnGridHeight();
@@ -374,8 +357,6 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
     if (wdir.sqrMagnitude > 0f) wdir.Normalize();
     return wdir;
 }
-
-
     private void StartDustPocket()
     {
         if (!keepDustPocketOpen) return;
@@ -383,7 +364,6 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         if (_dustPocketRoutine != null) return;
         _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
     }
-
     private void StopDustPocket()
     {
         if (_dustPocketRoutine != null)
@@ -392,18 +372,12 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
             _dustPocketRoutine = null;
         }
     }
-    public void SetDesiredGridTarget(Vector2Int gridPos) {
-        _desiredGridTarget = gridPos; 
-        _hasDesiredGridTarget = true;
-    }
     private bool IsInsideDustStable(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen)
     {
         if (dt == null || dustGen == null) return IsPositionInsideDust(worldPos); // fallback if you must
         Vector2Int gp = dt.WorldToGridPosition(worldPos);
         return dustGen.HasDustAt(gp);
     }
-
-
     private void StartDustPocketRoutineIfNeeded()
     {
         if (!keepDustPocketOpen) return;
@@ -411,7 +385,6 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         if (_dustPocketRoutine != null) return;
         _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
     }
-
     private void StopDustPocketRoutineIfRunning()
     {
         if (_dustPocketRoutine == null) return;
@@ -518,22 +491,7 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
 
         _hasReservation = false;
     }
-
-    bool TryReserveCell(Vector2Int cell)
-    {
-        lock (_lock)
-        {
-            if (IsCellOccupiedByOther(cell, this)) return false;
-            if (IsCellReservedByOther(cell, this)) return false;
-
-            _reservedByCell[cell] = this;
-        }
-
-        _reservedCell = cell;
-        _hasReservation = true;
-        return true;
-    }
-
+    
     // Small helper: normalize duration ticks (large => slow)
     private float Duration01()
     {
@@ -542,30 +500,11 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         // map: 1  -> 0 (short/fast)   16 -> 1 (long/slow)
         return (t - 1f) / 15f;
     }
-    
-    public static bool IsCellFree(Vector2Int cell)
-    {
-        lock (_lock)
-        {
-            if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null) return false;
-            if (_reservedByCell.TryGetValue(cell, out var res) && res != null) return false;
-            return true;
-        }
-    }
-
-
     private float ComputeMoveSpeed()
     {
         // Invert so long notes are slow: v = lerp(maxSpeed -> minSpeed, duration01)
         float d = Duration01();
         return Mathf.Lerp(maxSpeed, minSpeed, d);
-    }
-
-    private float ComputeLingerSeconds()
-    {
-        // More linger for long notes
-        float d = Duration01();
-        return Mathf.Lerp(lingerShortNote, lingerLongNote, d);
     }
 
     // stable seed so different InstrumentTracks exhibit slightly different “turn biases”
@@ -579,7 +518,6 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
             return (a * 486187739) ^ (b * 1009) ^ (c * 9176);
         }
     }
-
     private bool IsPositionInsideDust(Vector2 worldPos) {
                 // Robust: if ClosestPoint == query point, we are inside that collider.
         var hits = Physics2D.OverlapCircleAll(worldPos, dustAdjacencyProbe); 
@@ -591,33 +529,11 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
         } 
         return false;
     }
-
-    private bool IsAdjacentToDust(Vector2 worldPos) { 
-        // Near an edge but not inside: distance-to-edge within ring.
-        var hits = Physics2D.OverlapCircleAll(worldPos, dustAdjacencyProbe * 1.35f); 
-        for (int i = 0; i < hits.Length; i++) { 
-            var dust = hits[i] ? hits[i].GetComponent<CosmicDust>() : null; 
-            if (!dust) continue; 
-            Vector2 cp = hits[i].ClosestPoint(worldPos); 
-            float d = (cp - worldPos).magnitude; 
-            if (d > 0.02f && d <= dustAdjacencyProbe) return true; // edge ring
-        }
-        return false;
-    }
-
-    private IEnumerable<Vector2Int> FourNeighbors(Vector2Int g) {
-        yield return new Vector2Int(g.x + 1, g.y);
-        yield return new Vector2Int(g.x - 1, g.y);
-        yield return new Vector2Int(g.x, g.y + 1);
-        yield return new Vector2Int(g.x, g.y - 1);
-    }
-    
     private IEnumerator MovementRoutine()
 {
     if (!_rb && !TryGetComponent(out _rb)) yield break;
 
     _speed = ComputeMoveSpeed();
-    const float TURB_STEP_SCALE = 0.35f;  // tune
     // Optional: trapped drift damping so notes don't "skate through dust"
     const float TRAPPED_DRIFT_MUL = 0.35f; // could be a serialized field if desired
 
@@ -989,15 +905,15 @@ private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGe
     if (tether) Destroy(tether.gameObject);
     Destroy(gameObject);
 } 
-public void BeginCarryThenDepositAtDsp(
-    double depositDspTime,
-    int durationTicks,
-    float force,
-    Action onArrived)
-{
-    if (_carryRoutine != null) StopCoroutine(_carryRoutine);
-    _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
-}
+    public void BeginCarryThenDepositAtDsp(
+        double depositDspTime,
+        int durationTicks,
+        float force,
+        Action onArrived)
+    {
+        if (_carryRoutine != null) StopCoroutine(_carryRoutine);
+        _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
+    }
 
     private IEnumerator PulseEnergySprite()
     {
@@ -1097,9 +1013,6 @@ public void BeginCarryThenDepositAtDsp(
 
             away.Normalize();
             _rb.AddForce(away * dustCollisionEnterImpulse, ForceMode2D.Impulse);
-
-            // Prevent rapid-fire escape impulses in the movement loop.
-            _dustEscapeCooldown = dustEscapeCooldownSeconds;
         }
     }
 
@@ -1127,276 +1040,208 @@ public void BeginCarryThenDepositAtDsp(
         }
     }
 
-private void RegisterCarryOrbit()
-{
-    if (_collector == null || _registeredInCarryOrbit) return;
-
-    if (!_carryOrbitByCollector.TryGetValue(_collector, out var list) || list == null)
+    private void RegisterCarryOrbit()
     {
-        list = new List<Collectable>();
-        _carryOrbitByCollector[_collector] = list;
-    }
+        if (_collector == null || _registeredInCarryOrbit) return;
 
-    if (!list.Contains(this))
-        list.Add(this);
-
-    _registeredInCarryOrbit = true;
-    _carryOrbitPhaseOffset = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-
-    RefreshCarryOrbitIndices(_collector);
-}
-
-private void UnregisterCarryOrbit()
-{
-    if (_collector == null || !_registeredInCarryOrbit) return;
-
-    if (_carryOrbitByCollector.TryGetValue(_collector, out var list) && list != null)
-    {
-        list.Remove(this);
-
-        if (list.Count == 0)
-            _carryOrbitByCollector.Remove(_collector);
-        else
-            RefreshCarryOrbitIndices(_collector);
-    }
-
-    _registeredInCarryOrbit = false;
-    _carryOrbitIndex = -1;
-}
-
-private static void RefreshCarryOrbitIndices(Transform collector)
-{
-    if (collector == null) return;
-    if (!_carryOrbitByCollector.TryGetValue(collector, out var list) || list == null) return;
-
-    // Compact and re-index so orbit slots are stable and evenly spaced
-    for (int i = list.Count - 1; i >= 0; i--)
-        if (list[i] == null) list.RemoveAt(i);
-
-    for (int i = 0; i < list.Count; i++)
-        if (list[i] != null) list[i]._carryOrbitIndex = i;
-}
-
-private Vector3 ComputeCarryOrbitTargetWorld()
-{
-    if (_collector == null) return transform.position;
-
-    int count = 1;
-    if (_carryOrbitByCollector.TryGetValue(_collector, out var list) && list != null)
-        count = Mathf.Max(1, list.Count);
-
-    // Even angular distribution around the vehicle
-    float slotAngle = (Mathf.PI * 2f) * (_carryOrbitIndex / (float)count);
-
-    // Rotate over time for “orbit” feel
-    float t = Time.time;
-    float angle = _carryOrbitPhaseOffset + slotAngle + t * carryOrbitAngularSpeed;
-
-    Vector3 center = _collector.position;
-    Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * carryOrbitRadius;
-
-    // Optional readability bias (slightly above the vehicle)
-    offset.y += carryOrbitVerticalBias;
-
-    return center + offset;
-}
-
-
-/// <summary>
-/// Compute normalized ribbon X (0..1) for the ribbonMarker against the ribbon UI width.
-/// This is the “visual truth” that the playhead line is moving across.
-/// </summary>
-// ---- Note Trail API (called each frame by Vehicle) ----
-
-/// <summary>Sets the world-space target position for this note in the vehicle trail.</summary>
-public void SetTrailTarget(Vector3 worldPos)
-{
-    _trailWorldTarget = worldPos;
-}
-
-/// <summary>
-/// Drives the visual urgency of this note (0 = just collected, 1 = release imminent).
-/// The note pulses and brightens as the value approaches 1.
-/// </summary>
-public void SetReleasePulse(float pulse01)
-{
-    _trailReleasePulse01 = Mathf.Clamp01(pulse01);
-}
-
-private IEnumerator TrailFollowRoutine()
-{
-    while (_trailFollowActive)
-    {
-        float dt = Time.deltaTime;
-        float pulse = _trailReleasePulse01;
-
-        // --- Drift orbit around the slot target ---
-        // Radius shrinks as release approaches, focusing the energy like a coiling spring.
-        float focusedRadius = Mathf.Lerp(trailDriftRadius, trailDriftRadius * trailDriftFocusMul, pulse);
-        _trailDriftPhase += trailDriftSpeed * dt;
-
-        // Lissajous-ish figure: x and y use slightly different frequencies so it
-        // never quite repeats, giving an organic "restless" feel.
-        Vector3 driftOffset = new Vector3(
-            Mathf.Sin(_trailDriftPhase) * focusedRadius,
-            Mathf.Cos(_trailDriftPhase * 0.73f) * focusedRadius * 0.6f,
-            0f
-        );
-
-        // --- Tether-world pull ---
-        // If this collectable has a tether, bias the drift toward the tether's far end
-        // so the energy visually strains toward the note world it's destined for.
-        Vector3 tetherBias = Vector3.zero;
-        if (tether != null && tether.end != null)
+        if (!_carryOrbitByCollector.TryGetValue(_collector, out var list) || list == null)
         {
-            Vector3 toEnd = tether.end.position - _trailWorldTarget;
-            // Only the direction matters; we don't want it to escape the slot.
-            if (toEnd.sqrMagnitude > 0.0001f)
-                tetherBias = toEnd.normalized * trailTetherPull;
+            list = new List<Collectable>();
+            _carryOrbitByCollector[_collector] = list;
         }
 
-        // --- Compose target and follow ---
-        Vector3 desiredPos = _trailWorldTarget + driftOffset + tetherBias;
-        float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
-        transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
+        if (!list.Contains(this))
+            list.Add(this);
 
-        // --- Scale / alpha ---
-        if (_trailBaseScaleCaptured && energySprite != null)
+        _registeredInCarryOrbit = true;
+        RefreshCarryOrbitIndices(_collector);
+    }
+
+    private void UnregisterCarryOrbit()
+    {
+        if (_collector == null || !_registeredInCarryOrbit) return;
+
+        if (_carryOrbitByCollector.TryGetValue(_collector, out var list) && list != null)
         {
-            // Breathe faster and larger as release nears.
-            float breathe = Mathf.Sin(Time.time * trailReadyPulseSpeed * (1f + pulse * 2f)) * 0.5f + 0.5f;
-            float scaleTarget = Mathf.Lerp(trailIdleScaleMin, trailReadyScaleMax, pulse * breathe);
-            transform.localScale = _trailBaseScale * scaleTarget;
+            list.Remove(this);
 
-            var col = energySprite.color;
-            col.a = Mathf.Lerp(col.a, Mathf.Lerp(0.45f, 0.95f, pulse), 0.15f);
-            energySprite.color = col;
+            if (list.Count == 0)
+                _carryOrbitByCollector.Remove(_collector);
+            else
+                RefreshCarryOrbitIndices(_collector);
         }
 
-        yield return null;
-    }
-}
-
-private bool TryGetRibbonU01(out double u01)
-{
-    u01 = 0.0;
-
-    if (ribbonMarker == null)
-        return false;
-
-    // You need a RectTransform that defines the ribbon width in world/canvas space.
-    // Commonly this is the parent of your marker(s) or the same root as playheadLine.
-    // Try: marker’s parent rect.
-    var parentRect = ribbonMarker.parent as RectTransform;
-    if (parentRect == null)
-        return false;
-
-    // Convert marker world position into parent local space, then normalize by width.
-    Vector2 local;
-    RectTransformUtility.ScreenPointToLocalPointInRectangle(
-        parentRect,
-        RectTransformUtility.WorldToScreenPoint(null, ribbonMarker.position),
-        null,
-        out local
-    );
-
-    float w = parentRect.rect.width;
-    if (w <= 0.0001f)
-        return false;
-
-    // parentRect local X typically ranges [-w/2, +w/2]
-    double x01 = (local.x / w) + 0.5;
-    // clamp to [0,1)
-    x01 = Math.Max(0.0, Math.Min(0.999999, x01));
-
-    u01 = x01;
-    return true;
-}
-public void BeginCarryAndDepositAtDsp(
-    double depositDspTime,
-    int durationTicks,
-    float force,
-    Action onArrived)
-{
-    if (_carryRoutine != null) StopCoroutine(_carryRoutine);
-    _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
-}
-
-private IEnumerator CarryAndDepositRoutine(
-    double depositDspTime,
-    int durationTicks,
-    float force,
-    Action onArrived)
-{
-    _inCarry = true;
-
-    // non-physical immediately
-    if (_rb != null) _rb.simulated = false;
-    if (TryGetComponent(out Collider2D col)) col.enabled = false;
-
-    var ps = GetComponentInChildren<ParticleSystem>();
-    if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-    // ----- Parent to vehicle ("children in back seat") -----
-    if (_collector != null)
-    {
-        _carryParent = _collector;
-
-        transform.SetParent(_carryParent, worldPositionStays: true);
-
-        Vector3 jitter = (carryLocalOffsetJitter > 0f)
-            ? (Vector3)(UnityEngine.Random.insideUnitCircle * carryLocalOffsetJitter)
-            : Vector3.zero;
-
-        transform.localPosition = carryLocalOffset + jitter;
-        transform.localRotation = Quaternion.identity;
+        _registeredInCarryOrbit = false;
+        _carryOrbitIndex = -1;
     }
 
-    // ----- DSP timing -----
-    double dspNow = AudioSettings.dspTime;
-
-    // If deposit time is already passed (rare), snap immediately.
-    if (depositDspTime <= dspNow + 0.0005)
+    private static void RefreshCarryOrbitIndices(Transform collector)
     {
+        if (collector == null) return;
+        if (!_carryOrbitByCollector.TryGetValue(collector, out var list) || list == null) return;
+
+        // Compact and re-index so orbit slots are stable and evenly spaced
+        for (int i = list.Count - 1; i >= 0; i--)
+            if (list[i] == null) list.RemoveAt(i);
+
+        for (int i = 0; i < list.Count; i++)
+            if (list[i] != null) list[i]._carryOrbitIndex = i;
+    }
+    
+    /// <summary>Sets the world-space target position for this note in the vehicle trail.</summary>
+    public void SetTrailTarget(Vector3 worldPos)
+    {
+        _trailWorldTarget = worldPos;
+    }
+
+    /// <summary>
+    /// Drives the visual urgency of this note (0 = just collected, 1 = release imminent).
+    /// The note pulses and brightens as the value approaches 1.
+    /// </summary>
+    public void SetReleasePulse(float pulse01)
+    {
+        _trailReleasePulse01 = Mathf.Clamp01(pulse01);
+    }
+
+    private IEnumerator TrailFollowRoutine()
+    {
+        while (_trailFollowActive)
+        {
+            float dt = Time.deltaTime;
+            float pulse = _trailReleasePulse01;
+
+            // --- Drift orbit around the slot target ---
+            // Radius shrinks as release approaches, focusing the energy like a coiling spring.
+            float focusedRadius = Mathf.Lerp(trailDriftRadius, trailDriftRadius * trailDriftFocusMul, pulse);
+            _trailDriftPhase += trailDriftSpeed * dt;
+
+            // Lissajous-ish figure: x and y use slightly different frequencies so it
+            // never quite repeats, giving an organic "restless" feel.
+            Vector3 driftOffset = new Vector3(
+                Mathf.Sin(_trailDriftPhase) * focusedRadius,
+                Mathf.Cos(_trailDriftPhase * 0.73f) * focusedRadius * 0.6f,
+                0f
+            );
+
+            // --- Tether-world pull ---
+            // If this collectable has a tether, bias the drift toward the tether's far end
+            // so the energy visually strains toward the note world it's destined for.
+            Vector3 tetherBias = Vector3.zero;
+            if (tether != null && tether.end != null)
+            {
+                Vector3 toEnd = tether.end.position - _trailWorldTarget;
+                // Only the direction matters; we don't want it to escape the slot.
+                if (toEnd.sqrMagnitude > 0.0001f)
+                    tetherBias = toEnd.normalized * trailTetherPull;
+            }
+
+            // --- Compose target and follow ---
+            Vector3 desiredPos = _trailWorldTarget + driftOffset + tetherBias;
+            float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
+            transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
+
+            // --- Scale / alpha ---
+            if (_trailBaseScaleCaptured && energySprite != null)
+            {
+                // Breathe faster and larger as release nears.
+                float breathe = Mathf.Sin(Time.time * trailReadyPulseSpeed * (1f + pulse * 2f)) * 0.5f + 0.5f;
+                float scaleTarget = Mathf.Lerp(trailIdleScaleMin, trailReadyScaleMax, pulse * breathe);
+                transform.localScale = _trailBaseScale * scaleTarget;
+
+                var col = energySprite.color;
+                col.a = Mathf.Lerp(col.a, Mathf.Lerp(0.45f, 0.95f, pulse), 0.15f);
+                energySprite.color = col;
+            }
+
+            yield return null;
+        }
+    }
+
+    public void BeginCarryAndDepositAtDsp(
+        double depositDspTime,
+        int durationTicks,
+        float force,
+        Action onArrived)
+    {
+        if (_carryRoutine != null) StopCoroutine(_carryRoutine);
+        _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
+    }
+
+    private IEnumerator CarryAndDepositRoutine(
+        double depositDspTime,
+        int durationTicks,
+        float force,
+        Action onArrived)
+    {
+        _inCarry = true;
+
+        // non-physical immediately
+        if (_rb != null) _rb.simulated = false;
+        if (TryGetComponent(out Collider2D col)) col.enabled = false;
+
+        var ps = GetComponentInChildren<ParticleSystem>();
+        if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
+        // ----- Parent to vehicle ("children in back seat") -----
+        if (_collector != null)
+        {
+            _carryParent = _collector;
+
+            transform.SetParent(_carryParent, worldPositionStays: true);
+
+            Vector3 jitter = (carryLocalOffsetJitter > 0f)
+                ? (Vector3)(UnityEngine.Random.insideUnitCircle * carryLocalOffsetJitter)
+                : Vector3.zero;
+
+            transform.localPosition = carryLocalOffset + jitter;
+            transform.localRotation = Quaternion.identity;
+        }
+
+        // ----- DSP timing -----
+        double dspNow = AudioSettings.dspTime;
+
+        // If deposit time is already passed (rare), snap immediately.
+        if (depositDspTime <= dspNow + 0.0005)
+        {
+            transform.SetParent(null, worldPositionStays: true);
+            _carryParent = null;
+
+            if (ribbonMarker) transform.position = ribbonMarker.position;
+            onArrived?.Invoke();
+            _inCarry = false;
+            yield break;
+        }
+
+        float desiredTravel = Mathf.Clamp(depositTravelSeconds, minDepositTravelSeconds, maxDepositTravelSeconds);
+
+        // available time until deposit
+        double timeUntilDeposit = depositDspTime - dspNow;
+
+        // travel cannot exceed available time
+        float travelSeconds = Mathf.Clamp(desiredTravel, 0.02f, (float)timeUntilDeposit);
+
+        // launch moment: deposit minus travel duration
+        double travelStartDsp = depositDspTime - travelSeconds;
+
+        // Ensure we don't start "late" due to frame timing.
+        // If we're already too close, shorten travel by pushing start forward (still lands exactly).
+        double minLaunch = dspNow + carryMinLeadSeconds;
+        if (travelStartDsp < minLaunch)
+            travelStartDsp = minLaunch;
+
+        // ----- Hold as child until launch moment (DSP-driven) -----
+        while (_carryParent != null && AudioSettings.dspTime < travelStartDsp)
+            yield return null;
+
+        // ----- Detach and travel -----
         transform.SetParent(null, worldPositionStays: true);
         _carryParent = null;
 
-        if (ribbonMarker) transform.position = ribbonMarker.position;
-        onArrived?.Invoke();
+        // DSP-authoritative travel. Lands EXACTLY at depositDspTime.
+        yield return StartCoroutine(TravelRoutine(depositDspTime, durationTicks, force, onArrived));
         _inCarry = false;
-        yield break;
     }
-
-    float desiredTravel = Mathf.Clamp(depositTravelSeconds, minDepositTravelSeconds, maxDepositTravelSeconds);
-
-    // available time until deposit
-    double timeUntilDeposit = depositDspTime - dspNow;
-
-    // travel cannot exceed available time
-    float travelSeconds = Mathf.Clamp(desiredTravel, 0.02f, (float)timeUntilDeposit);
-
-    // launch moment: deposit minus travel duration
-    double travelStartDsp = depositDspTime - travelSeconds;
-
-    // Ensure we don't start "late" due to frame timing.
-    // If we're already too close, shorten travel by pushing start forward (still lands exactly).
-    double minLaunch = dspNow + carryMinLeadSeconds;
-    if (travelStartDsp < minLaunch)
-        travelStartDsp = minLaunch;
-
-    // ----- Hold as child until launch moment (DSP-driven) -----
-    while (_carryParent != null && AudioSettings.dspTime < travelStartDsp)
-        yield return null;
-
-    // ----- Detach and travel -----
-    transform.SetParent(null, worldPositionStays: true);
-    _carryParent = null;
-
-    // DSP-authoritative travel. Lands EXACTLY at depositDspTime.
-    yield return StartCoroutine(TravelRoutine(depositDspTime, durationTicks, force, onArrived));
-    _inCarry = false;
-}
-private static double EffectiveLoopStart(double transportStartDsp, double loopLen, double dspNow)
+    private static double EffectiveLoopStart(double transportStartDsp, double loopLen, double dspNow)
 {
     if (transportStartDsp <= 0.0 || loopLen <= 0.0) return 0.0;
 
@@ -1411,7 +1256,7 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
 
     return effective;
 }
-   private void OnTriggerEnter2D(Collider2D coll)
+    private void OnTriggerEnter2D(Collider2D coll)
 {
     var vehicle = coll.GetComponent<Vehicle>();
     if (vehicle == null || _handled) return;
@@ -1576,7 +1421,6 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
         _trailFollowActive = true;
         _trailReleasePulse01 = 0f;
         _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-        _trailDriftVelocity = Vector3.zero;
         if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
         if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
         _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
@@ -1710,7 +1554,5 @@ private static double EffectiveLoopStart(double transportStartDsp, double loopLe
         // Default: destroy the carried visual orb.
         Destroy(gameObject);
     }
-
-
-
+    
 }

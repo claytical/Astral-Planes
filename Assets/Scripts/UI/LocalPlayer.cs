@@ -356,8 +356,6 @@ public class LocalPlayer : MonoBehaviour
 
         plane.Move(finalMove);
     }
-
-
     private void HandleConfirm()
     {
         // If we're in the "primary tutorial gate" (post-ready, pre-game), confirm advances it.
@@ -400,7 +398,6 @@ public class LocalPlayer : MonoBehaviour
         _isReady = false;
         IsReady = false;
     }
-
     private void Restart()
     {
         _isReady = false;
@@ -518,17 +515,6 @@ public class LocalPlayer : MonoBehaviour
         }
     }
 
-    private void ToggleGlitch(int index)
-    {
-        if (GameFlowManager.Instance.ReadyToPlay() && GameFlowManager.Instance.CurrentState == GameState.Playing)
-        {
-            var drumTrack = FindAnyObjectByType<DrumTrack>();
-            if (drumTrack != null && GameFlowManager.Instance.phaseTransitionManager.currentPhase == MazeArchetype.Wildcard)
-            {
-                GameFlowManager.Instance.glitch.ToggleEffect(index);
-            }
-        }
-    }
     private void StartRumble(float lowFreq, float highFreq, float duration)
     {
 //        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)

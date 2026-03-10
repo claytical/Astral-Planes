@@ -6,10 +6,8 @@ public enum TrackRetunePolicy { BassHarmonyLead, DensestFirst, Manual }
 public class HarmonyDirector : MonoBehaviour
 {
     
-    private const int MaxCharges = 4;
     [SerializeField] private ChordProgressionProfile profile;
     [SerializeField] private int cursor = 0;
-    private const int MaxRings = 4;
 
     private bool _armedChordAdvance, _previewActiveThisLoop, _heldThroughBoundary, _previewStartedInsideWindow, _hasPendingProfileSwap;
     private int  _pendingCharges = 0, _lastPreviewLoopIdx    = -1, _ringsArmedThisLoop    = 0, _globalBuiltCount = 1, _previewChordIdx = -1;   // the palette index we're previewing this loop
@@ -95,14 +93,14 @@ public class HarmonyDirector : MonoBehaviour
     }
 }
 
-void OnDestroy()
+    void OnDestroy()
 {
     var ptm = GameFlowManager.Instance?.phaseTransitionManager;
     if (ptm != null)
         ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
 }
 
-private void HandlePhaseChangedBridgeAware(MazeArchetype from, MazeArchetype to)
+    private void HandlePhaseChangedBridgeAware(MazeArchetype from, MazeArchetype to)
 {
     // 1) If enabled, stage the motif's chord progression as the next profile.
     MotifProfile motif = null;
@@ -147,7 +145,7 @@ private void HandlePhaseChangedBridgeAware(MazeArchetype from, MazeArchetype to)
     }
 }
 
-private System.Collections.IEnumerator CommitOnNextBoundary()
+    private System.Collections.IEnumerator CommitOnNextBoundary()
 {
     // Debounced: wait one full loop, then commit
     var d = GameFlowManager.Instance?.activeDrumTrack;

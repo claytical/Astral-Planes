@@ -978,6 +978,8 @@ MonoBehaviour:
   BridgePending: 0
   suppressCollectableSpawnsDuringBridge: 1
   phaseBridgeWaitMaxLoops: 64
+  motifCoralVisualizer: {fileID: 0}
+  motifBridgeHoldSeconds: 4
   useSpiralCoralDuringBridge: 1
   coralRoot: {fileID: 0}
   spiralCoralBase: {fileID: 0}
@@ -997,7 +999,7 @@ MonoBehaviour:
   localPlayers: []
   playerStatsGrid: {fileID: 0}
   _activeTracks: []
-  phaseBridgeFadeOutSeconds: 1
+  phaseBridgeFadeOutSeconds: 16
   phaseBridgeFadeInSeconds: 0.6
 --- !u!114 &1151719980
 MonoBehaviour:

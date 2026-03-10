@@ -12,12 +12,6 @@ public class SpawnStrategyProfile : ScriptableObject
     [NonSerialized] private int _cursor;
 
     public void ResetForNewStar() => _cursor = 0;
-    public MusicalRole PeekRoleAtCycleIndex(int cycleIndex)
-    {
-        if (roleSequence == null || roleSequence.Count == 0) return MusicalRole.Bass; // or a safe default
-        int idx = ((cycleIndex % roleSequence.Count) + roleSequence.Count) % roleSequence.Count;
-        return roleSequence[idx];
-    }
 
     public MusicalRole PeekRoleAtOffset(int offset, int nodesPerStar)
     {
@@ -31,10 +25,4 @@ public class SpawnStrategyProfile : ScriptableObject
         return roleSequence[seqIdx];
     }
 
-    public MusicalRole ConsumeNextRole(int nodesPerStar)
-    {
-        var role = PeekRoleAtOffset(_cursor, nodesPerStar);
-        _cursor++;
-        return role;
-    }
 }

@@ -129,6 +129,8 @@ public class
     [SerializeField] private LoopPattern loopPattern;
 // Scratch buffer to avoid allocations each step.
     private readonly List<(int note, int duration, float velocity01)> _tmpStepNotes = new();
+    [SerializeField] private Color trackShadowColor = new Color(0.08f,0.08f,0.08f,1f);
+    public Color TrackShadowColor => trackShadowColor;
 
     [System.Serializable]
     struct PendingBurst
@@ -155,17 +157,6 @@ public class
         // Prefer cells that currently have dust (and are not permanently clear),
         // biased near originWorld.x. Falls back to any free cell.
         TrappedInDustNearOrigin = 1
-    }
-
-    private struct LoopNote
-    {
-        public int bin;        // 0..maxLoopMultiplier-1 (or allocated bins)
-        public int localStep;  // 0..BinSize-1
-        public int note;
-        public int duration;
-        public float velocity;
-
-        public int ToAbsoluteStep(int binSize) => bin * binSize + localStep;
     }
 
     [SerializeField]
@@ -223,7 +214,6 @@ public class
         if (controller != null)
             controller.EndGravityVoidForPendingExpand(this);    }
 
-    //public (NoteSet noteSet, int maxToSpawn)? _pendingBurstAfterExpand;
     private readonly List<Action> _nextFrameQueue = new();
     private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
     public int BinSize() => drumTrack != null ? drumTrack.totalSteps : 16;
@@ -251,12 +241,7 @@ public class
         }
         return _currentNoteSet;
     }
-
-    /// <summary>
-    /// Returns all pre-assigned bin NoteSets (may contain nulls for ungenerated bins).
-    /// </summary>
-    public NoteSet[] GetAllBinNoteSets() => _binNoteSets;
-
+    
     public bool IsStepInFilledBin(int step)
     {
         EnsureBinList();
@@ -276,7 +261,7 @@ public class
         if (dustGen.IsPermanentlyClearCell(gp)) return true;
         return !dustGen.HasDustAt(gp);
     }
-        private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells) {
+    private bool HasTrapBuffer(CosmicDustGenerator dustGen, Vector2Int gp, int gridW, int gridH, int bufferCells) {
     if (bufferCells <= 0) return true;
 
     for (int dx = -bufferCells; dx <= bufferCells; dx++)
@@ -303,7 +288,7 @@ public class
 /// - free (no collectable occupant)
 /// - not within trapBufferCells of open/permanent space
 /// </summary>
-private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
+    private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
     CosmicDustGenerator dustGen,
     DrumTrack dt,
     Vector3 originWorld,
@@ -356,8 +341,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         candidates.Add(gp);
     }
 }
-    [SerializeField] private Color trackShadowColor = new Color(0.08f,0.08f,0.08f,1f);
-    public Color TrackShadowColor => trackShadowColor;
 
     public void RefreshRoleColorsFromProfile()
     {
@@ -814,39 +797,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         float tin = TimeInLeader();
         return Mathf.Max(0f, my - tin);
     }
-    private int ComputeTargetMultiplierFromUsage()
-    {
-        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return 1;
-
-        int drumSteps = drumTrack != null ? drumTrack.totalSteps : 16;
-        int maxUsedStep = 0;
-        foreach (var (step, _, _, _, _) in persistentLoopNotes)
-            if (step > maxUsedStep) maxUsedStep = step;
-
-        int requiredBins = Mathf.CeilToInt((maxUsedStep + 1) / (float)drumSteps);
-        int target = Mathf.Clamp(requiredBins, 1, Mathf.Max(1, loopMultiplier)); // never grow here
-        return target;
-    }
-    private void EvaluateAndQueueCollapseIfPossible() {
-        if (drumTrack == null) return;
-        if (loopMultiplier <= 1) return;
-
-        int target = ComputeTargetMultiplierFromUsage();
-        if (target < loopMultiplier)
-            QueueCollapseTo(target);
-    }
-    private void QueueCollapseTo(int newMultiplier) {
-        newMultiplier = Mathf.Clamp(newMultiplier, 1, loopMultiplier);
-        if (newMultiplier == loopMultiplier) return;
-        _pendingCollapse = true;
-        _collapseTargetMultiplier = newMultiplier;
-        HookCollapseBoundary();
-    }
-    private void HookCollapseBoundary() {
-        if (_hookedBoundaryForCollapse || drumTrack == null) return;
-        drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitCollapse;
-        _hookedBoundaryForCollapse = true;
-    }
     private void UnhookCollapseBoundary() {
         if (!_hookedBoundaryForCollapse || drumTrack == null) return;
         drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitCollapse;
@@ -901,7 +851,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         _lastLocalStep = -1;
         _lastLoopSeen = -1;
     }
-
     private void Harmony_Bins_EnsureSize(int want)
 {
     if (want <= 0) want = 1;
@@ -956,7 +905,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         if (_binFillOrder[binIndex] == 0)
             _binFillOrder[binIndex] = _nextFillOrdinal++;
     }
-
     private void Harmony_OnBinEmptied(int binIndex)
     {
         if (binIndex < 0) return;
@@ -969,7 +917,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // DO NOT clear _binChordIndex here.
         // Chord identity is deterministic per bin index (or authored override), not fill state.
     }
-
     public int Harmony_GetChordIndexForBin(int binIndex)
     {
         var hd = GameFlowManager.Instance?.harmony;
@@ -988,7 +935,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // Deterministic: absolute bin -> progression slot
         return ((binIndex % progLen) + progLen) % progLen;
     }
-
     private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
@@ -1052,7 +998,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return best;
 }
-    
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
     {
         if (ascensionCohort == null) ascensionCohort = new AscensionCohort();
@@ -1117,7 +1062,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             _burstSteps[burstId] = set = new HashSet<int>();
         set.Add(step);
     }
-
     public void ClearBinNotesKeepAllocated(int binIdx)
     {
         int binSize = Mathf.Max(1, BinSize());
@@ -1144,8 +1088,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         _loopCacheDirtyPending = true;
 
     }
-
-
     public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force) {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
         controller.NotifyCollected(this);
@@ -1447,8 +1389,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                 _currentBurstArmed = false;
         }
 }
-
-
     // ---------------------------------------------------------------------
     // Manual Note Release integration
     // ---------------------------------------------------------------------
@@ -1587,7 +1527,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             if (persistentLoopNotes[i].stepIndex == stepAbs) return true;
         return false;
     }
-
     /// <summary>
     /// Returns this track's authored root, transposed into the same register as referenceMidi and clamped to allowed range.
     /// </summary>
@@ -1603,13 +1542,11 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         root = Mathf.Clamp(root, lowestAllowedNote, highestAllowedNote);
         return root;
     }
-
     public void PlayOneShotMidi(int midiNote, float velocity127, int durationTicks = -1)
     {
         int dur = (durationTicks > 0) ? durationTicks : 120;
         PlayNote127(midiNote, dur, velocity127);
     }
-
     public int GetHighestAllocatedBin()
     {
         if (binAllocated == null) return -1;
@@ -1620,17 +1557,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return -1;
     }
-    private double GetTransportAnchorDsp()
-    {
-        if (drumTrack == null) return 0.0;
-
-        // Match NoteVisualizer's anchor choice.
-        if (drumTrack.leaderStartDspTime > 0.0) return drumTrack.leaderStartDspTime;
-        if (drumTrack.startDspTime > 0.0)       return drumTrack.startDspTime;
-
-        return 0.0;
-    }
-
     private double NextOccurrenceDspForAbsoluteStep(int absoluteStep)
     {
         if (drumTrack == null) return AudioSettings.dspTime + 0.01;
@@ -1668,14 +1594,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return now + dt;
     }
-    private double NextOccurrenceDspForLocalStep(int localStep)
-    {
-        // WARNING: localStep is ambiguous when leaderBins > 1.
-        // This function maps localStep into bin 0, then schedules in leader step space.
-        int baseSteps = Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : 64);
-        int step0 = ((localStep % baseSteps) + baseSteps) % baseSteps;
-        return NextOccurrenceDspForAbsoluteStep(step0);
-    }
     public int GetHighestFilledBin()
     {
         EnsureBinList();
@@ -1687,7 +1605,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return -1;
     }
-
     public bool IsBinFilled(int binIndex)
     {
         EnsureBinList();
@@ -1696,7 +1613,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
                && binIndex < _binFilled.Count
                && _binFilled[binIndex];
     }
-
     /// <summary>
     /// Returns the Time.time value at which the given bin was marked filled,
     /// or -1 if the bin has not been filled yet.
@@ -1748,7 +1664,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         // We already clear looped notes elsewhere; no double clear here.
     }
-
     /// <summary>
     /// Single hard reset entry point for motif boundaries.
     /// Clears loop content, bin allocation, burst state, and expansion/mapping flags.
@@ -1778,7 +1693,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         ResetBinStateForNewPhase();
         ResetBinsForPhase();
     }
-
     public bool HasNoteSet()
     {
         return _currentNoteSet != null;
@@ -1796,7 +1710,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         }
         return _currentNoteSet;
     }
-
     public int GetTotalSteps()
     {
         // Always reflect current loopMultiplier.
@@ -1807,26 +1720,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         return Mathf.Max(1, _totalSteps);
     }
-
-    public void ClearLoopedNotes(Vehicle vehicle = null)
-    {
-        if (persistentLoopNotes.Count == 0) return;
-
-        Debug.LogWarning(
-            $"[TRK:CLEAR_LOOP] track={name} fn=ClearLoopedNotes " +
-            $"vehicle={(vehicle != null ? vehicle.name : "null")} " +
-            $"persistentBefore={persistentLoopNotes.Count}\n" +
-            Environment.StackTrace);
-
-        ResetPerfectionFlag();
-        controller?.noteVisualizer?.TriggerNoteBlastOff(this);
-        _spawnedNotes.Clear();
-        persistentLoopNotes.Clear();
-        _loopCacheDirtyPending = true;
-        RecomputeBinsFromLoop();
-        EvaluateAndQueueCollapseIfPossible();
-    }
-
     public void PlayNote127(int note, int durationTicks, float velocity)
     {
         if (midiVoice == null)
@@ -1837,8 +1730,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
         midiVoice.PlayNoteTicks(note, durationTicks, velocity);
     }
-    public bool IsPerfectThisPhase { get; private set; }
-
     public void RetuneLoopToChord(Chord chord)
     {
         if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
@@ -1872,10 +1763,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             modified.Add((step, Closest(note), dur, vel));
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
-    }
-    public int GetNoteDensity()
-    {
-        return persistentLoopNotes.Count;
     }
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue)
     {
@@ -1917,7 +1804,7 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
             controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
         return stepIndex;
     }
-   public float GetVelocityAtStep(int step)
+    public float GetVelocityAtStep(int step)
     {
         float max = 0f;
         foreach (var (noteStep, _, _, velocity, _) in GetPersistentLoopNotes())
@@ -1927,7 +1814,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         }
         return max;
     }
-
     public int GetNextBinForSpawn()
     {
         EnsureBinList();
@@ -1952,7 +1838,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         // All bins filled: deterministic wrap-to-zero for density reuse.
         return 0;
     }
-
     public int GetNextFilledBinForDensity()
     {
         EnsureBinList();
@@ -1970,7 +1855,6 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
         return 0;
     }
 
-// Extended overload: allows MineNode-origin "void burst" intent.
     public void SpawnCollectableBurst(
         NoteSet noteSet,
         int maxToSpawn = -1,
@@ -2458,98 +2342,95 @@ private List<Vector2Int> BuildTrappedCandidatesNearOrigin(
 
     controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
 }
-private bool TryPickRandomSpawnCell(
-    CosmicDustGenerator dustGen,
-    DrumTrack drumTrack,
-    HashSet<Vector2Int> usedCellsThisBurst,
-    out Vector2Int chosenCell)
-{
-    chosenCell = default;
-
-    int w = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
-    int h = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
-    if (w <= 0 || h <= 0) return false;
-
-    float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
-    Vector2 halfExtents = Vector2.one * (cellWorld * 0.45f);
-
-    for (int attempt = 0; attempt < Mathf.Max(8, spawnPickMaxTries); attempt++)
+    private bool TryPickRandomSpawnCell(
+        CosmicDustGenerator dustGen,
+        DrumTrack drumTrack,
+        HashSet<Vector2Int> usedCellsThisBurst,
+        out Vector2Int chosenCell)
     {
-        var gp = new Vector2Int(UnityEngine.Random.Range(0, w), UnityEngine.Random.Range(0, h));
+        chosenCell = default;
 
-        if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp))
-            continue;
+        int w = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
+        int h = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
+        if (w <= 0 || h <= 0) return false;
 
-        // Avoid stacking collectables.
-        if (!Collectable.IsCellFreeStatic(gp))
-            continue;
+        float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+        Vector2 halfExtents = Vector2.one * (cellWorld * 0.45f);
 
-        // Avoid PhaseStar / Vehicle (or any other blockers you include in the mask).
-        Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
-        Collider2D hit = Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask);
-        if (hit != null)
-            continue;
+        for (int attempt = 0; attempt < Mathf.Max(8, spawnPickMaxTries); attempt++)
+        {
+            var gp = new Vector2Int(UnityEngine.Random.Range(0, w), UnityEngine.Random.Range(0, h));
 
-        chosenCell = gp;
-        return true;
+            if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp))
+                continue;
+
+            // Avoid stacking collectables.
+            if (!Collectable.IsCellFreeStatic(gp))
+                continue;
+
+            // Avoid PhaseStar / Vehicle (or any other blockers you include in the mask).
+            Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
+            Collider2D hit = Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask);
+            if (hit != null)
+                continue;
+
+            chosenCell = gp;
+            return true;
+        }
+
+        return false;
     }
 
-    return false;
-}
+    public float GetSecondsUntilNextLoopBoundaryDSP()
+    {
+        if (drumTrack == null) return 0f;
 
-public float GetSecondsUntilNextLoopBoundaryDSP()
-{
-    if (drumTrack == null) return 0f;
+        double dspNow = AudioSettings.dspTime;
 
-    double dspNow = AudioSettings.dspTime;
+        // OnLoopBoundary is based on leaderStartDspTime + EffectiveLoopLengthSec.
+        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
+        if (start <= 0.0) return 0f;
 
-    // OnLoopBoundary is based on leaderStartDspTime + EffectiveLoopLengthSec.
-    double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
-    if (start <= 0.0) return 0f;
+        float loopLen = drumTrack.GetLoopLengthInSeconds(); // this is EffectiveLoopLengthSec
+        if (loopLen <= 0f) return 0f;
 
-    float loopLen = drumTrack.GetLoopLengthInSeconds(); // this is EffectiveLoopLengthSec
-    if (loopLen <= 0f) return 0f;
+        double elapsed = dspNow - start;
+        if (elapsed < 0.0) elapsed = 0.0;
 
-    double elapsed = dspNow - start;
-    if (elapsed < 0.0) elapsed = 0.0;
+        // Next leader boundary
+        double loopsCompleted = System.Math.Floor(elapsed / loopLen);
+        double nextBoundary = start + (loopsCompleted + 1.0) * loopLen;
 
-    // Next leader boundary
-    double loopsCompleted = System.Math.Floor(elapsed / loopLen);
-    double nextBoundary = start + (loopsCompleted + 1.0) * loopLen;
+        double secs = nextBoundary - dspNow;
+        if (secs < 0.0) secs = 0.0;
 
-    double secs = nextBoundary - dspNow;
-    if (secs < 0.0) secs = 0.0;
-
-    return (float)secs;
-}
-
-public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
-{
-    if (incoming == null) return false; 
-    if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return false;
-    int activeBins = Mathf.Max(1, loopMultiplier); 
-    int bSz        = Mathf.Max(1, BinSize()); 
-    bool anyBinChecked = false;
-    var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
-    
-    for (int b = 0; b < activeBins; b++) { 
-        if (!IsBinFilled(b)) continue;  // bin exists but player hasn't harvested it yet — skip
-        var binNoteSet = GetNoteSetForBin(b) ?? incoming; 
-        binNoteSet.Initialize(this, bSz); 
-        var allowed = binNoteSet.GetStepList(); 
-        if (allowed == null || allowed.Count == 0) continue;
+        return (float)secs;
+    }
+    public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
+    {
+        if (incoming == null) return false; 
+        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return false;
+        int activeBins = Mathf.Max(1, loopMultiplier); 
+        int bSz        = Mathf.Max(1, BinSize()); 
+        bool anyBinChecked = false;
+        var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
         
-        foreach (int localStep in allowed) { 
-            int absStep = b * bSz + (localStep % bSz); 
-            if (!occupied.Contains(absStep)) return false;
-        } 
-        anyBinChecked = true;
+        for (int b = 0; b < activeBins; b++) { 
+            if (!IsBinFilled(b)) continue;  // bin exists but player hasn't harvested it yet — skip
+            var binNoteSet = GetNoteSetForBin(b) ?? incoming; 
+            binNoteSet.Initialize(this, bSz); 
+            var allowed = binNoteSet.GetStepList(); 
+            if (allowed == null || allowed.Count == 0) continue;
+            
+            foreach (int localStep in allowed) { 
+                int absStep = b * bSz + (localStep % bSz); 
+                if (!occupied.Contains(absStep)) return false;
+            } 
+            anyBinChecked = true;
+        }
+        // If no filled bins exist yet, we are not saturated.
+        return anyBinChecked;
     }
-    // If no filled bins exist yet, we are not saturated.
-    return anyBinChecked;
-}
-
-
     private void OnCollectableDestroyed(Collectable c) { 
         if (c == null) return; 
         if (c.assignedInstrumentTrack != this) return;
@@ -2884,9 +2765,7 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
       //  SyncSpanFromBins();
       _totalSteps = loopMultiplier * BinSize();
     }
-
-    private void ResetPerfectionFlag() => IsPerfectThisPhase = false;
-
+    
     private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modified, Vector3 _)
     {
         Debug.LogWarning(
@@ -2934,13 +2813,6 @@ public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
         midiVoice.PlayCollectionConfirm(note, velocity);
     }
     
-
-    private IEnumerator ResetPitchBendAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        midiStreamPlayer.MPTK_Channels[channel].fluid_channel_pitch_bend(8192); // Center
-    }
-
     private int FirstEmptyBin()
     {
         for (int i = 0; i < _binFilled.Count; i++)

@@ -10,15 +10,9 @@ public class MineNode : MonoBehaviour
     public int maxStrength = 100;
     private Vector2Int _spawnCell;
     private bool _hasSpawnCell;
-// === Rhythmic steering (authored steps) ===
-    [Header("Rhythmic Steering")]
-    public bool useRhythmicKeyframes = true;
-    [Range(0f, 1f)] public float turnSmoothing = 0.25f;
-    [Range(0f, 25f)] public float headingJitterDegrees = 12f;
 // Cached authored steps for O(1) membership tests
     private HashSet<int> _turnStepSet;
     private NoteSet _cachedTurnSetSource;
-    public NoteSet NoteSet => _noteSet;
 // Stuck breaker state
     private float _nextEscapeAllowedTime = 0f;
     private Vector2 _lastPosForStall;
@@ -28,13 +22,9 @@ public class MineNode : MonoBehaviour
 // Optional: if you want deterministic jitter per step
     private int _rngSalt = 0;
 
-    private HashSet<int> _authoredStepSet;
     private int _stepsPerLoop = 16;     // derived from allowed steps
     private int _lastStepIndex = -1;
-
-    private Vector2 _desiredHeading = Vector2.right;
-    private Vector2 _smoothedHeading = Vector2.right;
-
+    
     private float _stuckCheckAt;
     private Vector2 _stuckLastPos;
     private int _stuckCount;
@@ -77,18 +67,9 @@ public class MineNode : MonoBehaviour
 
     private int _lastProcessedStep = -1;
     private Vector2 _carveDir = Vector2.right; // will be randomized on init
-
-    [Header("Corridor Healing (MineNode carve)")] 
-    [Tooltip("Baseline seconds before carved corridor dust regrows (before age tightening).")] 
-    [Min(0.1f)] public float corridorHealDelaySeconds = 6f;
-    [Tooltip("Minimum seconds before regrow after the node has aged (tightening).")] 
-    [Min(0.1f)] public float corridorHealMinDelaySeconds = 2f;
-    [Tooltip("Over this many completed loops, corridor heal delay tightens from baseline to min.")] 
-    [Min(1)] public int corridorHealTightenLoops = 4;
     private MineNodeDustInteractor _dustInteractor;
     private float _currentDesiredSpeed;
-
-
+    
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -266,7 +247,6 @@ public class MineNode : MonoBehaviour
         _rb.linearVelocity *= 0.5f;
     }
 }
-
     private void EnsureTurnStepsCached()
 {
     if (_noteSet == null) return;
@@ -276,19 +256,15 @@ public class MineNode : MonoBehaviour
     _turnStepSet = (stepList != null && stepList.Count > 0) ? new HashSet<int>(stepList) : null;
     _cachedTurnSetSource = _noteSet;
 }
-
     private void CacheAuthoredStepsFromNoteSet()
 {
-    _authoredStepSet = null;
     _stepsPerLoop = 16;
 
     if (_drumTrack == null || _noteSet == null) return;
 
     var steps = _noteSet.GetStepList();
     if (steps == null || steps.Count == 0) return;
-
-    _authoredStepSet = new HashSet<int>(steps);
-
+    
     int max = -1;
     for (int i = 0; i < steps.Count; i++) max = Mathf.Max(max, steps[i]);
     _stepsPerLoop = Mathf.Max(1, max + 1);
@@ -298,23 +274,6 @@ public class MineNode : MonoBehaviour
     int bar = 16;
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
-
-    private void SeedInitialHeadingFromVelocity()
-{
-    if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f)
-    {
-        _desiredHeading = _rb.linearVelocity.normalized;
-        _smoothedHeading = _desiredHeading;
-    }
-    else
-    {
-        _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized;
-        _smoothedHeading = _desiredHeading;
-    }
-}
-
-
-
     public Color GetImprintShadowColor()
 {
     if (_track != null)
@@ -324,8 +283,6 @@ public class MineNode : MonoBehaviour
     Color c = _lockedColor;
     return new Color(c.r * 0.2f, c.g * 0.2f, c.b * 0.2f, c.a);
 }
-
-
     public Color GetImprintColor()
     {
         // InstrumentTrack is the semantic source of color
@@ -334,7 +291,6 @@ public class MineNode : MonoBehaviour
 
         return Color.white;
     }
-
     public float GetImprintHardness()
     {
         // Inverted pitch:
@@ -359,15 +315,6 @@ public class MineNode : MonoBehaviour
         {
             explode.SetTint(_lockedColor, multiply: true);
         }
-
-        if (_rb != null && _rb.linearVelocity.sqrMagnitude > 0.01f) {
-            _desiredHeading = _rb.linearVelocity.normalized; 
-            _smoothedHeading = _desiredHeading;
-        }
-        else {
-            _desiredHeading = UnityEngine.Random.insideUnitCircle.normalized; 
-            _smoothedHeading = _desiredHeading;
-        }
         
         float a = UnityEngine.Random.Range(0f, 360f); 
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized; 
@@ -386,7 +333,6 @@ public class MineNode : MonoBehaviour
             coreSprite.color = tint;
         }
         CacheAuthoredStepsFromNoteSet(); 
-        SeedInitialHeadingFromVelocity(); 
     }
 
     private void HandleLoopBoundary()
@@ -413,7 +359,7 @@ public class MineNode : MonoBehaviour
     }
     public float GetCorridorHealDelaySeconds()
     {
-        // Example tunables (make them per-role later if desired)
+        // tunables (make them per-role later if desired)
         float slow = 2.5f;  // low note
         float fast = 0.4f;  // high note
         return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
@@ -452,7 +398,6 @@ public class MineNode : MonoBehaviour
 
         _carvedPath.Add(cell);
     }
-
     void ConfigureFromRole(MusicalRole role)
     {
         var dust = GetComponent<MineNodeDustInteractor>();
@@ -481,7 +426,6 @@ public class MineNode : MonoBehaviour
                 break;
         }
     }
-    
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (_depletedHandled) return;
@@ -513,7 +457,6 @@ public class MineNode : MonoBehaviour
 
         TriggerExplosion();
     }
-
     void TryPlayPreviewNote()
     {
         if (_track == null || _noteSet == null || _drumTrack == null) return;
@@ -535,7 +478,6 @@ public class MineNode : MonoBehaviour
         }
         Destroy(gameObject);
     }
-    
     private void TriggerExplosion()
     {
         Debug.Log($"Triggering Explosion in Mine Node");
@@ -552,7 +494,6 @@ public class MineNode : MonoBehaviour
         _resolvedFired = true;
         OnResolved?.Invoke(this);
     }
-
     private void OnDisable() { 
         Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); 
         // Defensive: if we're disabled without CleanupAndDestroy running, unsubscribe here.

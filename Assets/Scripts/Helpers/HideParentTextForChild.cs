@@ -5,9 +5,6 @@ public class HideParentTextForChild : MonoBehaviour
     public GameObject childToWatch;
 
     private bool changeToStatus = true;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-
-    // Update is called once per frame
     void Update()
     {
         if (childToWatch.transform.childCount > 0)

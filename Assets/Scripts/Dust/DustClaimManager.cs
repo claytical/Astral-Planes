@@ -27,23 +27,7 @@ public sealed class DustClaimManager : MonoBehaviour
         CleanupExpired(cell);
         return _claims.TryGetValue(cell, out var list) && list.Count > 0;
     }
-
-    public float GetMaxRemaining(Vector2Int cell)
-    {
-        CleanupExpired(cell);
-        if (!_claims.TryGetValue(cell, out var list) || list.Count == 0) return 0f;
-
-        float now = Time.time;
-        float max = 0f;
-        for (int i = 0; i < list.Count; i++)
-        {
-            float exp = list[i].expiresAt;
-            if (exp <= 0f) return float.PositiveInfinity; // non-expiring claim
-            max = Mathf.Max(max, exp - now);
-        }
-        return max;
-    }
-
+    
     public void ClaimCell(string owner, Vector2Int cell, DustClaimType type, float seconds = -1f, bool refresh = true)
     {
         if (string.IsNullOrEmpty(owner)) owner = "Unknown";
@@ -70,14 +54,7 @@ public sealed class DustClaimManager : MonoBehaviour
 
         list.Add(new Claim { owner = owner, type = type, expiresAt = exp });
     }
-
-    public void ClaimCells(string owner, IEnumerable<Vector2Int> cells, DustClaimType type, float seconds = -1f, bool refresh = true)
-    {
-        if (cells == null) return;
-        foreach (var c in cells)
-            ClaimCell(owner, c, type, seconds, refresh);
-    }
-
+    
     public void ReleaseOwner(string owner)
     {
         if (string.IsNullOrEmpty(owner)) return;
