@@ -172,32 +172,17 @@ public class MineNodeDustInteractor : MonoBehaviour
     float healDelay =
         (_node != null) ? _node.GetCorridorHealDelaySeconds() : -1f;
 
-    Color imprintColor =
-        (_node != null) ? _node.GetImprintColor() : Color.white;
-
-    Color imprintShadowColor =
-        (_node != null) ? _node.GetImprintShadowColor() : Color.black;
-
-    float hardness01 =
-        (_node != null) ? _node.GetImprintHardness() : 0f;
-
-    MusicalRole imprintRole =
-        (_node != null) ? _node.GetImprintRole() : MusicalRole.None;
-
-    // Width in CELLS, not world radius
+// Width in CELLS, not world radius
     int resolveRadiusCells = Mathf.Max(0, (carveWidthCells - 1) / 2);
+
     _drumTrack.CarveTemporaryCellFromMineNode(
         carveWorld,
         phase,
         healDelay,
-        imprintColor,
-        imprintHardness01: hardness01, 
-        imprintShadowColor: imprintShadowColor, 
+        removedRoleOverride: (_node != null) ? _node.GetImprintRole() : MusicalRole.None,
         resolveRadiusCells: resolveRadiusCells,
-        appetiteMul:1, 
-        imprintRole: imprintRole
+        appetiteMul: 1f
     );
-
     if (_node != null)
         _node.NotifyDustErodedAt(carveWorld);
 }

@@ -223,13 +223,7 @@ private float alphaDirection = 1f;
         // stays centred on the star even if the star's RB was frozen mid-frame.
         bubbleRoot.localPosition = Vector3.zero;
     }
-
-    private void Update()
-    {
-        // Per-shard alpha is now driven by charge accumulation in PhaseStar.Update.
-        // The old single-sprite pulse is retired.
-    }
-
+    
     public void HighlightActive(Transform active, Color c, float alpha = 0.95f)
     {
         if (!active) return;

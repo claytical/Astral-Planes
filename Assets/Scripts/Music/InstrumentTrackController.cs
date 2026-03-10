@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -134,9 +135,6 @@ public class InstrumentTrackController : MonoBehaviour
     public void NotifyCommitted(InstrumentTrack track, int stepIndex)
 {
     Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
-    // (Optional) you could track lastCommitTime here if you want.
-    //PlayCommitStinger(track);
-    PlayGravityVoidChordPulse(track, _lastTransportFrame.playheadBin, 3);
 }
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
@@ -345,7 +343,6 @@ public class InstrumentTrackController : MonoBehaviour
             {
                 _lastGravityVoidChordBin = playheadBin;
                 int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
-                PlayGravityVoidChordPulse(_gravityVoidOwner, playheadBin, chordSize);
             }
 
             // ---------------------------------------------------------------
@@ -444,35 +441,78 @@ public class InstrumentTrackController : MonoBehaviour
 
         _gravityVoidRoutine = null;
     }
-    private void PlayGravityVoidChordPulse(
-        InstrumentTrack track,
-        int playheadBin,
-        int chordSize)
+    public InstrumentTrack GetTrackForRole(MusicalRole role)
     {
-        if (track == null) return;
+        if (role == MusicalRole.None) return null;
+        if (tracks == null || tracks.Length == 0) return null;
 
-        var harmony = GameFlowManager.Instance?.harmony;
-        if (harmony == null) return;
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (t != null && t.assignedRole == role)
+                return t;
+        }
 
-        int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
-        if (chordIdx < 0) return;
+        return null;
+    }
+    public void PlayDustChordPluck(
+        MusicalRole role,
+        float phrase01 = 0f,
+        int chordSize = 4,
+        int durTicks = 180,
+        float vel127 = 24f)
+    {
+        try
+        {
+            if (role == MusicalRole.None)
+                return;
 
-        if (!harmony.TryGetChordAt(chordIdx, out var chord))
-            return;
+            var track = GetTrackForRole(role);
+            if (track == null)
+                return;
 
-        var notes = BuildGravityVoidVoicing(
-            track.assignedRole,
-            chord,
-            chordSize,
-            track.lowestAllowedNote,
-            track.highestAllowedNote
-        );
+            var harmony = GameFlowManager.Instance?.harmony;
+            if (harmony == null)
+                return;
 
-        int durTicks = 480; 
-        float vel127 = 80f;
+            int playheadBin = GetTransportFrame().playheadBin;
+            int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
+            if (chordIdx < 0)
+                return;
 
-        foreach (int midi in notes)
+            if (!harmony.TryGetChordAt(chordIdx, out var chord))
+                return;
+
+            if (chord.intervals == null || chord.intervals.Count == 0)
+                return;
+
+            var notes = BuildGravityVoidVoicing(
+                track.assignedRole,
+                chord,
+                Mathf.Max(1, chordSize),
+                track.lowestAllowedNote,
+                track.highestAllowedNote
+            );
+
+            if (notes == null || notes.Count == 0)
+                return;
+
+            phrase01 = Mathf.Clamp01(phrase01);
+
+            int noteIndex = Mathf.Clamp(
+                Mathf.RoundToInt(phrase01 * (notes.Count - 1)),
+                0,
+                notes.Count - 1
+            );
+
+            int midi = notes[noteIndex];
+
             track.PlayNote127(midi, durTicks, vel127);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[DUST] PlayDustChordPluck EXCEPTION: {ex}");
+        }
     }
     private List<int> BuildGravityVoidVoicing(
         MusicalRole role,

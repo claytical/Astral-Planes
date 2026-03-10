@@ -10,6 +10,7 @@ public class CosmicDustGenerator : MonoBehaviour
     public GameObject dustPrefab;
     public Transform activeDustRoot;
     Dictionary<Vector2Int, DustImprint> _imprints; 
+    private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
     private bool _cellGridReady;
     [Header("Maze Collision Shape")]
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
@@ -783,12 +784,11 @@ public class CosmicDustGenerator : MonoBehaviour
             // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
             // Priority 2: no imprint (vehicle-carved or PhaseStar-drained) → least-dense role,
             //             so the maze self-balances toward equal representation of all four roles.
-            MusicalRole regrowRole = MusicalRole.None;
-            if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
-                regrowRole = imp.role;
-            else
-                regrowRole = GetLeastDenseRole();
+            MusicalRole excludedRole = MusicalRole.None;
+            if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
+                excludedRole = ex;
 
+            MusicalRole regrowRole = GetRandomRoleExcluding(excludedRole);
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
@@ -840,7 +840,8 @@ public class CosmicDustGenerator : MonoBehaviour
 
         // Solidify: enable collider and register in legacy map for queries.
         SetCellState(gp, DustCellState.Solid);        
-        if (dust != null) SetDustCollision(dust, true);    
+        if (dust != null) SetDustCollision(dust, true); 
+        _regrowExcludeRoleByCell.Remove(gp);
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -848,6 +849,9 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureRegrowController();
         _regrow?.EnqueueStepRegrow(gp);
     }
+    
+    
+    
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         MazeArchetype phase,
         Vector2Int starCell,
@@ -2272,17 +2276,41 @@ public class CosmicDustGenerator : MonoBehaviour
             new(-1, 0), new(0, -1), new(1, -1)
         };
     }
-    
+    private MusicalRole GetRandomRoleExcluding(MusicalRole excludedRole)
+    {
+         MusicalRole[] roles =
+        {
+            MusicalRole.Bass,
+            MusicalRole.Harmony,
+            MusicalRole.Lead,
+            MusicalRole.Groove
+        };
+
+        int validCount = 0;
+        for (int i = 0; i < roles.Length; i++)
+            if (roles[i] != excludedRole)
+                validCount++;
+
+        if (validCount <= 0)
+            return MusicalRole.Bass;
+
+        int pick = Random.Range(0, validCount);
+        for (int i = 0; i < roles.Length; i++)
+        {
+            if (roles[i] == excludedRole) continue;
+            if (pick == 0) return roles[i];
+            pick--;
+        }
+
+        return MusicalRole.Bass;
+    }
     public int CarveTemporaryCellFromMineNode(
         Vector3 centerWorld,
         MazeArchetype phase,
         float regrowDelaySeconds,
-        Color imprintColor,
-        Color imprintShadowColor,
-        float imprintHardness01,
+        MusicalRole removedRoleOverride,
         int resolveRadiusCells,
-        float appetiteMul = 1f,
-        MusicalRole imprintRole = MusicalRole.None) {
+        float appetiteMul = 1f) {
         if (drums == null) return 0;
 
         EnsureImprints();
@@ -2299,9 +2327,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // We still refresh regrow timers across the footprint.
         int removed = 0;
         int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetiteMul, 0.4f, 2f));
-
-        float hardness01 = Mathf.Clamp01(imprintHardness01);
-
+        
         for (int gx = c.x - rCells; gx <= c.x + rCells; gx++)
         {
             for (int gy = c.y - rCells; gy <= c.y + rCells; gy++)
@@ -2314,19 +2340,17 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (_permanentClearCells.Contains(gp)) continue;
                 if (IsKeepClearCell(gp)) continue;
 
-                // Record/refresh MineNode imprint for regrowth semantics.
-                // Include the MineNode's role so CommitRegrowCell can restore it.
-                Color blendedImprint = BlendImprintWithNeighbors(gp, imprintColor, imprintBlendRadius, imprintNeighborWeight);
-                _imprints[gp] = new DustImprint
+                MusicalRole removedRole = removedRoleOverride;
+
+                if (removedRole == MusicalRole.None &&
+                    TryGetDustAt(gp, out var existingDust) &&
+                    existingDust != null)
                 {
-                    color       = blendedImprint,
-                    healDelay   = regrowDelaySeconds,
-                    hardness01  = hardness01,
-                    role        = imprintRole   // ← was always left as default (Bass); now explicit
-                };
+                    removedRole = existingDust.Role;
+                }
 
-                MarkTintDirty(gp, tintDirtyMarkRadius);
-
+                if (removedRole != MusicalRole.None)
+                    _regrowExcludeRoleByCell[gp] = removedRole;
                 // Clear if present, respecting budget.
                 if (HasDustAt(gp))
                 {

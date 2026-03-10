@@ -152,11 +152,9 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     {
         _profile = profile;
 
-        // Drive enable/disable from PhaseStar events
-        star.OnArmed += s => Enable(true);
-        star.OnDisarmed += s => Enable(false);
+        // Motion is no longer tied to armed/disarmed.
+        _enabled = true;
 
-        // Default dust sampler
         if (DustDensitySampler == null)
         {
             DustDensitySampler = pos =>
@@ -168,7 +166,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             };
         }
 
-        // Default vehicle provider: read from GameFlowManager.localPlayers[].plane
         VehiclePositionsProvider ??= () =>
         {
             var gfm = GameFlowManager.Instance;
@@ -186,10 +183,9 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             return list;
         };
 
-        // Ensure body type matches tuning (if someone flipped it in inspector)
         ApplyBodyType();
+        Enable(true);
     }
-
     public void Enable(bool on)
     {
         _enabled = on;
@@ -232,8 +228,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         // --- Vehicle avoidance --------------------------------------------
         Vector2 avoid = ComputeVehicleAvoidance(_rb.position);
 
-        // --- Dust edge seeking --------------------------------------------
-        Vector2 edge = ComputeDustEdgeSeek(_rb.position);
 
         // --- Personality: arc around avoidance via orbitBias --------------
         Vector2 avoidTangent = (avoid.sqrMagnitude > 0.0001f)
@@ -245,21 +239,14 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         // suppressing the generic edge-seek in favour of role-targeted movement.
         Vector2 waypointDir = Vector2.zero;
         float waypointWeight = 0f;
-        if (_navigator != null && _navigator.HasWaypoint)
-        {
-            waypointDir    = _navigator.GetWaypointSteerDir(_rb.position);
-            waypointWeight = _navigator.WaypointPull;
-        }
 
-        // Weighted blend in direction space
-        // When waypointWeight > 0, edge-seek is suppressed proportionally so the
-        // craving pull takes precedence without completely overriding avoidance.
-        float edgeWeight = edgeSeek.strength * (1f - waypointWeight);
+        Vector2 patch = ComputeDustPatchSeek(_rb.position);
+
         Vector2 desiredDir = drift
-            + avoid      * avoidance.strength
-            + edge       * edgeWeight
-            + avoidTangent
-            + waypointDir * waypointWeight * 2f; // ×2 so it dominates drift at full pull
+                             + avoid * avoidance.strength
+                             + patch * edgeSeek.strength
+                             + avoidTangent;
+
         if (desiredDir.sqrMagnitude < 0.0001f) desiredDir = drift;
         else desiredDir.Normalize();
 
@@ -351,7 +338,40 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         return sum;
     }
+    private Vector2 ComputeDustPatchSeek(Vector2 pos)
+    {
+        if (DustDensitySampler == null) return Vector2.zero;
 
+        float probe = Mathf.Max(0.5f, edgeSeek.sampleStep * 4f);
+
+        Vector2[] dirs =
+        {
+            Vector2.up,
+            (Vector2.up + Vector2.right).normalized,
+            Vector2.right,
+            (Vector2.down + Vector2.right).normalized,
+            Vector2.down,
+            (Vector2.down + Vector2.left).normalized,
+            Vector2.left,
+            (Vector2.up + Vector2.left).normalized
+        };
+
+        float best = -1f;
+        Vector2 bestDir = Vector2.zero;
+
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            Vector2 d = dirs[i];
+            float density = DustDensitySampler(pos + d * probe);
+            if (density > best)
+            {
+                best = density;
+                bestDir = d;
+            }
+        }
+
+        return bestDir;
+    }
     private Vector2 ComputeDustEdgeSeek(Vector2 starPos)
     {
         var sampler = DustDensitySampler;

@@ -2246,7 +2246,9 @@ public class
             spawnPos += (Vector3)j;
         }
 
-        var go = Instantiate(collectablePrefab, spawnPos, Quaternion.identity, collectableParent);
+        Vector3 spawnOrigin = originWorld ?? transform.position;
+
+        var go = Instantiate(collectablePrefab, spawnOrigin, Quaternion.identity, collectableParent);
         if (!go) continue;
 
         if (!go.TryGetComponent(out Collectable c))
@@ -2255,7 +2257,7 @@ public class
             continue;
         }
 
-        // assign burstId BEFORE Initialize
+// assign burst metadata BEFORE intro flight
         c.burstId = burstId;
         c.intendedStep = absStep;
         c.intendedBin = targetBin;
@@ -2265,21 +2267,6 @@ public class
         _scratchSteps.Add(absStep);
 
         c.isTrappedInDust = cellHasDust;
-        c.Initialize(note, dur, this, noteSet, _scratchSteps);
-
-        if (burstImpulse > 0f && go.TryGetComponent<Rigidbody2D>(out var crb))
-        {
-            Vector3 from = repelFromWorld ?? originWorld ?? spawnPos;
-            Vector2 away = (Vector2)(spawnPos - from);
-            if (away.sqrMagnitude < 0.0001f) away = UnityEngine.Random.insideUnitCircle;
-            away.Normalize();
-
-            float half = Mathf.Max(0f, spreadAngleDeg) * 0.5f;
-            float ang = UnityEngine.Random.Range(-half, half);
-            Vector2 dir = (Vector2)(Quaternion.Euler(0f, 0f, ang) * (Vector3)away);
-            crb.AddForce(dir * burstImpulse, ForceMode2D.Impulse);
-        }
-
         if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
         {
             c.OnDestroyed -= oldHandler;
@@ -2305,7 +2292,16 @@ public class
 
             c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur, absStep);
         }
-
+// Begin intro flight from MineNode explosion site -> chosen grid spawn pos
+        c.BeginSpawnArrival(
+            spawnOrigin,
+            spawnPos,
+            note,
+            dur,
+            this,
+            noteSet,
+            _scratchSteps
+        );
         spawnedCollectables.Add(go);
         _currentBurstRemaining++;
         spawnedCount++;

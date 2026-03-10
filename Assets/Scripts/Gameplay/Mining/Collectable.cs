@@ -14,7 +14,12 @@ public class Collectable : MonoBehaviour
     public float dustCollisionStayForce = 2.25f;
     private bool _hasDesiredGridTarget; 
     public int intendedBin = -1;
-
+// ---- Spawn Arrival Intro ----
+    [Header("Spawn Arrival")]
+    [SerializeField] private float spawnArrivalSeconds = 0.28f;
+    [SerializeField] private AnimationCurve spawnArrivalEase = null;
+    private Coroutine _spawnArrivalRoutine;
+    private bool _spawnArrivalInProgress;
 // ---- Dust pocket (collectable visibility) ----
     [Header("Dust Pocket (Visibility)")]
     [SerializeField] private bool keepDustPocketOpen = true;
@@ -181,8 +186,99 @@ public class Collectable : MonoBehaviour
 
     private Rigidbody2D _rb;
     private float _speed;
-    private System.Random _rng;       // deterministic per-track/per-note
+    private System.Random _rng;  
+    public void BeginSpawnArrival(
+    Vector3 originWorld,
+    Vector3 targetWorld,
+    int note,
+    int duration,
+    InstrumentTrack track,
+    NoteSet noteSet,
+    List<int> steps)
+{
+    if (_spawnArrivalRoutine != null)
+        StopCoroutine(_spawnArrivalRoutine);
 
+    _spawnArrivalRoutine = StartCoroutine(SpawnArrivalRoutine(
+        originWorld,
+        targetWorld,
+        note,
+        duration,
+        track,
+        noteSet,
+        steps));
+}
+
+private IEnumerator SpawnArrivalRoutine(
+    Vector3 originWorld,
+    Vector3 targetWorld,
+    int note,
+    int duration,
+    InstrumentTrack track,
+    NoteSet noteSet,
+    List<int> steps)
+{
+    _spawnArrivalInProgress = true;
+
+    transform.position = originWorld;
+
+    if (_rb == null) TryGetComponent(out _rb);
+
+    if (_rb != null)
+    {
+        _rb.linearVelocity = Vector2.zero;
+        _rb.angularVelocity = 0f;
+        _rb.simulated = false;
+    }
+
+    if (TryGetComponent(out Collider2D col))
+        col.enabled = false;
+
+    float dur = Mathf.Max(0.01f, spawnArrivalSeconds);
+    float t = 0f;
+
+    Vector3 start = originWorld;
+    Vector3 end = targetWorld;
+
+    Vector3 mid = Vector3.Lerp(start, end, 0.5f);
+    float arcHeight = Mathf.Max(0.15f, Vector3.Distance(start, end) * 0.12f);
+    mid += Vector3.up * arcHeight;
+
+    while (t < dur)
+    {
+        t += Time.deltaTime;
+        float u = Mathf.Clamp01(t / dur);
+
+        if (spawnArrivalEase != null && spawnArrivalEase.length > 0)
+            u = spawnArrivalEase.Evaluate(u);
+        else
+            u = Mathf.SmoothStep(0f, 1f, u);
+
+        Vector3 a = Vector3.Lerp(start, mid, u);
+        Vector3 b = Vector3.Lerp(mid, end, u);
+        transform.position = Vector3.Lerp(a, b, u);
+
+        yield return null;
+    }
+
+    transform.position = end;
+
+    if (_rb != null)
+    {
+        _rb.linearVelocity = Vector2.zero;
+        _rb.angularVelocity = 0f;
+        _rb.simulated = true;
+    }
+
+    if (TryGetComponent(out Collider2D finalCol))
+        finalCol.enabled = true;
+
+    _spawnArrivalInProgress = false;
+    _spawnArrivalRoutine = null;
+
+    // IMPORTANT: only now do we start dust pocket, movement, occupancy, etc.
+    Initialize(note, duration, track, noteSet, steps);
+}
     public void OnManualReleaseDiscarded()
     {
         // stop trail follow
@@ -1257,82 +1353,83 @@ public class Collectable : MonoBehaviour
     return effective;
 }
     private void OnTriggerEnter2D(Collider2D coll)
-{
-    var vehicle = coll.GetComponent<Vehicle>();
-    if (vehicle == null || _handled) return;
-
-    _collector = vehicle.transform;
-
-    // ---- Validate we can actually process a collection BEFORE latching _handled ----
-    if (assignedInstrumentTrack == null)
     {
-        Debug.LogWarning($"[COLLECT] Ignored: assignedInstrumentTrack is null (name={name}).");
-        return;
-    }
+        if (_spawnArrivalInProgress) return;
+        var vehicle = coll.GetComponent<Vehicle>();
+        if (vehicle == null || _handled) return;
 
-    var drumTrack = assignedInstrumentTrack.drumTrack;
-    if (drumTrack == null)
-    {
-        Debug.LogWarning($"[COLLECT] Ignored: track '{assignedInstrumentTrack.name}' has no DrumTrack yet (name={name}).");
-        return;
-    }
+        _collector = vehicle.transform;
 
-    // Transport + loop sanity
-    double dspNow  = AudioSettings.dspTime;
+        // ---- Validate we can actually process a collection BEFORE latching _handled ----
+        if (assignedInstrumentTrack == null)
+        {
+            Debug.LogWarning($"[COLLECT] Ignored: assignedInstrumentTrack is null (name={name}).");
+            return;
+        }
 
-    double loopLen = drumTrack.GetLoopLengthInSeconds();
-    if (loopLen <= 0.0)
-    {
-        Debug.LogWarning($"[COLLECT] Deferred: loopLen <= 0 (loopLen={loopLen:F6}) name={name}");
-        return; // do NOT latch _handled
-    }
+        var drumTrack = assignedInstrumentTrack.drumTrack;
+        if (drumTrack == null)
+        {
+            Debug.LogWarning($"[COLLECT] Ignored: track '{assignedInstrumentTrack.name}' has no DrumTrack yet (name={name}).");
+            return;
+        }
 
-    // IMPORTANT: leaderStart/start are "transport origins". Convert to the most recent loop boundary.
-    double transportStart = drumTrack.leaderStartDspTime;
-    if (transportStart <= 0.0) transportStart = drumTrack.startDspTime;
-    if (transportStart <= 0.0)
-    {
-        Debug.LogWarning($"[COLLECT] Deferred: drum transport not anchored yet (leaderStart/start <= 0). name={name}");
-        return; // do NOT latch _handled
-    }
+        // Transport + loop sanity
+        double dspNow  = AudioSettings.dspTime;
 
-    // Snap to the current loop boundary so we match what the player hears.
-    double loopStart = EffectiveLoopStart(transportStart, loopLen, dspNow);
-    if (loopStart <= 0.0)
-    {
-        Debug.LogWarning($"[COLLECT] Deferred: effective loopStart invalid. name={name}");
-        return; // do NOT latch _handled
-    }
+        double loopLen = drumTrack.GetLoopLengthInSeconds();
+        if (loopLen <= 0.0)
+        {
+            Debug.LogWarning($"[COLLECT] Deferred: loopLen <= 0 (loopLen={loopLen:F6}) name={name}");
+            return; // do NOT latch _handled
+        }
 
-    // Now we can safely latch idempotency + switch to carry behavior.
-    _handled = true;
+        // IMPORTANT: leaderStart/start are "transport origins". Convert to the most recent loop boundary.
+        double transportStart = drumTrack.leaderStartDspTime;
+        if (transportStart <= 0.0) transportStart = drumTrack.startDspTime;
+        if (transportStart <= 0.0)
+        {
+            Debug.LogWarning($"[COLLECT] Deferred: drum transport not anchored yet (leaderStart/start <= 0). name={name}");
+            return; // do NOT latch _handled
+        }
 
-    // We are now "collected": stop dust pocket & claims and enter carry mode immediately.
-    StopDustPocketAndReleaseClaims();
-    RegisterCarryOrbit();
+        // Snap to the current loop boundary so we match what the player hears.
+        double loopStart = EffectiveLoopStart(transportStart, loopLen, dspNow);
+        if (loopStart <= 0.0)
+        {
+            Debug.LogWarning($"[COLLECT] Deferred: effective loopStart invalid. name={name}");
+            return; // do NOT latch _handled
+        }
 
-    // ------------------------------------------------------------
-    // STEP MATCHING (anchor-consistent)
-    // ------------------------------------------------------------
-    int baseSteps   = Mathf.Max(1, drumTrack.totalSteps);
-    int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
+        // Now we can safely latch idempotency + switch to carry behavior.
+        _handled = true;
 
-    // We expect leaderSteps to be an integer multiple of baseSteps.
-    int mul = Mathf.Max(1, Mathf.RoundToInt(leaderSteps / (float)baseSteps));
+        // We are now "collected": stop dust pocket & claims and enter carry mode immediately.
+        StopDustPocketAndReleaseClaims();
+        RegisterCarryOrbit();
 
-    // Position within current loop [0, loopLen)
-    double tPos = dspNow - loopStart;
-    if (tPos < 0) tPos = 0;
-    if (tPos >= loopLen) tPos %= loopLen;
+        // ------------------------------------------------------------
+        // STEP MATCHING (anchor-consistent)
+        // ------------------------------------------------------------
+        int baseSteps   = Mathf.Max(1, drumTrack.totalSteps);
+        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
 
-    // Leader step duration (seconds)
-    double leaderStepDur = loopLen / leaderSteps;
+        // We expect leaderSteps to be an integer multiple of baseSteps.
+        int mul = Mathf.Max(1, Mathf.RoundToInt(leaderSteps / (float)baseSteps));
 
-    // Timing window expressed in leader steps (your timingWindowSteps is assumed "base steps")
-    double timingWin = leaderStepDur * (drumTrack.timingWindowSteps * mul) * 0.5;
+        // Position within current loop [0, loopLen)
+        double tPos = dspNow - loopStart;
+        if (tPos < 0) tPos = 0;
+        if (tPos >= loopLen) tPos %= loopLen;
 
-    int matchedStep = -1;
-    double bestErr = timingWin;
+        // Leader step duration (seconds)
+        double leaderStepDur = loopLen / leaderSteps;
+
+        // Timing window expressed in leader steps (your timingWindowSteps is assumed "base steps")
+        double timingWin = leaderStepDur * (drumTrack.timingWindowSteps * mul) * 0.5;
+
+        int matchedStep = -1;
+        double bestErr = timingWin;
 
     for (int i = 0; i < sharedTargetSteps.Count; i++)
     {
@@ -1359,7 +1456,7 @@ public class Collectable : MonoBehaviour
     // ------------------------------------------------------------
     float force = vehicle.GetForceAsMidiVelocity();
     vehicle.CollectEnergy(amount);
-
+    assignedInstrumentTrack.PlayNote127(assignedNote, 2, force);
     int stepToReportBase =
         (matchedStep >= 0) ? matchedStep :
         (intendedStep >= 0) ? (((intendedStep % baseSteps) + baseSteps) % baseSteps) :

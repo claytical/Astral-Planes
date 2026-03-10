@@ -46,9 +46,7 @@ public class GameFlowManager : MonoBehaviour
 
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
-    private struct PhaseChordMap { public MazeArchetype phase; public ChordProgressionProfile progression; }
 
-    private List<PhaseChordMap> chordMaps = new();
 
     public HarmonyDirector harmony;
     public InstrumentTrackController controller;
@@ -433,8 +431,8 @@ public class GameFlowManager : MonoBehaviour
     var phase = phaseTransitionManager.currentPhase;
 
     Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
-    var prof = GetProfileForPhase(phase);
-    harmony.SetActiveProfile(prof, applyImmediately: true);
+    
+    harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
     Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
     StartMazeAndStarForPhase(phase);
     _setupDone = true;
@@ -762,12 +760,7 @@ public class GameFlowManager : MonoBehaviour
         if (_setupDone || _setupInFlight) return;
         StartCoroutine(HandleTrackSceneSetupAsync());
     }
-
-    private ChordProgressionProfile GetProfileForPhase(MazeArchetype phase)
-    {
-        for (int i = 0; i < chordMaps.Count; i++) if (chordMaps[i].phase == phase) return chordMaps[i].progression;
-        return null;
-    }
+    
     private List<InstrumentTrack> PickSeeds(List<InstrumentTrack> pool, int n, MusicalRole[] preferred)
     {
         var list = new List<InstrumentTrack>();
