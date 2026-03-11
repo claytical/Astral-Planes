@@ -4,6 +4,32 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
+[System.Serializable]
+public class PhaseRecord
+{
+    public string ChapterId;          // stable authored ID from PhaseLibrary
+    public int    PlaythroughIndex;   // 1 = first time, 2 = second, etc.
+    public long   CompletedAtTicks;   // DateTime.UtcNow.Ticks — survives timezone changes
+    public List<MotifSnapshot> Motifs = new();
+
+    // Convenience
+    public System.DateTime CompletedAt =>
+        new System.DateTime(CompletedAtTicks, System.DateTimeKind.Utc);
+}
+
+// The full persistent garden — one instance, loaded at startup, saved on phase completion.
+[Serializable]
+public class GardenRecord
+{
+    public int              SaveVersion = 1;      // for future migration
+    public List<string>     UnlockedChapterIds = new();
+    public List<PhaseRecord> CompletedPhases    = new();
+
+    // How many times a given chapter has been completed (derived, but cached for perf)
+    public int PlaythroughCountFor(string chapterId) =>
+        CompletedPhases.Count(r => r.ChapterId == chapterId);
+}
+
 
 public enum PhaseStarState
 {

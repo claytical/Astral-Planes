@@ -3,70 +3,8 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
-using Steamworks;
-using Random = UnityEngine.Random;
-
-public class MotifSnapshot
-{
-    public MazeArchetype Pattern;
-    public Color Color;
-    public List<NoteEntry> CollectedNotes = new();
-    public Dictionary<MusicalRole, float> TrackScores = new();
-    public float Timestamp;
-    /// <summary>Total drum-track steps at the moment this snapshot was committed.
-    /// Used to normalise NoteEntry.Step → 0–1 bridge time in GrowTracksAnimated.</summary>
-    public int TotalSteps;
-    /// <summary>MIDI root note of the motif that produced this snapshot (default C4 = 60).
-    /// Used to give root-note buds a distinct visual treatment.</summary>
-    public int MotifKeyRootMidi;
-    /// <summary>Per-track, per-bin data for the coral branch/fork visualizer.</summary>
-    public List<TrackBinData> TrackBins = new();
-
-    public class NoteEntry
-    {
-        public int Step;
-        public int Note;
-        public float Velocity;
-        public Color TrackColor;
-        /// <summary>Which bin (0–3) this note belongs to.</summary>
-        public int BinIndex;
-        /// <summary>True if this note's step was present in the bin's authored NoteSet template.</summary>
-        public bool IsMatched;
-
-        public NoteEntry(int step, int note, float velocity, Color trackColor,
-                         int binIndex = 0, bool isMatched = false)
-        {
-            this.Step      = step;
-            this.Note      = note;
-            this.Velocity  = velocity;
-            this.TrackColor = trackColor;
-            this.BinIndex  = binIndex;
-            this.IsMatched = isMatched;
-        }
-    }
-
-    /// <summary>
-    /// Snapshot of a single bin on a single track, captured at motif commit time.
-    /// Drives branch segment geometry in the coral visualizer.
-    /// </summary>
-    public class TrackBinData
-    {
-        public Color  TrackColor;
-        public MusicalRole Role;
-        public int    BinIndex;
-        public bool   IsFilled;
-        /// <summary>Time.time when this bin was marked filled. -1 if not filled.</summary>
-        public float  CompletionTime;
-        /// <summary>Time.time when the motif started (used to compute fill duration).</summary>
-        public float  MotifStartTime;
-        /// <summary>How many of this bin's collected notes matched the authored template steps.</summary>
-        public int    MatchedNoteCount;
-        /// <summary>How many of this bin's collected notes did NOT match template steps.</summary>
-        public int    UnmatchedNoteCount;
-        /// <summary>Step indices of notes in this bin, for branch-width calculation.</summary>
-        public List<int> CollectedSteps = new();
-    }
-}
+// One completed playthrough of one authored chapter.
+// Sealed at phase completion and added to GardenRecord.
 
 public class DrumTrack : MonoBehaviour
 {
