@@ -36,6 +36,16 @@ public class PhaseStar : MonoBehaviour
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
+    [Header("Off-Screen Entry")]
+    [Tooltip("World units outside the screen edge where the star spawns.")]
+    [SerializeField] private float entryOffscreenMargin = 2f;
+
+    [Tooltip("How close to the screen interior edge (world units) before the star is " +
+             "considered 'arrived' and arms itself.")]
+    [SerializeField] private float entryArriveThreshold = 1.5f;
+
+    [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
+    [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
     [Header("Charge Readiness")]
     [SerializeField, Range(0f, 4f)] private float pokeChargeThreshold = 1.0f;
     [SerializeField, Range(0f, 1f)] private float preReadyGrayFloor = 0.15f;
@@ -87,6 +97,7 @@ public class PhaseStar : MonoBehaviour
     private float beatInterval;
     private float _roleAdvanceInterval;
     private bool _isDisposing;
+    private bool _entryInProgress;
     private Transform activeShardVisual;
     private bool buildingPreview = false;
     private int _shardsEjectedCount; // how many shards have ejected so far
@@ -241,6 +252,93 @@ public class PhaseStar : MonoBehaviour
             InitializeTimingAndSpeeds();
         }
     }
+    public void EnterFromOffScreen(Vector2 targetWorldPos)
+    {
+        _entryInProgress = true;
+
+        // Hide visuals and disable colliders until arrival.
+        visuals?.HideAll();
+        DisableColliders();
+
+        // Place star just outside a random screen edge.
+        Vector2 offPos = PickOffScreenSpawnPoint();
+        transform.position = (Vector3)offPos + Vector3.forward * transform.position.z;
+
+        // Motion is already initialized by this point — enable it so the star drifts inward.
+        if (motion != null) motion.Enable(true);
+
+        StartCoroutine(Co_EntryApproach(targetWorldPos));
+    }
+    private Vector2 PickOffScreenSpawnPoint()
+{
+    var cam = Camera.main;
+    if (cam == null) return Vector2.zero;
+
+    float margin = Mathf.Max(0.5f, entryOffscreenMargin);
+    const float z = 0f;
+
+    Vector2 min = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+    Vector2 max = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+
+    // Pick a random edge: 0=left, 1=right, 2=bottom, 3=top
+    int edge = Random.Range(0, 4);
+    return edge switch
+    {
+        0 => new Vector2(min.x - margin, Random.Range(min.y, max.y)),
+        1 => new Vector2(max.x + margin, Random.Range(min.y, max.y)),
+        2 => new Vector2(Random.Range(min.x, max.x), min.y - margin),
+        _ => new Vector2(Random.Range(min.x, max.x), max.y + margin),
+    };
+}
+
+private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
+{
+    var cam = Camera.main;
+
+    // Wait until the star is inside the screen boundary (with a small inset).
+    while (true)
+    {
+        if (cam == null) cam = Camera.main;
+
+        if (cam != null)
+        {
+            const float z = 0f;
+            Vector2 sMin = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+            Vector2 sMax = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+
+            float threshold = Mathf.Max(0f, entryArriveThreshold);
+            Vector2 p = transform.position;
+
+            bool inside = p.x > sMin.x + threshold &&
+                          p.x < sMax.x - threshold &&
+                          p.y > sMin.y + threshold &&
+                          p.y < sMax.y - threshold;
+
+            if (inside) break;
+        }
+
+        yield return null;
+    }
+
+    // ── Arrived ──────────────────────────────────────────────
+    _entryInProgress = false;
+
+    // Fade visuals in.
+    if (visuals != null && entryFadeInSeconds > 0.01f)
+    {
+        // ShowBright starts the visual; shardAlphaLerpSpeed will naturally
+        // animate from 0→target over the next several frames — no extra
+        // coroutine needed.  We just need to un-hide the renderers.
+        visuals.ShowBright(ResolvePreviewColorByReadiness());
+    }
+
+    // Re-enable colliders and arm.
+    EnableColliders();
+    dust?.RefreshDustIgnore();
+    ArmNext();
+    LogState("EntryComplete+Armed");
+}
+
     void OnEnable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
@@ -354,8 +452,14 @@ public class PhaseStar : MonoBehaviour
             _subscribedLoopBoundary = true;
         }
 
-        ArmNext();
-        LogState("Initialized+Armed");
+        if (_entryInProgress)
+        {
+            LogState("Initialized+AwaitingEntry");
+        } 
+        else {
+         ArmNext();
+         LogState("Initialized+Armed");
+        }
     }
     private float GetChargeReady01()
     {

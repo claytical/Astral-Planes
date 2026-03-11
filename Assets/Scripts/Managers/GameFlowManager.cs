@@ -43,6 +43,14 @@ public class GameFlowManager : MonoBehaviour
 // Optional: fade using renderer alpha (Standard shader)
     [SerializeField] private bool fadeSpiralCoralDuringBridge = true;
     [SerializeField, Min(0f)] private float spiralCoralFadeTarget = 0.65f;
+    [Header("Phase-In FX")]
+    [Tooltip("Particle system prefab instantiated at each vehicle position when a new " +
+             "phase begins.  Should be a short burst (self-destruct or timed).")]
+    [SerializeField] private ParticleSystem vehiclePhaseInFxPrefab;
+
+    [Tooltip("Seconds to wait after the vehicle phase-in FX before spawning the PhaseStar. " +
+             "Gives the player a moment to orient before the star walks in.")]
+    [SerializeField, Min(0f)] private float vehiclePhaseInDelaySeconds = 1.2f;
 
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
@@ -957,10 +965,10 @@ public class GameFlowManager : MonoBehaviour
     {
         StartCoroutine(StartNextPhaseMazeAndStar(phase));
     }
-    private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHardReset = true)
+private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHardReset = true)
 {
     // ============================================================
-    // RESPONSIBILITY: chapter wiring + maze rebuild + PhaseStar spawn
+    // RESPONSIBILITY: chapter wiring + maze rebuild + vehicle FX + PhaseStar entry
     // ============================================================
 
     var drums = activeDrumTrack;
@@ -968,7 +976,6 @@ public class GameFlowManager : MonoBehaviour
 
     if (doHardReset)
     {
-        // Only do this when the caller truly wants a full phase start reset.
         controller?.BeginNewMotif($"PhaseStart {nextPhase}");
         noteViz?.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
     }
@@ -976,9 +983,7 @@ public class GameFlowManager : MonoBehaviour
     if (drums == null) { Debug.LogWarning("[GFM] No DrumTrack."); yield break; }
     if (dust  == null) { Debug.LogWarning("[GFM] No CosmicDustGenerator."); yield break; }
 
-    // Chapter wiring:
-    // - if phase changes: StartChapter (resets motif index, sets currentMotif, applies motif to audio/tracks)
-    // - if same phase: EnsureChapterLoaded only (do NOT reset motif index)
+    // Chapter wiring.
     if (phaseTransitionManager != null)
     {
         if (phaseTransitionManager.currentPhase != nextPhase)
@@ -991,11 +996,11 @@ public class GameFlowManager : MonoBehaviour
 
     yield return new WaitUntil(() =>
         drums.HasSpawnGrid() &&
-        drums.GetSpawnGridWidth() > 0 &&
+        drums.GetSpawnGridWidth()  > 0 &&
         drums.GetSpawnGridHeight() > 0 &&
         Camera.main != null);
 
-    // 1) Choose star cell
+    // 1) Choose star cell.
     var starCell = drums.GetRandomAvailableCell();
     if (starCell.x < 0)
     {
@@ -1003,7 +1008,7 @@ public class GameFlowManager : MonoBehaviour
         yield break;
     }
 
-    // 2) Gather vehicle grid cells (for carve pockets)
+    // 2) Gather vehicle grid cells (carve pockets).
     _vehicleCellsScratch.Clear();
 
     if (vehicles != null && vehicles.Count > 0)
@@ -1026,21 +1031,16 @@ public class GameFlowManager : MonoBehaviour
         }
     }
 
-    // Keep regrowth veto consistent immediately (not one frame later in Update()).
     dust.SetReservedVehicleCells(_vehicleCellsScratch);
 
-    // 3) Apply phase profile to dust generator BEFORE maze generation so that
-    //    BuildMazeRoleImprints can read _activeProfile.dominantRole.
-    //    (HandleChapterChanged fires after StartChapter above, but GenerateMaze
-    //    runs synchronously in a coroutine and may execute before the event
-    //    propagates — apply explicitly here to guarantee ordering.)
+    // 3) Apply phase profile to dust generator before maze generation.
     var profileForPhase = drums.phasePersonalityRegistry != null
         ? drums.phasePersonalityRegistry.Get(nextPhase)
         : null;
     if (profileForPhase != null)
         dust.ApplyProfile(profileForPhase);
 
-    // 4) Build maze (dust fill + carve star pocket + carve vehicle pockets)
+    // 4) Build maze.
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
             nextPhase,
@@ -1050,12 +1050,35 @@ public class GameFlowManager : MonoBehaviour
         )
     );
 
-    // 4) Spawn star at same cell used by dust
+    // ── 5) Vehicle phase-in FX ────────────────────────────────────────────────
+    // Trigger a particle burst at each active vehicle position so the player
+    // gets a clear "new phase begins" signal before the star enters.
+    if (vehiclePhaseInFxPrefab != null)
+    {
+        var activeVehicles = vehicles != null && vehicles.Count > 0
+            ? vehicles
+            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+
+        foreach (var v in activeVehicles)
+        {
+            if (v == null || !v.isActiveAndEnabled) continue;
+            var fx = Instantiate(vehiclePhaseInFxPrefab, v.transform.position, Quaternion.identity);
+            fx.Play();
+            // Auto-destroy after the longest reasonable burst duration.
+            Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
+        }
+    }
+
+    // Hold briefly so the FX reads before the star starts walking in.
+    if (vehiclePhaseInDelaySeconds > 0f)
+        yield return new WaitForSeconds(vehiclePhaseInDelaySeconds);
+
+    // ── 6) Spawn star (off-screen entry via EnterFromOffScreen) ───────────────
     drums.RequestPhaseStar(nextPhase, starCell);
 
-    Debug.Log($"[GFM] Maze+Star started: phase={nextPhase} starCell={starCell} vehicleCells={_vehicleCellsScratch.Count}");
+    Debug.Log($"[GFM] Maze+Star started: phase={nextPhase} starCell={starCell} " +
+              $"vehicleCells={_vehicleCellsScratch.Count}");
 }
-
     private void FreezeGameplayForBridge()
     {
         CleanupAllNoteTethers();

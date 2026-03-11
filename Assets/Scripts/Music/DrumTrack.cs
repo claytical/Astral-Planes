@@ -1256,88 +1256,97 @@ public class DrumTrack : MonoBehaviour
         Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked) uiBottomV={uiReserveBottomViewport:F3}");
     }   
 
-    public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
+public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
+{
+    if (isPhaseStarActive)
     {
-        if (isPhaseStarActive)
-        {
-            Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
-            return;
-        }
-
-        if (!phaseStarPrefab)
-        {
-            Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
-            return;
-        }
-
-        // Resolve dependencies up-front so we can error loudly instead of NRE
-        if (!_trackController || _trackController.tracks == null || _trackController.tracks.Length == 0)
-        {
-            Debug.LogError("[Spawn] No instrument tracks available.");
-            return;
-        }
-
-        // Pick a cell (prefer hint)
-        Vector2Int cell = cellHint ?? (_spawnGrid != null ? _spawnGrid.GetRandomAvailableCell() : GetRandomAvailableCell());
-        if (cell.x < 0)
-        {
-            Debug.LogWarning("[Spawn] 🚫 No available cell for PhaseStar.");
-            return;
-        }
-
-        var pos = GridToWorldPosition(cell);
-        Debug.Log($"[Spawn] 🌠 Spawning PhaseStar at {cell} (world {pos}) for phase {phase}");
-
-        // Instantiate
-        var go = Instantiate(phaseStarPrefab, pos, Quaternion.identity);
-        _star = go.GetComponent<PhaseStar>();
-        if (!_star)
-        {
-            Debug.LogError("[Spawn] Prefab missing PhaseStar");
-            Destroy(go);
-            return;
-        }
-
-        isPhaseStarActive = true;
-
-        // Simple hook – PhaseStar exposes OnDestroyed? If not, use a helper component:
-        var killer = go.AddComponent<OnDestroyRelay>();
-        killer.onDestroyed += () =>
-        {
-            isPhaseStarActive = false;
-            if (_star != null) _star = null; // important: clear stale reference
-            if (_spawnGrid != null) _spawnGrid.FreeCell(cell.x, cell.y);
-        };
-
-        // Behavior profile + dust
-        var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
-        if (_dust && profileAsset) _dust.ApplyProfile(profileAsset);
-        if (_gfm && _dust) _dust.RetintExisting(0.4f);
-
-        // Targets
-        IEnumerable<InstrumentTrack> targets = _trackController.tracks.Where(t => t != null);
-
-
-        // 🔹 Look up the motif for this spawn from the PhaseTransitionManager
-        MotifProfile motif = null;
-        
-        if (_phaseTransitionManager != null && _phaseTransitionManager.currentMotif != null)
-        {
-            motif = _phaseTransitionManager.currentMotif;
-
-            // Optional sanity check: warn if phase/motif phase don't line up
-            Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase {phase}).");
-        }
-        else
-        {
-            Debug.Log("[Spawn] No current motif available; PhaseStar will use phase-based NoteSets.");
-        }
-
-        // Wire star (now motif-aware)
-        _star.Initialize(this, targets, profileAsset, phase, motif);
-        OnPhaseStarSpawned?.Invoke(phase, profileAsset);
+        Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
+        return;
     }
 
+    if (!phaseStarPrefab)
+    {
+        Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
+        return;
+    }
+
+    if (!_trackController || _trackController.tracks == null || _trackController.tracks.Length == 0)
+    {
+        Debug.LogError("[Spawn] No instrument tracks available.");
+        return;
+    }
+
+    // The grid cell remains the star's logical "home" for navigator seeding and
+    // keep-clear registration — we just don't place the GO there at spawn time.
+    Vector2Int cell = cellHint ?? (_spawnGrid != null
+        ? _spawnGrid.GetRandomAvailableCell()
+        : GetRandomAvailableCell());
+
+    if (cell.x < 0)
+    {
+        Debug.LogWarning("[Spawn] No available cell for PhaseStar.");
+        return;
+    }
+
+    // World-space destination the navigator will steer toward from off-screen.
+    Vector2 targetWorldPos = GridToWorldPosition(cell);
+
+    // ── Spawn off-screen ─────────────────────────────────────────────────────
+    // Place the GO at the target for initial subcomponent setup, then
+    // PhaseStar.EnterFromOffScreen immediately relocates it to an edge point.
+    Debug.Log($"[Spawn] 🌠 Spawning PhaseStar (off-screen entry) targeting cell={cell} (world {targetWorldPos}) phase={phase}");
+
+    var go = Instantiate(phaseStarPrefab, (Vector3)targetWorldPos, Quaternion.identity);
+    _star = go.GetComponent<PhaseStar>();
+    if (!_star)
+    {
+        Debug.LogError("[Spawn] Prefab missing PhaseStar component.");
+        Destroy(go);
+        return;
+    }
+
+    isPhaseStarActive = true;
+
+    var killer = go.AddComponent<OnDestroyRelay>();
+    killer.onDestroyed += () =>
+    {
+        isPhaseStarActive = false;
+        _star = null;
+        if (_spawnGrid != null) _spawnGrid.FreeCell(cell.x, cell.y);
+    };
+
+    // Behavior profile + dust retint.
+    var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
+    if (_dust && profileAsset) _dust.ApplyProfile(profileAsset);
+    if (_gfm && _dust)        _dust.RetintExisting(0.4f);
+
+    // Instrument tracks.
+    IEnumerable<InstrumentTrack> targets = _trackController.tracks.Where(t => t != null);
+
+    // Motif.
+    MotifProfile motif = null;
+    if (_phaseTransitionManager?.currentMotif != null)
+    {
+        motif = _phaseTransitionManager.currentMotif;
+        Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase={phase}).");
+    }
+    else
+    {
+        Debug.LogWarning("[Spawn] No current motif found on PhaseTransitionManager.");
+    }
+
+    // Initialize all subcomponents (motion, visuals, dust, navigator).
+    // Initialize internally sets _entryInProgress = false by default;
+    // EnterFromOffScreen flips it to true before ArmNext() runs.
+    _star.Initialize(this, targets, profileAsset, phase, motif);
+
+    // ── Hand off entry sequence ──────────────────────────────────────────────
+    // EnterFromOffScreen repositions the GO to a screen-edge point, hides
+    // visuals, disables colliders, and defers ArmNext until arrival.
+    _star.EnterFromOffScreen(targetWorldPos);
+
+    OnPhaseStarSpawned?.Invoke(phase, profileAsset);
+}
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust)
     {
         dust = null;
