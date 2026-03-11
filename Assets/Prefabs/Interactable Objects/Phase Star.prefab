@@ -4882,9 +4882,9 @@ GameObject:
   - component: {fileID: 6754461597857711404}
   - component: {fileID: 4631393831486629443}
   - component: {fileID: 6224665215610089654}
+  - component: {fileID: 4892159809986813886}
   - component: {fileID: 1335835332103871931}
   - component: {fileID: 7872104301369236207}
-  - component: {fileID: 4892159809986813886}
   m_Layer: 0
   m_Name: Phase Star
   m_TagString: Untagged
@@ -4928,12 +4928,12 @@ MonoBehaviour:
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
-  pokeChargeThreshold: 1
+  pokeChargeThreshold: 0.37
   preReadyGrayFloor: 0.15
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
-  cravingNavigator: {fileID: 0}
+  cravingNavigator: {fileID: 4892159809986813886}
   _progressionMul: 1
   _isInFocusMode: 0
   syncRotationToLoop: 1
@@ -4947,6 +4947,7 @@ MonoBehaviour:
   shardAlphaLerpSpeed: 6
   shardSnifferTurnSpeed: 180
   shardShedDuration: 0.35
+  shardReadyThreshold: 0.5
   maxActiveDps: 360
   _assignedMotif: {fileID: 0}
   _perPetalLayerStep: 0
@@ -4991,7 +4992,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
   keepClearTick: 0.1
+  drainTick: 0.08
   drainRatePerSec: 0.6
+  probeDepthCells: 2
+  dustLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  dustIgnoreSearchRadius: 40
+  dustIgnoreMaxHits: 256
+  starDrainRegrowDelay: 6
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5020,6 +5029,28 @@ MonoBehaviour:
     gradMin: 0.02
   steering:
     maxAccel: 4
+  navBlend:
+    densityWeight: 0.6
+    snifferWeight: 0.35
+  verbose: 0
+--- !u!114 &4892159809986813886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 687ec4739b9ad4c0da0976e45b7d5a84, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
+  replanIntervalSeconds: 0.5
+  spokeCount: 8
+  spokeLength: 5
+  spokeSamples: 4
+  snifferIntervalSeconds: 0.3
+  snifferBfsBudget: 60
   verbose: 0
 --- !u!58 &1335835332103871931
 CircleCollider2D:
@@ -5084,26 +5115,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &4892159809986813886
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312498068821558259}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 687ec4739b9ad4c0da0976e45b7d5a84, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
-  replanIntervalSeconds: 0.5
-  bfsBudget: 150
-  waypointPull: 0.85
-  waypointArrivalRadius: 0.35
-  navigationSpeed: 3.5
-  verbose: 0
-  snifferIntervalSeconds: 0.3
-  snifferBfsBudget: 60
 --- !u!1 &6090321477331913616
 GameObject:
   m_ObjectHideFlags: 0

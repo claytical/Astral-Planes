@@ -33,7 +33,8 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Header("Safety Bubble (gravity void only)")]
     [Tooltip("If enabled, the star can display a temporary refuge bubble during gravity void expansion.")]
     public bool enableSafetyBubble = true;
-
+    [Tooltip("Speed when the star is hungry (no shard at threshold). Blends down to starDriftSpeed when satiated.")]
+    public float starHungrySpeed = 2.5f;
     [Min(0)]
     [Tooltip("Bubble radius in grid cells for the gravity-void refuge zone.")]
     public int safetyBubbleRadiusCells = 4;

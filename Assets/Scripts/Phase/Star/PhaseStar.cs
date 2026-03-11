@@ -157,9 +157,19 @@ public class PhaseStar : MonoBehaviour
     private List<float> _baseAngles = new(); // 0..90° spread
     private List<float> _turns = new(); // r[i] = 1/(i+1)
     private List<float> _omega = new(); // deg/sec = 360*r/T_loop
+    // In [Header("Charge Readiness")] section, alongside pokeChargeThreshold:
+    [SerializeField, Range(0f, 1f)] private float shardReadyThreshold = 0.5f;
+    
     public bool IsChargeReady()
     {
-        return GetTotalCharge() >= pokeChargeThreshold;
+        // Any single shard at or above the per-role threshold makes the star pokeable.
+        if (previewRing == null) return false;
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            _starCharge.TryGetValue(previewRing[i].role, out float c);
+            if (c >= shardReadyThreshold) return true;
+        }
+        return false;
     }
     public enum DisarmReason
     {
@@ -1663,6 +1673,7 @@ public class PhaseStar : MonoBehaviour
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
         _shardsEjectedCount++;
+        _starCharge[ejectedRole] = 0f;
         int remainingAfter = GetRemainingShardCount();
         bool isFinalShardEjection = (remainingAfter <= 0);
 
@@ -1678,6 +1689,28 @@ public class PhaseStar : MonoBehaviour
         currentShardIndex = Mathf.Clamp(currentShardIndex, 0, Mathf.Max(0, remainingAfter - 1));
         RebuildPreviewRingForRemainingShards(keepCurrentIndex: true);
         PrepareNextDirective();
+    }
+    /// <summary>
+    /// 0 = satiated (at least one shard is above shardReadyThreshold).
+    /// 1 = starving (no shard has crossed the threshold).
+    /// Used by PhaseStarMotion2D to scale drift speed.
+    /// </summary>
+    public float GetHungerLevel()
+    {
+        if (previewRing == null || previewRing.Count == 0) return 1f;
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            _starCharge.TryGetValue(previewRing[i].role, out float c);
+            if (c >= shardReadyThreshold) return 0f;
+        }
+        // Partial hunger: lerp based on how close the best shard is to threshold
+        float best = 0f;
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            _starCharge.TryGetValue(previewRing[i].role, out float c);
+            if (c > best) best = c;
+        }
+        return 1f - Mathf.Clamp01(best / Mathf.Max(0.001f, shardReadyThreshold));
     }
     private void SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
     {
