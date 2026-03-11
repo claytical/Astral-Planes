@@ -132,13 +132,19 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private float shardSnifferTurnSpeed = 180f;
     [Tooltip("Duration of the shed-fly animation when a shard is ejected (seconds).")]
     [SerializeField] private float shardShedDuration = 0.35f;
+// AFTER
     public void AddCharge(MusicalRole role, float dustChargeTaken)
     {
         if (role == MusicalRole.None) return;
         float add = Mathf.Max(0f, dustChargeTaken) * dustToStarChargeMul;
         if (add <= 0f) return;
 
-            _starCharge.TryGetValue(role, out float cur);
+        // [BALANCE-C] Diminishing returns: charge earned above field average accrues at half rate.
+        float fieldAvg = (_starCharge.Count > 0) ? GetTotalCharge() / _starCharge.Count : 0f;
+        _starCharge.TryGetValue(role, out float cur);
+        if (cur > fieldAvg)
+            add *= 0.5f;
+
         _starCharge[role] = Mathf.Min(1f, cur + add);
     }
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
@@ -497,12 +503,14 @@ public class PhaseStar : MonoBehaviour
         }
         
         if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
-            float dec = passiveChargeDecayPerSec * dt; 
-            // iterate keys snapshot to avoid collection modification issues if AddCharge occurs elsewhere
-            var keys = _starCharge.Keys.ToList(); 
-            for (int i = 0; i < keys.Count; i++) { 
-                var r = keys[i]; 
-                _starCharge[r] = Mathf.Max(0f, _starCharge[r] - dec);
+            float dec = passiveChargeDecayPerSec * dt;
+        // [BALANCE-B] Dominant role decays 3× faster to compress the charge gap.
+            TryGetDominantRole(out var dominantRoleNow, out _, out _);
+            var keys = _starCharge.Keys.ToList();
+            for (int i = 0; i < keys.Count; i++) {
+                var r = keys[i];
+                float roleDec = (r == dominantRoleNow) ? dec * 3f : dec;
+                _starCharge[r] = Mathf.Max(0f, _starCharge[r] - roleDec);
             }
         }
         
