@@ -260,7 +260,7 @@ public class MotifCoralVisualizer : MonoBehaviour
     // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>Instantly build and display the full coral for this snapshot.</summary>
-    public void RenderMotifCoral(PhaseSnapshot snapshot)
+    public void RenderMotifCoral(MotifSnapshot snapshot)
     {
         ClearAll();
         if (snapshot == null) return;
@@ -272,7 +272,7 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// Build the coral and animate it growing over <paramref name="durationSec"/> seconds.
     /// <paramref name="getSteer"/> is polled each frame; stick-X modulates the fork angle.
     /// </summary>
-    public IEnumerator GrowMotifCoral(PhaseSnapshot snapshot, float durationSec, Func<Vector2> getSteer = null)
+    public IEnumerator GrowMotifCoral(MotifSnapshot snapshot, float durationSec, Func<Vector2> getSteer = null)
     {
         ClearAll();
         if (snapshot == null) { yield return new WaitForSeconds(durationSec); yield break; }
@@ -295,7 +295,7 @@ public class MotifCoralVisualizer : MonoBehaviour
     //  Build
     // ═══════════════════════════════════════════════════════════════════════
 
-    private void BuildCoral(PhaseSnapshot snapshot)
+    private void BuildCoral(MotifSnapshot snapshot)
     {
         if (snapshot.TrackBins == null || snapshot.TrackBins.Count == 0) return;
 
@@ -669,8 +669,8 @@ public class MotifCoralVisualizer : MonoBehaviour
     //  Buds
     // ═══════════════════════════════════════════════════════════════════════
 
-    private void SpawnBuds(List<PhaseSnapshot.NoteEntry> notes, Vector3[] spine,
-                            int binIndex, PhaseSnapshot snapshot,
+    private void SpawnBuds(List<MotifSnapshot.NoteEntry> notes, Vector3[] spine,
+                            int binIndex, MotifSnapshot snapshot,
                             bool isMatched, Transform segParent,
                             float growStart, float growEnd)
     {

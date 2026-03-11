@@ -6,7 +6,7 @@ using System.Linq;
 using Steamworks;
 using Random = UnityEngine.Random;
 
-public class PhaseSnapshot
+public class MotifSnapshot
 {
     public MazeArchetype Pattern;
     public Color Color;
@@ -127,7 +127,7 @@ public class DrumTrack : MonoBehaviour
     private AudioSource _activeDrum; // currently audible deck
     private AudioSource _inactiveDrum;
     public double leaderStartDspTime { get; private set; }
-    public List<PhaseSnapshot> SessionPhases = new();
+    public List<MotifSnapshot> SessionPhases = new();
     public List<MineNode> activeMineNodes = new List<MineNode>();
     public bool isPhaseStarActive;
     public int currentStep;
