@@ -130,6 +130,7 @@ GameObject:
   m_Component:
   - component: {fileID: 45202785}
   - component: {fileID: 45202786}
+  - component: {fileID: 45202787}
   m_Layer: 5
   m_Name: NoteRows
   m_TagString: Untagged
@@ -174,16 +175,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63d0b38c6683745cb832e4f566b663d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  lineOfAscent: {fileID: 296242525}
-  ascendLoops: 8
-  ascendPaddingSeconds: 0.15
-  ascendLineWorldPadding: 0
+  ascensionDirector: {fileID: 45202787}
   playheadLine: {fileID: 657963291}
   playheadParticles: {fileID: 264452581}
   _playheadEnergy01: 0
   _playheadEnergyLerpSpeed: 4
-  _lineCharge01: 0
-  _lineChargeDecaySpeed: 0.5
   releasePulseSeconds: 0.18
   releasePulseColor: {r: 1, g: 0.2, b: 0.9, a: 1}
   notePrefab: {fileID: 4452279037497567512, guid: ece60c6a349a846e085a4f328163340b,
@@ -200,17 +196,31 @@ MonoBehaviour:
   - {fileID: 197216900}
   - {fileID: 371719000}
   binStripParent: {fileID: 150479618}
-  binIndicatorPrefab: {fileID: 3671981459538206729, guid: c13c9053efb984a11b0e57af226016ac,
-    type: 3}
-  binInactiveColor: {r: 1, g: 1, b: 1, a: 0.2}
-  binActiveColor: {r: 1, g: 1, b: 1, a: 0.9}
+  firstPlayConfirmOrbPrefab: {fileID: 296242526}
+  firstPlayConfirmTravelSeconds: 1
+  firstPlayConfirmEmitCount: 24
   playheadTrailEnabled: 1
   playheadTrailEmitPerWorldUnit: 45
   playheadTrailMaxEmitPerFrame: 160
   playheadTrailWorldZOverride: NaN
-  firstPlayConfirmOrbPrefab: {fileID: 296242526}
-  firstPlayConfirmTravelSeconds: 1
-  firstPlayConfirmEmitCount: 24
+--- !u!114 &45202787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 45202784}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04665b15e8a34407c83562f95fd11fbc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NoteAscensionDirector
+  lineOfAscent: {fileID: 423220218}
+  ascendLoops: 8
+  ascendPaddingSeconds: 0.15
+  ascendLineWorldPadding: 0
+  firstPlayConfirmEmitCount: 6
+  lineChargeDecaySpeed: 0.5
 --- !u!1 &48689784
 GameObject:
   m_ObjectHideFlags: 0
