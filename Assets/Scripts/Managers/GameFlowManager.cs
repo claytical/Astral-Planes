@@ -23,7 +23,7 @@ public static class SessionGenome
 
 public enum GameState { Begin, Selection, Playing, GameOver }
 
-public class GameFlowManager : MonoBehaviour
+public partial class GameFlowManager : MonoBehaviour
 {
     [Header("Bridge gating")]
     [Tooltip("If true, bridge/cinematic is pending and should gate spawns and re-arm.")]
@@ -105,70 +105,7 @@ public class GameFlowManager : MonoBehaviour
         set => currentState = value;
     }
     
-    public void JoinGame()
-    {
-        var intro = FindByNameIncludingInactive("IntroScreen");
-        var setup = FindByNameIncludingInactive("GameSetupScreen");
 
-        if (intro != null && intro.activeSelf)
-        {
-            intro.SetActive(false);
-            if (setup != null)
-            {
-                string title = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.InstanceID).FirstOrDefault().text = "Select your vessel...";
-                Debug.Log($"Set title to {title}");
-                setup.SetActive(true);
-            }
-        }
-    }
-    private void SetBridgeCinematicMode(bool on)
-    {
-        // Existing behavior: hide maze + note UI
-        SetBridgeVisualMode(on);
-
-        if (on)
-            HideNonCoralRenderersForBridge();
-        else
-            RestoreNonCoralRenderersAfterBridge();
-    }
-
-    private void HideNonCoralRenderersForBridge()
-    {
-        _bridgeHiddenRenderers.Clear();
-
-        // Hide Vehicles + any other visible gameplay renderers.
-        // We intentionally do NOT touch the coral instance here.
-        foreach (var r in FindObjectsOfType<Renderer>(includeInactive: true))
-        {
-            if (!r) continue;
-            
-            // Skip the motif coral visualizer so it stays visible during the motif bridge
-            if (motifCoralVisualizer != null && r.transform.IsChildOf(motifCoralVisualizer.transform))
-                continue;
-
-            // Skip UI canvases (they’re already handled by SetBridgeVisualMode)
-            if (r.GetComponentInParent<Canvas>(true) != null)
-                continue;
-
-            // Only hide things that are currently visible
-            if (r.enabled)
-            {
-                _bridgeHiddenRenderers.Add(r);
-                r.enabled = false;
-            }
-        }
-    }
-
-    private void RestoreNonCoralRenderersAfterBridge()
-    {
-        for (int i = 0; i < _bridgeHiddenRenderers.Count; i++)
-        {
-            var r = _bridgeHiddenRenderers[i];
-            if (r) r.enabled = true;
-        }
-        _bridgeHiddenRenderers.Clear();
-    }
-    
     public NoteSet GenerateNotes(InstrumentTrack track, int entropy = 0)
     {
         if (track == null) return null;
@@ -204,63 +141,7 @@ public class GameFlowManager : MonoBehaviour
         };
 
     }
-    public void RegisterPlayer(LocalPlayer player)
-    {
-        localPlayers.Add(player);
-    }
-    public bool ReadyToPlay()
-    {
-        return CurrentState == GameState.Playing && localPlayers.Count > 0;
-    }
-    private void SetBridgeVisualMode(bool on)
-    {
-        // When ON: hide gameplay visuals (maze + noteviz), coral is shown by PlayPhaseBridge.
-        // When OFF: show gameplay visuals again.
-        if (dustGenerator) dustGenerator.gameObject.SetActive(!on);
-
-        if (noteViz && noteViz.GetUIParent())
-            noteViz.GetUIParent().gameObject.SetActive(!on);
-    }
-    public void CheckAllPlayersReady()
-    {
-        if (!localPlayers.All(p => p.IsReady)) return;
-
-        // Don’t load GeneratedTrack yet — show the primary tutorial sequence first.
-        if (ControlTutorialDirector.Instance != null)
-        {
-            Debug.Log($"[TUTORIAL] Begin Tutorial Sequence");
-            ControlTutorialDirector.Instance.BeginPrimaryTutorialSequence();
-            return;
-        }
-
-        // Fallback if director is missing
-        SessionGenome.BootNewSessionSeed((int)UnityEngine.Random.Range(0, 1000f));
-        StartCoroutine(TransitionToScene("GeneratedTrack"));
-    }
-
-    public void BeginGameAfterTutorial()
-    {
-        SessionGenome.BootNewSessionSeed((int)UnityEngine.Random.Range(0, 1000f));
-        StartCoroutine(TransitionToScene("GeneratedTrack"));
-    }
-
-    public void StartShipSelectionPhase()
-    {
-        CurrentState = GameState.Selection;
-        // No need to call PlayerInput.Instantiate — joining is handled by PlayerInputManager
-        Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
-    }
-    public void CheckAllPlayersOutOfEnergy()
-    {
-        if (hasGameOverStarted) return;
-        if (GhostCycleInProgress) return;
-        if (localPlayers.Where(p => p != null).All(p => !p.IsReady || p.GetVehicleEnergy() <= 0f))
-
-        {
-            hasGameOverStarted = true;
-            StartCoroutine(HandleGameOverSequence());
-        }
-    }
+    
     public void QuitToSelection()
     {
         Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={demoMode})");
@@ -555,10 +436,14 @@ public class GameFlowManager : MonoBehaviour
             yield return new WaitForSeconds(motifBridgeSec);
         }
 
-        // Advance motif — this calls BeginNewMotif() which clears track state.
+// Coral is finished. Restore gameplay objects BEFORE rebuilding the next motif,
+// otherwise CosmicDustGenerator will still be inactive and cannot start nested coroutines.
+        SetBridgeCinematicMode(false);
+
+// Advance motif — this calls BeginNewMotif() which clears track state
+// and rebuilds maze/star for the next motif/phase.
         yield return StartCoroutine(StartNextMotifInPhase(phaseToRestart));
 
-        SetBridgeCinematicMode(false); // restore maze, dust, vehicles
         GhostCycleInProgress = false;
         BridgePending = false;
     }
@@ -1101,22 +986,7 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
             try { activeDrumTrack._star = null; } catch {}
         }
     }
-
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            vehicles = new List<Vehicle>();
-
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-
+    
     private void Update()
     {
         // Feed current vehicle grid positions to the dust generator so regrowth can be vetoed deterministically.
