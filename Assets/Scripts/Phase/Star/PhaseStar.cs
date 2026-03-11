@@ -1664,6 +1664,7 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
+        _starCharge[ejectedRole] = 0f;
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
@@ -1673,7 +1674,6 @@ public class PhaseStar : MonoBehaviour
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
         _shardsEjectedCount++;
-        _starCharge[ejectedRole] = 0f;
         int remainingAfter = GetRemainingShardCount();
         bool isFinalShardEjection = (remainingAfter <= 0);
 
