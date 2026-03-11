@@ -885,6 +885,18 @@ public class CosmicDustGenerator : MonoBehaviour
             SetCellState(gp, DustCellState.Empty);
             yield break;
         }
+
+        // ---------------------------------------------------------------
+        // VEHICLE GATE: never begin grow-in while a vehicle sits on the cell.
+        // Re-enqueue as PendingRegrow so the step gate retries later.
+        // ---------------------------------------------------------------
+        if (IsVehicleOverlappingCell(gp))
+        {
+            SetCellState(gp, DustCellState.PendingRegrow);
+            EnqueueStepRegrow(gp);
+            yield break;
+        }
+
         var go = GetOrCreateCellGO(gp);
         if (go == null) yield break;
         if (!go.activeSelf)
