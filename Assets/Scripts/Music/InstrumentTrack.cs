@@ -2239,8 +2239,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
             ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-
-            c.AttachTetherAtSpawn(markerGO.transform, nv.noteTetherPrefab, trackColor, dur, absStep);
+            c.BindMarkerAtSpawn(markerGO.transform, absStep);
         }
 // Begin intro flight from MineNode explosion site -> chosen grid spawn pos
         c.BeginSpawnArrival(
