@@ -12,7 +12,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     // Public API / hooks
     // ============================================================
     public event Action<Vector2> OnVelocityChanged;
-
+    private PhaseStar _star;
     /// <summary>Optional provider for vehicle world positions (for avoidance).</summary>
     public Func<IReadOnlyList<Vector2>> VehiclePositionsProvider;
 
@@ -164,7 +164,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     {
         _profile = profile;
         _enabled = true;
-
+        _star = star;
         if (DustDensitySampler == null)
         {
             DustDensitySampler = pos =>
@@ -222,8 +222,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
 
         float dt    = Time.fixedDeltaTime;
-        float speed = Mathf.Max(0f, _profile.starDriftSpeed);
-        float jitter = Mathf.Max(0f, _profile.starDriftJitter);
+      
+        float hunger = (_star != null) ? _star.GetHungerLevel() : 0f;
+        float speed  = Mathf.Lerp(
+            Mathf.Max(0f, _profile.starDriftSpeed),
+            Mathf.Max(0f, _profile.starHungrySpeed),
+            hunger
+        );        float jitter = Mathf.Max(0f, _profile.starDriftJitter);
         if (_focus) speed *= bounds.focusSpeedMul;
 
         _rechooseTimer -= dt;
@@ -304,6 +309,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVel : _rb.linearVelocity);
         }
     }
+    
 
     private void KeepInsideScreenAndBounce()
     {
