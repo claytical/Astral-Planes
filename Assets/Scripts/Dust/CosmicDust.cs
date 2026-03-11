@@ -69,6 +69,7 @@ public class CosmicDust : MonoBehaviour {
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
     private const float kRegrowAlphaCap = 0.35f;
+    private const float kSolidAlphaFloor = .55f;
     [Serializable]
     public struct DustInteractionSettings
     {
@@ -297,6 +298,19 @@ private bool _tintPulseActive = false;
     {
         TickVehicleCompression();
     }
+    /// <summary>
+    /// Called by the generator when a cell becomes Solid. Ensures the sprite alpha
+    /// is at least <paramref name="minAlpha"/> so the cell is never invisible-but-solid.
+    /// </summary>
+    public void EnsureMinSolidAlpha(float minAlpha)
+    {
+        if (_currentTint.a < minAlpha)
+        {
+            _currentTint.a = minAlpha;
+            Charge01 = Mathf.Clamp01(_currentTint.a);
+        }
+        ApplyDisplayedTint(_currentTint);
+    }
     private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
     {
         if (!enableVehicleCompression || vehicle == null || visual.sprite == null)
@@ -482,10 +496,12 @@ private bool _tintPulseActive = false;
     {
         Role     = r;
         Charge01 = Mathf.Clamp01(charge);
-        float visibleAlpha = Mathf.Lerp(0.55f, 1f, Charge01);
+        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
         roleColorRgb.a = visibleAlpha;
-        SetTint(roleColorRgb);       // sprite reads hue+alpha correctly
-        // Optional: only call if you re-enable particle tinting.
+        // Alpha comes from the caller (roleProfile.baseAlpha via GetBaseColor()).
+        // Do NOT floor it here — cells that aren't Solid yet must stay dim.
+        // The generator enforces a visible-alpha floor when solidifying.
+        SetTint(roleColorRgb);
     }
     
     public float DrainCharge(float amount)
@@ -506,6 +522,17 @@ private bool _tintPulseActive = false;
         _currentTint = drained;
         // Apply immediately — the star is actively consuming this cell, player needs visual feedback.
         ApplyDisplayedTint(_currentTint);
+
+        // Enforce solid-visibility threshold: if alpha has dropped below the floor
+        // where dust should read as terrain, kill collision and tell the generator
+        // to transition this cell out of Solid.
+        if (drained.a < kSolidAlphaFloor)
+        {
+            SetTerrainColliderEnabled(false);
+            if (gen != null)
+                gen.OnDustDrainedBelowThreshold(this);
+        }
+
         return take;
     }
     public void ConfigureForPhase(MazeArchetype phase)
@@ -1461,25 +1488,27 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
     }
     private void RebuildColliderForCurrentScale()
     {
-        // Keep legacy BoxCollider2D support, but prefer CircleCollider2D for the new grid-of-circles approach.
-        // If neither is present, we do nothing.
-        if (_circle != null)
-        {
-            // For circle tiles, radius is driven by the sprite footprint (Rule #3).
-            SyncColliderRadiusToSprite();
-            return;
-        }
-
         if (_box == null) return;
 
         float desiredWorld = Mathf.Clamp(_cellWorldSize - _cellClearanceWorld, 0.001f, _cellWorldSize);
 
-        // Convert desired WORLD size into LOCAL size accounting for lossy scale.
-        // This prevents oversized colliders when the dust root or prefab is scaled.
+        // The box collider must represent exactly one cell in physics space,
+        // regardless of the sprite's visual footprint (dustFootprintMul).
+        //
+        // IMPORTANT: if the box is on the same transform as the sprite,
+        // the sprite scale-in animation (to _spriteScaleTarget, typically 1.15)
+        // will inflate the box's world footprint AFTER this method runs.
+        // Compensate by dividing out the target sprite scale so the final
+        // world size lands at exactly desiredWorld once the animation completes.
+        float spriteScale = Mathf.Max(0.01f, _spriteScaleTarget);
+
         float sx = Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.x));
         float sy = Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.y));
 
-        _box.size   = new Vector2(desiredWorld / sx, desiredWorld / sy);
+        _box.size = new Vector2(
+            desiredWorld / (sx * spriteScale),
+            desiredWorld / (sy * spriteScale)
+        );
         _box.offset = Vector2.zero;
     }
     private void SyncColliderRadiusToSprite()

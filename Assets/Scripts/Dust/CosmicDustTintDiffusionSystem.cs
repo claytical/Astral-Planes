@@ -84,6 +84,12 @@ public sealed class CosmicDustTintDiffusionSystem
             Color cur = dust.CurrentTint;
             Color next = Color.Lerp(cur, avg, t);
 
+// Don't let diffusion drag a solid cell's alpha below the visibility
+// threshold — that creates invisible-but-collidable terrain.
+// 0.55 matches CosmicDust.kSolidAlphaFloor.
+            if (cur.a >= 0.55f)
+                next.a = Mathf.Max(next.a, 0.55f);
+
             if (ColorMaxAbsDelta(cur, next) < minDelta)
                 continue;
 
