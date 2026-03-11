@@ -1150,7 +1150,6 @@ public class InstrumentTrackController : MonoBehaviour
         if (tracks == null || tracks.Length == 0) return false; 
         foreach (var t in tracks) {
             if (t.IsExpansionPending) {
-                Debug.Log($"[CTRL:EP] {t.name} pendExpand={t._pendingExpandForBurst}  hooked={t._hookedBoundaryForExpand}");
             }
             if (!t) continue;
             if (t.IsExpansionPending) return true; 
