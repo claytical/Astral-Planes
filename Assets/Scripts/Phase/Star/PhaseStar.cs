@@ -520,8 +520,6 @@ public class PhaseStar : MonoBehaviour
                 _subscribedLoopBoundary = false;
             }
         }
-        if (cravingNavigator != null)
-            cravingNavigator.OnCravingChanged -= NotifyCravingChanged;
     }
 
     bool AnyExpansionPendingGlobal()
@@ -692,6 +690,7 @@ public class PhaseStar : MonoBehaviour
 
         // Pokeability no longer controls locomotion.
         EnableColliders();
+        dust?.RefreshDustIgnore();
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
     }
@@ -1271,12 +1270,19 @@ public class PhaseStar : MonoBehaviour
             // Color MUST come from the role’s track, not a cycling palette.
             var track = FindTrackByRole(role);
 
-// Prefer the MusicalRoleProfile authority when available.
-// Fallback to baked trackColor to preserve legacy behavior.
-            Color startGray = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
-            
-            Color shadow = track != null ? track.TrackShadowColor : new Color(0.08f,0.08f,0.08f,1f);
+            // Role color is the lerp TARGET stored in the shard struct.
+            // Fall back to MusicalRoleProfileLibrary, then a visible default so it's never invisible.
+            Color roleColor;
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+            if (roleProfile != null)
+                roleColor = new Color(roleProfile.dustColors.baseColor.r, roleProfile.dustColors.baseColor.g, roleProfile.dustColors.baseColor.b, 1f);
+            else if (track != null)
+                roleColor = new Color(track.trackColor.r, track.trackColor.g, track.trackColor.b, 1f);
+            else
+                roleColor = Color.white;
 
+            Color startGray = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
+            Color shadow = track != null ? track.TrackShadowColor : new Color(0.08f,0.08f,0.08f,1f);
 
  
             var shardGO = new GameObject($"PreviewShard_{i}_{role}");
@@ -1295,7 +1301,7 @@ public class PhaseStar : MonoBehaviour
             
             previewRing.Add(new PreviewShard
             {
-                color = startGray,
+                color = roleColor,
                 shadowColor = shadow,
                 collected = false,
                 visual = shardGO.transform,

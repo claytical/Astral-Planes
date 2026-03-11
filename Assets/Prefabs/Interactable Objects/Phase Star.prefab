@@ -4884,6 +4884,7 @@ GameObject:
   - component: {fileID: 6224665215610089654}
   - component: {fileID: 1335835332103871931}
   - component: {fileID: 7872104301369236207}
+  - component: {fileID: 4892159809986813886}
   m_Layer: 0
   m_Name: Phase Star
   m_TagString: Untagged
@@ -4922,6 +4923,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   spawnStrategyProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c,
     type: 2}
+  dominantRoleSwitchDelta: 0.1
   behaviorProfile: {fileID: 11400000, guid: 56d8541b1799a436ca860fa02d237caf, type: 2}
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
@@ -5082,6 +5084,26 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
+--- !u!114 &4892159809986813886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2312498068821558259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 687ec4739b9ad4c0da0976e45b7d5a84, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
+  replanIntervalSeconds: 0.5
+  bfsBudget: 150
+  waypointPull: 0.85
+  waypointArrivalRadius: 0.35
+  navigationSpeed: 3.5
+  verbose: 0
+  snifferIntervalSeconds: 0.3
+  snifferBfsBudget: 60
 --- !u!1 &6090321477331913616
 GameObject:
   m_ObjectHideFlags: 0
