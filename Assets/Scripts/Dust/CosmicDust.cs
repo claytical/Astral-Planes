@@ -4,8 +4,6 @@ using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public enum DustBehaviorType { PushThrough, Stop, Repel }
-
 public class CosmicDust : MonoBehaviour {
     [Serializable]
     public struct DustVisualSettings {
@@ -58,8 +56,8 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private int dustPluckMinDurationTicks = 360;
     [SerializeField] private int dustPluckMaxDurationTicks = 1440;
 
-    [SerializeField] private float dustPluckMinVelocity127 = 8f;
-    [SerializeField] private float dustPluckMaxVelocity127 = 28f;
+    [SerializeField] private float dustPluckMinVelocity127 = 40f;
+    [SerializeField] private float dustPluckMaxVelocity127 = 70f;
 
     [SerializeField] private float dustPluckMinCooldownSeconds = 0.8f;
     [SerializeField] private float dustPluckMaxCooldownSeconds = 2f;
@@ -82,24 +80,19 @@ public class CosmicDust : MonoBehaviour {
         [Header("Imprint (from MineNodes)")]
         [Range(0f, 1f)] public float hardness01; // 0 = soft/easy, 1 = hard/needs more boost
 
-        [Header("Dust Clearing")]
-        [Min(0.05f)] public float nonBoostSecondsToBreak;
     }
     private readonly struct PhaseDustConfig
     {
         public readonly float drainMul;
-        public readonly DustBehavior behavior;
         public readonly float lateral;
         public readonly float turb;
 
         public PhaseDustConfig(
             float drainMul,
-            DustBehavior behavior,
             float lateral,
             float turb)
         {
             this.drainMul   = drainMul;
-            this.behavior   = behavior;
             this.lateral    = lateral;
             this.turb       = turb;
         }
@@ -117,26 +110,18 @@ public class CosmicDust : MonoBehaviour {
 
     [SerializeField] public DustClearingSettings clearing = new DustClearingSettings
     {
-        hardness01                = 0f,
-        nonBoostSecondsToBreak    = 2.5f
-      
+        hardness01                = 0
     };
     [Header("Shader Params")]
     [SerializeField] private bool useWorkShaderParams = true;
     private MaterialPropertyBlock _mpb;
     private float _workSigned01 = 0f;
-    private float _baseDrainPerSecond;
+
     [Header("Work / Preview (Boost Path)")]
     [SerializeField] private float previewWorkHoldSeconds = 0.10f;
     private Coroutine _previewWorkRoutine;
-    private int _previewWorkToken = 0;
     private Vector3 _initialLocalScale = Vector3.one;
     private bool _cachedInitialScale;
-    public enum DustBehavior { ViscousSlow, SiltDissipate, StaticCling, CrossCurrent, Turbulent }
-    [Header("Behavior")]
-    public DustBehavior behavior = DustBehavior.ViscousSlow; // NEW
-    [Range(0f,10f)]  public float lateralForce = 2.0f;        // NEW (CrossCurrent)
-    [Range(0f,10f)]  public float turbulence = 0.0f;          // NEW (Wildcard micro-deflection)
     private Vector3 _baseLocalScale = Vector3.one;
 // ---- Particle visibility control ----
 // We treat particle emission as an on/off module toggle and never "cache whatever the current rate is"
@@ -285,7 +270,6 @@ private bool _tintPulseActive = false;
             transform.localScale = visual.prefabReferenceScale;
         _baseLocalScale = transform.localScale;
         float r = GetWorldRadius();
-        _baseDrainPerSecond = interaction.energyDrainPerSecond;
         // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
         var psr = GetComponent<ParticleSystemRenderer>();
         if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
@@ -534,75 +518,6 @@ private bool _tintPulseActive = false;
         }
 
         return take;
-    }
-    public void ConfigureForPhase(MazeArchetype phase)
-    {
-        // One switch → one config object → one assignment block.
-        var cfg = phase switch
-        {
-            MazeArchetype.Establish => new PhaseDustConfig(
-                drainMul:   0.50f,
-                behavior:   DustBehavior.SiltDissipate,
-                lateral:    0f,
-                turb:       0f
-            ),
-
-            MazeArchetype.Evolve => new PhaseDustConfig(
-                drainMul:   1.00f,
-                behavior:   DustBehavior.CrossCurrent,
-                lateral:    2.5f,
-                turb:       0.25f
-            ),
-
-            MazeArchetype.Intensify => new PhaseDustConfig(
-                drainMul:   1.60f,
-                behavior:   DustBehavior.StaticCling,
-                lateral:    0.5f,
-                turb:       0.4f
-            ),
-
-            MazeArchetype.Release => new PhaseDustConfig(
-                drainMul:   0.90f,
-                behavior:   DustBehavior.SiltDissipate,
-                lateral:    0f,
-                turb:       0f
-            ),
-
-            MazeArchetype.Wildcard => new PhaseDustConfig(
-                drainMul:   1.25f,
-                behavior:   DustBehavior.Turbulent,
-                lateral:    1.2f,
-                turb:       2.0f
-            ),
-
-            MazeArchetype.Pop => new PhaseDustConfig(
-                drainMul:   0.75f,
-                behavior:   DustBehavior.ViscousSlow,
-                lateral:    0f,
-                turb:       0.2f
-            ),
-
-            _ => new PhaseDustConfig(
-                drainMul:   1.0f,
-                behavior:   DustBehavior.SiltDissipate,
-                lateral:    0f,
-                turb:       0f
-            )
-        };
-
-// Root stays unit scale for collider determinism
-        transform.localScale = Vector3.one;
-
-// Apply phase scale to particle footprint only
-        ApplyParticleFootprint();
-
-        RebuildColliderForCurrentScale();
-        SyncParticlesToCollider();
-        interaction.energyDrainPerSecond = _baseDrainPerSecond * cfg.drainMul;
-        // Motion / feel
-        behavior       = cfg.behavior;
-        lateralForce   = cfg.lateral;
-        turbulence     = cfg.turb;
     }
     public void Begin()
     {
@@ -1326,14 +1241,18 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
         }
         else
         {
-            float hardnessMul = Mathf.Lerp(1.0f, 2.25f, h);
-
+            // ---------------------------------------------------------------
+            // NON-BOOST PATH: dust is a wall. No clearing, no energy drain.
+            // Musical pluck still fires so pressing against dust sounds alive.
+            // _nonBoostClearSeconds tracks contact duration for pluck intensity
+            // only — it never triggers a break.
+            // ---------------------------------------------------------------
             _nonBoostClearSeconds += dt;
 
-            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-            vehicle.DrainEnergy(drainPerSec * hardnessMul * dt);
+            // No vehicle.DrainEnergy — non-boost contact is free.
+            // No clearing — severity is purely cosmetic for pluck bloom.
 
-            float denom    = Mathf.Max(0.05f, clearing.nonBoostSecondsToBreak);
+            float denom = Mathf.Max(0.05f, dustPluckSwellSeconds);
             float severity = Mathf.Clamp01(_nonBoostClearSeconds / denom);
 
             if (_currentPluckVehicle != vehicle)
@@ -1363,7 +1282,7 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
                     bloom01
                 );
 
-                // Starts sparse, gets denser as the dust “sings.”
+                // Starts sparse, gets denser as the dust "sings."
                 float cooldown = Mathf.Lerp(
                     dustPluckMaxCooldownSeconds,
                     dustPluckMinCooldownSeconds,
@@ -1378,10 +1297,10 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
                 }
 
                 // Space future triggers as a fraction of phrase length so it feels cohesive.
-                float durSecApprox = TicksToSecondsApprox(durTicks);
-                _nextDustPluckTime = Time.time + Mathf.Max(cooldown, durSecApprox * 0.28f);
+
             }
         }
+
     }
     private float TicksToSecondsApprox(int ticks)
     {

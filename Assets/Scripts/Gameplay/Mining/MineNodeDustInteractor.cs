@@ -107,33 +107,6 @@ public class MineNodeDustInteractor : MonoBehaviour
             Vector2 brake = -_rb.linearVelocity * extraBrake;
             _rb.AddForce(brake, ForceMode2D.Force);
         }
-
-        // Optional per-dust behavior
-        if (_drumTrack.TryGetDustAt(cell, out var dust) && dust != null)
-        {
-            if (dust.behavior == CosmicDust.DustBehavior.CrossCurrent && dust.lateralForce > 0f)
-            {
-                Vector2 v = _rb.linearVelocity;
-                if (v.sqrMagnitude > 0.0001f)
-                {
-                    Vector2 side = new Vector2(-v.y, v.x).normalized;
-                    _rb.AddForce(side * dust.lateralForce * lateralNudgeMul, ForceMode2D.Force);
-                }
-            }
-
-            if (dust.behavior == CosmicDust.DustBehavior.Turbulent && dust.turbulence > 0f)
-            {
-                Vector2 noise =
-                    Random.insideUnitCircle.normalized *
-                    (dust.turbulence * turbulenceMul);
-                _rb.AddForce(noise, ForceMode2D.Force);
-            }
-
-            if (dust.behavior == CosmicDust.DustBehavior.StaticCling)
-            {
-                _rb.AddForce(-_rb.linearVelocity * 0.5f, ForceMode2D.Force);
-            }
-        }
     }
 
     // ------------------------------------------------------------
