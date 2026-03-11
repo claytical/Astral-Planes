@@ -746,7 +746,6 @@ public class
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
     }
-    private int LastExpandOldTotal { get; set; } = 0;
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);
     private int   MyMultiplier()     => Mathf.Max(1, loopMultiplier);
@@ -2016,7 +2015,6 @@ public class
         // Defensive reset
         if (_expandCommitted)
         {
-            Debug.LogWarning($"[TRK:STAGE_EXPAND] track={name} burstId={burstId} RESET stale expandCommitted=true oldTotalAtExpand={_oldTotalAtExpand} totalSteps={_totalSteps} loopMul={loopMultiplier} targetBin={targetBin}");
             _expandCommitted = false;
         }
 
@@ -2139,14 +2137,13 @@ public class
         return;
     }
 
-    List<Vector2Int> trappedCandidates = null;
 
     if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin &&
         dustGen != null &&
         drumTrack != null &&
         originWorld.HasValue)
     {
-        trappedCandidates = BuildTrappedCandidatesNearOrigin(
+        List <Vector2Int> trappedCandidates = BuildTrappedCandidatesNearOrigin(
             dustGen,
             drumTrack,
             originWorld.Value,
@@ -2572,7 +2569,6 @@ public class
             }
 
             // A) Snapshot old width
-            LastExpandOldTotal = _totalSteps;
             _oldTotalAtExpand = _totalSteps;
 
 // "Leader" loop width should reflect what is actually audible/committed, not merely a
