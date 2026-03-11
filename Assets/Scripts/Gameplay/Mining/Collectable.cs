@@ -16,7 +16,7 @@ public class Collectable : MonoBehaviour
     public int intendedBin = -1;
 // ---- Spawn Arrival Intro ----
     [Header("Spawn Arrival")]
-    [SerializeField] private float spawnArrivalSeconds = 0.28f;
+    [SerializeField] private float spawnArrivalSeconds = 1.5f;
     [SerializeField] private AnimationCurve spawnArrivalEase = null;
     private Coroutine _spawnArrivalRoutine;
     private bool _spawnArrivalInProgress;

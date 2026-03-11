@@ -203,7 +203,11 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         _rb.linearVelocity = Vector2.zero;
         _rb.angularVelocity = 0f;
-
+        if (on)
+        {
+            // Snap back inside screen before releasing constraints
+            KeepInsideScreenAndBounce();
+        }
         _rb.constraints = on
             ? RigidbodyConstraints2D.FreezeRotation
             : RigidbodyConstraints2D.FreezeAll;
