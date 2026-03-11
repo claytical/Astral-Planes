@@ -892,7 +892,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 denyColor = (shadow != Color.clear && shadow != Color.magenta) ? shadow : Color.darkGray;
             }
             dust.SetFeedbackColors(Color.white, denyColor);
-
+            dust.regrowAlphaCapped = true;
             dust.Begin();
             SetDustCollision(dust, false);
         }
@@ -919,7 +919,13 @@ public class CosmicDustGenerator : MonoBehaviour
 
         // Solidify: enable collider and register in legacy map for queries.
         SetCellState(gp, DustCellState.Solid);        
-        if (dust != null) SetDustCollision(dust, true); 
+        if (dust != null)
+        {
+            dust.regrowAlphaCapped = false;
+            // Re-apply the tint so alpha ramps to its authored value now that cap is lifted
+            dust.RefreshDisplayedTint();
+            SetDustCollision(dust, true);
+        }
         _regrowExcludeRoleByCell.Remove(gp);
     }
 

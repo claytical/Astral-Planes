@@ -16,7 +16,7 @@ public class Collectable : MonoBehaviour
     public int intendedBin = -1;
 // ---- Spawn Arrival Intro ----
     [Header("Spawn Arrival")]
-    [SerializeField] private float spawnArrivalSeconds = 1.5f;
+    [SerializeField] private float spawnArrivalSeconds = 2.5f;
     [SerializeField] private AnimationCurve spawnArrivalEase = null;
     private Coroutine _spawnArrivalRoutine;
     private bool _spawnArrivalInProgress;
@@ -234,16 +234,21 @@ private IEnumerator SpawnArrivalRoutine(
     if (TryGetComponent(out Collider2D col))
         col.enabled = false;
 
-    float dur = Mathf.Max(0.01f, spawnArrivalSeconds);
+    // Scale arrival duration by distance so nearby notes drift gently
+    // and distant notes don't zip across the screen.
+    float dist = Vector3.Distance(originWorld, targetWorld);
+    float baseDur = Mathf.Max(0.01f, spawnArrivalSeconds);
+    float dur = Mathf.Lerp(baseDur * 0.75f, baseDur * 1.5f, Mathf.Clamp01(dist / 8f));
+    dur = Mathf.Max(1.0f, dur); // never shorter than 1 second
     float t = 0f;
 
     Vector3 start = originWorld;
     Vector3 end = targetWorld;
 
+    // Deeper arc so the fan reads as a gentle bloom, not an explosion.
     Vector3 mid = Vector3.Lerp(start, end, 0.5f);
-    float arcHeight = Mathf.Max(0.15f, Vector3.Distance(start, end) * 0.12f);
+    float arcHeight = Mathf.Max(0.35f, dist * 0.25f);
     mid += Vector3.up * arcHeight;
-
     while (t < dur)
     {
         t += Time.deltaTime;
