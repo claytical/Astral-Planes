@@ -55,14 +55,14 @@ public class CosmicDust : MonoBehaviour {
     [Header("Dust Musical Swell")]
     [SerializeField] private float dustPluckSwellSeconds = 1.4f;
 
-    [SerializeField] private int dustPluckMinDurationTicks = 70;
-    [SerializeField] private int dustPluckMaxDurationTicks = 720;
+    [SerializeField] private int dustPluckMinDurationTicks = 360;
+    [SerializeField] private int dustPluckMaxDurationTicks = 1440;
 
-    [SerializeField] private float dustPluckMinVelocity127 = 10f;
-    [SerializeField] private float dustPluckMaxVelocity127 = 58f;
+    [SerializeField] private float dustPluckMinVelocity127 = 8f;
+    [SerializeField] private float dustPluckMaxVelocity127 = 28f;
 
-    [SerializeField] private float dustPluckMinCooldownSeconds = 0.10f;
-    [SerializeField] private float dustPluckMaxCooldownSeconds = 0.55f;
+    [SerializeField] private float dustPluckMinCooldownSeconds = 0.8f;
+    [SerializeField] private float dustPluckMaxCooldownSeconds = 2f;
 
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
@@ -775,10 +775,13 @@ private bool _tintPulseActive = false;
     public void FinalizeClearedVisuals()
     {
         SetTerrainColliderEnabled(false);
+        var dormantTint = _currentTint;
+        dormantTint.a = 0.35f;
+        ApplyDisplayedTint(dormantTint);
         SetVisualsEnabled(true);
-
         ResetSpriteScaleTo(0f);
         ApplyEmissionMultiplierImmediate(0f);
+        
     }
     public void PrepareForReuse()
     {
@@ -807,8 +810,9 @@ private bool _tintPulseActive = false;
         // Keep particles running but quiet until Begin() restores default emission.
         EnsureParticlesPlaying();
         ApplyEmissionMultiplierImmediate(0f);
-
-        RestoreDisplayToBaseTint();
+        var dormantTint = _currentTint;
+        dormantTint.a = 0.35f;
+        ApplyDisplayedTint(dormantTint);
         clearing.hardness01 = 0f;
     }
     public IEnumerator RetintOver(float seconds, Color toTint)

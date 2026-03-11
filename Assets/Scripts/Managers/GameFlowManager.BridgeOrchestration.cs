@@ -336,8 +336,6 @@ public partial class GameFlowManager
         if (activeDrumTrack != null)
         {
             activeDrumTrack.isPhaseStarActive = false;
-            // If _star is accessible, clear it. If it’s private, add a public helper on DrumTrack (see below).
-            try { activeDrumTrack._star = null; } catch {}
         }
     }
 }
