@@ -4,18 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Bass.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Groove.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Harmony.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/RoleProfiles/Lead.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
-    </list>
+    <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -279,7 +268,7 @@
       <workItem from="1772717968670" duration="26058000" />
       <workItem from="1772841791822" duration="329000" />
       <workItem from="1772915798384" duration="3049000" />
-      <workItem from="1772925075412" duration="62432000" />
+      <workItem from="1772925075412" duration="62832000" />
     </task>
     <servers />
   </component>
