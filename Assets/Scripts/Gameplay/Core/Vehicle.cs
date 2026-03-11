@@ -1387,7 +1387,7 @@ private bool IsCellEmpty(Vector2Int gp)
             centerCell,
             Mathf.Max(0, vehicleKeepClearRadiusCells),
             phaseNow,
-            forceRemoveExisting: true,
+            forceRemoveExisting: false,
             forceRemoveFadeSeconds: 0.20f
         );
     }

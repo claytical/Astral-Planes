@@ -2220,8 +2220,6 @@ public class CosmicDustGenerator : MonoBehaviour
                             }
                         }
                         dust.SetFeedbackColors(Color.white, denyColor);
-
-                        dust.ConfigureForPhase(phaseNow);
                         dust.Begin();
 
                         // Critical: keep collider OFF during bulk topology changes.

@@ -121,7 +121,7 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "Hold",
                     "processors": "",
-                    "groups": ";Generic Gamepad",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -132,29 +132,7 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Switch",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "2f78123b-35e7-4b5d-b92d-b4c88cc0f3a4",
-                    "path": "<Gamepad>/buttonSouth",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Xbox",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "b4d25a7d-3a5b-4845-b66b-bcc9d9e6d82b",
-                    "path": "<Gamepad>/buttonSouth",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Playstation",
+                    "groups": ";Switch;Generic Gamepad;Xbox;Playstation",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
