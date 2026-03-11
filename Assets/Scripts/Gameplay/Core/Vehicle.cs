@@ -346,8 +346,25 @@ public class Vehicle : MonoBehaviour
             // Still run the loop-boundary timer and input hygiene below,
             // but skip keep-clear refresh entirely.
         }
+// After the safety bubble block, before RefreshVehicleKeepClearIfNeeded:
+        bool insideBubble = PhaseStar.IsPointInsideSafetyBubble(transform.position);
 
-        RefreshVehicleKeepClearIfNeeded();
+        if (insideBubble)
+        {
+            // Release keep-clear claim so refuge dust regrows.
+            if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
+            {
+                var phaseNow = (gfm.phaseTransitionManager != null)
+                    ? gfm.phaseTransitionManager.currentPhase
+                    : MazeArchetype.Establish;
+                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+            }
+            // Skip keep-clear refresh — we're a guest inside the bubble.
+        }
+        else
+        {
+            RefreshVehicleKeepClearIfNeeded();
+        }
         // --- Loop boundary check (null-safe) ---
         if (drumTrack != null)
         {

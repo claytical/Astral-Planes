@@ -805,12 +805,8 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
     private void ArmNext()
     {
-        DBG(
-            $"ArmNext: ENTER collectablesInFlight={AnyCollectablesInFlightGlobal()} expansionPending={AnyExpansionPendingGlobal()}");
-
         if (AnyCollectablesInFlightGlobal())
         {
-            DBG("ArmNext: blocked by ExpansionPending -> Disarm:CollectablesInFlight");
             Disarm(DisarmReason.CollectablesInFlight);
             return;
         }
@@ -824,7 +820,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         if (!HasShardsRemaining())
         {
-            DBG("ArmNext: blocked by ExpansionPending -> Disarm:AwaitBridge");
             Disarm(DisarmReason.AwaitBridge);
             return;
         }

@@ -867,7 +867,7 @@ public class CosmicDustGenerator : MonoBehaviour
             if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
                 excludedRole = ex;
 
-            MusicalRole regrowRole = GetRandomRoleExcluding(excludedRole);
+            MusicalRole regrowRole = GetLeastDenseRoleExcluding(excludedRole);
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
@@ -1868,7 +1868,27 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return best;
     }
-
+    private MusicalRole GetLeastDenseRoleExcluding(MusicalRole excluded)
+    {
+        MusicalRole best = MusicalRole.Bass;
+        int bestCount = int.MaxValue;
+    
+        foreach (var kv in _solidCountByRole)
+        {
+            if (kv.Key == excluded) continue;
+            if (kv.Value < bestCount)
+            {
+                bestCount = kv.Value;
+                best = kv.Key;
+            }
+            else if (kv.Value == bestCount && Random.value > 0.5f)
+            {
+                best = kv.Key; // random tie-break
+            }
+        }
+    
+        return best;
+    }
     private Color BlendImprintWithNeighbors(Vector2Int cell, Color target, int radius, float neighborWeight)
     {
         radius = Mathf.Max(0, radius);
