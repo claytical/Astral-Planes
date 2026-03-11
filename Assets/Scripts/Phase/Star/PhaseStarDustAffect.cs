@@ -247,6 +247,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             if (dustCell.Charge01 <= 0f)
             {
+                gen.ClearImprintAt(probeCell);
                 var phaseMgr = gfm.phaseTransitionManager;
                 MazeArchetype phase = phaseMgr != null ? phaseMgr.currentPhase : MazeArchetype.Establish;
                 gen.ClearCell(probeCell, CosmicDustGenerator.DustClearMode.FadeAndHide,

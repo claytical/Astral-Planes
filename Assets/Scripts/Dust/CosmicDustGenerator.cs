@@ -1066,7 +1066,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // --- Role assignment: currently Voronoi for all archetypes.
         // Future: switch on phase to use archetype-specific distributions
         // (e.g. radial wedges for Release, striped for Pop, noise blobs for Wildcard).
-        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, dominant);
+        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, dominant, phase);
 
         // --- Write imprints ---
         for (int i = 0; i < cells.Count; i++)
@@ -2351,6 +2351,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
                 if (removedRole != MusicalRole.None)
                     _regrowExcludeRoleByCell[gp] = removedRole;
+                _imprints?.Remove(gp);
                 // Clear if present, respecting budget.
                 if (HasDustAt(gp))
                 {
@@ -2368,7 +2369,15 @@ public class CosmicDustGenerator : MonoBehaviour
 
         return removed;
     }
-
+    /// <summary>
+    /// Removes the role imprint for a cell so its next regrowth is assigned
+    /// the least-dense role rather than its original Voronoi role.
+    /// Called by PhaseStarDustAffect when the star fully drains a cell.
+    /// </summary>
+    public void ClearImprintAt(Vector2Int cell)
+    {
+        _imprints?.Remove(cell);
+    }
     public void CarveTemporaryCellFromVehicle(
         Vector3 worldPos,
         MazeArchetype phase,

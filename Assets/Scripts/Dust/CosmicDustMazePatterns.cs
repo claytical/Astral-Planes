@@ -341,7 +341,8 @@ public static class CosmicDustMazePatterns
         Vector2Int starCell,
         int gridW,
         int gridH,
-        MusicalRole dominantRole)
+        MusicalRole dominantRole,
+        MazeArchetype phase = MazeArchetype.Establish)
     {
         var result = new Dictionary<Vector2Int, MusicalRole>(cells.Count);
         if (cells == null || cells.Count == 0) return result;
@@ -367,7 +368,7 @@ public static class CosmicDustMazePatterns
         float halfDiag   = Mathf.Sqrt(gridW * gridW + gridH * gridH) * 0.5f;
         float domRadius  = halfDiag * 0.75f;
         float restRadius = halfDiag * 0.45f;
-
+        bool giveAdvantage = (phase == MazeArchetype.Establish);
         // Find the dominant role's index so we can skip it in the secondary pass.
         int domIdx = System.Array.IndexOf(roles, dominantRole);
         if (domIdx < 0) domIdx = 3; // fallback to Bass if role not found
