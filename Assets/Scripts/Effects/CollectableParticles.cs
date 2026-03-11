@@ -42,9 +42,9 @@ public class CollectableParticles : MonoBehaviour
             fol.enabled = false; // no tether yet: pure fountain
         }
     }
-    public void ConfigureByDuration(NoteSet noteSet, int durationTicks, InstrumentTrack track)
+    public void ConfigureByDuration(int durationTicks, InstrumentTrack track)
 {
-    if (!particleSystem || noteSet == null || track == null) return;
+    if (!particleSystem || track == null) return;
 
     // --- duration in seconds (respects loop multipliers) ---
     int totalSteps     = Mathf.Max(1, track.GetTotalSteps());

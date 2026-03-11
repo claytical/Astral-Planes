@@ -321,7 +321,6 @@ private IEnumerator SpawnArrivalRoutine(
     _spawnArrivalInProgress = true;
 
     transform.position = originWorld;
-
     if (_rb == null) TryGetComponent(out _rb);
 
     if (_rb != null)
@@ -344,11 +343,7 @@ private IEnumerator SpawnArrivalRoutine(
 
     Vector3 start = originWorld;
     Vector3 end = targetWorld;
-
-    // Deeper arc so the fan reads as a gentle bloom, not an explosion.
-    Vector3 mid = Vector3.Lerp(start, end, 0.5f);
-    float arcHeight = Mathf.Max(0.35f, dist * 0.25f);
-    mid += Vector3.up * arcHeight;
+// Simple lerp — energy drifts from the MineNode to its resting place.
     while (t < dur)
     {
         t += Time.deltaTime;
@@ -359,9 +354,7 @@ private IEnumerator SpawnArrivalRoutine(
         else
             u = Mathf.SmoothStep(0f, 1f, u);
 
-        Vector3 a = Vector3.Lerp(start, mid, u);
-        Vector3 b = Vector3.Lerp(mid, end, u);
-        transform.position = Vector3.Lerp(a, b, u);
+        transform.position = Vector3.Lerp(start, end, u);
 
         yield return null;
     }
@@ -798,7 +791,31 @@ private IEnumerator SpawnArrivalRoutine(
 
     public int GetNote() => assignedNote;
     public bool IsDark { get; private set; } = false;
-    
+    /// <summary>
+    /// Applies track color, explode tint, and starts the pulse.
+    /// Safe to call before the collectable reaches its grid cell —
+    /// no grid, physics, or occupancy side-effects.
+    /// </summary>
+    public void ApplyTrackVisuals(InstrumentTrack track)
+    {
+        if (track == null) return;
+        if (TryGetComponent(out CollectableParticles particleScript))
+            particleScript.ConfigureByDuration(1, track);
+
+        if (energySprite != null)
+        {
+            var c = track.trackColor;
+            c.a = Mathf.Clamp01(maxAlpha);
+            energySprite.color = c;
+
+            if (_pulseRoutine != null) StopCoroutine(_pulseRoutine);
+            _pulseRoutine = StartCoroutine(PulseEnergySprite());
+        }
+
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+            explode.SetTint(track.trackColor, multiply: true);
+    }
     public void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
     {
         assignedNote              = note;
@@ -813,29 +830,7 @@ private IEnumerator SpawnArrivalRoutine(
         if (sharedTargetSteps.Count == 0)
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
 
-        if (TryGetComponent(out CollectableParticles particleScript) && noteSet != null)
-            particleScript.ConfigureByDuration(noteSet, duration, track);
-
-        if (track != null)
-            energySprite.color = track.trackColor;
-
-        var explode = GetComponent<Explode>();
-        if (explode != null && track != null)
-        {
-            // Multiply tends to look best if the prefab already has “hot” highlights.
-            explode.SetTint(track.trackColor, multiply: true);
-        }
-
-        if (energySprite != null && track != null)
-        {
-            var c = track.trackColor;
-            c.a = Mathf.Clamp01(maxAlpha);
-            energySprite.color = c;
-
-            if (_pulseRoutine != null) StopCoroutine(_pulseRoutine);
-            _pulseRoutine = StartCoroutine(PulseEnergySprite());
-        }
-
+        ApplyTrackVisuals(track);
         if (assignedInstrumentTrack == null)
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
 
