@@ -322,12 +322,31 @@ public class Vehicle : MonoBehaviour
     void FixedUpdate() {
 
         if (incapacitated) return;
-    // --- PhaseStar Safety Bubble: dust has no effect inside the bubble ---
-        if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
-        {
-        }
 
         float dt = Time.fixedDeltaTime;
+
+        // --- PhaseStar Safety Bubble: refuge zone during gravity void expansion ---
+        // While inside the bubble the vehicle is a guest, not an agent:
+        //   - Skip keep-clear carving so refuge dust is preserved.
+        //   - Skip the rest of FixedUpdate physics (movement still runs via rb).
+        // Energy drain from dust contact is suppressed in CosmicDust.OnCollisionStay2D
+        // because that method checks Vehicle.boosting; inside the bubble the player
+        // still pilots normally, so no change is needed there.
+        if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+        {
+            // Release any existing keep-clear claim so refuge cells can regrow.
+            if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
+            {
+                var phaseNow = (gfm.phaseTransitionManager != null)
+                    ? gfm.phaseTransitionManager.currentPhase
+                    : MazeArchetype.Establish;
+                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+            }
+
+            // Still run the loop-boundary timer and input hygiene below,
+            // but skip keep-clear refresh entirely.
+        }
+
         RefreshVehicleKeepClearIfNeeded();
         // --- Loop boundary check (null-safe) ---
         if (drumTrack != null)

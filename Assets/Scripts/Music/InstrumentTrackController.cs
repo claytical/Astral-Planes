@@ -274,13 +274,22 @@ public class InstrumentTrackController : MonoBehaviour
             _gravityVoidRoutine = null;
         }
 
-        Debug.Log(
-            $"[VOID] BEGIN (start) track={ownerTrack.name} " +
-            $"prevOwner={(sameOwner ? "same" : "changed")} routineWas={routineRunning} instWas={instanceAlive} " +
-            $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} pos={centerWorld} gp={centerGP} " +
-            $"grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
-        );
-
+        // Safety bubble: activate on the PhaseStar while the void is expanding.
+        // Players need a refuge zone — the star is the landmark they navigate toward.
+        {
+            var gfm = GameFlowManager.Instance;
+            var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
+            if (star != null)
+            {
+                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble on star={star.name}");
+                star.SetGravityVoidSafetyBubbleActive(true);
+            }
+            else
+            {
+                Debug.Log("[BUBBLE] BeginGravityVoid → no active PhaseStar found; bubble skipped");
+            }
+        }
+        
         _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
     }
     public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
@@ -302,7 +311,18 @@ public class InstrumentTrackController : MonoBehaviour
             StopCoroutine(_gravityVoidRoutine);
             _gravityVoidRoutine = null;
         }
-
+        // Safety bubble: deactivate when the void resolves.
+        // ArmNext will also call DeactivateSafetyBubble, but this ensures
+        // it clears even if the star never re-arms (e.g. bridge follows immediately).
+        {
+            var gfm = GameFlowManager.Instance;
+            var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
+            if (star != null)
+            {
+                Debug.Log($"[BUBBLE] EndGravityVoid → deactivating bubble on star={star.name}");
+                star.SetGravityVoidSafetyBubbleActive(false);
+            }
+        }
         DespawnGravityVoid();
     }
     private IEnumerator GravityVoidGrowAndImprintRoutine()
