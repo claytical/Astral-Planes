@@ -460,6 +460,45 @@ public class CosmicDustGenerator : MonoBehaviour
 
         return processed;
     }
+    /// <summary>
+    /// Called by CosmicDust.DrainCharge when a cell's visual alpha drops below the
+    /// solid-visibility threshold (0.55). The cell is physically drained but was
+    /// never explicitly "cleared" by gameplay — this bridges that gap so the
+    /// collider doesn't linger as an invisible wall.
+    /// </summary>
+    public void OnDustDrainedBelowThreshold(CosmicDust dust)
+    {
+        if (dust == null) return;
+
+        // Resolve grid position.
+        Vector2Int gp;
+        bool have = _goToCell.TryGetValue(dust.gameObject, out gp);
+        if (!have && drums != null)
+        {
+            gp = drums.WorldToGridPosition(dust.transform.position);
+            have = IsInBounds(gp);
+        }
+        if (!have) return;
+
+        // Only act if the cell is still considered Solid. If it's already
+        // Clearing/Empty/PendingRegrow, someone else owns the transition.
+        if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid)
+            return;
+
+        Debug.Log($"[DUSTGEN] DrainedBelowThreshold grid={gp} alpha={dust.CurrentTint.a:F2}", dust);
+
+        // Kill collision immediately (CosmicDust already did this, belt-and-suspenders).
+        SetDustCollision(dust, false);
+
+        // Transition to Clearing → the existing dissipate path handles the
+        // visual fade-out and will call OnDustVisualFadedOut to finalize Empty.
+        SetCellState(gp, DustCellState.Clearing);
+        dust.DissipateAndHideVisualOnly(0.3f);
+
+        // Schedule regrow so the maze heals.
+        MazeArchetype phase = GetCurrentPhaseSafe();
+        RequestRegrowCellAt(gp, phase, refreshIfPending: true);
+    }
     private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
     {
         if (!IsInBounds(gp)) { _voidGrowCoroutines.Remove(gp); yield break; }
@@ -917,13 +956,11 @@ public class CosmicDustGenerator : MonoBehaviour
             yield break;
         }
 
-        // Solidify: enable collider and register in legacy map for queries.
         SetCellState(gp, DustCellState.Solid);        
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
-            // Re-apply the tint so alpha ramps to its authored value now that cap is lifted
-            dust.RefreshDisplayedTint();
+            dust.EnsureMinSolidAlpha(0.55f);
             SetDustCollision(dust, true);
         }
         _regrowExcludeRoleByCell.Remove(gp);
@@ -2233,6 +2270,7 @@ public class CosmicDustGenerator : MonoBehaviour
                         continue;
 
 // At this point, it is legitimately solid terrain.
+                    d.EnsureMinSolidAlpha(0.55f);
                     SetDustCollision(d, true);
                 }
 
@@ -2561,5 +2599,31 @@ public class CosmicDustGenerator : MonoBehaviour
             MazeArchetype.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
             _ => 0.35f
         };
+    }
+    // Add to CosmicDustGenerator
+    [ContextMenu("Debug: Find Phantom Colliders")]
+    public void DebugFindPhantomColliders()
+    {
+        if (_cellState == null || _cellGo == null) return;
+        int phantoms = 0;
+        for (int x = 0; x < _cellW; x++)
+        for (int y = 0; y < _cellH; y++)
+        {
+            var st = _cellState[x, y];
+            var go = _cellGo[x, y];
+            if (go == null) continue;
+        
+            if (st != DustCellState.Solid)
+            {
+                // Cell isn't solid, but does it have an enabled collider?
+                if (go.TryGetComponent<CosmicDust>(out var d) && d.terrainCollider != null 
+                                                              && d.terrainCollider.enabled)
+                {
+                    Debug.LogWarning($"[PHANTOM] Cell ({x},{y}) state={st} but collider ENABLED on {go.name}", go);
+                    phantoms++;
+                }
+            }
+        }
+        Debug.Log($"[PHANTOM] Scan complete. Found {phantoms} phantom colliders.");
     }
 }
