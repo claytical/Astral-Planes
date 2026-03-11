@@ -547,7 +547,7 @@ public class GameFlowManager : MonoBehaviour
                     motifBridgeSec,
                     ReadAveragedSteer)
             );
-            motifCoralVisualizer.gameObject.SetActive(false);
+            yield return StartCoroutine(motifCoralVisualizer.TransitionOutAndClear());
         }
         else
         {
