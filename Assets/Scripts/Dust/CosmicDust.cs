@@ -67,6 +67,8 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
+    public bool regrowAlphaCapped = false;
+    private const float kRegrowAlphaCap = 0.35f;
     [Serializable]
     public struct DustInteractionSettings
     {
@@ -609,6 +611,11 @@ private bool _tintPulseActive = false;
         // Consume override so normal spawns aren't affected later
         _growInOverride = -1f;
     }
+    /// <summary>Re-applies _currentTint through ApplyDisplayedTint (e.g. after lifting regrowAlphaCapped).</summary>
+    public void RefreshDisplayedTint()
+    {
+        ApplyDisplayedTint(_currentTint);
+    }
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;
@@ -619,7 +626,12 @@ private bool _tintPulseActive = false;
         _displayTint = tint;
 
         if (visual.sprite != null)
-            visual.sprite.color = tint;
+        {
+            Color applied = tint;
+            if (regrowAlphaCapped)
+                applied.a = Mathf.Min(applied.a, kRegrowAlphaCap);
+            visual.sprite.color = applied;
+        }
     }
 
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
@@ -791,6 +803,7 @@ private bool _tintPulseActive = false;
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
         CancelTintPulse(restoreToBase: false);
         _isBreaking = false;
+        regrowAlphaCapped = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;

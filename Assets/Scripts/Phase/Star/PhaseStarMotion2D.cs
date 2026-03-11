@@ -280,11 +280,16 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         if (desiredDir.sqrMagnitude < 0.0001f) desiredDir = drift;
         else desiredDir.Normalize();
+        
+// --- Replace with: ---
+// ── Edge repulsion: steer away from screen edges BEFORE velocity integration ──
+        Vector2 edgeRepulsion = ComputeEdgeRepulsion(_rb.position);
+        desiredDir += edgeRepulsion;
+        if (desiredDir.sqrMagnitude > 0.0001f) desiredDir.Normalize();
 
         Vector2 desiredVel = desiredDir * speed;
         Vector2 curVel     = _rb.linearVelocity;
         Vector2 newVel     = Vector2.MoveTowards(curVel, desiredVel, steering.maxAccel * dt);
-
         // Optional external kinematic override (compat path — not used by density nav)
         if (bounds.kinematicMode && ExternalPathStep != null)
         {
@@ -314,7 +319,44 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Returns a direction vector pushing the star away from screen edges.
+    /// Strength ramps from 0 at the safe interior to a strong inward push at the edge.
+    /// This prevents the star from ever reaching the hard clamp in KeepInsideScreenAndBounce.
+    /// </summary>
+    private Vector2 ComputeEdgeRepulsion(Vector2 pos)
+    {
+        if (_cam == null) _cam = Camera.main;
+        if (_cam == null) return Vector2.zero;
 
+        const float z = 0f;
+        var min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+        var max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+
+        // Margin where repulsion begins (larger than screenPadding so it activates early)
+        float margin = bounds.screenPadding + 1.5f;
+
+        Vector2 push = Vector2.zero;
+
+        // Left edge
+        float dL = pos.x - min.x;
+        if (dL < margin) push.x += Mathf.Pow(1f - Mathf.Clamp01(dL / margin), 2f);
+
+        // Right edge
+        float dR = max.x - pos.x;
+        if (dR < margin) push.x -= Mathf.Pow(1f - Mathf.Clamp01(dR / margin), 2f);
+
+        // Bottom edge
+        float dB = pos.y - min.y;
+        if (dB < margin) push.y += Mathf.Pow(1f - Mathf.Clamp01(dB / margin), 2f);
+
+        // Top edge
+        float dT = max.y - pos.y;
+        if (dT < margin) push.y -= Mathf.Pow(1f - Mathf.Clamp01(dT / margin), 2f);
+
+        // Scale: strong enough to overcome avoidance + nav when near the edge
+        return push * 3.0f;
+    }
     private void KeepInsideScreenAndBounce()
     {
         if (_cam == null) _cam = Camera.main;
@@ -334,7 +376,16 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         else if (pos.y > max.y) { pos.y = max.y; _driftDir.y = -Mathf.Abs(_driftDir.y) * bounds.edgeBounce; hit = true; }
 
         if (!hit) return;
+        if (!hit) return;
         _driftDir.Normalize();
+
+// Kill velocity component pushing into the wall
+        Vector2 vel = _rb.linearVelocity;
+        if (pos.x <= min.x && vel.x < 0f) vel.x = 0f;
+        if (pos.x >= max.x && vel.x > 0f) vel.x = 0f;
+        if (pos.y <= min.y && vel.y < 0f) vel.y = 0f;
+        if (pos.y >= max.y && vel.y > 0f) vel.y = 0f;
+        _rb.linearVelocity = vel;
 
         if (bounds.kinematicMode) _rb.position  = pos;
         else                       _rb.MovePosition(pos);
