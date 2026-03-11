@@ -6,9 +6,9 @@ using UnityEngine;
 
 public static class ConstellationMemoryStore
 {
-    private static List<PhaseSnapshot> cachedSnapshots = new();
+    private static List<MotifSnapshot> cachedSnapshots = new();
     private static string SaveDirectory => Application.persistentDataPath + "/CoralSessions/";
-    public static SerializablePhaseSession ConvertToSerializable(List<PhaseSnapshot> raw)
+    public static SerializablePhaseSession ConvertToSerializable(List<MotifSnapshot> raw)
     {
         return new SerializablePhaseSession
         {
@@ -30,20 +30,20 @@ public static class ConstellationMemoryStore
     }
 
 
-    public static List<PhaseSnapshot> ConvertFromSerializable(SerializablePhaseSession session)
+    public static List<MotifSnapshot> ConvertFromSerializable(SerializablePhaseSession session)
     {
-        return session.snapshots.Select(s => new PhaseSnapshot
+        return session.snapshots.Select(s => new MotifSnapshot
         {
             Pattern = Enum.TryParse<MazeArchetype>(s.pattern, out var parsedPhase) ? parsedPhase : MazeArchetype.Establish,
             Color = s.color,
             Timestamp = s.timestamp,
-            CollectedNotes = s.collectedNotes.Select(n => new PhaseSnapshot.NoteEntry(
+            CollectedNotes = s.collectedNotes.Select(n => new MotifSnapshot.NoteEntry(
                 n.step, n.note, n.velocity, n.trackColor
             )).ToList()
         }).ToList();
     }
 
-    public static void SaveSessionToDisk(List<PhaseSnapshot> snapshots)
+    public static void SaveSessionToDisk(List<MotifSnapshot> snapshots)
     {
         SerializablePhaseSession serial = ConvertToSerializable(snapshots);
         string json = JsonUtility.ToJson(serial, true);
@@ -56,7 +56,7 @@ public static class ConstellationMemoryStore
         Debug.Log($"✅ Coral session saved to {fileName}");
     }
 
-    public static List<List<PhaseSnapshot>> LoadAllSessionsFromDisk()
+    public static List<List<MotifSnapshot>> LoadAllSessionsFromDisk()
     {
 #if UNITY_EDITOR
         string mockPath = Path.Combine(Application.streamingAssetsPath, "CoralSessions/mock_history.json");
@@ -73,7 +73,7 @@ public static class ConstellationMemoryStore
         }
 #endif
 
-        var allSessions = new List<List<PhaseSnapshot>>();
+        var allSessions = new List<List<MotifSnapshot>>();
         if (!Directory.Exists(SaveDirectory)) return allSessions;
 
         foreach (var file in Directory.GetFiles(SaveDirectory, "*.json"))
@@ -94,20 +94,20 @@ public static class ConstellationMemoryStore
         return allSessions;
     }
 
-    public static void StoreSnapshot(List<PhaseSnapshot> snapshots)
+    public static void StoreSnapshot(List<MotifSnapshot> snapshots)
     {
-        cachedSnapshots = snapshots.Select(s => new PhaseSnapshot
+        cachedSnapshots = snapshots.Select(s => new MotifSnapshot
         {
             Pattern = s.Pattern,
             Color = s.Color,
             Timestamp = s.Timestamp,
             CollectedNotes = s.CollectedNotes
-                .Select(n => new PhaseSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor))
+                .Select(n => new MotifSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor))
                 .ToList()
         }).ToList(); // Deep copy for safety
     }
 
-    public static List<PhaseSnapshot> RetrieveSnapshot()
+    public static List<MotifSnapshot> RetrieveSnapshot()
     {
         return cachedSnapshots;
     }

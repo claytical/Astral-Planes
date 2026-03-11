@@ -70,7 +70,7 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
     private bool _setupInFlight, _setupDone;
-    private readonly List<PhaseSnapshot> _motifSnapshots = new();
+    private readonly List<MotifSnapshot> _motifSnapshots = new();
     private float _motifStartTime = 0f; // stamped when each motif begins, used for coral branch height
     private GameState currentState = GameState.Begin;
     private Dictionary<string, Action> sceneHandlers;
@@ -607,28 +607,20 @@ public class GameFlowManager : MonoBehaviour
         return activeDrumTrack && controller && dustGenerator && noteViz && harmony && phaseTransitionManager && spawnGrid && playerStatsGrid;
     }
     private void TryFillTracksBundleIfMissing() {
-    // If anchors already set these, these lines do nothing.
-    activeDrumTrack      = activeDrumTrack      ? activeDrumTrack      : FindFirstObjectByType<DrumTrack>(FindObjectsInactive.Include);
-    controller           = controller           ? controller           : FindFirstObjectByType<InstrumentTrackController>(FindObjectsInactive.Include);
-    dustGenerator        = dustGenerator        ? dustGenerator        : FindFirstObjectByType<CosmicDustGenerator>(FindObjectsInactive.Include);
-    noteViz              = noteViz              ? noteViz              : FindFirstObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
-    harmony              = harmony              ? harmony              : FindFirstObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
-    phaseTransitionManager = phaseTransitionManager ? phaseTransitionManager : FindFirstObjectByType<PhaseTransitionManager>(FindObjectsInactive.Include);
-    spawnGrid            = spawnGrid            ? spawnGrid            : FindFirstObjectByType<SpawnGrid>(FindObjectsInactive.Include);
+        // If anchors already set these, these lines do nothing.
+        activeDrumTrack      = activeDrumTrack      ? activeDrumTrack      : FindFirstObjectByType<DrumTrack>(FindObjectsInactive.Include);
+        controller           = controller           ? controller           : FindFirstObjectByType<InstrumentTrackController>(FindObjectsInactive.Include);
+        dustGenerator        = dustGenerator        ? dustGenerator        : FindFirstObjectByType<CosmicDustGenerator>(FindObjectsInactive.Include);
+        noteViz              = noteViz              ? noteViz              : FindFirstObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
+        harmony              = harmony              ? harmony              : FindFirstObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
+        phaseTransitionManager = phaseTransitionManager ? phaseTransitionManager : FindFirstObjectByType<PhaseTransitionManager>(FindObjectsInactive.Include);
+        spawnGrid            = spawnGrid            ? spawnGrid            : FindFirstObjectByType<SpawnGrid>(FindObjectsInactive.Include);
 
-    if (!playerStatsGrid)
-    {
-        // Prefer anchor if you added it
-        var gridAnchor = FindFirstObjectByType<PlayerStatsGridAnchor>(FindObjectsInactive.Include);
-        if (gridAnchor) RegisterPlayerStatsGrid(gridAnchor.transform);
-    }
-}
-    private void BindPhaseHandlers()
-    {
-        if (phaseTransitionManager == null) return;
-
-        phaseTransitionManager.OnPhaseChanged -= HandleChapterChanged;
-        phaseTransitionManager.OnPhaseChanged += HandleChapterChanged;
+        if (!playerStatsGrid) {
+            // Prefer anchor if you added it
+            var gridAnchor = FindFirstObjectByType<PlayerStatsGridAnchor>(FindObjectsInactive.Include);
+            if (gridAnchor) RegisterPlayerStatsGrid(gridAnchor.transform);
+        }
     }
 
     private void HandleChapterChanged(MazeArchetype oldP, MazeArchetype newP)
@@ -828,9 +820,9 @@ public class GameFlowManager : MonoBehaviour
         return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
     }
 
-    private PhaseSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum)
+    private MotifSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum)
     {
-        var snapshot = new PhaseSnapshot { Timestamp = Time.time };
+        var snapshot = new MotifSnapshot { Timestamp = Time.time };
 
         // --- PHASE CONTEXT (REPLACE THESE 2 LINES WITH YOUR REAL API) ---
         snapshot.Pattern = MazeArchetype.Establish;   // MusicalPhase
@@ -882,7 +874,7 @@ public class GameFlowManager : MonoBehaviour
                                  && stepNoteMap.TryGetValue(localStep, out int authoredNote)
                                  && n.note == authoredNote;
 
-                snapshot.CollectedNotes.Add(new PhaseSnapshot.NoteEntry(
+                snapshot.CollectedNotes.Add(new MotifSnapshot.NoteEntry(
                     step:       n.stepIndex,
                     note:       n.note,
                     velocity:   n.velocity,
@@ -913,7 +905,7 @@ public class GameFlowManager : MonoBehaviour
                     else unmatched++;
                 }
 
-                snapshot.TrackBins.Add(new PhaseSnapshot.TrackBinData
+                snapshot.TrackBins.Add(new MotifSnapshot.TrackBinData
                 {
                     TrackColor         = c,
                     Role               = track.assignedRole,

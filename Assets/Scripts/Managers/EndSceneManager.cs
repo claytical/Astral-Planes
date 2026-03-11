@@ -5,7 +5,7 @@ public class EndSceneManager : MonoBehaviour
 { 
     void Start()
     {
-        List<PhaseSnapshot> data = ConstellationMemoryStore.RetrieveSnapshot();
+        List<MotifSnapshot> data = ConstellationMemoryStore.RetrieveSnapshot();
         Debug.Log($"{data.Count} data points");
         if (data != null && data.Count > 0)
         {
