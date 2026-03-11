@@ -489,12 +489,21 @@ private bool _tintPulseActive = false;
     public float DrainCharge(float amount)
     {
         float take = Mathf.Min(Charge01, Mathf.Max(0f, amount));
+        if (take <= 0f) return 0f;
         Charge01 -= take;
 
-        var c = _currentTint;
-        float visibleAlpha = Mathf.Lerp(0.55f, 1f, Charge01);
-        c.a = visibleAlpha;
-        SetBaseTint(c, applyImmediatelyIfNoPulse: false);
+        // Lerp RGB toward gray as charge depletes, and drop alpha too.
+        // At Charge01=1: full role color. At Charge01=0: gray at low alpha.
+        Color gray = new Color(0.3f, 0.3f, 0.3f, 0f);
+        Color full = _currentTint;
+        full.a = 1f;
+        Color drained = Color.Lerp(gray, full, Charge01);
+        drained.a = Mathf.Lerp(0.05f, _currentTint.a, Charge01);
+
+        // Write back to _currentTint so subsequent drains start from the right base.
+        _currentTint = drained;
+        // Apply immediately — the star is actively consuming this cell, player needs visual feedback.
+        ApplyDisplayedTint(_currentTint);
         return take;
     }
     public void ConfigureForPhase(MazeArchetype phase)
