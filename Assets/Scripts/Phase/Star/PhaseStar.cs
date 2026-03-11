@@ -699,10 +699,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         bool noShardsRemain = _shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar);
 
-        Debug.Log(
-            $"[PS:BURST_CLEARED] awaitClr(after)={_awaitingCollectableClear} -> {(noShardsRemain ? "BeginBridgeNow" : "ArmNext")}"
-        );
-
         // Final shard: start bridge immediately on last collected note.
         if (noShardsRemain)
         {

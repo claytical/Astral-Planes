@@ -5,48 +5,13 @@ using Random = System.Random;
 
 public class MineNode : MonoBehaviour
 {
+    public SpriteRenderer coreSprite;
+    public int maxStrength = 100;
+
     [Header("Dust Affinity")]
     [SerializeField, Range(0f, 1f)] private float sameRoleDustAffinityStrength = 0.25f; // medium
     [SerializeField, Min(1)] private int sameRoleDustAffinityRadiusCells = 2;            // moderate
-    public event System.Action<MineNode> OnResolved;
-    public SpriteRenderer coreSprite;
-    public int maxStrength = 100;
-    private Vector2Int _spawnCell;
-    private bool _hasSpawnCell;
-// Cached authored steps for O(1) membership tests
-    private HashSet<int> _turnStepSet;
-    private NoteSet _cachedTurnSetSource;
-// Stuck breaker state
-    private float _nextEscapeAllowedTime = 0f;
-    private Vector2 _lastPosForStall;
-    private float _nextStallSampleTime = 0f;
-    private int _stallHits = 0;
-
-// Optional: if you want deterministic jitter per step
-    private int _rngSalt = 0;
-
-    private int _stepsPerLoop = 16;     // derived from allowed steps
-    private int _lastStepIndex = -1;
-    
-    private float _stuckCheckAt;
-    private Vector2 _stuckLastPos;
-    private int _stuckCount;
-
-    private int _strength;
-    private Vector3 _originalScale;
-    private Color _lockedColor;
-    private bool _depletedHandled, _resolvedFired;
-    private Collider2D _col;
-    private Rigidbody2D _rb;
-    // Cached normalized pitch (0 = lowest note, 1 = highest note)
-    private float _lastNote01 = 0.5f;
-
     [SerializeField] private float minCarveSeconds = 1.25f;
-    private DrumTrack _drumTrack;
-    public DrumTrack DrumTrack => _drumTrack;
-    // --- Grid-based path recording (only during carving) ---
-    // Each entry is a grid cell the node occupied while carving.
-    private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
     public bool pruneCarvedPathOnLoopBoundary = true;
     [Tooltip("Minimum carved path length before pruning runs.")] 
     [Min(2)] public int pruneMinPathCount = 8;
@@ -64,15 +29,115 @@ public class MineNode : MonoBehaviour
     [SerializeField] private float turnAngleHarmony = 22f;
     [SerializeField] private float turnAngleLead = 40f;
 
+    public event System.Action<MineNode> OnResolved;
+    public DrumTrack DrumTrack => _drumTrack;
+
+    private Vector2Int _spawnCell;
+    private bool _hasSpawnCell;
+    private HashSet<int> _turnStepSet;
+    private NoteSet _cachedTurnSetSource;
+    private float _nextEscapeAllowedTime = 0f;
+    private Vector2 _lastPosForStall;
+    private float _nextStallSampleTime = 0f;
+    private int _stallHits = 0;
+    private int _stepsPerLoop = 16;     // derived from allowed steps
+    private int _strength;
+    private Vector3 _originalScale;
+    private Color _lockedColor;
+    private bool _depletedHandled, _resolvedFired;
+    private Collider2D _col;
+    private Rigidbody2D _rb;
+    // Cached normalized pitch (0 = lowest note, 1 = highest note)
+    private float _lastNote01 = 0.5f;
+    private DrumTrack _drumTrack;
+    // --- Grid-based path recording (only during carving) ---
+    // Each entry is a grid cell the node occupied while carving.
+    private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
     private NoteSet _noteSet;
     private InstrumentTrack _track;
     private MusicalRole _role;
-
     private int _lastProcessedStep = -1;
     private Vector2 _carveDir = Vector2.right; // will be randomized on init
     private MineNodeDustInteractor _dustInteractor;
     private float _currentDesiredSpeed;
-    
+        public MusicalRole GetImprintRole()
+    {
+        return _role;
+    }
+    public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
+        _track = track; 
+        _spawnCell = spawnCell; 
+        _role = track != null ? track.assignedRole : default; 
+        _noteSet = noteSet; 
+        _lockedColor = tint; 
+        _drumTrack = (track != null) ? track.drumTrack : null;
+        var explode = GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.SetTint(_lockedColor, multiply: true);
+        }
+        
+        float a = UnityEngine.Random.Range(0f, 360f); 
+        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized; 
+        _lastProcessedStep = -1;
+        if (_drumTrack != null) { 
+            _drumTrack.RegisterMineNode(this); 
+            _drumTrack.OnLoopBoundary += HandleLoopBoundary;
+        }
+        
+        var dust = GetComponent<MineNodeDustInteractor>(); 
+        if (dust != null) dust.SetLevelAuthority(_drumTrack); 
+        _carvedPath.Clear(); 
+        if (track != null) ConfigureFromRole(track.assignedRole);
+        if (coreSprite != null) {
+            tint.a = 1; 
+            coreSprite.color = tint;
+        }
+        CacheAuthoredStepsFromNoteSet(); 
+    }
+
+    private void HandleLoopBoundary()
+    { if (_drumTrack == null) return;
+        if (!pruneCarvedPathOnLoopBoundary) return; 
+        if (_carvedPath == null || _carvedPath.Count < pruneMinPathCount) return; 
+        int before = _carvedPath.Count;
+        // Keep only cells that are still clear (no dust present).
+        // This makes _carvedPath represent the *currently-open corridor*, not historical traversal.
+        var compact = new List<Vector2Int>(before);
+        Vector2Int? last = null;
+        for (int i = 0; i < _carvedPath.Count; i++) {
+            var cell = _carvedPath[i];
+            // If dust has regrown here, it is no longer part of the active corridor.
+            if (_drumTrack.HasDustAt(cell)) continue;
+            // Avoid duplicates from lingering in a cell.
+            if (last.HasValue && last.Value == cell) continue;
+            compact.Add(cell);
+            last = cell;
+        }
+        if (compact.Count == before) return; // no changes
+        _carvedPath.Clear(); 
+        _carvedPath.AddRange(compact);
+    }
+    public float GetCorridorHealDelaySeconds()
+    {
+        // tunables (make them per-role later if desired)
+        float slow = 2.5f;  // low note
+        float fast = 0.4f;  // high note
+        return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
+    }
+    public void NotifyDustErodedAt(Vector3 worldPos)
+    {
+        if (_drumTrack == null) return;
+
+        // Project carving position into the grid
+        Vector2Int cell = _drumTrack.CellOf(worldPos);
+
+        // Avoid duplicate samples when staying in the same cell
+        if (_carvedPath.Count > 0 && _carvedPath[_carvedPath.Count - 1] == cell)
+            return;
+
+        _carvedPath.Add(cell);
+    }
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -283,7 +348,6 @@ public class MineNode : MonoBehaviour
 
         return accum.sqrMagnitude > 0.0001f ? accum.normalized : Vector2.zero;
     }
-
     private void ApplyLocalDustAffinity()
     {
         if (sameRoleDustAffinityStrength <= 0f) return;
@@ -324,97 +388,6 @@ public class MineNode : MonoBehaviour
     int bar = 16;
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
-    public Color GetImprintShadowColor()
-{
-    if (_track != null)
-        return _track.TrackShadowColor;
-
-    // hard fallback
-    Color c = _lockedColor;
-    return new Color(c.r * 0.2f, c.g * 0.2f, c.b * 0.2f, c.a);
-}
-    public Color GetImprintColor()
-    {
-        // InstrumentTrack is the semantic source of color
-        if (_track != null)
-            return _track.trackColor;
-
-        return Color.white;
-    }
-    public float GetImprintHardness()
-    {
-        // Inverted pitch:
-        // low note  -> hard / long-lasting
-        // high note -> soft / fast-healing
-        return Mathf.Clamp01(1f - _lastNote01);
-    }
-
-    public MusicalRole GetImprintRole()
-    {
-        return _role;
-    }
-    public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
-        _track = track; 
-        _spawnCell = spawnCell; 
-        _role = track != null ? track.assignedRole : default; 
-        _noteSet = noteSet; 
-        _lockedColor = tint; 
-        _drumTrack = (track != null) ? track.drumTrack : null;
-        var explode = GetComponent<Explode>();
-        if (explode != null)
-        {
-            explode.SetTint(_lockedColor, multiply: true);
-        }
-        
-        float a = UnityEngine.Random.Range(0f, 360f); 
-        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized; 
-        _lastProcessedStep = -1;
-        if (_drumTrack != null) { 
-            _drumTrack.RegisterMineNode(this); 
-            _drumTrack.OnLoopBoundary += HandleLoopBoundary;
-        }
-        
-        var dust = GetComponent<MineNodeDustInteractor>(); 
-        if (dust != null) dust.SetLevelAuthority(_drumTrack); 
-        _carvedPath.Clear(); 
-        if (track != null) ConfigureFromRole(track.assignedRole);
-        if (coreSprite != null) {
-            tint.a = 1; 
-            coreSprite.color = tint;
-        }
-        CacheAuthoredStepsFromNoteSet(); 
-    }
-
-    private void HandleLoopBoundary()
-    { if (_drumTrack == null) return;
-        if (!pruneCarvedPathOnLoopBoundary) return; 
-        if (_carvedPath == null || _carvedPath.Count < pruneMinPathCount) return; 
-        int before = _carvedPath.Count;
-        // Keep only cells that are still clear (no dust present).
-        // This makes _carvedPath represent the *currently-open corridor*, not historical traversal.
-        var compact = new List<Vector2Int>(before);
-        Vector2Int? last = null;
-        for (int i = 0; i < _carvedPath.Count; i++) {
-            var cell = _carvedPath[i];
-            // If dust has regrown here, it is no longer part of the active corridor.
-            if (_drumTrack.HasDustAt(cell)) continue;
-            // Avoid duplicates from lingering in a cell.
-            if (last.HasValue && last.Value == cell) continue;
-            compact.Add(cell);
-            last = cell;
-        }
-        if (compact.Count == before) return; // no changes
-        _carvedPath.Clear(); 
-        _carvedPath.AddRange(compact);
-    }
-    public float GetCorridorHealDelaySeconds()
-    {
-        // tunables (make them per-role later if desired)
-        float slow = 2.5f;  // low note
-        float fast = 0.4f;  // high note
-        return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
-    }
-    
     private float GetRoleTurnAngleDeg(MusicalRole role)
     {
         switch (role)
@@ -426,7 +399,6 @@ public class MineNode : MonoBehaviour
             default:                  return 18f;
         }
     }
-
     private static Vector2 Rotate(Vector2 v, float degrees)
     {
         float r = degrees * Mathf.Deg2Rad;
@@ -435,20 +407,7 @@ public class MineNode : MonoBehaviour
         return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
     }
     
-    public void NotifyDustErodedAt(Vector3 worldPos)
-    {
-        if (_drumTrack == null) return;
-
-        // Project carving position into the grid
-        Vector2Int cell = _drumTrack.CellOf(worldPos);
-
-        // Avoid duplicate samples when staying in the same cell
-        if (_carvedPath.Count > 0 && _carvedPath[_carvedPath.Count - 1] == cell)
-            return;
-
-        _carvedPath.Add(cell);
-    }
-    void ConfigureFromRole(MusicalRole role)
+    private void ConfigureFromRole(MusicalRole role)
     {
         var dust = GetComponent<MineNodeDustInteractor>();
         if (!dust) return;
@@ -476,27 +435,7 @@ public class MineNode : MonoBehaviour
                 break;
         }
     }
-    private void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (_depletedHandled) return;
-        if (!coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
-            return;
-
-        // Preview note (optional)
-        TryPlayPreviewNote();
-
-        // Apply damage
-        _strength -= vehicle.GetForceAsDamage();
-        _strength = Mathf.Max(0, _strength);
-
-        float normalized = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
-        float scaleFactor = Mathf.Lerp(0.2f, 1.1f, normalized);
-        StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
-        // Deplete -> burst -> resolve
-        if(_strength <= 0)
-            HandleDepleted(vehicle);
-    }
-    void HandleDepleted(Vehicle vehicle)
+    private void HandleDepleted(Vehicle vehicle)
     {
         _depletedHandled = true;
 
@@ -507,7 +446,7 @@ public class MineNode : MonoBehaviour
 
         TriggerExplosion();
     }
-    void TryPlayPreviewNote()
+    private void TryPlayPreviewNote()
     {
         if (_track == null || _noteSet == null || _drumTrack == null) return;
 
@@ -544,18 +483,7 @@ public class MineNode : MonoBehaviour
         _resolvedFired = true;
         OnResolved?.Invoke(this);
     }
-    private void OnDisable() { 
-        Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); 
-        // Defensive: if we're disabled without CleanupAndDestroy running, unsubscribe here.
-        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
-    }
-    private void OnDestroy() {
-        Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); 
-        // Defensive: ensure no stale event subscriptions survive destruction.
-        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
-        // If we were destroyed unexpectedly, also try to remove from active list.
-        if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
-    }
+
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)
     {
         Vector3 initialScale = transform.localScale;
@@ -574,6 +502,39 @@ public class MineNode : MonoBehaviour
             
             TriggerExplosion();
     } 
+    private void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (_depletedHandled) return;
+        if (!coll.gameObject.TryGetComponent<Vehicle>(out var vehicle))
+            return;
+
+        // Preview note (optional)
+        TryPlayPreviewNote();
+
+        // Apply damage
+        _strength -= vehicle.GetForceAsDamage();
+        _strength = Mathf.Max(0, _strength);
+
+        float normalized = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
+        float scaleFactor = Mathf.Lerp(0.2f, 1.1f, normalized);
+        StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
+        // Deplete -> burst -> resolve
+        if(_strength <= 0)
+            HandleDepleted(vehicle);
+    }
+
+    private void OnDisable() { 
+        Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})"); 
+        // Defensive: if we're disabled without CleanupAndDestroy running, unsubscribe here.
+        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
+    }
+    private void OnDestroy() {
+        Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})"); 
+        // Defensive: ensure no stale event subscriptions survive destruction.
+        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
+        // If we were destroyed unexpectedly, also try to remove from active list.
+        if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
+    }
     void OnEnable() { 
          
         _col = GetComponent<Collider2D>(); 
