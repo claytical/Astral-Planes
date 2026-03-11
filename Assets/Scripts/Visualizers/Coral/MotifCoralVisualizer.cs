@@ -228,25 +228,31 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// <summary>
     /// Fits the coral to a world-space play area so it never overflows the screen.
     /// Call once before GrowMotifCoral / RenderMotifCoral.
-    /// The trunk is placed at the lower-center of the area; arms grow upward into view.
+    /// The coral is a sphere: trunk + arms radiate in all directions.
+    /// worldScale is derived so the full ball diameter fills 80% of the shorter axis.
     /// </summary>
     public void FitToPlayArea(float areaWidth, float areaHeight, float areaCenterX, float areaCenterY)
     {
-        // The coral is a ball: center sphere + branches radiating in all directions.
-        // Total extent = sphereRadius + max branch length, in every direction.
-        // We want the whole ball to fit within the smaller of width/height * 0.75.
-        float targetExtent = Mathf.Min(areaWidth, areaHeight) * 0.75f * 0.5f; // radius of bounding sphere
+        // Target: coral ball should fill 80% of the shorter screen axis.
+        float targetDiameter = Mathf.Min(areaWidth, areaHeight) * 0.80f;
 
-        // Raw extent at worldScale=1: trunk radius + longest possible arm
-        float rawBranchLen = 4f * segHeightMax; // 4 bins at max height
-        float rawExtent    = trunkRadius + rawBranchLen;
+        // Raw diameter at worldScale=1 (pre-scale inspector values):
+        //   One arm = trunk surface to branch tip = trunkRadius + 4 bins * segHeightMax
+        //   Ball diameter = 2 * that (arms radiate in all directions)
+        float rawArmLen  = trunkRadius + 4f * segHeightMax;
+        float rawDiam    = rawArmLen * 2f;
 
-        worldScale = rawExtent > 0f
-            ? Mathf.Clamp(targetExtent / rawExtent, 0.05f, 50f)
+        // Clamp upper bound high enough for typical 2D orthographic world units (e.g. 30 units wide).
+        worldScale = rawDiam > 0f
+            ? Mathf.Clamp(targetDiameter / rawDiam, 0.05f, 200f)
             : 1f;
 
-        // Center the ball in the play area
+        // Center the ball in the play area.
         origin = new Vector3(areaCenterX, areaCenterY, 0f);
+
+        Debug.Log($"[MotifCoral] FitToPlayArea: area={areaWidth:F2}x{areaHeight:F2} " +
+                  $"targetDiam={targetDiameter:F2} rawDiam={rawDiam:F2} worldScale={worldScale:F2} " +
+                  $"origin=({areaCenterX:F2},{areaCenterY:F2})");
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -296,8 +302,8 @@ public class MotifCoralVisualizer : MonoBehaviour
         // ── Central sphere ────────────────────────────────────────────────
         // All branches radiate from the surface of this sphere.
         // Its radius is worldScale * trunkRadius so it scales proportionally.
-        Vector3 center     = origin;
-        float   sphereR    = S(trunkRadius);
+        Vector3 center  = origin;
+        float   sphereR = S(trunkRadius);
         SpawnCenterSphere(center, sphereR);
 
         // ── Collect all bins, assign a unique surface direction to each ───
@@ -338,7 +344,7 @@ public class MotifCoralVisualizer : MonoBehaviour
                 // ── Surface direction for this bin ────────────────────────
                 // Azimuth: base cardinal + (bi * binRotationDeg) so each new
                 // bin on this arm rotates around the sphere.
-                float azimuth   = baseAz + bi * binRotationDeg;
+                float azimuth = baseAz + bi * binRotationDeg;
 
                 // Elevation: alternate above/below equator per bin so the
                 // ball fills out in 3-D rather than all branches being flat.
@@ -449,84 +455,76 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// Generates 5 control points that wander gently off the main axis using
     /// overlapping sine waves seeded from the branch's world position,
     /// so every branch has a unique personality while staying predictable.
-    /// Drift is enveloped to zero at base and tip so branches connect cleanly.
     /// </summary>
     private Vector3[] GenerateOrganicControlPoints(Vector3 start, Vector3 dir, float height, float driftRadius)
     {
-        Vector3 up   = dir.normalized;
-        Vector3 side = Vector3.Cross(up, Vector3.forward);
-        if (side.sqrMagnitude < 1e-5f) side = Vector3.Cross(up, Vector3.right);
-        side.Normalize();
-        Vector3 fwd = Vector3.Cross(side, up).normalized;
+        // Build a stable local frame from dir
+        Vector3 up    = dir;
+        Vector3 right = Vector3.Cross(dir, Vector3.up);
+        if (right.sqrMagnitude < 1e-4f) right = Vector3.Cross(dir, Vector3.forward);
+        right.Normalize();
+        Vector3 fwd = Vector3.Cross(up, right).normalized;
 
-        float safeDrift = Mathf.Min(driftRadius, height * 0.38f);
+        // Seed from position to give each branch its own wander personality
+        float seed = start.x * 13.7f + start.y * 7.3f + start.z * 17.1f;
 
-        // Deterministic per-branch seed from world position
-        float seed = start.x * 1.7f + start.y * 3.1f + start.z * 2.3f;
-
-        const int n = 6;
-        var pts = new Vector3[n];
-        pts[0]     = start;
-        pts[n - 1] = start + up * height;
-
-        for (int i = 1; i < n - 1; i++)
+        const int numPts = 5;
+        var pts = new Vector3[numPts];
+        for (int i = 0; i < numPts; i++)
         {
-            float t        = i / (float)(n - 1);
-            float envelope = Mathf.Sin(t * Mathf.PI); // tapers to 0 at both ends
-            float ds       = Mathf.Sin(seed + t * 5.3f) * safeDrift;
-            float df       = Mathf.Sin(seed * 1.4f + t * 3.7f + 1.1f) * safeDrift * 0.55f;
-            pts[i] = start + up * (t * height)
-                           + side * (ds * envelope)
-                           + fwd  * (df * envelope);
-        }
+            float t      = i / (float)(numPts - 1);
+            float angle  = seed + t * Mathf.PI * 3.1f;
+            float radius = driftRadius * Mathf.Sin(t * Mathf.PI); // zero at ends, max at middle
 
+            // Two overlapping sine waves for organic, non-repeating drift
+            float ox = Mathf.Sin(angle * 1.0f) * radius + Mathf.Sin(angle * 1.7f + 1.3f) * radius * 0.4f;
+            float oz = Mathf.Cos(angle * 1.0f) * radius + Mathf.Cos(angle * 2.1f + 0.7f) * radius * 0.4f;
+
+            pts[i] = start + up * (height * t) + right * ox + fwd * oz;
+        }
         return pts;
     }
 
     /// <summary>
-    /// Samples a clamped Catmull-Rom spline through control points into
-    /// evenly-spaced spine positions.
+    /// Interpolates through control points using Catmull-Rom splines,
+    /// producing <paramref name="totalRings"/> evenly-spaced sample points.
     /// </summary>
-    private static Vector3[] CatmullRomSpine(Vector3[] pts, int ringCount)
+    private static Vector3[] CatmullRomSpine(Vector3[] pts, int totalRings)
     {
-        var spine = new Vector3[ringCount];
-        int n     = pts.Length;
+        int n = pts.Length;
+        if (n < 2) return pts;
 
-        for (int r = 0; r < ringCount; r++)
+        var result = new Vector3[totalRings];
+        int segs   = n - 1;
+
+        for (int ri = 0; ri < totalRings; ri++)
         {
-            float global = (float)r / (ringCount - 1) * (n - 1);
-            int   i1     = Mathf.Clamp(Mathf.FloorToInt(global), 0, n - 2);
-            float lt     = global - i1;
+            float globalT = (float)ri / (totalRings - 1) * segs;
+            int   seg     = Mathf.Min(Mathf.FloorToInt(globalT), segs - 1);
+            float t       = globalT - seg;
 
-            Vector3 p0 = pts[Mathf.Max(i1 - 1, 0)];
-            Vector3 p1 = pts[i1];
-            Vector3 p2 = pts[Mathf.Min(i1 + 1, n - 1)];
-            Vector3 p3 = pts[Mathf.Min(i1 + 2, n - 1)];
+            Vector3 p0 = pts[Mathf.Max(seg - 1, 0)];
+            Vector3 p1 = pts[seg];
+            Vector3 p2 = pts[Mathf.Min(seg + 1, n - 1)];
+            Vector3 p3 = pts[Mathf.Min(seg + 2, n - 1)];
 
-            spine[r] = CatmullRom(p0, p1, p2, p3, lt);
+            result[ri] = 0.5f * (
+                2f * p1 +
+                (-p0 + p2) * t +
+                (2f * p0 - 5f * p1 + 4f * p2 - p3) * t * t +
+                (-p0 + 3f * p1 - 3f * p2 + p3) * t * t * t
+            );
         }
-
-        return spine;
-    }
-
-    private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
-    {
-        float t2 = t * t, t3 = t2 * t;
-        return 0.5f * (
-              2f * p1
-            + (-p0 + p2) * t
-            + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2
-            + (-p0 + 3f * p1 - 3f * p2 + p3) * t3
-        );
+        return result;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  Tube mesh
+    //  Tube segment
     // ═══════════════════════════════════════════════════════════════════════
 
     private GameObject SpawnTubeSegment(string segName, Vector3[] spine, float baseRadius,
-                                   Color col, float vertexAlpha,
-                                   float growStart01, float growEnd01)
+                                         Color col, float vertexAlpha,
+                                         float growStart01, float growEnd01)
     {
         var go = new GameObject(segName);
         go.transform.SetParent(_root, false);
@@ -618,105 +616,84 @@ public class MotifCoralVisualizer : MonoBehaviour
             Vector3 binormal = Vector3.Cross(tangent, normal).normalized;
             prevNorm = normal;
 
-            float t      = rings <= 1 ? 0f : r / (float)(rings - 1);
-            float taper  = Mathf.Max(S(minTipRadius) / baseRadius, Mathf.Pow(1f - t, tapePower));
-            float radius = baseRadius * taper;
+            float t      = rings <= 1 ? 0f : (float)r / (rings - 1);
+            float taper  = Mathf.Pow(1f - t, tapePower);
+            float radius = Mathf.Max(S(minTipRadius), baseRadius * taper);
 
-            // Colour: very subtle darkening toward tip so the taper reads without muddying the hue
-            Color ringCol = Color.Lerp(col, col * 0.88f, t);
-            ringCol.a = vertexAlpha;
-
-            int baseIdx = r * sides;
             for (int s = 0; s < sides; s++)
             {
-                float ang = (s / (float)sides) * Mathf.PI * 2f;
-                Vector3 dir = Mathf.Cos(ang) * normal + Mathf.Sin(ang) * binormal;
-                verts[baseIdx + s] = spine[r] + dir * radius;
-                norms[baseIdx + s] = dir;
-                uvs[baseIdx + s]   = new Vector2(s / (float)sides, t);
-                cols[baseIdx + s]  = ringCol;
+                float angle = (float)s / sides * Mathf.PI * 2f;
+                float cos   = Mathf.Cos(angle);
+                float sin   = Mathf.Sin(angle);
+
+                Vector3 offset = (normal * cos + binormal * sin) * radius;
+                int vi = r * sides + s;
+                verts[vi] = spine[r] + offset;
+                norms[vi] = offset.normalized;
+                uvs[vi]   = new Vector2((float)s / sides, t);
+
+                Color c = col;
+                c.a = vertexAlpha * (1f - t * 0.35f); // subtle fade toward tip
+                cols[vi] = c;
             }
         }
 
+        // Triangles
         int ti = 0;
         for (int r = 0; r < segCount; r++)
         {
-            int r0 = r * sides, r1 = (r + 1) * sides;
             for (int s = 0; s < sides; s++)
             {
-                int s1 = (s + 1) % sides;
-                tris[ti++] = r0 + s;  tris[ti++] = r1 + s;  tris[ti++] = r0 + s1;
-                tris[ti++] = r0 + s1; tris[ti++] = r1 + s;  tris[ti++] = r1 + s1;
+                int sNext = (s + 1) % sides;
+                int a = r * sides + s;
+                int b = r * sides + sNext;
+                int c = (r + 1) * sides + s;
+                int d = (r + 1) * sides + sNext;
+
+                tris[ti++] = a; tris[ti++] = c; tris[ti++] = b;
+                tris[ti++] = b; tris[ti++] = c; tris[ti++] = d;
             }
         }
 
-        mesh.Clear();
-        mesh.vertices  = verts;
-        mesh.normals   = norms;
-        mesh.uv        = uvs;
-        mesh.colors    = cols;
-        mesh.triangles = tris;
+        mesh.SetVertices(verts);
+        mesh.SetNormals(norms);
+        mesh.SetUVs(0, uvs);
+        mesh.SetColors(cols);
+        mesh.SetTriangles(tris, 0, true);
         mesh.RecalculateBounds();
 
         return (tris, segCount);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  Bud spawning
+    //  Buds
     // ═══════════════════════════════════════════════════════════════════════
 
     private void SpawnBuds(List<PhaseSnapshot.NoteEntry> notes, Vector3[] spine,
-                            int binIndex, PhaseSnapshot snapshot, bool isMatched,
-                            Transform segParent, float growStart, float growEnd)
+                            int binIndex, PhaseSnapshot snapshot,
+                            bool isMatched, Transform segParent,
+                            float growStart, float growEnd)
     {
         if (notes == null || notes.Count == 0 || spine == null || spine.Length < 2) return;
 
-        // binSize is how many steps fit in ONE bin on ONE track.
-        // snapshot.TotalSteps = drum.totalSteps (e.g. 16 or 64 for the base loop).
-        // loopMultiplier tells us how many bins this track has.
-        // For a 1-bin track: binSize = TotalSteps. For a 4-bin track: binSize = TotalSteps/4.
-        // We infer it from the number of unique BinIndexes present for this segment's role.
-        // Simplest safe fallback: binSize = TotalSteps (1 bin). TrackBinData.BinIndex tells us which bin.
-        // The absolute step for bin b spans [b*binSize .. (b+1)*binSize - 1].
-        // So bin-local step = note.Step - (binIndex * binSize).
-        // We need binSize. Count bins for this track by scanning TrackBins for same role+color.
-        int binsPerTrack = 1;
-        if (snapshot.TrackBins != null && notes.Count > 0)
+        int binSteps = snapshot.TotalSteps > 0 ? snapshot.TotalSteps : 16;
+
+        for (int ni = 0; ni < notes.Count; ni++)
         {
-            var roleColor = notes[0].TrackColor;
-            binsPerTrack = Mathf.Max(1,
-                snapshot.TrackBins.Count(b => b.TrackColor == roleColor));
-        }
-        int binSize  = Mathf.Max(1, snapshot.TotalSteps > 0 ? snapshot.TotalSteps / binsPerTrack : 16);
-        int rootMidi = snapshot.MotifKeyRootMidi;
+            var note = notes[ni];
 
-        foreach (var note in notes)
-        {
-            // Bin-local step: subtract the absolute offset of this bin's start
-            int   localStep = note.Step - (binIndex * binSize);
-            localStep = Mathf.Clamp(localStep, 0, binSize - 1);
-            float t01 = binSize <= 1 ? 0.5f : (float)localStep / (binSize - 1);
-            t01 = Mathf.Clamp01(t01);
+            // Map the note's step to a 0..1 position along this segment's spine
+            float t01 = binSteps > 1
+                ? Mathf.Clamp01((float)(note.Step % binSteps) / (binSteps - 1))
+                : 0.5f;
 
-            // World position on the spine
-            float   spineT     = t01 * (spine.Length - 1);
-            int     spineIdx   = Mathf.Min((int)spineT, spine.Length - 2);
-            float   spineBlend = spineT - spineIdx;
-            Vector3 budPos     = Vector3.Lerp(spine[spineIdx], spine[spineIdx + 1], spineBlend);
+            // Interpolate position along spine
+            float spineT  = t01 * (spine.Length - 1);
+            int   spineI  = Mathf.Min(Mathf.FloorToInt(spineT), spine.Length - 2);
+            float spineFr = spineT - spineI;
+            Vector3 budPos = Vector3.Lerp(spine[spineI], spine[spineI + 1], spineFr);
 
-            // Offset the bud radially away from the spine so it sits on the branch surface,
-            // not buried inside it. Direction = outward from the spine tangent's normal plane.
-            Vector3 tangent = (spine[Mathf.Min(spineIdx + 1, spine.Length - 1)] - spine[spineIdx]).normalized;
-            if (tangent.sqrMagnitude < 1e-5f) tangent = Vector3.up;
-            Vector3 outDir = Vector3.Cross(tangent, Vector3.right);
-            if (outDir.sqrMagnitude < 1e-5f) outDir = Vector3.Cross(tangent, Vector3.forward);
-            outDir.Normalize();
-            // Rotate outward direction per-note so buds orbit the branch instead of all facing the same way
-            float orbitAngle = (note.Note % 12) * 30f; // 12 semitones → 360° spread
-            outDir = Quaternion.AngleAxis(orbitAngle, tangent) * outDir;
-            budPos += outDir * (S(tubeRadiusBase) * 3.5f);
-
-            bool  isRoot = (note.Note == rootMidi);
+            bool isRoot = snapshot.MotifKeyRootMidi > 0 && (note.Note % 12) == (snapshot.MotifKeyRootMidi % 12);
             float radius = S(budRadiusBase) * (isRoot ? rootNoteScaleBoost : 1f);
             if (!isMatched) radius *= 0.75f;
 
@@ -816,8 +793,8 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// </summary>
     private static Vector3 AzimuthElevationDir(float azimuthDeg, float elevationDeg)
     {
-        float az  = azimuthDeg  * Mathf.Deg2Rad;
-        float el  = elevationDeg * Mathf.Deg2Rad;
+        float az    = azimuthDeg   * Mathf.Deg2Rad;
+        float el    = elevationDeg * Mathf.Deg2Rad;
         float cosEl = Mathf.Cos(el);
         return new Vector3(
             cosEl * Mathf.Sin(az),
@@ -841,64 +818,52 @@ public class MotifCoralVisualizer : MonoBehaviour
             float u     = Mathf.Clamp01(elapsed / dur);
             float eased = growCurve != null ? growCurve.Evaluate(u) : u;
 
-            // Player stick modulates fork angle (stick X → spread)
+            // Modulate fork angle from stick input
             if (getSteer != null)
             {
-                Vector2 stick = getSteer();
-                SetForkAngle(Mathf.Clamp01(stick.magnitude));
+                Vector2 steer = getSteer();
+                SetForkAngle(steer.x * 0.5f + 0.5f);
             }
 
-            // Reveal each tube segment proportionally within its grow window
+            // Reveal tube segments progressively
             foreach (var seg in _segments)
             {
-                float segU = Mathf.InverseLerp(seg.growStartNorm, seg.growEndNorm, eased);
-                RevealSegment(seg, segU);
+                if (eased < seg.growStartNorm) continue;
+
+                float segU = seg.growEndNorm > seg.growStartNorm
+                    ? Mathf.Clamp01((eased - seg.growStartNorm) / (seg.growEndNorm - seg.growStartNorm))
+                    : 1f;
+
+                int outlineReveal = Mathf.RoundToInt(segU * seg.outlineSegCount);
+                int fillReveal    = Mathf.RoundToInt(segU * seg.fillSegCount);
+
+                if (seg.outlineFullTris != null && outlineReveal > 0)
+                    seg.outlineMesh.SetTriangles(seg.outlineFullTris, 0, outlineReveal * tubeSides * 6, 0, true);
+
+                if (seg.fillFullTris != null && fillReveal > 0)
+                    seg.fillMesh.SetTriangles(seg.fillFullTris, 0, fillReveal * tubeSides * 6, 0, true);
             }
 
-            // Pop buds visible when the grow front reaches their position
+            // Reveal buds when grow front passes their showAtNorm
             foreach (var bud in _buds)
-            {
                 if (bud.go != null && !bud.go.activeSelf && eased >= bud.showAtNorm)
                     bud.go.SetActive(true);
-            }
 
             yield return null;
         }
 
+        // Ensure fully revealed
         ForceFullReveal();
-    }
-
-    private void RevealSegment(in TubeSegmentRuntime seg, float t01)
-    {
-        t01 = Mathf.Clamp01(t01);
-        int sides = Mathf.Max(3, tubeSides);
-        int idxPerRing = sides * 6;
-
-        RevealTube(seg.outlineMesh, seg.outlineFullTris, seg.outlineSegCount, t01, idxPerRing);
-        RevealTube(seg.fillMesh,    seg.fillFullTris,    seg.fillSegCount,    t01, idxPerRing);
-    }
-
-    private static void RevealTube(Mesh mesh, int[] fullTris, int segCount, float t01, int idxPerRing)
-    {
-        if (mesh == null || fullTris == null || fullTris.Length == 0 || segCount <= 0) return;
-
-        int visSegs  = Mathf.Clamp(Mathf.RoundToInt(t01 * segCount), 0, segCount);
-        int idxCount = Mathf.Min(visSegs * idxPerRing, fullTris.Length);
-
-        if (idxCount <= 0) { mesh.SetTriangles(Array.Empty<int>(), 0, true); return; }
-
-        var tris = new int[idxCount];
-        Array.Copy(fullTris, tris, idxCount);
-        mesh.SetTriangles(tris, 0, true);
     }
 
     private void ForceFullReveal()
     {
         foreach (var seg in _segments)
         {
-            if (seg.outlineMesh != null && seg.outlineFullTris != null)
+            if (seg.outlineFullTris != null && seg.outlineMesh != null)
                 seg.outlineMesh.SetTriangles(seg.outlineFullTris, 0, true);
-            if (seg.fillMesh != null && seg.fillFullTris != null)
+            if (seg.fillFullTris != null && seg.fillMesh != null
+                && seg.fillFullTris != null)
                 seg.fillMesh.SetTriangles(seg.fillFullTris, 0, true);
         }
         foreach (var bud in _buds)
@@ -932,8 +897,8 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// </summary>
     private static Vector3 AzimuthLeanDir(float azimuthDeg, float leanDeg)
     {
-        float az  = azimuthDeg * Mathf.Deg2Rad;
-        float lean = leanDeg  * Mathf.Deg2Rad;
+        float az   = azimuthDeg * Mathf.Deg2Rad;
+        float lean = leanDeg   * Mathf.Deg2Rad;
         return new Vector3(
             Mathf.Sin(lean) * Mathf.Cos(az),
             Mathf.Cos(lean),
@@ -1005,15 +970,15 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// </summary>
     private Texture2D GenerateOrganicNoise(int size, bool darkenEdges)
     {
+        size = Mathf.Max(4, size);
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, mipChain: true);
-        tex.wrapMode   = TextureWrapMode.Repeat;
-        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Repeat;
 
-        // Scatter cell points for Worley noise (tileable by wrapping)
-        const int cellCount = 12;
-        var cells = new Vector2[cellCount];
+        // Pre-generate Worley cell centres (tileable)
+        int numCells = 12;
+        var cells = new Vector2[numCells];
         var rng = new System.Random(42);
-        for (int i = 0; i < cellCount; i++)
+        for (int i = 0; i < numCells; i++)
             cells[i] = new Vector2((float)rng.NextDouble(), (float)rng.NextDouble());
 
         var pixels = new Color[size * size];
@@ -1021,20 +986,12 @@ public class MotifCoralVisualizer : MonoBehaviour
         {
             for (int x = 0; x < size; x++)
             {
-                float u = x / (float)size;
-                float v = y / (float)size;
+                float u = (float)x / size;
+                float v = (float)y / size;
 
-                // ── Cellular / Worley ────────────────────────────────────────
-                float worley = WorleyTileable(u, v, cells, noiseScale);
-                // Invert so cell centres are bright, edges dark — coral polyp look
-                float cell = 1f - Mathf.Clamp01(worley * 2f);
-                // Re-map to keep only the cell-interior bright bands
-                cell = Mathf.SmoothStep(0.25f, 0.75f, cell);
+                float cell = WorleyTileable(u, v, cells, noiseScale);
+                float fbm  = FbmNoise(u * noiseScale, v * noiseScale, 4);
 
-                // ── FBM noise ────────────────────────────────────────────────
-                float fbm = FbmNoise(u * noiseScale, v * noiseScale, octaves: 4);
-
-                // ── Combine ──────────────────────────────────────────────────
                 float value = Mathf.Lerp(1f, cell, cellularStrength)
                             * Mathf.Lerp(1f, fbm,  fbmStrength);
                 value = Mathf.Clamp01(value);
@@ -1042,8 +999,6 @@ public class MotifCoralVisualizer : MonoBehaviour
                 // ── Edge darkening (simulates tube curvature / subsurface) ───
                 if (darkenEdges)
                 {
-                    // U maps around the tube circumference (0..1 = full ring)
-                    // darken toward u=0 and u=1 edges
                     float edgeFactor = Mathf.Sin(u * Mathf.PI);
                     value = Mathf.Lerp(value * (1f - edgeDarken), value, edgeFactor);
                 }
@@ -1065,7 +1020,6 @@ public class MotifCoralVisualizer : MonoBehaviour
         float minDist = float.MaxValue;
         foreach (var c in cells)
         {
-            // Check wrapped neighbours for tileability
             for (int ox = -1; ox <= 1; ox++)
             for (int oy = -1; oy <= 1; oy++)
             {
@@ -1139,9 +1093,8 @@ public class MotifCoralVisualizer : MonoBehaviour
         if (noiseTex == null) return;
         var mpb = new MaterialPropertyBlock();
         mr.GetPropertyBlock(mpb);
-        mpb.SetTexture("_MainTex",  noiseTex);
-        mpb.SetTexture("_BaseMap",  noiseTex);  // URP
+        mpb.SetTexture("_MainTex", noiseTex);
+        mpb.SetTexture("_BaseMap", noiseTex);  // URP
         mr.SetPropertyBlock(mpb);
     }
-
 }
