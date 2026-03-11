@@ -7,15 +7,10 @@ using UnityEngine.UI;
 
 public class NoteVisualizer : MonoBehaviour
 {
-    [Header("Ascension")]
-    [Tooltip("World-space UI reference the notes should rise to (e.g., a RectTransform named 'Line of Ascent').")]
-    public RectTransform lineOfAscent;
-    [Tooltip("Ascend duration in drum loops (1 = one full loop).")]
-    [Min(1)] public int ascendLoops = 8;
-    [Tooltip("Extra seconds added to the loop-based duration to avoid snapping on the boundary.")]
-    public float ascendPaddingSeconds = 0.15f;
-    [Tooltip("Small world-space Y padding to keep notes from sitting exactly on the line.")]
-    public float ascendLineWorldPadding = 0f;
+    [Header("Ascension Director")]
+    [Tooltip("Handles all time-sequenced ascension animation. Must be assigned.")]
+    [SerializeField] private NoteAscensionDirector ascensionDirector;
+
     [Header("Playhead")]
     public RectTransform playheadLine;
     public ParticleSystem playheadParticles;
@@ -23,24 +18,8 @@ public class NoteVisualizer : MonoBehaviour
     [SerializeField] private float _playheadEnergy01 = 0f;       // what we actually render
     private float _playheadEnergyTarget01 = 0f;                  // what game logic asks for
     [SerializeField] private float _playheadEnergyLerpSpeed = 4f;
-    // Each ascended note bumps this; decays over time. Drives extra particle activity.
-    [Range(0f, 1f)]
-    [SerializeField] private float _lineCharge01 = 0f;
-    [SerializeField] private float _lineChargeDecaySpeed = 0.5f;
-    [Header("Playhead Pulse (Color)")]
     [SerializeField] private float releasePulseSeconds = 0.18f;
     [SerializeField] private Color releasePulseColor = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
-
-    private float _releasePulseT = 0f; // seconds remaining
-    // Flag to fire a short "release" burst when drums change / burst completes.
-    private bool _pendingReleasePulse = false;
-// Cached core refs (do not assume stable across scenes)
-    private GameFlowManager _gfm;
-    private InstrumentTrackController _ctrl;
-    private DrumTrack _drum;
-    private bool _hasCachedDrumAnchor;
-    private double _cachedLeaderStartDspTime;
-    private float _playheadBaseHeight;
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
@@ -52,33 +31,16 @@ public class NoteVisualizer : MonoBehaviour
     [Min(1)] public int releaseCueLookaheadSteps = 8;
     [Tooltip("World-space arc height for the cue path (0 = straight line).")]
     public float releaseCueArcHeight = 0.8f;
-
-    private int _forcedLeaderSteps = -1;
-    private int _forcedLeaderBins = -1;
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
     [Header("Bin Visualization")]
     [Tooltip("Parent RectTransform where bin indicators will be instantiated.")]
     public RectTransform binStripParent;
-
-    [Tooltip("Prefab with an Image component used for each bin indicator.")]
-    public GameObject binIndicatorPrefab;
-
-    [Tooltip("Color for inactive bins.")]
-    public Color binInactiveColor = new Color(1f, 1f, 1f, 0.2f);
-
-    [Tooltip("Color for the currently active target bin.")]
-    public Color binActiveColor = new Color(1f, 1f, 1f, 0.9f);
-    private List<(InstrumentTrack, int)> deadKeys = new List<(InstrumentTrack, int)>();
-    private Canvas _worldSpaceCanvas;
-    private Transform _uiParent;
-    private bool isInitialized;
-    private readonly Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
-    private readonly Dictionary<InstrumentTrack, Dictionary<int, Vector3>> _trackStepWorldPositions = new();
-    private readonly List<Image> _binIndicators = new List<Image>();
-    private int _activeBinCount = 0;      // How many bins are currently in use (post-contraction)
-    private int _currentTargetBin = -1;  
+    [Header("First-Play Confirm FX")]
+    [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
+    [SerializeField] private float firstPlayConfirmTravelSeconds = 2f;
+    [SerializeField] private int firstPlayConfirmEmitCount = 24;
     [Header("Playhead Trail (Particles)")]
     [SerializeField] private bool playheadTrailEnabled = true;
 
@@ -90,6 +52,30 @@ public class NoteVisualizer : MonoBehaviour
 
 // Optional: keep particle Z stable (useful if your world-space canvas depth fights sorting).
     [SerializeField] private float playheadTrailWorldZOverride = float.NaN;
+
+    // Each ascended note bumps this; decays over time. Drives extra particle activity.
+    private float _lineCharge01 => ascensionDirector != null ? ascensionDirector.LineCharge01 : 0f;    [Header("Playhead Pulse (Color)")]
+
+    private float _releasePulseT = 0f; // seconds remaining
+    // Flag to fire a short "release" burst when drums change / burst completes.
+    private bool _pendingReleasePulse = false;
+// Cached core refs (do not assume stable across scenes)
+    private GameFlowManager _gfm;
+    private InstrumentTrackController _ctrl;
+    private DrumTrack _drum;
+    private bool _hasCachedDrumAnchor;
+    private double _cachedLeaderStartDspTime;
+    private float _playheadBaseHeight;
+    private int _forcedLeaderSteps = -1;
+    private List<(InstrumentTrack, int)> deadKeys = new List<(InstrumentTrack, int)>();
+    private Canvas _worldSpaceCanvas;
+    private Transform _uiParent;
+    private bool isInitialized;
+    private readonly Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
+    private readonly Dictionary<InstrumentTrack, Dictionary<int, Vector3>> _trackStepWorldPositions = new();
+    private readonly List<Image> _binIndicators = new List<Image>();
+    private int _activeBinCount = 0;      // How many bins are currently in use (post-contraction)
+    private int _currentTargetBin = -1;  
 
     private Vector3 _lastPlayheadParticleWorldPos;
     private bool _hasLastPlayheadParticleWorldPos;
@@ -132,7 +118,6 @@ public class NoteVisualizer : MonoBehaviour
         public float t;              // normalized 0..1
         public Action onArrive; // called when we reach target (chain effects/cleanup)
     }
-    private readonly Dictionary<InstrumentTrack, AscendTask> _ascendTasks = new();
     private int _lastObservedCompletedLoops = -1;
     private readonly Dictionary<(InstrumentTrack track, int step), int> _stepBurst = new();
     private readonly HashSet<(InstrumentTrack track, int step)> _animatingSteps = new();
@@ -140,10 +125,6 @@ public class NoteVisualizer : MonoBehaviour
     private readonly List<RushTask> _rushTasks = new();
 
     private readonly Dictionary<int, GameObject> _releaseCuesByVehicle = new();
-    [Header("First-Play Confirm FX")]
-    [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
-    [SerializeField] private float firstPlayConfirmTravelSeconds = 2f;
-    [SerializeField] private int firstPlayConfirmEmitCount = 24;
 
     private struct FirstPlayConfirmRequest
     {
@@ -591,7 +572,7 @@ public void Initialize()
     public void BeginNewMotif_ClearAll(bool destroyMarkerGameObjects = true)
     {
         // Stop any in-progress task state (we use Update-driven task lists; clearing is sufficient).
-        _ascendTasks.Clear();
+        ascensionDirector?.ClearAllTasks();
         _blastTasks.Clear();
         _rushTasks.Clear();
         _stepBurst.Clear();
@@ -640,8 +621,7 @@ public void Initialize()
 
         // Force any temporarily overridden leader sizes back to default.
         _forcedLeaderSteps = -1;
-        _forcedLeaderBins = -1;
-
+        
         // Particles: clear any lingering emission so nothing looks "stuck".
         if (playheadParticles != null)
             playheadParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -649,7 +629,6 @@ public void Initialize()
         _pendingReleasePulse = false;
         _playheadEnergy01 = 0f;
         _playheadEnergyTarget01 = 0f;
-        _lineCharge01 = 0f;
         // Cache playhead visuals (optional if you want to scale/alpha it with energy)
         if (playheadLine != null)
         {
@@ -832,19 +811,7 @@ void Update()
         _playheadEnergyTarget01,
         _playheadEnergyLerpSpeed * Time.deltaTime
     );
-
-    _lineCharge01 = Mathf.MoveTowards(
-        _lineCharge01,
-        0f,
-        _lineChargeDecaySpeed * Time.deltaTime
-    );
-
-    // --- Playhead position across the "leader" loop (max loop multiplier) ---
-    int audibleBin = (_gfm != null && _gfm.controller != null)
-        ? _gfm.controller.GetTransportFrame().playheadBin
-        : 0;
-    _ = audibleBin; // (kept to preserve your original intent; safe no-op if unused)
-
+    
 // --- Visual clock MUST match playheadLine clock ---
 // Use the leader loop length for both x-position AND step sampling.
     int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
@@ -972,7 +939,6 @@ void Update()
     if (loopsNow != _lastObservedCompletedLoops)
     {
         _lastObservedCompletedLoops = loopsNow;
-        OnLoopBoundary();
     }
 
     for (int i = _blastTasks.Count - 1; i >= 0; i--)
@@ -1085,17 +1051,8 @@ private void ProcessFirstPlayConfirmFx()
         main.simulationSpace = ParticleSystemSimulationSpace.World;
 
         ps.Play(true);
-
+        ascensionDirector?.EnqueueFirstPlayTask(ps, startWorld, endWorld, r.color, r.duration);
         // IMPORTANT: duration = time remaining until first-play moment
-        _firstPlayTasks.Add(new FirstPlayConfirmTask
-        {
-            ps = ps,
-            start = startWorld,
-            end = endWorld,
-            startDsp = now,
-            endDsp = r.duration,
-            color = r.color
-        });
 
         r.spawned = true;
         _firstPlayRequests[i] = r;
@@ -1178,94 +1135,6 @@ private Color ComputeStepColor(int step)
     Vector3 rgb = sum / totalW;
     return new Color(rgb.x, rgb.y, rgb.z, 1f);
 }
-    private void OnLoopBoundary()
-{
-    if (_ascendTasks.Count == 0) return;
-
-    // Take a snapshot of keys so we can safely modify the dictionary.
-    var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
-
-    foreach (var trk in keys)
-    {
-        var task = _ascendTasks[trk];
-
-        // Optional: keep batch-level delay if you still use it.
-        if (task.delayLoopsRemaining > 0)
-        {
-            task.delayLoopsRemaining--;
-            _ascendTasks[trk] = task;   // <-- WRITE BACK
-            continue;
-        }
-
-        bool anyAlive = false;
-
-        for (int i = 0; i < task.markers.Count; i++)
-        {
-            var ms = task.markers[i];
-
-            // Already finished?
-            if (ms.go == null) continue;
-
-            // Per-marker delay (optional)
-            if (ms.delayLoopsRemaining > 0)
-            {
-                ms.delayLoopsRemaining--;
-                task.markers[i] = ms;
-                anyAlive = true;
-                continue;
-            }
-
-            // Move one "loop step" toward target
-            var t = ms.go.transform;
-            var p = t.position; // world space
-            p.y += ms.stepY;    // step size was computed at enqueue time
-            t.position = p;
-
-            // Countdown loops; when zero, this marker has arrived
-            ms.loopsRemaining = Mathf.Max(0, ms.loopsRemaining - 1);
-
-            if (ms.loopsRemaining <= 0)
-            {
-                // Each arrival at the line gives the "line" a bit more charge.
-                _lineCharge01 = Mathf.Clamp01(_lineCharge01 + 0.2f);
-
-                // Per-marker finish (what the coroutine tail used to do)
-                _animatingSteps.Remove(ms.key);
-                if (ms.go) Destroy(ms.go);
-
-                try { ms.onDonePerMarker?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
-
-                ms.go = null; // mark finished
-                task.markers[i] = ms;
-                // don’t set anyAlive here; marker is done
-            }
-
-            else
-            {
-                // Still moving next loop
-                task.markers[i] = ms;
-                anyAlive = true;
-            }
-        }
-
-        task.stepsCompleted++; // keep if you use it elsewhere
-
-        if (!anyAlive)
-        {
-            // All markers for this track are finished
-            try { task.onArrive?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); }
-            _ascendTasks.Remove(trk);
-
-            // IMPORTANT: don’t mass-destroy markers or call DestroyOrphanRowMarkers() here.
-            // Burst-level cleanup (remove from noteMarkers, culls, audio) is handled by the
-            // pending--/if(pending==0) lambda you pass per marker.
-        }
-        else
-        {
-            _ascendTasks[trk] = task;   // <-- WRITE BACK
-        }
-    }
-}
     public void MarkGhostPadding(InstrumentTrack track, int startStepInclusive, int count) {
         if (!_ghostNoteSteps.TryGetValue(track, out var set))
             _ghostNoteSteps[track] = set = new HashSet<int>();
@@ -1303,6 +1172,7 @@ private Color ComputeStepColor(int step)
             _drum = newDrum;
             _ctrl = newCtrl;
         }
+        ascensionDirector?.Initialize(_drum);
 
         return (_drum != null && _ctrl != null && _ctrl.tracks != null);
     }
@@ -1330,11 +1200,9 @@ private Color ComputeStepColor(int step)
     }
     private float GetAscendTargetWorldY()
     {
-        if (lineOfAscent != null)
-            return lineOfAscent.position.y + ascendLineWorldPadding;
-
-        // Fallback (old behavior) — but you generally should not rely on this.
-        return GetTopWorldY() + ascendLineWorldPadding;
+        return ascensionDirector != null
+            ? ascensionDirector.GetAscendTargetWorldY()
+            : GetTopWorldY();   // fallback — should not normally be reached
     }
     public float GetTopWorldY()
     {
@@ -1697,119 +1565,30 @@ private Color ComputeStepColor(int step)
         for (int i = 0; i < deadKeys.Count; i++)
             noteMarkers.Remove(deadKeys[i]);
     }
-
-    public void TriggerBurstAscend(InstrumentTrack track, int burstId, float durationSeconds) {
-    if (track == null || burstId < 0) return; 
-    if (!isActiveAndEnabled) return;
-    
-    var uiParent = GetUIParent(); 
-    if (uiParent != null && !uiParent.gameObject.activeInHierarchy) return;
-
-    // Ascend BOTH lit and placeholder markers for this burst.
-    // If you truly only want lit loop-owned markers to rise, you can reintroduce filtering,
-    // but for burst-cohort visuals this should be inclusive.
-    bool includePlaceholders = true;
-
-    var cohort = new List<(int step, Transform rt, MarkerTag tag)>();
-
-    // ---- 1) Primary: dictionary-owned markers (fast path, consistent) ----
-    foreach (var kvp in noteMarkers)
+    public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds)
     {
-        var key = kvp.Key; // (InstrumentTrack, step)
-        if (key.Item1 != track) continue;
+        if (ascensionDirector == null) return;
 
-        var tr = kvp.Value;
-        if (!tr) continue;
-
-        var tag = tr.GetComponent<MarkerTag>();
-        if (tag == null) continue;
-
-        // We key cohort membership ONLY by burstId
-        // Cohort membership: tag burstId OR persisted step->burst registry.
-        bool matchesBurst = (tag.burstId == burstId) || (tag.ascendBurstId == burstId) || (_stepBurst.TryGetValue((track, key.Item2), out var sb) && sb == burstId);
-        if (!matchesBurst) continue;
-        if (!tr.TryGetComponent(out RectTransform rt)) continue;
-
-        cohort.Add((key.Item2, rt, tag));
+        ascensionDirector.TriggerBurstAscend(
+            track,
+            burstId,
+            seconds,
+            GetMarkersForTrackAndBurst   // local helper — see [6]
+        );
     }
-
-    // ---- 2) Optional: pick up not-owned markers in the row (debug / resilience) ----
-    // If you are still seeing reappearing/disappearing, this helps ensure we animate the actual on-screen cohort.
-    if (cohort.Count == 0)
+    private IEnumerable<GameObject> GetMarkersForTrackAndBurst(InstrumentTrack track, int burstId)
     {
-        int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-        if (trackIndex >= 0 && trackIndex < trackRows.Count)
+        foreach (var kv in noteMarkers)
         {
-            var row = trackRows[trackIndex];
-            for (int i = 0; i < row.childCount; i++)
-            {
-                var child = row.GetChild(i);
-                if (!child) continue;
+            if (kv.Key.Item1 != track) continue;
+            if (kv.Value == null) continue;
 
-                var tag = child.GetComponent<MarkerTag>();
-                if (tag == null) continue;
+            var tag = kv.Value.GetComponent<MarkerTag>();
+            if (tag != null && tag.burstId != burstId) continue;
 
-                if (tag.track != track) continue;
-
-                bool matchesBurst = (tag.burstId == burstId) || (tag.ascendBurstId == burstId) || (_stepBurst.TryGetValue((track, tag.step), out var sb) && sb == burstId);
-                if (!matchesBurst) continue;
-                if (!child.TryGetComponent(out RectTransform rt)) continue;
-
-                cohort.Add((tag.step, rt, tag));
-            }
+            yield return kv.Value.gameObject;
         }
     }
-    
-    if (cohort.Count == 0) {
-        if (track != null && track.TryGetBurstSteps(burstId, out var burstSteps)) { 
-            foreach (var step in burstSteps) { 
-                if (!noteMarkers.TryGetValue((track, step), out var tr) || tr == null) continue; 
-                var tag = tr.GetComponent<MarkerTag>(); 
-                if (tag == null) continue; 
-                if (!includePlaceholders && tag.isPlaceholder) continue; 
-                cohort.Add((step, tr, tag));
-            }
-        }
-    }
-    if (cohort.Count == 0)
-    {
-        int trackOwned = 0, stepBurstMatch = 0;
-        foreach (var kvp in noteMarkers)
-        {
-            if (kvp.Key.Item1 != track) continue;
-            trackOwned++;
-
-            int step = kvp.Key.Item2;
-            var tr = kvp.Value;
-            var tag = tr ? tr.GetComponent<MarkerTag>() : null;
-
-            bool hasSB = _stepBurst.TryGetValue((track, step), out var sb);
-            if (hasSB && sb == burstId) stepBurstMatch++;
-
-            Debug.Log(
-                $"[ASCEND:DBG] track={track.name} burstId={burstId} step={step} " +
-                $"tagBurst={(tag?tag.burstId:-999)} ascendBurst={(tag?tag.ascendBurstId:-999)} " +
-                $"placeholder={(tag?tag.isPlaceholder:false)} hasSB={hasSB} sb={(hasSB?sb:-999)} " +
-                $"tr={(tr?tr.GetInstanceID():-1)}");
-        }
-
-        Debug.LogWarning(
-            $"[ASCEND] track={track.name} burstId={burstId} -> no markers found. " +
-            $"noteMarkers(trackOnly)={trackOwned} stepBurstMatches={stepBurstMatch} stepBurstTotal={_stepBurst.Count}");
-        return;
-    }
-// Mark ascending so orphan cleanup never kills them mid-flight
-    foreach (var c in cohort)
-    {
-        c.tag.isAscending = true;
-        c.tag.ascendBurstId = burstId;
-        _animatingSteps.Add((track, c.step));
-    }
-
-    Debug.Log($"[ASCEND] track={track.name} burstId={burstId} cohort={cohort.Count} dur={durationSeconds:F2}s");
-
-    StartCoroutine(AscendCohortCoroutine(track, burstId, cohort, durationSeconds));
-}
     private IEnumerator AscendCohortCoroutine(InstrumentTrack track, int burstId, List<(int step, Transform rt, MarkerTag tag)> cohort, float durationSeconds)
 {
     // Spawn stationary grey placeholders so the lit marker can rise away.
@@ -2015,62 +1794,6 @@ private Color ComputeStepColor(int step)
         foreach (var k in keysToRemove)
             noteMarkers.Remove(k);
     }
-    public void ConfigureBinStrip(int activeBinCount)
-{
-    if (binStripParent == null || binIndicatorPrefab == null)
-    {
-        Debug.LogWarning("[NoteVisualizer] ConfigureBinStrip called but binStripParent or binIndicatorPrefab is not assigned.");
-        return;
-    }
-
-    activeBinCount = Mathf.Max(0, activeBinCount);
-
-    // If the count is unchanged, do nothing.
-    if (activeBinCount == _activeBinCount && _binIndicators.Count == activeBinCount)
-        return;
-
-    _activeBinCount = activeBinCount;
-
-    // Clear existing indicators
-    foreach (var img in _binIndicators)
-    {
-        if (img != null)
-            Destroy(img.gameObject);
-    }
-    _binIndicators.Clear();
-
-    if (_activeBinCount == 0)
-        return;
-
-    // Instantiate new indicators and lay them out horizontally
-    for (int i = 0; i < _activeBinCount; i++)
-    {
-        var go = Instantiate(binIndicatorPrefab, binStripParent);
-        go.name = $"BinIndicator_{i}";
-        var img = go.GetComponent<Image>();
-        if (img == null)
-        {
-            img = go.AddComponent<Image>();
-//            img.sprite.color = binInactiveColor;
-        }
-
-        _binIndicators.Add(img);
-    }
-
-    // Simple layout: distribute evenly across the parent width
-    LayoutBinStrip();
-
-    // Default target bin to the first one if out of range
-    if (_currentTargetBin < 0 || _currentTargetBin >= _activeBinCount)
-    {
-        _currentTargetBin = 0;
-    }
-
-    RefreshBinHighlight();
-}
-    /// <summary>
-    /// Positions bin indicators evenly within the binStripParent.
-    /// </summary>
     private void LayoutBinStrip()
     {
         if (binStripParent == null || _binIndicators.Count == 0)
@@ -2494,20 +2217,11 @@ private Color ComputeStepColor(int step)
             .FirstOrDefault(t => t && t.track == track && t.step == stepIndex);
         return tag ? tag.transform : null;
     }
-    bool IsAscending(Transform tf) {
+    private static bool IsAscending(Transform tf)
+    {
         if (tf == null) return false;
-        foreach (var kv in _ascendTasks) // _ascendTasks: track -> task
-        {
-            var task = kv.Value;
-            if (task == null || task.markers == null) continue;
-            for (int i = 0; i < task.markers.Count; i++)
-            {
-                var ms = task.markers[i];
-                if (ms.go != null && ms.go.transform == tf)
-                    return true;
-            }
-        }
-        return false;
+        var tag = tf.GetComponent<MarkerTag>();
+        return tag != null && tag.isAscending;
     }
-    
+
 }
