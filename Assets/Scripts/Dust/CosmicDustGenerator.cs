@@ -770,7 +770,8 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         var go = GetOrCreateCellGO(gp);
         if (go == null) yield break;
-
+        if (!go.activeSelf)
+            go.SetActive(true);
         // Visual comes back first.
         SetCellState(gp, DustCellState.Regrowing);
         CosmicDust dust = null;
@@ -1347,15 +1348,23 @@ public class CosmicDustGenerator : MonoBehaviour
     private GameObject GetOrCreateCellGO(Vector2Int gp)
     {
         EnsureCellGrid();
-        if (_cellGo == null) return null;
-        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return null;
+        if (!IsInBounds(gp)) return null;
+        Transform root = activeDustRoot != null ? activeDustRoot : transform;
+
+        // If the active dust container was hidden earlier, bring it back before reuse/instantiate.
+        if (root != null && !root.gameObject.activeSelf)
+            root.gameObject.SetActive(true);
 
         var existing = _cellGo[gp.x, gp.y];
-        if (existing != null) return existing;
+        if (existing != null)
+        {
+            if (!existing.activeSelf)
+                existing.SetActive(true);
 
+            return existing;
+        }
         if (dustPrefab == null) return null;
 
-        var root = (activeDustRoot != null) ? activeDustRoot : transform;
         var go = Instantiate(dustPrefab, drums != null ? drums.GridToWorldPosition(gp) : Vector3.zero, Quaternion.identity, root);
         go.name = $"Cosmic Dust ({gp.x},{gp.y})";
 
@@ -1382,7 +1391,6 @@ public class CosmicDustGenerator : MonoBehaviour
                 }
             }
             dust.SetFeedbackColors(Color.white, denyColorGo);
-
             dust.Begin();
             SetDustCollision(dust, false);
         }

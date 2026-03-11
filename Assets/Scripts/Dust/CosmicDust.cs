@@ -577,6 +577,12 @@ private bool _tintPulseActive = false;
     }
     public void Begin()
     {
+        if (!gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning($"[COSMIC DUST] Begin called while inactive on {name}", this);
+            return;
+        }
+
         SetVisualsEnabled(true);
         SetColorVariance();
 
