@@ -65,7 +65,50 @@ public class MotifCoralVisualizer : MonoBehaviour
     [Range(1f, 16f)] public float noiseScale = 4f;
     [Tooltip("Darkening at the edges of the tube (simulates subsurface depth). 0 = none.")]
     [Range(0f, 1f)] public float edgeDarken = 0.4f;
+    [Header("Bud Signal Particles")]
+    [SerializeField] private Material budParticleMaterial;
+    [SerializeField] private GradientAlphaKey[] budParticleAlphaKeys = new GradientAlphaKey[]
+    {
+        new GradientAlphaKey(0.85f, 0f),
+        new GradientAlphaKey(0.35f, 0.65f),
+        new GradientAlphaKey(0f, 1f)
+    };
+    [Header("Transition Out")]
+    [Min(0.05f)] public float transitionOutSeconds = 0.9f;
+    public AnimationCurve transitionOutScaleCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+    public AnimationCurve transitionOutMoveCurve  = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
+    [Tooltip("World-space direction the coral is whisked toward before teleporting.")]
+    public Vector3 transitionOutDirection = new Vector3(0.8f, 1.2f, 0f);
+
+    [Tooltip("How far the coral root moves during the transition.")]
+    [Min(0f)] public float transitionOutDistance = 1.75f;
+
+    [Tooltip("Adds a little spin during the whisk-away.")]
+    [Min(0f)] public float transitionOutSpinDeg = 90f;
+
+    [Header("Teleport Burst")]
+    public bool spawnTeleportBurst = true;
+    [Min(4)]  public int teleportBurstCount = 36;
+    [Min(0.01f)] public float teleportBurstLifetime = 0.55f;
+    [Min(0.01f)] public float teleportBurstSpeedMin = 0.8f;
+    [Min(0.01f)] public float teleportBurstSpeedMax = 2.2f;
+    [Min(0.001f)] public float teleportBurstSizeMin = 0.03f;
+    [Min(0.001f)] public float teleportBurstSizeMax = 0.08f;
+    public Color teleportBurstTint = new Color(0.8f, 0.95f, 1f, 1f);
+    public Material teleportBurstMaterial;
+    [SerializeField] private Color budMatchedColor = new Color(0.55f, 1f, 0.72f, 1f);
+    [SerializeField] private Color budUnmatchedColor = new Color(1f, 0.35f, 0.45f, 1f);
+
+    [SerializeField] private int budParticlesMin = 6;
+    [SerializeField] private int budParticlesMax = 12;
+    [SerializeField] private float budParticleLifetimeMin = 0.35f;
+    [SerializeField] private float budParticleLifetimeMax = 0.7f;
+    [SerializeField] private float budParticleSpeedMin = 0.08f;
+    [SerializeField] private float budParticleSpeedMax = 0.32f;
+    [SerializeField] private float budParticleSizeMin = 0.015f;
+    [SerializeField] private float budParticleSizeMax = 0.05f;
+    [SerializeField] private float budParticleRadiusMul = 0.65f;
     // Runtime noise textures — generated once in Awake, shared across all segments
     private Texture2D _outlineNoiseTex;
     private Texture2D _fillNoiseTex;
@@ -164,11 +207,11 @@ public class MotifCoralVisualizer : MonoBehaviour
         public float  growEndNorm;   // 0..1 when fully revealed
     }
 
-    // One entry per bud spawned — hidden initially, revealed when grow clock reaches showAtNorm
     private struct BudRuntime
     {
         public GameObject go;
-        public float      showAtNorm; // 0..1 normalised grow time when this bud pops visible
+        public float showAtNorm;
+        public bool isMatched;
     }
 
     private readonly List<TubeSegmentRuntime> _segments = new();
@@ -202,12 +245,12 @@ public class MotifCoralVisualizer : MonoBehaviour
                 worldScale *= inheritedScale;
                 Debug.Log($"[MotifCoral] Absorbed transform scale {inheritedScale:F2} into worldScale → {worldScale:F2}. Reset transform to (1,1,1).");
             }
-//            transform.localScale = Vector3.one;
+            transform.localScale = Vector3.one;
         }
 
         var rootGO = new GameObject("MotifCoralRoot");
         rootGO.transform.SetParent(transform, false);
-        rootGO.transform.localPosition = origin;
+        rootGO.transform.localPosition = Vector3.zero;
         _root = rootGO.transform;
 
         _forkAngleDeg = defaultForkAngleDeg;
@@ -233,28 +276,31 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// </summary>
     public void FitToPlayArea(float areaWidth, float areaHeight, float areaCenterX, float areaCenterY)
     {
-        // Target: coral ball should fill 80% of the shorter screen axis.
         float targetDiameter = Mathf.Min(areaWidth, areaHeight) * 0.80f;
 
-        // Raw diameter at worldScale=1 (pre-scale inspector values):
-        //   One arm = trunk surface to branch tip = trunkRadius + 4 bins * segHeightMax
-        //   Ball diameter = 2 * that (arms radiate in all directions)
-        float rawArmLen  = trunkRadius + 4f * segHeightMax;
-        float rawDiam    = rawArmLen * 2f;
+        // Actual structure is a sphere with many independent outward branches.
+        // Bins do NOT chain end-to-end, so use the max extent of one branch.
+        float rawRadius =
+            trunkRadius +
+            segHeightMax +
+            coilRadiusMax +
+            Mathf.Max(tubeRadiusBase + tubeRadiusPerNote * 8f, budRadiusBase * rootNoteScaleBoost);
 
-        // Clamp upper bound high enough for typical 2D orthographic world units (e.g. 30 units wide).
+        float rawDiam = rawRadius * 2f;
+
         worldScale = rawDiam > 0f
             ? Mathf.Clamp(targetDiameter / rawDiam, 0.05f, 200f)
             : 1f;
 
-        // Center the ball in the play area.
         origin = new Vector3(areaCenterX, areaCenterY, 0f);
+
+        if (_root != null)
+            _root.localPosition = Vector3.zero;
 
         Debug.Log($"[MotifCoral] FitToPlayArea: area={areaWidth:F2}x{areaHeight:F2} " +
                   $"targetDiam={targetDiameter:F2} rawDiam={rawDiam:F2} worldScale={worldScale:F2} " +
                   $"origin=({areaCenterX:F2},{areaCenterY:F2})");
     }
-
     // ═══════════════════════════════════════════════════════════════════════
     //  Public API
     // ═══════════════════════════════════════════════════════════════════════
@@ -433,7 +479,148 @@ public class MotifCoralVisualizer : MonoBehaviour
             }
         }
     }
+    public IEnumerator TransitionOutAndClear(float? durationOverride = null)
+    {
+        if (_root == null || _root.childCount == 0)
+            yield break;
 
+        yield return StartCoroutine(AnimateTransitionOut(durationOverride ?? transitionOutSeconds));
+        ClearAll();
+    }
+    private IEnumerator AnimateTransitionOut(float durationSec)
+    {
+        float dur = Mathf.Max(0.05f, durationSec);
+
+        Vector3 startPos   = _root.position;
+        Vector3 startScale = _root.localScale;
+        Quaternion startRot = _root.rotation;
+
+        Vector3 dir = transitionOutDirection.sqrMagnitude > 0.0001f
+            ? transitionOutDirection.normalized
+            : Vector3.up;
+
+        Vector3 endPos = startPos + dir * S(transitionOutDistance);
+
+        float elapsed = 0f;
+        bool burstPlayed = false;
+
+        while (elapsed < dur)
+        {
+            elapsed += Time.deltaTime;
+            float u = Mathf.Clamp01(elapsed / dur);
+
+            float moveT  = transitionOutMoveCurve  != null ? transitionOutMoveCurve.Evaluate(u)  : u;
+            float scaleT = transitionOutScaleCurve != null ? transitionOutScaleCurve.Evaluate(u) : (1f - u);
+
+            _root.position = Vector3.LerpUnclamped(startPos, endPos, moveT);
+            _root.localScale = startScale * Mathf.Max(0f, scaleT);
+
+            if (transitionOutSpinDeg > 0f)
+            {
+                float spin = transitionOutSpinDeg * moveT;
+                _root.rotation = startRot * Quaternion.AngleAxis(spin, dir);
+            }
+
+            // Fire burst near the end so the final pop masks the last collapse.
+            if (!burstPlayed && u >= 0.82f)
+            {
+                burstPlayed = true;
+                if (spawnTeleportBurst)
+                    SpawnTeleportBurst(_root.position);
+            }
+
+            yield return null;
+        }
+
+        // Snap to final collapsed state.
+        _root.position = endPos;
+        _root.localScale = Vector3.zero;
+    }
+    private void SpawnTeleportBurst(Vector3 worldPos)
+{
+    var burstGO = new GameObject("CoralTeleportBurst");
+    burstGO.transform.position = worldPos;
+    burstGO.transform.rotation = Quaternion.identity;
+
+    var ps = burstGO.AddComponent<ParticleSystem>();
+    var psr = burstGO.GetComponent<ParticleSystemRenderer>();
+
+    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+    ps.Clear(true);
+
+    var main = ps.main;
+    main.playOnAwake = false;
+    main.loop = false;
+    main.duration = teleportBurstLifetime;
+    main.startLifetime = new ParticleSystem.MinMaxCurve(teleportBurstLifetime * 0.7f, teleportBurstLifetime);
+    main.startSpeed = new ParticleSystem.MinMaxCurve(S(teleportBurstSpeedMin), S(teleportBurstSpeedMax));
+    main.startSize = new ParticleSystem.MinMaxCurve(S(teleportBurstSizeMin), S(teleportBurstSizeMax));
+    main.simulationSpace = ParticleSystemSimulationSpace.World;
+    main.maxParticles = Mathf.Max(teleportBurstCount, 8);
+
+    var emission = ps.emission;
+    emission.enabled = false;
+
+    var shape = ps.shape;
+    shape.enabled = true;
+    shape.shapeType = ParticleSystemShapeType.Sphere;
+    shape.radius = S(0.06f);
+    shape.arcMode = ParticleSystemShapeMultiModeValue.Random;
+
+    var col = ps.colorOverLifetime;
+    col.enabled = true;
+
+    Gradient g = new Gradient();
+    g.SetKeys(
+        new[]
+        {
+            new GradientColorKey(Color.white, 0f),
+            new GradientColorKey(teleportBurstTint, 0.35f),
+            new GradientColorKey(new Color(teleportBurstTint.r, teleportBurstTint.g, teleportBurstTint.b, 1f), 1f)
+        },
+        new[]
+        {
+            new GradientAlphaKey(0.95f, 0f),
+            new GradientAlphaKey(0.65f, 0.25f),
+            new GradientAlphaKey(0f, 1f)
+        }
+    );
+    col.color = new ParticleSystem.MinMaxGradient(g);
+
+    var sizeOverLifetime = ps.sizeOverLifetime;
+    sizeOverLifetime.enabled = true;
+    sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(
+        1f,
+        new AnimationCurve(
+            new Keyframe(0f, 0.25f),
+            new Keyframe(0.15f, 1f),
+            new Keyframe(1f, 0.05f)
+        )
+    );
+
+    var noise = ps.noise;
+    noise.enabled = true;
+    noise.strength = new ParticleSystem.MinMaxCurve(0.08f);
+    noise.frequency = 0.4f;
+    noise.damping = true;
+
+    if (psr != null)
+    {
+        psr.renderMode = ParticleSystemRenderMode.Billboard;
+        psr.sortMode = ParticleSystemSortMode.Distance;
+        psr.alignment = ParticleSystemRenderSpace.View;
+
+        if (teleportBurstMaterial != null)
+            psr.material = teleportBurstMaterial;
+        else
+            psr.material = GetOrCreateMaterial(branchMaterial, transparent: true);
+    }
+
+    ps.Emit(teleportBurstCount);
+    ps.Play();
+
+    Destroy(burstGO, teleportBurstLifetime + 0.5f);
+}
     // ═══════════════════════════════════════════════════════════════════════
     //  Spine construction
     // ═══════════════════════════════════════════════════════════════════════
@@ -450,7 +637,119 @@ public class MotifCoralVisualizer : MonoBehaviour
         var controlPts = GenerateOrganicControlPoints(start, dir, height, driftRadius);
         return CatmullRomSpine(controlPts, rings);
     }
+private void AttachBudSignalParticles(GameObject budGo, Color branchColor, bool isMatched)
+{
+    if (budGo == null) return;
 
+    var ps = budGo.GetComponent<ParticleSystem>();
+    if (ps == null)
+        ps = budGo.AddComponent<ParticleSystem>();
+
+    // Critical: stop immediately before touching duration/start values.
+    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+    ps.Clear(true);
+
+    var psr = budGo.GetComponent<ParticleSystemRenderer>();
+    if (psr == null)
+        psr = budGo.AddComponent<ParticleSystemRenderer>();
+
+    var main = ps.main;
+    main.playOnAwake = false;
+    main.loop = false;
+    main.duration = budParticleLifetimeMax;
+    main.startLifetime = new ParticleSystem.MinMaxCurve(budParticleLifetimeMin, budParticleLifetimeMax);
+    main.startSpeed = new ParticleSystem.MinMaxCurve(S(budParticleSpeedMin), S(budParticleSpeedMax));
+    main.startSize = new ParticleSystem.MinMaxCurve(S(budParticleSizeMin), S(budParticleSizeMax));
+    main.simulationSpace = ParticleSystemSimulationSpace.Local;
+    main.maxParticles = 24;
+
+    if (psr != null)
+    {
+        psr.renderMode = ParticleSystemRenderMode.Billboard;
+        psr.sortMode = ParticleSystemSortMode.Distance;
+        psr.alignment = ParticleSystemRenderSpace.View;
+
+        if (budParticleMaterial != null)
+            psr.material = budParticleMaterial;
+    }
+
+    var emission = ps.emission;
+    emission.enabled = false;
+
+    var shape = ps.shape;
+    shape.enabled = true;
+    shape.shapeType = ParticleSystemShapeType.Circle;
+    shape.radius = Mathf.Max(S(0.0025f), budParticleRadiusMul * 0.05f);
+    shape.arcMode = ParticleSystemShapeMultiModeValue.Random;
+
+    var vel = ps.velocityOverLifetime;
+    vel.enabled = true;
+
+    if (isMatched)
+    {
+        vel.x = new ParticleSystem.MinMaxCurve(-S(0.02f), S(0.02f));
+        vel.y = new ParticleSystem.MinMaxCurve(S(0.02f), S(0.10f));
+        vel.z = new ParticleSystem.MinMaxCurve(-S(0.02f), S(0.02f));
+    }
+    else
+    {
+        vel.x = new ParticleSystem.MinMaxCurve(-S(0.05f), S(0.05f));
+        vel.y = new ParticleSystem.MinMaxCurve(0f, S(0.04f));
+        vel.z = new ParticleSystem.MinMaxCurve(-S(0.05f), S(0.05f));
+    }
+
+    var col = ps.colorOverLifetime;
+    col.enabled = true;
+
+    Gradient g = new Gradient();
+    Color target = isMatched ? budMatchedColor : budUnmatchedColor;
+    g.SetKeys(
+        new[]
+        {
+            new GradientColorKey(branchColor, 0f),
+            new GradientColorKey(Color.Lerp(branchColor, target, 0.5f), 0.45f),
+            new GradientColorKey(target, 1f)
+        },
+        new[]
+        {
+            new GradientAlphaKey(0.85f, 0f),
+            new GradientAlphaKey(0.35f, 0.65f),
+            new GradientAlphaKey(0f, 1f)
+        }
+    );
+    col.color = new ParticleSystem.MinMaxGradient(g);
+
+    var sizeOverLifetime = ps.sizeOverLifetime;
+    sizeOverLifetime.enabled = true;
+    sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(
+        1f,
+        new AnimationCurve(
+            new Keyframe(0f, 0.5f),
+            new Keyframe(0.2f, 1f),
+            new Keyframe(1f, 0.2f)
+        )
+    );
+
+    var noise = ps.noise;
+    noise.enabled = true;
+    noise.strength = new ParticleSystem.MinMaxCurve(isMatched ? 0.05f : 0.11f);
+    noise.frequency = 0.35f;
+    noise.scrollSpeed = 0.15f;
+    noise.damping = true;
+
+    // Leave it clean and idle until reveal time.
+    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+}
+private void PlayBudSignal(GameObject budGo, bool isMatched)
+{
+    if (budGo == null) return;
+
+    var ps = budGo.GetComponent<ParticleSystem>();
+    if (ps == null) return;
+
+    int burstCount = UnityEngine.Random.Range(budParticlesMin, budParticlesMax + 1);
+    ps.Emit(burstCount);
+}
     /// <summary>
     /// Generates 5 control points that wander gently off the main axis using
     /// overlapping sine waves seeded from the branch's world position,
@@ -710,7 +1009,13 @@ public class MotifCoralVisualizer : MonoBehaviour
             // Show bud when the grow front reaches its position on this segment
             float showAtNorm = Mathf.Lerp(growStart, growEnd, t01);
 
-            _buds.Add(new BudRuntime { go = bud, showAtNorm = showAtNorm });
+            _buds.Add(new BudRuntime
+            {
+                go = bud,
+                showAtNorm = showAtNorm,
+                isMatched = isMatched
+            });
+            
         }
     }
 
@@ -739,33 +1044,38 @@ public class MotifCoralVisualizer : MonoBehaviour
         return go;
     }
 
-    private GameObject SpawnBudRing(Vector3 worldPos, float radius, Color col, Transform parent)
+    private GameObject SpawnBudRing(Vector3 worldPos, float radius, Color col, Transform parent, bool isMatched = false)
     {
-        var go = new GameObject("Bud_Ring");
+        var go = new GameObject(isMatched ? "Bud_Ring_Matched" : "Bud_Ring_Unmatched");
         go.transform.SetParent(parent ?? _root, false);
         go.transform.position = worldPos;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = Vector3.one;
 
         var mf = go.AddComponent<MeshFilter>();
         var mr = go.AddComponent<MeshRenderer>();
         mr.sharedMaterial = GetOrCreateMaterial(barrenBudMaterial, transparent: true);
         ApplyColorToRenderer(mr, col, alpha: barrenBudAlpha);
 
-        int   ringSegs = 16;
-        float ringR    = radius * 0.6f;
+        int ringSegs = 16;
+        float ringR  = radius * 0.6f;
+
+        // IMPORTANT: local-space ring around this bud object's origin
         var spine = new Vector3[ringSegs + 1];
         for (int i = 0; i <= ringSegs; i++)
         {
             float a = (i / (float)ringSegs) * Mathf.PI * 2f;
-            spine[i] = worldPos + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * ringR;
+            spine[i] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * ringR;
         }
 
         var mesh = new Mesh { name = "BudRing" };
         mf.sharedMesh = mesh;
         BuildTube(mesh, spine, Mathf.Max(S(0.005f), radius * 0.08f), col, barrenBudAlpha);
 
+        AttachBudSignalParticles(go, col, isMatched);
+
         return go;
     }
-
     // ═══════════════════════════════════════════════════════════════════════
     //  Center sphere & helpers
     // ═══════════════════════════════════════════════════════════════════════
@@ -847,8 +1157,11 @@ public class MotifCoralVisualizer : MonoBehaviour
             // Reveal buds when grow front passes their showAtNorm
             foreach (var bud in _buds)
                 if (bud.go != null && !bud.go.activeSelf && eased >= bud.showAtNorm)
+                {
                     bud.go.SetActive(true);
-
+                    PlayBudSignal(bud.go, bud.isMatched);
+                    
+                }
             yield return null;
         }
 
@@ -883,10 +1196,13 @@ public class MotifCoralVisualizer : MonoBehaviour
         _buds.Clear();
 
         if (_root == null) return;
+
+        _root.localScale = Vector3.one;
+        _root.localRotation = Quaternion.identity;
+
         for (int i = _root.childCount - 1; i >= 0; i--)
             Destroy(_root.GetChild(i).gameObject);
     }
-
     // ═══════════════════════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════════════════════
