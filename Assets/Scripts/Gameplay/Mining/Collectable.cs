@@ -171,7 +171,107 @@ public class Collectable : MonoBehaviour
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
+/// <summary>
+    /// Lightweight spawn-time binding: stores the marker reference and resolved step
+    /// so the tether can be created later at vehicle pickup.
+    /// No tether GameObject is instantiated here.
+    /// </summary>
+    public void BindMarkerAtSpawn(Transform marker, int anchorStep)
+    {
+        ribbonMarker = marker;
+        // intendedStep is already set before this call; anchorStep is stored
+        // implicitly via intendedStep. No tether creation.
+        Debug.Log($"[Collectable] BindMarkerAtSpawn track={assignedInstrumentTrack?.name} " +
+                  $"step={intendedStep} anchorStep={anchorStep} " +
+                  $"marker={(marker ? marker.name : "(null)")}");
+    }
 
+    /// <summary>
+    /// Creates the tether at vehicle pickup time. Reuses the same tether-creation
+    /// logic from AttachTetherAtSpawn but is called from the collision/pickup path.
+    /// The metaphor: the vehicle claims the wild energy and connects it to the harvester.
+    /// </summary>
+    public void AttachTetherAtPickup()
+    {
+        var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
+        if (!assignedInstrumentTrack || !viz) return;
+
+        // Resolve tether prefab
+        GameObject tetherPrefabGO = viz.noteTetherPrefab;
+        if (!tetherPrefabGO) return;
+
+        Color trackColor = assignedInstrumentTrack.trackColor;
+
+        // If ribbonMarker wasn't bound at spawn, try to find it from the visualizer
+        if (ribbonMarker == null && intendedStep >= 0)
+        {
+            if (viz.noteMarkers != null &&
+                viz.noteMarkers.TryGetValue((assignedInstrumentTrack, intendedStep), out var m) && m)
+            {
+                ribbonMarker = m;
+            }
+        }
+
+        // Resolve anchor step (same logic as AttachTetherAtSpawn)
+        int resolvedStep = intendedStep >= 0 ? intendedStep : 0;
+        try
+        {
+            int binSize = Mathf.Max(1, assignedInstrumentTrack.BinSize());
+            int total   = Mathf.Max(binSize, assignedInstrumentTrack.GetTotalSteps());
+            int mult    = Mathf.Max(1, total / binSize);
+            int local   = ((resolvedStep % binSize) + binSize) % binSize;
+
+            if (intendedStep >= 0 && (intendedStep % binSize) == local && intendedStep < total)
+            {
+                resolvedStep = intendedStep;
+            }
+            else
+            {
+                bool found = false;
+                for (int b = 0; b < mult; b++)
+                {
+                    int abs = b * binSize + local;
+                    if (abs < 0 || abs >= total) continue;
+                    if (viz.noteMarkers != null &&
+                        viz.noteMarkers.TryGetValue((assignedInstrumentTrack, abs), out var tr) && tr)
+                    {
+                        resolvedStep = abs;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found && (resolvedStep < 0 || resolvedStep >= total))
+                    resolvedStep = local;
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[Collectable] AttachTetherAtPickup step resolution failed: {ex.Message}");
+        }
+
+        // Don't double-create
+        if (tether != null)
+        {
+            tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
+            tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
+            return;
+        }
+
+        var go = Instantiate(tetherPrefabGO);
+        go.name = $"Tether_{assignedInstrumentTrack.name}_s{resolvedStep}";
+        tether = go.GetComponent<NoteTether>();
+        if (!tether) tether = go.AddComponent<NoteTether>();
+
+        tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
+        tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
+
+        // Particle drip hookup
+        if (TryGetComponent(out CollectableParticles cp) && tether != null)
+            cp.RegisterTether(tether, pull: 0.7f);
+
+        Debug.Log($"[Collectable] AttachTetherAtPickup track={assignedInstrumentTrack.name} " +
+                  $"step={resolvedStep} marker={(ribbonMarker ? ribbonMarker.name : "(null)")}");
+    }
     public List<int> sharedTargetSteps = new List<int>();
     // --- Movement (grid-aware, dust-adjacent) ---
     [Header("Movement")]
@@ -1527,6 +1627,9 @@ private IEnumerator SpawnArrivalRoutine(
         if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
         _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
 
+        // Vehicle claims the energy — form the tether to the harvester now.
+        AttachTetherAtPickup();
+
         return;
     }
 
@@ -1544,6 +1647,9 @@ private IEnumerator SpawnArrivalRoutine(
 
     var explode = GetComponent<Explode>();
     if (explode != null) explode.Permanent(false);
+
+    // Vehicle claims the energy — form the tether to the harvester now.
+    AttachTetherAtPickup();
 
     // ------------------------------------------------------------
     // VISUAL DEPOSIT: schedule at next occurrence of the chosen base step
