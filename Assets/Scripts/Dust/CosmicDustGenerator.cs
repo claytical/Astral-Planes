@@ -23,7 +23,7 @@ public class CosmicDustGenerator : MonoBehaviour
 // Track bin edge so we only fire once per bin boundary
     int lastPlayheadBin = -1;
     float lastPulseTime = -999f; // optional: debouncing / spam guard
-
+    private bool _regrowthSuppressed = false;
     struct DustImprint
     {
         public Color color;
@@ -211,6 +211,74 @@ public class CosmicDustGenerator : MonoBehaviour
 
          if (scheduleRegrow) 
              RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true); 
+    }
+    public void HardStopRegrowthForBridge(bool hideTransientDust = true)
+    {
+        _regrowthSuppressed = true;
+
+        // Stop maze-growth/stagger routines tied to the outgoing motif.
+        if (_spawnRoutine != null)
+        {
+            StopCoroutine(_spawnRoutine);
+            _spawnRoutine = null;
+        }
+
+        // Stop any legacy per-cell regrowth coroutines if they still exist.
+        if (_regrowthCoroutines != null)
+        {
+            foreach (var kv in _regrowthCoroutines)
+            {
+                if (kv.Value != null)
+                    StopCoroutine(kv.Value);
+            }
+            _regrowthCoroutines.Clear();
+        }
+
+        // Stop any void-grow coroutines that might still be animating dust in.
+        if (_voidGrowCoroutines != null)
+        {
+            foreach (var kv in _voidGrowCoroutines)
+            {
+                if (kv.Value != null)
+                    StopCoroutine(kv.Value);
+            }
+            _voidGrowCoroutines.Clear();
+        }
+
+        // Hide/discard transient cells from the outgoing motif so nothing "pops" during coral.
+        EnsureCellGrid();
+        if (_cellState != null && _cellGo != null)
+        {
+            for (int x = 0; x < _cellW; x++)
+            {
+                for (int y = 0; y < _cellH; y++)
+                {
+                    var gp = new Vector2Int(x, y);
+                    var st = _cellState[x, y];
+
+                    if (st == DustCellState.PendingRegrow ||
+                        st == DustCellState.Regrowing ||
+                        st == DustCellState.Clearing)
+                    {
+                        _cellState[x, y] = DustCellState.Empty;
+
+                        var go = _cellGo[x, y];
+                        if (hideTransientDust && go != null)
+                            HideCellGO(go);
+                    }
+                }
+            }
+        }
+
+        // IMPORTANT:
+        // Drop the controller entirely so any internal pending queue/timers are discarded.
+        _regrow = null;
+    }
+
+    public void ResumeRegrowthAfterBridge()
+    {
+        _regrowthSuppressed = false;
+        EnsureRegrowController();
     }
     public bool TryResolveDustCellFromWorldPoint(Vector2 world, int searchRadiusCells, out Vector2Int resolved)
     {
@@ -737,6 +805,8 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         if (!drums) return;
+        if (_regrowthSuppressed)
+            return;
         EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
@@ -768,6 +838,14 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private IEnumerator CommitRegrowCell(Vector2Int gp)
     {
+        if (_regrowthSuppressed)
+        {
+            if (TryGetCellGo(gp, out var existing) && existing != null)
+                HideCellGO(existing);
+
+            SetCellState(gp, DustCellState.Empty);
+            yield break;
+        }
         var go = GetOrCreateCellGO(gp);
         if (go == null) yield break;
         if (!go.activeSelf)
@@ -1437,6 +1515,8 @@ public class CosmicDustGenerator : MonoBehaviour
 
     private void RequestRegrowCellAt(Vector2Int gridPos, MazeArchetype phase, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
+        if (_regrowthSuppressed)
+            return;
         if (!IsInBounds(gridPos)) { 
 
             if (_regrowthCoroutines != null && _regrowthCoroutines.TryGetValue(gridPos, out var pending))
