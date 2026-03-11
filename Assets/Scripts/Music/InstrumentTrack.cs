@@ -2241,6 +2241,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
             c.BindMarkerAtSpawn(markerGO.transform, absStep);
         }
+        c.ApplyTrackVisuals(this);
 // Begin intro flight from MineNode explosion site -> chosen grid spawn pos
         c.BeginSpawnArrival(
             spawnOrigin,
