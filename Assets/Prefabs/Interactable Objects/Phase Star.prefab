@@ -4940,7 +4940,7 @@ MonoBehaviour:
   _tracePhaseStar: 1
   bubbleTint: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 0.3882353}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
-  passiveChargeDecayPerSec: 0.02
+  passiveChargeDecayPerSec: 0
   dustToStarChargeMul: 1
   shardMinAlpha: 0.08
   shardDisarmedAlphaCeil: 0.22
@@ -4997,7 +4997,7 @@ MonoBehaviour:
   probeDepthCells: 2
   dustLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   dustIgnoreSearchRadius: 40
   dustIgnoreMaxHits: 256
   starDrainRegrowDelay: 6
