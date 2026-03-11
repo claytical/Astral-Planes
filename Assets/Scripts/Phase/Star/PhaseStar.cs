@@ -684,9 +684,11 @@ public class PhaseStar : MonoBehaviour
             Disarm(DisarmReason.AwaitBridge);
             return;
         }
-
         _disarmReason = DisarmReason.None;
         _isArmed = true;
+
+        // Bubble is a gravity-void refuge — deactivate when returning to armed/ready state.
+        DeactivateSafetyBubble();
 
         // Pokeability no longer controls locomotion.
         EnableColliders();
@@ -1477,6 +1479,7 @@ public class PhaseStar : MonoBehaviour
     }
     public void SetGravityVoidSafetyBubbleActive(bool active)
     {
+        Debug.Log($"[BUBBLE] SetGravityVoidSafetyBubbleActive active={active} star={name} frame={Time.frameCount}");
         if (active) ActivateSafetyBubble();
         else DeactivateSafetyBubble();
     }
@@ -1555,14 +1558,13 @@ public class PhaseStar : MonoBehaviour
         }
         if (previewRing != null && previewRing.Count > 0)
         {
-            s_bubbleCenter = transform.position;
+            if (_bubbleActive) s_bubbleCenter = transform.position;
             EjectActivePreviewShardAndFlow(coll);
             return;
         }
 
-        s_bubbleCenter = transform.position;
+        if (_bubbleActive) s_bubbleCenter = transform.position;
         EjectCachedDirectiveAndFlow(coll);
-        return;
     }
     void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
@@ -1660,7 +1662,6 @@ public class PhaseStar : MonoBehaviour
             ejectedTrack.trackColor);
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
-        ActivateSafetyBubble();
         if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
             SpawnSuperNodeCommon(contact, ejectedTrack);
         else
@@ -1952,6 +1953,7 @@ public class PhaseStar : MonoBehaviour
     private void ActivateSafetyBubble()
     {
         if (!SafetyBubbleEnabled) return;
+        Debug.Log($"[BUBBLE] ActivateSafetyBubble star={name} frame={Time.frameCount}");
 
         float cell = ComputeCellWorldSize();
 
@@ -1973,6 +1975,9 @@ public class PhaseStar : MonoBehaviour
     }
     private void DeactivateSafetyBubble()
     {
+        if (!_bubbleActive) return; // already off — no log spam
+
+        Debug.Log($"[BUBBLE] DeactivateSafetyBubble star={name} frame={Time.frameCount}");
         _bubbleActive = false;
 
         s_bubbleActive = false;
