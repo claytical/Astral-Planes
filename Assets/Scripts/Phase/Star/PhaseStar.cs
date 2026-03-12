@@ -65,11 +65,15 @@ public class PhaseStar : MonoBehaviour
     [Header("Off-Screen Entry")]
     [Tooltip("World units outside the screen edge where the star spawns.")]
     [SerializeField] private float entryOffscreenMargin = 2f;
+    [Tooltip("Once a role's charge reaches this value, it is considered 'tasted' and decay is floored.")]
+    [SerializeField, Range(0f, 0.5f)] private float chargeTastedThreshold = 0.12f;
 
+    [Tooltip("Minimum charge for a tasted role. Prevents full bleed-out so the star remembers prior feeding.")]
+    [SerializeField, Range(0f, 0.3f)] private float chargeDecayFloor = 0.08f;
     [Tooltip("How close to the screen interior edge (world units) before the star is " +
              "considered 'arrived' and arms itself.")]
     [SerializeField] private float entryArriveThreshold = 1.5f;
-
+    private readonly HashSet<MusicalRole> _tastedRoles = new();
     [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
     [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
     [Header("Charge Readiness")]
@@ -183,6 +187,17 @@ public class PhaseStar : MonoBehaviour
             add *= 0.5f;
 
         _starCharge[role] = Mathf.Min(1f, cur + add);
+        if (_starCharge[role] >= chargeTastedThreshold)
+            _tastedRoles.Add(role);
+    }
+    /// <summary>
+    /// Returns 0..1 hunger for a specific role: 1 = starving (zero charge), 0 = fully charged.
+    /// Used by the navigator to weight density steering toward under-charged roles.
+    /// </summary>
+    public float GetRoleHunger(MusicalRole role)
+    {
+        _starCharge.TryGetValue(role, out float c);
+        return 1f - Mathf.Clamp01(c);
     }
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
     {
@@ -455,6 +470,10 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         spawnStrategyProfile?.ResetForNewStar();
 
+        // Clear charge state for this new star.
+        _starCharge.Clear();
+        _tastedRoles.Clear();
+
         _shardsEjectedCount = 0;
 
         BuildPhasePlan(_assignedPhase, Mathf.Max(1, behaviorProfile.nodesPerStar));
@@ -595,8 +614,8 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         if (previewRing != null && previewRing.Count > 0)
         {
-            if (TryGetDominantRole(out var dominantRole, out var dominantIdx, out _))
-                currentShardIndex = dominantIdx;
+            // Resolve dominant shard with hysteresis + soft switch delta (BALANCE-E).
+            ResolveDominantRoleFromCharge();
             
             for (int i = 0; i < previewRing.Count; i++)
             {
@@ -644,16 +663,21 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         
         if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
             float dec = passiveChargeDecayPerSec * dt;
-        // [BALANCE-B] Dominant role decays 3× faster to compress the charge gap.
+            // [BALANCE-B] Dominant role decays 3× faster to compress the charge gap.
             TryGetDominantRole(out var dominantRoleNow, out _, out _);
             var keys = _starCharge.Keys.ToList();
             for (int i = 0; i < keys.Count; i++) {
                 var r = keys[i];
+                float cur = _starCharge[r];
                 float roleDec = (r == dominantRoleNow) ? dec * 3f : dec;
-                _starCharge[r] = Mathf.Max(0f, _starCharge[r] - roleDec);
+                // [BALANCE-D] Decay floor: once a role has been tasted, charge
+                // never drops below the floor. The star remembers what it ate.
+                // Uses persistent _tastedRoles set (populated in AddCharge) so the
+                // floor survives even after charge decays below the tasted threshold.
+                float floor = _tastedRoles.Contains(r) ? chargeDecayFloor : 0f;
+                _starCharge[r] = Mathf.Max(floor, cur - roleDec);
             }
-        }
-        
+        } 
         
     }
 
@@ -1506,13 +1530,8 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             sr.sortingOrder = _baseSortingOrder + (rank * _perPetalLayerStep);
         }
 
-        // Keep currentShardIndex aligned to highest-charge shard (= the craving)
-        int topIdx = order[n - 1];
-        if (topIdx != currentShardIndex)
-        {
-            currentShardIndex = topIdx;
-            activeShardVisual = previewRing[currentShardIndex].visual;
-        }
+        // Sorting order only — dominance is resolved by ResolveDominantRoleFromCharge()
+        // which applies hysteresis and soft switch delta (BALANCE-E).
     }
     /// <summary>
     /// Called by PhaseStarCravingNavigator.OnCravingChanged when the star tastes a new role.
@@ -1609,11 +1628,22 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
         _starCharge.TryGetValue(previewRing[currentShardIndex].role, out float curCharge);
-
-        if (bestIdx != currentShardIndex && bestCharge >= curCharge + dominantRoleSwitchDelta)
+        if (bestIdx != currentShardIndex)
         {
-            currentShardIndex = bestIdx;
-            activeShardVisual = previewRing[currentShardIndex].visual;
+            // [BALANCE-E] Soften the switch delta when the challenger is starving.
+            // A role the star hasn't fed on yet should flip dominance easily.
+            float effectiveDelta = dominantRoleSwitchDelta;
+            if (bestCharge < chargeTastedThreshold)
+            {
+                // Challenger is freshly encountered — almost no hysteresis needed.
+                effectiveDelta *= 0.15f;
+            }
+
+            if (bestCharge >= curCharge + effectiveDelta)
+            {
+                currentShardIndex = bestIdx;
+                activeShardVisual = previewRing[currentShardIndex].visual;
+            }
         }
     }
     public void SetGravityVoidSafetyBubbleActive(bool active)

@@ -46,12 +46,17 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     [Tooltip("Max grid cells visited per sniffer BFS. Keep low — it runs per-role.")]
     [SerializeField] private int snifferBfsBudget = 80;
 
+    [Header("Hunger-Weighted Steering")]
+    [Tooltip("Weight given to dust of a fully-charged role (0 = ignore it entirely, 1 = no hunger bias).")]
+    [SerializeField, Range(0f, 1f)] private float hungerFloorWeight = 0.15f;
+
     [Header("Debug")]
     [SerializeField] private bool verbose = false;
 
     // ----------------------------------------------------------------
     // State
     // ----------------------------------------------------------------
+    private PhaseStar _star;
     private bool _active;
     private float _replanTimer;
     private float _snifferTimer;
@@ -98,6 +103,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             snifferBfsBudget      = Mathf.Max(10,   profile.mazeNavBfsBudget);
         }
 
+        _star = star;
         _active       = true;
         _replanTimer  = 0f; // replan immediately
         _snifferTimer = 0f;
@@ -130,14 +136,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         return _snifferDirs.TryGetValue(_dominantRole, out var d) ? d : Vector2.zero;
     }
 
-    /// <summary>
-    /// Returns the world-space direction toward the nearest dust of the given role.
-    /// Used by PhaseStar.Update to rotate each diamond shard.
-    /// Returns Vector2.zero if no dust of that role was found in the last sniffer tick.
-    /// </summary>
-    public Vector2 GetSnifferDir(MusicalRole role)
-        => _snifferDirs.TryGetValue(role, out var d) ? d : Vector2.zero;
-
     // ----------------------------------------------------------------
     // Unity
     // ----------------------------------------------------------------
@@ -166,9 +164,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     // ----------------------------------------------------------------
 
     /// <summary>
-    /// Samples dust density along evenly-spaced spokes. The spoke with the
-    /// highest total solid-cell count becomes the new steer direction.
-    /// Cheap: no BFS, just direct grid lookups along rays.
+    /// Samples dust density along evenly-spaced spokes. Each dust cell is weighted
+    /// by how hungry the star is for that cell's role — starving roles pull harder,
+    /// already-charged roles pull less. The star drifts toward variety, not bulk.
     /// </summary>
     private void DensitySpokeTick()
     {
@@ -193,8 +191,19 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
                 Vector2    sampleWorld = origin + dir * (step * p);
                 Vector2Int cell        = drum.WorldToGridPosition(sampleWorld);
 
-                if (gen.HasDustAt(cell))
-                    score += 1f;
+                if (!gen.HasDustAt(cell)) continue;
+
+                // Weight by hunger: starving roles score 1.0, fully-charged roles score hungerFloorWeight.
+                float weight = 1f;
+                if (_star != null && gen.TryGetDustAt(cell, out var dust) && dust != null
+                    && dust.Role != MusicalRole.None)
+                {
+                    float hunger = _star.GetRoleHunger(dust.Role);
+                    // Remap: hunger 1 (starving) → weight 1.0, hunger 0 (full) → hungerFloorWeight
+                    weight = Mathf.Lerp(hungerFloorWeight, 1f, hunger);
+                }
+
+                score += weight;
             }
 
             if (score > bestScore)
@@ -211,14 +220,12 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         }
         else
         {
-            // No dust found in any direction — clear so motion reverts to drift
             _hasDensityDir = false;
         }
 
         if (verbose)
-            Debug.Log($"[DensityNav] Spoke scan: bestScore={bestScore:F1} dir={_densitySteerDir}");
+            Debug.Log($"[DensityNav] Spoke scan: bestScore={bestScore:F2} dir={_densitySteerDir}");
     }
-
     // ----------------------------------------------------------------
     // Sniffer: per-role nearest-dust direction
     // ----------------------------------------------------------------
