@@ -45,6 +45,23 @@ public partial class GameFlowManager
 
         Debug.Log($"[MOTIF-BRIDGE] Bridge duration: {motifBridgeSec:F2}s (motifBridgeHoldSeconds fallback={motifBridgeHoldSeconds})");
 
+        // Capture note marker world positions before the coral grows (NoteViz UI is hidden but
+        // Transform.position is still readable on inactive GameObjects).
+        var noteOrigins = new Dictionary<(int step, Color32 trackColor), Vector3>();
+        if (noteViz != null)
+        {
+            foreach (var kv in noteViz.noteMarkers)
+            {
+                var track = kv.Key.Item1;
+                var step  = kv.Key.Item2;
+                var tr    = kv.Value;
+                if (tr == null || track == null) continue;
+                var tag = tr.GetComponent<MarkerTag>();
+                if (tag == null || tag.isPlaceholder) continue; // only lit (collected) markers
+                noteOrigins[(step, (Color32)track.trackColor)] = tr.position;
+            }
+        }
+
         // Show MotifCoralVisualizer — grows over exactly one musical loop.
         if (motifCoralVisualizer != null)
         {
@@ -65,7 +82,8 @@ public partial class GameFlowManager
                 motifCoralVisualizer.GrowMotifCoral(
                     motifSnap,
                     motifBridgeSec,
-                    ReadAveragedSteer)
+                    ReadAveragedSteer,
+                    noteOrigins)
             );
             motifCoralVisualizer.gameObject.SetActive(false);
         }

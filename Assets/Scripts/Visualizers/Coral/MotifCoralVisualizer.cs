@@ -188,6 +188,12 @@ public class MotifCoralVisualizer : MonoBehaviour
     [Header("Grow Animation")]
     public AnimationCurve growCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
+    [Header("Note Shot FX")]
+    [Tooltip("Duration in seconds for a collected note marker to fly from the grid to its coral bud.")]
+    [Min(0.05f)] public float noteShotDuration = 0.25f;
+    [Tooltip("Radius of the flying dot (before worldScale).")]
+    [Min(0.005f)] public float noteShotScale = 0.055f;
+
     // ═══════════════════════════════════════════════════════════════════════
     //  Private state
     // ═══════════════════════════════════════════════════════════════════════
@@ -212,6 +218,7 @@ public class MotifCoralVisualizer : MonoBehaviour
         public GameObject go;
         public float showAtNorm;
         public bool isMatched;
+        public MotifSnapshot.NoteEntry note; // used to match origin position for shot FX
     }
 
     private readonly List<TubeSegmentRuntime> _segments = new();
@@ -318,13 +325,14 @@ public class MotifCoralVisualizer : MonoBehaviour
     /// Build the coral and animate it growing over <paramref name="durationSec"/> seconds.
     /// <paramref name="getSteer"/> is polled each frame; stick-X modulates the fork angle.
     /// </summary>
-    public IEnumerator GrowMotifCoral(MotifSnapshot snapshot, float durationSec, Func<Vector2> getSteer = null)
+    public IEnumerator GrowMotifCoral(MotifSnapshot snapshot, float durationSec, Func<Vector2> getSteer = null,
+        IReadOnlyDictionary<(int step, Color32 trackColor), Vector3> noteOrigins = null)
     {
         ClearAll();
         if (snapshot == null) { yield return new WaitForSeconds(durationSec); yield break; }
 
         BuildCoral(snapshot);
-        yield return StartCoroutine(AnimateGrowth(durationSec, getSteer));
+        yield return StartCoroutine(AnimateGrowth(durationSec, getSteer, noteOrigins));
     }
 
     /// <summary>
@@ -1011,9 +1019,10 @@ private void PlayBudSignal(GameObject budGo, bool isMatched)
 
             _buds.Add(new BudRuntime
             {
-                go = bud,
+                go         = bud,
                 showAtNorm = showAtNorm,
-                isMatched = isMatched
+                isMatched  = isMatched,
+                note       = note,
             });
             
         }
@@ -1117,7 +1126,8 @@ private void PlayBudSignal(GameObject budGo, bool isMatched)
     //  Grow animation
     // ═══════════════════════════════════════════════════════════════════════
 
-    private IEnumerator AnimateGrowth(float durationSec, Func<Vector2> getSteer)
+    private IEnumerator AnimateGrowth(float durationSec, Func<Vector2> getSteer,
+        IReadOnlyDictionary<(int step, Color32 trackColor), Vector3> noteOrigins = null)
     {
         float dur     = Mathf.Max(0.05f, durationSec);
         float elapsed = 0f;
@@ -1160,13 +1170,57 @@ private void PlayBudSignal(GameObject budGo, bool isMatched)
                 {
                     bud.go.SetActive(true);
                     PlayBudSignal(bud.go, bud.isMatched);
-                    
+
+                    // Shoot the collected note marker from the grid toward this bud
+                    if (noteOrigins != null && bud.note != null)
+                    {
+                        var key = (bud.note.Step, (Color32)bud.note.TrackColor);
+                        if (noteOrigins.TryGetValue(key, out Vector3 origin))
+                            StartCoroutine(AnimateNoteShot(origin, bud.go.transform.position, bud.note.TrackColor));
+                    }
                 }
             yield return null;
         }
 
         // Ensure fully revealed
         ForceFullReveal();
+    }
+
+    private IEnumerator AnimateNoteShot(Vector3 from, Vector3 to, Color col, float dur = -1f)
+    {
+        if (dur < 0f) dur = noteShotDuration;
+        dur = Mathf.Max(0.05f, dur);
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "NoteShot";
+        go.transform.SetParent(_root, false);
+        go.transform.position = from;
+
+        var coll = go.GetComponent<Collider>();
+        if (coll) Destroy(coll);
+
+        float radius = S(noteShotScale);
+        go.transform.localScale = Vector3.one * radius * 2f;
+
+        var mr = go.GetComponent<MeshRenderer>();
+        mr.sharedMaterial = GetOrCreateMaterial(budMaterial, transparent: true);
+        col.a = 0.85f;
+        ApplyColorToRenderer(mr, col, alpha: col.a);
+
+        float t = 0f;
+        while (t < dur)
+        {
+            if (!go) yield break;
+            t += Time.deltaTime;
+            float u     = Mathf.Clamp01(t / dur);
+            float eased = 1f - (1f - u) * (1f - u); // ease-out: fast start, slow arrival
+
+            go.transform.position   = Vector3.Lerp(from, to, eased);
+            go.transform.localScale = Vector3.one * radius * 2f * Mathf.Lerp(1f, 0.2f, u);
+            yield return null;
+        }
+
+        if (go) Destroy(go);
     }
 
     private void ForceFullReveal()
