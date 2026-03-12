@@ -1296,8 +1296,8 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
                     controller.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
                 }
 
-                // Space future triggers as a fraction of phrase length so it feels cohesive.
-
+                // Space future triggers so notes swell rather than machine-gun.
+                _nextDustPluckTime = Time.time + cooldown;
             }
         }
 
