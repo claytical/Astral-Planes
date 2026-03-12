@@ -706,6 +706,7 @@ public class Vehicle : MonoBehaviour
         // stable across bin expansions.
         // ------------------------------------------------------------------
         float pulse01 = 0f;
+        bool isAuthoritative = true;
 
         if (_armedReleases.Count > 0)
         {
@@ -728,6 +729,10 @@ public class Vehicle : MonoBehaviour
 
                 if (a.note.track.IsExpansionPending)
                     pulse01 = Mathf.Min(pulse01, 0.3f);
+
+                int aTargetLocal = ((a.targetAbsStep % aBinSize) + aBinSize) % aBinSize;
+                bool aMatchesAuthored = (a.note.authoredAbsStep < 0) || (a.targetAbsStep == a.note.authoredAbsStep);
+                isAuthoritative = aMatchesAuthored || (aTargetLocal == a.note.authoredLocalStep);
             }
         }
         else if (_pendingNotes.Count > 0)
@@ -763,6 +768,10 @@ public class Vehicle : MonoBehaviour
                     const float ringWindowLead = 1.5f;
                     double windowDsp = (manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
                     pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
+
+                    int nextLocal = ((nextStep % pBinSize) + pBinSize) % pBinSize;
+                    bool pMatchesAuthored = (p.authoredAbsStep >= 0) && (nextStep == p.authoredAbsStep);
+                    isAuthoritative = pMatchesAuthored || (nextLocal == p.authoredLocalStep);
                 }
             }
         }
@@ -773,7 +782,7 @@ public class Vehicle : MonoBehaviour
         else if (_pendingNotes.Count > 0)
             cueTrack = _pendingNotes.Peek().track;
 
-        UpdateVehiclePlacementResonance(pulse01, cueTrack);
+        UpdateVehiclePlacementResonance(pulse01, cueTrack, isAuthoritative);
         // Armed notes: fly orb toward its target marker.
         int armedSlot = 0;
         foreach (var ar in _armedReleases)
@@ -873,7 +882,7 @@ public class Vehicle : MonoBehaviour
 
         releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
     }
-        private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack)
+        private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
     {
         if (!useVehiclePlacementResonance)
             return;
@@ -904,7 +913,7 @@ public class Vehicle : MonoBehaviour
         // -----------------------------------------------------------------
         if (soulSprite != null)
         {
-            bool active = cueTrack != null && pulse01 > 0.001f;
+            bool active = cueTrack != null;
 
             if (!active)
             {
@@ -938,7 +947,7 @@ public class Vehicle : MonoBehaviour
 
             float soulAlpha = Mathf.Lerp(soulAlphaMin, soulAlphaMax, pulse01);
 
-            Color targetSoulColor = roleColor;
+            Color targetSoulColor = isAuthoritative ? Color.white : roleColor;
             targetSoulColor.a = soulAlpha;
 
             soulSprite.color = Color.Lerp(
@@ -1822,6 +1831,7 @@ private void DoImpactDig(Collision2D coll)
             var dropped = _pendingNotes.Dequeue();
             if (dropped.collectable != null)
                 dropped.collectable.OnManualReleaseDiscarded();
+            dropped.track?.NotifyNoteDiscarded(dropped.burstId, dropped.authoredAbsStep);
         }
 
         _pendingNotes.Enqueue(p);
@@ -1854,6 +1864,7 @@ private void DoImpactDig(Collision2D coll)
     {
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
         viz?.BlastManualReleaseCue(transform);
         return false;
     }
@@ -1872,6 +1883,7 @@ private void DoImpactDig(Collision2D coll)
     {
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
         viz?.BlastManualReleaseCue(transform);
         return false;
     }
@@ -1887,6 +1899,7 @@ private void DoImpactDig(Collision2D coll)
         // can skip notes they don't want to place.
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
         viz?.BlastManualReleaseCue(transform);
         return false;
     }

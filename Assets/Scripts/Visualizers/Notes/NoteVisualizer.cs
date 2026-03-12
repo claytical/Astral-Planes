@@ -1262,6 +1262,7 @@ private Color ComputeStepColor(int step)
     foreach (var tag in tags)
     {
         if (!tag || tag.track != track) continue;
+        if (tag.isAscending) continue; // never disrupt in-flight ascension markers
 
         bool isLoop = loopSteps.Contains(tag.step); // loop is the source of truth
         bool inFilledBin = true;
@@ -1294,7 +1295,9 @@ private Color ComputeStepColor(int step)
         }
         if (isLoop)
         {
-            tag.burstId = -1;       // neutral for persistent loop
+            // Keep burstId so the ascension director can find this marker by burst.
+            // (DestroyOrphanRowMarkers only destroys isPlaceholder=true markers, so
+            // keeping burstId >= 0 here does not cause premature cleanup.)
             tag.isPlaceholder = false;
 
             var key = (track, tag.step);
@@ -1575,6 +1578,47 @@ private Color ComputeStepColor(int step)
             seconds,
             GetMarkersForTrackAndBurst   // local helper — see [6]
         );
+    }
+
+    /// <summary>
+    /// Removes and destroys the marker at the given step for the given track only if it is
+    /// still a placeholder (isPlaceholder=true). Used to clean up discarded-note authored steps.
+    /// </summary>
+    public void RemovePlaceholderAtStep(InstrumentTrack track, int stepAbs)
+    {
+        var key = (track, stepAbs);
+        if (!noteMarkers.TryGetValue(key, out var tr) || tr == null) return;
+
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag == null || !tag.isPlaceholder) return; // don't touch lit or ascending markers
+
+        noteMarkers.Remove(key);
+        Destroy(tr.gameObject);
+    }
+
+    /// <summary>
+    /// Removes and destroys all placeholder markers for the given track and burst.
+    /// Called on burst completion so authored-step placeholders that were never
+    /// committed (collectables picked up and released elsewhere, or discarded) don't linger.
+    /// </summary>
+    public void RemoveAllPlaceholdersForBurst(InstrumentTrack track, int burstId)
+    {
+        var toRemove = new List<(InstrumentTrack, int)>();
+        foreach (var kv in noteMarkers)
+        {
+            if (kv.Key.Item1 != track) continue;
+            if (kv.Value == null) continue;
+            var tag = kv.Value.GetComponent<MarkerTag>();
+            if (tag == null || !tag.isPlaceholder || tag.isAscending) continue;
+            if (tag.burstId != burstId) continue;
+            toRemove.Add(kv.Key);
+        }
+        foreach (var key in toRemove)
+        {
+            if (noteMarkers.TryGetValue(key, out var tr) && tr != null)
+                Destroy(tr.gameObject);
+            noteMarkers.Remove(key);
+        }
     }
     private IEnumerable<GameObject> GetMarkersForTrackAndBurst(InstrumentTrack track, int burstId)
     {
