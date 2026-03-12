@@ -13,12 +13,14 @@ MonoBehaviour:
   m_Name: Chokepoint Rings
   m_EditorClassIdentifier: 
   mazeColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  dominantRole: 0
   nodesPerStar: 5
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 2
   enableSafetyBubble: 1
-  safetyBubbleRadiusCells: 4
-  rotateSelectionOnLoopBoundary: 1
+  starHungrySpeed: 2.5
+  safetyBubbleRadiusCells: 2
+  rotateSelectionOnLoopBoundary: 0
   rotateEveryNLoops: 2
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
@@ -29,6 +31,9 @@ MonoBehaviour:
   starDriftJitter: 0.1
   orbitBias: 0
   teleportChancePerSec: 0
+  mazeNavReplanInterval: 0.5
+  mazeNavBfsBudget: 150
+  mazeNavWaypointPull: 0.85
   ejectionPrefab: {fileID: 2567590292593330884, guid: 5a8e825c2087ded49aa4ecab9c1e0efc,
     type: 3}
   nodeFlightSeconds: 0.6

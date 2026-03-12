@@ -256,13 +256,12 @@ public sealed class NoteAscensionDirector : MonoBehaviour
                     // Arrived at ascent line — bump line charge
                     LineCharge01 = Mathf.Min(1f, LineCharge01 + 0.25f);
 
-                    // Snap to line world position
-                    var lp = tf.position;
-                    lp.y = GetAscendTargetWorldY();
-                    tf.position = lp;
+                    // Remove the note from the persistent loop so it stops playing.
+                    if (ms.tag != null && ms.tag.track != null)
+                        ms.tag.track.RemovePersistentNoteAtStep(ms.tag.step);
 
-                    // Clear ascending flag so RecomputeTrackLayout stops preserving Y
-                    if (ms.tag != null) ms.tag.isAscending = false;
+                    // Destroy the visual marker.
+                    Destroy(ms.go);
                 }
                 else
                 {
@@ -316,8 +315,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             float startY = go.transform.position.y;
             float totalY = (GetAscendTargetWorldY()) - startY;
 
-            float durationSec = totalSeconds + ascendPaddingSeconds;
-            int loops = Mathf.Max(1, Mathf.RoundToInt(durationSec / loopLen));
+            int loops = Mathf.Max(1, ascendLoops);
 
             float stepY = (loops > 0) ? totalY / loops : totalY;
 

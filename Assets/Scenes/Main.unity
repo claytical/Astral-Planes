@@ -984,6 +984,8 @@ MonoBehaviour:
   coralRoot: {fileID: 0}
   fadeSpiralCoralDuringBridge: 1
   spiralCoralFadeTarget: 0.65
+  vehiclePhaseInFxPrefab: {fileID: 0}
+  vehiclePhaseInDelaySeconds: 1.2
   demoMode: 0
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
@@ -1037,7 +1039,7 @@ MonoBehaviour:
   primaryAnchorName: PrimaryTutorialAnchor
   pressAnyStepSeconds: 0.5
   pressAnyLoop: 1
-  tutorialStepSeconds: 5
+  tutorialStepSeconds: 4
 --- !u!1 &1241868050
 GameObject:
   m_ObjectHideFlags: 0

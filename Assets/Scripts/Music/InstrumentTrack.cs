@@ -1384,7 +1384,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // If your collectable carries authoredRootMidi, use it here.
         // Otherwise keep int.MinValue (your existing default).
         int authoredRootMidi = int.MinValue;
-        // authoredRootMidi = collectable.authoredRootMidi; // if you have it
 
 
         // If NotifyCommitted is part of your causality grammar / stinger,
@@ -1422,7 +1421,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             vnm.LightUp(this.trackColor);
             vnm.Initialize(this.trackColor);
         }
-    }
+            }
 );
         if (_currentBurstArmed && collectable.burstId == currentBurstId) { 
             _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1); 
@@ -1465,7 +1464,27 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int authoredLocal = (authoredAbs >= 0) ? (((authoredAbs % binSize) + binSize) % binSize) : (((reportedBaseStep % binSize) + binSize) % binSize);
 
         int collectedMidi = collectable.GetNote();
-        int rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi);
+
+        // Anchor authoredRootMidi to the chord that was active at the authored bin.
+        // QuantizeNoteToBinChord uses rootDelta = (targetChordRoot - authoredRootMidi), so
+        // this must reflect which chord the collectable was spawned under, not the I-chord static field.
+        int rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi); // fallback
+        if (rootShiftNotesByChord && authoredAbs >= 0)
+        {
+            var hd = GameFlowManager.Instance?.harmony;
+            if (hd != null)
+            {
+                int authoredBin = BinIndexForStep(authoredAbs);
+                int authoredChordIdx = Harmony_GetChordIndexForBin(authoredBin);
+                if (authoredChordIdx >= 0 && hd.TryGetChordAt(authoredChordIdx, out var authoredChord))
+                {
+                    int chordRoot = authoredChord.rootNote;
+                    while (chordRoot < collectedMidi - 6) chordRoot += 12;
+                    while (chordRoot > collectedMidi + 6) chordRoot -= 12;
+                    rootInRegister = Mathf.Clamp(chordRoot, lowestAllowedNote, highestAllowedNote);
+                }
+            }
+        }
 
         var pending = new Vehicle.PendingCollectedNote
         {
@@ -1550,6 +1569,23 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (controller != null)
                     controller.AllowAdvanceNextBurst(this);
 
+                // Clear remaining placeholders and trigger ascension for committed markers.
+                if (drumTrack != null)
+                {
+                    int binCount = BinSize();
+                    int effectiveLoops = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+                    float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
+                    int capturedBurstId = burstId;
+                    EnqueueNextFrame(() =>
+                    {
+                        if (controller != null && controller.noteVisualizer != null)
+                        {
+                            controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
+                            controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, ascendSeconds);
+                        }
+                    });
+                }
+
                 _burstRemaining.Remove(burstId);
                 _burstLeaderBinsBeforeWrite.Remove(burstId);
                 _burstWroteBin.Remove(burstId);
@@ -1559,6 +1595,71 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 _burstRemaining[burstId] = rem;
             }
         }
+    }
+
+    /// <summary>Removes the persistent note at the given absolute step from the loop.</summary>
+    public void RemovePersistentNoteAtStep(int stepAbs)
+    {
+        persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
+        _loopCacheDirtyPending = true;
+    }
+
+    /// <summary>
+    /// Call when a manually-queued note was discarded (outside window, queue overflow, etc.).
+    /// Decrements the burst counter. Placeholder removal is deferred: when all collectables
+    /// for the burst have left the vehicle, any remaining placeholders are cleared together.
+    /// </summary>
+    public void NotifyNoteDiscarded(int burstId, int authoredAbsStep)
+    {
+        if (burstId == 0) return;
+
+        if (!_burstRemaining.TryGetValue(burstId, out var rem)) return;
+
+        rem--;
+        if (rem > 0)
+        {
+            _burstRemaining[burstId] = rem;
+            return;
+        }
+
+        // All notes in this burst have been resolved (committed or discarded).
+        // Clear remaining placeholders and trigger ascension for committed markers.
+        if (drumTrack != null)
+        {
+            int binCount = BinSize();
+            int effectiveLoops = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+            float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
+            int capturedBurstId = burstId;
+            EnqueueNextFrame(() =>
+            {
+                if (controller?.noteVisualizer != null)
+                {
+                    controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
+                    controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, ascendSeconds);
+                }
+            });
+        }
+
+        // Fill the bin only if at least one note was actually committed.
+        if (_burstWroteBin.TryGetValue(burstId, out var filledBin))
+        {
+            SetBinFilled(filledBin, true);
+
+            if (controller?.noteVisualizer != null && drumTrack != null)
+            {
+                int bSize = Mathf.Max(1, drumTrack.totalSteps);
+                int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
+                int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
+                controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * bSize);
+            }
+
+            if (controller != null)
+                controller.AllowAdvanceNextBurst(this);
+        }
+
+        _burstRemaining.Remove(burstId);
+        _burstLeaderBinsBeforeWrite.Remove(burstId);
+        _burstWroteBin.Remove(burstId);
     }
 
     /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>

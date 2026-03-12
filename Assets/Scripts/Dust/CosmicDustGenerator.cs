@@ -2236,6 +2236,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
                         // Critical: keep collider OFF during bulk topology changes.
                         SetDustCollision(dust, false);
+                        dust.regrowAlphaCapped = true;
                         spawnedDust.Add(dust);
                     }
 
@@ -2280,6 +2281,7 @@ public class CosmicDustGenerator : MonoBehaviour
                         continue;
 
 // At this point, it is legitimately solid terrain.
+                    d.regrowAlphaCapped = false;
                     d.EnsureMinSolidAlpha(0.55f);
                     SetDustCollision(d, true);
                 }
