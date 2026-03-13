@@ -15494,7 +15494,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 0
-  preset: 0
+  preset: 33
   bank: 0
 --- !u!1 &371718999
 GameObject:
@@ -15672,7 +15672,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.6
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -15886,7 +15886,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -16059,7 +16059,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 89
+  preset: 19
   bank: 0
 --- !u!1 &652946506
 GameObject:
@@ -16174,7 +16174,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 18
+  preset: 34
   bank: 0
 --- !u!1 &657963290
 GameObject:
@@ -16508,7 +16508,7 @@ MonoBehaviour:
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   cellClearanceWorld: 0
-  defaultMazeHardness01: 1
+  defaultMazeHardness01: 0.232
   dustTimings:
     spriteScaleInSeconds: 1
     spriteScaleOutSeconds: 1
@@ -16879,63 +16879,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1080859562}
   m_CullTransparentMesh: 1
---- !u!1 &1117845171
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1117845173}
-  - component: {fileID: 1117845172}
-  m_Layer: 0
-  m_Name: RoutineTimingController
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1117845172
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1117845171}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 754970a73e201694787a76901341dc92, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MidiPlayer.Run::MidiPlayerTK.Routine
-  TimeBetweenSlowUpdateCalls: 0.14285715
-  ProfilerDebugAmount: 0
-  AutoTriggerManualTimeframe: 1
-  UpdateCoroutines: 0
-  FixedUpdateCoroutines: 0
-  LateUpdateCoroutines: 0
-  SlowUpdateCoroutines: 0
-  RealtimeUpdateCoroutines: 0
-  EditorUpdateCoroutines: 64
-  EditorSlowUpdateCoroutines: 0
-  EndOfFrameCoroutines: 0
-  ManualTimeframeCoroutines: 0
-  _instanceID: 1
---- !u!4 &1117845173
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1117845171}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1190942844
 GameObject:
   m_ObjectHideFlags: 0
@@ -17330,17 +17273,11 @@ MonoBehaviour:
   phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
     type: 2}
   logBeatSeqGates: 1
-  clampPlayAreaToDustBand: 0
   sessionBurnEmaAlpha: 0.25
   burnMultipleAtFullIntensity: 2.5
-  uiReserveBottomViewport: 0
-  uiReserveTopViewport: 0
-  uiReserveBottomInsetWorld: 0
-  uiReserveTopInsetWorld: 0
-  gridVerticalOffsetViewport: 0.037
   drumLoopBPM: 120
-  gridPadding: 1
   totalSteps: 32
+  gridPadding: 1
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
@@ -17348,15 +17285,11 @@ MonoBehaviour:
   activeMineNodes: []
   isPhaseStarActive: 0
   currentStep: 0
-  dustBandMinY: 0.1
-  dustBandMaxY: 1
-  dustBandTopInsetWorld: 0
   referenceWidthPx: 1920
-  referenceColumns: 64
-  uiBottomPaddingPx: 270
+  referenceColumns: 40
+  uiBottomPaddingPx: 160
   autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
-  stepPulseEveryN: 4
   tanksPerLoopAtFullIntensity: 0.35
   intensityHysteresis: 0.08
   lockPlayAreaAfterInit: 1
@@ -17410,10 +17343,7 @@ MonoBehaviour:
   pickupTickLead: {fileID: 0}
   pickupTickHarmony: {fileID: 0}
   pickupTickGroove: {fileID: 0}
-  gravityVoidGrowSeconds: 1.25
-  gravityVoidMaxRadiusCells: 12
   gravityVoidImprintTickSeconds: 0.05
-  gravityVoidImprintBudgetPerTick: 80
   commitSfxSource: {fileID: 480221064}
   commitStingerVolume: 1.25
   commitStingerPitchJitter: 0.02
@@ -17439,7 +17369,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 012f1ac6c751c4e4b85ec716c8a67aa8, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.6
+  m_Volume: 0.4
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -18492,7 +18422,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.8
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -18683,7 +18613,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 53
+  preset: 12
   bank: 0
 --- !u!1 &1736554591
 GameObject:
@@ -18798,7 +18728,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -19344,7 +19274,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -19455,7 +19385,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.9
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -19986,5 +19916,4 @@ SceneRoots:
   - {fileID: 51606787}
   - {fileID: 2067870202}
   - {fileID: 869126478}
-  - {fileID: 1117845173}
   - {fileID: 1795146083}

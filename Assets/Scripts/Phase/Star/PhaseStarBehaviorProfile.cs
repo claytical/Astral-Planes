@@ -38,14 +38,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Min(0)]
     [Tooltip("Bubble radius in grid cells for the gravity-void refuge zone.")]
     public int safetyBubbleRadiusCells = 4;
-    [Header("Selection Rotation (agency)")]
-    [Tooltip("If true, the highlighted preview shard rotates by 1 at each loop boundary while the star is idle/armed.")]
-    public bool rotateSelectionOnLoopBoundary = true;
-
-    [Min(1)]
-    [Tooltip("If rotateSelectionOnLoopBoundary is true, rotate every N loop boundaries. (Future: step-synced scheduling can layer on top.)")]
-    public int rotateEveryNLoops = 1;
-
     [Header("Self-heal / Deadlock Recovery")]
     [Min(0)]
     [Tooltip("If waiting for collectables to clear but nothing is in flight, re-arm/advance after this many loop boundaries. 0 disables.")]

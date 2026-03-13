@@ -34,29 +34,8 @@ public class MusicalRoleProfile : ScriptableObject
     [Range(0f, 1f)]
     [Tooltip("How hard dust imprinted/regrown with this role should be. 0 = soft/easy, 1 = hard/resists digging.")]
     public float dustHardness01 = 0.50f;
-
-    [Header("Charge / Deny Tuning")]
-    [Range(0f, 1f)]
-    [Tooltip("How strongly charge pushes defaultColor toward white at full appetite.")]
-    public float chargeToWhite = 0.80f;
-
-    [Range(0f, 1f)]
-    [Tooltip("How strongly deny pushes defaultColor toward shadowColor at full severity.")]
-    public float denyToShadow = 0.75f;
-
-    [Range(0f, 1f)]
-    [Tooltip("Additional alpha added on charge at full appetite (on top of baseAlpha).")]
-    public float chargeAlphaBoost = 0.35f;
-
-    [Range(0f, 1f)]
-    [Tooltip("Additional alpha added on deny at full severity (on top of baseAlpha).")]
-    public float denyAlphaBoost = 0.25f;
-
-    [TextArea]
-    public string description;
-
-    [Header("Behavior & Presets")]
-    public NoteBehavior defaultBehavior;
+    
+    [Header("Presets")]
     public List<int> allowedMidiPresets = new List<int>();
 
     // ---------- Color helpers (authority) ----------

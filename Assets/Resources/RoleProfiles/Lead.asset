@@ -19,7 +19,7 @@ MonoBehaviour:
     denyColor: {r: 0.6460066, g: 0.021493427, b: 0.6509434, a: 1}
     shadowColor: {r: 0.5619831, g: 0, b: 1, a: 0.72156864}
   baseAlpha: 1
-  dustHardness01: 0.2
+  dustHardness01: 0.1
   chargeToWhite: 0.8
   denyToShadow: 0.75
   chargeAlphaBoost: 0.35

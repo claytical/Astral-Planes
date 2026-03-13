@@ -20,9 +20,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Baseline dust hardness for non-imprinted maze cells. Imprinted MineNode cells override this via DustImprint.hardness01.")]
     [Range(0f, 1f)]
     [SerializeField] private float defaultMazeHardness01 = 0f;
-// Track bin edge so we only fire once per bin boundary
-    int lastPlayheadBin = -1;
-    float lastPulseTime = -999f; // optional: debouncing / spam guard
     private bool _regrowthSuppressed = false;
     struct DustImprint
     {
@@ -81,7 +78,6 @@ public class CosmicDustGenerator : MonoBehaviour
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
     private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
-    private readonly Dictionary<Vector2Int, Coroutine> _voidSolidifyCoroutines = new();
     // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
     private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
@@ -133,6 +129,12 @@ public class CosmicDustGenerator : MonoBehaviour
         { MusicalRole.Lead,    0 },
         { MusicalRole.Groove,  0 },
     };
+    // Density conservation: target solid count set at maze init; -1 = inactive.
+    private int _targetSolidCount = -1;
+    // Cells currently transitioning in (Regrowing state). Added to Solid count
+    // for committed-count checks so original cells are suppressed before
+    // compensation cells finish growing in.
+    private int _regrowingCount = 0;
     public float TileDiameterWorld
     {
         get => tileDiameterWorld;
@@ -197,8 +199,14 @@ public class CosmicDustGenerator : MonoBehaviour
          SetCellState(gp, DustCellState.Empty); 
          }
 
-         if (scheduleRegrow) 
-             RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true); 
+         if (scheduleRegrow)
+         {
+             RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+             // Density conservation: immediately fill a frontier cell so total coverage
+             // is maintained. The eroded cell's own regrow will be suppressed in
+             // CommitRegrowCell once the compensation cell is committed.
+             TryQueueFrontierCompensation(phase);
+         }
     }
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
     {
@@ -263,52 +271,13 @@ public class CosmicDustGenerator : MonoBehaviour
         _regrow = null;
     }
 
-    public void ResumeRegrowthAfterBridge()
+     public void ResumeRegrowthAfterBridge()
     {
         _regrowthSuppressed = false;
         EnsureRegrowController();
     }
-    public bool TryResolveDustCellFromWorldPoint(Vector2 world, int searchRadiusCells, out Vector2Int resolved)
-    {
-        resolved = default;
-        if (drums == null) return false;
 
-        Vector2Int baseCell = drums.WorldToGridPosition(world);
-
-        // Perfect hit
-        if (HasDustAt(baseCell))
-        {
-            resolved = baseCell;
-            return true;
-        }
-
-        // Spiral / ring search outward (Manhattan rings)
-        for (int r = 1; r <= searchRadiusCells; r++)
-        {
-            // Top/Bottom rows of ring
-            for (int dx = -r; dx <= r; dx++)
-            {
-                var c1 = new Vector2Int(baseCell.x + dx, baseCell.y + r);
-                if (HasDustAt(c1)) { resolved = c1; return true; }
-
-                var c2 = new Vector2Int(baseCell.x + dx, baseCell.y - r);
-                if (HasDustAt(c2)) { resolved = c2; return true; }
-            }
-
-            // Left/Right cols of ring (skip corners already checked)
-            for (int dy = -r + 1; dy <= r - 1; dy++)
-            {
-                var c1 = new Vector2Int(baseCell.x + r, baseCell.y + dy);
-                if (HasDustAt(c1)) { resolved = c1; return true; }
-
-                var c2 = new Vector2Int(baseCell.x - r, baseCell.y + dy);
-                if (HasDustAt(c2)) { resolved = c2; return true; }
-            }
-        }
-
-        return false;
-    }
-    public int GrowVoidDustDiskFromGrid(
+     public int GrowVoidDustDiskFromGrid(
         Vector2Int centerGP,
         int outerRadiusCells,
         MusicalRole imprintRole,
@@ -789,33 +758,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 GetCellVisualColor);
         
     }
-
-    /// <summary>
-    /// Repositions and rescales all existing dust cell GOs to match the current play area.
-    /// Call this after changing grid offset or cell size at runtime (e.g. from DrumTrack.SyncTileWithScreen).
-    /// </summary>
-    public void ResyncAllCellPositions()
-    {
-        if (drums == null || _cellGo == null) return;
-
-        float cellSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
-
-        for (int x = 0; x < _cellW; x++)
-        {
-            for (int y = 0; y < _cellH; y++)
-            {
-                var go = _cellGo[x, y];
-                if (go == null) continue;
-
-                var gp = new Vector2Int(x, y);
-                go.transform.position = (Vector3)drums.GridToWorldPosition(gp);
-
-                var dust = _cellDust[x, y];
-                if (dust != null)
-                    dust.SetCellSizeDrivenScale(cellSize, dustFootprintMul, cellClearanceWorld);
-            }
-        }
-    }
+    
     private bool IsDustSpawnBlocked(Vector2Int cell)
     {
         return dustClaims != null && dustClaims.IsBlocked(cell);
@@ -885,6 +828,14 @@ public class CosmicDustGenerator : MonoBehaviour
             yield break;
         }
 
+        // Density gate: a frontier compensation cell already restored coverage for this
+        // erosion event. Suppress the original cell so dust "shifts" rather than doubling.
+        if (_targetSolidCount > 0 && TotalSolidCount() + _regrowingCount >= _targetSolidCount)
+        {
+            SetCellState(gp, DustCellState.Empty);
+            yield break;
+        }
+
         var go = GetOrCreateCellGO(gp);
         if (go == null) yield break;
         if (!go.activeSelf)
@@ -900,13 +851,26 @@ public class CosmicDustGenerator : MonoBehaviour
 
             // --- Role resolution ---
             // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
-            // Priority 2: no imprint (vehicle-carved or PhaseStar-drained) → least-dense role,
-            //             so the maze self-balances toward equal representation of all four roles.
+            // Priority 2: no imprint → prefer the plurality role among solid imprinted neighbors
+            //             (maintains spatial cohesion with the Voronoi layout). Fall back to
+            //             least-dense when neighbors are split or absent (global balance).
             MusicalRole excludedRole = MusicalRole.None;
             if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
                 excludedRole = ex;
 
-            MusicalRole regrowRole = GetLeastDenseRoleExcluding(excludedRole);
+            MusicalRole regrowRole;
+            if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp)
+                && existingImp.role != MusicalRole.None)
+            {
+                regrowRole = existingImp.role;
+            }
+            else
+            {
+                var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
+                regrowRole = neighborRole != MusicalRole.None
+                    ? neighborRole
+                    : GetLeastDenseRoleExcluding(excludedRole);
+            }
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
@@ -971,8 +935,6 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureRegrowController();
         _regrow?.EnqueueStepRegrow(gp);
     }
-    
-    
     
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
         MazeArchetype phase,
@@ -1285,6 +1247,9 @@ public class CosmicDustGenerator : MonoBehaviour
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
             }
         }
+        // Capture density baseline after all permanent clears are carved.
+        // Compensation will maintain this exact solid count throughout the phase.
+        _targetSolidCount = TotalSolidCount();
         OnMazeReady?.Invoke(starCell);
     }
     private void BuildStarPocketSet(Vector2Int starCell, int radiusCells)
@@ -1311,16 +1276,7 @@ public class CosmicDustGenerator : MonoBehaviour
             }
         }
     }
-    public bool IsEffectivelyOpenCell(Vector2Int gp)
-    {
-        // “Open” means: the cell is currently not solid dust terrain (i.e., no collider wall),
-        // OR it is permanently cleared.
-        if (_permanentClearCells.Contains(gp)) return true;
 
-        // Authoritative: if we have dust (Solid), it is not open.
-        return !HasDustAt(gp);
-    }
-    
     // ------------------------------------------------------------------
     // Authoritative cell grid helpers
     // ------------------------------------------------------------------
@@ -1436,6 +1392,11 @@ public class CosmicDustGenerator : MonoBehaviour
                 TrackRoleDensityChange(gp, becomesSolid: true);
             else if (prev == DustCellState.Solid)
                 TrackRoleDensityChange(gp, becomesSolid: false);
+
+            if (prev == DustCellState.Regrowing && st != DustCellState.Regrowing)
+                _regrowingCount = Mathf.Max(0, _regrowingCount - 1);
+            else if (prev != DustCellState.Regrowing && st == DustCellState.Regrowing)
+                _regrowingCount++;
         }
     }
     /// <summary>
@@ -1938,32 +1899,119 @@ public class CosmicDustGenerator : MonoBehaviour
     
         return best;
     }
-    private Color BlendImprintWithNeighbors(Vector2Int cell, Color target, int radius, float neighborWeight)
+    private int TotalSolidCount()
     {
-        radius = Mathf.Max(0, radius);
-        neighborWeight = Mathf.Clamp01(neighborWeight);
-        if (radius == 0 || neighborWeight <= 0f)
-            return target;
+        int n = 0;
+        foreach (var kv in _solidCountByRole) n += kv.Value;
+        return n;
+    }
 
-        int count = 0;
-        float r = 0f, g = 0f, b = 0f, a = 0f;
+    /// <summary>
+    /// When a cell is eroded, immediately queue a frontier empty cell to regrow,
+    /// preserving overall maze coverage. The eroded cell will be suppressed in
+    /// CommitRegrowCell once the compensation cell is committed, so dust "shifts"
+    /// rather than appearing and disappearing.
+    /// </summary>
+    private void TryQueueFrontierCompensation(MazeArchetype phase)
+    {
+        if (_targetSolidCount <= 0) return;
+        if (TotalSolidCount() + _regrowingCount >= _targetSolidCount) return;
 
-        for (int dy = -radius; dy <= radius; dy++)
+        var cell = GetBestFrontierCell();
+        if (cell.HasValue)
+            RequestRegrowCellAt(cell.Value, phase, delaySeconds: 0f);
+    }
+
+    private const int kFrontierSamples = 200;
+
+    /// <summary>
+    /// Randomly samples empty cells and returns the one most embedded in the existing
+    /// solid pattern (highest solid-neighbor count). At 75% coverage, 200 samples
+    /// reliably finds good frontier candidates. Returns null if none found.
+    /// </summary>
+    private Vector2Int? GetBestFrontierCell()
+    {
+        if (_cellState == null) return null;
+        int w = _cellW, h = _cellH;
+        if (w <= 0 || h <= 0) return null;
+
+        Vector2Int best = default;
+        int bestScore = 0; // require at least 1 solid neighbor
+
+        for (int i = 0; i < kFrontierSamples; i++)
         {
-            for (int dx = -radius; dx <= radius; dx++)
-            {
-                if (dx == 0 && dy == 0) continue;
-                var c = GetCellVisualColor(new Vector2Int(cell.x + dx, cell.y + dy));
-                r += c.r; g += c.g; b += c.b; a += c.a;
+            var c = new Vector2Int(Random.Range(0, w), Random.Range(0, h));
+            if (!TryGetCellState(c, out var st) || st != DustCellState.Empty) continue;
+            if (_permanentClearCells.Contains(c)) continue;
+            if (IsDustSpawnBlocked(c)) continue; // skip cells held by active claims (e.g. collectable jails)
+            int score = CountSolidNeighbors(c);
+            if (score > bestScore) { bestScore = score; best = c; }
+        }
+
+        return bestScore > 0 ? best : (Vector2Int?)null;
+    }
+
+    private int CountSolidNeighbors(Vector2Int cell)
+    {
+        int count = 0;
+        for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            if (TryGetCellState(new Vector2Int(cell.x + dx, cell.y + dy), out var st)
+                && st == DustCellState.Solid)
                 count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Returns the role held by the plurality of solid imprinted neighbors within 1 cell.
+    /// Ties broken by global density (least-dense wins). Returns None when no imprinted
+    /// solid neighbors exist.
+    /// </summary>
+    private MusicalRole GetPluralityNeighborRole(Vector2Int cell, MusicalRole excluded)
+    {
+        if (_imprints == null) return MusicalRole.None;
+
+        int bassC = 0, harmC = 0, leadC = 0, grooveC = 0;
+        for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            var n = new Vector2Int(cell.x + dx, cell.y + dy);
+            if (!TryGetCellState(n, out var st) || st != DustCellState.Solid) continue;
+            if (!_imprints.TryGetValue(n, out var imp)
+                || imp.role == MusicalRole.None || imp.role == excluded) continue;
+            switch (imp.role)
+            {
+                case MusicalRole.Bass:    bassC++;   break;
+                case MusicalRole.Harmony: harmC++;   break;
+                case MusicalRole.Lead:    leadC++;   break;
+                case MusicalRole.Groove:  grooveC++; break;
             }
         }
 
-        if (count <= 0)
-            return target;
+        int max = Mathf.Max(bassC, Mathf.Max(harmC, Mathf.Max(leadC, grooveC)));
+        if (max == 0) return MusicalRole.None;
 
-        Color avg = new Color(r / count, g / count, b / count, a / count);
-        return Color.Lerp(target, avg, neighborWeight);
+        // Among tied leaders, prefer the globally least-dense (secondary balance signal).
+        MusicalRole best = MusicalRole.None;
+        int bestDensity = int.MaxValue;
+        UpdatePluralityBest(MusicalRole.Bass,    bassC,   max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Harmony, harmC,   max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Lead,    leadC,   max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Groove,  grooveC, max, ref best, ref bestDensity);
+        return best;
+    }
+
+    private void UpdatePluralityBest(
+        MusicalRole role, int count, int max,
+        ref MusicalRole best, ref int bestDensity)
+    {
+        if (count != max) return;
+        int d = _solidCountByRole.TryGetValue(role, out int cv) ? cv : 0;
+        if (d < bestDensity) { bestDensity = d; best = role; }
     }
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust) {
         dust = null;
@@ -1988,7 +2036,8 @@ public class CosmicDustGenerator : MonoBehaviour
         // nudge visuals to match the new profile so we don't leave any tiles at prefab/default.
         RetintExisting(seconds: 0.20f);
     }
-    public void BeginStaggeredMazeRegrowth(List<(Vector2Int, Vector3)> cellsToGrow)
+
+    private void BeginStaggeredMazeRegrowth(List<(Vector2Int, Vector3)> cellsToGrow)
     {
         if (_spawnRoutine != null)
             StopCoroutine(_spawnRoutine); 
@@ -2065,6 +2114,8 @@ public class CosmicDustGenerator : MonoBehaviour
         finally
         {
         }
+        _targetSolidCount = -1;
+        _regrowingCount   = 0;
     }
     /// <summary>
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
@@ -2396,10 +2447,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
         // No composite collider rebuild (per-cell terrain only).
     }
-     private static Vector2Int Any(HashSet<Vector2Int> set) {
-        foreach (var v in set) return v;             // returns the first enumerated element
-        return new Vector2Int(-1, -1);
-    } 
     private MazeArchetype GetCurrentPhaseSafe()
     {
         TryEnsureRefs();
@@ -2424,17 +2471,6 @@ public class CosmicDustGenerator : MonoBehaviour
         // CRITICAL: schedule regrow.
         RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
     }
-    private int CountFilledNeighbors(Vector2Int cell)
-    {
-        int count = 0;
-        foreach (var dir in GetHexDirections(cell.y))
-        {
-            Vector2Int neighbor = cell + dir;
-            if (_fillMap.TryGetValue(neighbor, out bool filled) && filled)
-                count++;
-        }
-        return count;
-    }
     private List<Vector2Int> GetHexDirections(int row)
     {
         // Even-q offset coordinates
@@ -2448,34 +2484,7 @@ public class CosmicDustGenerator : MonoBehaviour
             new(-1, 0), new(0, -1), new(1, -1)
         };
     }
-    private MusicalRole GetRandomRoleExcluding(MusicalRole excludedRole)
-    {
-         MusicalRole[] roles =
-        {
-            MusicalRole.Bass,
-            MusicalRole.Harmony,
-            MusicalRole.Lead,
-            MusicalRole.Groove
-        };
 
-        int validCount = 0;
-        for (int i = 0; i < roles.Length; i++)
-            if (roles[i] != excludedRole)
-                validCount++;
-
-        if (validCount <= 0)
-            return MusicalRole.Bass;
-
-        int pick = Random.Range(0, validCount);
-        for (int i = 0; i < roles.Length; i++)
-        {
-            if (roles[i] == excludedRole) continue;
-            if (pick == 0) return roles[i];
-            pick--;
-        }
-
-        return MusicalRole.Bass;
-    }
     public int CarveTemporaryCellFromMineNode(
         Vector3 centerWorld,
         MazeArchetype phase,
@@ -2549,63 +2558,6 @@ public class CosmicDustGenerator : MonoBehaviour
     public void ClearImprintAt(Vector2Int cell)
     {
         _imprints?.Remove(cell);
-    }
-    public void CarveTemporaryCellFromVehicle(
-        Vector3 worldPos,
-        MazeArchetype phase,
-        float healDelaySeconds,
-        int resolveRadiusCells = 0)
-    {
-        if (drums == null) return;
-
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-        if (w <= 0 || h <= 0) return;
-
-        Vector2Int cell;
-        if (resolveRadiusCells > 0)
-        {
-            if (!TryResolveDustCellFromWorldPoint(worldPos, resolveRadiusCells, out cell))
-                cell = drums.WorldToGridPosition(worldPos);
-        }
-        else
-        {
-            cell = drums.WorldToGridPosition(worldPos);
-        }
-
-        if (cell.x < 0 || cell.y < 0 || cell.x >= w || cell.y >= h)
-            return;
-
-        // Open corridor immediately
-        if (HasDustAt(cell))
-            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds: 0.20f, scheduleRegrow: true, phase: phase, regrowDelaySeconds: healDelaySeconds);
-
-        // Vehicle carving does NOT own the role — it's purely a physical interaction.
-        // If a Voronoi or MineNode role imprint exists, preserve the role so the cell
-        // remembers its musical identity when it regrows.
-        // If there is no imprint (or no role), CommitRegrowCell will assign the
-        // least-dense role automatically, keeping the maze balanced.
-        if (_imprints != null && _imprints.TryGetValue(cell, out var existingImp)
-            && existingImp.role != MusicalRole.None)
-        {
-            // Keep the imprint role intact; just refresh the heal delay.
-            _imprints[cell] = new DustImprint
-            {
-                color      = existingImp.color,
-                hardness01 = existingImp.hardness01,
-                role       = existingImp.role,
-                healDelay  = healDelaySeconds
-            };
-        }
-        // else: no imprint → CommitRegrowCell will use least-dense role on regrowth.
-
-        // Schedule normal dust regrow
-        RequestRegrowCellAt(
-            cell,
-            phase,
-            healDelaySeconds,
-            refreshIfPending: true
-        );
     }
 
     private float GetFillProbability(MazeArchetype phase)

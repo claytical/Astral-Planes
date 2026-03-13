@@ -22,11 +22,6 @@ public class DrumTrack : MonoBehaviour
     private int _beatSeqGateSpamGuard = 0;
     private string _lastMotifSetBy = "never";
     private int _motifSetSerial = 0;
-    [Header("Play Area Mapping")]
-    [Tooltip(
-        "If true, GetPlayAreaWorld() is clamped to Dust Band (min/max Y). If false, grid uses full screen minus UI reserve.")]
-    [SerializeField]
-    private bool clampPlayAreaToDustBand = false;
 // --- Session-relative intensity (aggregate across all players) ---
     [SerializeField, Tooltip("EMA smoothing for the session baseline (aggregate energy burn per loop). Higher adapts faster.")]
     private float sessionBurnEmaAlpha = 0.25f;
@@ -37,44 +32,29 @@ public class DrumTrack : MonoBehaviour
     private const float kLateBindMotifInterval = 1.0f;
     private float _lastTotalSpentSample = -1f; // baseline sample of TOTAL spent tanks (cumulative)
     private float _burnBaselineEma = 0f;       // EMA of per-loop delta (aggregate)
-    [Header("UI Safe Area (Viewport)")] [Range(0f, 0.5f)] [SerializeField]
-    private float uiReserveBottomViewport = 0.14f; // reserve bottom 14% for UI
-
-    [Range(0f, 0.5f)] [SerializeField] private float uiReserveTopViewport = 0.00f; // optional top reserve
-
-    [SerializeField] private float uiReserveBottomInsetWorld = 0f; // optional fine-tune in world units
-    [SerializeField] private float uiReserveTopInsetWorld = 0f;
-
-    [Header("Grid Position Tuning")]
-    [Tooltip("Shifts the entire play area up (+) or down (-) as a fraction of screen height. " +
-             "Use this to recentre the dust grid when UI reserves cause it to sit too high or low. " +
-             "Changing this at runtime calls InvalidateAndResync() automatically.")]
-    [Range(-0.3f, 0.3f)]
-    [SerializeField] private float gridVerticalOffsetViewport = 0f;
-    private float _lastGridVerticalOffset = float.NaN; // detect Inspector changes
     private double _lastApplyMotifDsp = -1.0;
     private string _lastApplyMotifId = "";
+    [HideInInspector]
     public float drumLoopBPM = 120f;
-    public float gridPadding = 0f;
+    [HideInInspector]
     public int totalSteps = 16;
+    public float gridPadding = 0f;
     public float timingWindowSteps = .25f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
+    [HideInInspector]
     public double startDspTime;
     private AudioSource _drumA; // primary deck
     private AudioSource _drumB; // secondary deck (created at runtime if missing)
     private AudioSource _activeDrum; // currently audible deck
     private AudioSource _inactiveDrum;
     public double leaderStartDspTime { get; private set; }
+    [HideInInspector]
     public List<MotifSnapshot> SessionPhases = new();
+    [HideInInspector]
     public List<MineNode> activeMineNodes = new List<MineNode>();
     [HideInInspector] public bool isPhaseStarActive;
+    [HideInInspector]
     public int currentStep;
-
-    [Header("Dust Band Mapping (Viewport Y)")] [Range(0f, 1f)] [SerializeField]
-    private float dustBandMinY = 0.00f; // bottom of screen
-
-    [Range(0f, 1f)] [SerializeField] private float dustBandMaxY = 0.80f; // 80% up the screen
-    [SerializeField] private float dustBandTopInsetWorld = 0f; // optional extra inset in world units
 
     [Header("Grid Sizing (Pixel-driven)")]
     [Tooltip("Reference screen width used to derive a default cell pixel size (e.g., 1920).")]
@@ -106,6 +86,7 @@ public class DrumTrack : MonoBehaviour
     private SpawnGrid _spawnGrid;
     private CosmicDustGenerator _dust;
     private InstrumentTrackController _trackController;
+    [HideInInspector]
     public PhaseStar _star;
     private PhaseTransitionManager _phaseTransitionManager;
 
@@ -124,11 +105,8 @@ public class DrumTrack : MonoBehaviour
 
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
     public event System.Action<MazeArchetype, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
-    public event System.Action<int, int> OnBinChanged; // (idx, binCount)
     public event System.Action<int, int> OnStepChanged; // (stepIndex, leaderSteps)
-    public event System.Action<int, int> OnStepPulseN; // (stepIndex, n)
 
-    [SerializeField] private int stepPulseEveryN = 0; // 0 disables
     private int _lastStepIdx = -1;
     private bool _driveFromEnergy;
 
@@ -225,47 +203,13 @@ public class DrumTrack : MonoBehaviour
 			top    -= gridPadding;
 		} 
 // --- UI safe area clamp (viewport -> world) ---
-// We reserve a bottom viewport band for UI so the grid never overlaps it.
-// This is independent of dust visuals and does not depend on NoteVisualizer init.
-        float uiBotV = Mathf.Clamp01(uiReserveBottomViewport);
-        float uiTopV = Mathf.Clamp01(uiReserveTopViewport);
-
- 
+// Reserve a bottom viewport band for UI derived from uiBottomPaddingPx.
+        float uiBotV = Screen.height > 0 ? Mathf.Clamp01(uiBottomPaddingPx / (float)Screen.height) : 0f;
 
         if (uiBotV > 0f)
         {
             float uiBottomWorld = cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y;
-            bottom = Mathf.Max(bottom, uiBottomWorld + Mathf.Max(0f, uiReserveBottomInsetWorld));
-        }
-
-        if (uiTopV > 0f)
-        {
-            float uiTopWorld = cam.ViewportToWorldPoint(new Vector3(0f, 1f - uiTopV, z)).y;
-            top = Mathf.Min(top, uiTopWorld - Mathf.Max(0f, uiReserveTopInsetWorld));
-        }
-        if (clampPlayAreaToDustBand) { 
-            // Convert viewport band (minY..maxY) into world Y limits, using camera viewport conversion.
-            float vMin = Mathf.Clamp01(dustBandMinY); 
-            float vMax = Mathf.Clamp01(dustBandMaxY); 
-            if (vMax < vMin) { float t = vMin; vMin = vMax; vMax = t; }
-            // Use left edge x for conversion; only Y matters.
-            Vector3 w0 = cam.ViewportToWorldPoint(new Vector3(0f, vMin, cam.nearClipPlane)); 
-            Vector3 w1 = cam.ViewportToWorldPoint(new Vector3(0f, vMax, cam.nearClipPlane));
-            bottom = Mathf.Max(bottom, Mathf.Min(w0.y, w1.y)); 
-            top    = Mathf.Min(top,    Mathf.Max(w0.y, w1.y) - Mathf.Max(0f, dustBandTopInsetWorld));
-        }
-
-        // Vertical offset: shift the whole play area up/down without changing its size.
-        // This lets you recentre the grid when UI reserves create asymmetric padding.
-        if (gridVerticalOffsetViewport != 0f)
-        {
-            float screenH = top - bottom + (uiBotV > 0f ? cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y - (camPos.y - (cam.orthographic ? cam.orthographicSize : 0f)) : 0f);
-            // Simpler: just convert the viewport fraction directly to a world-unit shift.
-            float worldShift = gridVerticalOffsetViewport * (cam.orthographic
-                ? cam.orthographicSize * 2f
-                : (cam.ViewportToWorldPoint(new Vector3(0f, 1f, z)).y - cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)).y));
-            bottom += worldShift;
-            top    += worldShift;
+            bottom = Mathf.Max(bottom, uiBottomWorld);
         }
 		// Validate.
 		if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
@@ -582,15 +526,6 @@ public class DrumTrack : MonoBehaviour
     if (_gfm == null || !_gfm.ReadyToPlay())
         return;
 
-    // Detect Inspector changes to gridVerticalOffsetViewport and resync immediately.
-    // This makes the slider feel live in the Editor without needing a full scene reload.
-    if (!Mathf.Approximately(_lastGridVerticalOffset, gridVerticalOffsetViewport))
-    {
-        _lastGridVerticalOffset = gridVerticalOffsetViewport;
-        SyncTileWithScreen();
-        if (_dust != null) _dust.ResyncAllCellPositions();
-    }
-
     // ---------------------------------------------------------------------
     // 0.5) Motif late-bind (recovery) — ONE SHOT ONLY, only if we truly have no motif.
     // Do NOT late-bind just because intensityLoops is empty, drive is false, etc.
@@ -746,10 +681,6 @@ public class DrumTrack : MonoBehaviour
     {
         _lastStepIdx = currentStep;
         OnStepChanged?.Invoke(currentStep, leaderSteps);
-
-        int n = stepPulseEveryN;
-        if (n > 0 && (currentStep % n) == 0)
-            OnStepPulseN?.Invoke(currentStep, n);
     }
 
     // ---------------------------------------------------------------------
@@ -771,7 +702,7 @@ public class DrumTrack : MonoBehaviour
         if (idx != _binIdx)
         {
             _binIdx = idx;
-            OnBinChanged?.Invoke(_binIdx, bins);
+            //OnBinChanged?.Invoke(_binIdx, bins);
         }
     }
 
@@ -1026,6 +957,8 @@ public class DrumTrack : MonoBehaviour
             _phaseTransitionManager = _gfm.phaseTransitionManager;
         }
 
+        AutoSizeSpawnGridIfEnabled();
+
         // Optional debug: grid to screen scale sanity
         if (_gfm != null && _spawnGrid != null && _dust != null)
         {
@@ -1169,19 +1102,16 @@ public class DrumTrack : MonoBehaviour
         int   refUsableH = 1080 - Mathf.Max(0, uiBottomPaddingPx);
         int   refRows    = Mathf.Max(1, Mathf.RoundToInt(refUsableH / cellPx));
 
-        // UI viewport reserve must still be expressed in terms of the *actual* screen height
-        // so the world-space UI boundary lands in the right place on every device.
         int sh = Mathf.Max(1, Screen.height);
-        uiReserveBottomViewport = Mathf.Clamp01(uiBottomPaddingPx / (float)sh);
 
         // Apply fixed reference grid — same on every device.
         _spawnGrid.ResizeGrid(refCols, refRows);
         _hasLockedPlayArea = false;
-        
+
         // Any cached world mapping based on old grid dims must be invalidated.
         InvalidateGridWorldCache();
-        
-        Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked) uiBottomV={uiReserveBottomViewport:F3}");
+
+        Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
     }   
 
 public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
@@ -1595,8 +1525,7 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
         int gridH = _spawnGrid.gridHeight;
         if (gridW <= 0 || gridH <= 0) return;
 
-        // Invalidate the cached play area so TryGetPlayAreaWorld recomputes from current
-        // Inspector values (uiReserve, gridVerticalOffsetViewport, dustBand, etc.)
+        // Invalidate the cached play area so TryGetPlayAreaWorld recomputes from current values.
         _hasLockedPlayArea = false;
         InvalidateGridWorldCache();
 
