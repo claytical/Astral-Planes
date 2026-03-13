@@ -2189,6 +2189,7 @@ public class CosmicDustGenerator : MonoBehaviour
                     if (HasDustAt(grid)) continue;
                     if (IsDustSpawnBlocked(grid)) continue;          // includes permanent + keepclear + claims/holds
                     if (!Collectable.IsCellFreeStatic(grid)) continue; // never grow dust on top of a collectable
+                    if (IsVehicleOverlappingCell(grid)) { RequestRegrowCellAt(grid, phaseNow, refreshIfPending: true); continue; } // defer to step-gate
                     // ---------------------------
                     // SPAWN + REGISTER (VISUAL FIRST)
                     // ---------------------------
@@ -2289,6 +2290,15 @@ public class CosmicDustGenerator : MonoBehaviour
 // Respect DustClaimManager / exclusion vetoes (PhaseStar pocket, etc.)
                     if (IsKeepClearCell(gp) || IsDustSpawnBlocked(gp))
                         continue;
+
+// Never enable a collider on top of a vehicle — hand off to the step-gate retry path.
+                    if (IsVehicleOverlappingCell(gp))
+                    {
+                        SetCellState(gp, DustCellState.PendingRegrow);
+                        FadeAndHideCellGO(d.gameObject);
+                        EnqueueStepRegrow(gp);
+                        continue;
+                    }
 
 // At this point, it is legitimately solid terrain.
                     d.regrowAlphaCapped = false;
