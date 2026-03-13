@@ -1509,7 +1509,13 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.PrepareForReuse();
             dust.SetGrowInDuration(hexGrowInSeconds);
             dust.clearing.hardness01 = GetCellHardness01(gp);
-            dust.SetTint(GetCellVisualColor(gp));
+
+            // Apply role (not just tint) so dust.Role is never left as MusicalRole.None.
+            Color initColor = GetCellVisualColor(gp);
+            if (_imprints != null && _imprints.TryGetValue(gp, out var initImprint) && initImprint.role != MusicalRole.None)
+                dust.ApplyRoleAndCharge(initImprint.role, initColor, initColor.a);
+            else
+                dust.ApplyRoleAndCharge(GetLeastDenseRole(), initColor, initColor.a);
 
             Color denyColorGo = Color.darkGray;
             if (_imprints != null && _imprints.TryGetValue(gp, out var impGo) && impGo.role != MusicalRole.None)
@@ -2212,7 +2218,11 @@ public class CosmicDustGenerator : MonoBehaviour
                         }
                         else
                         {
-                            dust.SetTint(cellColor);
+                            // No imprint: assign least-dense role so dust.Role is never MusicalRole.None.
+                            var fallbackRole = GetLeastDenseRole();
+                            var fallbackProfile = MusicalRoleProfileLibrary.GetProfile(fallbackRole);
+                            Color fallbackColor = (fallbackProfile != null) ? fallbackProfile.GetBaseColor() : cellColor;
+                            dust.ApplyRoleAndCharge(fallbackRole, fallbackColor, fallbackColor.a);
                         }
 
                         // Use the role's shadow color as the deny feedback color.

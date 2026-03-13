@@ -24,10 +24,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Header("Carving")]
     [Tooltip("Whether this node is allowed to carve dust into the maze grid.")]
     public bool enableCarving = true;
-
-    [Tooltip("Maximum number of grid cells this node can clear across its lifetime.")]
-    public int maxDustCellsToCarve = 0;
-
+    
     [Tooltip("How many grid cells wide the carved strip should be (1 = single cell, 3 = trench).")]
     public int carveWidthCells = 1;
     // === NEW: Maze carving hooks ===

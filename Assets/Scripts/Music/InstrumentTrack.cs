@@ -1449,8 +1449,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
         }
 
-        // Remove from spawned list now (the physical object becomes the carried orb).
-        spawnedCollectables?.Remove(collectable.gameObject);
+        // Keep the collectable in spawnedCollectables until it is released from the Vehicle.
+        // Removal is deferred to OnManualReleaseConsumed / OnManualReleaseDiscarded so that
+        // AnyCollectablesInFlightGlobal() stays true while the note is being carried.
 
         int binSize = Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : BinSize());
 
@@ -1630,11 +1631,17 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             int effectiveLoops = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
             float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
             int capturedBurstId = burstId;
+            int capturedDiscardedStep = authoredAbsStep;
             EnqueueNextFrame(() =>
             {
                 if (controller?.noteVisualizer != null)
                 {
                     controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
+                    // Defensive: also explicitly remove the discarded step's marker if it
+                    // is still present and not in the loop (catches cases where burstId or
+                    // isPlaceholder was altered before cleanup ran).
+                    if (capturedDiscardedStep >= 0)
+                        controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep);
                     controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, ascendSeconds);
                 }
             });
@@ -1930,7 +1937,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         else
         {
             bool lit = lightMarkerNow;
-            int burst = lightMarkerNow ? -1 : currentBurstId; // optional: keep it burst-owned while waiting
+            // Always stamp currentBurstId so newly created committed markers can be found
+            // by GetMarkersForTrackAndBurst when TriggerBurstAscend runs at burst completion.
+            // Using -1 here was the original intent (loop-owned), but it breaks ascension.
+            int burst = currentBurstId;
             noteMarker = controller?.noteVisualizer?.PlacePersistentNoteMarker(this, stepIndex, lit: lit, burstId: burst);
             Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False lit={lit} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
         }

@@ -865,16 +865,15 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         _disarmReason = reason;
         Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
 
-        DisableColliders();
-
         var tint = tintOverride ?? ResolvePreviewColorByReadiness();
 
         switch (reason)
         {
             case DisarmReason.AwaitBridge:
             case DisarmReason.Bridge:
-                // True shutdown states may hide / stop later in bridge completion flow,
-                // but ordinary disarm no longer freezes ecological drift.
+                // True shutdown: disable colliders so the star doesn't interact while
+                // the bridge plays out. Motion may stop separately in the bridge flow.
+                DisableColliders();
                 SetVisual(VisualMode.Hidden, tint);
                 break;
 
@@ -882,6 +881,11 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             case DisarmReason.CollectablesInFlight:
             case DisarmReason.ExpansionPending:
             default:
+                // Keep colliders enabled during ordinary disarm so the star stays
+                // bounded by the physical boundary walls while it continues to drift.
+                // OnCollisionEnter2D already guards against pokes when !_isArmed,
+                // and preserving collider state keeps Physics2D.IgnoreCollision dust
+                // pairs intact (Unity clears them when a collider is disabled/re-enabled).
                 SetVisual(VisualMode.Dim, tint);
                 break;
         }
