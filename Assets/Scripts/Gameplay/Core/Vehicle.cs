@@ -1376,16 +1376,17 @@ private bool IsCellEmpty(Vector2Int gp)
 
         int ownerId = GetInstanceID();
 
-        // If not boosting, ensure we RELEASE any previous footprint continuously.
-        // (This prevents stale keep-clear claims that permanently veto regrowth.)
+        Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
+
         if (!boosting)
         {
-            gen.ReleaseVehicleKeepClear(ownerId, phaseNow);
+            // Claim just the center cell (radius=0, no force-remove) so dust can never
+            // regrow directly under the vehicle, without actively clearing any dust.
+            gen.SetVehicleKeepClear(ownerId, centerCell, 0, phaseNow, forceRemoveExisting: false);
             return;
         }
 
-        // While boosting, maintain the pocket and optionally remove dust.
-        Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
+        // While boosting, maintain the full pocket and optionally remove dust.
 
         gen.SetVehicleKeepClear(
             ownerId,
