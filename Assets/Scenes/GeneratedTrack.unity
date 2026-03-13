@@ -15449,15 +15449,9 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 8
   ascensionLoopsPerExtraBin: 2
-  ghostUndevelopedBins: 1
   undevelopedBinGhostGain: 0.35
-  ghostUndevelopedVelocityScalar: 0.25
   rootShiftNotesByChord: 1
   spawnedCollectables: []
-  cosmicDustLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  dustCheckRadius: 0.2
   currentBurstId: 0
   _binFilled: 
   _maxBins: 4
@@ -16006,15 +16000,9 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  ghostUndevelopedBins: 1
   undevelopedBinGhostGain: 0.35
-  ghostUndevelopedVelocityScalar: 0.25
   rootShiftNotesByChord: 1
   spawnedCollectables: []
-  cosmicDustLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  dustCheckRadius: 0.2
   currentBurstId: 0
   _binFilled: 
   _maxBins: 4
@@ -16143,15 +16131,9 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  ghostUndevelopedBins: 1
   undevelopedBinGhostGain: 0.35
-  ghostUndevelopedVelocityScalar: 0.25
   rootShiftNotesByChord: 1
   spawnedCollectables: []
-  cosmicDustLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  dustCheckRadius: 0.2
   currentBurstId: 0
   _binFilled: 
   _maxBins: 4
@@ -17563,8 +17545,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17f0094acf2944184b8a01cb25a3e90a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridWidth: 20
-  gridHeight: 10
+  gridWidth: 40
+  gridHeight: 20
   cellSize: 1
 --- !u!164 &1354683692
 AudioReverbFilter:
@@ -18651,15 +18633,9 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  ghostUndevelopedBins: 1
   undevelopedBinGhostGain: 0.35
-  ghostUndevelopedVelocityScalar: 0.25
   rootShiftNotesByChord: 1
   spawnedCollectables: []
-  cosmicDustLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  dustCheckRadius: 0.2
   currentBurstId: 0
   _binFilled: 
   _maxBins: 4
