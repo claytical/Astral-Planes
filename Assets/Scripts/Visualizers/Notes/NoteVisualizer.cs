@@ -19,7 +19,9 @@ public class NoteVisualizer : MonoBehaviour
     private float _playheadEnergyTarget01 = 0f;                  // what game logic asks for
     [SerializeField] private float _playheadEnergyLerpSpeed = 4f;
     [SerializeField] private float releasePulseSeconds = 0.18f;
-    [SerializeField] private Color releasePulseColor = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
+    [Tooltip("Fallback color used when no MusicalRole profile can be resolved for the releasing note.")]
+    [SerializeField] private Color releasePulseColorFallback = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
+    private MusicalRole _lastReleasePulseRole = MusicalRole.None;
     [Header("Marker & Tether Prefabs")]
     public GameObject notePrefab;
     public GameObject noteTetherPrefab;
@@ -51,6 +53,7 @@ public class NoteVisualizer : MonoBehaviour
     [SerializeField] private int playheadTrailMaxEmitPerFrame = 160;
 
 // Optional: keep particle Z stable (useful if your world-space canvas depth fights sorting).
+    [Tooltip("Override Z-depth for playhead trail particles. Leave as NaN to use actual world Z.")]
     [SerializeField] private float playheadTrailWorldZOverride = float.NaN;
 
     // Each ascended note bumps this; decays over time. Drives extra particle activity.
@@ -552,7 +555,7 @@ public void Initialize()
             if (_releasePulseT > 0f)
             {
                 float pulse01 = Mathf.Clamp01(_releasePulseT / Mathf.Max(0.0001f, releasePulseSeconds));
-                emitParams.startColor = Color.Lerp(Color.white, releasePulseColor, pulse01);
+                emitParams.startColor = Color.Lerp(Color.white, GetReleasePulseColor(_lastReleasePulseRole), pulse01);
             }
             else
             {
@@ -747,10 +750,21 @@ public void Initialize()
     /// <summary>
     /// Called when a burst completes & drums change to trigger a short visual pulse.
     /// </summary>
-    public void TriggerPlayheadReleasePulse()
+    public void TriggerPlayheadReleasePulse(MusicalRole role = MusicalRole.None)
     {
+        _lastReleasePulseRole = role;
         _pendingReleasePulse = true;
         _releasePulseT = releasePulseSeconds; // start the color pulse immediately
+    }
+
+    private Color GetReleasePulseColor(MusicalRole role)
+    {
+        if (role != MusicalRole.None)
+        {
+            var profile = MusicalRoleProfileLibrary.GetProfile(role);
+            if (profile != null) return profile.GetBaseColor();
+        }
+        return releasePulseColorFallback;
     }
     private void Awake()
     {
@@ -893,11 +907,12 @@ void Update()
         Color c0 = Color.white;
         Color c1 = Color.cyan;
 
-// Pulse pushes both ends toward releasePulseColor
+// Pulse pushes both ends toward role pulse color
         if (pulse01 > 0f)
         {
-            c0 = Color.Lerp(c0, releasePulseColor, pulse01);
-            c1 = Color.Lerp(c1, releasePulseColor, pulse01);
+            var pulseColor = GetReleasePulseColor(_lastReleasePulseRole);
+            c0 = Color.Lerp(c0, pulseColor, pulse01);
+            c1 = Color.Lerp(c1, pulseColor, pulse01);
             alphaBoost += 0.35f * pulse01; // optional: make it “flash” brighter
         }
         Gradient g = new Gradient();

@@ -13,8 +13,8 @@ using System.Collections.Generic;
 }
     public class SpawnGrid : MonoBehaviour
 {
-    public int gridWidth = 8;
-    public int gridHeight = 12;
+    [HideInInspector] public int gridWidth = 8;
+    [HideInInspector] public int gridHeight = 12;
     public GridCell[,] GridCells;
     public float cellSize = 1f; // Adjust to match the world space size
     private DrumTrack _drums;

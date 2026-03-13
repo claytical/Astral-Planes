@@ -44,12 +44,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private CosmicDustTintDiffusionSystem _tintDiffusionSystem;
     private readonly List<Vector2Int> _tmpReleased = new List<Vector2Int>(512);
     private readonly List<Vector2Int> _tmpClaimed  = new List<Vector2Int>(512);
-    [Header("Vehicle erosion (temporary)")]
-    [SerializeField] private float vehicleErodeRadius = 1f;   // world units
-    [SerializeField] private int vehicleErodePerTick = 2;       // max cells per call
     [Header("MineNode Erosion")]
-    [SerializeField] private float mineNodeErodeRadius = 1f;
-
     [SerializeField] private int mineNodeErodePerTick = 10;
     [Header("Dust Visual Footprint")]
     [Range(0.8f, 1.6f)]
@@ -91,11 +86,6 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
     private PhaseStarBehaviorProfile _activeProfile;
-    [Header("Tint Blending (Neighborhood)")]
-    [Tooltip("When MineNodes imprint dust colors, blend the imprint toward nearby cell tints to avoid sharp grid seams.")]
-    [Range(0, 3)] [SerializeField] private int imprintBlendRadius = 1;
-    [Tooltip("0 = no blending (pure imprint). 1 = fully neighborhood average.")]
-    [Range(0f, 1f)] [SerializeField] private float imprintNeighborWeight = 0.55f;
     [Header("Tint Diffusion (Option 2)")]
     [Tooltip("If enabled, recently modified dust cells will gradually blend toward their neighbors over time (local diffusion).")]
     [SerializeField] private bool enableTintDiffusion = true;
@@ -148,8 +138,6 @@ public class CosmicDustGenerator : MonoBehaviour
         get => tileDiameterWorld;
         set => tileDiameterWorld = value;
     }
-    [Header("Dust Terrain Query")]
-    [SerializeField] private float dustQueryRadiusWorld = 1.25f;
     [Header("Regrow Veto (Vehicle Overlap)")] 
     [Tooltip("If a vehicle overlaps a cell, regrow/spawn is deferred to prevent collider penetration shoves.")] 
     [SerializeField] private LayerMask vehicleMask;

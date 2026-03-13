@@ -16,7 +16,6 @@ public class InstrumentTrackController : MonoBehaviour
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
-    [SerializeField] private MusicalRole cohortTriggerRole = MusicalRole.Lead;
     [SerializeField] private float cohortWindowFraction = 0.5f; // e.g., lower half of the leader loop (0..16 when leader is 32)
     private bool _chordEventsSubscribed;
     private Vector2Int _gravityVoidCenterGP;
@@ -1242,9 +1241,6 @@ public class InstrumentTrackController : MonoBehaviour
     private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
     {
         Debug.Log($"[CHORD][CTRLR] CohortCompleted received from track={track.name} role={track.assignedRole} window=[{start},{end})");
-
-        // If you intend to restrict to a specific role, keep this. Otherwise remove it.
-        // if (track.assignedRole != cohortTriggerRole) { Debug.Log("[CHORD][CTRLR] Ignored: not trigger role"); return; }
 
         var h = GameFlowManager.Instance ? GameFlowManager.Instance.harmony : null;
         if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }
