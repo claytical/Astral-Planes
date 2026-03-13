@@ -61,6 +61,9 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         public float maxAccel = 4.0f;
     }
 
+    [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f; // m/s decay per second
+    private Vector2 _pushVelocity = Vector2.zero;
+
     [Serializable]
     private sealed class ScreenBoundsTuning
     {
@@ -143,6 +146,15 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     }
 
     public void SetFocusMode(bool on) => _focus = on;
+
+    /// <summary>
+    /// Applies a one-shot push that decays naturally each FixedUpdate.
+    /// Overwrites any previous push so rapid hits don't compound infinitely.
+    /// </summary>
+    public void ApplyPushImpulse(Vector2 velocity)
+    {
+        _pushVelocity = velocity;
+    }
 
     /// <summary>
     /// Wire the density navigator so its directions are blended into steering each tick.
@@ -283,6 +295,15 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         Vector2 desiredVel = desiredDir * speed;
         Vector2 curVel     = _rb.linearVelocity;
         Vector2 newVel     = Vector2.MoveTowards(curVel, desiredVel, steering.maxAccel * dt);
+
+        // Push impulse: added on top of steering so it feels immediate.
+        // Decays each tick; bypasses MoveTowards so the shove isn't fought frame-by-frame.
+        if (_pushVelocity.sqrMagnitude > 0.0001f)
+        {
+            newVel += _pushVelocity;
+            _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
+        }
+
         if (bounds.kinematicMode)
         {
             _rb.MovePosition(_rb.position + newVel * dt);

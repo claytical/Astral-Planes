@@ -848,8 +848,11 @@ private IEnumerator SpawnArrivalRoutine(
         TryBindLoopBoundary();
         HandleLoopBoundaryIdea(); // seed an initial idea immediately
 
-        if (!isTrappedInDust)
-            StartDustPocket(); 
+        // DustPocketRoutine is intentionally NOT started here.
+        // The jail hollow is carved once at spawn by CreateJailCenterForCollectable.
+        // After the vehicle releases the collectable, it navigates existing corridors
+        // without carving — DustPocketRoutine would call CarveTemporaryDiskFromCollectable
+        // on every tick, which erodes the maze as the collectable wanders.
 
         // --- Occupancy initialization (Mode A: never overlap another collectable) ---
         ClearReservation();
@@ -994,10 +997,7 @@ private IEnumerator SpawnArrivalRoutine(
     // non-physical immediately
     if (_rb != null) _rb.simulated = false;
     if (TryGetComponent(out Collider2D col)) col.enabled = false;
-
-    var ps = GetComponentInChildren<ParticleSystem>();
-    if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
+    
     // ----- Parent to vehicle ("children in back seat") -----
     if (_collector != null)
     {
@@ -1142,7 +1142,7 @@ private IEnumerator SpawnArrivalRoutine(
     {
         _handled = false;
         _destroyNotified = false;
-        if (isInitialized) StartDustPocketRoutineIfNeeded();
+        // Do not restart DustPocketRoutine on re-enable; collectables no longer carve dust.
     }
     private void StopDustPocketAndReleaseClaims()
     {
@@ -1256,6 +1256,10 @@ private IEnumerator SpawnArrivalRoutine(
             list.Add(this);
 
         _registeredInCarryOrbit = true;
+        
+        if (TryGetComponent(out CollectableParticles cp))
+            cp.Captured();
+
         RefreshCarryOrbitIndices(_collector);
     }
 
@@ -1381,8 +1385,8 @@ private IEnumerator SpawnArrivalRoutine(
         if (_rb != null) _rb.simulated = false;
         if (TryGetComponent(out Collider2D col)) col.enabled = false;
 
-        var ps = GetComponentInChildren<ParticleSystem>();
-        if (ps) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        foreach (var ps in GetComponentsInChildren<ParticleSystem>())
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
         // ----- Parent to vehicle ("children in back seat") -----
         if (_collector != null)

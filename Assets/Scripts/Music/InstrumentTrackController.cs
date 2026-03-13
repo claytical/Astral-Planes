@@ -59,10 +59,7 @@ public class InstrumentTrackController : MonoBehaviour
     private int _gravityVoidCurrentOuterR;
 
     [Header("Gravity Void → Dust Imprint")]
-    [SerializeField] private float gravityVoidGrowSeconds = 1.25f;
-    [SerializeField] private int gravityVoidMaxRadiusCells = 120;
     [SerializeField] private float gravityVoidImprintTickSeconds = 0.05f;
-    [SerializeField] private int gravityVoidImprintBudgetPerTick = 80; // -1 = unlimited
     private Coroutine _gravityVoidRoutine;
     private InstrumentTrack _gravityVoidOwner;
     private Vector3 _gravityVoidCenterWorld;
@@ -236,8 +233,8 @@ public class InstrumentTrackController : MonoBehaviour
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
         // Recompute runtime parameters; these can change while pending.
-        _gravityVoidGrowSecondsRuntime = gravityVoidGrowSeconds;
-        _gravityVoidMaxRadiusRuntime = gravityVoidMaxRadiusCells;
+        _gravityVoidGrowSecondsRuntime = -1f;
+        _gravityVoidMaxRadiusRuntime   = -1;
 
         if (_gravityVoidOwner != null)
         {
@@ -321,6 +318,17 @@ public class InstrumentTrackController : MonoBehaviour
         }
         DespawnGravityVoid();
     }
+    // Canonical role order for rainbow ring cycling.
+    private static readonly MusicalRole[] kVoidRoleOrder =
+        { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+
+    private static MusicalRole CycleVoidRole(MusicalRole startRole, int ringIndex)
+    {
+        int start = System.Array.IndexOf(kVoidRoleOrder, startRole);
+        if (start < 0) start = 0;
+        return kVoidRoleOrder[(start + ringIndex) % kVoidRoleOrder.Length];
+    }
+
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
         int _lastGravityVoidChordBin = -1;
@@ -334,6 +342,7 @@ public class InstrumentTrackController : MonoBehaviour
         // Tracks the outermost radius already committed to the grid so we only ever
         // pass new annuli to GrowVoidDustDiskFromGrid (innerRadiusCellsExclusive).
         int completedOuterR = 0;
+        int ringIndex = 0;
 
         // Which bin boundary we have already fired a burst for. Prevents re-firing
         // multiple times within the same bin while the routine ticks faster than a bin.
@@ -425,6 +434,12 @@ public class InstrumentTrackController : MonoBehaviour
                             _vehicleCellsScratch.Add(drum.WorldToGridPosition(v.transform.position));
                     }
 
+                    // Resolve role and visuals for this ring (rainbow cycling).
+                    var ringRole     = CycleVoidRole(_gravityVoidOwner.assignedRole, ringIndex);
+                    var ringProfile  = MusicalRoleProfileLibrary.GetProfile(ringRole);
+                    Color ringColor     = ringProfile != null ? ringProfile.GetBaseColor()      : _gravityVoidDustImprintTint;
+                    float ringHardness  = ringProfile != null ? ringProfile.GetDustHardness01() : _gravityVoidDustHardness01;
+
                     // Unlimited budget — burst commits the whole annulus at once.
                     // energyAtCenter01 = 1f with a near-flat falloffExp (0.3) keeps the
                     // role color vivid and immediately readable across the whole annulus.
@@ -433,9 +448,9 @@ public class InstrumentTrackController : MonoBehaviour
                     dustGen.GrowVoidDustDiskFromGrid(
                         centerGP:                  _gravityVoidCenterGP,
                         outerRadiusCells:          targetOuterR,
-                        imprintRole:               _gravityVoidOwner.assignedRole,
-                        hueRgb:                    _gravityVoidDustImprintTint,
-                        imprintHardness01:         _gravityVoidDustHardness01,
+                        imprintRole:               ringRole,
+                        hueRgb:                    ringColor,
+                        imprintHardness01:         ringHardness,
                         energyAtCenter01:          1f,
                         falloffExp:                0.3f,   // near-flat — role color stays vivid to the edge
                         growInSeconds:             growIn,
@@ -447,6 +462,7 @@ public class InstrumentTrackController : MonoBehaviour
                     );
 
                     completedOuterR = targetOuterR;
+                    ringIndex++;
                 }
             }
 

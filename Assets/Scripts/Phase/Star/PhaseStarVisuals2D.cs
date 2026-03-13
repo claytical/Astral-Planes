@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Quaternion = UnityEngine.Quaternion;
@@ -19,6 +20,10 @@ private float alphaDirection = 1f;
     [SerializeField, Range(0f, 1f)] private float dimAlpha = 0.06f;     // very faint
     [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.08f;    // nearly gray/black
     [SerializeField] private bool dimUsesFixedTint = true;
+    [SerializeField] private Color rejectFlashColor = new Color(0.9f, 0.25f, 0.05f, 0.55f);
+    [SerializeField, Min(0.02f)] private float rejectFlashSeconds = 0.12f;
+
+    private Coroutine _rejectFlashRoutine;
 
     public ParticleSystem particles;
 
@@ -157,6 +162,21 @@ private float alphaDirection = 1f;
         if (particles && particles.isPlaying) particles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
+
+    public void FlashReject()
+    {
+        if (_rejectFlashRoutine != null) StopCoroutine(_rejectFlashRoutine);
+        _rejectFlashRoutine = StartCoroutine(RejectFlashRoutine());
+    }
+
+    private IEnumerator RejectFlashRoutine()
+    {
+        SetShardTint(rejectFlashColor);
+        ApplyParticleAlpha(0.3f);
+        yield return new WaitForSeconds(rejectFlashSeconds);
+        ShowDim(_lastTint);   // restore dim grey state
+        _rejectFlashRoutine = null;
+    }
 
     public void HideAll()
     {

@@ -56,6 +56,8 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Range(0f, 0.5f)] private float dominantRoleSwitchDelta = 0.10f;
 
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
+    // In [Header("Charge Readiness")] section, alongside pokeChargeThreshold:
+    [SerializeField, Range(0f, 1f)] private float shardReadyThreshold = 0.5f;
 
     // -------------------- Profile-driven tuning (authoring surface) --------------------
     // PhaseStar no longer owns duplicated serialized fields for these knobs; they come from PhaseStarBehaviorProfile.
@@ -78,7 +80,6 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
     [Header("Charge Readiness")]
     [SerializeField, Range(0f, 4f)] private float pokeChargeThreshold = 1.0f;
-    [SerializeField, Range(0f, 1f)] private float preReadyGrayFloor = 0.15f;
     private bool _cachedIsSuperNode = false;
 
     private bool StarKeepsDustClear => !behaviorProfile || behaviorProfile.starKeepsDustClear;
@@ -88,11 +89,6 @@ public class PhaseStar : MonoBehaviour
 
     private bool SafetyBubbleEnabled => !behaviorProfile || behaviorProfile.enableSafetyBubble;
     private int SafetyBubbleRadiusCells => behaviorProfile ? Mathf.Max(0, behaviorProfile.safetyBubbleRadiusCells) : 4;
-
-    private bool RotateSelectionOnLoopBoundary =>
-        !behaviorProfile || behaviorProfile.rotateSelectionOnLoopBoundary;
-
-    private int RotateEveryNLoops => behaviorProfile ? Mathf.Max(1, behaviorProfile.rotateEveryNLoops) : 1;
 
     private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
 
@@ -113,11 +109,10 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private PhaseStarMotion2D motion;
     [SerializeField] private PhaseStarDustAffect dust;
     [SerializeField] private PhaseStarCravingNavigator cravingNavigator;
-    [SerializeField] private float _progressionMul = 1f;
+
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
     private MazeArchetype _assignedPhase;
-    [SerializeField] private bool _isInFocusMode = false;
     private bool _lockPreviewTintUntilIdle;
     private Color _lockedTint;
     private List<PreviewShard> previewRing = new();
@@ -138,10 +133,9 @@ public class PhaseStar : MonoBehaviour
 
     // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
+    [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
     private bool _awaitingCollectableClear;
 
-    public event Action<MusicalRole, int, int> OnShardEjected;
-    [SerializeField] private bool syncRotationToLoop = true;
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration; // seconds (time authority)
 
@@ -171,7 +165,69 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private float shardSnifferTurnSpeed = 180f;
     [Tooltip("Duration of the shed-fly animation when a shard is ejected (seconds).")]
     [SerializeField] private float shardShedDuration = 0.35f;
-// AFTER
+
+
+    public enum DisarmReason
+    {
+        None = 0,
+
+        // Star was hit; we are in the process of spawning/resolving a MineNode.
+        NodeResolving,
+
+        // There exist collectables in flight (global), so we must not allow another poke.
+        CollectablesInFlight,
+
+        //A track is staged to expand on the net loop boundary; don't allow another collision that could queue an additional burst/bin change in the same window
+        ExpansionPending,
+
+        // Star has no shards remaining and we’re awaiting bridge transition.
+        AwaitBridge,
+
+        // The bridge is actively running (coral/transition).
+        Bridge
+    }
+
+    private DisarmReason _disarmReason = DisarmReason.None;
+
+    // -------------------- State & caches --------------------
+    private PhaseStarState _state = PhaseStarState.WaitingForPoke;
+
+    private enum VisualMode
+    {
+        Bright,
+        Dim,
+        Hidden
+    }
+
+    private bool _ejectionInFlight;
+    private bool _advanceStarted;
+    private int _spawnTicket;
+    private Coroutine _retryCo;
+    private int _lastPokeFrame = -999999;
+    private InstrumentTrack _cachedTrack;
+    private MineNode _activeNode;
+    private readonly List<InstrumentTrack> _targets = new(4);
+    private List<MusicalRole> _phasePlanRoles;
+    [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
+
+    public event Action<PhaseStar> OnArmed;
+    public event Action<PhaseStar> OnDisarmed;
+    private bool _isArmed;
+    private int _baseSortingOrder;
+    [SerializeField] private int _perPetalLayerStep;
+    public MotifProfile AssignedMotif => _assignedMotif;
+
+    private GameFlowManager gfm;
+    // -------------------- Lifecycle --------------------
+    void Start()
+    {
+        gfm = GameFlowManager.Instance;
+        EnsurePreviewRing();
+        if (!buildingPreview)
+        {
+            InitializeTimingAndSpeeds();
+        }
+    }
     public void AddCharge(MusicalRole role, float dustChargeTaken)
     {
         if (role == MusicalRole.None) return;
@@ -202,14 +258,6 @@ public class PhaseStar : MonoBehaviour
         if (!s_bubbleActive) return false;
         return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
     }
-
-    private List<Transform> _petals = new(); // visuals previewRing[i].visual
-    private List<float> _baseAngles = new(); // 0..90° spread
-    private List<float> _turns = new(); // r[i] = 1/(i+1)
-    private List<float> _omega = new(); // deg/sec = 360*r/T_loop
-    // In [Header("Charge Readiness")] section, alongside pokeChargeThreshold:
-    [SerializeField, Range(0f, 1f)] private float shardReadyThreshold = 0.5f;
-    
     public bool IsChargeReady()
     {
         // Any single shard at or above the per-role threshold makes the star pokeable.
@@ -220,76 +268,6 @@ public class PhaseStar : MonoBehaviour
             if (c >= shardReadyThreshold) return true;
         }
         return false;
-    }
-    public enum DisarmReason
-    {
-        None = 0,
-
-        // Star was hit; we are in the process of spawning/resolving a MineNode.
-        NodeResolving,
-
-        // There exist collectables in flight (global), so we must not allow another poke.
-        CollectablesInFlight,
-
-        //A track is staged to expand on the net loop boundary; don't allow another collision that could queue an additional burst/bin change in the same window
-        ExpansionPending,
-
-        // Star has no shards remaining and we’re awaiting bridge transition.
-        AwaitBridge,
-
-        // The bridge is actively running (coral/transition).
-        Bridge
-    }
-
-    private DisarmReason _disarmReason = DisarmReason.None;
-
-    [SerializeField] private float maxActiveDps = 360f; // clamp for comfort
-
-    // -------------------- State & caches --------------------
-    private PhaseStarState _state = PhaseStarState.WaitingForPoke;
-
-    private enum VisualMode
-    {
-        Bright,
-        Dim,
-        Hidden
-    }
-
-    private bool _ejectionInFlight;
-    private bool _advanceStarted;
-    private int _spawnTicket;
-    private Coroutine _retryCo;
-    private int _lastPokeFrame = -999999;
-    private InstrumentTrack _cachedTrack;
-    private MineNode _activeNode;
-    private readonly List<InstrumentTrack> _targets = new(4);
-    private int _spawnSerial = 0;
-    private List<MusicalRole> _phasePlanRoles;
-    private int _planConsumeIdx;
-    [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
-
-    public event Action<PhaseStar> OnArmed;
-    public event Action<PhaseStar> OnDisarmed;
-    private bool _isArmed;
-    private int _baseSortingOrder;
-    [SerializeField] private int _perPetalLayerStep;
-    [SerializeField] private int _activeTopBoost;
-    [SerializeField] private float _spinEnvMul;
-    private float _tweenWindow = 2f;
-    public MotifProfile AssignedMotif => _assignedMotif;
-
-    private GameFlowManager gfm;
-    [SerializeField] private int nowLoop;
-
-    // -------------------- Lifecycle --------------------
-    void Start()
-    {
-        gfm = GameFlowManager.Instance;
-        EnsurePreviewRing();
-        if (!buildingPreview)
-        {
-            InitializeTimingAndSpeeds();
-        }
     }
     public void EnterFromOffScreen(Vector2 targetWorldPos)
     {
@@ -381,7 +359,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     void OnEnable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drum != null) drum.OnStepPulseN += HandleStepPulse;
     }
     
     private float GetTotalCharge()
@@ -909,7 +886,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         return true;
     }
 
-    public void OnLoopBoundary_RearmIfNeeded()
+    private void OnLoopBoundary_RearmIfNeeded()
     {
         bool cif = AnyCollectablesInFlightGlobal();
         bool ep = AnyExpansionPendingGlobal();
@@ -1140,17 +1117,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             return;
         }
 
-        // --- Selection rotation at loop boundary (agency) ---
-        // Only rotate when we are actually waiting for the next poke, i.e. armed + idle.
-        if (RotateSelectionOnLoopBoundary && _state == PhaseStarState.WaitingForPoke && _isArmed
-            && (RotateEveryNLoops <= 1 || (nowLoop % RotateEveryNLoops) == 0)
-            && !_awaitingCollectableClear && !_awaitingLoopPhaseFinish && !_advanceStarted && !_ejectionInFlight &&
-            HasShardsRemaining() && !AnyCollectablesInFlightGlobal() && !AnyExpansionPendingGlobal())
-        {
-            
-            DBG($"[PS:LB] Rotated offered shard at boundary. currentShardIndex={currentShardIndex}");
-        }
-
         // ------------------------------------------------------------
         // 4) Normal re-arm path
         // ------------------------------------------------------------
@@ -1172,13 +1138,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
     }
-
-    private void HandleStepPulse(int step, int n)
-    {
-        // Step-pulse rotation replaced by charge-driven shard selection.
-        // Kept as stub to avoid breaking DrumTrack event wiring.
-    }
-
+    
     private void DBG(string msg)
     {
         Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} advStarted={_advanceStarted} " +
@@ -1186,30 +1146,17 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                   $"shards={_shardsEjectedCount}/{behaviorProfile?.nodesPerStar} preview={(previewRing != null ? previewRing.Count : -1)} " +
                   $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
     }
-
-    private static int Mod(int x, int m)
-    {
-        if (m <= 0) return 0;
-        int r = x % m;
-        return r < 0 ? r + m : r;
-    }
-
+    
     void BuildOrRefreshPreviewRing()
     {
-        // Collect petal transforms from previewRing
-        _petals.Clear();
-        foreach (var shard in previewRing)
-            if (shard.visual)
-                _petals.Add(shard.visual);
-
-        int N = _petals.Count;
+        int N = previewRing.Count;
         if (N == 0) return;
 
         // Set each shard's initial rotation to point upward (sniffers will take over in Update).
         // Apply sorting order by ascending index; UpdateShardSortingByCharge() in Update will reorder by charge.
         for (int i = 0; i < N; i++)
         {
-            var t = _petals[i];
+            var t = previewRing[i].visual;
             if (!t) continue;
             t.localRotation = Quaternion.Euler(0f, 0f, 0f); // face up initially
             var sr = t.GetComponent<SpriteRenderer>();
@@ -1238,7 +1185,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     private void OnDisable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drum != null) drum.OnStepPulseN -= HandleStepPulse;
         SafeUnsubscribeAll();
         if (!StarKeepsDustClear) return;
         var gen = gfm != null ? gfm.dustGenerator : null;
@@ -1516,26 +1462,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         // Sorting order only — dominance is resolved by ResolveDominantRoleFromCharge()
         // which applies hysteresis and soft switch delta (BALANCE-E).
     }
-    /// <summary>
-    /// Called by PhaseStarCravingNavigator.OnCravingChanged when the star tastes a new role.
-    /// Snaps the active shard to the matching diamond and refreshes the directive.
-    /// </summary>
-    private void NotifyCravingChanged(MusicalRole newCraving)
-    {
-        if (previewRing == null || previewRing.Count == 0) return;
 
-        // Find the shard for this role
-        for (int i = 0; i < previewRing.Count; i++)
-        {
-            if (previewRing[i].role != newCraving) continue;
-            currentShardIndex = i;
-            activeShardVisual = previewRing[i].visual;
-            break;
-        }
-
-        PrepareNextDirective();
-        Trace($"NotifyCravingChanged → newCraving={newCraving} shardIndex={currentShardIndex}");
-    }
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         var controller = GameFlowManager.Instance?.controller;
@@ -1644,9 +1571,22 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     }
     private void OnCollisionEnter2D(Collision2D coll)
     {
+        if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
+
+        // Disarmed push: bypass the CIF/EP gates so the vehicle always shoves the star
+        // while it is waiting between ejections. Collectables are in-flight during this
+        // window, so the old order (CIF check first) was preventing the push entirely.
+        if (!_isArmed
+            && HasShardsRemaining()
+            && _state == PhaseStarState.WaitingForPoke
+            && !_ejectionInFlight)
+        {
+            HandleDisarmedVehicleHit(coll);
+            return;
+        }
+
         if (AnyCollectablesInFlightGlobal())
         {
-            // Optional: keep it disarmed while collectables exist, so we don’t accept pokes mid-burst.
             Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
             Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
             return;
@@ -1661,7 +1601,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         // --- Safety & gating ---
         if (!HasShardsRemaining()) return;
-        if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
         if (_state != PhaseStarState.WaitingForPoke)
         {
             Trace($"OnCollision: ignored, state={_state}");
@@ -1671,12 +1610,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (_ejectionInFlight)
         {
             Trace("OnCollision: ignored, busy flags");
-            return;
-        }
-
-        if (!_isArmed)
-        {
-            Trace("OnCollisionEnter2D: ignored poke because star is not armed");
             return;
         }
         if (!IsChargeReady())
@@ -1718,6 +1651,22 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (_bubbleActive) s_bubbleCenter = transform.position;
         EjectCachedDirectiveAndFlow(coll);
     }
+
+    private void HandleDisarmedVehicleHit(Collision2D coll)
+    {
+        if (motion != null)
+        {
+            Vector2 starPos   = transform.position;
+            Vector2 pushDir   = coll.contacts.Length > 0
+                ? (starPos - (Vector2)coll.contacts[0].point).normalized
+                : ((starPos - (Vector2)coll.transform.position).normalized);
+            float   pushSpeed = Mathf.Clamp(coll.relativeVelocity.magnitude * disarmedPushScale,
+                                             0f, MaxImpactStrength);
+            motion.ApplyPushImpulse(pushDir * pushSpeed);
+        }
+        visuals?.FlashReject();
+    }
+
     void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
         int ticket = ++_spawnTicket;
@@ -1772,7 +1721,10 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            Disarm(DisarmReason.NodeResolving, spawnTint);
+            // If this was the final shard, keep the star hidden (AwaitBridge) rather than
+            // flashing back to Dim (NodeResolving), which would make an empty-shard star visible.
+            var postResolveReason = HasShardsRemaining() ? DisarmReason.NodeResolving : DisarmReason.AwaitBridge;
+            Disarm(postResolveReason, spawnTint);
             LogState("OnResolved");
         };
 
@@ -1787,7 +1739,18 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (previewRing == null || previewRing.Count == 0) return;
         if (!HasShardsRemaining()) return;
 
-        int shardIdx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
+        // At ejection, use the highest-charge shard directly — no hysteresis.
+        // This matches the sort order (highest on top) that the player reads as "what will fire."
+        int shardIdx = 0;
+        float bestEjectCharge = -1f;
+        for (int i = 0; i < previewRing.Count; i++)
+        {
+            _starCharge.TryGetValue(previewRing[i].role, out float c);
+            if (c > bestEjectCharge) { bestEjectCharge = c; shardIdx = i; }
+        }
+        // Snap the highlight to match so the visual is consistent post-eject.
+        currentShardIndex = shardIdx;
+        activeShardVisual = previewRing[shardIdx].visual;
         var shard = previewRing[shardIdx];
 
         MusicalRole ejectedRole = shard.role;

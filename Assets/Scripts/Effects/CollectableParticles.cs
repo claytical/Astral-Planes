@@ -4,6 +4,7 @@ public class CollectableParticles : MonoBehaviour
 {
     public ParticleSystem particleSystem; // Assign in prefab
     public ParticleSystem coreParticleSystem;
+    public ParticleSystem outlineParticleSystem;
     private ParticleSystem.EmissionModule _emission;
     private NoteTether _tetherRef;
     [SerializeField] private float pullStrength = 0.7f;  // force toward tether
@@ -143,6 +144,13 @@ public class CollectableParticles : MonoBehaviour
         particleSystem.Play();
     }
 }
+
+    public void Captured()
+    {
+        outlineParticleSystem.Stop();
+        particleSystem.Stop();
+
+    }
     public void RegisterTether(NoteTether tether, float pull = 0.7f)
 {
     _tetherRef = tether;
