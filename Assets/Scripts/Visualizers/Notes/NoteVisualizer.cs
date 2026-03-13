@@ -1597,6 +1597,26 @@ private Color ComputeStepColor(int step)
     }
 
     /// <summary>
+    /// Defensive cleanup: removes the marker at stepAbs for the given track if it is not
+    /// currently in the persistent loop and is not mid-ascension. Used after a discard to
+    /// ensure the authored step's marker is gone even if isPlaceholder or burstId was altered.
+    /// </summary>
+    public void RemoveOrphanMarkerAtStep(InstrumentTrack track, int stepAbs)
+    {
+        var key = (track, stepAbs);
+        if (!noteMarkers.TryGetValue(key, out var tr) || tr == null) return;
+
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag != null && tag.isAscending) return; // leave ascending markers alone
+
+        // Only remove if the step is not in the persistent loop (it was discarded, not committed).
+        if (track != null && track.IsPersistentStepOccupied(stepAbs)) return;
+
+        noteMarkers.Remove(key);
+        Destroy(tr.gameObject);
+    }
+
+    /// <summary>
     /// Removes and destroys all placeholder markers for the given track and burst.
     /// Called on burst completion so authored-step placeholders that were never
     /// committed (collectables picked up and released elsewhere, or discarded) don't linger.

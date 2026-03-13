@@ -121,8 +121,8 @@ public class MineNode : MonoBehaviour
     public float GetCorridorHealDelaySeconds()
     {
         // tunables (make them per-role later if desired)
-        float slow = 2.5f;  // low note
-        float fast = 0.4f;  // high note
+        float slow = 16f;  // low note
+        float fast = 4f;  // high note
         return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
     }
     public void NotifyDustErodedAt(Vector3 worldPos)

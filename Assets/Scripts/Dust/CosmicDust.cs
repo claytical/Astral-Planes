@@ -67,6 +67,7 @@ public class CosmicDust : MonoBehaviour {
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
     private const float kRegrowAlphaCap = 0.35f;
+    [SerializeField] private float colliderDisabledAlpha = 0.08f;
     private const float kSolidAlphaFloor = .55f;
     [Serializable]
     public struct DustInteractionSettings
@@ -689,13 +690,20 @@ private bool _tintPulseActive = false;
         // Maintain legacy field behavior too.
         if (terrainCollider != null) terrainCollider.enabled = enabled;
 
+        // Mirror collider state onto sprite alpha so non-interactive cells read as ghost/faint.
+        if (visual.sprite != null)
+        {
+            Color c = _displayTint;
+            c.a = enabled ? _currentTint.a : colliderDisabledAlpha;
+            ApplyDisplayedTint(c);
+        }
+
         // When enabling collision, ensure CircleCollider2D radius matches the current sprite footprint.
         if (enabled)
         {
             RebuildColliderForCurrentScale();
             SyncColliderRadiusToSprite();
         }
-
     }
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
     {
@@ -1263,7 +1271,7 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
 
             if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
             {
-                TriggerDenyTintPulse(Mathf.Lerp(0.08f, 0.28f, severity));
+                TriggerDenyTintPulse(Mathf.Lerp(0.5f, 1.28f, severity));
 
                 float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
 

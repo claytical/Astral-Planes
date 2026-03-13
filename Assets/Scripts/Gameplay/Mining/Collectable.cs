@@ -379,6 +379,9 @@ private IEnumerator SpawnArrivalRoutine(
 }
     public void OnManualReleaseDiscarded()
     {
+        // Mark as handled so OnCollectableDestroyed doesn't double-decrement _burstRemaining.
+        ReportedCollected = true;
+
         // stop trail follow
         _trailFollowActive = false;
         if (_trailFollowRoutine != null) { StopCoroutine(_trailFollowRoutine); _trailFollowRoutine = null; }
@@ -407,6 +410,9 @@ private IEnumerator SpawnArrivalRoutine(
 
         if (energySprite != null)
             energySprite.color = new Color(1f, 0.2f, 0.2f, 0.85f);
+
+        // Note is leaving the vehicle — remove from spawned list before destruction.
+        assignedInstrumentTrack?.spawnedCollectables?.Remove(gameObject);
 
         Destroy(gameObject);
     }
@@ -1754,8 +1760,11 @@ private IEnumerator SpawnArrivalRoutine(
             if (tg != null) Destroy(tg);
         }
 
+        // Note is leaving the vehicle — remove from spawned list before destruction.
+        assignedInstrumentTrack?.spawnedCollectables?.Remove(gameObject);
+
         // Default: destroy the carried visual orb.
         Destroy(gameObject);
     }
-    
+
 }

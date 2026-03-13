@@ -555,20 +555,10 @@ public class DrumTrack : MonoBehaviour
     {
         Debug.LogError($"[DRUM] SetScheduledEndTime FAILED on active clip={(_activeDrum.clip ? _activeDrum.clip.name : "null")} swapDsp={swapDsp:F3}\n{e}");
     }
-    if (_inactiveDrum != null && _inactiveDrum.isPlaying)
-    {
-        try
-        {
-            _inactiveDrum.PlayScheduled(swapDsp);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[DRUM] PlayScheduled FAILED on inactive clip={(_inactiveDrum.clip ? _inactiveDrum.clip.name : "null")} swapDsp={swapDsp:F3}\n{e}");
-        }
-        
-    }
     // Schedule the new loop, but DO NOT swap references yet.
     // The currently-audible deck must remain authoritative until swapDsp arrives.
+    // Note: assigning .clip above already stopped any prior playback on _inactiveDrum,
+    // so there is no need to check isPlaying before calling PlayScheduled.
     _inactiveDrum.PlayScheduled(swapDsp);
 
     _pendingDrumLoopDspStart = swapDsp;
