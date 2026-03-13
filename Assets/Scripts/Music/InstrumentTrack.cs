@@ -133,11 +133,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int ascensionLoopsPerExtraBin = 2;
     private NoteSet[] _binNoteSets;
     [Header("Undeveloped Bin Playback ")]
-    [Tooltip("If true, when the global leader width is wider than this track, this track's notes will 'ghost repeat' into undeveloped bins at reduced velocity.")]
-    [SerializeField] private bool ghostUndevelopedBins = true; 
     [SerializeField, Range(0f, 1f)] private float undevelopedBinGhostGain = 0.35f; // 0=silent, 1=full repeat
-    [Tooltip("Velocity scalar applied to ghost repeats in undeveloped bins.")]
-    [Range(0f, 1f)] [SerializeField] private float ghostUndevelopedVelocityScalar = 0.25f;
     [Header("Harmony")]
     [Tooltip("If enabled, notes are treated as authored relative to chord index 0 (the 'I' chord), then root-shifted by the current chord before quantization. This makes progressions like I–IV–V change the bass/lead pitch even when the authored notes are static.")]
     public bool rootShiftNotesByChord = true;
@@ -150,8 +146,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
     private int _lastLoopSeen = -1;
-    [SerializeField] private LayerMask cosmicDustLayer;   // set this in the Inspector to your Dust layer
-    [SerializeField] private float dustCheckRadius = 0.2f;
     private int _nextBurstId = 0;
     private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
     private readonly Dictionary<int,int> _burstTotalSpawned = new(); // burstId -> total spawned

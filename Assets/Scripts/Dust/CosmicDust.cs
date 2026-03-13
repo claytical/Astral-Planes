@@ -623,32 +623,6 @@ private bool _tintPulseActive = false;
         var col  = ps.colorOverLifetime;
 
         col.enabled = true;
-/*
-        // Premultiply for premultiplied-alpha material.
-        Color pm = Premultiply(target);
-        var g = new Gradient();
-        g.SetKeys(
-            new[] {
-                // Color keys: RGB only. Keep alpha at 1 so alpha is controlled solely by alpha keys.
-                new GradientColorKey(new Color(pm.r, pm.g, pm.b, 1f), 0f),
-                new GradientColorKey(new Color(pm.r, pm.g, pm.b, 1f), 1f)
-            },
-            new[] {
-                // Alpha curve: your shape (fast rise, sustain, fade out)
-                new GradientAlphaKey(0f,             0f),
-                new GradientAlphaKey(pm.a * 0.65f,   0.08f),
-                new GradientAlphaKey(pm.a * 0.65f,   0.55f),
-                new GradientAlphaKey(pm.a * 0.75f,   0.85f),
-                new GradientAlphaKey(0f,             1f),
-
-            }
-        );
-
-        col.color = new ParticleSystem.MinMaxGradient(g);
-
-        // Also set startColor for newly emitted particles.
-        main.startColor = pm;
-*/
     }
 
     public void SetGrowInDuration(float seconds)

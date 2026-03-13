@@ -21,13 +21,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     /// </summary>
     public Func<Vector2, float> DustDensitySampler;
 
-    /// <summary>
-    /// Optional external path step (kinematic override). If provided, moves by returned position each FixedUpdate.
-    /// Signature: (currentPos, dt) -> nextPos.
-    /// Not used in the density-navigator system (dynamic mode only), kept for compatibility.
-    /// </summary>
-    public Func<Vector2, float, Vector2> ExternalPathStep;
-
     // ============================================================
     // Inspector tuning
     // ============================================================
@@ -290,13 +283,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         Vector2 desiredVel = desiredDir * speed;
         Vector2 curVel     = _rb.linearVelocity;
         Vector2 newVel     = Vector2.MoveTowards(curVel, desiredVel, steering.maxAccel * dt);
-        // Optional external kinematic override (compat path — not used by density nav)
-        if (bounds.kinematicMode && ExternalPathStep != null)
-        {
-            var next = ExternalPathStep(_rb.position, dt);
-            _rb.MovePosition(next);
-        }
-        else if (bounds.kinematicMode)
+        if (bounds.kinematicMode)
         {
             _rb.MovePosition(_rb.position + newVel * dt);
         }
@@ -425,22 +412,4 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _rechooseTimer = Random.Range(1.2f, 2.4f);
     }
 
-    // ============================================================
-    // Legacy compat
-    // ============================================================
-    public void SetTarget(Vector3 target, float curiosity = 1f)
-    {
-        StartCoroutine(MoveTowardTarget(target, curiosity));
-    }
-
-    private IEnumerator MoveTowardTarget(Vector3 target, float curiosity)
-    {
-        while (true)
-        {
-            Vector2 dir = (target - transform.position).normalized;
-            _rb.AddForce(dir * curiosity * 0.5f, ForceMode2D.Force);
-            yield return new WaitForSeconds(0.25f);
-            if (Vector2.Distance(transform.position, target) < 1f) break;
-        }
-    }
 }

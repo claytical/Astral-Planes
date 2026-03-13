@@ -5,9 +5,6 @@ using System.Collections;
 using System.Linq;
 using MidiPlayerTK;
 using Random = UnityEngine.Random;
-public static class ShipTrackAssigner
-{
-}
 public struct TransportFrame
 {
     public int barIndex;
@@ -1260,7 +1257,6 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
     {
-//        ShipTrackAssigner.AssignShipsToTracks(selectedShips, tracks.ToList());
         UpdateVisualizer();
     } 
     public InstrumentTrack GetAmbientContextTrack() {
