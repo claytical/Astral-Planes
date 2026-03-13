@@ -114,8 +114,6 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private PhaseStarDustAffect dust;
     [SerializeField] private PhaseStarCravingNavigator cravingNavigator;
     [SerializeField] private float _progressionMul = 1f;
-    private List<float> _petalStartAngles = new();
-    private List<float> _petalTargetAngles = new();
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
     private MazeArchetype _assignedPhase;
@@ -383,15 +381,9 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     void OnEnable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drum != null) drum.OnBinChanged += HandleBinChanged;
         if (drum != null) drum.OnStepPulseN += HandleStepPulse;
     }
     
-    private void HandleBinChanged(int idx, int bins)
-    {
-        // Selection rotation is now driven by charge accumulation, not bin changes.
-        // Kept as subscription stub to avoid breaking DrumTrack event wiring.
-    }
     private float GetTotalCharge()
     {
         float total = 0f;
@@ -486,10 +478,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (visuals) visuals.Initialize(behaviorProfile, this);
         if (motion) motion.Initialize(behaviorProfile, this);
 
-        // Resolve initial craving from profile's dominant role (always present, defaults to Bass)
-        MusicalRole initialCraving = behaviorProfile != null
-            ? behaviorProfile.dominantRole
-            : MusicalRole.Bass;
         if (dust) dust.Initialize(behaviorProfile, this);
         if (drum != null && !_subscribedLoopBoundary)
         {
@@ -1250,7 +1238,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     private void OnDisable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
-        if (drum != null) drum.OnBinChanged -= HandleBinChanged;
         if (drum != null) drum.OnStepPulseN -= HandleStepPulse;
         SafeUnsubscribeAll();
         if (!StarKeepsDustClear) return;
@@ -1400,11 +1387,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
         previewRing.Clear();
 
-// These angle arrays are legacy and unsafe once we shrink.
-        // If you still have them referenced elsewhere, we can keep them, but they must be resized to match previewRing.
-        _petalStartAngles.Clear();
-        _petalTargetAngles.Clear();
-
         if (_baseSortingOrder == 0)
         {
             var baseSr = GetComponentInChildren<SpriteRenderer>(true);
@@ -1477,9 +1459,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                 role = role
             });
 
-            // If you still want these for smooth visual transitions, keep them sized to n.
-            _petalStartAngles.Add(ang);
-            _petalTargetAngles.Add(ang);
         }
 
         currentShardIndex = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
@@ -2106,27 +2085,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             if (!c) continue;
             c.enabled = false;
-        }
-    }
-
-    // Freeze/unfreeze the *root* Rigidbody2D so the star always stops immediately on disarm,
-    // even if PhaseStarMotion2D is on a child object or uses a different Rigidbody2D.
-    private void SetRootPhysicsFrozen(bool frozen)
-    {
-        if (_isDisposing || this == null) return;
-
-        var rb = GetComponent<Rigidbody2D>();
-        if (!rb) return;
-
-        if (frozen)
-        {
-            rb.linearVelocity = Vector2.zero;
-            rb.angularVelocity = 0f;
-            rb.constraints = RigidbodyConstraints2D.FreezeAll;
-        }
-        else
-        {
-            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
     }
 

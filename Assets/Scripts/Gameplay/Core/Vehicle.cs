@@ -158,11 +158,7 @@ public class Vehicle : MonoBehaviour
     [Header("Scale Calibration (Debug)")] 
     [SerializeField] private bool logScaleCalibrationOnAssign = true;
     private bool _scaleCalibrationLogged = false;
-// Replace the frac field with steps
     [Header("Manual Release Timing")]
-    [Range(0f, 2f)]
-    public float manualReleaseWindowSteps = 1f; // legacy: direct-release hit window (steps)
-
     [Tooltip("If true, button press ARMS the next unlit placeholder if it is within Arm Ahead Steps, then the note auto-commits when the playhead reaches that step. This is less twitchy and supports mashy sequences.")]
     [SerializeField] private bool manualReleaseUseArmLock = true;
 
