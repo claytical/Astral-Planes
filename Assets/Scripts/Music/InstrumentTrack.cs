@@ -10,8 +10,8 @@ public class AscensionCohort
     public int windowStartInclusive;
     public int windowEndExclusive;
 
-    // Unity-visible (optional, for debugging)
-    [SerializeField] private List<int> stepsRemainingSerialized = new();
+    // Hidden in inspector — debug aid only; runtime truth is in stepsRemaining (HashSet).
+    [HideInInspector] [SerializeField] private List<int> stepsRemainingSerialized = new();
 
     // Runtime truth
     [System.NonSerialized] public HashSet<int> stepsRemaining;
@@ -132,8 +132,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     [SerializeField]
     private int ascensionLoopsPerExtraBin = 2;
     private NoteSet[] _binNoteSets;
-    [Header("Undeveloped Bin Playback ")]
-    [SerializeField, Range(0f, 1f)] private float undevelopedBinGhostGain = 0.35f; // 0=silent, 1=full repeat
     [Header("Harmony")]
     [Tooltip("If enabled, notes are treated as authored relative to chord index 0 (the 'I' chord), then root-shifted by the current chord before quantization. This makes progressions like I–IV–V change the bass/lead pitch even when the authored notes are static.")]
     public bool rootShiftNotesByChord = true;
@@ -1241,7 +1239,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // Visual: "release" the charged playhead when the burst resolves.
             if (controller != null && controller.noteVisualizer != null)
             {
-                controller.noteVisualizer.TriggerPlayheadReleasePulse();
+                controller.noteVisualizer.TriggerPlayheadReleasePulse(assignedRole);
             }
 
             var hd = GameFlowManager.Instance?.harmony;

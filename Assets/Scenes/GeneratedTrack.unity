@@ -181,7 +181,7 @@ MonoBehaviour:
   _playheadEnergy01: 0
   _playheadEnergyLerpSpeed: 4
   releasePulseSeconds: 0.18
-  releasePulseColor: {r: 1, g: 0.2, b: 0.9, a: 1}
+  releasePulseColorFallback: {r: 1, g: 0.2, b: 0.9, a: 1}
   notePrefab: {fileID: 4452279037497567512, guid: ece60c6a349a846e085a4f328163340b,
     type: 3}
   noteTetherPrefab: {fileID: 4452279037497567512, guid: 02e436cf9f25e4670b99977e63d7df29,
@@ -15449,7 +15449,6 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 8
   ascensionLoopsPerExtraBin: 2
-  undevelopedBinGhostGain: 0.35
   rootShiftNotesByChord: 1
   spawnedCollectables: []
   currentBurstId: 0
@@ -16000,7 +15999,6 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  undevelopedBinGhostGain: 0.35
   rootShiftNotesByChord: 1
   spawnedCollectables: []
   currentBurstId: 0
@@ -16131,7 +16129,6 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  undevelopedBinGhostGain: 0.35
   rootShiftNotesByChord: 1
   spawnedCollectables: []
   currentBurstId: 0
@@ -16517,17 +16514,12 @@ MonoBehaviour:
     spriteScaleOutSeconds: 1
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.1
-  vehicleErodeRadius: 1
-  vehicleErodePerTick: 5
-  mineNodeErodeRadius: 1
   mineNodeErodePerTick: 10
   dustFootprintMul: 1.1
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
-  imprintBlendRadius: 1
-  imprintNeighborWeight: 0.55
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256
@@ -16538,7 +16530,6 @@ MonoBehaviour:
   tintDirtyMarkRadius: 1
   maxSpawnMillisPerFrame: 1.2
   hexGrowInSeconds: 0.45
-  dustQueryRadiusWorld: 1.25
   vehicleMask:
     serializedVersion: 2
     m_Bits: 0
@@ -17406,7 +17397,6 @@ MonoBehaviour:
   - {fileID: 627412777}
   - {fileID: 652946508}
   noteVisualizer: {fileID: 45202786}
-  cohortTriggerRole: 2
   cohortWindowFraction: 0.5
   gravityVoidPrefab: {fileID: 9142743768792165380, guid: 3c8cf7e4f7b0f479b9cd36dffc6bdbe5,
     type: 3}
@@ -17547,7 +17537,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridWidth: 40
   gridHeight: 20
-  cellSize: 1
+  cellSize: 0.5
 --- !u!164 &1354683692
 AudioReverbFilter:
   m_ObjectHideFlags: 0
@@ -18633,7 +18623,6 @@ MonoBehaviour:
   maxLoopMultiplier: 4
   ascendLoopCount: 1
   ascensionLoopsPerExtraBin: 2
-  undevelopedBinGhostGain: 0.35
   rootShiftNotesByChord: 1
   spawnedCollectables: []
   currentBurstId: 0

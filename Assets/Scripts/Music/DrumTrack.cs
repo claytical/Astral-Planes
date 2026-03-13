@@ -67,7 +67,7 @@ public class DrumTrack : MonoBehaviour
     public double leaderStartDspTime { get; private set; }
     public List<MotifSnapshot> SessionPhases = new();
     public List<MineNode> activeMineNodes = new List<MineNode>();
-    public bool isPhaseStarActive;
+    [HideInInspector] public bool isPhaseStarActive;
     public int currentStep;
 
     [Header("Dust Band Mapping (Viewport Y)")] [Range(0f, 1f)] [SerializeField]
@@ -1186,7 +1186,7 @@ public class DrumTrack : MonoBehaviour
 
 public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
 {
-    if (isPhaseStarActive)
+    if (_star != null)
     {
         Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
         return;

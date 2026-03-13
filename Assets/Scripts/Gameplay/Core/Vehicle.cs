@@ -591,7 +591,7 @@ public class Vehicle : MonoBehaviour
         if (viz != null)
         {
             viz.PulseMarkerSpecial(p.track, targetAbsStep);
-            viz.TriggerPlayheadReleasePulse();
+            viz.TriggerPlayheadReleasePulse(p.track.assignedRole);
         }
 
         // Occupied-step reward accent.
