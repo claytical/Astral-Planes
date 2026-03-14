@@ -32,13 +32,7 @@ public class CosmicDust : MonoBehaviour {
         particleGrowInSeconds = 1.00f,
         fadeOutSeconds = 0.20f
     };
-    [SerializeField] private float dustPluckInitialCooldown = 1f;
-    [SerializeField] private float dustPluckMinCooldown = 0.5f;
-    [SerializeField] private int dustPluckInitialDurationTicks = 180;
-    [SerializeField] private int dustPluckMaxStage = 6;
-
     private float _nextDustPluckTime = -999f;
-    private int _dustPluckStage = 0;
     private Vehicle _currentPluckVehicle = null;
     public float Charge01 { get; private set; } = 1f;
     public MusicalRole Role { get; private set; } = MusicalRole.None;
@@ -119,7 +113,6 @@ public class CosmicDust : MonoBehaviour {
     private float _workSigned01 = 0f;
 
     [Header("Work / Preview (Boost Path)")]
-    [SerializeField] private float previewWorkHoldSeconds = 0.10f;
     private Coroutine _previewWorkRoutine;
     private Vector3 _initialLocalScale = Vector3.one;
     private bool _cachedInitialScale;
@@ -143,13 +136,10 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private bool enableVehicleCompression = true;
     [SerializeField, Range(0f, 0.75f)] private float noseCompressAmount = 0.22f;
     [SerializeField, Range(0f, 0.5f)] private float noseBulgeAmount = 0.10f;
-    [SerializeField] private float noseCompressEnterLerp = 18f;
-    [SerializeField] private float noseCompressExitLerp = 8f;
     [SerializeField] private float noseCompressMaxOffsetWorld = 0.16f;
     [SerializeField] private float noseProbeWorld = 0.55f;
     [SerializeField] private float noseCompressSpeedForFull = 10f;
     [SerializeField] private float noseCompressBoostBonus = 0.20f;
-    [SerializeField] private float noseCompressHoldSeconds = 0.06f;
     private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
     private Vector3 _dustSpriteBaseLocalPos;
     private Vector3 _noseVisualScale = Vector3.one;
@@ -167,8 +157,6 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private float noseCompressReleaseSharpness = 16f;
     // Carve/disable must be authoritative, so we cache all colliders in the hierarchy.
     private Collider2D[] _cachedColliders;
-    [SerializeField] private int solidLayer = 0;       // Default or your "Dust" layer
-    [SerializeField] private int nonBlockingLayer = 2; // Ignore Raycast or a custom non-blocking layer
     private BoxCollider2D _box;
     private CircleCollider2D _circle;
     private float _nonBoostClearSeconds;
@@ -195,8 +183,6 @@ public class CosmicDust : MonoBehaviour {
 // Canonical/rest tint.
     private Color _currentTint = Color.white;
 
-    [SerializeField] private int epochId;
-    [SerializeField] private float stayForceEvery = 0.05f; // seconds
     private float _stayForceUntil;
     private bool _isBreaking;
     [SerializeField] private float _baseEmission = 1;
@@ -1245,7 +1231,6 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
 
             if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
             {
-                TriggerDenyTintPulse(Mathf.Lerp(0.5f, 1.28f, severity));
 
                 float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
 

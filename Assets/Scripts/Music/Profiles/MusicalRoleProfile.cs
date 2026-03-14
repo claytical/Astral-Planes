@@ -12,10 +12,8 @@ public enum MusicalRole
 [System.Serializable]
 public struct DustColorSet
 {
-    public Color baseColor;     // neutral presence
-    public Color chargeColor;   // boost → brighten
-    public Color denyColor;     // bump → darken / assert
-    public Color shadowColor;   // regrowth / memory / afterimage
+    public Color baseColor;    // neutral presence
+    public Color shadowColor;  // regrowth / memory / deny feedback
 }
 
 [CreateAssetMenu(menuName = "Astral Planes/Musical Role Profile", fileName = "NewMusicalRoleProfile")]

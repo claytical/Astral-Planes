@@ -16515,7 +16515,7 @@ MonoBehaviour:
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.1
   mineNodeErodePerTick: 10
-  dustFootprintMul: 1.1
+  dustFootprintMul: 1.143
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
@@ -17277,7 +17277,7 @@ MonoBehaviour:
   burnMultipleAtFullIntensity: 2.5
   drumLoopBPM: 120
   totalSteps: 32
-  gridPadding: 1
+  gridPadding: 1.1
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
@@ -18613,7 +18613,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 12
+  preset: 15
   bank: 0
 --- !u!1 &1736554591
 GameObject:
