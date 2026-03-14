@@ -197,6 +197,7 @@ public class CosmicDust : MonoBehaviour {
 private Coroutine _tintPulseRoutine;
 private int _tintPulseToken = 0;
 private bool _tintPulseActive = false;
+private Coroutine _jiggleRoutine;
     void Awake() {
         if (!_cachedInitialScale)
         {
@@ -711,6 +712,7 @@ private bool _tintPulseActive = false;
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
+        if (_jiggleRoutine != null) { StopCoroutine(_jiggleRoutine); _jiggleRoutine = null; }
         CancelTintPulse(restoreToBase: false);
         _isBreaking = false;
         regrowAlphaCapped = false;
@@ -1118,6 +1120,35 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
         _tintPulseRoutine = null;
     }
 }
+    private void TriggerJiggle()
+{
+    if (_jiggleRoutine != null)
+        StopCoroutine(_jiggleRoutine);
+    _jiggleRoutine = StartCoroutine(JiggleRoutine());
+}
+
+private IEnumerator JiggleRoutine()
+{
+    const float duration  = 0.28f;
+    const float frequency = 28f;   // oscillations per second
+    const float amplitude = 0.18f; // peak scale offset
+
+    Vector3 baseScale = _dustSpriteBaseVisualScale;
+    float elapsed = 0f;
+
+    while (elapsed < duration)
+    {
+        elapsed += Time.deltaTime;
+        float decay  = 1f - Mathf.Clamp01(elapsed / duration);
+        float offset = Mathf.Sin(elapsed * frequency * Mathf.PI * 2f) * amplitude * decay;
+        SetBaseSpriteScale(baseScale * (1f + offset));
+        yield return null;
+    }
+
+    SetBaseSpriteScale(baseScale);
+    _jiggleRoutine = null;
+}
+
     private void ApplyParticleFootprint()
     {
         if (visual.particleSystem == null) return;
@@ -1227,6 +1258,8 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
             {
                 _currentPluckVehicle = vehicle;
                 _nextDustPluckTime = Time.time;
+                TriggerDenyTintPulse(1);
+                TriggerJiggle();
             }
 
             if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
