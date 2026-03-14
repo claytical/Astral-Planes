@@ -769,14 +769,9 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             return;
         }
 
-        // Optional: also require a clean global gate if you want bridge to be impossible
-        // until all collectables/expansions are done (usually desirable).
-        if (AnyCollectablesInFlightGlobal())
-        {
-            DBG("BeginBridgeNow: BLOCKED (collectables in flight)");
-            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
-            return;
-        }
+        // CIF is intentionally not gated here: once the last node is captured (_activeNode == null),
+        // remaining collectables from that node resolve independently of phase progression.
+        // Blocking on CIF here caused the bridge to never start when notes took time to clear.
 
         if (AnyExpansionPendingGlobal())
         {
@@ -906,10 +901,12 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         // ------------------------------------------------------------
         if (_awaitingCollectableClear)
         {
-            // If collectables exist, we're legitimately waiting.
-            if (AnyCollectablesInFlightGlobal())
+            // If collectables exist AND the last node is still live, wait.
+            // But if the node is already captured (_activeNode == null), fall through to
+            // bridge logic even with stray collectables still in flight.
+            if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _ejectionInFlight))
             {
-                Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF)");
+                Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
                 Disarm(DisarmReason.NodeResolving, _lockedTint);
                 return;
             }
@@ -1052,8 +1049,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
         if (!_advanceStarted && _state != PhaseStarState.BridgeInProgress && !HasShardsRemaining() && noShardsRemain0
-            && !_awaitingCollectableClear
-            && !AnyCollectablesInFlightGlobal()
+            && _activeNode == null && !_ejectionInFlight
             && !AnyExpansionPendingGlobal())
         {
             Debug.LogWarning(
@@ -1762,6 +1758,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
         _starCharge[ejectedRole] = 0f;
+        _tastedRoles.Remove(ejectedRole); // ejection spends the charge; role must re-earn its floor
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;

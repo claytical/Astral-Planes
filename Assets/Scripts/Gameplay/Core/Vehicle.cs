@@ -143,6 +143,16 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float vehiclePlacementOscillationSpeed = 1f;
 
     private Color _vehicleDefaultColor = Color.white;
+
+    /// <summary>
+    /// Sets both the sprite color and the resonance baseline so UpdateVehiclePlacementResonance
+    /// lerps toward the player's chosen color instead of back to the prefab white.
+    /// </summary>
+    public void SetBaseColor(Color c)
+    {
+        _vehicleDefaultColor = c;
+        if (baseSprite != null) baseSprite.color = c;
+    }
     [Header("Dust Spawn Rest Pocket")]
     [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
     [SerializeField] private bool carveSpawnRestPocket = true;
