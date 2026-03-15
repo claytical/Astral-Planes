@@ -623,6 +623,10 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
     if (profileForPhase != null)
         dust.ApplyProfile(profileForPhase);
 
+    // Apply motif active roles to dust so Voronoi and regrowth use only this motif's roles.
+    var motifRoles = activeDrumTrack?._star?.GetMotifActiveRoles();
+    dust.ApplyActiveRoles(motifRoles);
+
     // 4) Build maze.
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(

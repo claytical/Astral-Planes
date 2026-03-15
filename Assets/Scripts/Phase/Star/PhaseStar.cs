@@ -51,8 +51,7 @@ struct PreviewShard
 public class PhaseStar : MonoBehaviour
 {
     // -------------------- Serialized config --------------------
-    [Header("Profiles & Prefs")] [SerializeField]
-    private SpawnStrategyProfile spawnStrategyProfile;
+    [Header("Profiles & Prefs")]
     [SerializeField, Range(0f, 0.5f)] private float dominantRoleSwitchDelta = 0.10f;
 
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
@@ -144,6 +143,8 @@ public class PhaseStar : MonoBehaviour
 
     private bool _bubbleActive;
     private float _bubbleRadiusWorld;
+    // World-space center of the active bubble; set at activation and held fixed (gravity void uses MineNode capture position).
+    private Vector2 _bubbleCenterWorld;
 
 // Static “global query” (simple + reliable for Vehicle)
     private static bool s_bubbleActive;
@@ -216,6 +217,15 @@ public class PhaseStar : MonoBehaviour
     private int _baseSortingOrder;
     [SerializeField] private int _perPetalLayerStep;
     public MotifProfile AssignedMotif => _assignedMotif;
+
+    public List<MusicalRole> GetMotifActiveRoles() =>
+        _assignedMotif != null ? _assignedMotif.GetActiveRoles() : null;
+
+    private int GetEffectiveNodesPerStar()
+    {
+        if (_assignedMotif != null) return Mathf.Max(1, _assignedMotif.nodesPerStar);
+        return behaviorProfile != null ? behaviorProfile.nodesPerStar : 1;
+    }
 
     private GameFlowManager gfm;
     // -------------------- Lifecycle --------------------
@@ -437,15 +447,13 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         }
 
-        spawnStrategyProfile?.ResetForNewStar();
-
         // Clear charge state for this new star.
         _starCharge.Clear();
         _tastedRoles.Clear();
 
         _shardsEjectedCount = 0;
 
-        BuildPhasePlan(_assignedPhase, Mathf.Max(1, behaviorProfile.nodesPerStar));
+        BuildPhasePlan(_assignedPhase, GetEffectiveNodesPerStar());
         PrepareNextDirective();
         // ensure subcomponents are present if assigned
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
@@ -559,13 +567,13 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             }
         }
 
-// ---- Keep bubble center locked to star world position every frame ----
-// Bubble is a gravity-void refuge zone and should track the drifting star cleanly.
+// ---- Keep bubble center locked to its activation position every frame ----
+// Gravity-void bubbles are anchored to the MineNode capture position, not the drifting star.
         if (_bubbleActive)
         {
-            s_bubbleCenter = transform.position;
+            s_bubbleCenter = _bubbleCenterWorld;
             // Also nudge the bubble root so its shimmer particles stay centred.
-            visuals?.UpdateBubblePosition(transform.position);
+            visuals?.UpdateBubblePosition(_bubbleCenterWorld);
         }
 
         // ---- Charge-alpha: each shard's opacity = its role's accumulated charge ----
@@ -712,7 +720,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             return;
         }
 
-        bool noShardsRemain = _shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar);
+        bool noShardsRemain = _shardsEjectedCount >= GetEffectiveNodesPerStar();
 
         // Final shard: start bridge immediately on last collected note.
         if (noShardsRemain)
@@ -987,9 +995,9 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
             bool noShardsRemain =
                 (previewRing == null || previewRing.Count == 0) ||
-                (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+                (_shardsEjectedCount >= GetEffectiveNodesPerStar());
             int prCount = (previewRing != null ? previewRing.Count : -1);
-            int nps = Mathf.Max(1, behaviorProfile.nodesPerStar);
+            int nps = GetEffectiveNodesPerStar();
 
             Debug.LogWarning(
                 $"[PS:LB/RECOVERY] timedOut={timedOut} shardsEjected={_shardsEjectedCount}/{nps} " +
@@ -1036,9 +1044,12 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         // ------------------------------------------------------------
         // 3) Deterministic bridge trigger (end-of-star)
         // ------------------------------------------------------------
-        // If the star is complete, we should bridge on the next clean loop boundary// even if a specific latch flag was not set (prevents “stuck not bridging”).bool shardsComplete = behaviorProfile != null && behaviorProfile.nodesPerStar > 0 && _shardsEjectedCount >= behaviorProfile.nodesPerStar;
+        // If the star is complete, we should bridge on the next clean loop boundary
+        // even if a specific latch flag was not set (prevents “stuck not bridging”).
+        int _nps = GetEffectiveNodesPerStar();
+        bool shardsComplete = _nps > 0 && _shardsEjectedCount >= _nps;
         bool noShardsRemain0 = (previewRing == null || previewRing.Count == 0) ||
-                               (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+                               (_shardsEjectedCount >= _nps);
         // HARD BLOCK: if a MineNode is still active (not captured/resolved), we cannot advance.
         // This enforces "no skip capture" as a player choice.
         if (_activeNode != null || _ejectionInFlight)
@@ -1119,7 +1130,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (!_isArmed)
         {
             // If the plan is fully completed, stay quiet and let the bridge path take over.
-            if (_shardsEjectedCount >= behaviorProfile.nodesPerStar && behaviorProfile.nodesPerStar > 0)
+            if (_shardsEjectedCount >= GetEffectiveNodesPerStar() && GetEffectiveNodesPerStar() > 0)
             {
                 Debug.Log($"[PS:LB] -> Not Armed, Ejected Shards ");
                 return;
@@ -1209,27 +1220,22 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     private void BuildPhasePlan(MazeArchetype phase, int shardCount)
     {
         _phasePlanRoles = new List<MusicalRole>();
-        if (!spawnStrategyProfile) return;
+
+        var activeRoles = _assignedMotif?.GetActiveRoles();
+        if (activeRoles == null || activeRoles.Count == 0)
+            activeRoles = new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
 
         int target = Mathf.Max(1, shardCount);
-
         for (int i = 0; i < target; i++)
-        {
-            // “always balanced” model: rebuild from the authored strategy order,
-            // repeated/cropped to the CURRENT remaining shard count.
-            MusicalRole role = spawnStrategyProfile.PeekRoleAtOffset(i, target);
-            _phasePlanRoles.Add(role);
-        }
+            _phasePlanRoles.Add(activeRoles[i % activeRoles.Count]);
 
-        Trace($"BuildPhasePlan: planned {_phasePlanRoles.Count}/{target} roles (phase={phase})");
     }
 
-    private bool HasShardsRemaining() => _shardsEjectedCount < behaviorProfile.nodesPerStar;
+    private bool HasShardsRemaining() => _shardsEjectedCount < GetEffectiveNodesPerStar();
 
     private int GetRemainingShardCount()
     {
-        if (behaviorProfile == null) return 0;
-        int total = Mathf.Max(0, behaviorProfile.nodesPerStar);
+        int total = Mathf.Max(0, GetEffectiveNodesPerStar());
         int rem = total - Mathf.Max(0, _shardsEjectedCount);
         return Mathf.Clamp(rem, 0, total);
     }
@@ -1266,7 +1272,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         _cachedTrack = null;
         _cachedIsSuperNode = false;
         
-        if (_drum == null || spawnStrategyProfile == null) return;
+        if (_drum == null) return;
 
         MusicalRole role = GetPlannedRoleForHighlightedShard();
 
@@ -1337,10 +1343,9 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
         // Ensure we have a plan to visualize.
-        if (_phasePlanRoles == null || _phasePlanRoles.Count != behaviorProfile.nodesPerStar)
+        if (_phasePlanRoles == null || _phasePlanRoles.Count != GetEffectiveNodesPerStar())
         {
-            // If you have _assignedPhase or equivalent, pass it; otherwise pass the active phase you already cache.
-            BuildPhasePlan(_assignedPhase, Mathf.Max(1, behaviorProfile.nodesPerStar));
+            BuildPhasePlan(_assignedPhase, GetEffectiveNodesPerStar());
         }
 
         int n = (_phasePlanRoles != null) ? _phasePlanRoles.Count : 0;
@@ -1552,12 +1557,14 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             }
         }
     }
-    public void SetGravityVoidSafetyBubbleActive(bool active)
+    public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
     {
         Debug.Log($"[BUBBLE] SetGravityVoidSafetyBubbleActive active={active} star={name} frame={Time.frameCount}");
-        if (active) ActivateSafetyBubble();
+        if (active) ActivateSafetyBubble(center);
         else DeactivateSafetyBubble();
     }
+
+    public int GetSafetyBubbleRadiusCells() => SafetyBubbleRadiusCells;
 
     private Color ResolvePreviewShadowColor()
     {
@@ -1850,7 +1857,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
         _shardsEjectedCount++;
 
-        bool isFinal = (_shardsEjectedCount >= Mathf.Max(1, behaviorProfile.nodesPerStar));
+        bool isFinal = (_shardsEjectedCount >= GetEffectiveNodesPerStar());
         Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving, _cachedTrack.trackColor);
         ActivateSafetyBubble();
         if (_cachedIsSuperNode)
@@ -2064,7 +2071,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
     }
 
-    private void ActivateSafetyBubble()
+    private void ActivateSafetyBubble(Vector3 center = default)
     {
         if (!SafetyBubbleEnabled) return;
         Debug.Log($"[BUBBLE] ActivateSafetyBubble star={name} frame={Time.frameCount}");
@@ -2076,12 +2083,16 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         _bubbleActive = true;
 
+        // Use provided center (e.g. MineNode capture position for gravity void),
+        // falling back to star position for non-void calls.
+        _bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
+
         s_bubbleActive = true;
-        s_bubbleCenter = transform.position;
+        s_bubbleCenter = _bubbleCenterWorld;
         s_bubbleRadiusWorld = _bubbleRadiusWorld;
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint);
+        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint, _bubbleCenterWorld);
 
         // IMPORTANT:
         // Safety bubble is now a gravity-void refuge zone only.

@@ -15494,7 +15494,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 0
-  preset: 33
+  preset: 1
   bank: 0
 --- !u!1 &371718999
 GameObject:
@@ -16059,7 +16059,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 19
+  preset: 5
   bank: 0
 --- !u!1 &652946506
 GameObject:
@@ -16174,7 +16174,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 34
+  preset: 3
   bank: 0
 --- !u!1 &657963290
 GameObject:
@@ -17349,7 +17349,7 @@ MonoBehaviour:
   commitStingerPitchJitter: 0.02
   commitStingerDefault: {fileID: 8300000, guid: 775b86890cb5041ee89cf2f109f69e40,
     type: 3}
-  commitStingerBass: {fileID: 8300000, guid: fd34c6928641945afbfe7cca1e2effc6, type: 3}
+  commitStingerBass: {fileID: 0}
   commitStingerLead: {fileID: 8300000, guid: 51ad531b2be9b4e89a5cb1d4de4429c5, type: 3}
   commitStingerHarmony: {fileID: 8300000, guid: 0f35a54cb48d4445a9396b3c1df83269,
     type: 3}
@@ -18613,7 +18613,7 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 15
+  preset: 7
   bank: 0
 --- !u!1 &1736554591
 GameObject:

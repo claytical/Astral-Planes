@@ -122,6 +122,7 @@ public class CosmicDustGenerator : MonoBehaviour
     // Used by CommitRegrowCell to pick the least-represented role when a cell
     // has no role imprint (e.g. vehicle-carved cells whose imprint was removed).
     // ---------------------------------------------------------------------------
+    private List<MusicalRole> _activeRoles; // set from motif at phase start via ApplyActiveRoles
     private readonly Dictionary<MusicalRole, int> _solidCountByRole = new Dictionary<MusicalRole, int>
     {
         { MusicalRole.Bass,    0 },
@@ -417,6 +418,29 @@ public class CosmicDustGenerator : MonoBehaviour
 
         return processed;
     }
+
+    /// <summary>
+    /// Erodes all Solid cells within <paramref name="radiusCells"/> of <paramref name="centerGP"/>
+    /// so the gravity-void safety bubble zone is visually clear when the void begins.
+    /// Cells may regrow normally after the void ends.
+    /// </summary>
+    public void ClearBubbleZone(Vector2Int centerGP, int radiusCells)
+    {
+        if (radiusCells <= 0 || _cellState == null) return;
+        EnsureCellGrid();
+        var phase = GetCurrentPhaseSafe();
+        int rSq = radiusCells * radiusCells;
+        for (int dy = -radiusCells; dy <= radiusCells; dy++)
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        {
+            if (dx * dx + dy * dy > rSq) continue;
+            var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+            if (!IsInBounds(gp)) continue;
+            if (TryGetCellState(gp, out var st) && st == DustCellState.Solid)
+                ClearCell(gp, DustClearMode.FadeAndHide, dustTimings.spriteScaleOutSeconds, scheduleRegrow: true, phase);
+        }
+    }
+
     /// <summary>
     /// Called by CosmicDust.DrainCharge when a cell's visual alpha drops below the
     /// solid-visibility threshold (0.55). The cell is physically drained but was
@@ -1142,15 +1166,15 @@ public class CosmicDustGenerator : MonoBehaviour
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
 
-        // Resolve dominant role from the active profile; fall back to Bass.
-        MusicalRole dominant = (_activeProfile != null)
-            ? _activeProfile.dominantRole
-            : MusicalRole.Bass;
+        // Resolve active roles from motif; fall back to all 4 roles.
+        IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
+            ? _activeRoles
+            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
 
         // --- Role assignment: currently Voronoi for all archetypes.
         // Future: switch on phase to use archetype-specific distributions
         // (e.g. radial wedges for Release, striped for Pop, noise blobs for Wildcard).
-        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, dominant, phase);
+        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, roles, phase);
 
         // --- Write imprints ---
         for (int i = 0; i < cells.Count; i++)
@@ -1174,7 +1198,7 @@ public class CosmicDustGenerator : MonoBehaviour
             };
         }
 
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: phase={phase} dominant={dominant} cells={cells.Count} imprinted={roleMap.Count}");
+        Debug.Log($"[MAZE] BuildMazeRoleImprints: phase={phase} activeRoles=[{string.Join(",", roles)}] cells={cells.Count} imprinted={roleMap.Count}");
     }
 
     public IEnumerator GenerateMazeForPhaseWithPaths(MazeArchetype phase, Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
@@ -1863,10 +1887,14 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         MusicalRole best = MusicalRole.Bass;
         int bestCount = int.MaxValue;
-        // Stable iteration order; tie-break randomly so all roles are equally likely.
-        var roles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+
+        // Use only motif-active roles so regrowth doesn't introduce roles the motif doesn't use.
+        var roles = (_activeRoles != null && _activeRoles.Count > 0)
+            ? new List<MusicalRole>(_activeRoles)
+            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+
         // Shuffle order for tie-breaking
-        for (int i = roles.Length - 1; i > 0; i--)
+        for (int i = roles.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
             (roles[i], roles[j]) = (roles[j], roles[i]);
@@ -1878,25 +1906,32 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         return best;
     }
+
     private MusicalRole GetLeastDenseRoleExcluding(MusicalRole excluded)
     {
         MusicalRole best = MusicalRole.Bass;
         int bestCount = int.MaxValue;
-    
-        foreach (var kv in _solidCountByRole)
+
+        // Use only motif-active roles so regrowth doesn't introduce roles the motif doesn't use.
+        var roles = (_activeRoles != null && _activeRoles.Count > 0)
+            ? (IReadOnlyList<MusicalRole>)_activeRoles
+            : new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+
+        foreach (var r in roles)
         {
-            if (kv.Key == excluded) continue;
-            if (kv.Value < bestCount)
+            if (r == excluded) continue;
+            int cnt = _solidCountByRole.TryGetValue(r, out var c) ? c : 0;
+            if (cnt < bestCount)
             {
-                bestCount = kv.Value;
-                best = kv.Key;
+                bestCount = cnt;
+                best = r;
             }
-            else if (kv.Value == bestCount && Random.value > 0.5f)
+            else if (cnt == bestCount && Random.value > 0.5f)
             {
-                best = kv.Key; // random tie-break
+                best = r; // random tie-break
             }
         }
-    
+
         return best;
     }
     private int TotalSolidCount()
@@ -2023,6 +2058,13 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         return _mazeTint;
     }
+    public void ApplyActiveRoles(IReadOnlyList<MusicalRole> roles)
+    {
+        _activeRoles = roles != null && roles.Count > 0
+            ? new List<MusicalRole>(roles)
+            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+    }
+
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;

@@ -58,6 +58,8 @@ public class InstrumentTrackController : MonoBehaviour
 // Optionally track current outer radius for VFX scaling.
     private int _gravityVoidCurrentOuterR;
 
+    [Header("Gravity Void Rings")]
+    [SerializeField, Min(1)] private int voidRingWidthCells = 2;
     [Header("Gravity Void → Dust Imprint")]
     [SerializeField] private float gravityVoidImprintTickSeconds = 0.05f;
     private Coroutine _gravityVoidRoutine;
@@ -68,6 +70,8 @@ public class InstrumentTrackController : MonoBehaviour
     private float _gravityVoidDustHardness01;
     private float _gravityVoidGrowSecondsRuntime = -1f;
     private int   _gravityVoidMaxRadiusRuntime   = -1;
+    // Inner radius (cells) where void ring growth begins — set to safety bubble radius so rings grow outward from the bubble perimeter.
+    private int   _gravityVoidBubbleInnerR       = 0;
     private bool _hasLastTransportFrame;
     private TransportFrame _lastTransportFrame;
     private double _lastTransportDsp;
@@ -267,22 +271,35 @@ public class InstrumentTrackController : MonoBehaviour
             _gravityVoidRoutine = null;
         }
 
-        // Safety bubble: activate on the PhaseStar while the void is expanding.
-        // Players need a refuge zone — the star is the landmark they navigate toward.
+        // Safety bubble: activate at the MineNode capture position while the void is expanding.
+        // The bubble is the refuge zone; the void will grow outward from its perimeter.
         {
             var gfm = GameFlowManager.Instance;
             var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
             if (star != null)
             {
-                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble on star={star.name}");
-                star.SetGravityVoidSafetyBubbleActive(true);
+                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at MineNode pos={_gravityVoidCenterWorld} star={star.name}");
+                star.SetGravityVoidSafetyBubbleActive(true, _gravityVoidCenterWorld);
+                _gravityVoidBubbleInnerR = star.GetSafetyBubbleRadiusCells();
             }
             else
             {
                 Debug.Log("[BUBBLE] BeginGravityVoid → no active PhaseStar found; bubble skipped");
+                _gravityVoidBubbleInnerR = 0;
             }
+
+            // Clear any existing dust inside the bubble refuge zone.
+            if (_gravityVoidHasCenterGP && _gravityVoidBubbleInnerR > 0)
+                gfm?.dustGenerator?.ClearBubbleZone(_gravityVoidCenterGP, _gravityVoidBubbleInnerR);
+
+            // Compute max outer radius from ring formula so VFX sizes correctly.
+            var motifRoles = gfm?.activeDrumTrack?._star?.GetMotifActiveRoles();
+            int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
+            int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
+            int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
+            _gravityVoidMaxRadiusRuntime = _gravityVoidBubbleInnerR + totalRings * voidRingWidthCells;
         }
-        
+
         _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
     }
     public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
@@ -331,143 +348,76 @@ public class InstrumentTrackController : MonoBehaviour
 
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
-        int _lastGravityVoidChordBin = -1;
         var gfm = GameFlowManager.Instance;
-        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
-        if (dustGen == null)
-            yield break;
+        var dustGen = gfm?.dustGenerator;
+        if (dustGen == null) yield break;
 
-        float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
+        // Get motif-active roles (falls back to all 4 if no motif).
+        var star = gfm?.activeDrumTrack?._star;
+        IReadOnlyList<MusicalRole> activeRoles = star?.GetMotifActiveRoles();
+        if (activeRoles == null || activeRoles.Count == 0)
+            activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
 
-        // Tracks the outermost radius already committed to the grid so we only ever
-        // pass new annuli to GrowVoidDustDiskFromGrid (innerRadiusCellsExclusive).
-        int completedOuterR = 0;
-        int ringIndex = 0;
+        int N = activeRoles.Count;
+        int W = voidRingWidthCells;
+        int ringsPerSubseq = Mathf.Max(1, N / 2);
+        int totalBins = (_gravityVoidOwner != null) ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier) : 1;
 
-        // Which bin boundary we have already fired a burst for. Prevents re-firing
-        // multiple times within the same bin while the routine ticks faster than a bin.
+        int completedRings = 0;
         int lastBurstBin = -1;
-
-        // How many total bins this expansion spans (1, 2, or more).
-        // Resolved once from the owner at routine start; stable for its lifetime.
-        int totalExpansionBins = (_gravityVoidOwner != null)
-            ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier)
-            : 1;
+        float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
 
         while (_gravityVoidOwner != null)
         {
-            // Keep VFX positioned and scaled.
             SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
             int playheadBin = GetTransportFrame().playheadBin;
 
-            // ---------------------------------------------------------------
-            // Chord pulse — fire once per bin boundary (unchanged behaviour).
-            // ---------------------------------------------------------------
-            if (playheadBin != _lastGravityVoidChordBin)
-            {
-                _lastGravityVoidChordBin = playheadBin;
-                int chordSize = Mathf.Clamp(2 + playheadBin, 2, 5);
-            }
-
-            // ---------------------------------------------------------------
-            // Bin-boundary dust burst.
-            //
-            // Coverage targets (playheadBin is 0-based within the expansion):
-            //   Bin 0 — first bin:    30 % of grid area  (r = sqrt(0.30 * w*h / π))
-            //   Bin 1 — middle bins:  50 % of grid area  (r = sqrt(0.50 * w*h / π))
-            //   Final bin:            80 % of grid area  (r = sqrt(0.80 * w*h / π))
-            //
-            // Each burst fires once per bin crossing and grows only the new
-            // annulus from completedOuterR outward to the new target radius.
-            // MusicalRole is set per-cell by GrowVoidDustDiskFromGrid via imprintRole.
-            // ---------------------------------------------------------------
             if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
             {
                 lastBurstBin = playheadBin;
 
-                int w = dustGen.GridW;
-                int h = dustGen.GridH;
+                int ringsThisBin = (playheadBin == 0) ? N : ringsPerSubseq;
+                float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
 
-                // Half-diagonal so bursts can reach every corner of the grid.
-                int maxPossibleR = Mathf.CeilToInt(Mathf.Sqrt(w * w + h * h) * 0.5f);
-
-                int targetOuterR;
-                bool isFinalBin = (playheadBin >= totalExpansionBins - 1);
-
-                if (playheadBin == 0)
+                _vehicleCellsScratch.Clear();
+                var vehicles = FindObjectsOfType<Vehicle>();
+                for (int i = 0; i < vehicles.Length; i++)
                 {
-                    // First burst: 30 % of grid area — immediately visible spread.
-                    float r30 = Mathf.Sqrt(0.30f * w * h / Mathf.PI);
-                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r30), 1, maxPossibleR);
-                }
-                else if (!isFinalBin)
-                {
-                    // Intermediate burst: ~50 % of grid area.  r = sqrt(0.50 * w*h / π)
-                    float r50 = Mathf.Sqrt(0.5f * w * h / Mathf.PI);
-                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r50), completedOuterR + 1, maxPossibleR);
-                }
-                else
-                {
-                    // Final burst: ~80 % of grid area.  r = sqrt(0.80 * w*h / π)
-                    float r80 = Mathf.Sqrt(0.80f * w * h / Mathf.PI);
-                    targetOuterR = Mathf.Clamp(Mathf.RoundToInt(r80), completedOuterR + 1, maxPossibleR);
+                    var v = vehicles[i];
+                    if (v != null && v.isActiveAndEnabled && gfm?.activeDrumTrack != null)
+                        _vehicleCellsScratch.Add(gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
                 }
 
-                _gravityVoidCurrentOuterR = targetOuterR;
-
-                if (targetOuterR > completedOuterR)
+                for (int r = 0; r < ringsThisBin; r++)
                 {
-                    // Grow-in time spans the remainder of this bin so cells finish
-                    // solidifying before the next bin crosses.
-                    float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+                    int globalRingIdx = completedRings + r;
+                    int innerR = _gravityVoidBubbleInnerR + globalRingIdx * W;
+                    int outerR = innerR + W;
+                    var ringRole    = activeRoles[globalRingIdx % N];
+                    var roleProfile = MusicalRoleProfileLibrary.GetProfile(ringRole);
 
-                    // Vehicle positions — avoid spawning directly on players.
-                    _vehicleCellsScratch.Clear();
-                    var vehicles = FindObjectsOfType<Vehicle>();
-                    for (int i = 0; i < vehicles.Length; i++)
-                    {
-                        var v = vehicles[i];
-                        if (v == null || !v.isActiveAndEnabled) continue;
-                        var drum = gfm?.activeDrumTrack;
-                        if (drum != null)
-                            _vehicleCellsScratch.Add(drum.WorldToGridPosition(v.transform.position));
-                    }
-
-                    // Resolve role and visuals for this ring (rainbow cycling).
-                    var ringRole     = CycleVoidRole(_gravityVoidOwner.assignedRole, ringIndex);
-                    var ringProfile  = MusicalRoleProfileLibrary.GetProfile(ringRole);
-                    Color ringColor     = ringProfile != null ? ringProfile.GetBaseColor()      : _gravityVoidDustImprintTint;
-                    float ringHardness  = ringProfile != null ? ringProfile.GetDustHardness01() : _gravityVoidDustHardness01;
-
-                    // Unlimited budget — burst commits the whole annulus at once.
-                    // energyAtCenter01 = 1f with a near-flat falloffExp (0.3) keeps the
-                    // role color vivid and immediately readable across the whole annulus.
-                    // kMinVisibleAlpha in GrowVoidDustDiskFromGrid floors at 0.06, but
-                    // with falloffExp this low the outer-edge energy stays well above it.
                     dustGen.GrowVoidDustDiskFromGrid(
                         centerGP:                  _gravityVoidCenterGP,
-                        outerRadiusCells:          targetOuterR,
+                        outerRadiusCells:          outerR,
                         imprintRole:               ringRole,
-                        hueRgb:                    ringColor,
-                        imprintHardness01:         ringHardness,
+                        hueRgb:                    roleProfile?.GetBaseColor()      ?? _gravityVoidDustImprintTint,
+                        imprintHardness01:         roleProfile?.GetDustHardness01() ?? _gravityVoidDustHardness01,
                         energyAtCenter01:          1f,
-                        falloffExp:                0.3f,   // near-flat — role color stays vivid to the edge
+                        falloffExp:                0.3f,
                         growInSeconds:             growIn,
-                        fillWedges01To4:           4,      // always full 360°
+                        fillWedges01To4:           4,
                         vehicleCells:              _vehicleCellsScratch,
                         vehicleNoSpawnRadiusCells: 1,
-                        maxCellsThisCall:          -1,     // unlimited — commit whole annulus now
-                        innerRadiusCellsExclusive: completedOuterR
+                        maxCellsThisCall:          -1,
+                        innerRadiusCellsExclusive: innerR
                     );
-
-                    completedOuterR = targetOuterR;
-                    ringIndex++;
                 }
+
+                completedRings += ringsThisBin;
+                _gravityVoidCurrentOuterR = _gravityVoidBubbleInnerR + completedRings * W;
             }
 
-            // Keep ticking so VFX stays live and chord pulses keep firing until
-            // EndGravityVoidForPendingExpand clears the owner.
             yield return new WaitForSeconds(tick);
         }
 

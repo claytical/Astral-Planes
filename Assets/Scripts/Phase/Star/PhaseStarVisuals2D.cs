@@ -184,10 +184,17 @@ private float alphaDirection = 1f;
         // Bubble should be hidden when the star is truly hidden
         HideSafetyBubble();
     }
-    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint)
+    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default)
     {
         if (!bubbleRoot) return;
         bubbleRoot.gameObject.SetActive(true);
+
+        // Position bubble at provided world center (MineNode capture pos for gravity void),
+        // falling back to local origin (star position) if no center supplied.
+        if (worldCenter != default)
+            bubbleRoot.position = new Vector3(worldCenter.x, worldCenter.y, bubbleRoot.position.z);
+        else
+            bubbleRoot.localPosition = Vector3.zero;
 
         // Scale ONLY the fill sprite (not the whole bubbleRoot)
         if (bubbleSprite)
@@ -234,14 +241,14 @@ private float alphaDirection = 1f;
 
     /// <summary>
     /// Call every frame while the bubble is active to keep the bubble root
-    /// anchored to the star's world position (guards against any parent-transform drift).
+    /// anchored to the given world position (guards against any parent-transform drift).
     /// </summary>
     public void UpdateBubblePosition(Vector2 worldPos)
     {
         if (!bubbleRoot || !bubbleRoot.gameObject.activeSelf) return;
-        // The bubble root is a child — keep its local position at zero so it
-        // stays centred on the star even if the star's RB was frozen mid-frame.
-        bubbleRoot.localPosition = Vector3.zero;
+        // Set world position so the bubble stays at the activation center (e.g. MineNode capture pos)
+        // rather than drifting with the parent star transform.
+        bubbleRoot.position = new Vector3(worldPos.x, worldPos.y, bubbleRoot.position.z);
     }
     
     public void HighlightActive(Transform active, Color c, float alpha = 0.95f)
