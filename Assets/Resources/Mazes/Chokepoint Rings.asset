@@ -19,9 +19,7 @@ MonoBehaviour:
   starKeepClearRadiusCells: 2
   enableSafetyBubble: 1
   starHungrySpeed: 2.5
-  safetyBubbleRadiusCells: 2
-  rotateSelectionOnLoopBoundary: 0
-  rotateEveryNLoops: 2
+  safetyBubbleRadiusCells: 5
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
   particlePulseSpeed: 0.5

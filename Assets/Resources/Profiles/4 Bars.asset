@@ -19,13 +19,10 @@ MonoBehaviour:
   - {fileID: 8300000, guid: ae22811334b424cce8d01ddd97a6b5c8, type: 3}
   intensityDrumLoops:
   - {fileID: 8300000, guid: ae22811334b424cce8d01ddd97a6b5c8, type: 3}
-  - {fileID: 8300000, guid: d903d2bf33fc1495c992a407831d82d4, type: 3}
-  - {fileID: 8300000, guid: c0d4ac95e978e49c0b15e6fd446a0ec7, type: 3}
-  - {fileID: 8300000, guid: 136ce7dc4cbfd495283cdd391c171bbd, type: 3}
-  - {fileID: 8300000, guid: 344aeabf170a541ad98f9cf3f67467ee, type: 3}
   entryLoopCount: 1
   bpm: 162
   stepsPerLoop: 64
+  nodesPerStar: 4
   chordProgression: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 7f3f298110bd74ed1a3157b6631846e7, type: 2}

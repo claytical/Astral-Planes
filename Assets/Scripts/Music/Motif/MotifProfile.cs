@@ -30,6 +30,10 @@ public class MotifProfile : ScriptableObject
     public float bpm = 120f;
     public int stepsPerLoop = 16;
 
+    [Header("Star Structure")]
+    [Min(1), Tooltip("Total shards this PhaseStar ejects. Distribute roles across shards via round-robin.")]
+    public int nodesPerStar = 4;
+
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;
@@ -87,5 +91,22 @@ public class MotifProfile : ScriptableObject
         int idx = Mathf.Abs(binIndex) % matches.Count;
         return matches[idx];
     }
- 
+
+    /// <summary>
+    /// Returns distinct MusicalRoles present in roleNoteConfigs, in first-appearance order.
+    /// The first role in this list is treated as primary (gets the largest Voronoi territory).
+    /// </summary>
+    public List<MusicalRole> GetActiveRoles()
+    {
+        var seen = new HashSet<MusicalRole>();
+        var result = new List<MusicalRole>();
+        for (int i = 0; i < roleNoteConfigs.Count; i++)
+        {
+            var cfg = roleNoteConfigs[i];
+            if (cfg != null && cfg.role != MusicalRole.None && seen.Add(cfg.role))
+                result.Add(cfg.role);
+        }
+        return result;
+    }
+
 }

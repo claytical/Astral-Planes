@@ -2,11 +2,11 @@
 <MidiSet xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <SoundFonts>
     <SoundFontInfo>
-      <Name>Moonlight</Name>
-      <PatchCount>42</PatchCount>
-      <WaveCount>78</WaveCount>
-      <WaveSize>24369082</WaveSize>
-      <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Moonlight.sf2</SF2Path>
+      <Name>Astral Planes</Name>
+      <PatchCount>10</PatchCount>
+      <WaveCount>20</WaveCount>
+      <WaveSize>10459828</WaveSize>
+      <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Astral Planes.sf2</SF2Path>
     </SoundFontInfo>
   </SoundFonts>
   <IndexSelectedSF>0</IndexSelectedSF>
