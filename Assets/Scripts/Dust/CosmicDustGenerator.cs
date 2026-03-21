@@ -132,6 +132,8 @@ public class CosmicDustGenerator : MonoBehaviour
     };
     // Density conservation: target solid count set at maze init; -1 = inactive.
     private int _targetSolidCount = -1;
+    // Pattern oracle: wall cells intended by the current archetype. Null when no maze is active.
+    private HashSet<Vector2Int> _mazePatternCells;
     // Cells currently transitioning in (Regrowing state). Added to Solid count
     // for committed-count checks so original cells are suppressed before
     // compensation cells finish growing in.
@@ -466,8 +468,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid)
             return;
 
-        Debug.Log($"[DUSTGEN] DrainedBelowThreshold grid={gp} alpha={dust.CurrentTint.a:F2}", dust);
-
         // Kill collision immediately (CosmicDust already did this, belt-and-suspenders).
         SetDustCollision(dust, false);
 
@@ -664,7 +664,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
     }
 }
-    public void ReleaseVehicleKeepClear(int ownerId, MazeArchetype phase = MazeArchetype.Establish)
+    public void ReleaseVehicleKeepClear(int ownerId, MazeArchetype phase = MazeArchetype.Windows)
 {
     _tmpReleased.Clear();
     _exclusions.ReleaseVehicleFootprint(ownerId, _tmpReleased);
@@ -778,7 +778,12 @@ public class CosmicDustGenerator : MonoBehaviour
         if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
-                cell => { TryGetDustAt(cell, out var d); return d; },
+                cell =>
+                {
+                    TryGetDustAt(cell, out var d); 
+                    Debug.Log($"[DUST] {d.name} with {GetCellVisualColor(cell)}");
+                    return d;
+                },
                 GetCellVisualColor);
         
     }
@@ -884,7 +889,8 @@ public class CosmicDustGenerator : MonoBehaviour
 
             MusicalRole regrowRole;
             if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp)
-                && existingImp.role != MusicalRole.None)
+                && existingImp.role != MusicalRole.None
+                && IsRoleActive(existingImp.role))
             {
                 regrowRole = existingImp.role;
             }
@@ -1002,7 +1008,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
         switch (phase)
         {
-            case MazeArchetype.Establish:
+            case MazeArchetype.Windows:
             {
                 // Legacy behavior: fill everything except reserved.
                 var rect = new List<(Vector2Int, Vector3)>(w * h);
@@ -1101,8 +1107,23 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildPopDots(
                     width: w,
                     height: h,
-                    step: 4,
+                    step: 12, //Wide Diagonal Lines
                     phaseOffset: Random.Range(0, 8),
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
+                break;
+            }
+
+            case MazeArchetype.Tunnel:
+            {
+                growth = CosmicDustMazePatterns.BuildPacManTunnels(
+                    width: w,
+                    height: h,
+                    corridorStep: 1,  // wall thickness = step - corridorWidth
+                    corridorWidth: 3, // must fit vehicle collision width
+                    phaseOffsetX: 0,
+                    phaseOffsetY: 0,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
@@ -1242,6 +1263,11 @@ public class CosmicDustGenerator : MonoBehaviour
 // Pattern-driven growth list
         var cellsToFill = BuildMazeGrowthForPhase(phase, starCell, reserved);
         Debug.Log($"[MAZE] cellsToFill(pattern) count={cellsToFill.Count}");
+
+        // Cache pattern oracle so frontier compensation can prefer original wall cells.
+        _mazePatternCells = new HashSet<Vector2Int>(cellsToFill.Count);
+        foreach (var (cell, _) in cellsToFill)
+            _mazePatternCells.Add(cell);
 
         // --- Voronoi role imprint pass ---
         // Write a DustImprint for every cell before StaggeredGrowthFitDuration spawns them.
@@ -1575,12 +1601,13 @@ public class CosmicDustGenerator : MonoBehaviour
         // Compute delay (phase default unless explicitly overridden).
         float delay = delaySeconds >= 0f ? delaySeconds : phase switch
         {
-            MazeArchetype.Establish  => 4f,
+            MazeArchetype.Windows  => 4f,
             MazeArchetype.Evolve     => 12f,
             MazeArchetype.Intensify  => 8f,
             MazeArchetype.Release    => 32f,
             MazeArchetype.Wildcard   => 16f,
             MazeArchetype.Pop        => 24f,
+            MazeArchetype.Tunnel     => 10f,
             _ => 32f
         };
 
@@ -1909,7 +1936,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
     private MusicalRole GetLeastDenseRoleExcluding(MusicalRole excluded)
     {
-        MusicalRole best = MusicalRole.Bass;
+        MusicalRole best = MusicalRole.None;
         int bestCount = int.MaxValue;
 
         // Use only motif-active roles so regrowth doesn't introduce roles the motif doesn't use.
@@ -1931,6 +1958,11 @@ public class CosmicDustGenerator : MonoBehaviour
                 best = r; // random tie-break
             }
         }
+
+        // If excluded was the only active role, ignore the exclusion rather than
+        // returning None or a role outside the motif's active set.
+        if (best == MusicalRole.None)
+            best = GetLeastDenseRole();
 
         return best;
     }
@@ -1980,6 +2012,7 @@ public class CosmicDustGenerator : MonoBehaviour
             if (_permanentClearCells.Contains(c)) continue;
             if (IsDustSpawnBlocked(c)) continue; // skip cells held by active claims (e.g. collectable jails)
             int score = CountSolidNeighbors(c);
+            if (_mazePatternCells != null && !_mazePatternCells.Contains(c)) score = score > 0 ? 1 : 0;
             if (score > bestScore) { bestScore = score; best = c; }
         }
 
@@ -2017,7 +2050,8 @@ public class CosmicDustGenerator : MonoBehaviour
             var n = new Vector2Int(cell.x + dx, cell.y + dy);
             if (!TryGetCellState(n, out var st) || st != DustCellState.Solid) continue;
             if (!_imprints.TryGetValue(n, out var imp)
-                || imp.role == MusicalRole.None || imp.role == excluded) continue;
+                || imp.role == MusicalRole.None || imp.role == excluded
+                || !IsRoleActive(imp.role)) continue;
             switch (imp.role)
             {
                 case MusicalRole.Bass:    bassC++;   break;
@@ -2065,6 +2099,14 @@ public class CosmicDustGenerator : MonoBehaviour
             : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
     }
 
+    // Returns true if the role is present in the current motif's active role list.
+    // When no active roles are set (fallback), all roles are considered active.
+    private bool IsRoleActive(MusicalRole role)
+    {
+        if (_activeRoles == null || _activeRoles.Count == 0) return true;
+        return _activeRoles.Contains(role);
+    }
+
     public void ApplyProfile(PhaseStarBehaviorProfile profile)
     {
         if (profile == null) return;
@@ -2072,7 +2114,7 @@ public class CosmicDustGenerator : MonoBehaviour
         _activeProfile = profile;
 
         // Authoritative default: phase-authored maze tint.
-        _mazeTint = profile.mazeColor;
+//        _mazeTint = profile.mazeColor;
 
         // If dust already exists (e.g., generator persists between phases), immediately
         // nudge visuals to match the new profile so we don't leave any tiles at prefab/default.
@@ -2158,6 +2200,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         _targetSolidCount = -1;
         _regrowingCount   = 0;
+        _mazePatternCells = null;
     }
     /// <summary>
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
@@ -2492,7 +2535,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private MazeArchetype GetCurrentPhaseSafe()
     {
         TryEnsureRefs();
-        return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MazeArchetype.Establish;
+        return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MazeArchetype.Windows;
     }
 
     private void DespawnDustAt(Vector2Int gridPos)
@@ -2606,11 +2649,12 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         return phase switch
         {
-            MazeArchetype.Establish => 0.90f,
+            MazeArchetype.Windows => 0.90f,
             MazeArchetype.Evolve => 0.30f,
             MazeArchetype.Intensify => 0.45f,
             MazeArchetype.Release => 0.15f,
             MazeArchetype.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
+            MazeArchetype.Tunnel   => 0.64f,
             _ => 0.35f
         };
     }

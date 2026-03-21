@@ -13,7 +13,8 @@ public class RoleMotifNoteSetConfig : ScriptableObject
 {
     [Header("Identity")]
     public string id;                   // Optional stable ID (e.g. "MotifA_BassMain")
-    public MusicalRole role;            // Bass, Harmony, Lead, Groove, etc.
+    public MusicalRoleProfile roleProfile;
+    public MusicalRole role => roleProfile != null ? roleProfile.role : MusicalRole.None;
 
     [Header("Authored Riff (optional)")]
     public RiffAsset riff;

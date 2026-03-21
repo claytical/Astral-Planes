@@ -16,7 +16,7 @@ public class MidiVoice : MonoBehaviour
 
     [Header("Channel / Program")]
     [SerializeField] private int channel = 0;
-    [SerializeField] private int preset = 0;
+    private int preset;
     [SerializeField] private int bank = 0;
     
     private static bool _forcedProgramPropsCached;
@@ -31,16 +31,23 @@ public class MidiVoice : MonoBehaviour
     {
         if (drums != null) drumTrack = drums;
     }
+
+    public void SetPreset(int value)
+    {
+        Debug.Log($"[MidiVoice] Setting preset to {value}");
+        preset = value;
+    }
     
     public void Bind(
         MidiStreamPlayer player,
         DrumTrack drums,
-        System.Func<float> remainingActiveWindowSec)
+        System.Func<float> remainingActiveWindowSec,
+        int initialPreset = 0)
     {
         midiStreamPlayer = player;
         drumTrack = drums;
         _remainingActiveWindowSec = remainingActiveWindowSec;
-        
+        preset = initialPreset;
     }
 
     /// <summary>
@@ -72,7 +79,7 @@ public class MidiVoice : MonoBehaviour
                 durationMs = Mathf.Min(durationMs, maxMs);
             }
         }
-
+        Debug.Log($"[MidiVoice] Playing note {note} ({durationMs} ms) using {preset}");
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
 

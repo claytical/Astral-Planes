@@ -36,6 +36,9 @@ public partial class GameFlowManager : MonoBehaviour
     public int phaseBridgeWaitMaxLoops = 64;
     [Header("Coral (New Spiral)")]
     [SerializeField] private MotifCoralVisualizer motifCoralVisualizer;
+
+    [Header("Glyph (2D Bridge Visualizer)")]
+    [SerializeField] private GlyphApplicator motifGlyphApplicator;
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [SerializeField] private bool useSpiralCoralDuringBridge = true;
     [SerializeField] private Transform coralRoot; // scene object root
@@ -97,6 +100,11 @@ public partial class GameFlowManager : MonoBehaviour
     {
         motifCoralVisualizer = vis;
         Debug.Log($"[CORAL:MOTIF] Registered MotifCoralVisualizer: {vis?.name}");
+    }
+
+    public void RegisterGlyphApplicator(GlyphApplicator applicator)
+    {
+        motifGlyphApplicator = applicator;
     }
 
     public GameState CurrentState
@@ -278,14 +286,11 @@ public partial class GameFlowManager : MonoBehaviour
     Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END"); 
     // STEP 2: Choose phase chapter
 
-    var startPhase = MazeArchetype.Release;
-
     // STEP 2.5: Choose the chapter + first paragraph motif BEFORE starting drums.
     if (phaseTransitionManager != null)
     {
-        // Pick your intended starting chapter here (you used Release as boot elsewhere).
-        // If you want Establish as the first chapter, change MazeArchetype.Release -> MazeArchetype.Establish.
-        phaseTransitionManager.StartChapter(MazeArchetype.Release, "GFM/TrackSetup");
+        var startPhase = phaseTransitionManager.GetFirstPhase();
+        phaseTransitionManager.StartChapter(startPhase, "GFM/TrackSetup");
     }
     else
     {
@@ -321,7 +326,8 @@ public partial class GameFlowManager : MonoBehaviour
 
     Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
     
-    harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
+    if (phaseTransitionManager.currentMotif != null)
+        harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
     Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
     StartMazeAndStarForPhase(phase);
     _setupDone = true;
@@ -624,7 +630,8 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
         dust.ApplyProfile(profileForPhase);
 
     // Apply motif active roles to dust so Voronoi and regrowth use only this motif's roles.
-    var motifRoles = activeDrumTrack?._star?.GetMotifActiveRoles();
+    // Read from phaseTransitionManager.currentMotif — the star doesn't exist yet at this point.
+    var motifRoles = phaseTransitionManager?.currentMotif?.GetActiveRoles();
     dust.ApplyActiveRoles(motifRoles);
 
     // 4) Build maze.

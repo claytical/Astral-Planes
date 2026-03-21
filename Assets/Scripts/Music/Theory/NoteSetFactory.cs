@@ -281,7 +281,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
 
     var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
         ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
-        : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MazeArchetype.Establish, track.assignedRole));
+        : new List<NoteBehavior>(NoteBehaviorPolicy.GetDefaults(MazeArchetype.Windows, track.assignedRole));
 
     var ns = new NoteSet
     {

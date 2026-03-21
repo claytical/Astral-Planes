@@ -28,6 +28,9 @@ public class PhaseTransitionManager : MonoBehaviour
 
     // PhaseTransitionManager.cs
     private bool _chapterLoadedForCurrentPhase = false;
+    public MazeArchetype GetFirstPhase() =>
+        chapterLibrary != null ? chapterLibrary.FirstPhase : MazeArchetype.Windows;
+
     public MazeArchetype ResolveNextPhase(MazeArchetype current)
     {
         if (chapterLibrary == null || chapterLibrary.chapters == null || chapterLibrary.chapters.Count == 0)
@@ -235,14 +238,15 @@ public class PhaseTransitionManager : MonoBehaviour
  
             track.authoredRootMidi = currentMotif.keyRootMidi;
             track.SetNoteSet(bin0NoteSet);
+
+            // Apply preset from this motif's config roleProfile; fall back to library lookup.
+            var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier);
+            track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
         }
     }
 
-    // IMPORTANT: Do NOT let DrumTrack/PhaseStar spawn mutate phase or motif here.
-    private PhaseStarBehaviorProfile _activeBehaviorProfile;
     private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile)
     {
-        _activeBehaviorProfile = profile;
         // (No phase/motif mutations. That’s GFM’s job: chapter start / paragraph advance.)
     }
 

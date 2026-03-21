@@ -15377,8 +15377,8 @@ Transform:
   - {fileID: 1849649913}
   - {fileID: 608598249}
   - {fileID: 1798320909}
-  - {fileID: 1750563041}
   - {fileID: 480221061}
+  - {fileID: 1750563041}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &342701838
@@ -15442,8 +15442,6 @@ MonoBehaviour:
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
-  preset: 0
-  bank: 0
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -15494,7 +15492,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
   channel: 0
-  preset: 1
   bank: 0
 --- !u!1 &371718999
 GameObject:
@@ -15573,7 +15570,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 140}
+  m_AnchoredPosition: {x: 0, y: 120}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1001 &480221059
@@ -15802,7 +15799,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 480221060}
   drumTrack: {fileID: 1354683682}
   channel: 5
-  preset: 12
   bank: 0
 --- !u!82 &480221064 stripped
 AudioSource:
@@ -15992,8 +15988,6 @@ MonoBehaviour:
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
-  preset: 18
-  bank: 0
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -16059,7 +16053,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
   channel: 2
-  preset: 5
   bank: 0
 --- !u!1 &652946506
 GameObject:
@@ -16122,8 +16115,6 @@ MonoBehaviour:
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
-  preset: 1
-  bank: 0
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -16174,7 +16165,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
   channel: 3
-  preset: 3
   bank: 0
 --- !u!1 &657963290
 GameObject:
@@ -16227,7 +16217,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.101960786}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.29803923}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -16515,7 +16505,7 @@ MonoBehaviour:
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.1
   mineNodeErodePerTick: 10
-  dustFootprintMul: 1.143
+  dustFootprintMul: 1
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
@@ -17277,7 +17267,7 @@ MonoBehaviour:
   burnMultipleAtFullIntensity: 2.5
   drumLoopBPM: 120
   totalSteps: 32
-  gridPadding: 1.1
+  gridPadding: 1
   timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
   startDspTime: 0
@@ -17287,7 +17277,7 @@ MonoBehaviour:
   currentStep: 0
   referenceWidthPx: 1920
   referenceColumns: 40
-  uiBottomPaddingPx: 160
+  uiBottomPaddingPx: 250
   autoSizeSpawnGridToScreen: 1
   _star: {fileID: 0}
   tanksPerLoopAtFullIntensity: 0.35
@@ -17343,6 +17333,7 @@ MonoBehaviour:
   pickupTickLead: {fileID: 0}
   pickupTickHarmony: {fileID: 0}
   pickupTickGroove: {fileID: 0}
+  voidRingWidthCells: 2
   gravityVoidImprintTickSeconds: 0.05
   commitSfxSource: {fileID: 480221064}
   commitStingerVolume: 1.25
@@ -17467,7 +17458,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridWidth: 40
   gridHeight: 20
-  cellSize: 0.5
+  cellSize: 1
 --- !u!164 &1354683692
 AudioReverbFilter:
   m_ObjectHideFlags: 0
@@ -18546,8 +18537,6 @@ MonoBehaviour:
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
-  preset: 16
-  bank: 0
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
@@ -18613,7 +18602,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
   channel: 1
-  preset: 7
   bank: 0
 --- !u!1 &1736554591
 GameObject:
@@ -18802,7 +18790,6 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 1750563045}
   drumTrack: {fileID: 1354683682}
   channel: 4
-  preset: 6
   bank: 0
 --- !u!114 &1750563045 stripped
 MonoBehaviour:
@@ -18960,7 +18947,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1795146081
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19712,6 +19699,247 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1979255051}
   m_CullTransparentMesh: 1
+--- !u!1 &2009313289
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2009313293}
+  - component: {fileID: 2009313292}
+  - component: {fileID: 2009313291}
+  - component: {fileID: 2009313290}
+  - component: {fileID: 2009313294}
+  m_Layer: 0
+  m_Name: Glyph Generator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2009313290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd54378dfddb42bca7bd59f0cb24d7a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlyphApplicator
+  SpeciesParams:
+    BassMinLoops: 1
+    BassMaxLoops: 4
+    BassBaseRadius: 0.35
+    BassWidthBase: 0.025
+    HarmonyMinBranches: 1
+    HarmonyMaxBranches: 6
+    HarmonyBranchLen: 0.25
+    HarmonyWidthBase: 0.018
+    LeadControlPoints: 12
+    LeadAmplitude: 0.3
+    LeadWidthBase: 0.015
+    GrooveMinTicks: 3
+    GrooveMaxTicks: 16
+    GrooveTickLen: 0.08
+    GrooveWidthBase: 0.01
+    GlyphRadius: 0.45
+  LineMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
+--- !u!120 &2009313291
+LineRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 0
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Positions:
+  - {x: 0, y: 0, z: 0}
+  - {x: 0, y: 0, z: 1}
+  m_Parameters:
+    serializedVersion: 3
+    widthMultiplier: 1
+    widthCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    colorGradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    numCornerVertices: 0
+    numCapVertices: 0
+    alignment: 0
+    textureMode: 0
+    textureScale: {x: 1, y: 1}
+    shadowBias: 0.5
+    generateLightingData: 0
+  m_MaskInteraction: 0
+  m_UseWorldSpace: 1
+  m_Loop: 0
+  m_ApplyActiveColorSpace: 1
+--- !u!114 &2009313292
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fecb906a0b6b4c839e7ed7f76308562, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MotifGlyphRegistrar
+--- !u!4 &2009313293
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -6.38348, y: -4.37186, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2009313294
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4938235e403c8447dac13925202c3c5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MotifGlyphPreview
+  Target: {fileID: 2009313290}
+  Pattern: 3
+  MotifColor: {r: 0.4, g: 0.8, b: 1, a: 1}
+  TotalSteps: 16
+  KeyRootMidi: 60
+  Bass:
+    Active: 1
+    Role: 0
+    NoteCount: 8
+    BinCount: 2
+    FilledBins: 2
+    MatchRatio: 0.7
+    Velocity: 0.6
+    TrackColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  Harmony:
+    Active: 0
+    Role: 1
+    NoteCount: 8
+    BinCount: 2
+    FilledBins: 2
+    MatchRatio: 0.7
+    Velocity: 0.6
+    TrackColor: {r: 0.3, g: 1, b: 0.5, a: 1}
+  Lead:
+    Active: 0
+    Role: 2
+    NoteCount: 8
+    BinCount: 2
+    FilledBins: 2
+    MatchRatio: 0.7
+    Velocity: 0.6
+    TrackColor: {r: 1, g: 0.8, b: 0.2, a: 1}
+  Groove:
+    Active: 0
+    Role: 3
+    NoteCount: 8
+    BinCount: 2
+    FilledBins: 2
+    MatchRatio: 0.7
+    Velocity: 0.6
+    TrackColor: {r: 1, g: 0.3, b: 0.4, a: 1}
+  LivePreview: 0
 --- !u!1 &2067870200
 GameObject:
   m_ObjectHideFlags: 0
@@ -19917,3 +20145,4 @@ SceneRoots:
   - {fileID: 2067870202}
   - {fileID: 869126478}
   - {fileID: 1795146083}
+  - {fileID: 2009313293}

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Lights
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: 4bars
+  displayName: 4 bars
+  keyRootMidi: 60
+  entryDrumLoops:
+  - {fileID: 8300000, guid: ae22811334b424cce8d01ddd97a6b5c8, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: ae22811334b424cce8d01ddd97a6b5c8, type: 3}
+  entryLoopCount: 1
+  bpm: 162
+  stepsPerLoop: 64
+  nodesPerStar: 4
+  chordProgression: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: fbc08bcf3e12f4c42831d6c7bca68cfb, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

@@ -99,7 +99,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             var gen = gfm?.dustGenerator;
             if (gen != null)
-                gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Establish);
+                gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Windows);
         };
     }
 
@@ -182,7 +182,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         Vector2Int center = drums.WorldToGridPosition(transform.position);
 
         gen.SetStarKeepClear(center, radiusCells,
-            _hasLastPhase ? _lastPhase : MazeArchetype.Establish,
+            _hasLastPhase ? _lastPhase : MazeArchetype.Windows,
             forceRemoveExisting: false);
 
         // Re-sweep for any dust colliders spawned since Initialize
@@ -249,7 +249,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 gen.ClearImprintAt(probeCell);
                 var phaseMgr = gfm.phaseTransitionManager;
-                MazeArchetype phase = phaseMgr != null ? phaseMgr.currentPhase : MazeArchetype.Establish;
+                MazeArchetype phase = phaseMgr != null ? phaseMgr.currentPhase : MazeArchetype.Windows;
                 gen.ClearCell(probeCell, CosmicDustGenerator.DustClearMode.FadeAndHide,
                     fadeSeconds: 0.4f,
                     scheduleRegrow: true,

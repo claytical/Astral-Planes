@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: tres-bass
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: tres-bass-0
-  role: 0
+  roleProfile: {fileID: 11400000, guid: b63a78a8afc9544ffaeacdd2306d6ee8, type: 2}
   riff: {fileID: 11400000, guid: e250e09c4e90a45549518b8cc85b47e9, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
@@ -26,15 +26,6 @@ MonoBehaviour:
   maxBehaviorsStack: 2
   variation:
     extensionBias: 0.35
-    passingToneProb: 0.2
-    neighborOrnProb: 0.15
-    minMidi: 36
-    maxMidi: 84
-    leapProb: 0.15
     octaveMoveProb: 0.1
     restProb: 0.1
-    humanizeMs: 0.02
     durJitter: 1
-    mutatePitch: 0.08
-    mutateVelocity: 0.12
-    mutateDuration: 0.1

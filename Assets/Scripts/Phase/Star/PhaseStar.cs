@@ -138,6 +138,14 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration; // seconds (time authority)
 
+    // ---- Flower / disarmed state ----
+    private bool      _inFlowerMode;
+    private float     _flowerRotOffsetDeg;
+    private float     _flowerRotSpeedDeg;
+    private float     _breathPhase;
+    private Vector3   _originalLocalScale = Vector3.one;
+    private Coroutine _scaleCoroutine;
+
     [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f); // fill/edge tint (alpha handled by visuals)
     [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
 
@@ -166,6 +174,20 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private float shardSnifferTurnSpeed = 180f;
     [Tooltip("Duration of the shed-fly animation when a shard is ejected (seconds).")]
     [SerializeField] private float shardShedDuration = 0.35f;
+
+    [Header("Disarmed Flower")]
+    [Tooltip("Scale multiplier applied to the star body when a MineNode ejects.")]
+    [SerializeField] private float disarmedScaleMul = 1.35f;
+    [Tooltip("Seconds for the scale-up / scale-back tweens.")]
+    [SerializeField] private float disarmedScaleSeconds = 0.18f;
+    [Tooltip("Initial petal spin speed (deg/s) when flower mode begins.")]
+    [SerializeField] private float disarmedFlowerRotStartDeg = 50f;
+    [Tooltip("Seconds for the spin to decay toward the breath oscillation floor.")]
+    [SerializeField] private float disarmedFlowerRotDecaySec = 5f;
+    [Tooltip("Seconds per alpha breath cycle while disarmed.")]
+    [SerializeField] private float disarmedBreathPeriod = 2.5f;
+    [SerializeField, Range(0f, 1f)] private float disarmedBreathAlphaMin = 0.04f;
+    [SerializeField, Range(0f, 1f)] private float disarmedBreathAlphaMax = 0.18f;
 
 
     public enum DisarmReason
@@ -231,6 +253,7 @@ public class PhaseStar : MonoBehaviour
     // -------------------- Lifecycle --------------------
     void Start()
     {
+        _originalLocalScale = transform.localScale;
         gfm = GameFlowManager.Instance;
         EnsurePreviewRing();
         if (!buildingPreview)
@@ -589,7 +612,27 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             // Resolve dominant shard with hysteresis + soft switch delta (BALANCE-E).
             ResolveDominantRoleFromCharge();
-            
+
+            // --- Flower rotation state update ---
+            if (_inFlowerMode)
+            {
+                if (!_isArmed)
+                {
+                    float decayRate = disarmedFlowerRotStartDeg / Mathf.Max(0.001f, disarmedFlowerRotDecaySec);
+                    _flowerRotSpeedDeg = Mathf.MoveTowards(_flowerRotSpeedDeg, 0f, decayRate * dt);
+                    float breathOsc = Mathf.Sin(_breathPhase * Mathf.PI * 2f) * 5f;
+                    _flowerRotOffsetDeg += (_flowerRotSpeedDeg + breathOsc) * dt;
+                }
+                else
+                {
+                    // Armed + single-role maze: gentle continuous rotation
+                    _flowerRotOffsetDeg += 15f * dt;
+                }
+                _breathPhase = Mathf.Repeat(_breathPhase + dt / Mathf.Max(0.001f, disarmedBreathPeriod), 1f);
+            }
+
+            float petalStep = 360f / previewRing.Count;
+
             for (int i = 0; i < previewRing.Count; i++)
             {
                 var shard = previewRing[i];
@@ -597,36 +640,58 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
                 var sr = shard.visual.GetComponent<SpriteRenderer>();
 
-                // --- Alpha from charge, scaled by armed state ---
+                // --- Alpha: dim+breath in flower mode while disarmed, else charge-driven ---
                 if (sr != null)
                 {
-                    _starCharge.TryGetValue(shard.role, out float charge);
-                    float t = Mathf.Clamp01(charge);
+                    if (_inFlowerMode && !_isArmed)
+                    {
+                        float breath = (Mathf.Sin(_breathPhase * Mathf.PI * 2f) + 1f) * 0.5f;
+                        float targetAlpha = Mathf.Lerp(disarmedBreathAlphaMin, disarmedBreathAlphaMax, breath);
+                        Color c = sr.color;
+                        c.r = Mathf.Lerp(c.r, 0.12f, shardAlphaLerpSpeed * dt);
+                        c.g = Mathf.Lerp(c.g, 0.12f, shardAlphaLerpSpeed * dt);
+                        c.b = Mathf.Lerp(c.b, 0.14f, shardAlphaLerpSpeed * dt);
+                        c.a = Mathf.Lerp(c.a, targetAlpha, shardAlphaLerpSpeed * dt);
+                        sr.color = c;
+                    }
+                    else
+                    {
+                        _starCharge.TryGetValue(shard.role, out float charge);
+                        float t = Mathf.Clamp01(charge);
 
-                    Color targetColor = Color.Lerp(
-                        new Color(0.45f, 0.45f, 0.45f, 1f),
-                        shard.color,
-                        t
-                    );
+                        Color targetColor = Color.Lerp(
+                            new Color(0.45f, 0.45f, 0.45f, 1f),
+                            shard.color,
+                            t
+                        );
 
-                    float targetAlpha = Mathf.Lerp(shardMinAlpha, alphaScale, t);
+                        float targetAlpha = Mathf.Lerp(shardMinAlpha, alphaScale, t);
 
-                    Color c = sr.color;
-                    c.r = Mathf.Lerp(c.r, targetColor.r, shardAlphaLerpSpeed * dt);
-                    c.g = Mathf.Lerp(c.g, targetColor.g, shardAlphaLerpSpeed * dt);
-                    c.b = Mathf.Lerp(c.b, targetColor.b, shardAlphaLerpSpeed * dt);
-                    c.a = Mathf.Lerp(c.a, targetAlpha, shardAlphaLerpSpeed * dt);
-                    sr.color = c;
+                        Color c = sr.color;
+                        c.r = Mathf.Lerp(c.r, targetColor.r, shardAlphaLerpSpeed * dt);
+                        c.g = Mathf.Lerp(c.g, targetColor.g, shardAlphaLerpSpeed * dt);
+                        c.b = Mathf.Lerp(c.b, targetColor.b, shardAlphaLerpSpeed * dt);
+                        c.a = Mathf.Lerp(c.a, targetAlpha, shardAlphaLerpSpeed * dt);
+                        sr.color = c;
+                    }
                 }
- 
-                // --- Sniffer facing: rotate diamond toward nearest dust of its role ---
-                Vector2 sniffDir = GetNearestDustDirForRole(shard.role, 8);
-                if (sniffDir.sqrMagnitude > 0.0001f)
+
+                // --- Rotation: flower petal spin or sniffer facing ---
+                if (_inFlowerMode)
                 {
-                    float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
-                    float curAngle = shard.visual.localEulerAngles.z;
-                    float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle, shardSnifferTurnSpeed * dt);
-                    shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
+                    float totalAngle = petalStep * i + _flowerRotOffsetDeg;
+                    shard.visual.localRotation = Quaternion.Euler(0f, 0f, totalAngle);
+                }
+                else
+                {
+                    Vector2 sniffDir = GetNearestDustDirForRole(shard.role, 8);
+                    if (sniffDir.sqrMagnitude > 0.0001f)
+                    {
+                        float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
+                        float curAngle = shard.visual.localEulerAngles.z;
+                        float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle, shardSnifferTurnSpeed * dt);
+                        shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
+                    }
                 }
             }
 
@@ -825,6 +890,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         EnableColliders();
         dust?.RefreshDustIgnore();
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
+        ExitFlowerModeOnRearm();
         OnArmed?.Invoke(this);
     }
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
@@ -839,12 +905,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             case DisarmReason.AwaitBridge:
             case DisarmReason.Bridge:
-                // True shutdown: disable colliders so the star doesn't interact while
-                // the bridge plays out. Motion may stop separately in the bridge flow.
-                DisableColliders();
-                SetVisual(VisualMode.Hidden, tint);
-                break;
-
             case DisarmReason.NodeResolving:
             case DisarmReason.CollectablesInFlight:
             case DisarmReason.ExpansionPending:
@@ -854,6 +914,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                 // OnCollisionEnter2D already guards against pokes when !_isArmed,
                 // and preserving collider state keeps Physics2D.IgnoreCollision dust
                 // pairs intact (Unity clears them when a collider is disabled/re-enabled).
+                DisableColliders();
                 SetVisual(VisualMode.Dim, tint);
                 break;
         }
@@ -1189,6 +1250,63 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         RebuildPreviewRingForRemainingShards(keepCurrentIndex:false);
     }
 
+    // ---- Flower mode helpers ----
+
+    /// <summary>
+    /// True when all planned shards share the same musical role (single-role maze).
+    /// In that case the flower rotation persists even when re-armed.
+    /// </summary>
+    private bool IsSingleRoleMaze()
+    {
+        if (_phasePlanRoles == null || _phasePlanRoles.Count == 0) return false;
+        var first = _phasePlanRoles[0];
+        for (int i = 1; i < _phasePlanRoles.Count; i++)
+            if (_phasePlanRoles[i] != first) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Called when a MineNode is successfully ejected. Scales the star up quickly
+    /// and begins the slow petal-rotation / breathing disarmed look.
+    /// </summary>
+    private void EnterFlowerMode()
+    {
+        _inFlowerMode = true;
+        _flowerRotSpeedDeg = disarmedFlowerRotStartDeg;
+        _breathPhase = 0f;
+        motion?.SetSpeedMultiplier(0.04f);
+        if (_scaleCoroutine != null) StopCoroutine(_scaleCoroutine);
+        _scaleCoroutine = StartCoroutine(Co_ScaleTo(_originalLocalScale * disarmedScaleMul, disarmedScaleSeconds));
+    }
+
+    /// <summary>
+    /// Called when the star re-arms. Ends flower mode (unless single-role maze)
+    /// and tweens the star body back to its original scale.
+    /// </summary>
+    private void ExitFlowerModeOnRearm()
+    {
+        if (!IsSingleRoleMaze())
+            _inFlowerMode = false;
+        motion?.SetSpeedMultiplier(1f);
+        if (_scaleCoroutine != null) StopCoroutine(_scaleCoroutine);
+        _scaleCoroutine = StartCoroutine(Co_ScaleTo(_originalLocalScale, disarmedScaleSeconds));
+    }
+
+    private IEnumerator Co_ScaleTo(Vector3 target, float duration)
+    {
+        if (duration <= 0f) { transform.localScale = target; _scaleCoroutine = null; yield break; }
+        Vector3 start = transform.localScale;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            transform.localScale = Vector3.Lerp(start, target, elapsed / duration);
+            yield return null;
+        }
+        transform.localScale = target;
+        _scaleCoroutine = null;
+    }
+
     private void OnDisable()
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
@@ -1293,7 +1411,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             var factory = gfm != null ? gfm.phaseTransitionManager.noteSetFactory : null;
             var phase = (gfm != null && gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Establish;
+                : MazeArchetype.Windows;
 
             if (factory != null)
                 planned = factory.Generate(track, _assignedMotif);
@@ -1707,6 +1825,10 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         _activeNode = node;
         _ejectionInFlight = false;
 
+        // Flower mode: scale up and begin petal rotation when a node ejects (not final bridge).
+        if (_disarmReason != DisarmReason.AwaitBridge && _disarmReason != DisarmReason.Bridge)
+            EnterFlowerMode();
+
         bool handledResolve = false;
 
         node.OnResolved += (resolvedNode) =>
@@ -1940,6 +2062,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
         int entropy = CurrentEntropyForSelection();
         var noteSet = GameFlowManager.Instance != null ? GameFlowManager.Instance.GenerateNotes(track, entropy) : null;
+ Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell);        
         return node;
     }

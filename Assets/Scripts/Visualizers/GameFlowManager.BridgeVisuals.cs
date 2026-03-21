@@ -47,6 +47,10 @@ public partial class GameFlowManager
             if (motifCoralVisualizer != null && r.transform.IsChildOf(motifCoralVisualizer.transform))
                 continue;
 
+            // Skip the glyph applicator so its LineRenderers aren't hidden
+            if (motifGlyphApplicator != null && r.transform.IsChildOf(motifGlyphApplicator.transform))
+                continue;
+
             // Skip UI canvases (they’re already handled by SetBridgeVisualMode)
             if (r.GetComponentInParent<Canvas>(true) != null)
                 continue;

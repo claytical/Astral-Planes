@@ -15,12 +15,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
     public float extraBrake = 0.25f;
 
-    [Tooltip("How strongly we follow dust lateral/cross-current suggestions.")]
-    public float lateralNudgeMul = 1.0f;
-
-    [Tooltip("How strongly we apply dust turbulence wobble.")]
-    public float turbulenceMul = 1.0f;
-
     [Header("Carving")]
     [Tooltip("Whether this node is allowed to carve dust into the maze grid.")]
     public bool enableCarving = true;
@@ -32,11 +26,8 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("If true, this node will chew a path through the dust maze as it moves.")]
     public bool carveMaze = true;
 
-    [Tooltip("Seconds between carve ticks (how often we nibble dust).")]
-    public float carveIntervalSeconds = 0.08f;
-
-    [Tooltip("Appetite multiplier passed into CosmicDustGenerator.ErodeDustDisk.")]
-    public float carveAppetiteMul = 1.0f;
+    private float carveIntervalSeconds = 0.08f;
+    private float carveAppetiteMul     = 1.0f;
     private bool _ignoredDustCollisions = false;
     [Header("Dust Collision Ignore (MineNode only)")]
     [SerializeField] private LayerMask dustTerrainMask;   // should include CosmicDust (layer 7)

@@ -11,23 +11,12 @@ public class MineNode : MonoBehaviour
     [Header("Dust Affinity")]
     [SerializeField, Range(0f, 1f)] private float sameRoleDustAffinityStrength = 0.25f; // medium
     [SerializeField, Min(1)] private int sameRoleDustAffinityRadiusCells = 2;            // moderate
-    [SerializeField] private float minCarveSeconds = 1.25f;
     public bool pruneCarvedPathOnLoopBoundary = true;
     [Tooltip("Minimum carved path length before pruning runs.")] 
     [Min(2)] public int pruneMinPathCount = 8;
 
     [Header("NoteSet-Driven Motion (Carving)")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
-    public float maxSteerForce = 50f;
-
-    [SerializeField] private float carveSpeedMin = 1.25f;
-    [SerializeField] private float carveSpeedMax = 8.0f;
-
-    [SerializeField] private float steerForce = 10f;          // how hard we correct velocity toward desired dir
-    [SerializeField] private float turnAngleBass = 8f;
-    [SerializeField] private float turnAngleGroove = 14f;
-    [SerializeField] private float turnAngleHarmony = 22f;
-    [SerializeField] private float turnAngleLead = 40f;
 
     public event System.Action<MineNode> OnResolved;
     public DrumTrack DrumTrack => _drumTrack;
@@ -56,6 +45,9 @@ public class MineNode : MonoBehaviour
     private NoteSet _noteSet;
     private InstrumentTrack _track;
     private MusicalRole _role;
+    private float _speed    = 0.5f;
+    private float _clearing = 0.5f;
+    private float _agility  = 0.5f;
     private int _lastProcessedStep = -1;
     private Vector2 _carveDir = Vector2.right; // will be randomized on init
     private MineNodeDustInteractor _dustInteractor;
@@ -65,12 +57,19 @@ public class MineNode : MonoBehaviour
         return _role;
     }
     public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
-        _track = track; 
-        _spawnCell = spawnCell; 
-        _role = track != null ? track.assignedRole : default; 
-        _noteSet = noteSet; 
-        _lockedColor = tint; 
+        _track = track;
+        _spawnCell = spawnCell;
+        _role = track != null ? track.assignedRole : default;
+        _noteSet = noteSet;
+        _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
+        var prof = MusicalRoleProfileLibrary.GetProfile(_role);
+        if (prof != null)
+        {
+            _speed    = prof.mineNodeSpeed;
+            _clearing = prof.mineNodeClearing;
+            _agility  = prof.mineNodeAgility;
+        }
         var explode = GetComponent<Explode>();
         if (explode != null)
         {
@@ -227,7 +226,11 @@ public class MineNode : MonoBehaviour
         _track.highestAllowedNote,
         currentNote);
     ApplyLocalDustAffinity();
-    float targetSpeed = Mathf.Lerp(carveSpeedMin, carveSpeedMax, speed01);
+    float effectiveSpeedMin = Mathf.Lerp(0.5f,  2.5f, _speed);
+    float effectiveSpeedMax = Mathf.Lerp(3f,   14f,   _speed);
+    float effectiveSteer    = Mathf.Lerp(3f,   20f,   _speed);
+    float effectiveMaxSteer = Mathf.Lerp(15f,  80f,   _speed);
+    float targetSpeed = Mathf.Lerp(effectiveSpeedMin, effectiveSpeedMax, speed01);
     targetSpeed = Mathf.Max(targetSpeed, minDesiredSpeedFloor);
 
     if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
@@ -238,8 +241,8 @@ public class MineNode : MonoBehaviour
     Vector2 velocityDelta   = desiredVelocity - _rb.linearVelocity;
 
     // Use mass-scaled force. Clamp helps avoid “solver pinning” at high deltas.
-    Vector2 force = velocityDelta * steerForce * _rb.mass;
-    force = Vector2.ClampMagnitude(force, maxSteerForce);
+    Vector2 force = velocityDelta * effectiveSteer * _rb.mass;
+    force = Vector2.ClampMagnitude(force, effectiveMaxSteer);
     _rb.AddForce(force, ForceMode2D.Force);
 
     // --- BOUNDARY / STALL ESCAPE ---
@@ -388,17 +391,7 @@ public class MineNode : MonoBehaviour
     int bar = 16;
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
-    private float GetRoleTurnAngleDeg(MusicalRole role)
-    {
-        switch (role)
-        {
-            case MusicalRole.Bass:    return turnAngleBass;
-            case MusicalRole.Groove:  return turnAngleGroove;
-            case MusicalRole.Harmony: return turnAngleHarmony;
-            case MusicalRole.Lead:    return turnAngleLead;
-            default:                  return 18f;
-        }
-    }
+    private float GetRoleTurnAngleDeg(MusicalRole _) => Mathf.Lerp(5f, 45f, _agility);
     private static Vector2 Rotate(Vector2 v, float degrees)
     {
         float r = degrees * Mathf.Deg2Rad;
@@ -411,29 +404,9 @@ public class MineNode : MonoBehaviour
     {
         var dust = GetComponent<MineNodeDustInteractor>();
         if (!dust) return;
-
-        switch (role)
-        {
-            case MusicalRole.Bass:
-                // big, clear trench – more appetite, frequent carving
-                dust.ConfigureCarving(intervalSeconds: 0.05f, appetiteMul: 1.4f);
-                break;
-
-            case MusicalRole.Groove:
-                // medium appetite, slightly slower – rhythm-y “dotted” path
-                dust.ConfigureCarving(intervalSeconds: 0.09f, appetiteMul: 1.0f);
-                break;
-
-            case MusicalRole.Harmony:
-                // lighter carving, slower – subtle lace
-                dust.ConfigureCarving(intervalSeconds: 0.11f, appetiteMul: 0.8f);
-                break;
-
-            case MusicalRole.Lead:
-                // sharp, high-contrast nibble – narrow but insistent
-                dust.ConfigureCarving(intervalSeconds: 0.07f, appetiteMul: 1.1f);
-                break;
-        }
+        float interval = Mathf.Lerp(0.14f, 0.04f, _clearing);
+        float appetite = Mathf.Lerp(0.6f,  1.6f,  _clearing);
+        dust.ConfigureCarving(interval, appetite);
     }
     private void HandleDepleted(Vehicle vehicle)
     {

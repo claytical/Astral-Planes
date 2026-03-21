@@ -63,6 +63,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f; // m/s decay per second
     private Vector2 _pushVelocity = Vector2.zero;
+    private float   _speedMul = 1f;
+
+    /// <summary>
+    /// Scales all drift/hungry speed by a multiplier. 0 = full stop, 1 = normal.
+    /// Used by PhaseStar to slow the body to a near standstill during flower mode.
+    /// </summary>
+    public void SetSpeedMultiplier(float mul) => _speedMul = Mathf.Max(0f, mul);
 
     [Serializable]
     private sealed class ScreenBoundsTuning
@@ -237,7 +244,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             Mathf.Max(0f, _profile.starDriftSpeed),
             Mathf.Max(0f, _profile.starHungrySpeed),
             hunger
-        );        float jitter = Mathf.Max(0f, _profile.starDriftJitter);
+        ) * _speedMul;
+        float jitter = Mathf.Max(0f, _profile.starDriftJitter) * _speedMul;
         if (_focus) speed *= bounds.focusSpeedMul;
 
         _rechooseTimer -= dt;

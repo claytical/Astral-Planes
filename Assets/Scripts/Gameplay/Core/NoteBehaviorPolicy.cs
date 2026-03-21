@@ -59,7 +59,7 @@ public static class NoteBehaviorPolicy
             case MusicalRole.Bass:
                 switch (phase)
                 {
-                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Legatify, NoteBehavior.VelocityShape };
+                    case MazeArchetype.Windows:  return new[] { NoteBehavior.Legatify, NoteBehavior.VelocityShape };
                     case MazeArchetype.Evolve:     return new[] { NoteBehavior.Staccatify, NoteBehavior.HumanizeTiming };
                     case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
                     case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify };
@@ -71,7 +71,7 @@ public static class NoteBehaviorPolicy
             case MusicalRole.Harmony:
                 switch (phase)
                 {
-                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Legatify };
+                    case MazeArchetype.Windows:  return new[] { NoteBehavior.Legatify };
                     case MazeArchetype.Evolve:     return new[] { NoteBehavior.VelocityShape, NoteBehavior.AddNeighborOrnament };
                     case MazeArchetype.Intensify:  return new[] { NoteBehavior.InvertVoicing, NoteBehavior.DensityPulse };
                     case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify, NoteBehavior.RegisterCompress };
@@ -83,7 +83,7 @@ public static class NoteBehaviorPolicy
             case MusicalRole.Lead:
                 switch (phase)
                 {
-                    case MazeArchetype.Establish:  return new[] { NoteBehavior.VelocityShape };
+                    case MazeArchetype.Windows:  return new[] { NoteBehavior.VelocityShape };
                     case MazeArchetype.Evolve:     return new[] { NoteBehavior.AddNeighborOrnament, NoteBehavior.HumanizeTiming };
                     case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
                     case MazeArchetype.Release:    return new[] { NoteBehavior.Legatify };
@@ -95,7 +95,7 @@ public static class NoteBehaviorPolicy
             case MusicalRole.Groove:
                 switch (phase)
                 {
-                    case MazeArchetype.Establish:  return new[] { NoteBehavior.Staccatify };
+                    case MazeArchetype.Windows:  return new[] { NoteBehavior.Staccatify };
                     case MazeArchetype.Evolve:     return new[] { NoteBehavior.HumanizeTiming };
                     case MazeArchetype.Intensify:  return new[] { NoteBehavior.Staccatify, NoteBehavior.DensityPulse };
                     case MazeArchetype.Release:    return new[] { NoteBehavior.HumanizeTiming };

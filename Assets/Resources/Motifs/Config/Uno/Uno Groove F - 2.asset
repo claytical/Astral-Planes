@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Uno Groove F - 2
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: Groove riff
-  role: 3
+  roleProfile: {fileID: 11400000, guid: 05cf7af1c912041afbc3402571026c6a, type: 2}
   riff: {fileID: 11400000, guid: db25c2b8882ec4130b3d41ed9d74ca74, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
@@ -26,15 +26,6 @@ MonoBehaviour:
   maxBehaviorsStack: 2
   variation:
     extensionBias: 0.35
-    passingToneProb: 0.2
-    neighborOrnProb: 0.15
-    minMidi: 36
-    maxMidi: 84
-    leapProb: 0.15
     octaveMoveProb: 0.1
     restProb: 0.1
-    humanizeMs: 0.02
     durJitter: 1
-    mutatePitch: 0.08
-    mutateVelocity: 0.12
-    mutateDuration: 0.1

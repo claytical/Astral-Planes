@@ -34,7 +34,7 @@ public static class ConstellationMemoryStore
     {
         return session.snapshots.Select(s => new MotifSnapshot
         {
-            Pattern = Enum.TryParse<MazeArchetype>(s.pattern, out var parsedPhase) ? parsedPhase : MazeArchetype.Establish,
+            Pattern = Enum.TryParse<MazeArchetype>(s.pattern, out var parsedPhase) ? parsedPhase : MazeArchetype.Windows,
             Color = s.color,
             Timestamp = s.timestamp,
             CollectedNotes = s.collectedNotes.Select(n => new MotifSnapshot.NoteEntry(

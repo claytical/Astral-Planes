@@ -53,7 +53,7 @@ public static class BridgeLibrary
     };
 
     private static PhaseBridgeSignature Establish_To_Intensify() => new PhaseBridgeSignature {
-        fromPhase = MazeArchetype.Establish, toPhase = MazeArchetype.Intensify,
+        fromPhase = MazeArchetype.Windows, toPhase = MazeArchetype.Intensify,
         bars = 2, humanizeMs = 6f,
         rhythmOverride = RhythmStyle.Dense,
         noteBehaviorOverride = NoteBehavior.Percussion,
@@ -126,7 +126,7 @@ public static class BridgeLibrary
 
     public static PhaseBridgeSignature For(MazeArchetype from, MazeArchetype to)
     {
-        if (from == MazeArchetype.Establish && to == MazeArchetype.Intensify) return Establish_To_Intensify();
+        if (from == MazeArchetype.Windows && to == MazeArchetype.Intensify) return Establish_To_Intensify();
         if (from == MazeArchetype.Evolve     && to == MazeArchetype.Intensify) return Evolve_To_Intensify();
         if (from == MazeArchetype.Intensify  && to == MazeArchetype.Release)   return Intensify_To_Release();
         if (from == MazeArchetype.Release    && to == MazeArchetype.Wildcard)  return Release_To_Wildcard();
