@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: tres-lead-1
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: tres-lead-1
-  role: 2
+  roleProfile: {fileID: 11400000, guid: b074910f739d0459f81d5e08e65047ab, type: 2}
   riff: {fileID: 11400000, guid: f7e992cfd95de4a37b78c3ccc0863cea, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
@@ -26,15 +26,6 @@ MonoBehaviour:
   maxBehaviorsStack: 2
   variation:
     extensionBias: 0.35
-    passingToneProb: 0.2
-    neighborOrnProb: 0.15
-    minMidi: 36
-    maxMidi: 84
-    leapProb: 0.15
     octaveMoveProb: 0.1
     restProb: 0.1
-    humanizeMs: 0.02
     durJitter: 1
-    mutatePitch: 0.08
-    mutateVelocity: 0.12
-    mutateDuration: 0.1

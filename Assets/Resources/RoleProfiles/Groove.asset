@@ -15,15 +15,11 @@ MonoBehaviour:
   role: 3
   dustColors:
     baseColor: {r: 0, g: 0.9764706, b: 1, a: 0.7607843}
-    chargeColor: {r: 0, g: 1, b: 0.6977861, a: 1}
-    denyColor: {r: 0, g: 0.6799817, b: 1, a: 1}
     shadowColor: {r: 0, g: 0.54350716, b: 0.5566038, a: 1}
   baseAlpha: 1
   dustHardness01: 0.3
-  chargeToWhite: 1
-  denyToShadow: 0.75
-  chargeAlphaBoost: 1
-  denyAlphaBoost: 0.25
-  description: Percussive rhythms that give structure and drive.
-  defaultBehavior: 3
+  mineNodeSpeed: 0.5
+  mineNodeClearing: 0.3
+  mineNodeAgility: 0.2
+  midiPreset: 2
   allowedMidiPresets: 0c000000

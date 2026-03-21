@@ -32,8 +32,13 @@ public class MusicalRoleProfile : ScriptableObject
     [Range(0f, 1f)]
     [Tooltip("How hard dust imprinted/regrown with this role should be. 0 = soft/easy, 1 = hard/resists digging.")]
     public float dustHardness01 = 0.50f;
-    
-    [Header("Presets")]
+
+    [Header("MineNode Balance")]
+    [Range(0f, 1f)] public float mineNodeSpeed    = 0.5f;  // 0 = sluggish, 1 = fast
+    [Range(0f, 1f)] public float mineNodeClearing = 0.5f;  // 0 = light nibble, 1 = aggressive trench
+    [Range(0f, 1f)] public float mineNodeAgility  = 0.5f;  // 0 = gentle curves, 1 = sharp turns
+
+    [Header("Presets")] public int midiPreset;
     public List<int> allowedMidiPresets = new List<int>();
 
     // ---------- Color helpers (authority) ----------

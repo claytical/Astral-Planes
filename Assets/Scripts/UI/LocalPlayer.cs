@@ -184,7 +184,7 @@ public class LocalPlayer : MonoBehaviour
             // Determine phase for regrowth scheduling (keep-clear itself blocks regrow).
             MazeArchetype phaseNow = (gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Establish;
+                : MazeArchetype.Windows;
 
             gfm.dustGenerator.SetVehicleKeepClear(
                 ownerId: _dustKeepClearOwnerId,

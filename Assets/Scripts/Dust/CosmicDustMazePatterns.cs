@@ -16,12 +16,13 @@ using Random = UnityEngine.Random;
 /// </summary>
 public enum MazeArchetype
 {
-    Establish = 0,   // early stable loop
+    Windows = 0,   // early stable loop
     Evolve = 1,      // moderate complexity
     Intensify = 2,   // denser and brighter
     Release = 3,     // breath or breakdown
     Wildcard = 4,    // glitchy, unpredictable
-    Pop = 5          // catchy hook
+    Pop = 5,         // catchy hook
+    Tunnel = 6       // pac-man corridor grid
 }
 
 public static class CosmicDustMazePatterns
@@ -319,6 +320,125 @@ public static class CosmicDustMazePatterns
         return growth;
     }
     /// <summary>
+    /// Pac-Man / labyrinth corridor pattern built via DFS maze carving.
+    ///
+    /// Logical rooms sit on a (corridorStep × corridorStep) grid. A DFS spanning tree
+    /// randomly connects every room through exactly one path. Each room block and carved
+    /// passage is corridorWidth cells wide, so the vehicle can actually navigate through.
+    ///
+    /// corridorStep must be > corridorWidth (wall thickness = step - corridorWidth).
+    ///   corridorStep=5, corridorWidth=2 → 2-cell-wide corridors, 3-cell-thick walls
+    ///   corridorStep=4, corridorWidth=2 → 2-cell-wide corridors, 2-cell-thick walls
+    ///
+    /// phaseOffsetX/Y are accepted for API symmetry but unused; randomness comes from DFS.
+    /// </summary>
+    public static List<(Vector2Int cell, Vector3 world)> BuildPacManTunnels(
+        int width,
+        int height,
+        int corridorStep,
+        int corridorWidth,
+        int phaseOffsetX,
+        int phaseOffsetY,
+        Func<Vector2Int, Vector3> gridToWorld,
+        Func<int, int, bool> isCellAvailable,
+        Func<Vector3, bool> includeWorld = null)
+    {
+        var growth = new List<(Vector2Int, Vector3)>();
+        if (width <= 0 || height <= 0) return growth;
+        if (gridToWorld == null || isCellAvailable == null) return growth;
+
+        corridorWidth = Mathf.Max(1, corridorWidth);
+        int step = Mathf.Max(corridorWidth + 1, corridorStep);
+        int mw   = Mathf.Max(1, width  / step);
+        int mh   = Mathf.Max(1, height / step);
+
+        var openCells = new HashSet<Vector2Int>(mw * mh * step * 4);
+
+        // Open a corridorWidth × corridorWidth block at each logical room centre
+        for (int rx = 0; rx < mw; rx++)
+        for (int ry = 0; ry < mh; ry++)
+        {
+            int bx = rx * step, by = ry * step;
+            for (int dx = 0; dx < corridorWidth; dx++)
+            for (int dy = 0; dy < corridorWidth; dy++)
+                openCells.Add(new Vector2Int(bx + dx, by + dy));
+        }
+
+        // DFS spanning tree — carve passages between rooms
+        var visited = new bool[mw, mh];
+        var stack   = new Stack<Vector2Int>();
+        var rStart  = new Vector2Int(Random.Range(0, mw), Random.Range(0, mh));
+        visited[rStart.x, rStart.y] = true;
+        stack.Push(rStart);
+
+        var logDirs = new[] {
+            new Vector2Int( 1,  0),
+            new Vector2Int(-1,  0),
+            new Vector2Int( 0,  1),
+            new Vector2Int( 0, -1)
+        };
+
+        while (stack.Count > 0)
+        {
+            var cur = stack.Peek();
+
+            var neighbours = new List<Vector2Int>(4);
+            foreach (var d in logDirs)
+            {
+                var nb = cur + d;
+                if (nb.x >= 0 && nb.x < mw && nb.y >= 0 && nb.y < mh && !visited[nb.x, nb.y])
+                    neighbours.Add(nb);
+            }
+
+            if (neighbours.Count == 0) { stack.Pop(); continue; }
+
+            var chosen = neighbours[Random.Range(0, neighbours.Count)];
+            visited[chosen.x, chosen.y] = true;
+            stack.Push(chosen);
+
+            // Carve a corridorWidth-wide passage between the two room blocks.
+            // The passage spans the gap between room edges (not including the room blocks themselves).
+            int px0 = cur.x    * step, py0 = cur.y    * step;
+            int px1 = chosen.x * step, py1 = chosen.y * step;
+
+            if (px0 != px1) // horizontal passage
+            {
+                int xFrom = Mathf.Min(px0, px1) + corridorWidth;
+                int xTo   = Mathf.Max(px0, px1);
+                int yBase = Mathf.Min(py0, py1);
+                for (int x = xFrom; x < xTo; x++)
+                for (int w = 0; w < corridorWidth; w++)
+                    openCells.Add(new Vector2Int(x, yBase + w));
+            }
+            else // vertical passage
+            {
+                int yFrom = Mathf.Min(py0, py1) + corridorWidth;
+                int yTo   = Mathf.Max(py0, py1);
+                int xBase = Mathf.Min(px0, px1);
+                for (int y = yFrom; y < yTo; y++)
+                for (int w = 0; w < corridorWidth; w++)
+                    openCells.Add(new Vector2Int(xBase + w, y));
+            }
+        }
+
+        // Every available cell NOT in openCells becomes dust (wall)
+        for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++)
+        {
+            if (!isCellAvailable(x, y)) continue;
+            if (openCells.Contains(new Vector2Int(x, y))) continue;
+
+            var grid  = new Vector2Int(x, y);
+            var world = gridToWorld(grid);
+            if (includeWorld != null && !includeWorld(world)) continue;
+
+            growth.Add((grid, world));
+        }
+
+        return growth;
+    }
+
+    /// <summary>
     /// Assigns a MusicalRole to every cell in <paramref name="cells"/> using a Voronoi
     /// partition driven by the motif's active roles.
     ///
@@ -342,7 +462,7 @@ public static class CosmicDustMazePatterns
         int gridW,
         int gridH,
         IReadOnlyList<MusicalRole> activeRoles,
-        MazeArchetype phase = MazeArchetype.Establish)
+        MazeArchetype phase = MazeArchetype.Pop)
     {
         var result = new Dictionary<Vector2Int, MusicalRole>(cells.Count);
         if (cells == null || cells.Count == 0) return result;

@@ -1258,7 +1258,7 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     {
         // DrumTrack is level authority; phaseTransitionManager is already cached here.
         if (_phaseTransitionManager != null) return _phaseTransitionManager.currentPhase;
-        return MazeArchetype.Establish;
+        return MazeArchetype.Windows;
     }
     
     private void ValidateSpawnGrid()

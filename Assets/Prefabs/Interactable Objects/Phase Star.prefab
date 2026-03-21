@@ -4921,39 +4921,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnStrategyProfile: {fileID: 11400000, guid: ac591e7aafa4c4e91a2b7661db658f6c,
-    type: 2}
   dominantRoleSwitchDelta: 0.1
   behaviorProfile: {fileID: 11400000, guid: 56d8541b1799a436ca860fa02d237caf, type: 2}
+  shardReadyThreshold: 0.5
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
-  pokeChargeThreshold: 0.37
-  preReadyGrayFloor: 0.15
+  entryOffscreenMargin: 2
+  chargeTastedThreshold: 0.12
+  chargeDecayFloor: 0.08
+  entryArriveThreshold: 1.5
+  entryFadeInSeconds: 0.6
+  pokeChargeThreshold: 0.24
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
   cravingNavigator: {fileID: 4892159809986813886}
-  _progressionMul: 1
-  _isInFocusMode: 0
-  syncRotationToLoop: 1
+  disarmedPushScale: 0.1
   _tracePhaseStar: 1
-  bubbleTint: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 0.3882353}
+  bubbleTint: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 0.2}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   passiveChargeDecayPerSec: 0
   dustToStarChargeMul: 1
   shardMinAlpha: 0.08
-  shardDisarmedAlphaCeil: 0.22
+  shardDisarmedAlphaCeil: 0.1
   shardAlphaLerpSpeed: 6
   shardSnifferTurnSpeed: 180
   shardShedDuration: 0.35
-  shardReadyThreshold: 0.5
-  maxActiveDps: 360
+  disarmedScaleMul: 2.4
+  disarmedScaleSeconds: 0.18
+  disarmedFlowerRotStartDeg: 50
+  disarmedFlowerRotDecaySec: 5
+  disarmedBreathPeriod: 2.5
+  disarmedBreathAlphaMin: 0.04
+  disarmedBreathAlphaMax: 0.18
   _assignedMotif: {fileID: 0}
   _perPetalLayerStep: 0
-  _activeTopBoost: 0
-  _spinEnvMul: 0
-  nowLoop: 0
 --- !u!114 &6754461597857711404
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4972,6 +4975,8 @@ MonoBehaviour:
   dimAlpha: 0.06
   dimRgbMul: 0.08
   dimUsesFixedTint: 1
+  rejectFlashColor: {r: 0.9, g: 0.25, b: 0.05, a: 0.55}
+  rejectFlashSeconds: 0.12
   particles: {fileID: 382306593780773728}
   bubbleRoot: {fileID: 5131073904990169975}
   bubbleSprite: {fileID: 2552610199592648178}
@@ -5013,6 +5018,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 046395d4bfb814e78a40f94065987a0a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
+  pushDecayPerSecond: 5
   bounds:
     kinematicMode: 0
     edgeBounce: 0.9
@@ -5051,6 +5057,7 @@ MonoBehaviour:
   spokeSamples: 4
   snifferIntervalSeconds: 0.3
   snifferBfsBudget: 60
+  hungerFloorWeight: 0.15
   verbose: 0
 --- !u!58 &1335835332103871931
 CircleCollider2D:

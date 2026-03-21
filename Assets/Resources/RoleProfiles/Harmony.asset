@@ -15,15 +15,11 @@ MonoBehaviour:
   role: 1
   dustColors:
     baseColor: {r: 0, g: 1, b: 0.21960784, a: 1}
-    chargeColor: {r: 0.3984537, g: 1, b: 0, a: 1}
-    denyColor: {r: 0, g: 1, b: 0.1750474, a: 0.50980395}
     shadowColor: {r: 0, g: 0.5566038, b: 0.12223455, a: 1}
   baseAlpha: 1
   dustHardness01: 0.2
-  chargeToWhite: 1
-  denyToShadow: 0.75
-  chargeAlphaBoost: 1
-  denyAlphaBoost: 0.25
-  description: "\tLush chords and layered textures that fill in the soundscape."
-  defaultBehavior: 2
+  mineNodeSpeed: 0.3
+  mineNodeClearing: 0.7
+  mineNodeAgility: 0.7
+  midiPreset: 5
   allowedMidiPresets: 04000000

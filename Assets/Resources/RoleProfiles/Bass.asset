@@ -15,15 +15,11 @@ MonoBehaviour:
   role: 0
   dustColors:
     baseColor: {r: 0.23529412, g: 0, b: 1, a: 1}
-    chargeColor: {r: 0, g: 0.3250146, b: 1, a: 1}
-    denyColor: {r: 0.38956833, g: 0, b: 1, a: 0.8}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
   baseAlpha: 1
   dustHardness01: 0.5
-  chargeToWhite: 1
-  denyToShadow: 0.75
-  chargeAlphaBoost: 1
-  denyAlphaBoost: 0.618
-  description: Deep and grounding. Adds weight to the groove with low-end power.
-  defaultBehavior: 0
+  mineNodeSpeed: 0.2
+  mineNodeClearing: 1
+  mineNodeAgility: 0.2
+  midiPreset: 0
   allowedMidiPresets: 00000000

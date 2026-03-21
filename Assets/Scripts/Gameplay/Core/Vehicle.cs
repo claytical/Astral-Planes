@@ -179,6 +179,10 @@ public class Vehicle : MonoBehaviour
     [Tooltip("How close (in steps) the playhead must be to the armed target for auto-commit. Keep small; this is NOT the player timing window.")]
     [Range(0.05f, 1.0f)]
     [SerializeField] private float manualReleaseAutoCommitEpsSteps = 0.35f;
+
+    [Tooltip("Grace period (in steps) after a commit window closes. Notes released this many steps late are still accepted and committed retroactively to the target step.")]
+    [Range(0f, 2f)]
+    [SerializeField] private float manualReleaseGracePeriodSteps = 0.5f;
     private struct ArmedRelease
     {
         public PendingCollectedNote note;
@@ -345,7 +349,7 @@ public class Vehicle : MonoBehaviour
             {
                 var phaseNow = (gfm.phaseTransitionManager != null)
                     ? gfm.phaseTransitionManager.currentPhase
-                    : MazeArchetype.Establish;
+                    : MazeArchetype.Windows;
                 gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
             }
 
@@ -362,7 +366,7 @@ public class Vehicle : MonoBehaviour
             {
                 var phaseNow = (gfm.phaseTransitionManager != null)
                     ? gfm.phaseTransitionManager.currentPhase
-                    : MazeArchetype.Establish;
+                    : MazeArchetype.Windows;
                 gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
             }
             // Skip keep-clear refresh — we're a guest inside the bubble.
@@ -925,7 +929,7 @@ public class Vehicle : MonoBehaviour
             {
                 soulSprite.transform.localScale = Vector3.Lerp(
                     soulSprite.transform.localScale,
-                    Vector3.one * soulMinScale,
+                    Vector3.one * soulMaxScale,
                     soulScaleLerpSpeed * Time.deltaTime
                 );
 
@@ -1382,7 +1386,7 @@ private bool IsCellEmpty(Vector2Int gp)
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Establish;
+            : MazeArchetype.Windows;
 
         int ownerId = GetInstanceID();
 
@@ -1423,7 +1427,7 @@ private bool IsCellEmpty(Vector2Int gp)
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Establish;
+            : MazeArchetype.Windows;
 
         // Compute which cell we're currently in.
         Vector2 pos = (rb != null) ? rb.position : (Vector2)transform.position;
@@ -1465,7 +1469,7 @@ private bool IsCellEmpty(Vector2Int gp)
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Establish;
+            : MazeArchetype.Windows;
 
         gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
     }
@@ -1484,7 +1488,7 @@ private bool IsCellEmpty(Vector2Int gp)
 
         var phaseNow = (gfm.phaseTransitionManager != null)
             ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Establish;
+            : MazeArchetype.Windows;
 
         gen.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
     }
@@ -1902,6 +1906,16 @@ private void DoImpactDig(Collision2D coll)
 
     if (fwdToTarget > manualReleaseArmAheadSteps)
     {
+        // Check if the playhead just passed the target within the grace period.
+        double backFromTarget = effectiveTotal - fwdToTarget;
+        if (manualReleaseGracePeriodSteps > 0f && backFromTarget <= manualReleaseGracePeriodSteps)
+        {
+            // Late but within grace — consume and commit retroactively to targetAbsStep.
+            _pendingNotes.Dequeue();
+            CommitManualReleaseAtStep(p, targetAbsStep);
+            return true;
+        }
+
         // Outside the timing window — treat as an intentional discard so the player
         // can skip notes they don't want to place.
         _pendingNotes.Dequeue();

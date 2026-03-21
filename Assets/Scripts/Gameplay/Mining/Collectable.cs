@@ -618,7 +618,7 @@ private IEnumerator SpawnArrivalRoutine(
 
             MazeArchetype phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
                 ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Establish;
+                : MazeArchetype.Windows;
             dustGen.ClaimTemporaryDiskForCollectable(
                 cur,
                 dustPocketRadiusWorld,

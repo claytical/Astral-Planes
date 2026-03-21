@@ -29,7 +29,7 @@ public partial class GameFlowManager
         var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
         motifSnap.Pattern = phaseTransitionManager != null
             ? phaseTransitionManager.currentPhase
-            : MazeArchetype.Establish;
+            : MazeArchetype.Windows;
 
         _motifSnapshots.Add(motifSnap);
         ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
@@ -45,51 +45,25 @@ public partial class GameFlowManager
 
         Debug.Log($"[MOTIF-BRIDGE] Bridge duration: {motifBridgeSec:F2}s (motifBridgeHoldSeconds fallback={motifBridgeHoldSeconds})");
 
-        // Capture note marker world positions before the coral grows (NoteViz UI is hidden but
-        // Transform.position is still readable on inactive GameObjects).
-        var noteOrigins = new Dictionary<(int step, Color32 trackColor), Vector3>();
-        if (noteViz != null)
+        // Show GlyphApplicator — instant 2D glyph held for bridge duration.
+        if (motifGlyphApplicator != null)
         {
-            foreach (var kv in noteViz.noteMarkers)
-            {
-                var track = kv.Key.Item1;
-                var step  = kv.Key.Item2;
-                var tr    = kv.Value;
-                if (tr == null || track == null) continue;
-                var tag = tr.GetComponent<MarkerTag>();
-                if (tag == null || tag.isPlaceholder) continue; // only lit (collected) markers
-                noteOrigins[(step, (Color32)track.trackColor)] = tr.position;
-            }
-        }
-
-        // Show MotifCoralVisualizer — grows over exactly one musical loop.
-        if (motifCoralVisualizer != null)
-        {
-            motifCoralVisualizer.gameObject.SetActive(true);
-
-            // Fit coral to the live play area so it stays within the visible game space.
+            motifGlyphApplicator.gameObject.SetActive(true);
             if (activeDrumTrack != null && activeDrumTrack.TryGetPlayAreaWorld(out var playArea))
             {
-                motifCoralVisualizer.FitToPlayArea(
-                    playArea.width,
-                    playArea.height,
+                motifGlyphApplicator.FitToPlayArea(
+                    playArea.width, playArea.height,
                     (playArea.left + playArea.right) * 0.5f,
-                    (playArea.bottom + playArea.top) * 0.5f
-                );
+                    (playArea.bottom + playArea.top) * 0.5f);
             }
-
-            yield return StartCoroutine(
-                motifCoralVisualizer.GrowMotifCoral(
-                    motifSnap,
-                    motifBridgeSec,
-                    ReadAveragedSteer,
-                    noteOrigins)
-            );
-            motifCoralVisualizer.gameObject.SetActive(false);
+            motifGlyphApplicator.Apply(motifSnap);
+            yield return new WaitForSeconds(motifBridgeSec);
+            motifGlyphApplicator.Clear();
+            motifGlyphApplicator.gameObject.SetActive(false);
         }
         else
         {
-            Debug.LogWarning("[MOTIF-BRIDGE] No MotifCoralVisualizer assigned — holding without visual.");
+            Debug.LogWarning("[MOTIF-BRIDGE] No GlyphApplicator assigned — holding without visual.");
             yield return new WaitForSeconds(motifBridgeSec);
         }
 
@@ -216,7 +190,7 @@ public partial class GameFlowManager
         var snapshot = new MotifSnapshot { Timestamp = Time.time };
 
         // --- PHASE CONTEXT (REPLACE THESE 2 LINES WITH YOUR REAL API) ---
-        snapshot.Pattern = MazeArchetype.Establish; // MusicalPhase
+        snapshot.Pattern = MazeArchetype.Windows; // MusicalPhase
         snapshot.Color = dustGenerator.MazeColor(); // Color (maze/dust/phase tint)
         // ---------------------------------------------------------------
 

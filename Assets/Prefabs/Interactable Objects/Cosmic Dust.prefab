@@ -54,37 +54,39 @@ MonoBehaviour:
     spriteScaleOutSeconds: 0.2
     particleGrowInSeconds: 1
     fadeOutSeconds: 0.2
+  dustPluckSwellSeconds: 1.4
+  dustPluckMinDurationTicks: 360
+  dustPluckMaxDurationTicks: 1440
+  dustPluckMinVelocity127: 40
+  dustPluckMaxVelocity127: 70
+  dustPluckMinCooldownSeconds: 0.8
+  dustPluckMaxCooldownSeconds: 2
   _chargeColor: {r: 1, g: 1, b: 1, a: 1}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
+  regrowAlphaCapped: 0
+  colliderDisabledAlpha: 0.08
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
     particleFootprintMul: 0.775
     sprite: {fileID: 8999714297043290424}
-    starRemovesWithoutRegrow: 0
-    starAlphaFadeBias: 0
-    fadeSeconds: 0
   interaction:
-    speedScale: 0.4
-    accelScale: 0.4
     energyDrainPerSecond: 0
-    noDrainWhileBoosting: 0
   clearing:
     hardness01: 0.367
-    nonBoostSecondsToBreak: 0
-    temporaryRegrowDelaySeconds: 0
   useWorkShaderParams: 1
-  previewWorkHoldSeconds: 0.1
-  behavior: 0
-  slowFactor: 0.2
-  slowDuration: 0.1
-  lateralForce: 1.59
-  turbulence: 0.97
   terrainCollider: {fileID: 0}
-  solidLayer: 7
-  nonBlockingLayer: 0
-  epochId: 0
-  stayForceEvery: 0
+  enableVehicleCompression: 1
+  noseCompressAmount: 0.22
+  noseBulgeAmount: 0.1
+  noseCompressMaxOffsetWorld: 0.16
+  noseProbeWorld: 0.55
+  noseCompressSpeedForFull: 10
+  noseCompressBoostBonus: 0.2
+  noseContactGraceSeconds: 0.075
+  noseMinimumVisibleSeconds: 0.05
+  noseCompressAttackSharpness: 10
+  noseCompressReleaseSharpness: 16
   _baseEmission: 10
   denyPulseDefaultSeconds: 0.25
 --- !u!114 &8747843313378906591
@@ -104,6 +106,10 @@ MonoBehaviour:
   preExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
+  tintExplosions: 1
+  explosionTint: {r: 1, g: 1, b: 1, a: 1}
+  multiplyWithAuthoredColor: 1
+  tintTrails: 1
 --- !u!61 &3983120499980671434
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -176,13 +182,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2371707622271433480}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0.003926977, w: 0.9999923}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4213040972611002}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0.45}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!198 &5371160903463010692
 ParticleSystem:
   m_ObjectHideFlags: 0
@@ -192,7 +198,7 @@ ParticleSystem:
   m_GameObject: {fileID: 2371707622271433480}
   serializedVersion: 8
   lengthInSec: 0.5
-  simulationSpeed: 0.4
+  simulationSpeed: 0.8
   stopAction: 0
   cullingMode: 0
   ringBufferMode: 0
@@ -761,7 +767,7 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
+      scalar: 0.001
       minScalar: 0
       maxCurve:
         serializedVersion: 2

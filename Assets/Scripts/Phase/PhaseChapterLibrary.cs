@@ -15,6 +15,9 @@ public class PhaseChapterLibrary : ScriptableObject
 
     public List<Chapter> chapters = new();
 
+    public MazeArchetype FirstPhase =>
+        chapters != null && chapters.Count > 0 ? chapters[0].phase : MazeArchetype.Windows;
+
     public Chapter Get(MazeArchetype phase)
         => chapters.Find(c => c.phase == phase);
 }

@@ -9,9 +9,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2614095863033673403}
+  - component: {fileID: 6267414685674281640}
   - component: {fileID: 1970310610805977373}
   - component: {fileID: 3138199776794840757}
-  - component: {fileID: 6267414685674281640}
   - component: {fileID: 964252887607637339}
   - component: {fileID: 7090461230668326449}
   - component: {fileID: -230908558113346295}
@@ -39,6 +39,87 @@ Transform:
   - {fileID: 2182521702435531297}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6267414685674281640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableManualNoteRelease: 1
+  manualReleaseQueueCapacity: 9
+  occupiedStepVelocityMultiplier: 1.25
+  occupiedStepOctaveAccent: 1
+  maxDigCellsSoft: 10
+  minDigCellsWhenBoosting: 1
+  impactDigCooldownSeconds: 0.12
+  digBaseCellCost: 1
+  digHardnessCost: 1
+  profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
+  capacity: 85
+  arcadeMaxSpeed: 14
+  arcadeAccel: 10
+  arcadeBoostAccel: 80
+  arcadeLinearDamping: 2
+  arcadeAngularDamping: 0.5
+  requireBoostForThrust: 0
+  coastBrakeForce: 6
+  stopSpeed: 0.05
+  stopAngularSpeed: 5
+  soulSprite: {fileID: 1466181140352930863}
+  soulMinScale: 0.3
+  soulMaxScale: 1.2
+  soulScaleLerpSpeed: 14
+  soulAlphaMin: 0
+  soulAlphaMax: 0.85
+  inputDeadzone: 0.2
+  inputTimeout: 0.15
+  enableRecovery: 1
+  viewportOobMargin: 0.15
+  minSecondsBetweenRecoveries: 0.75
+  respawnSearchRadiusCells: 8
+  stuckSpeedThreshold: 0.35
+  stuckSecondsInVoid: 0.6
+  gravityVoidMask:
+    serializedVersion: 2
+    m_Bits: 0
+  gravityVoidTag: GravityVoid
+  voidProbeRadiusWorld: 0.6
+  energyLevel: 85
+  boosting: 0
+  trail: {fileID: 5973205746167519599, guid: b8208b79aa374604699ea6099e1fbff6, type: 3}
+  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
+  playerStatsUI: {fileID: 0}
+  playerStats: {fileID: 0}
+  rb: {fileID: 0}
+  isLocked: 0
+  keepDustClearAroundVehicle: 1
+  vehicleKeepClearRadiusCells: 1
+  vehicleKeepClearRefreshSeconds: 0.1
+  useVehiclePlacementResonance: 1
+  vehiclePlacementColorLerpSpeed: 10
+  vehiclePlacementMinTint: 0.08
+  vehiclePlacementOscillation: 0.18
+  vehiclePlacementOscillationSpeed: 1
+  carveSpawnRestPocket: 1
+  spawnRestPocketAutoRadius: 0
+  spawnRestPocketRadiusCells: 3
+  spawnRestPocketFadeSeconds: 0.05
+  spawnRestPocketDelaySeconds: 0
+  logScaleCalibrationOnAssign: 1
+  manualReleaseUseArmLock: 1
+  manualReleaseArmAheadSteps: 6
+  manualReleaseAutoCommitEpsSteps: 0.35
+  releaseCue: {fileID: 0}
+  trailSlotSpacing: 0.55
+  trailFirstSlotOffset: 0.7
+  trailHistoryCapacity: 48
+  trailReleasePulseSteps: 4
 --- !u!212 &1970310610805977373
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -125,88 +206,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 0
---- !u!114 &6267414685674281640
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  enableManualNoteRelease: 1
-  manualReleaseQueueCapacity: 9
-  occupiedStepVelocityMultiplier: 1.25
-  occupiedStepOctaveAccent: 1
-  maxDigCellsSoft: 10
-  minDigCellsWhenBoosting: 1
-  impactDigCooldownSeconds: 0.12
-  digBaseCellCost: 1
-  digHardnessCost: 1
-  profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
-  capacity: 85
-  arcadeMaxSpeed: 14
-  arcadeAccel: 10
-  arcadeBoostAccel: 80
-  arcadeLinearDamping: 2
-  arcadeAngularDamping: 0.5
-  requireBoostForThrust: 0
-  coastBrakeForce: 6
-  stopSpeed: 0.05
-  stopAngularSpeed: 5
-  soulSprite: {fileID: 1466181140352930863}
-  soulMinScale: 0.3
-  soulMaxScale: 1.2
-  soulScaleLerpSpeed: 14
-  soulAlphaMin: 0
-  soulAlphaMax: 0.85
-  inputDeadzone: 0.2
-  inputTimeout: 0.15
-  enableRecovery: 1
-  viewportOobMargin: 0.15
-  minSecondsBetweenRecoveries: 0.75
-  respawnSearchRadiusCells: 8
-  stuckSpeedThreshold: 0.35
-  stuckSecondsInVoid: 0.6
-  gravityVoidMask:
-    serializedVersion: 2
-    m_Bits: 0
-  gravityVoidTag: GravityVoid
-  voidProbeRadiusWorld: 0.6
-  energyLevel: 85
-  boosting: 0
-  trail: {fileID: 5973205746167519599, guid: b8208b79aa374604699ea6099e1fbff6, type: 3}
-  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
-  playerStatsUI: {fileID: 0}
-  playerStats: {fileID: 0}
-  rb: {fileID: 0}
-  isLocked: 0
-  keepDustClearAroundVehicle: 1
-  vehicleKeepClearRadiusCells: 1
-  vehicleKeepClearRefreshSeconds: 0.1
-  useVehiclePlacementResonance: 1
-  vehiclePlacementColorLerpSpeed: 10
-  vehiclePlacementMinTint: 0.08
-  vehiclePlacementOscillation: 0.18
-  vehiclePlacementOscillationSpeed: 1
-  carveSpawnRestPocket: 1
-  spawnRestPocketAutoRadius: 0
-  spawnRestPocketRadiusCells: 3
-  spawnRestPocketFadeSeconds: 0.05
-  spawnRestPocketDelaySeconds: 0
-  logScaleCalibrationOnAssign: 1
-  manualReleaseWindowSteps: 1.25
-  manualReleaseUseArmLock: 1
-  manualReleaseArmAheadSteps: 6
-  manualReleaseAutoCommitEpsSteps: 0.35
-  releaseCue: {fileID: 0}
-  trailSlotSpacing: 0.55
-  trailFirstSlotOffset: 0.7
-  trailHistoryCapacity: 48
-  trailReleasePulseSteps: 4
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -376,7 +375,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.64, y: 0.54}
+    oldSize: {x: 0.62, y: 0.52}
     newSize: {x: 0.88, y: 0.74}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -496,7 +495,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &2182521702435531297
 Transform:
   m_ObjectHideFlags: 0

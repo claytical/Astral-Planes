@@ -118,8 +118,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public MidiStreamPlayer midiStreamPlayer; // Plays MIDI notes
     public DrumTrack drumTrack;
     private int channel;
-    [SerializeField] private int preset;
-    [SerializeField] private int bank;
+    private int preset;
+    private int bank;
 
     public int Preset => preset;
     public int Bank   => bank;
@@ -385,13 +385,15 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
 }
 
-    public void RefreshRoleColorsFromProfile()
+    public void RefreshRoleColorsFromProfile(MusicalRoleProfile overrideProfile = null)
     {
-        var prof = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        var prof = overrideProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
         if (prof == null) return;
 
         trackColor       = prof.GetBaseColor();
-        trackShadowColor = prof.GetShadowColor(); // new field on MusicalRoleProfile
+        trackShadowColor = prof.GetShadowColor();
+        preset           = prof.midiPreset;
+        midiVoice?.SetPreset(prof.midiPreset);
     }
 
     void Awake()
@@ -400,16 +402,18 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (!loopPattern) loopPattern = GetComponent<LoopPattern>();
         _expansionCtrl = new TrackExpansionController(this);
         _expansionCtrl?.Bind(drumTrack);
+        var awakeProf = MusicalRoleProfileLibrary.GetProfile(assignedRole);
         if (midiVoice != null)
         {
             midiVoice.Bind(
                 midiStreamPlayer,
                 drumTrack,
-                RemainingActiveWindowSec
+                RemainingActiveWindowSec,
+                awakeProf?.midiPreset ?? 0
             );
         }
 
-        RefreshRoleColorsFromProfile();
+        RefreshRoleColorsFromProfile(awakeProf);
     }
     void Start() {
         if (controller == null)
