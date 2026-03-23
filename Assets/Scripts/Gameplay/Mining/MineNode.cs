@@ -49,6 +49,7 @@ public class MineNode : MonoBehaviour
     private float _clearing = 0.5f;
     private float _agility  = 0.5f;
     private int _lastProcessedStep = -1;
+    private float _rescanTimer = 0f;
     private Vector2 _carveDir = Vector2.right; // will be randomized on init
     private MineNodeDustInteractor _dustInteractor;
     private float _currentDesiredSpeed;
@@ -155,50 +156,89 @@ public class MineNode : MonoBehaviour
         return;
     }
 
-    EnsureTurnStepsCached();
-
     // ---- Tunables (safe defaults) ----
-    const float microTurnGate        = 0.15f; // how much we turn on non-authored steps
     const float stallSpeed           = 0.20f; // below this, consider "stalled"
     const float stuckDot             = 0.10f; // below this alignment, consider "not progressing"
     const float escapeJitterDeg      = 25f;   // random jitter after an escape redirect
     const float minDesiredSpeedFloor = 0.25f; // avoid meaningless speed caps downstream
 
-    // New: stuck breaker sampling / cooldown
+    // Stuck breaker sampling / cooldown
     const float stallSamplePeriod    = 0.40f; // how often we evaluate true "not moving"
     const float stallDistanceEps     = 0.12f; // moved less than this in sample window => stall hit
     const float escapeCooldown       = 0.30f; // don't escape every frame
 
-    // STEP INDEX SOURCE
-    // If _drumTrack.currentStep is stable and DSP-based, keep using it:
+    // STEP INDEX SOURCE (used for note-driven speed below)
     int stepNow = _drumTrack.currentStep;
 
-    // --- STEP-BASED TURNING (authored-step keyframes) ---
-    if (stepNow != _lastProcessedStep)
+    // --- CORRIDOR LOOKAHEAD SCANNER ---
+    // Moves through open space while hugging dust walls.
+    // On a wall-ahead or timer expiry, scores 8 directions by:
+    //   open cells ahead + wall-adjacency bonus - backward penalty.
+    _rescanTimer -= Time.fixedDeltaTime;
+    Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
+
+    bool wallAhead = false;
+    for (int i = 1; i <= 3; i++)
     {
-        _lastProcessedStep = stepNow;
+        var probe = myCell + new Vector2Int(
+            Mathf.RoundToInt(_carveDir.x * i),
+            Mathf.RoundToInt(_carveDir.y * i));
+        if (_drumTrack.HasDustAt(probe)) { wallAhead = true; break; }
+    }
 
-        bool isTurnStep = (_turnStepSet != null && _turnStepSet.Contains(stepNow));
-        float turnGate  = isTurnStep ? 1f : microTurnGate;
+    if (wallAhead || _rescanTimer <= 0f)
+    {
+        _rescanTimer = 0.6f;
 
-        int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
+        Vector2[] candidates = {
+            Vector2.right,
+            new Vector2( 1f,  1f).normalized,
+            Vector2.up,
+            new Vector2(-1f,  1f).normalized,
+            Vector2.left,
+            new Vector2(-1f, -1f).normalized,
+            Vector2.down,
+            new Vector2( 1f, -1f).normalized,
+        };
 
-        float note01 = Mathf.InverseLerp(
-            _track.lowestAllowedNote,
-            _track.highestAllowedNote,
-            note);
+        float bestScore = float.MinValue;
+        Vector2 bestDir = _carveDir;
 
-        _lastNote01 = note01;
+        foreach (var dir in candidates)
+        {
+            float score = 0f;
 
-        float baseAngle = GetRoleTurnAngleDeg(_role);
+            // Count open cells ahead (stop at first wall)
+            for (int i = 1; i <= 3; i++)
+            {
+                var probe = myCell + new Vector2Int(
+                    Mathf.RoundToInt(dir.x * i),
+                    Mathf.RoundToInt(dir.y * i));
+                if (!_drumTrack.HasDustAt(probe)) score += 1f;
+                else break;
+            }
 
-        // Scale turn magnitude by pitch + whether this step is authored as a turn.
-        float turnAngle = Mathf.Lerp(baseAngle * 0.5f, baseAngle * 1.25f, note01) * turnGate;
+            // Wall-hugging bonus: prefer directions alongside a wall, decaying with distance.
+            // Checked out to 3 cells so the node is attracted to dust patches from afar.
+            for (int d = 1; d <= 3; d++)
+            {
+                var lc = myCell + new Vector2Int(Mathf.RoundToInt(-dir.y * d), Mathf.RoundToInt( dir.x * d));
+                var rc = myCell + new Vector2Int(Mathf.RoundToInt( dir.y * d), Mathf.RoundToInt(-dir.x * d));
+                if (_drumTrack.HasDustAt(lc) || _drumTrack.HasDustAt(rc))
+                {
+                    score += 1.5f / d; // 1.5 at 1 cell, 0.75 at 2, 0.5 at 3
+                    break;
+                }
+            }
 
-        // If you want deterministic "jitter" per step, replace Random.Range with a hash of (stepNow, _rngSalt).
-        float delta = UnityEngine.Random.Range(-turnAngle, turnAngle);
+            // Backward penalty: avoid reversing unless the stall escape intervenes
+            if (Vector2.Dot(dir, _carveDir) < -0.5f)
+                score *= 0.1f;
 
-        _carveDir = Rotate(_carveDir, delta).normalized;
+            if (score > bestScore) { bestScore = score; bestDir = dir; }
+        }
+
+        _carveDir = bestDir.normalized;
     }
     var vehicles = GameFlowManager.Instance?.localPlayers;
     if (vehicles != null)
@@ -225,6 +265,7 @@ public class MineNode : MonoBehaviour
         _track.lowestAllowedNote,
         _track.highestAllowedNote,
         currentNote);
+    _lastNote01 = speed01; // keep heal delay responsive to pitch
     ApplyLocalDustAffinity();
     float effectiveSpeedMin = Mathf.Lerp(0.5f,  2.5f, _speed);
     float effectiveSpeedMax = Mathf.Lerp(3f,   14f,   _speed);
@@ -269,7 +310,7 @@ public class MineNode : MonoBehaviour
             if (moved < stallDistanceEps && pressedNow) _stallHits++;
             else _stallHits = Mathf.Max(0, _stallHits - 1);
 
-            confirmedStall = (_stallHits >= 2); // require persistence across samples
+            confirmedStall = (_stallHits >= 1); // single sample confirmation for faster corner escape
         }
 
         _lastPosForStall = pos;
@@ -287,7 +328,7 @@ public class MineNode : MonoBehaviour
         Vector2 fwd = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
         Vector2 left  = new Vector2(-fwd.y, fwd.x);
         Vector2 right = new Vector2(fwd.y, -fwd.x);
-        Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
+//        Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
         int w = _drumTrack.GetSpawnGridWidth();
         int h = _drumTrack.GetSpawnGridHeight();
         Vector2 toCenter = new Vector2(w * 0.5f - myCell.x, h * 0.5f - myCell.y);

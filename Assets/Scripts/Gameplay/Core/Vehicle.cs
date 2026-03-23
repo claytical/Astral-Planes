@@ -347,10 +347,7 @@ public class Vehicle : MonoBehaviour
             // Release any existing keep-clear claim so refuge cells can regrow.
             if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
-                var phaseNow = (gfm.phaseTransitionManager != null)
-                    ? gfm.phaseTransitionManager.currentPhase
-                    : MazeArchetype.Windows;
-                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
             }
 
             // Still run the loop-boundary timer and input hygiene below,
@@ -364,10 +361,7 @@ public class Vehicle : MonoBehaviour
             // Release keep-clear claim so refuge dust regrows.
             if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
-                var phaseNow = (gfm.phaseTransitionManager != null)
-                    ? gfm.phaseTransitionManager.currentPhase
-                    : MazeArchetype.Windows;
-                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
             }
             // Skip keep-clear refresh — we're a guest inside the bubble.
         }
@@ -1384,10 +1378,6 @@ private bool IsCellEmpty(Vector2Int gp)
         var drum = gfm.activeDrumTrack;
         if (gen == null || drum == null) return;
 
-        var phaseNow = (gfm.phaseTransitionManager != null)
-            ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Windows;
-
         int ownerId = GetInstanceID();
 
         Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
@@ -1396,7 +1386,7 @@ private bool IsCellEmpty(Vector2Int gp)
         {
             // Claim just the center cell (radius=0, no force-remove) so dust can never
             // regrow directly under the vehicle, without actively clearing any dust.
-            gen.SetVehicleKeepClear(ownerId, centerCell, 0, phaseNow, forceRemoveExisting: false);
+            gen.SetVehicleKeepClear(ownerId, centerCell, 0, forceRemoveExisting: false);
             return;
         }
 
@@ -1406,7 +1396,6 @@ private bool IsCellEmpty(Vector2Int gp)
             ownerId,
             centerCell,
             Mathf.Max(0, vehicleKeepClearRadiusCells),
-            phaseNow,
             forceRemoveExisting: false,
             forceRemoveFadeSeconds: 0.20f
         );
@@ -1424,10 +1413,6 @@ private bool IsCellEmpty(Vector2Int gp)
         var gen = gfm.dustGenerator;
 
         if (gen == null || drumTrack == null) yield break;
-
-        var phaseNow = (gfm.phaseTransitionManager != null)
-            ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Windows;
 
         // Compute which cell we're currently in.
         Vector2 pos = (rb != null) ? rb.position : (Vector2)transform.position;
@@ -1457,21 +1442,16 @@ private bool IsCellEmpty(Vector2Int gp)
             ownerId,
             centerCell,
             radiusCells,
-            phaseNow,
             forceRemoveExisting: true,
             forceRemoveFadeSeconds: Mathf.Max(0.01f, spawnRestPocketFadeSeconds)
         );
-        gen.ReleaseVehicleKeepClear(ownerId, phaseNow);
+        gen.ReleaseVehicleKeepClear(ownerId);
     }
     void OnDisable()
     {
         if (gfm == null || gfm.dustGenerator == null) return;
 
-        var phaseNow = (gfm.phaseTransitionManager != null)
-            ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Windows;
-
-        gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+        gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
     }
     private void OnDestroy()
     {
@@ -1486,11 +1466,7 @@ private bool IsCellEmpty(Vector2Int gp)
         var gen = (gfm != null) ? gfm.dustGenerator : null;
         if (gen == null) return;
 
-        var phaseNow = (gfm.phaseTransitionManager != null)
-            ? gfm.phaseTransitionManager.currentPhase
-            : MazeArchetype.Windows;
-
-        gen.ReleaseVehicleKeepClear(GetInstanceID(), phaseNow);
+        gen.ReleaseVehicleKeepClear(GetInstanceID());
     }
     private void ConsumeEnergy(float amount)
         {

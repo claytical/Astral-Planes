@@ -2287,14 +2287,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         bool cellHasDust = dustGen != null && dustGen.HasDustAt(chosenCell);
         if (cellHasDust && dustGen != null)
         {
-            var gfm = GameFlowManager.Instance;
-            MazeArchetype phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
-                ? gfm.phaseTransitionManager.currentPhase
-                : drumTrack.GetCurrentPhaseSafe();
-
             // How long the center stays empty while "jailed"
             const float jailHoldSeconds = 4.0f; // tune (or serialize)
-            dustGen.CreateJailCenterForCollectable(chosenCell, phaseNow, jailHoldSeconds, ownerId: burstId);
+            dustGen.CreateJailCenterForCollectable(chosenCell, jailHoldSeconds, ownerId: burstId);
         }
 
         if (originWorld.HasValue && spawnJitterRadius > 0f)

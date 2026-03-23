@@ -12,26 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 06e2b29f6cb454beeb4ff9412f9f1b5b, type: 3}
   m_Name: Phase Library
   m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
-  chapters:
-  - phase: 6
+  phases:
+  - phaseName: We Begin
     motifs:
     - {fileID: 11400000, guid: 5f2a721cab8e94c648c3d1d571a52e62, type: 2}
-    loopMotifs: 0
-  - phase: 0
-    motifs:
-    - {fileID: 11400000, guid: c55899e7953cc4f53bd61991852a4043, type: 2}
-    - {fileID: 11400000, guid: 4f9fbf90f0cf1416baa56372e3f9af95, type: 2}
-    - {fileID: 11400000, guid: c55899e7953cc4f53bd61991852a4043, type: 2}
-    loopMotifs: 0
-  - phase: 0
-    motifs:
-    - {fileID: 11400000, guid: 6401f559d669148ceb6b302e80d3f0df, type: 2}
-    loopMotifs: 0
-  - phase: 1
-    motifs:
-    - {fileID: 11400000, guid: 0bc601df3260a4ced88b5418d38584ca, type: 2}
-    loopMotifs: 0
-  - phase: 4
-    motifs:
-    - {fileID: 11400000, guid: 9eeaf2461f71645d3bf232959c99621c, type: 2}
     loopMotifs: 0

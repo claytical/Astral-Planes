@@ -100,7 +100,7 @@ public class HarmonyDirector : MonoBehaviour
         ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
 }
 
-    private void HandlePhaseChangedBridgeAware(MazeArchetype from, MazeArchetype to)
+    private void HandlePhaseChangedBridgeAware()
 {
     // 1) If enabled, stage the motif's chord progression as the next profile.
     MotifProfile motif = null;
@@ -113,19 +113,11 @@ public class HarmonyDirector : MonoBehaviour
         {
             // Stage for swap at the next commit (do not apply immediately here).
             SetActiveProfile(motif.chordProgression, applyImmediately: false);
-            Debug.Log($"[CHORD][HD] Staged motif chord profile '{motif.chordProgression.name}' for phase transition {from} → {to}.");
-        }
-        else
-        {
-            if (motif == null)
-                Debug.Log($"[CHORD][HD] Phase {from} → {to}: no current motif; keeping existing chord profile.");
-            else
-                Debug.Log($"[CHORD][HD] Phase {from} → {to}: motif '{motif.name}' has no chordProgression; keeping existing chord profile.");
         }
     }
 
     // 2) Preserve existing bridge timing behavior.
-    var sig = BridgeLibrary.For(from, to);
+    var sig = BridgeLibrary.Default();
     switch (sig.commitTiming)
     {
         case HarmonyCommit.AtBridgeStart:

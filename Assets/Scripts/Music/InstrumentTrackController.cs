@@ -1364,28 +1364,4 @@ public class InstrumentTrackController : MonoBehaviour
 
         
     }
-    private (NoteBehavior behavior, RhythmStyle rhythm) GetDefaultStyleForPhaseAndRole(MazeArchetype phase, MusicalRole role) {
-    switch (phase)
-    {
-        case MazeArchetype.Intensify:
-            return role == MusicalRole.Groove
-                ? (NoteBehavior.Percussion, RhythmStyle.Dense)
-                : (NoteBehavior.Lead, RhythmStyle.Syncopated);
-
-        case MazeArchetype.Release:
-            return (NoteBehavior.Drone, RhythmStyle.Sparse);
-
-        case MazeArchetype.Evolve:
-            return (NoteBehavior.Lead, RhythmStyle.Steady);
-
-        case MazeArchetype.Wildcard:
-            return (NoteBehavior.Glitch, RhythmStyle.Triplet);
-
-        case MazeArchetype.Pop:
-            return (NoteBehavior.Harmony, RhythmStyle.Steady);
-
-        default: // Establish
-            return (NoteBehavior.Lead, RhythmStyle.Steady);
-    }
-}
 }

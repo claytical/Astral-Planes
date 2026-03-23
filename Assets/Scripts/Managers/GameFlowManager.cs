@@ -278,6 +278,13 @@ public partial class GameFlowManager : MonoBehaviour
     Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips END");
 
     // --------------------
+    // STEP 1b: Load first phase + motif, configure tracks with note sets
+    // --------------------
+    Debug.Log("[GFM] [STEP 1b] StartChapter BEGIN");
+    phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+    Debug.Log("[GFM] [STEP 1b] StartChapter END");
+
+    // --------------------
     // STEP 2: Bind graph + init viz/harmony
     // --------------------
 
@@ -285,18 +292,7 @@ public partial class GameFlowManager : MonoBehaviour
     harmony.Initialize(activeDrumTrack, controller);
     Debug.Log("[GFM] [STEP 2] Bind ARP + init NoteViz/Harmony END"); 
     // STEP 2: Choose phase chapter
-
-    // STEP 2.5: Choose the chapter + first paragraph motif BEFORE starting drums.
-    if (phaseTransitionManager != null)
-    {
-        var startPhase = phaseTransitionManager.GetFirstPhase();
-        phaseTransitionManager.StartChapter(startPhase, "GFM/TrackSetup");
-    }
-    else
-    {
-        Debug.LogWarning("[GFM] No PhaseTransitionManager; DrumTrack will boot from inspector/default clip.");
-    }
-
+    
     activeDrumTrack.ManualStart();
     dustGenerator.ManualStart();
     
@@ -329,7 +325,14 @@ public partial class GameFlowManager : MonoBehaviour
     if (phaseTransitionManager.currentMotif != null)
         harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
     Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
-    StartMazeAndStarForPhase(phase);
+
+    // --------------------
+    // STEP 6: Build first maze + spawn PhaseStar
+    // --------------------
+    Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar BEGIN");
+    yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+    Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar END");
+
     _setupDone = true;
     _setupInFlight = false;
     Debug.Log("[GFM] [SETUP] Completed successfully.");
@@ -395,14 +398,6 @@ public partial class GameFlowManager : MonoBehaviour
             if (gridAnchor) RegisterPlayerStatsGrid(gridAnchor.transform);
         }
     }
-
-    private void HandleChapterChanged(MazeArchetype oldP, MazeArchetype newP)
-    {
-        var prof = activeDrumTrack.phasePersonalityRegistry != null ? activeDrumTrack.phasePersonalityRegistry.Get(newP) : null;
-        if (dustGenerator != null && prof != null)
-            dustGenerator.ApplyProfile(prof);
-    }
-
     private void HandleTrackFinishedSceneSetup()
     {
         currentState = GameState.GameOver;
@@ -550,11 +545,7 @@ public partial class GameFlowManager : MonoBehaviour
         // Let NoteVisualizer apply on its next loop boundary; grid is clean.
     }
 }
-    public void StartMazeAndStarForPhase(MazeArchetype phase)
-    {
-        StartCoroutine(StartNextPhaseMazeAndStar(phase));
-    }
-private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHardReset = true)
+private IEnumerator StartNextPhaseMazeAndStar(bool doHardReset = true)
 {
     // ============================================================
     // RESPONSIBILITY: chapter wiring + maze rebuild + vehicle FX + PhaseStar entry
@@ -565,7 +556,7 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
 
     if (doHardReset)
     {
-        controller?.BeginNewMotif($"PhaseStart {nextPhase}");
+        controller?.BeginNewMotif($"Next PhaseStart");
         noteViz?.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
     }
 
@@ -575,10 +566,6 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
     // Chapter wiring.
     if (phaseTransitionManager != null)
     {
-        if (phaseTransitionManager.currentPhase != nextPhase)
-            phaseTransitionManager.StartChapter(nextPhase, "GFM/StartNextPhaseMazeAndStar");
-        else
-            phaseTransitionManager.EnsureChapterLoaded(nextPhase, "GFM/StartNextPhaseMazeAndStar(SamePhase)");
     }
 
     ResetPhaseBinStateAndGrid();
@@ -623,9 +610,7 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
     dust.SetReservedVehicleCells(_vehicleCellsScratch);
 
     // 3) Apply phase profile to dust generator before maze generation.
-    var profileForPhase = drums.phasePersonalityRegistry != null
-        ? drums.phasePersonalityRegistry.Get(nextPhase)
-        : null;
+    var profileForPhase = phaseTransitionManager?.currentMotif?.starBehavior;
     if (profileForPhase != null)
         dust.ApplyProfile(profileForPhase);
 
@@ -637,7 +622,6 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
     // 4) Build maze.
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
-            nextPhase,
             starCell,
             _vehicleCellsScratch,
             totalSpawnDuration: 1.0f
@@ -668,10 +652,8 @@ private IEnumerator StartNextPhaseMazeAndStar(MazeArchetype nextPhase, bool doHa
         yield return new WaitForSeconds(vehiclePhaseInDelaySeconds);
 
     // ── 6) Spawn star (off-screen entry via EnterFromOffScreen) ───────────────
-    drums.RequestPhaseStar(nextPhase, starCell);
+    drums.RequestPhaseStar(starCell);
 
-    Debug.Log($"[GFM] Maze+Star started: phase={nextPhase} starCell={starCell} " +
-              $"vehicleCells={_vehicleCellsScratch.Count}");
 }
 
     private void Update()

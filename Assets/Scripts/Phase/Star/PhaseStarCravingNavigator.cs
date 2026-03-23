@@ -118,6 +118,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     /// </summary>
     public void SetDominantRole(MusicalRole role) => _dominantRole = role;
 
+    /// <summary>Pause or resume the navigator. Call with false while star is Dormant.</summary>
+    public void SetActive(bool active) => _active = active;
+
     /// <summary>
     /// World-space direction toward highest-density dust region.
     /// Used by PhaseStarMotion2D to steer the star body.
@@ -132,8 +135,14 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     /// </summary>
     public Vector2 GetDominantSnifferDir()
     {
-        if (_dominantRole == MusicalRole.None) return Vector2.zero;
-        return _snifferDirs.TryGetValue(_dominantRole, out var d) ? d : Vector2.zero;
+        if (_dominantRole != MusicalRole.None)
+            return _snifferDirs.TryGetValue(_dominantRole, out var d) ? d : Vector2.zero;
+
+        // No dominant role yet (pre-charge): steer toward nearest colored dust of any role.
+        foreach (var kv in _snifferDirs)
+            if (kv.Value.sqrMagnitude > 0.0001f)
+                return kv.Value;
+        return Vector2.zero;
     }
 
     // ----------------------------------------------------------------
@@ -192,11 +201,12 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
                 Vector2Int cell        = drum.WorldToGridPosition(sampleWorld);
 
                 if (!gen.HasDustAt(cell)) continue;
+                if (!gen.TryGetDustAt(cell, out var dust) || dust == null) continue;
+                if (dust.Role == MusicalRole.None) continue; // ignore gray dust
 
                 // Weight by hunger: starving roles score 1.0, fully-charged roles score hungerFloorWeight.
                 float weight = 1f;
-                if (_star != null && gen.TryGetDustAt(cell, out var dust) && dust != null
-                    && dust.Role != MusicalRole.None)
+                if (_star != null)
                 {
                     float hunger = _star.GetRoleHunger(dust.Role);
                     // Remap: hunger 1 (starving) → weight 1.0, hunger 0 (full) → hungerFloorWeight

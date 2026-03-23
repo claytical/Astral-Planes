@@ -546,6 +546,20 @@ private Coroutine _jiggleRoutine;
     {
         ApplyDisplayedTint(_currentTint);
     }
+
+    /// <summary>
+    /// Syncs both the sprite renderer AND the particle system to _currentTint.
+    /// Call after ApplyRoleAndCharge when the cell is already live (not growing in),
+    /// e.g. after MineNode tinting. ApplyRoleAndCharge alone only updates the sprite;
+    /// particles keep their birth color until explicitly refreshed.
+    /// </summary>
+    public void SyncParticleColor()
+    {
+        if (useWorkShaderParams)
+            ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
+        else
+            SetDustColorAllParticles(_currentTint);
+    }
     public void SetTrackBundle(CosmicDustGenerator _dustGenerator, DrumTrack _drums)
     {
         gen = _dustGenerator;

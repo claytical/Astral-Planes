@@ -34,6 +34,13 @@ public class MotifProfile : ScriptableObject
     [Min(1), Tooltip("Total shards this PhaseStar ejects. Distribute roles across shards via round-robin.")]
     public int nodesPerStar = 4;
 
+    [Tooltip("Star behavior profile for this motif (speed, drift, keep-clear, safety bubble, etc.). Overrides the phase-level personality registry.")]
+    public PhaseStarBehaviorProfile starBehavior;
+
+    [Header("Maze")]
+    [Tooltip("Pattern config for maze generation while this motif is active. If null, falls back to FullFill.")]
+    public MazePatternConfig mazePattern;
+
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;

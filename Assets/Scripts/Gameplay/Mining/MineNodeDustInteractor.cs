@@ -22,9 +22,11 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("How many grid cells wide the carved strip should be (1 = single cell, 3 = trench).")]
     public int carveWidthCells = 1;
     // === NEW: Maze carving hooks ===
-    [Header("Maze Carving")]
-    [Tooltip("If true, this node will chew a path through the dust maze as it moves.")]
-    public bool carveMaze = true;
+    [Header("Maze Tinting")]
+    [Tooltip("If true, this node will tint adjacent dust with its MusicalRole as it moves through corridors.")]
+    public bool carveMaze = true; // kept as carveMaze to avoid breaking prefab references; controls tinting
+
+    [SerializeField] private float edgeHugForce = 2f;
 
     private float carveIntervalSeconds = 0.08f;
     private float carveAppetiteMul     = 1.0f;
@@ -58,8 +60,8 @@ public class MineNodeDustInteractor : MonoBehaviour
         _myColliders = GetComponentsInChildren<Collider2D>();
         _node = GetComponent<MineNode>();
         _drumTrack = (_node != null) ? _node.DrumTrack : null;
-        if (dustPhysicsLayer >= 0)
-            Physics2D.IgnoreLayerCollision(gameObject.layer, dustPhysicsLayer, true);
+        // MineNode now physically collides with dust walls so it stays in corridors naturally.
+        // Layer-wide dust collision ignore removed.
 
     }
 
@@ -100,52 +102,46 @@ public class MineNodeDustInteractor : MonoBehaviour
     // ------------------------------------------------------------
     // CARVING (Phase 3A)
     // ------------------------------------------------------------
-    if (!carveMaze || !enableCarving) return;
+    if (!carveMaze) return;
 
     _carveTimer += Time.fixedDeltaTime;
     if (_carveTimer < carveIntervalSeconds) return;
     _carveTimer = 0f;
 
-    // Determine carve target:
-    // - If inside dust: carve current cell
-    // - Else: carve forward cell IF it contains dust
-    Vector3 carveWorld = transform.position;
-
-    if (!inDust)
+    // Tint adjacent solid dust with this node's MusicalRole
+    var gen = GameFlowManager.Instance?.dustGenerator;
+    if (gen != null && _node != null)
     {
-        Vector2 v = _rb.linearVelocity;
-        if (v.sqrMagnitude < 0.0001f)
-            return;
-
-        float step = _drumTrack.GetCellWorldSize() * 0.55f;
-        Vector2 ahead = worldPos + v.normalized * step;
-        Vector2Int aheadCell = _drumTrack.CellOf(ahead);
-
-        if (!_drumTrack.HasDustAt(aheadCell))
-            return;
-
-        carveWorld = _drumTrack.GridToWorldPosition(aheadCell);
-        inDust = true;
+        MusicalRole role = _node.GetImprintRole();
+        for (int dx = -1; dx <= 1; dx++)
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            var neighbor = cell + new Vector2Int(dx, dy);
+            if (_drumTrack.HasDustAt(neighbor))
+                gen.TintDustCellWithRole(neighbor, role);
+        }
     }
 
-    MazeArchetype phase = _drumTrack.GetCurrentPhaseSafe();
-
-    float healDelay =
-        (_node != null) ? _node.GetCorridorHealDelaySeconds() : -1f;
-
-// Width in CELLS, not world radius
-    int resolveRadiusCells = Mathf.Max(0, (carveWidthCells - 1) / 2);
-
-    _drumTrack.CarveTemporaryCellFromMineNode(
-        carveWorld,
-        phase,
-        healDelay,
-        removedRoleOverride: (_node != null) ? _node.GetImprintRole() : MusicalRole.None,
-        resolveRadiusCells: resolveRadiusCells,
-        appetiteMul: 1f
-    );
-    if (_node != null)
-        _node.NotifyDustErodedAt(carveWorld);
+    // Edge-hugging: apply small force toward nearest dust wall
+    Vector2 edgeDir = Vector2.zero;
+    int dustNeighborCount = 0;
+    for (int dx = -1; dx <= 1; dx++)
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        if (dx == 0 && dy == 0) continue;
+        var neighbor = cell + new Vector2Int(dx, dy);
+        if (_drumTrack.HasDustAt(neighbor))
+        {
+            edgeDir += new Vector2(dx, dy);
+            dustNeighborCount++;
+        }
+    }
+    if (dustNeighborCount > 0)
+    {
+        edgeDir = edgeDir.normalized;
+        _rb.AddForce(edgeDir * edgeHugForce, ForceMode2D.Force);
+    }
 }
     private bool TryGetDustFromCollision(Collision2D coll, out CosmicDust dust)
     {
@@ -155,26 +151,12 @@ public class MineNodeDustInteractor : MonoBehaviour
     }
     private void OnCollisionEnter2D(Collision2D coll)
     {
-        Debug.Log($"[MN:DUST_HIT] self={coll.collider.name} other={coll.otherCollider.name} otherLayer={coll.otherCollider.gameObject.layer} otherGO={coll.otherCollider.gameObject.name}");
-
-        if (coll == null || coll.collider == null) return;
-
-        // Option 2.2: MineNodes never physically collide with dust.
-        // Convert the first dust hit into an ignored collider so we don't pin.
-        if (TryIgnoreDustCollider(coll.collider))
-        {
-            // We do NOT rely on TryGetDustFromCollision anymore.
-            // Dust state + carving should be grid-driven in FixedUpdate.
-            return;
-        }
-        Debug.Log($"[MN:DUST_HIT] hit={coll.collider.name} type={coll.collider.GetType().Name} layer={coll.collider.gameObject.layer} isTrigger={coll.collider.isTrigger}");
-
-        // Non-dust collisions (Vehicle, walls, etc.) proceed normally.
+        // MineNode now physically collides with dust walls (they act as corridor boundaries).
+        // No dust ignore — collisions are handled naturally by the physics engine.
     }
     private void OnCollisionStay2D(Collision2D coll)
     {
-        if (coll == null || coll.collider == null) return;
-        TryIgnoreDustCollider(coll.collider);
+        // No dust ignore needed.
     }
     private void OnCollisionExit2D(Collision2D coll)
     {
