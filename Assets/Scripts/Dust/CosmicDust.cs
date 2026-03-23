@@ -581,7 +581,8 @@ private Coroutine _jiggleRoutine;
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
         _currentTint = tint;
-        Charge01 = Mathf.Clamp01(_currentTint.a);
+        // Charge01 is game state managed by DrainCharge / ApplyRoleAndCharge / EnsureMinSolidAlpha.
+        // Do NOT overwrite it here — diffusion and other visual-only callers must not reset drain progress.
 
         if (!_tintPulseActive || applyImmediatelyIfNoPulse)
             ApplyDisplayedTint(_currentTint);
