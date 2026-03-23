@@ -59,6 +59,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private PhaseStarBehaviorProfile _profile;
 
     private PhaseStar _star;
+    private PhaseStarCravingNavigator _navigator;
     private Rigidbody2D _rb;
     private Collider2D[] _myColliders;
     private readonly HashSet<int> _ignoredDustColliderIds = new HashSet<int>();
@@ -67,10 +68,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private Vector2 _lastPos;
     [SerializeField] private float starDrainRegrowDelay = 6f;
 
+    // Pre-allocated probe buffer (current cell + 4 neighbors + forward extension)
+    private readonly Vector2Int[] _drainProbeBuffer = new Vector2Int[16];
+
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
         _profile    = profile;
         _star       = star;
+        _navigator  = GetComponent<PhaseStarCravingNavigator>();
         _rb         = GetComponent<Rigidbody2D>();
         _lastPos    = transform.position;
         _myColliders = GetComponentsInChildren<Collider2D>(true);
@@ -139,15 +144,28 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private void IgnoreNearbyDustColliders()
     {
         if (_myColliders == null || _myColliders.Length == 0) return;
-        if (dustLayerMask == 0) return;
 
-        int count = Physics2D.OverlapCircleNonAlloc(
-            transform.position, dustIgnoreSearchRadius, _overlapScratch, dustLayerMask);
+        int count;
+        if (dustLayerMask != 0)
+        {
+            count = Physics2D.OverlapCircleNonAlloc(
+                transform.position, dustIgnoreSearchRadius, _overlapScratch, dustLayerMask);
+        }
+        else
+        {
+            // dustLayerMask not set in inspector — fall back to finding all nearby colliders
+            // and filtering by CosmicDust component so vehicle colliders are untouched.
+            count = Physics2D.OverlapCircleNonAlloc(
+                transform.position, dustIgnoreSearchRadius, _overlapScratch);
+        }
 
         for (int i = 0; i < count && i < _overlapScratch.Length; i++)
         {
             var dustCol = _overlapScratch[i];
             if (dustCol == null) continue;
+            // When using the no-mask fallback, skip anything that isn't actual dust.
+            if (dustLayerMask == 0 && !dustCol.gameObject.TryGetComponent<CosmicDust>(out _)) continue;
+
             int id = dustCol.GetInstanceID();
             if (_ignoredDustColliderIds.Contains(id)) continue;
 
@@ -210,25 +228,31 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         float cellSize    = Mathf.Max(0.001f, drums.GetCellWorldSize());
         float drainAmount = drainRatePerSec * drainTick;
 
-        // Build probe cells: current cell, then step forward along travel direction
+        // Build probe cells:
+        //   Near ring: current cell + 4 cardinal neighbors (omnidirectional so the star
+        //   drains adjacent colored dust even when physics is pushing it sideways).
+        //   Forward extension: additional cells along travel direction for probeDepthCells > 1.
         Vector2Int baseCell = drums.WorldToGridPosition(pos);
 
-        for (int depth = 0; depth <= probeDepthCells; depth++)
+        int probeCount = 0;
+        _drainProbeBuffer[probeCount++] = baseCell;
+        _drainProbeBuffer[probeCount++] = baseCell + new Vector2Int( 1,  0);
+        _drainProbeBuffer[probeCount++] = baseCell + new Vector2Int(-1,  0);
+        _drainProbeBuffer[probeCount++] = baseCell + new Vector2Int( 0,  1);
+        _drainProbeBuffer[probeCount++] = baseCell + new Vector2Int( 0, -1);
+        if (travelDir.sqrMagnitude > 0.001f)
         {
-            Vector2Int probeCell;
-            if (depth == 0)
-            {
-                probeCell = baseCell;
-            }
-            else if (travelDir.sqrMagnitude > 0.001f)
+            for (int depth = 2; depth <= probeDepthCells; depth++)
             {
                 Vector2 probeWorld = pos + travelDir * (cellSize * depth);
-                probeCell = drums.WorldToGridPosition(probeWorld);
+                _drainProbeBuffer[probeCount++] = drums.WorldToGridPosition(probeWorld);
             }
-            else
-            {
-                break; // no travel direction — only drain current cell
-            }
+        }
+
+        bool lockedThisTick = false;
+        for (int pi = 0; pi < probeCount; pi++)
+        {
+            Vector2Int probeCell = _drainProbeBuffer[pi];
 
             if (!gen.HasDustAt(probeCell)) continue;
             if (!gen.TryGetCellGo(probeCell, out var go) || go == null) continue;
@@ -237,10 +261,21 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             if (dustCell.Charge01 <= 0f) continue;
             float taken = dustCell.DrainCharge(drainAmount);
             if (taken > 0f && _star != null)
+            {
                 _star.AddCharge(dustCell.Role, taken);
+                // Lock navigator onto the shallowest draining cell so the star
+                // doesn't wander off before it finishes draining this cell.
+                if (!lockedThisTick)
+                {
+                    _navigator?.NotifyDraining(probeCell);
+                    lockedThisTick = true;
+                }
+            }
 
             if (dustCell.Charge01 <= 0f)
             {
+                // Release the lock for this specific cell — star seeks the next one.
+                _navigator?.ClearLockOn(probeCell);
                 gen.ClearImprintAt(probeCell);
                 gen.ClearCell(probeCell, CosmicDustGenerator.DustClearMode.FadeAndHide,
                     fadeSeconds: 0.4f,

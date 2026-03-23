@@ -190,7 +190,7 @@ MonoBehaviour:
   dustCollisionEnterImpulse: 0.85
   dustCollisionStayForce: 2.25
   intendedBin: -1
-  spawnArrivalSeconds: 2.5
+  spawnArrivalSeconds: 1
   spawnArrivalEase:
     serializedVersion: 2
     m_Curve: []
@@ -217,7 +217,7 @@ MonoBehaviour:
   pulseSpeed: 1.6
   minAlpha: 0.25
   maxAlpha: 0.65
-  pulseScale: 1.08
+  pulseScale: 1.1
   useLoopBoundaryIdea: 1
   ideaLookaheadCells: 5
   ideaBiasStrength: 0.55

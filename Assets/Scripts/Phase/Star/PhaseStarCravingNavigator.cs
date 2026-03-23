@@ -43,8 +43,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     [Tooltip("Seconds between sniffer BFS ticks.")]
     [SerializeField] private float snifferIntervalSeconds = 0.25f;
 
-    [Tooltip("Max grid cells visited per sniffer BFS. Keep low — it runs per-role.")]
-    [SerializeField] private int snifferBfsBudget = 80;
+    [Tooltip("Max grid cells visited per sniffer BFS. Must be large enough to span the full maze.")]
+    [SerializeField] private int snifferBfsBudget = 500;
 
     [Header("Hunger-Weighted Steering")]
     [Tooltip("Weight given to dust of a fully-charged role (0 = ignore it entirely, 1 = no hunger bias).")]
@@ -67,6 +67,13 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     // Sniffer: per-role direction toward nearest dust of that role
     private readonly Dictionary<MusicalRole, Vector2> _snifferDirs = new();
+
+    // Nearest colored dust of any role — updated fresh each BFS tick for pre-charge steering
+    private Vector2 _nearestColoredDustDir = Vector2.zero;
+
+    // Lock-on: while actively draining a cell, override nav to keep pointing at it
+    private bool      _hasLockOnCell;
+    private Vector2Int _lockOnCell;
 
     // Dominant role for motion blend (set externally by PhaseStar each frame)
     private MusicalRole _dominantRole = MusicalRole.None;
@@ -122,11 +129,40 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     public void SetActive(bool active) => _active = active;
 
     /// <summary>
+    /// Called by PhaseStarDustAffect when it begins draining a specific cell.
+    /// Locks navigation onto that cell so the star doesn't wander off mid-drain.
+    /// </summary>
+    public void NotifyDraining(Vector2Int cell)
+    {
+        _hasLockOnCell = true;
+        _lockOnCell    = cell;
+    }
+
+    /// <summary>
+    /// Called by PhaseStarDustAffect when a specific cell is fully drained.
+    /// Only clears the lock if it matches the locked cell so multi-cell probe
+    /// doesn't accidentally release a lock on a shallower cell when a deeper one drains.
+    /// </summary>
+    public void ClearLockOn(Vector2Int cell)
+    {
+        if (_hasLockOnCell && _lockOnCell == cell)
+            _hasLockOnCell = false;
+    }
+
+    /// <summary>
     /// World-space direction toward highest-density dust region.
     /// Used by PhaseStarMotion2D to steer the star body.
     /// Returns Vector2.zero when no data is available yet.
     /// </summary>
-    public Vector2 GetDensitySteerDir() => _hasDensityDir ? _densitySteerDir : Vector2.zero;
+    public Vector2 GetDensitySteerDir()
+    {
+        if (_hasLockOnCell)
+        {
+            Vector2 d = GetLockOnDir();
+            if (d.sqrMagnitude > 0.0001f) return d;
+        }
+        return _hasDensityDir ? _densitySteerDir : Vector2.zero;
+    }
 
     /// <summary>
     /// World-space direction the dominant shard's sniffer is pointing.
@@ -135,14 +171,17 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     /// </summary>
     public Vector2 GetDominantSnifferDir()
     {
+        if (_hasLockOnCell)
+        {
+            Vector2 d = GetLockOnDir();
+            if (d.sqrMagnitude > 0.0001f) return d;
+        }
+
         if (_dominantRole != MusicalRole.None)
             return _snifferDirs.TryGetValue(_dominantRole, out var d) ? d : Vector2.zero;
 
-        // No dominant role yet (pre-charge): steer toward nearest colored dust of any role.
-        foreach (var kv in _snifferDirs)
-            if (kv.Value.sqrMagnitude > 0.0001f)
-                return kv.Value;
-        return Vector2.zero;
+        // No dominant role yet (pre-charge): use fresh nearest-colored direction from last BFS tick.
+        return _nearestColoredDustDir;
     }
 
     // ----------------------------------------------------------------
@@ -262,6 +301,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         startCell.y = Mathf.Clamp(startCell.y, 0, h - 1);
 
         var found = new Dictionary<MusicalRole, Vector2Int>(4);
+        bool foundNearestColored = false;
+        Vector2Int nearestColoredCell = default;
 
         _bfsQueue.Clear();
         _bfsVisited.Clear();
@@ -287,7 +328,15 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
                     // Dust cell — record role, don't traverse further through it
                     MusicalRole role = GetDustRole(gen, nb);
                     if (role != MusicalRole.None && !found.ContainsKey(role))
+                    {
                         found[role] = nb;
+                        // BFS order = nearest first; first colored cell found is the closest
+                        if (!foundNearestColored)
+                        {
+                            nearestColoredCell  = nb;
+                            foundNearestColored = true;
+                        }
+                    }
                     // don't enqueue — dust is a boundary
                     continue;
                 }
@@ -306,6 +355,18 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
                 _snifferDirs[kvp.Key] = dir.normalized;
         }
 
+        // Update fresh nearest-colored direction (zero when no colored dust exists)
+        if (foundNearestColored)
+        {
+            Vector2 cellWorld = drum.GridToWorldPosition(nearestColoredCell);
+            Vector2 dir = cellWorld - starWorld;
+            if (dir.sqrMagnitude > 0.0001f) _nearestColoredDustDir = dir.normalized;
+        }
+        else
+        {
+            _nearestColoredDustDir = Vector2.zero;
+        }
+
         if (verbose)
             Debug.Log($"[DensityNav] Sniffer found {found.Count} roles in {visited} cells.");
     }
@@ -313,6 +374,28 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Returns world-space direction toward the locked-on cell, or Vector2.zero if the
+    /// cell no longer contains colored dust (auto-clears the lock in that case).
+    /// </summary>
+    private Vector2 GetLockOnDir()
+    {
+        var gfm  = GameFlowManager.Instance;
+        var gen  = gfm?.dustGenerator;
+        var drum = gfm?.activeDrumTrack;
+        if (gen == null || drum == null) return Vector2.zero;
+
+        if (!gen.HasDustAt(_lockOnCell) || GetDustRole(gen, _lockOnCell) == MusicalRole.None)
+        {
+            _hasLockOnCell = false;
+            return Vector2.zero;
+        }
+
+        Vector2 cellWorld = drum.GridToWorldPosition(_lockOnCell);
+        Vector2 dir = cellWorld - (Vector2)transform.position;
+        return dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.zero;
+    }
 
     private static MusicalRole GetDustRole(CosmicDustGenerator gen, Vector2Int gp)
     {
