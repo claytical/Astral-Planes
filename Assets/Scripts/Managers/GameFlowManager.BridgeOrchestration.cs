@@ -6,13 +6,12 @@ using Debug = UnityEngine.Debug;
 
 public partial class GameFlowManager
 {
-    public void BeginMotifBridge(MazeArchetype phaseToRestart, string who)
+    public void BeginMotifBridge(string who)
     {
-        Debug.Log($"[MOTIF-BRIDGE] BeginMotifBridge phase={phaseToRestart} by={who}");
-        StartCoroutine(PlayMotifBridgeAndRestart(phaseToRestart));
+        StartCoroutine(PlayMotifBridgeAndRestart());
     }
 
-    private IEnumerator PlayMotifBridgeAndRestart(MazeArchetype phaseToRestart)
+    private IEnumerator PlayMotifBridgeAndRestart()
     {
         GhostCycleInProgress = true;
         BridgePending = true;
@@ -27,9 +26,6 @@ public partial class GameFlowManager
             : new List<InstrumentTrack>();
 
         var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
-        motifSnap.Pattern = phaseTransitionManager != null
-            ? phaseTransitionManager.currentPhase
-            : MazeArchetype.Windows;
 
         _motifSnapshots.Add(motifSnap);
         ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
@@ -68,14 +64,14 @@ public partial class GameFlowManager
         }
 
         // Advance motif — this calls BeginNewMotif() which clears track state.
-        yield return StartCoroutine(StartNextMotifInPhase(phaseToRestart));
+        yield return StartCoroutine(StartNextMotifInPhase());
 
         SetBridgeCinematicMode(false); // restore maze, dust, vehicles
         GhostCycleInProgress = false;
         BridgePending = false;
     }
 
-    private IEnumerator StartNextMotifInPhase(MazeArchetype phase)
+    private IEnumerator StartNextMotifInPhase()
     {
         // ============================================================
         // RESPONSIBILITY: motif-level reset + motif advance decision
@@ -84,7 +80,6 @@ public partial class GameFlowManager
             dustGenerator.ResumeRegrowthAfterBridge();
         // 0) Hard reset only ONCE per motif boundary
         _motifStartTime = Time.time; // stamp before clearing tracks so coral height is correct
-        controller?.BeginNewMotif($"MotifStart {phase}");
         noteViz?.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
 
         if (phaseTransitionManager == null)
@@ -93,27 +88,26 @@ public partial class GameFlowManager
             yield break;
         }
 
-        // Ensure we're operating within the correct chapter without reinitializing it.
-        phaseTransitionManager.EnsureChapterLoaded(phase, "GFM/StartNextMotifInPhase");
+        // Ensure we're operating within the correct phase without reinitializing it.
+//        phaseTransitionManager.EnsurePhaseLoaded("GFM/StartNextMotifInPhase");
 
-        // 1) Try to advance within the chapter
+        // 1) Try to advance within the phase
         var newMotif = phaseTransitionManager.AdvanceMotif("GFM/StartNextMotifInPhase");
 
         if (newMotif == null)
         {
-            // Chapter exhausted (loopMotifs==false) -> advance phase/chapter
-            var nextPhase = phaseTransitionManager.ResolveNextPhase(phase);
-            Debug.Log($"[CHAPTER] Motifs exhausted for phase={phase}. Starting next chapter phase={nextPhase}.");
-
-            phaseTransitionManager.StartChapter(nextPhase, "GFM/StartNextMotifInPhase(Exhausted)");
+            // Phase motifs exhausted (loopMotifs==false) -> advance to next phase
+//            var nextPhase = phaseTransitionManager.ResolveNextPhase();
+  
+  //          phaseTransitionManager.StartPhase(nextPhase, "GFM/StartNextMotifInPhase(Exhausted)");
 
             // World rebuild only (doHardReset=false; we've already reset for motif boundary)
-            yield return StartCoroutine(StartNextPhaseMazeAndStar(nextPhase, doHardReset: false));
+            yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
             yield break;
         }
 
         // Motif advanced within same chapter: rebuild world only (no extra reset)
-        yield return StartCoroutine(StartNextPhaseMazeAndStar(phase, doHardReset: false));
+        yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
     }
 
     /// <summary>
@@ -189,10 +183,10 @@ public partial class GameFlowManager
     {
         var snapshot = new MotifSnapshot { Timestamp = Time.time };
 
-        // --- PHASE CONTEXT (REPLACE THESE 2 LINES WITH YOUR REAL API) ---
-        snapshot.Pattern = MazeArchetype.Windows; // MusicalPhase
-        snapshot.Color = dustGenerator.MazeColor(); // Color (maze/dust/phase tint)
-        // ---------------------------------------------------------------
+        snapshot.Pattern = phaseTransitionManager != null
+            ? phaseTransitionManager.currentPhase
+            : MazeArchetype.Windows;
+        snapshot.Color = dustGenerator.MazeColor();
 
         // Coral animation timing: normalise step → bridge time using the live drum totalSteps.
         snapshot.TotalSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 16;

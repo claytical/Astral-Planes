@@ -98,6 +98,65 @@ public static class CosmicDustMazePatterns
     }
 
     /// <summary>
+    /// Full grid fill with N rectangular clear zones punched out.
+    ///
+    /// Distributes box centers evenly across the grid by subdividing it into a sector grid,
+    /// then placing one box per sector with random jitter within the sector.
+    /// </summary>
+    public static List<(Vector2Int cell, Vector3 world)> BuildClearBoxes(
+        int width,
+        int height,
+        int count,
+        int boxW,
+        int boxH,
+        Func<Vector2Int, Vector3> gridToWorld,
+        Func<int, int, bool> isCellAvailable,
+        Func<Vector3, bool> includeWorld = null)
+    {
+        var cleared = new HashSet<Vector2Int>();
+
+        int cols = Mathf.Max(1, Mathf.RoundToInt(Mathf.Sqrt(count)));
+        int rows = Mathf.Max(1, Mathf.CeilToInt(count / (float)cols));
+
+        int placed = 0;
+        for (int row = 0; row < rows && placed < count; row++)
+        for (int col = 0; col < cols && placed < count; col++, placed++)
+        {
+            float sectorW = width  / (float)cols;
+            float sectorH = height / (float)rows;
+            int cx = Mathf.RoundToInt(col * sectorW + Random.Range(0.15f, 0.85f) * sectorW);
+            int cy = Mathf.RoundToInt(row * sectorH + Random.Range(0.15f, 0.85f) * sectorH);
+            cx = Mathf.Clamp(cx, 0, width  - 1);
+            cy = Mathf.Clamp(cy, 0, height - 1);
+
+            int hw = boxW / 2;
+            int hh = boxH / 2;
+            for (int dx = -hw; dx <= hw; dx++)
+            for (int dy = -hh; dy <= hh; dy++)
+            {
+                int nx = cx + dx;
+                int ny = cy + dy;
+                if ((uint)nx < (uint)width && (uint)ny < (uint)height)
+                    cleared.Add(new Vector2Int(nx, ny));
+            }
+        }
+
+        var growth = new List<(Vector2Int, Vector3)>(width * height);
+        for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++)
+        {
+            if (!isCellAvailable(x, y)) continue;
+            var gp = new Vector2Int(x, y);
+            if (cleared.Contains(gp)) continue;
+            var world = gridToWorld(gp);
+            if (includeWorld != null && !includeWorld(world)) continue;
+            growth.Add((gp, world));
+        }
+
+        return growth;
+    }
+
+    /// <summary>
     /// Ring chokepoints pattern, matching the legacy Build_RingChokepoints behavior currently used by CosmicDustGenerator.
     ///
     /// Uses a BFS distance in hex steps (via caller-provided neighbor offsets) to compute a distance field,
@@ -337,8 +396,6 @@ public static class CosmicDustMazePatterns
         int height,
         int corridorStep,
         int corridorWidth,
-        int phaseOffsetX,
-        int phaseOffsetY,
         Func<Vector2Int, Vector3> gridToWorld,
         Func<int, int, bool> isCellAvailable,
         Func<Vector3, bool> includeWorld = null)
@@ -461,8 +518,7 @@ public static class CosmicDustMazePatterns
         Vector2Int starCell,
         int gridW,
         int gridH,
-        IReadOnlyList<MusicalRole> activeRoles,
-        MazeArchetype phase = MazeArchetype.Pop)
+        IReadOnlyList<MusicalRole> activeRoles)
     {
         var result = new Dictionary<Vector2Int, MusicalRole>(cells.Count);
         if (cells == null || cells.Count == 0) return result;

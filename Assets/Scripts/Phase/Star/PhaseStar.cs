@@ -7,7 +7,7 @@ using Random = UnityEngine.Random;
 [System.Serializable]
 public class PhaseRecord
 {
-    public string ChapterId;          // stable authored ID from PhaseLibrary
+    public string PhaseId;            // stable authored ID from PhaseLibrary
     public int    PlaythroughIndex;   // 1 = first time, 2 = second, etc.
     public long   CompletedAtTicks;   // DateTime.UtcNow.Ticks — survives timezone changes
     public List<MotifSnapshot> Motifs = new();
@@ -22,17 +22,18 @@ public class PhaseRecord
 public class GardenRecord
 {
     public int              SaveVersion = 1;      // for future migration
-    public List<string>     UnlockedChapterIds = new();
+    public List<string>     UnlockedPhaseIds = new();
     public List<PhaseRecord> CompletedPhases    = new();
 
-    // How many times a given chapter has been completed (derived, but cached for perf)
-    public int PlaythroughCountFor(string chapterId) =>
-        CompletedPhases.Count(r => r.ChapterId == chapterId);
+    // How many times a given phase has been completed (derived, but cached for perf)
+    public int PlaythroughCountFor(string phaseId) =>
+        CompletedPhases.Count(r => r.PhaseId == phaseId);
 }
 
 
 public enum PhaseStarState
 {
+    Dormant        = -1,    // on-screen but inert, waiting for colored dust
     WaitingForPoke = 0,
     PursuitActive  = 1,
     Completed      = 2,
@@ -111,7 +112,6 @@ public class PhaseStar : MonoBehaviour
 
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
-    private MazeArchetype _assignedPhase;
     private bool _lockPreviewTintUntilIdle;
     private Color _lockedTint;
     private List<PreviewShard> previewRing = new();
@@ -373,21 +373,40 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     // ── Arrived ──────────────────────────────────────────────
     _entryInProgress = false;
 
-    // Fade visuals in.
-    if (visuals != null && entryFadeInSeconds > 0.01f)
-    {
-        // ShowBright starts the visual; shardAlphaLerpSpeed will naturally
-        // animate from 0→target over the next several frames — no extra
-        // coroutine needed.  We just need to un-hide the renderers.
-        visuals.ShowBright(ResolvePreviewColorByReadiness());
-    }
+    // Enter dormant flower state — dim, gray, fully stopped.
+    _inFlowerMode      = true;
+    _flowerRotSpeedDeg = disarmedFlowerRotStartDeg;
+    _breathPhase       = 0f;
+    motion?.SetSpeedMultiplier(0f);
+    cravingNavigator?.SetActive(false);
+    visuals?.ShowDim(Color.gray);
 
-    // Re-enable colliders and arm.
+    // Re-enable colliders; enter dormant state until colored dust exists.
     EnableColliders();
     dust?.RefreshDustIgnore();
-    ArmNext();
-    LogState("EntryComplete+Armed");
+    _state = PhaseStarState.Dormant;
+    StartCoroutine(Co_WaitForColoredDust());
+    LogState("EntryComplete+Dormant");
 }
+
+    private IEnumerator Co_WaitForColoredDust()
+    {
+        // Always poll — re-fetch gen each iteration in case it isn't ready yet.
+        // The original single-fetch bug: if gen was null at coroutine start,
+        // "while (gen != null && ...)" exited immediately and the star armed prematurely.
+        while (true)
+        {
+            yield return new WaitForSeconds(0.5f);
+            var gen = GameFlowManager.Instance?.dustGenerator;
+            if (gen != null && gen.HasAnyDustWithRole())
+                break;
+        }
+
+        _state = PhaseStarState.WaitingForPoke;
+        cravingNavigator?.SetActive(true);
+        ArmNext();
+        LogState("DormantWake+Armed");
+    }
 
     void OnEnable()
     {
@@ -439,7 +458,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
         PhaseStarBehaviorProfile profile,
-        MazeArchetype assignedPhase,
         MotifProfile motif = null)
     {
 // Safe, null-tolerant log:
@@ -448,8 +466,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             .ToArray() ?? Array.Empty<string>();
 
         Trace($"Initialize: received targets={roleNames.Length} :: {string.Join(", ", roleNames)}");
-
-        _assignedPhase = assignedPhase;
+        
         _assignedMotif = motif;
 
         if (_assignedMotif != null)
@@ -476,7 +493,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         _shardsEjectedCount = 0;
 
-        BuildPhasePlan(_assignedPhase, GetEffectiveNodesPerStar());
+        BuildPhasePlan(GetEffectiveNodesPerStar());
         PrepareNextDirective();
         // ensure subcomponents are present if assigned
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
@@ -576,16 +593,12 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
             {
-                var phase = gfm.phaseTransitionManager != null
-                    ? gfm.phaseTransitionManager.currentPhase
-                    : _assignedPhase;
-
                 int radiusCells = _bubbleActive ? SafetyBubbleRadiusCells : StarKeepClearRadiusCells;
 
                 gfm.dustGenerator.SetStarKeepClear(
                     gfm.activeDrumTrack.WorldToGridPosition(transform.position),
                     radiusCells,
-                    phase, false
+                    forceRemoveExisting: false
                 );
             }
         }
@@ -1315,8 +1328,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         var gen = gfm != null ? gfm.dustGenerator : null;
         if (gen == null) return;
 
-        var phase = gfm.phaseTransitionManager != null ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
-        gen.ClearStarKeepClear(phase);
+        gen.ClearStarKeepClear();
         
     }
 
@@ -1335,7 +1347,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         BuildOrRefreshPreviewRing();
     }
     
-    private void BuildPhasePlan(MazeArchetype phase, int shardCount)
+    private void BuildPhasePlan(int shardCount)
     {
         _phasePlanRoles = new List<MusicalRole>();
 
@@ -1378,7 +1390,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (!keepCurrentIndex) currentShardIndex = 0;
         currentShardIndex = Mathf.Clamp(currentShardIndex, 0, remaining - 1);
 
-        BuildPhasePlan(_assignedPhase, remaining);
+        BuildPhasePlan(remaining);
         BuildPreviewRing();
         BuildOrRefreshPreviewRing();
         UpdatePreviewTint();
@@ -1409,10 +1421,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             var gfm = GameFlowManager.Instance;
             var factory = gfm != null ? gfm.phaseTransitionManager.noteSetFactory : null;
-            var phase = (gfm != null && gfm.phaseTransitionManager != null)
-                ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Windows;
-
             if (factory != null)
                 planned = factory.Generate(track, _assignedMotif);
         }
@@ -1463,7 +1471,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         // Ensure we have a plan to visualize.
         if (_phasePlanRoles == null || _phasePlanRoles.Count != GetEffectiveNodesPerStar())
         {
-            BuildPhasePlan(_assignedPhase, GetEffectiveNodesPerStar());
+            BuildPhasePlan(GetEffectiveNodesPerStar());
         }
 
         int n = (_phasePlanRoles != null) ? _phasePlanRoles.Count : 0;
@@ -1818,8 +1826,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         var gen = gfm != null ? gfm.dustGenerator : null;
         if (gen != null)
         {
-            var phase = (gfm.phaseTransitionManager != null) ? gfm.phaseTransitionManager.currentPhase : _assignedPhase;
-            gen.RegrowPreviousCorridorOnNewNodeSpawn(phase);
+            gen.RegrowPreviousCorridorOnNewNodeSpawn();
         }
 
         _activeNode = node;
@@ -2080,10 +2087,8 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         // Decide the next phase based on the PhaseStar's assigned phase.
         // The star itself encodes where we’re going next.
-        var next = _assignedPhase;
 
-        Trace($"BeginPhaseBridge → next={next}");
-        GameFlowManager.Instance?.BeginMotifBridge(next, "PhaseStar/CompleteAdvanceAsync");
+        GameFlowManager.Instance?.BeginMotifBridge("PhaseStar/CompleteAdvanceAsync");
 
         // --- Wait for the bridge to start (be defensive) ---
         float start = Time.time;

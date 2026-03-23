@@ -4922,7 +4922,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dominantRoleSwitchDelta: 0.1
-  behaviorProfile: {fileID: 11400000, guid: 56d8541b1799a436ca860fa02d237caf, type: 2}
+  behaviorProfile: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   shardReadyThreshold: 0.5
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}

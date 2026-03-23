@@ -282,9 +282,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
 
         // --- Compose desired direction ---
-        // Nav contribution overrides drift when present; avoidance always applies on top.
+        // Nav contribution fully overrides drift when present so the star decisively
+        // seeks colored dust rather than wandering. Avoidance always applies on top.
         Vector2 baseDrift = navContrib.sqrMagnitude > 0.0001f
-            ? Vector2.Lerp(drift, navContrib.normalized, Mathf.Clamp01(navContrib.magnitude))
+            ? navContrib.normalized
             : drift;
 
         Vector2 desiredDir = baseDrift

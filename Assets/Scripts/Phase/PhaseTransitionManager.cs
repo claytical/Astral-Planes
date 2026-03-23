@@ -4,12 +4,14 @@ using UnityEngine;
 public class PhaseTransitionManager : MonoBehaviour
 {
     [Header("Chapters (Phase -> Motifs)")]
-    [SerializeField] private PhaseChapterLibrary chapterLibrary;
-    [SerializeField] private bool loopChapters = true;   // "book loops back to chapter 1"
-    [SerializeField] private bool holdOnLastChapter = false; // if not looping, stay on last vs return default
-    
-    public MazeArchetype previousPhase { get; private set; }
-    public MazeArchetype currentPhase  { get; private set; }
+    [SerializeField] private PhaseLibrary chapterLibrary;
+    [SerializeField] private bool loopChapters = true;
+    [SerializeField] private bool holdOnLastChapter = false;
+
+    // Phase index replaces MazeArchetype. Stub property kept for BridgeOrchestration compat.
+    public int currentPhaseIndex  { get; private set; } = -1;
+    public int previousPhaseIndex { get; private set; } = -1;
+    public MazeArchetype currentPhase => MazeArchetype.Windows; // compat stub — remove when MazeArchetype is fully gone
 
     public MotifProfile currentMotif   { get; private set; }
     public int currentMotifIndex       { get; private set; } = -1;
@@ -17,95 +19,38 @@ public class PhaseTransitionManager : MonoBehaviour
     private List<MotifProfile> _chapterMotifs;
     private bool _chapterLoops = true;
 
-    public event System.Action<MazeArchetype, MazeArchetype> OnPhaseChanged;
-    public event System.Action<MotifProfile, MotifProfile>   OnMotifChanged;
+    public event System.Action OnPhaseChanged;
+    public event System.Action<MotifProfile, MotifProfile> OnMotifChanged;
 
     public NoteSetFactory noteSetFactory;
+
+    public int FirstPhaseIndex => 0;
 
     // ---------------------------
     // CHAPTER START (PHASE)
     // ---------------------------
 
-    // PhaseTransitionManager.cs
-    private bool _chapterLoadedForCurrentPhase = false;
-    public MazeArchetype GetFirstPhase() =>
-        chapterLibrary != null ? chapterLibrary.FirstPhase : MazeArchetype.Windows;
-
-    public MazeArchetype ResolveNextPhase(MazeArchetype current)
+    public void StartChapter(int phaseIndex, string who)
     {
-        if (chapterLibrary == null || chapterLibrary.chapters == null || chapterLibrary.chapters.Count == 0)
-            return current; // safest fallback: no change
-
-        // Find current index in authored chapter list
-        int idx = chapterLibrary.chapters.FindIndex(c => c != null && c.phase == current);
-
-        // If current isn't in the list, start at first authored chapter
-        if (idx < 0)
-            return chapterLibrary.chapters[0].phase;
-
-        int next = idx + 1;
-
-        if (next >= chapterLibrary.chapters.Count)
-        {
-            if (loopChapters)
-                next = 0;
-            else
-                return holdOnLastChapter ? chapterLibrary.chapters[chapterLibrary.chapters.Count - 1].phase : current;
-        }
-
-        return chapterLibrary.chapters[next].phase;
-    }
-    public void EnsureChapterLoaded(MazeArchetype phase, string who)
-    {
-        // Already loaded for this phase? Do nothing. (CRITICAL: do NOT reset motif index.)
-        if (_chapterLoadedForCurrentPhase &&
-            currentPhase == phase &&
-            _chapterMotifs != null &&
-            _chapterMotifs.Count > 0)
-        {
-            return;
-        }
-
-        // We are loading (or re-loading) a chapter. Update phase bookkeeping.
-        previousPhase = currentPhase;
-        currentPhase  = phase;
-
-        // Load motifs + loop flag from library
-        LoadChapterForPhase(phase);
-        _chapterLoadedForCurrentPhase = (_chapterMotifs != null && _chapterMotifs.Count > 0);
-
-        // Initialize pointer ONLY because we just loaded a chapter (or swapped phases).
-        currentMotifIndex = (_chapterLoadedForCurrentPhase) ? 0 : -1;
-        currentMotif = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
-
-        Debug.Log($"[CHAPTER] EnsureLoaded phase={phase} loaded={_chapterLoadedForCurrentPhase} loop={_chapterLoops} motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
-    }
-
-    public void StartChapter(MazeArchetype phase, string who)
-    {
-        var oldPhase = currentPhase;
+        int oldIndex = currentPhaseIndex;
         var oldMotif = currentMotif;
 
-        previousPhase = currentPhase;
-        currentPhase  = phase;
+        previousPhaseIndex = currentPhaseIndex;
+        currentPhaseIndex  = phaseIndex;
 
-        // Force a reload + reset to paragraph 0
-        _chapterLoadedForCurrentPhase = false;
+        LoadChapterForPhase(phaseIndex);
 
-        LoadChapterForPhase(phase);
-        _chapterLoadedForCurrentPhase = (_chapterMotifs != null && _chapterMotifs.Count > 0);
+        currentMotifIndex = (_chapterMotifs != null && _chapterMotifs.Count > 0) ? 0 : -1;
+        currentMotif      = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
 
-        currentMotifIndex = (_chapterLoadedForCurrentPhase) ? 0 : -1;
-        currentMotif = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
-
-        if (oldPhase != currentPhase)
+        if (oldIndex != currentPhaseIndex)
         {
-            Debug.Log($"[CHAPTER] {oldPhase}→{currentPhase} by {who}");
-            OnPhaseChanged?.Invoke(oldPhase, currentPhase);
+            Debug.Log($"[CHAPTER] phase {oldIndex}→{currentPhaseIndex} by {who}");
+            OnPhaseChanged?.Invoke();
         }
         else
         {
-            Debug.Log($"[CHAPTER] Re-start {currentPhase} by {who}");
+            Debug.Log($"[CHAPTER] Re-start phase {currentPhaseIndex} by {who}");
         }
 
         Debug.Log($"[MOTIF] Chapter init/apply: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
@@ -123,25 +68,22 @@ public class PhaseTransitionManager : MonoBehaviour
     {
         if (_chapterMotifs == null || _chapterMotifs.Count == 0)
         {
-            Debug.LogWarning($"[MOTIF] Advance ignored (no motifs for chapter phase={currentPhase}) by {who}");
+            Debug.LogWarning($"[MOTIF] Advance ignored (no motifs for phase={currentPhaseIndex}) by {who}");
             return null;
         }
 
         var oldMotif = currentMotif;
-
         int next = currentMotifIndex + 1;
 
-        // Exhausted chapter?
         if (next >= _chapterMotifs.Count)
         {
             if (_chapterLoops)
             {
-                next = 0; // loop back to start
+                next = 0;
             }
             else
             {
-                // IMPORTANT: signal exhaustion to caller (GFM) so it can start next phase.
-                Debug.Log($"[MOTIF] Exhausted chapter motifs (loop=false) phase={currentPhase} by {who}");
+                Debug.Log($"[MOTIF] Exhausted chapter motifs (loop=false) phase={currentPhaseIndex} by {who}");
                 return null;
             }
         }
@@ -165,26 +107,37 @@ public class PhaseTransitionManager : MonoBehaviour
     // ---------------------------
     // INTERNALS
     // ---------------------------
-    private void LoadChapterForPhase(MazeArchetype phase)
+
+    private void LoadChapterForPhase(int phaseIndex)
     {
         _chapterMotifs = null;
-        _chapterLoops  = true;
+        _chapterLoops  = loopChapters;
 
         if (chapterLibrary == null)
         {
-            Debug.LogError("[CHAPTER] No PhaseChapterLibrary assigned.");
+            Debug.LogError("[CHAPTER] No PhaseLibrary assigned to PhaseTransitionManager.");
             return;
         }
 
-        var ch = chapterLibrary.Get(phase);
-        if (ch == null || ch.motifs == null || ch.motifs.Count == 0)
+        if (chapterLibrary.phases == null || chapterLibrary.phases.Count == 0)
         {
-            Debug.LogError($"[CHAPTER] Missing/empty chapter for phase={phase}.");
+            Debug.LogError("[CHAPTER] PhaseLibrary has no phases.");
             return;
         }
 
-        _chapterMotifs = ch.motifs;
-        _chapterLoops  = ch.loopMotifs;
+        int idx = Mathf.Clamp(phaseIndex, 0, chapterLibrary.phases.Count - 1);
+        var phase = chapterLibrary.phases[idx];
+
+        if (phase == null || phase.motifs == null || phase.motifs.Count == 0)
+        {
+            Debug.LogError($"[CHAPTER] Phase {idx} ('{phase?.phaseName}') has no motifs.");
+            return;
+        }
+
+        _chapterMotifs = phase.motifs;
+        _chapterLoops  = phase.loopMotifs;
+
+        Debug.Log($"[CHAPTER] Loaded phase {idx} '{phase.phaseName}' with {_chapterMotifs.Count} motif(s), loop={_chapterLoops}");
     }
 
     private void ApplyMotifToAudioAndTracks(
@@ -196,16 +149,13 @@ public class PhaseTransitionManager : MonoBehaviour
     {
         if (newMotif == null) return;
 
-        // Notify motif change
         if (oldMotif != newMotif)
             OnMotifChanged?.Invoke(oldMotif, newMotif);
 
-        // Authoritative drums
         var drums = GameFlowManager.Instance?.activeDrumTrack;
         if (drums != null)
             drums.SetMotifBeatSequence(newMotif, armAtNextBoundary, who, restartTransport);
 
-        // Notesets to tracks
         ConfigureTracksForCurrentPhaseAndMotif();
     }
 
@@ -216,7 +166,6 @@ public class PhaseTransitionManager : MonoBehaviour
 
         var controller = gfm.controller;
         if (controller == null || controller.tracks == null) return;
-
 
         foreach (var track in controller.tracks)
         {
@@ -230,25 +179,20 @@ public class PhaseTransitionManager : MonoBehaviour
                 if (noteSet == null) continue;
 
                 track.SetNoteSetForBin(b, noteSet);
-
                 if (b == 0) bin0NoteSet = noteSet;
             }
 
             if (bin0NoteSet == null) continue;
- 
+
             track.authoredRootMidi = currentMotif.keyRootMidi;
             track.SetNoteSet(bin0NoteSet);
 
-            // Apply preset from this motif's config roleProfile; fall back to library lookup.
             var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier);
             track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
         }
     }
 
-    private void HandlePhaseStarSpawned(MazeArchetype phase, PhaseStarBehaviorProfile profile)
-    {
-        // (No phase/motif mutations. That’s GFM’s job: chapter start / paragraph advance.)
-    }
+    private void HandlePhaseStarSpawned(PhaseStarBehaviorProfile profile) { }
 
     void OnEnable()
     {

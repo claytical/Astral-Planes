@@ -78,8 +78,7 @@ public class CosmicDustGenerator : MonoBehaviour
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
     private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
-    // Per-phase regrow pacing (lets PhaseStarBehaviorProfile drive maze closure without refactoring MazeArchetype).
-    private readonly Dictionary<MazeArchetype, float> _regrowDelayMulByPhase = new();
+    private MazePatternConfig _activeMazePattern;
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
     private PhaseStarBehaviorProfile _activeProfile;
     [Header("Tint Diffusion (Option 2)")]
@@ -101,9 +100,6 @@ public class CosmicDustGenerator : MonoBehaviour
     [Range(0, 3)] [SerializeField] private int tintDirtyMarkRadius = 1;
 
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
-
-    private float GetRegrowDelayMul(MazeArchetype phase)
-        => _regrowDelayMulByPhase.TryGetValue(phase, out var m) ? m : 1f;
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     private Coroutine _spawnRoutine;
@@ -130,6 +126,9 @@ public class CosmicDustGenerator : MonoBehaviour
         { MusicalRole.Lead,    0 },
         { MusicalRole.Groove,  0 },
     };
+    // Counts ALL solid cells regardless of role (including MusicalRole.None).
+    // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses this instead.
+    private int _allSolidCount = 0;
     // Density conservation: target solid count set at maze init; -1 = inactive.
     private int _targetSolidCount = -1;
     // Pattern oracle: wall cells intended by the current archetype. Null when no maze is active.
@@ -163,18 +162,18 @@ public class CosmicDustGenerator : MonoBehaviour
         FadeAndHide,
         HideInstant
     }
-    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, MazeArchetype phase, float regrowDelaySeconds = -1f) { 
-        if (!TryGetCellState(gp, out var st)) return; 
-        if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) { 
+    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds = -1f) {
+        if (!TryGetCellState(gp, out var st)) return;
+        if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
-            if (scheduleRegrow) 
-                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true); 
+            if (scheduleRegrow)
+                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
             return;
         }
         if (!TryGetCellGo(gp, out var go) || go == null) {
-            SetCellState(gp, DustCellState.Empty); 
-            if (scheduleRegrow) 
-                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+            SetCellState(gp, DustCellState.Empty);
+            if (scheduleRegrow)
+                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
             return;
         }
 
@@ -204,11 +203,11 @@ public class CosmicDustGenerator : MonoBehaviour
 
          if (scheduleRegrow)
          {
-             RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+             RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
              // Density conservation: immediately fill a frontier cell so total coverage
              // is maintained. The eroded cell's own regrow will be suppressed in
              // CommitRegrowCell once the compensation cell is committed.
-             TryQueueFrontierCompensation(phase);
+             TryQueueFrontierCompensation();
          }
     }
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
@@ -430,7 +429,6 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         if (radiusCells <= 0 || _cellState == null) return;
         EnsureCellGrid();
-        var phase = GetCurrentPhaseSafe();
         int rSq = radiusCells * radiusCells;
         for (int dy = -radiusCells; dy <= radiusCells; dy++)
         for (int dx = -radiusCells; dx <= radiusCells; dx++)
@@ -439,7 +437,7 @@ public class CosmicDustGenerator : MonoBehaviour
             var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
             if (!IsInBounds(gp)) continue;
             if (TryGetCellState(gp, out var st) && st == DustCellState.Solid)
-                ClearCell(gp, DustClearMode.FadeAndHide, dustTimings.spriteScaleOutSeconds, scheduleRegrow: true, phase);
+                ClearCell(gp, DustClearMode.FadeAndHide, dustTimings.spriteScaleOutSeconds, scheduleRegrow: true);
         }
     }
 
@@ -477,8 +475,7 @@ public class CosmicDustGenerator : MonoBehaviour
         dust.DissipateAndHideVisualOnly(0.3f);
 
         // Schedule regrow so the maze heals.
-        MazeArchetype phase = GetCurrentPhaseSafe();
-        RequestRegrowCellAt(gp, phase, refreshIfPending: true);
+        RequestRegrowCellAt(gp, refreshIfPending: true);
     }
     private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
     {
@@ -588,7 +585,7 @@ public class CosmicDustGenerator : MonoBehaviour
             _imprints = new Dictionary<Vector2Int, DustImprint>();
     }
     public bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
-    public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, MazeArchetype phase, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
+    public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
 {
     if (drums == null) return;
 
@@ -636,7 +633,7 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         var cell = _tmpReleased[i];
         if (_permanentClearCells.Contains(cell)) continue;
-        RequestRegrowCellAt(cell, phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
+        RequestRegrowCellAt(cell, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
     }
 
     // Claimed: optionally force-remove dust for legibility (boosting behavior).
@@ -660,11 +657,11 @@ public class CosmicDustGenerator : MonoBehaviour
             _fillMap[cell] = false;
 
             // Ensure a regrow attempt exists (it will self-delay while the keep-clear claim is active).
-            RequestRegrowCellAt(cell, phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
+            RequestRegrowCellAt(cell, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
         }
     }
 }
-    public void ReleaseVehicleKeepClear(int ownerId, MazeArchetype phase = MazeArchetype.Windows)
+    public void ReleaseVehicleKeepClear(int ownerId)
 {
     _tmpReleased.Clear();
     _exclusions.ReleaseVehicleFootprint(ownerId, _tmpReleased);
@@ -682,7 +679,7 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         var cell = _tmpReleased[i];
         if (_permanentClearCells.Contains(cell)) continue;
-        RequestRegrowCellAt(cell, phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
+        RequestRegrowCellAt(cell, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
     }
 }
     private void Start()
@@ -768,6 +765,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (gfm == null) return;
 
         if (drums == null) drums = gfm.activeDrumTrack;
+        if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
     }
     public void ManualStart()
     {
@@ -966,8 +964,8 @@ public class CosmicDustGenerator : MonoBehaviour
         _regrow?.EnqueueStepRegrow(gp);
     }
     
-    private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthForPhase(
-        MazeArchetype phase,
+    private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
+        MazePatternConfig config,
         Vector2Int starCell,
         HashSet<Vector2Int> reservedCells)
     {
@@ -977,23 +975,18 @@ public class CosmicDustGenerator : MonoBehaviour
         int h = drums.GetSpawnGridHeight();
         if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
 
-        // Delegates required by CosmicDustMazePatterns
         Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
         Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
         Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
-
-        // World veto: keep your existing screen cull.
         Func<Vector3, bool> includeWorld = world => true;
 
-        // Grid veto for BFS-based patterns (ring chokepoints)
+        // Grid veto for BFS-based patterns (ring chokepoints).
+        // IMPORTANT: allow the BFS seed (starCell) even though it's reserved —
+        // it will be filtered out from emitted growth by the final pass below.
         Func<Vector2Int, bool> includeCellForBfs = cell =>
         {
             if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
-
-            // IMPORTANT: allow the BFS seed (starCell) even though it's reserved.
-            // We will still filter it out from emitted growth later.
             if (cell == starCell) return true;
-
             if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
             if (reservedCells != null && reservedCells.Contains(cell)) return false;
             if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
@@ -1001,43 +994,35 @@ public class CosmicDustGenerator : MonoBehaviour
             return true;
         };
 
+        var patternType = config != null ? config.patternType : MazePatternType.FullFill;
 
         // IMPORTANT: Patterns return the *cells to place dust*.
-        // We apply a final reserved/permanent/keep-clear filter afterward as defense-in-depth.
+        // A final reserved/permanent/keep-clear filter is applied afterward as defense-in-depth.
         List<(Vector2Int cell, Vector3 world)> growth = null;
 
-        switch (phase)
+        switch (patternType)
         {
-            case MazeArchetype.Windows:
+            case MazePatternType.ClearBoxes:
             {
-                // Legacy behavior: fill everything except reserved.
-                var rect = new List<(Vector2Int, Vector3)>(w * h);
-                for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                {
-                    if (!drums.IsSpawnCellAvailable(x, y)) continue;
-                    var gp = new Vector2Int(x, y);
-                    if (reservedCells != null && reservedCells.Contains(gp)) continue;
-                    if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-                    if (IsKeepClearCell(gp)) continue;
-
-                    var world = drums.GridToWorldPosition(gp);
-                    if (!IsWorldPositionInsideScreen(world)) continue;
-                    rect.Add((gp, world));
-                }
-                growth = rect;
+                growth = CosmicDustMazePatterns.BuildClearBoxes(
+                    width: w,
+                    height: h,
+                    count: config.clearBoxCount,
+                    boxW: config.clearBoxWidth,
+                    boxH: config.clearBoxHeight,
+                    gridToWorld: gridToWorld,
+                    isCellAvailable: isCellAvailable,
+                    includeWorld: includeWorld);
                 break;
             }
 
-            case MazeArchetype.Evolve:
+            case MazePatternType.CellularAutomata:
             {
-                // Moderate CA
-                float fillChance = Mathf.Clamp01(GetFillProbability(phase));
                 growth = CosmicDustMazePatterns.BuildCA(
                     width: w,
                     height: h,
-                    fillChance: fillChance,
-                    iterations: 3,
+                    fillChance: Mathf.Clamp01(config.caFillChance),
+                    iterations: config.caIterations,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1045,37 +1030,15 @@ public class CosmicDustGenerator : MonoBehaviour
                 break;
             }
 
-            case MazeArchetype.Intensify:
+            case MazePatternType.RingChokepoints:
             {
-                // Denser CA (slightly higher fill chance + same iteration count)
-                float fillChance = Mathf.Clamp01(GetFillProbability(phase) + 0.15f);
-                growth = CosmicDustMazePatterns.BuildCA(
-                    width: w,
-                    height: h,
-                    fillChance: fillChance,
-                    iterations: 3,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazeArchetype.Release:
-            {
-                // “Breath / breakdown”: ring chokepoints reads like structure-with-air.
-                // Tunables: spacing larger = fewer rings; thickness smaller = thinner walls.
-                int spacing = 6;
-                int thickness = 1;
-                float jitter = 0.35f;
-
                 growth = CosmicDustMazePatterns.BuildRingChokepoints(
                     center: starCell,
                     width: w,
                     height: h,
-                    ringSpacing: spacing,
-                    ringThickness: thickness,
-                    jitter: jitter,
+                    ringSpacing: config.ringSpacing,
+                    ringThickness: config.ringThickness,
+                    jitter: config.ringJitter,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1084,16 +1047,15 @@ public class CosmicDustGenerator : MonoBehaviour
                 break;
             }
 
-            case MazeArchetype.Wildcard:
+            case MazePatternType.DrunkenStrokes:
             {
-                // Glitchy scribbles
                 growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
                     width: w,
                     height: h,
-                    strokes: 10,
-                    maxLen: 18,
-                    stepJitter: 0.35f,
-                    dilate: 0.30f,
+                    strokes: config.strokes,
+                    maxLen: config.strokeMaxLen,
+                    stepJitter: config.strokeJitter,
+                    dilate: config.strokeDilate,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1101,38 +1063,35 @@ public class CosmicDustGenerator : MonoBehaviour
                 break;
             }
 
-            case MazeArchetype.Pop:
+            case MazePatternType.DiagonalLanes:
             {
-                // Polka dots / hooky grid mask
                 growth = CosmicDustMazePatterns.BuildPopDots(
                     width: w,
                     height: h,
-                    step: 12, //Wide Diagonal Lines
-                    phaseOffset: Random.Range(0, 8),
+                    step: config.laneStep,
+                    phaseOffset: Random.Range(0, config.laneStep),
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
                 break;
             }
 
-            case MazeArchetype.Tunnel:
+            case MazePatternType.Tunnels:
             {
                 growth = CosmicDustMazePatterns.BuildPacManTunnels(
                     width: w,
                     height: h,
-                    corridorStep: 1,  // wall thickness = step - corridorWidth
-                    corridorWidth: 3, // must fit vehicle collision width
-                    phaseOffsetX: 0,
-                    phaseOffsetY: 0,
+                    corridorStep: config.tunnelCorridorStep,
+                    corridorWidth: config.tunnelCorridorWidth,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
                 break;
             }
 
+            case MazePatternType.FullFill:
             default:
             {
-                // Safe fallback: treat as Establish rectangle fill
                 var rect = new List<(Vector2Int, Vector3)>(w * h);
                 for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)
@@ -1142,7 +1101,6 @@ public class CosmicDustGenerator : MonoBehaviour
                     if (reservedCells != null && reservedCells.Contains(gp)) continue;
                     if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
                     if (IsKeepClearCell(gp)) continue;
-
                     var world = drums.GridToWorldPosition(gp);
                     if (!IsWorldPositionInsideScreen(world)) continue;
                     rect.Add((gp, world));
@@ -1155,7 +1113,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (growth == null)
             growth = new List<(Vector2Int, Vector3)>();
 
-        // Final filter: enforce reserved/permanent/keep-clear *even if a pattern emitted them*.
+        // Final filter: enforce reserved/permanent/keep-clear even if a pattern emitted them.
         var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
         for (int i = 0; i < growth.Count; i++)
         {
@@ -1175,7 +1133,6 @@ public class CosmicDustGenerator : MonoBehaviour
     /// GetCellHardness01 and GetCellVisualColor return per-cell role values during spawn.
     /// </summary>
     private void BuildMazeRoleImprints(
-        MazeArchetype phase,
         Vector2Int starCell,
         List<(Vector2Int cell, Vector3 world)> cells)
     {
@@ -1192,45 +1149,27 @@ public class CosmicDustGenerator : MonoBehaviour
             ? _activeRoles
             : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
 
-        // --- Role assignment: currently Voronoi for all archetypes.
-        // Future: switch on phase to use archetype-specific distributions
-        // (e.g. radial wedges for Release, striped for Pop, noise blobs for Wildcard).
-        var roleMap = CosmicDustMazePatterns.AssignRolesVoronoi(cells, starCell, w, h, roles, phase);
-
-        // --- Write imprints ---
-        for (int i = 0; i < cells.Count; i++)
+        // All dust starts gray (MusicalRole.None); roles are earned through vehicle carving + regrowth.
+        foreach (var (gp, _) in cells)
         {
-            var gp   = cells[i].cell;
-            if (!roleMap.TryGetValue(gp, out var role)) continue;
-
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
-            if (roleProfile == null) continue;
-
-            // Base color carries alpha = baseAlpha from the role profile.
-            // This makes hardness directly readable: Bass cells are more opaque than Lead cells.
-            Color baseColor = roleProfile.GetBaseColor();
-
             _imprints[gp] = new DustImprint
             {
-                color      = baseColor,
-                hardness01 = roleProfile.GetDustHardness01(),
-                role       = role,
-                healDelay  = 0f   // maze cells use phase-default regrow delay
+                role       = MusicalRole.None,
+                color      = _mazeTint,
+                hardness01 = defaultMazeHardness01
             };
         }
 
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: phase={phase} activeRoles=[{string.Join(",", roles)}] cells={cells.Count} imprinted={roleMap.Count}");
+        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}");
     }
 
-    public IEnumerator GenerateMazeForPhaseWithPaths(MazeArchetype phase, Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
+    public IEnumerator GenerateMazeForPhaseWithPaths(Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
     {
         if (drums == null)
         {
             Debug.LogError("[MAZE] No DrumTrack available; cannot build maze.");
             yield break;
         }
-
-        Debug.Log($"[MAZE] GenerateMazeForPhaseWithPaths START phase={phase} starCell={starCell} vehicleCount={(vehicleCells != null ? vehicleCells.Count : 0)} permCount(before grid wait)={_permanentClearCells.Count}");
 
         yield return new WaitUntil(() =>
             drums.HasSpawnGrid() &&
@@ -1260,8 +1199,11 @@ public class CosmicDustGenerator : MonoBehaviour
             }
         }
 
-// Pattern-driven growth list
-        var cellsToFill = BuildMazeGrowthForPhase(phase, starCell, reserved);
+        // Resolve pattern config from the active motif; null falls back to FullFill inside the method.
+        _activeMazePattern = phaseTransitionManager?.currentMotif?.mazePattern;
+
+        // Pattern-driven growth list
+        var cellsToFill = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
         Debug.Log($"[MAZE] cellsToFill(pattern) count={cellsToFill.Count}");
 
         // Cache pattern oracle so frontier compensation can prefer original wall cells.
@@ -1274,7 +1216,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // GetOrCreateCellGO reads GetCellHardness01(gp) and GetCellVisualColor(gp) which
         // consult _imprints, so each cell spawns with the correct role color + hardness
         // without any further per-cell logic in the spawn loop.
-        BuildMazeRoleImprints(phase, starCell, cellsToFill);
+        BuildMazeRoleImprints(starCell, cellsToFill);
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
         Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
@@ -1439,9 +1381,15 @@ public class CosmicDustGenerator : MonoBehaviour
         if (prev != st)
         {
             if (st == DustCellState.Solid)
+            {
+                _allSolidCount++;
                 TrackRoleDensityChange(gp, becomesSolid: true);
+            }
             else if (prev == DustCellState.Solid)
+            {
+                _allSolidCount = Mathf.Max(0, _allSolidCount - 1);
                 TrackRoleDensityChange(gp, becomesSolid: false);
+            }
 
             if (prev == DustCellState.Regrowing && st != DustCellState.Regrowing)
                 _regrowingCount = Mathf.Max(0, _regrowingCount - 1);
@@ -1546,7 +1494,6 @@ public class CosmicDustGenerator : MonoBehaviour
     } 
     public void CreateJailCenterForCollectable(
         Vector2Int gpCenter,
-        MazeArchetype phase,
         float holdSeconds,
         int ownerId,
         DustClearMode mode = DustClearMode.HideInstant,
@@ -1554,7 +1501,7 @@ public class CosmicDustGenerator : MonoBehaviour
         float regrowDelaySeconds = -1f)
     {
         // 1) Clear ONLY the center cell (the "jail cell" the note occupies).
-        ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, phase: phase, regrowDelaySeconds: regrowDelaySeconds);
+        ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds);
 
         // 2) Claim ONLY the center so it stays empty while jailed.
         if (dustClaims != null && holdSeconds > 0f)
@@ -1573,7 +1520,7 @@ public class CosmicDustGenerator : MonoBehaviour
         return HasDustAt(cell) ? 1f : 0f;
     }
 
-    private void RequestRegrowCellAt(Vector2Int gridPos, MazeArchetype phase, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
+    private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (_regrowthSuppressed)
             return;
@@ -1598,20 +1545,8 @@ public class CosmicDustGenerator : MonoBehaviour
         if (!shouldSchedule)
             return;
 
-        // Compute delay (phase default unless explicitly overridden).
-        float delay = delaySeconds >= 0f ? delaySeconds : phase switch
-        {
-            MazeArchetype.Windows  => 4f,
-            MazeArchetype.Evolve     => 12f,
-            MazeArchetype.Intensify  => 8f,
-            MazeArchetype.Release    => 32f,
-            MazeArchetype.Wildcard   => 16f,
-            MazeArchetype.Pop        => 24f,
-            MazeArchetype.Tunnel     => 10f,
-            _ => 32f
-        };
-
-        delay *= GetRegrowDelayMul(phase);
+        // Compute delay from the active motif's maze config, or fall back to a safe default.
+        float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.regrowDelay : 8f);
        
         EnsureRegrowController();
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
@@ -1627,7 +1562,6 @@ public class CosmicDustGenerator : MonoBehaviour
      public void ClaimTemporaryDiskForCollectable(
         Vector3 centerWorld,
         float radiusWorld,
-        MazeArchetype phase,
         float holdSeconds,
         int ownerId,
         int priority = 50)
@@ -1637,7 +1571,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // 1) Actually carve/hold the pocket (this despawns dust and schedules regrow).
         // Pass ownerId so the PeekHole claim uses the same owner string as the TemporaryCarve
         // claim below — both will be released together by ReleaseOwner("Collectable#{ownerId}").
-        CarveTemporaryDiskFromCollectable(centerWorld, radiusWorld, phase, holdSeconds, ownerId);
+        CarveTemporaryDiskFromCollectable(centerWorld, radiusWorld, holdSeconds, ownerId);
 
         // 2) Also claim cells in DustClaimManager so regrow attempts self-delay while the pocket is maintained
         //    (DustPocketRoutine refreshes this periodically, so expiry behaves as a "keep alive".)
@@ -1675,7 +1609,6 @@ public class CosmicDustGenerator : MonoBehaviour
      public void CarveTemporaryDiskFromCollectable(
         Vector3 centerWorld,
         float radiusWorld,
-        MazeArchetype phase,
         float holdSeconds,
         int ownerId = 0)
     {
@@ -1722,12 +1655,12 @@ public class CosmicDustGenerator : MonoBehaviour
                     if (dustClaims != null)
                         dustClaims.ClaimCell(owner, gp, DustClaimType.PeekHole, seconds: hold, refresh: true);
 
-                    RequestRegrowCellAt(gp, phase, hold, refreshIfPending: true);
+                    RequestRegrowCellAt(gp, hold, refreshIfPending: true);
                 }
             }
         }
     }
-    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, MazeArchetype phase, bool forceRemoveExisting)
+    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting)
     {
         if (drums == null) return;
 
@@ -1765,7 +1698,7 @@ public class CosmicDustGenerator : MonoBehaviour
         for (int i = 0; i < _tmpReleased.Count; i++)
         {
             var cell = _tmpReleased[i];
-            RequestRegrowCellAt(cell, phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
+            RequestRegrowCellAt(cell, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
         }
 
         // CLAIM -> keep empty; optionally clear any existing dust; DO NOT schedule regrow
@@ -1775,15 +1708,15 @@ public class CosmicDustGenerator : MonoBehaviour
             {
                 var cell = _tmpClaimed[i];
                 if (TryGetCellGo(cell, out var go) && go != null)
-                    ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds: 2f, scheduleRegrow: false, phase: phase);
+                    ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds: 2f, scheduleRegrow: false);
             }
         }
     }
-    public void ClearStarKeepClear(MazeArchetype phase)
+    public void ClearStarKeepClear()
     {
         _exclusions.ClearStarPocket(_tmpReleased);
         for (int i = 0; i < _tmpReleased.Count; i++)
-            RequestRegrowCellAt(_tmpReleased[i], phase, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
+            RequestRegrowCellAt(_tmpReleased[i], delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
     }
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {
@@ -1823,13 +1756,13 @@ public class CosmicDustGenerator : MonoBehaviour
         DespawnDustAt(gridPos);
         _regrow?.CancelRegrow(gridPos);
     }
-    public void RegrowPreviousCorridorOnNewNodeSpawn(MazeArchetype phase)
+    public void RegrowPreviousCorridorOnNewNodeSpawn()
     {
         if (_pendingCorridorRegrowth.Count == 0) return;
         var path = _pendingCorridorRegrowth.Dequeue();
-        BeginCorridorRegrowthReverse(path, phase);
+        BeginCorridorRegrowthReverse(path);
     }
-    private void BeginCorridorRegrowthReverse(List<Vector2Int> carvedPath, MazeArchetype phase)
+    private void BeginCorridorRegrowthReverse(List<Vector2Int> carvedPath)
     {
         if (carvedPath == null || carvedPath.Count == 0) return;
         
@@ -1968,9 +1901,10 @@ public class CosmicDustGenerator : MonoBehaviour
     }
     private int TotalSolidCount()
     {
-        int n = 0;
-        foreach (var kv in _solidCountByRole) n += kv.Value;
-        return n;
+        // _allSolidCount tracks ALL solid cells including MusicalRole.None.
+        // _solidCountByRole only tracks non-None roles, so it can't be used here
+        // after the gray-start change where all initial cells have role=None.
+        return _allSolidCount;
     }
 
     /// <summary>
@@ -1979,14 +1913,14 @@ public class CosmicDustGenerator : MonoBehaviour
     /// CommitRegrowCell once the compensation cell is committed, so dust "shifts"
     /// rather than appearing and disappearing.
     /// </summary>
-    private void TryQueueFrontierCompensation(MazeArchetype phase)
+    private void TryQueueFrontierCompensation()
     {
         if (_targetSolidCount <= 0) return;
         if (TotalSolidCount() + _regrowingCount >= _targetSolidCount) return;
 
         var cell = GetBestFrontierCell();
         if (cell.HasValue)
-            RequestRegrowCellAt(cell.Value, phase, delaySeconds: 0f);
+            RequestRegrowCellAt(cell.Value, delaySeconds: 0f);
     }
 
     private const int kFrontierSamples = 200;
@@ -2198,6 +2132,7 @@ public class CosmicDustGenerator : MonoBehaviour
         finally
         {
         }
+        _allSolidCount    = 0;
         _targetSolidCount = -1;
         _regrowingCount   = 0;
         _mazePatternCells = null;
@@ -2251,7 +2186,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         // Schedule regrow (held off by keep-clear, claims, vehicle veto, collectables)
-        RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
+        RequestRegrowCellAt(gridPos, refreshIfPending: true);
     }
     public void SetReservedVehicleCells(IReadOnlyList<Vector2Int> cells)
     {
@@ -2287,8 +2222,6 @@ public class CosmicDustGenerator : MonoBehaviour
             drums.SyncTileWithScreen();
             float cellWorldSize = Mathf.Max(0.001f, drums.GetCellWorldSize());
 
-            MazeArchetype phaseNow = GetCurrentPhaseSafe();
-
             float lastPacedAt = Time.realtimeSinceStartup;
             int i = 0;
 
@@ -2313,7 +2246,7 @@ public class CosmicDustGenerator : MonoBehaviour
                     if (HasDustAt(grid)) continue;
                     if (IsDustSpawnBlocked(grid)) continue;          // includes permanent + keepclear + claims/holds
                     if (!Collectable.IsCellFreeStatic(grid)) continue; // never grow dust on top of a collectable
-                    if (IsVehicleOverlappingCell(grid)) { RequestRegrowCellAt(grid, phaseNow, refreshIfPending: true); continue; } // defer to step-gate
+                    if (IsVehicleOverlappingCell(grid)) { RequestRegrowCellAt(grid, refreshIfPending: true); continue; } // defer to step-gate
                     // ---------------------------
                     // SPAWN + REGISTER (VISUAL FIRST)
                     // ---------------------------
@@ -2343,11 +2276,11 @@ public class CosmicDustGenerator : MonoBehaviour
                         }
                         else
                         {
-                            // No imprint: assign least-dense role so dust.Role is never MusicalRole.None.
-                            var fallbackRole = GetLeastDenseRole();
-                            var fallbackProfile = MusicalRoleProfileLibrary.GetProfile(fallbackRole);
-                            Color fallbackColor = (fallbackProfile != null) ? fallbackProfile.GetBaseColor() : cellColor;
-                            dust.ApplyRoleAndCharge(fallbackRole, fallbackColor, fallbackColor.a);
+                            // Gray start: initial cells spawn with no role (MusicalRole.None) and maze tint.
+                            // Roles are earned dynamically through vehicle carving + regrowth.
+                            // dust.Role must be None here so TickDrain's Role guard treats these as
+                            // inert gray cells and the star cannot drain them while dormant.
+                            dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, cellColor.a);
                         }
 
                         // Use the role's shadow color as the deny feedback color.
@@ -2532,11 +2465,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
         // No composite collider rebuild (per-cell terrain only).
     }
-    private MazeArchetype GetCurrentPhaseSafe()
-    {
-        TryEnsureRefs();
-        return (phaseTransitionManager != null) ? phaseTransitionManager.currentPhase : MazeArchetype.Windows;
-    }
 
     private void DespawnDustAt(Vector2Int gridPos)
     {
@@ -2554,7 +2482,7 @@ public class CosmicDustGenerator : MonoBehaviour
         SetCellState(gridPos, DustCellState.Empty);
 
         // CRITICAL: schedule regrow.
-        RequestRegrowCellAt(gridPos, GetCurrentPhaseSafe(), refreshIfPending: true);
+        RequestRegrowCellAt(gridPos, refreshIfPending: true);
     }
     private List<Vector2Int> GetHexDirections(int row)
     {
@@ -2572,7 +2500,6 @@ public class CosmicDustGenerator : MonoBehaviour
 
     public int CarveTemporaryCellFromMineNode(
         Vector3 centerWorld,
-        MazeArchetype phase,
         float regrowDelaySeconds,
         MusicalRole removedRoleOverride,
         int resolveRadiusCells,
@@ -2623,13 +2550,13 @@ public class CosmicDustGenerator : MonoBehaviour
                 {
                     if (removed < budget)
                     {
-                        ClearCell(gp,DustClearMode.FadeAndHide, fadeSeconds: 0.20f, scheduleRegrow: true, phase: phase,regrowDelaySeconds: regrowDelaySeconds);
+                        ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.20f, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds);
                         removed++;
                     }
                 }
 
                 // Always refresh regrow timer (even if already empty).
-                RequestRegrowCellAt(gp, phase, regrowDelaySeconds, refreshIfPending: true);
+                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
             }
         }
 
@@ -2645,19 +2572,46 @@ public class CosmicDustGenerator : MonoBehaviour
         _imprints?.Remove(cell);
     }
 
-    private float GetFillProbability(MazeArchetype phase)
+    /// <summary>
+    /// Returns true if any solid dust cell currently has a non-None MusicalRole.
+    /// Used by PhaseStar to detect when to wake from dormancy.
+    /// </summary>
+    public bool HasAnyDustWithRole()
     {
-        return phase switch
+        if (_imprints == null) return false;
+        foreach (var kvp in _imprints)
         {
-            MazeArchetype.Windows => 0.90f,
-            MazeArchetype.Evolve => 0.30f,
-            MazeArchetype.Intensify => 0.45f,
-            MazeArchetype.Release => 0.15f,
-            MazeArchetype.Wildcard => 0.40f + Random.Range(-0.1f, 0.1f),
-            MazeArchetype.Tunnel   => 0.64f,
-            _ => 0.35f
-        };
+            if (kvp.Value.role == MusicalRole.None) continue;
+            if (TryGetCellState(kvp.Key, out var st) && st == DustCellState.Solid)
+                return true;
+        }
+        return false;
     }
+
+    /// <summary>
+    /// Tints a solid dust cell with the given MusicalRole color without carving it.
+    /// Called by MineNode as it moves through corridors.
+    /// </summary>
+    public void TintDustCellWithRole(Vector2Int cell, MusicalRole role)
+    {
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (profile == null) return;
+
+        Color color = profile.GetBaseColor();
+        _imprints[cell] = new DustImprint
+        {
+            role       = role,
+            color      = color,
+            hardness01 = profile.GetDustHardness01()
+        };
+        if (TryGetDustAt(cell, out var dust))
+        {
+            dust.ApplyRoleAndCharge(role, color, dust.Charge01);
+            dust.SyncParticleColor(); // ApplyRoleAndCharge only updates the sprite; sync particles too
+        }
+    }
+
     // Add to CosmicDustGenerator
     [ContextMenu("Debug: Find Phantom Colliders")]
     public void DebugFindPhantomColliders()

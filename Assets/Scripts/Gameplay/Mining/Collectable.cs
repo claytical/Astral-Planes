@@ -616,13 +616,9 @@ private IEnumerator SpawnArrivalRoutine(
             // Carving makes it "not dust" — but we still need to keep the pocket held open.
             float hold = Mathf.Max(dustPocketTickSeconds * 2f, dustPocketHoldSeconds);
 
-            MazeArchetype phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
-                ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Windows;
             dustGen.ClaimTemporaryDiskForCollectable(
                 cur,
                 dustPocketRadiusWorld,
-                phaseNow,
                 hold,
                 _dustClaimOwnerId,
                 priority: 50);
@@ -634,10 +630,6 @@ private IEnumerator SpawnArrivalRoutine(
         var dustGen = gfm != null ? gfm.dustGenerator : null;
         var drumTrack = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
         if (dustGen == null || drumTrack == null) return;
-
-        var phaseNow = (gfm != null && gfm.phaseTransitionManager != null)
-            ? gfm.phaseTransitionManager.currentPhase
-            : drumTrack.GetCurrentPhaseSafe();
 
         float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         float radiusWorld = cellWorld * 0.10f;

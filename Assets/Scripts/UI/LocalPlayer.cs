@@ -181,16 +181,10 @@ public class LocalPlayer : MonoBehaviour
             _dustKeepClearOwnerId = GetInstanceID();
             _dustKeepClearCell = spawnCell;
 
-            // Determine phase for regrowth scheduling (keep-clear itself blocks regrow).
-            MazeArchetype phaseNow = (gfm.phaseTransitionManager != null)
-                ? gfm.phaseTransitionManager.currentPhase
-                : MazeArchetype.Windows;
-
             gfm.dustGenerator.SetVehicleKeepClear(
                 ownerId: _dustKeepClearOwnerId,
                 centerCell: _dustKeepClearCell,
                 radiusCells: Mathf.Max(0, spawnPocketRadiusCells),
-                phase: phaseNow,
                 forceRemoveExisting: true,
                 forceRemoveFadeSeconds: Mathf.Max(0.01f, spawnPocketFadeSeconds)
             );

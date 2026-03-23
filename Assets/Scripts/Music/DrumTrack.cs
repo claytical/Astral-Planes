@@ -13,7 +13,6 @@ public class DrumTrack : MonoBehaviour
     private bool _hasLastPlayAreaForTileCache = false;
     public GameObject phaseStarPrefab;
     public GameObject mineNodePrefab;
-    public PhasePersonalityRegistry phasePersonalityRegistry;
     private MotifProfile _pendingMotif;
     private float _pendingBpm;
     private int _pendingTotalSteps;
@@ -104,7 +103,7 @@ public class DrumTrack : MonoBehaviour
     private AudioClip _currentDrumClip;
 
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
-    public event System.Action<MazeArchetype, PhaseStarBehaviorProfile> OnPhaseStarSpawned;
+    public event System.Action<PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int, int> OnStepChanged; // (stepIndex, leaderSteps)
 
     private int _lastStepIdx = -1;
@@ -997,7 +996,7 @@ public class DrumTrack : MonoBehaviour
         {
             Debug.LogWarning(
                 "[BOOT] DrumTrack.ManualStart: PTM.currentMotif is null.\n" +
-                "Expected GameFlowManager to call PTM.StartChapter(...) before ManualStart.\n" +
+                "Expected GameFlowManager to call PTM.StartPhase(...) before ManualStart.\n" +
                 "Falling back to AudioSource.clip timing (may play inspector/default loop)."
             );
         }
@@ -1005,7 +1004,7 @@ public class DrumTrack : MonoBehaviour
         AudioClip initialClip = null;
 
     // Ensure our internal motif state is applied consistently with later transitions
-    // IMPORTANT: PTM.StartChapter already applied the motif to DrumTrack during TrackSetup.
+    // IMPORTANT: PTM.StartPhase already applied the motif to DrumTrack during TrackSetup.
     // ManualStart should NOT re-apply unless DrumTrack somehow missed it.
         if (_motif != null)
         {
@@ -1114,7 +1113,7 @@ public class DrumTrack : MonoBehaviour
         Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
     }   
 
-public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
+public void RequestPhaseStar(Vector2Int? cellHint = null)
 {
     if (_star != null)
     {
@@ -1149,10 +1148,6 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     // World-space destination the navigator will steer toward from off-screen.
     Vector2 targetWorldPos = GridToWorldPosition(cell);
 
-    // ── Spawn off-screen ─────────────────────────────────────────────────────
-    // Place the GO at the target for initial subcomponent setup, then
-    // PhaseStar.EnterFromOffScreen immediately relocates it to an edge point.
-    Debug.Log($"[Spawn] 🌠 Spawning PhaseStar (off-screen entry) targeting cell={cell} (world {targetWorldPos}) phase={phase}");
 
     var go = Instantiate(phaseStarPrefab, (Vector3)targetWorldPos, Quaternion.identity);
     _star = go.GetComponent<PhaseStar>();
@@ -1173,8 +1168,8 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
         if (_spawnGrid != null) _spawnGrid.FreeCell(cell.x, cell.y);
     };
 
-    // Behavior profile + dust retint.
-    var profileAsset = phasePersonalityRegistry ? phasePersonalityRegistry.Get(phase) : null;
+    // Behavior profile from active motif.
+    var profileAsset = _phaseTransitionManager?.currentMotif?.starBehavior;
     if (_dust && profileAsset) _dust.ApplyProfile(profileAsset);
     if (_gfm && _dust)        _dust.RetintExisting(0.4f);
 
@@ -1186,7 +1181,6 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     if (_phaseTransitionManager?.currentMotif != null)
     {
         motif = _phaseTransitionManager.currentMotif;
-        Debug.Log($"[Spawn] Using motif '{motif.motifId}' for PhaseStar (phase={phase}).");
     }
     else
     {
@@ -1196,14 +1190,14 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     // Initialize all subcomponents (motion, visuals, dust, navigator).
     // Initialize internally sets _entryInProgress = false by default;
     // EnterFromOffScreen flips it to true before ArmNext() runs.
-    _star.Initialize(this, targets, profileAsset, phase, motif);
+    _star.Initialize(this, targets, profileAsset, motif);
 
     // ── Hand off entry sequence ──────────────────────────────────────────────
     // EnterFromOffScreen repositions the GO to a screen-edge point, hides
     // visuals, disables colliders, and defers ArmNext until arrival.
     _star.EnterFromOffScreen(targetWorldPos);
 
-    OnPhaseStarSpawned?.Invoke(phase, profileAsset);
+    OnPhaseStarSpawned?.Invoke(profileAsset);
 }
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust)
     {
@@ -1213,7 +1207,6 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
 
     public int CarveTemporaryCellFromMineNode(
         Vector3 worldPos,
-        MazeArchetype phase,
         float healDelaySeconds,
         MusicalRole removedRoleOverride = MusicalRole.None,
         int resolveRadiusCells = 0,
@@ -1223,7 +1216,6 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
 
         return _dust.CarveTemporaryCellFromMineNode(
             worldPos,
-            phase,
             healDelaySeconds, removedRoleOverride,
             resolveRadiusCells,
             appetiteMul
@@ -1252,13 +1244,6 @@ public void RequestPhaseStar(MazeArchetype phase, Vector2Int? cellHint = null)
     public void UnregisterMineNode(MineNode obj)
     {
         activeMineNodes.Remove(obj);
-    }
-
-    public MazeArchetype GetCurrentPhaseSafe()
-    {
-        // DrumTrack is level authority; phaseTransitionManager is already cached here.
-        if (_phaseTransitionManager != null) return _phaseTransitionManager.currentPhase;
-        return MazeArchetype.Windows;
     }
     
     private void ValidateSpawnGrid()

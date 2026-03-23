@@ -57,8 +57,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private float _drainTimer;
 
     private PhaseStarBehaviorProfile _profile;
-    private MazeArchetype _lastPhase;
-    private bool _hasLastPhase;
 
     private PhaseStar _star;
     private Rigidbody2D _rb;
@@ -99,7 +97,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             var gen = gfm?.dustGenerator;
             if (gen != null)
-                gen.ClearStarKeepClear(_hasLastPhase ? _lastPhase : MazeArchetype.Windows);
+                gen.ClearStarKeepClear();
         };
     }
 
@@ -175,15 +173,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drums = gfm?.activeDrumTrack;
         if (gen == null || drums == null) return;
 
-        var phaseMgr = gfm.phaseTransitionManager;
-        if (phaseMgr != null) { _lastPhase = phaseMgr.currentPhase; _hasLastPhase = true; }
-
         int radiusCells = Mathf.Max(0, _profile.starKeepClearRadiusCells);
         Vector2Int center = drums.WorldToGridPosition(transform.position);
 
-        gen.SetStarKeepClear(center, radiusCells,
-            _hasLastPhase ? _lastPhase : MazeArchetype.Windows,
-            forceRemoveExisting: false);
+        gen.SetStarKeepClear(center, radiusCells, forceRemoveExisting: false);
 
         // Re-sweep for any dust colliders spawned since Initialize
         IgnoreNearbyDustColliders();
@@ -240,6 +233,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             if (!gen.HasDustAt(probeCell)) continue;
             if (!gen.TryGetCellGo(probeCell, out var go) || go == null) continue;
             if (!go.TryGetComponent<CosmicDust>(out var dustCell) || dustCell == null) continue;
+            if (dustCell.Role == MusicalRole.None) continue; // star doesn't feed on gray dust
             if (dustCell.Charge01 <= 0f) continue;
             float taken = dustCell.DrainCharge(drainAmount);
             if (taken > 0f && _star != null)
@@ -248,12 +242,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             if (dustCell.Charge01 <= 0f)
             {
                 gen.ClearImprintAt(probeCell);
-                var phaseMgr = gfm.phaseTransitionManager;
-                MazeArchetype phase = phaseMgr != null ? phaseMgr.currentPhase : MazeArchetype.Windows;
                 gen.ClearCell(probeCell, CosmicDustGenerator.DustClearMode.FadeAndHide,
                     fadeSeconds: 0.4f,
                     scheduleRegrow: true,
-                    phase: phase,
                     regrowDelaySeconds: starDrainRegrowDelay);
             }
             // Keep probing deeper — dense patches should feed the star continuously

@@ -8,7 +8,7 @@ public static class MusicalRoleProfileLibrary
     private static void LoadProfiles()
     {
         _roleToProfile = new Dictionary<MusicalRole, MusicalRoleProfile>();
-        var profiles = Resources.LoadAll<MusicalRoleProfile>("RoleProfiles");
+        var profiles = Resources.LoadAll<MusicalRoleProfile>("Profiles/Musical Roles");
         foreach (var profile in profiles)
         {
             if (!_roleToProfile.ContainsKey(profile.role))
