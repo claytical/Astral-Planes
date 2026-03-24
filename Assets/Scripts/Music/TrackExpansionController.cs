@@ -76,14 +76,14 @@ public class TrackExpansionController
     // ----------------------------------------------------------
     // State (was scattered across InstrumentTrack fields)
     // ----------------------------------------------------------
-    public bool  PendingExpandForBurst       { get; private set; }
-    public bool  HookedBoundaryForExpand     { get; private set; }
-    public bool  ExpandCommitted             { get; private set; }
-    public int   OldTotalAtExpand            { get; private set; }
-    public int   HalfOffsetAtExpand          { get; private set; }
-    public bool  MapIncomingCollectionsToSecondHalf { get; private set; }
-    public int   PendingMapIntoSecondHalfCount      { get; private set; }
-    public float PendingMapTimeout                  { get; private set; }
+    private bool  PendingExpandForBurst       { get; set; }
+    private bool  HookedBoundaryForExpand     { get; set; }
+    private bool  ExpandCommitted             { get; set; }
+    private int   OldTotalAtExpand            { get; set; }
+    private int   HalfOffsetAtExpand          { get; set; }
+    private bool  MapIncomingCollectionsToSecondHalf { get; set; }
+    private int   PendingMapIntoSecondHalfCount      { get; set; }
+    private float PendingMapTimeout                  { get; set; }
     public int   OverrideNextSpawnBin               { get; private set; } = -1;
 
     private PendingBurstData? _pendingBurstAfterExpand;
@@ -137,9 +137,7 @@ public class TrackExpansionController
     // ----------------------------------------------------------
     public bool IsExpansionPending =>
         PendingExpandForBurst || _pendingBurstAfterExpand.HasValue || HookedBoundaryForExpand;
-
-    public bool HasPendingBurst => _pendingBurstAfterExpand.HasValue;
-
+    
     // ----------------------------------------------------------
     // Staging (called from SpawnCollectableBurst when targetBin >= loopMultiplier)
     // ----------------------------------------------------------
@@ -286,10 +284,7 @@ public class TrackExpansionController
         _drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitExpand;
         HookedBoundaryForExpand = false;
     }
-
-    // ----------------------------------------------------------
-    // Commit (was InstrumentTrack.OnDrumDownbeat_CommitExpand)
-    // ----------------------------------------------------------
+    
     private void OnDrumDownbeat_CommitExpand()
     {
         bool hadAnyPending = PendingExpandForBurst || _pendingBurstAfterExpand.HasValue;

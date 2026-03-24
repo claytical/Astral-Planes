@@ -4,16 +4,6 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Astral Planes/PhaseStar Behavior Profile")]
 public class PhaseStarBehaviorProfile : ScriptableObject
 {
-    // =====================================================================
-    // Core identity (lightweight; mainly informs visuals & authoring clarity)
-    // =====================================================================
-
-//    [Tooltip("Primary color associated with this profile (used for maze tinting / UI).")]
-//    public Color mazeColor = Color.white;
-
-    [Tooltip("The role whose dust dominates this phase. Determines the largest Voronoi territory " +
-             "and the highest hardness region in the maze. Lead = softest, Bass = hardest.")]
-    public MusicalRole dominantRole = MusicalRole.Bass;
 
     // =====================================================================
     // Core star gameplay levers (PhaseStar.cs)
@@ -50,7 +40,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     // Preview ring & tempo coupling (visual + readability)
     // =====================================================================
     [Header("Preview Ring (visual rhythm)")]
-    [Range(0.25f, 3f)] public float particlePulseSpeed = 1f;
     [Range(0f, 1f)]    public float starAlphaMin = 0.10f;
     [Range(0f, 1f)]    public float starAlphaMax = 1.00f;
     
@@ -78,22 +67,8 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Min(0.1f)]
     public float mazeNavReplanInterval = 0.5f;
 
-    [Tooltip("Max grid cells visited per BFS replan. Keep ≤ 200 for frame-budget safety.")]
-    [Min(10)]
-    public int mazeNavBfsBudget = 150;
-
-    [Range(0f, 1f)]
-    [Tooltip("How strongly the craving waypoint overrides free drift. " +
-             "0 = star ignores maze corridors; 1 = fully committed to craving path. " +
-             "0.85 is a good default — leaves room for vehicle avoidance to still read clearly.")]
-    public float mazeNavWaypointPull = 0.85f;
-
-    
     [Tooltip("Optional prefab used for ejection VFX/markers.")]
     public GameObject ejectionPrefab;
-    
-    [Tooltip("VISUAL ONLY: time for the shard/node to fly to its target grid cell.")]
-    public float nodeFlightSeconds = 0.6f;
-    
+
 
 }

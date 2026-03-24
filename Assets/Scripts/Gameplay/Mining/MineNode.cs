@@ -46,7 +46,6 @@ public class MineNode : MonoBehaviour
     private InstrumentTrack _track;
     private MusicalRole _role;
     private float _speed    = 0.5f;
-    private float _clearing = 0.5f;
     private float _agility  = 0.5f;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
@@ -68,7 +67,6 @@ public class MineNode : MonoBehaviour
         if (prof != null)
         {
             _speed    = prof.mineNodeSpeed;
-            _clearing = prof.mineNodeClearing;
             _agility  = prof.mineNodeAgility;
         }
         var explode = GetComponent<Explode>();
@@ -88,7 +86,6 @@ public class MineNode : MonoBehaviour
         var dust = GetComponent<MineNodeDustInteractor>(); 
         if (dust != null) dust.SetLevelAuthority(_drumTrack); 
         _carvedPath.Clear(); 
-        if (track != null) ConfigureFromRole(track.assignedRole);
         if (coreSprite != null) {
             tint.a = 1; 
             coreSprite.color = tint;
@@ -118,26 +115,7 @@ public class MineNode : MonoBehaviour
         _carvedPath.Clear(); 
         _carvedPath.AddRange(compact);
     }
-    public float GetCorridorHealDelaySeconds()
-    {
-        // tunables (make them per-role later if desired)
-        float slow = 16f;  // low note
-        float fast = 4f;  // high note
-        return Mathf.Lerp(slow, fast, _lastNote01); // note01 high => fast
-    }
-    public void NotifyDustErodedAt(Vector3 worldPos)
-    {
-        if (_drumTrack == null) return;
-
-        // Project carving position into the grid
-        Vector2Int cell = _drumTrack.CellOf(worldPos);
-
-        // Avoid duplicate samples when staying in the same cell
-        if (_carvedPath.Count > 0 && _carvedPath[_carvedPath.Count - 1] == cell)
-            return;
-
-        _carvedPath.Add(cell);
-    }
+    
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -275,7 +253,16 @@ public class MineNode : MonoBehaviour
     targetSpeed = Mathf.Max(targetSpeed, minDesiredSpeedFloor);
 
     if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
-    if (_dustInteractor != null) _dustInteractor.SetDesiredSpeed(targetSpeed);
+    if (_dustInteractor != null)
+    {
+        _dustInteractor.SetDesiredSpeed(targetSpeed);
+        Vector2 huntDir = _dustInteractor.GetHuntDir();
+        if (huntDir.sqrMagnitude > 0.0001f)
+        {
+            float w = _dustInteractor.HuntDirWeight;
+            _carveDir = Vector2.Lerp(_carveDir, huntDir, w).normalized;
+        }
+    }
 
     // --- CONTINUOUS STEERING FORCE ---
     Vector2 desiredVelocity = _carveDir * targetSpeed;
@@ -405,15 +392,7 @@ public class MineNode : MonoBehaviour
         float authoredWeight = 1f - sameRoleDustAffinityStrength;
         _carveDir = (authoredWeight * _carveDir + sameRoleDustAffinityStrength * affinityDir).normalized;
     }
-    private void EnsureTurnStepsCached()
-{
-    if (_noteSet == null) return;
-    if (_turnStepSet != null && ReferenceEquals(_cachedTurnSetSource, _noteSet)) return;
 
-    var stepList = _noteSet.GetStepList();
-    _turnStepSet = (stepList != null && stepList.Count > 0) ? new HashSet<int>(stepList) : null;
-    _cachedTurnSetSource = _noteSet;
-}
     private void CacheAuthoredStepsFromNoteSet()
 {
     _stepsPerLoop = 16;
@@ -432,22 +411,13 @@ public class MineNode : MonoBehaviour
     int bar = 16;
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
-    private float GetRoleTurnAngleDeg(MusicalRole _) => Mathf.Lerp(5f, 45f, _agility);
+
     private static Vector2 Rotate(Vector2 v, float degrees)
     {
         float r = degrees * Mathf.Deg2Rad;
         float c = Mathf.Cos(r);
         float s = Mathf.Sin(r);
         return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
-    }
-    
-    private void ConfigureFromRole(MusicalRole role)
-    {
-        var dust = GetComponent<MineNodeDustInteractor>();
-        if (!dust) return;
-        float interval = Mathf.Lerp(0.14f, 0.04f, _clearing);
-        float appetite = Mathf.Lerp(0.6f,  1.6f,  _clearing);
-        dust.ConfigureCarving(interval, appetite);
     }
     private void HandleDepleted(Vehicle vehicle)
     {

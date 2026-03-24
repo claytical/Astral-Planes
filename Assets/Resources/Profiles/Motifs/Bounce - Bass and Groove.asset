@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Bounce - Bass and Groove
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: 2-track-bounce
+  displayName: Bass and Groove Bounce
+  keyRootMidi: 60
+  entryDrumLoops:
+  - {fileID: 8300000, guid: 8a64f814c188d4d348ad8d4b54986a90, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: f0961db8d0c3f44f0b32ae0659286d3e, type: 3}
+  - {fileID: 8300000, guid: 229ee4e306a2f4619b3e01eb63efc84d, type: 3}
+  - {fileID: 8300000, guid: 76bee1efcda8f40aca1acd16839ba2c3, type: 3}
+  - {fileID: 8300000, guid: 659e1c5e63a24435cb474ead32ce79a5, type: 3}
+  - {fileID: 8300000, guid: d89e1873c3d7d45ae87e26f8f1755dc1, type: 3}
+  - {fileID: 8300000, guid: 87150af2ac42e4e2d8ec025d5b7d9ead, type: 3}
+  entryLoopCount: 1
+  bpm: 175
+  stepsPerLoop: 16
+  nodesPerStar: 4
+  starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
+  chordProgression: {fileID: 11400000, guid: 2dbd76c1bfa6c49569e90a5939007775, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 8d0238b52ba48444aa574c56f55c92ef, type: 2}
+  - {fileID: 11400000, guid: 01400bf7515ba4097a293273fd4ec006, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

@@ -15,5 +15,7 @@ MonoBehaviour:
   phases:
   - phaseName: We Begin
     motifs:
-    - {fileID: 11400000, guid: 5f2a721cab8e94c648c3d1d571a52e62, type: 2}
+    - {fileID: 11400000, guid: cf6640d3ad20049e7b739ba79e026a11, type: 2}
+    - {fileID: 11400000, guid: ca1df9ac4a9b34c2d891b97075141cae, type: 2}
+    - {fileID: 11400000, guid: 01d5a06a93dbc4649989f03be242f088, type: 2}
     loopMotifs: 0

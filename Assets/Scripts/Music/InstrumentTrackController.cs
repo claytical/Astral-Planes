@@ -338,14 +338,7 @@ public class InstrumentTrackController : MonoBehaviour
     // Canonical role order for rainbow ring cycling.
     private static readonly MusicalRole[] kVoidRoleOrder =
         { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
-
-    private static MusicalRole CycleVoidRole(MusicalRole startRole, int ringIndex)
-    {
-        int start = System.Array.IndexOf(kVoidRoleOrder, startRole);
-        if (start < 0) start = 0;
-        return kVoidRoleOrder[(start + ringIndex) % kVoidRoleOrder.Length];
-    }
-
+    
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
         var gfm = GameFlowManager.Instance;
@@ -423,7 +416,8 @@ public class InstrumentTrackController : MonoBehaviour
 
         _gravityVoidRoutine = null;
     }
-    public InstrumentTrack GetTrackForRole(MusicalRole role)
+
+    private InstrumentTrack GetTrackForRole(MusicalRole role)
     {
         if (role == MusicalRole.None) return null;
         if (tracks == null || tracks.Length == 0) return null;
@@ -589,7 +583,7 @@ public class InstrumentTrackController : MonoBehaviour
         return Mathf.Clamp(note, low, high);
     }
 
-    public void DespawnGravityVoid()
+    private void DespawnGravityVoid()
     {
         if (_gravityVoidInstance == null)
             return;
@@ -609,7 +603,7 @@ public class InstrumentTrackController : MonoBehaviour
         _gravityVoidHasCenterGP = false;
     }
 
-    public void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
+    private void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
 {
     if (gravityVoidPrefab == null) return;
 
@@ -905,9 +899,7 @@ public class InstrumentTrackController : MonoBehaviour
         }
     }
     private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId) {
-    Debug.Log($"[CURSOR] track={(track != null ? track.name : "null")} burstId={burstId} " +
-              $"globalCIF={AnyCollectablesInFlight()} globalEP={AnyExpansionPending()}");
-
+    
     // We only want to advance when ALL collectables are gone (across tracks).
     if (AnyCollectablesInFlight()) return;
 
@@ -1118,7 +1110,8 @@ public class InstrumentTrackController : MonoBehaviour
         } 
         return false;
     }
-    public bool AnyCollectablesInFlight()
+
+    private bool AnyCollectablesInFlight()
     {
         if (tracks == null) return false;
 
@@ -1149,7 +1142,8 @@ public class InstrumentTrackController : MonoBehaviour
 
         return any;
     }
-    public int ForceDestroyAllCollectablesInFlight(string reason)
+
+    private int ForceDestroyAllCollectablesInFlight(string reason)
     {
         int destroyed = 0;
         if (tracks == null) return destroyed;
@@ -1221,15 +1215,6 @@ public class InstrumentTrackController : MonoBehaviour
     {
         UpdateVisualizer();
     } 
-    public InstrumentTrack GetAmbientContextTrack() {
-        if (tracks == null || tracks.Length == 0) return null; 
-        // Prefer Harmony → Groove → Bass → Lead (falls back to first that has a NoteSet)
-        MusicalRole[] pref = { MusicalRole.Harmony, MusicalRole.Groove, MusicalRole.Bass, MusicalRole.Lead }; 
-        foreach (var role in pref) {
-            var t = tracks.FirstOrDefault(x => x != null && x.assignedRole == role && x.HasNoteSet()); if (t != null) return t;
-        } 
-        return tracks.FirstOrDefault(x => x != null && x.HasNoteSet()) ?? tracks[0];
-    }
     private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
     {
         float startVolume = player.MPTK_Volume;

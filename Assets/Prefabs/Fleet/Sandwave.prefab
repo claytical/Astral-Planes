@@ -55,11 +55,11 @@ MonoBehaviour:
   manualReleaseQueueCapacity: 9
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
-  maxDigCellsSoft: 10
-  minDigCellsWhenBoosting: 1
-  impactDigCooldownSeconds: 0.12
-  digBaseCellCost: 1
-  digHardnessCost: 1
+  plowHalfWidthCells: 2
+  plowDepthCells: 2
+  plowMinSpeed: 1.5
+  plowTickSeconds: 0.06
+  plowFadeSeconds: 0.15
   profile: {fileID: 11400000, guid: 4f976cf7041bc4655bf5270088e90bf3, type: 2}
   capacity: 85
   arcadeMaxSpeed: 14
@@ -115,6 +115,7 @@ MonoBehaviour:
   manualReleaseUseArmLock: 1
   manualReleaseArmAheadSteps: 6
   manualReleaseAutoCommitEpsSteps: 0.35
+  manualReleaseGracePeriodSteps: 0.5
   releaseCue: {fileID: 0}
   trailSlotSpacing: 0.55
   trailFirstSlotOffset: 0.7

@@ -82,16 +82,6 @@ public class NoteVisualizer : MonoBehaviour
 
     private Vector3 _lastPlayheadParticleWorldPos;
     private bool _hasLastPlayheadParticleWorldPos;
-    class AscendTask
-    {
-        public InstrumentTrack track;
-        public List<MarkerState> markers = new();   // per-marker state
-        public int delayLoopsRemaining;
-        public int totalAscendLoops;
-        public int stepsCompleted;
-        public System.Action onArrive;
-        public bool IsArrived => stepsCompleted >= totalAscendLoops || markers.TrueForAll(ms => ms.go == null);
-    }
     private struct BlastTask
     {
         public GameObject go;
@@ -102,15 +92,6 @@ public class NoteVisualizer : MonoBehaviour
         public float dur;         // seconds
         public float t;           // normalized 0..1
         public System.Action onDone; // optional (SFX, pooling return, etc.)
-    }
-    private struct MarkerState
-    {
-        public GameObject go;
-        public (InstrumentTrack track, int step) key;
-        public float stepY;              // distance moved per loop tick
-        public int delayLoopsRemaining;  // per-marker optional delay
-        public int loopsRemaining;       // per-marker countdown to arrival
-        public Action onDonePerMarker; // your old coroutine's onDone lambda
     }
     private struct RushTask
     {
@@ -185,7 +166,7 @@ public class NoteVisualizer : MonoBehaviour
 /// Finds the next closest *unlit* placeholder step for the given track, scanning forward from a given step.
 /// We interpret "next closest" as the smallest positive forward distance in the leader loop timeline.
 /// </summary>
-public bool TryGetNextUnlitStep(InstrumentTrack track, double rawAbsStep, int totalAbsSteps, out int targetAbsStep)
+    private bool TryGetNextUnlitStep(InstrumentTrack track, double rawAbsStep, int totalAbsSteps, out int targetAbsStep)
 {
     targetAbsStep = -1;
     if (track == null) return false;
@@ -227,7 +208,7 @@ public bool TryGetNextUnlitStep(InstrumentTrack track, double rawAbsStep, int to
     targetAbsStep = bestStep;
     return true;
 }
-public void UpdateManualReleaseCueExcluding(
+    public void UpdateManualReleaseCueExcluding(
     Transform vehicle, InstrumentTrack track,
     double rawAbsStep, int floorAbsStep, int totalAbsSteps,
     HashSet<int> excludedSteps)
@@ -269,7 +250,7 @@ public void UpdateManualReleaseCueExcluding(
         cue.transform.position = p;
     }
 }
-public bool TryGetNextUnlitStepExcluding(
+    public bool TryGetNextUnlitStepExcluding(
     InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
     HashSet<int> excludedSteps, out int targetAbsStep)
 {
@@ -324,169 +305,44 @@ public bool TryGetNextUnlitStepExcluding(
     targetAbsStep = bestStep;
     return true;
 }
-// Integer overload for call sites that only have floorAbsStep.
-public bool TryGetNextUnlitStep(InstrumentTrack track, int fromAbsStep, int totalAbsSteps, out int targetAbsStep)
-    => TryGetNextUnlitStep(track, (double)fromAbsStep, totalAbsSteps, out targetAbsStep);
 
-/// <summary>
-/// Draws the arc ghost cue directly toward a specific known target step.
-/// Used by the armed-release path where the target is already resolved.
-/// The cue appears when the playhead is within <see cref="releaseCueLookaheadSteps"/>
-/// of the target and travels to the marker at a steady rate.
-/// </summary>
-public void UpdateManualReleaseCueToStep(Transform vehicle, InstrumentTrack track, int targetAbsStep, double rawAbsStep, int totalAbsSteps)
-{
-    if (releaseCuePrefab == null) return;
-    if (vehicle == null || track == null) return;
-    if (!isActiveAndEnabled) return;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-
-    // Forward distance from playhead to target, wrapping correctly around the loop.
-    double fwd = (targetAbsStep - rawAbsStep) % totalAbsSteps;
-    if (fwd < 0) fwd += totalAbsSteps;
-
-    // Window: show the cue once within lookahead steps of the target.
-    // Use at least one full bin so expansion-bin targets are always visible.
-    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
-    int lookahead = Mathf.Max(releaseCueLookaheadSteps, binSize);
-    lookahead = Mathf.Clamp(lookahead, 1, totalAbsSteps);
-
-    if (fwd > lookahead)
+    public void ClearManualReleaseCue(Transform vehicle)
     {
-        // Outside the window — hide the cue but do NOT clear it if it already exists,
-        // because this can happen momentarily at the loop boundary when fwd wraps to
-        // a large value. We only hide; the cue reappears next frame once fwd comes back.
-        // Do nothing — just return without updating position.
-        // (If no cue has been spawned yet this is a no-op.)
-        return;
+        if (vehicle == null) return;
+        int id = vehicle.GetInstanceID();
+        if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
+            Destroy(cue);
+        _releaseCuesByVehicle.Remove(id);
     }
 
-    // u goes 0→1 as the playhead closes in on the target step.
-    float u = 1f - Mathf.Clamp01((float)(fwd / lookahead));
-    u = Mathf.SmoothStep(0f, 1f, u);
-
-    Vector3 a = vehicle.position;
-    Vector3 b = a;
-    if (noteMarkers != null && noteMarkers.TryGetValue((track, targetAbsStep), out var markerTr) && markerTr != null)
-        b = markerTr.position;
-
-    Vector3 p = Vector3.Lerp(a, b, u);
-    if (releaseCueArcHeight != 0f)
-    {
-        float hump = 4f * u * (1f - u);
-        p.y += releaseCueArcHeight * hump;
-    }
-
-    int id = vehicle.GetInstanceID();
-    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
-    {
-        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
-        _releaseCuesByVehicle[id] = cue;
-    }
-    else
-    {
-        cue.transform.position = p;
-    }
-}
-
-/// <summary>
-/// Continuously updates (or spawns) a cue between the vehicle and the next placeholder marker.
-/// Call every frame while the vehicle has a queued note.
-/// </summary>
-public void UpdateManualReleaseCue(Transform vehicle, InstrumentTrack track, double rawAbsStep, int floorAbsStep, int totalAbsSteps)
-{
-    if (releaseCuePrefab == null) return;
-    if (vehicle == null || track == null) return;
-    if (!isActiveAndEnabled) return;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-
-    // Use continuous rawAbsStep so the nearest-forward search matches the live playhead,
-    // not the floor — avoids the ghost jumping forward one step early.
-    if (!TryGetNextUnlitStep(track, rawAbsStep, totalAbsSteps, out int targetAbs))
+    public void BlastManualReleaseCue(Transform vehicle)
     {
         ClearManualReleaseCue(vehicle);
-        return;
     }
 
-    Vector3 a = vehicle.position;
-    Vector3 b;
-    if (noteMarkers != null && noteMarkers.TryGetValue((track, targetAbs), out var markerTr) && markerTr != null)
-        b = markerTr.position;
-    else
-        b = a;
-
-    double fwd = (targetAbs - rawAbsStep + totalAbsSteps) % totalAbsSteps;
-
-    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
-    int lookahead = Mathf.Max(releaseCueLookaheadSteps, binSize);
-    lookahead = Mathf.Clamp(lookahead, 1, totalAbsSteps);
-    if (fwd > lookahead)
+    public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
     {
-        ClearManualReleaseCue(vehicle);
-        return;
+        if (track == null) return;
+        if (noteMarkers == null) return;
+        if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null) return;
+        var ml = tr.GetComponent<MarkerLight>();
+        if (ml != null) ml.LightUp(track.trackColor);
     }
-
-    float u = 1f - Mathf.Clamp01((float)(fwd / lookahead));
-    u = Mathf.SmoothStep(0f, 1f, u);
-
-    Vector3 p = Vector3.Lerp(a, b, u);
-    if (releaseCueArcHeight != 0f)
-    {
-        float hump = 4f * u * (1f - u);
-        p.y += releaseCueArcHeight * hump;
-    }
-
-    int id = vehicle.GetInstanceID();
-    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
-    {
-        cue = Instantiate(releaseCuePrefab, p, Quaternion.identity, _uiParent ? _uiParent : transform);
-        _releaseCuesByVehicle[id] = cue;
-    }
-    else
-    {
-        cue.transform.position = p;
-    }
-}
-
-public void ClearManualReleaseCue(Transform vehicle)
-{
-    if (vehicle == null) return;
-    int id = vehicle.GetInstanceID();
-    if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
-        Destroy(cue);
-    _releaseCuesByVehicle.Remove(id);
-}
-
-public void BlastManualReleaseCue(Transform vehicle)
-{
-    ClearManualReleaseCue(vehicle);
-}
-
-public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
-{
-    if (track == null) return;
-    if (noteMarkers == null) return;
-    if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null) return;
-    var ml = tr.GetComponent<MarkerLight>();
-    if (ml != null) ml.LightUp(track.trackColor);
-}
-public void Initialize()
-    {
-        isInitialized = true;
-        _uiParent = transform.parent;
-        _worldSpaceCanvas = _uiParent.GetComponentInParent<Canvas>();
-
-        // Ensure rows stretch horizontally so our mapping stays sane across resolutions
-        foreach (var row in trackRows)
+    public void Initialize()
         {
-            row.anchorMin = new Vector2(0f, row.anchorMin.y);
-            row.anchorMax = new Vector2(1f, row.anchorMax.y);
-            row.offsetMin = new Vector2(0f, row.offsetMin.y);
-            row.offsetMax = new Vector2(0f, row.offsetMax.y);
+            isInitialized = true;
+            _uiParent = transform.parent;
+            _worldSpaceCanvas = _uiParent.GetComponentInParent<Canvas>();
+
+            // Ensure rows stretch horizontally so our mapping stays sane across resolutions
+            foreach (var row in trackRows)
+            {
+                row.anchorMin = new Vector2(0f, row.anchorMin.y);
+                row.anchorMax = new Vector2(1f, row.anchorMax.y);
+                row.offsetMin = new Vector2(0f, row.offsetMin.y);
+                row.offsetMax = new Vector2(0f, row.offsetMax.y);
+            }
         }
-    }
     public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color, float noteDuration)
     {
         if (track == null || source == null) return;
@@ -783,7 +639,7 @@ public void Initialize()
         RefreshCoreRefs(force: true);
     }
 
-void Update()
+    void Update()
 {
     if (!isInitialized || playheadLine == null)
         return;
@@ -1016,140 +872,140 @@ void Update()
     }
 }
 
-private void ProcessFirstPlayConfirmFx()
-{
-    if (firstPlayConfirmOrbPrefab == null) return;
-    if (_firstPlayRequests.Count == 0) return;
-
-    double now = AudioSettings.dspTime;
-
-    for (int i = 0; i < _firstPlayRequests.Count; i++)
+    private void ProcessFirstPlayConfirmFx()
     {
-        var r = _firstPlayRequests[i];
-        if (r.spawned) continue;
+        if (firstPlayConfirmOrbPrefab == null) return;
+        if (_firstPlayRequests.Count == 0) return;
 
-        // If the target moment already passed, do nothing here.
-        // (You may optionally spawn an instant "late" pop instead.)
-        if (r.dspTime <= now + 0.0001)
+        double now = AudioSettings.dspTime;
+
+        for (int i = 0; i < _firstPlayRequests.Count; i++)
         {
+            var r = _firstPlayRequests[i];
+            if (r.spawned) continue;
+
+            // If the target moment already passed, do nothing here.
+            // (You may optionally spawn an instant "late" pop instead.)
+            if (r.dspTime <= now + 0.0001)
+            {
+                r.spawned = true;
+                _firstPlayRequests[i] = r;
+                continue;
+            }
+
+            // End position: marker if available, otherwise playhead
+            Vector3 endWorld;
+            if (noteMarkers != null &&
+                noteMarkers.TryGetValue((r.track, r.step), out var markerTr) &&
+                markerTr != null)
+            {
+                endWorld = markerTr.position;
+            }
+            else
+            {
+                endWorld = (playheadLine != null) ? playheadLine.position : transform.position;
+            }
+
+            // Start position: snapshot the source at spawn time
+            Vector3 startWorld = r.source != null ? r.source.position : transform.position;
+
+            // Spawn NOW (not "only when within travel window")
+            var ps = Instantiate(
+                firstPlayConfirmOrbPrefab,
+                startWorld,
+                Quaternion.identity,
+                _uiParent ? _uiParent : transform
+            );
+
+            var main = ps.main;
+            main.startColor = r.color;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+            ps.Play(true);
+            ascensionDirector?.EnqueueFirstPlayTask(ps, startWorld, endWorld, r.color, r.duration);
+            // IMPORTANT: duration = time remaining until first-play moment
+
             r.spawned = true;
             _firstPlayRequests[i] = r;
-            continue;
         }
-
-        // End position: marker if available, otherwise playhead
-        Vector3 endWorld;
-        if (noteMarkers != null &&
-            noteMarkers.TryGetValue((r.track, r.step), out var markerTr) &&
-            markerTr != null)
-        {
-            endWorld = markerTr.position;
-        }
-        else
-        {
-            endWorld = (playheadLine != null) ? playheadLine.position : transform.position;
-        }
-
-        // Start position: snapshot the source at spawn time
-        Vector3 startWorld = r.source != null ? r.source.position : transform.position;
-
-        // Spawn NOW (not "only when within travel window")
-        var ps = Instantiate(
-            firstPlayConfirmOrbPrefab,
-            startWorld,
-            Quaternion.identity,
-            _uiParent ? _uiParent : transform
-        );
-
-        var main = ps.main;
-        main.startColor = r.color;
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-
-        ps.Play(true);
-        ascensionDirector?.EnqueueFirstPlayTask(ps, startWorld, endWorld, r.color, r.duration);
-        // IMPORTANT: duration = time remaining until first-play moment
-
-        r.spawned = true;
-        _firstPlayRequests[i] = r;
     }
-}
-private void UpdateFirstPlayConfirmTasks()
-{
-    if (_firstPlayTasks.Count == 0) return;
-
-    double now = AudioSettings.dspTime;
-
-    for (int i = _firstPlayTasks.Count - 1; i >= 0; i--)
+    private void UpdateFirstPlayConfirmTasks()
     {
-        var t = _firstPlayTasks[i];
-        if (t.ps == null)
+        if (_firstPlayTasks.Count == 0) return;
+
+        double now = AudioSettings.dspTime;
+
+        for (int i = _firstPlayTasks.Count - 1; i >= 0; i--)
         {
-            _firstPlayTasks.RemoveAt(i);
-            continue;
-        }
-
-        double dur = System.Math.Max(0.0001, t.endDsp - t.startDsp);
-
-        // Normalized progress in DSP time
-        float u = (float)((now - t.startDsp) / dur);
-        u = Mathf.Clamp01(u);
-
-        // Smooth movement (prevents “linear snap” feel)
-        float eased = u * u * (3f - 2f * u); // SmoothStep
-
-        // If we spawned late for any reason, don’t force the orb to start at the old "start" point visually.
-        // This makes late spawns appear *already in progress* instead of racing to catch up.
-        Vector3 p = Vector3.Lerp(t.start, t.end, eased);
-        t.ps.transform.position = p;
-
-        if (now >= t.endDsp)
-        {
-            // ARRIVE: burst + cleanup
-            var emitParams = new ParticleSystem.EmitParams
+            var t = _firstPlayTasks[i];
+            if (t.ps == null)
             {
-                position = t.end,
-                startColor = t.color
-            };
-            t.ps.Emit(emitParams, firstPlayConfirmEmitCount);
+                _firstPlayTasks.RemoveAt(i);
+                continue;
+            }
 
-            t.ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-            Destroy(t.ps.gameObject, 0.35f);
+            double dur = System.Math.Max(0.0001, t.endDsp - t.startDsp);
 
-            _firstPlayTasks.RemoveAt(i);
-        }
-        else
-        {
-            _firstPlayTasks[i] = t;
+            // Normalized progress in DSP time
+            float u = (float)((now - t.startDsp) / dur);
+            u = Mathf.Clamp01(u);
+
+            // Smooth movement (prevents “linear snap” feel)
+            float eased = u * u * (3f - 2f * u); // SmoothStep
+
+            // If we spawned late for any reason, don’t force the orb to start at the old "start" point visually.
+            // This makes late spawns appear *already in progress* instead of racing to catch up.
+            Vector3 p = Vector3.Lerp(t.start, t.end, eased);
+            t.ps.transform.position = p;
+
+            if (now >= t.endDsp)
+            {
+                // ARRIVE: burst + cleanup
+                var emitParams = new ParticleSystem.EmitParams
+                {
+                    position = t.end,
+                    startColor = t.color
+                };
+                t.ps.Emit(emitParams, firstPlayConfirmEmitCount);
+
+                t.ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                Destroy(t.ps.gameObject, 0.35f);
+
+                _firstPlayTasks.RemoveAt(i);
+            }
+            else
+            {
+                _firstPlayTasks[i] = t;
+            }
         }
     }
-}
-private Color ComputeStepColor(int step)
-{
-    var controller = _gfm != null ? _gfm.controller : null;
-    if (controller == null || controller.tracks == null) return Color.white;
-
-    float totalW = 0f;
-    Vector3 sum = Vector3.zero;
-
-    foreach (var tr in controller.tracks)
+    private Color ComputeStepColor(int step)
     {
-        if (tr == null) continue;
+        var controller = _gfm != null ? _gfm.controller : null;
+        if (controller == null || controller.tracks == null) return Color.white;
 
-        float v = tr.GetVelocityAtStep(step);   // 0..127
-        if (v <= 0f) continue;
+        float totalW = 0f;
+        Vector3 sum = Vector3.zero;
 
-        float w = v / 127f;
-        totalW += w;
+        foreach (var tr in controller.tracks)
+        {
+            if (tr == null) continue;
 
-        Color c = tr.trackColor;
-        sum += new Vector3(c.r, c.g, c.b) * w;
+            float v = tr.GetVelocityAtStep(step);   // 0..127
+            if (v <= 0f) continue;
+
+            float w = v / 127f;
+            totalW += w;
+
+            Color c = tr.trackColor;
+            sum += new Vector3(c.r, c.g, c.b) * w;
+        }
+
+        if (totalW <= 0.0001f) return Color.white;
+
+        Vector3 rgb = sum / totalW;
+        return new Color(rgb.x, rgb.y, rgb.z, 1f);
     }
-
-    if (totalW <= 0.0001f) return Color.white;
-
-    Vector3 rgb = sum / totalW;
-    return new Color(rgb.x, rgb.y, rgb.z, 1f);
-}
     public void MarkGhostPadding(InstrumentTrack track, int startStepInclusive, int count) {
         if (!_ghostNoteSteps.TryGetValue(track, out var set))
             _ghostNoteSteps[track] = set = new HashSet<int>();
@@ -1253,7 +1109,6 @@ private Color ComputeStepColor(int step)
 
     // CURRENT loop steps (authoritative)
     var loopSteps = new HashSet<int>(track.GetPersistentLoopNotes().Select(n => n.Item1));
-    Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId} Loop Steps Count: {loopSteps.Count}");
 
     // Remove any stale entries for this track first
     var toRemove = new List<(InstrumentTrack,int)>();
@@ -1262,7 +1117,6 @@ private Color ComputeStepColor(int step)
         if (kv.Key.Item1 == track && (kv.Value == null || kv.Value.gameObject == null))
             toRemove.Add(kv.Key);
     }
-    Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId} Loop Steps Count: {loopSteps.Count} Removed {toRemove.Count}");
 
     foreach (var k in toRemove)
     {
@@ -1594,23 +1448,7 @@ private Color ComputeStepColor(int step)
             GetMarkersForTrackAndBurst   // local helper — see [6]
         );
     }
-
-    /// <summary>
-    /// Removes and destroys the marker at the given step for the given track only if it is
-    /// still a placeholder (isPlaceholder=true). Used to clean up discarded-note authored steps.
-    /// </summary>
-    public void RemovePlaceholderAtStep(InstrumentTrack track, int stepAbs)
-    {
-        var key = (track, stepAbs);
-        if (!noteMarkers.TryGetValue(key, out var tr) || tr == null) return;
-
-        var tag = tr.GetComponent<MarkerTag>();
-        if (tag == null || !tag.isPlaceholder) return; // don't touch lit or ascending markers
-
-        noteMarkers.Remove(key);
-        Destroy(tr.gameObject);
-    }
-
+    
     /// <summary>
     /// Defensive cleanup: removes the marker at stepAbs for the given track if it is not
     /// currently in the persistent loop and is not mid-ascension. Used after a discard to
@@ -1668,267 +1506,7 @@ private Color ComputeStepColor(int step)
             yield return kv.Value.gameObject;
         }
     }
-    private IEnumerator AscendCohortCoroutine(InstrumentTrack track, int burstId, List<(int step, Transform rt, MarkerTag tag)> cohort, float durationSeconds)
-{
-    // Spawn stationary grey placeholders so the lit marker can rise away.
-    foreach (var c in cohort)
-    {
-        if (!c.rt) continue;
-        var row = c.rt.parent as RectTransform;
-        if (!row) continue;
-
-        var phGO = Instantiate(c.rt.gameObject, row);
-        var phRT = phGO.GetComponent<Transform>();
-        phRT.localPosition = c.rt.localPosition;
-        phRT.localRotation = c.rt.localRotation;
-        phRT.localScale    = c.rt.localScale;
-
-        var phTag = phGO.GetComponent<MarkerTag>() ?? phGO.AddComponent<MarkerTag>();
-        phTag.track         = track;
-        phTag.step          = c.step;
-        phTag.burstId       = burstId;
-        phTag.isPlaceholder = true;
-        phTag.isAscending   = false;
-
-        var phML = phGO.GetComponent<MarkerLight>() ?? phGO.AddComponent<MarkerLight>();
-        phML.SetGrey(track.trackColor);
-
-        var phVNM = phGO.GetComponent<VisualNoteMarker>();
-        if (phVNM != null)
-        {
-            phVNM.IsLit = false;
-            if (phVNM.preCaptureParticles != null)
-                phVNM.preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            if (phVNM.capturedParticles != null)
-                phVNM.capturedParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        }
-
-        // The visual base for this step is now the placeholder.
-        noteMarkers[(track, c.step)] = phRT;
-    }
-
-    float ascendWorldY = GetAscendTargetWorldY();
-
-    var starts = new Dictionary<int, float>(cohort.Count);
-    var ends   = new Dictionary<int, float>(cohort.Count);
-
-    foreach (var c in cohort)
-    {
-        if (!c.rt) continue;
-        var row = c.rt.parent as RectTransform;
-        if (!row) continue;
-
-        float startY = c.rt.localPosition.y;
-
-        Vector3 markerWorld = c.rt.position;
-        float endY = row.InverseTransformPoint(new Vector3(markerWorld.x, ascendWorldY, markerWorld.z)).y;
-
-        starts[c.step] = startY;
-        ends[c.step]   = endY;
-    }
-
-    // Enforce a minimum duration that is loop-aware.
-    float loopLen = 1.0f;
-    if (_drum != null)
-    {
-        // Prefer the *bar* clock if available; fall back to loop length.
-        float clipLen = 0f;
-        try { clipLen = _drum.GetClipLengthInSeconds(); } catch {}
-        loopLen = (clipLen > 0f) ? clipLen : Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds());
-    }
     
-    float t = 0f;
-    while (t < durationSeconds)
-    {
-        float u = Mathf.Clamp01(t / durationSeconds);
-
-        foreach (var c in cohort)
-        {
-            if (!c.rt) continue;
-            if (!starts.TryGetValue(c.step, out var y0)) continue;
-            if (!ends.TryGetValue(c.step, out var y1)) continue;
-
-            var p = c.rt.localPosition;
-            p.y = Mathf.Lerp(y0, y1, u);
-            c.rt.localPosition = p;
-        }
-
-        t += Time.deltaTime;
-        yield return null;
-    }
-
-    // Snap to final position
-    foreach (var c in cohort)
-    {
-        if (!c.rt) continue;
-        if (!ends.TryGetValue(c.step, out var y1)) continue;
-
-        var p = c.rt.localPosition;
-        p.y = y1;
-        c.rt.localPosition = p;
-    }
-
-    // Remove ascending lit markers now that they reached the line
-    foreach (var c in cohort)
-    {
-        if (!c.rt) continue;
-
-        _animatingSteps.Remove((track, c.step));
-
-#if UNITY_EDITOR
-        if (!Application.isPlaying) DestroyImmediate(c.rt.gameObject);
-        else Destroy(c.rt.gameObject);
-#else
-        Destroy(c.rt.gameObject);
-#endif
-    }
-
-    // IMPORTANT CHANGE:
-    // Do NOT clear the track bin immediately (mid-bar can mute the just-collected note).
-    // Defer the clear to the next drum-bar boundary so the current bar finishes coherently.
-    int binSize = Mathf.Max(1, track.BinSize());
-    int anyStep = cohort[0].step;
-    int binIdx  = anyStep / binSize;
-
-    StartCoroutine(ClearBinOnNextBarBoundary(track, binIdx, burstId));
-}
-    private IEnumerator ClearBinOnNextBarBoundary(InstrumentTrack track, int binIdx, int burstId) {
-        if (track == null)
-            yield break;
-
-        // If we can’t compute a reliable boundary, fall back to immediate clear (still safe).
-        if (_drum == null || _drum.startDspTime == 0)
-        {
-            track.ClearBinNotesKeepAllocated(binIdx);
-            CanonicalizeTrackMarkers(track, burstId);
-            yield break;
-        }
-
-        float loopLen = 0f;
-        try { loopLen = _drum.GetClipLengthInSeconds(); } catch {}
-        if (loopLen <= 0f)
-            loopLen = Mathf.Max(0.05f, _drum.GetLoopLengthInSeconds());
-
-        if (loopLen <= 0.0001f)
-        {
-            track.ClearBinNotesKeepAllocated(binIdx);
-            CanonicalizeTrackMarkers(track, burstId);
-            yield break;
-        }
-
-        double dspNow   = AudioSettings.dspTime;
-        double elapsed  = dspNow - _drum.startDspTime;
-        double inBar    = elapsed % loopLen;
-        if (inBar < 0) inBar += loopLen;
-
-        float waitSec = (float)(loopLen - inBar);
-        if (waitSec < 0.001f) waitSec = 0f;
-
-        if (waitSec > 0f)
-            yield return new WaitForSeconds(waitSec);
-
-        track.ClearBinNotesKeepAllocated(binIdx);
-        RemovePlaceholdersInBin(track, binIdx);
-        CanonicalizeTrackMarkers(track, burstId);
-    }
-
-    private void RemovePlaceholdersInBin(InstrumentTrack track, int binIdx)
-    {
-        if (track == null) return;
-        if (noteMarkers == null || noteMarkers.Count == 0) return;
-
-        int totalAbsSteps = 1;
-        if (track.drumTrack != null)
-            totalAbsSteps = Mathf.Max(1, track.drumTrack.totalSteps * Mathf.Max(1, track.loopMultiplier));
-
-        int bins = 1;
-        if (track.controller != null)
-            bins = Mathf.Max(1, track.controller.GetGlobalVisualBins());
-
-        int stepsPerBin = Mathf.Max(1, Mathf.RoundToInt(totalAbsSteps / (float)bins));
-        int start = binIdx * stepsPerBin;
-        int endExclusive = start + stepsPerBin;
-
-        var keysToRemove = new List<(InstrumentTrack, int)>();
-        foreach (var kv in noteMarkers)
-        {
-            if (kv.Key.Item1 != track) continue;
-            int stepAbs = kv.Key.Item2;
-            if (stepAbs < start || stepAbs >= endExclusive) continue;
-
-            var tr = kv.Value;
-            if (!tr)
-            {
-                keysToRemove.Add(kv.Key);
-                continue;
-            }
-
-            var tag = tr.GetComponent<MarkerTag>();
-            if (tag == null || !tag.isPlaceholder) continue;
-
-            Destroy(tr.gameObject);
-            keysToRemove.Add(kv.Key);
-        }
-
-        foreach (var k in keysToRemove)
-            noteMarkers.Remove(k);
-    }
-    private void LayoutBinStrip()
-    {
-        if (binStripParent == null || _binIndicators.Count == 0)
-            return;
-
-        float width = binStripParent.rect.width;
-        float height = binStripParent.rect.height;
-
-        int count = _binIndicators.Count;
-        if (count == 0) return;
-
-        float slotWidth = width / count;
-
-        for (int i = 0; i < count; i++)
-        {
-            var img = _binIndicators[i];
-            if (img == null) continue;
-
-            var rt = img.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(0f, 0f);
-            rt.pivot     = new Vector2(0.5f, 0.5f);
-
-            float centerX = (i + 0.5f) * slotWidth;
-            float centerY = height * 0.5f;
-
-            rt.anchoredPosition = new Vector2(centerX, centerY);
-            rt.sizeDelta        = new Vector2(slotWidth * 0.8f, height * 0.8f);
-        }
-    }
-    /// <summary>
-    /// Applies colors to bin indicators according to _currentTargetBin.
-    /// </summary>
-    private void RefreshBinHighlight()
-    {
-        for (int i = 0; i < _binIndicators.Count; i++)
-        {
-            var img = _binIndicators[i];
-            if (img == null) continue;
-            //img.color = (i == _currentTargetBin) ? binActiveColor : binInactiveColor);
-        }
-    }
-     public void TriggerNoteBlastOff(InstrumentTrack track)
-    {
-        var gos = GetNoteMarkers(track);
-        var keys = new List<(InstrumentTrack,int)>();
-        foreach (var kv in noteMarkers)
-            if (kv.Key.Item1 == track) keys.Add(kv.Key);
-        foreach (var k in keys) noteMarkers.Remove(k);
-
-        foreach (var go in gos)
-            if (go) EnqueueBlast(go, UnityEngine.Random.insideUnitSphere, 0.25f);
-
-        Debug.Log($"[DESTROY] Note Blast off {track.name}");
-        DestroyOrphanRowMarkers(track,-1);
-    }
     private List<GameObject> GetNoteMarkers(InstrumentTrack track)
     {
         var result = new List<GameObject>();
@@ -2260,12 +1838,6 @@ private Color ComputeStepColor(int step)
          foreach (var t in _ctrl.tracks) 
              if (t) RecomputeTrackLayout(t);
          //UpdateNoteMarkerPositions(true);
-    }
-    private float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex) { 
-        int totalSteps = Mathf.Max(1, track.GetTotalSteps()); 
-        int binSize    = Mathf.Max(1, track.BinSize()); 
-        int leaderBins = GetLeaderBinsForPlacement(track, totalSteps, binSize); 
-        return ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBins);
     }
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {

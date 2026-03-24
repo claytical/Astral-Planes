@@ -113,23 +113,7 @@ public class VehicleReleaseCue : MonoBehaviour
     // Public API — called by Vehicle
     // ------------------------------------------------------------------
 
-    /// <summary>
-    /// Set the fill/growth amount. 0 = hidden, 1 = fully grown (release imminent).
-    /// Called every frame from Vehicle.TickNoteTrail.
-    /// </summary>
-    public void SetFill(float pulse01)
-    {
-        _targetPulse = Mathf.Clamp01(pulse01);
-    }
 
-    /// <summary>
-    /// Set the track color so the circle matches the note's destination track.
-    /// Call this whenever the pending/armed track changes (or every frame alongside SetFill).
-    /// </summary>
-    public void SetTrackColor(Color trackColor)
-    {
-        _trackColor = trackColor;
-    }
 
     /// <summary>
     /// Update the beat-dot countdown display.

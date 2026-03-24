@@ -123,7 +123,7 @@ public class MotifSnapshot
 
     /// <summary>Write a role score. Updates both the runtime cache and the
     /// serializable backing list so disk state stays in sync.</summary>
-    public void SetTrackScore(MusicalRole role, float score)
+    private void SetTrackScore(MusicalRole role, float score)
     {
         // Update cache
         if (_trackScores == null) RebuildTrackScoresCache();

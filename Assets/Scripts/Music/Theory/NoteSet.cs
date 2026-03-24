@@ -216,7 +216,8 @@ using Random = UnityEngine.Random;
 
     _notes.Sort();
 }
-    public int GetRootNote()
+
+    private int GetRootNote()
     {
         return Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
     }
@@ -224,7 +225,8 @@ using Random = UnityEngine.Random;
     {
         return _notes;
     }
-    public List<int> GetSortedNoteList()
+
+    private List<int> GetSortedNoteList()
     {
         return GetNoteList().OrderBy(n => n).ToList();
     }
@@ -234,7 +236,7 @@ using Random = UnityEngine.Random;
     }
     
 
-public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
+    public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
     {
         // Riff-authoritative: step->note comes directly from the template
         if (persistentTemplate != null && persistentTemplate.Count > 0)
@@ -276,12 +278,8 @@ public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
                 return GetNextArpeggiatedNote(step);
         }
     }
-    public void ChangeNoteBehavior(InstrumentTrack track, NoteBehavior newBehavior)
-    {
-        noteBehavior = newBehavior;
-        BuildNotesFromKey(track); // may change octave/root
-    }
-    public int GetNextArpeggiatedNote(int stepIndex)
+
+    private int GetNextArpeggiatedNote(int stepIndex)
     {
         if (_notes.Count == 0)
         {
@@ -375,8 +373,7 @@ public int GetNoteForPhaseAndRole(InstrumentTrack track, int step)
         if (_notes.Count == 0) return rootMidi;
         return _notes[Random.Range(0, _notes.Count)];
     }
-// Replace your AdjustRootOctave with this (and keep the same method name/signature)
-private int AdjustRootOctave(InstrumentTrack track, int baseRoot)
+    private int AdjustRootOctave(InstrumentTrack track, int baseRoot)
 {
     if (track == null)
         return baseRoot;

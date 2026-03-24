@@ -35,11 +35,9 @@ public class MusicalRoleProfile : ScriptableObject
 
     [Header("MineNode Balance")]
     [Range(0f, 1f)] public float mineNodeSpeed    = 0.5f;  // 0 = sluggish, 1 = fast
-    [Range(0f, 1f)] public float mineNodeClearing = 0.5f;  // 0 = light nibble, 1 = aggressive trench
     [Range(0f, 1f)] public float mineNodeAgility  = 0.5f;  // 0 = gentle curves, 1 = sharp turns
 
     [Header("Presets")] public int midiPreset;
-    public List<int> allowedMidiPresets = new List<int>();
 
     // ---------- Color helpers (authority) ----------
 

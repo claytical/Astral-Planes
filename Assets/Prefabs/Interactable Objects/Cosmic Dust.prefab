@@ -73,7 +73,7 @@ MonoBehaviour:
   interaction:
     energyDrainPerSecond: 0
   clearing:
-    hardness01: 0.367
+    hardness01: 0
   useWorkShaderParams: 1
   terrainCollider: {fileID: 0}
   enableVehicleCompression: 1

@@ -30,8 +30,5 @@ public static class ShipMusicalProfileLoader
         return null;
     }
 
-    public static List<ShipMusicalProfile> GetProfiles(IEnumerable<string> shipNames)
-    {
-        return shipNames.Select(GetProfile).Where(p => p != null).ToList();
-    }
+
 }

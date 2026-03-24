@@ -110,15 +110,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         float dt = Time.deltaTime;
 
-        // ---------------------------------------------------------------
-        // 1) Keep-clear pocket
-        // ---------------------------------------------------------------
-        _keepClearTimer += dt;
-        if (_keepClearTimer >= keepClearTick)
-        {
-            _keepClearTimer = 0f;
-            TickKeepClear();
-        }
 
         // ---------------------------------------------------------------
         // 2) Drain probe
@@ -179,26 +170,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------
-    // Keep-clear
-    // ---------------------------------------------------------------
-    private void TickKeepClear()
-    {
-        if (_profile == null || !_profile.starKeepsDustClear) return;
-
-        var gfm = GameFlowManager.Instance;
-        var gen = gfm?.dustGenerator;
-        var drums = gfm?.activeDrumTrack;
-        if (gen == null || drums == null) return;
-
-        int radiusCells = Mathf.Max(0, _profile.starKeepClearRadiusCells);
-        Vector2Int center = drums.WorldToGridPosition(transform.position);
-
-        gen.SetStarKeepClear(center, radiusCells, forceRemoveExisting: false);
-
-        // Re-sweep for any dust colliders spawned since Initialize
-        IgnoreNearbyDustColliders();
-    }
 
     // ---------------------------------------------------------------
     // Drain probe

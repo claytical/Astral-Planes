@@ -19,17 +19,13 @@ public class Vehicle : MonoBehaviour
 
     [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
     [SerializeField] private bool occupiedStepOctaveAccent = true;
-    [Header("Impact Dig Tuning")]
-    [Tooltip("Maximum trench length (cells) for the best ship at top speed when digging the softest dust.")]
-    [SerializeField] private int maxDigCellsSoft = 10;
-    [SerializeField] private float minDigCellsWhenBoosting = 1.0f; // allows digging out when boxed in
-    [Tooltip("Minimum time between impact digs per vehicle (seconds). Prevents multiple dust colliders from triggering multiple chain reactions on the same strike).")]
-    [SerializeField] private float impactDigCooldownSeconds = 0.12f;
-    [Tooltip("Per-cell budget cost before hardness. 1.0 means budget is in 'soft cells'.")]
-    [SerializeField] private float digBaseCellCost = 1.0f;
-    [Tooltip("Additional per-cell cost added by dust hardness01. 1.0 -> default hardness (0.5) costs 1.5 budget per cell.")]
-    [SerializeField] private float digHardnessCost = 1.0f;
-    private float _lastImpactDigAt = -999f;
+    [Header("Dust Plow")]
+    [SerializeField] private int   plowHalfWidthCells = 1;
+    [SerializeField] private int   plowDepthCells     = 1;
+    [SerializeField] private float plowMinSpeed       = 1.5f;
+    [SerializeField] private float plowTickSeconds    = 0.06f;
+    [SerializeField] private float plowFadeSeconds    = 0.15f;
+    private float _nextPlowTickAt;
     public ShipMusicalProfile profile;
     public float capacity = 10f;
     private float _baseBurnAmount = 1f;
@@ -120,7 +116,7 @@ public class Vehicle : MonoBehaviour
     
     [Header("Dust Legibility Pocket")]
     [SerializeField] private bool keepDustClearAroundVehicle = true;
-    [SerializeField] private int vehicleKeepClearRadiusCells = 1;
+    [SerializeField] private int vehicleKeepClearRadiusCells = 0;
     [SerializeField] private float vehicleKeepClearRefreshSeconds = 0.10f;
     private float _nextVehicleKeepClearRefreshAt = 0f;
 
@@ -144,15 +140,6 @@ public class Vehicle : MonoBehaviour
 
     private Color _vehicleDefaultColor = Color.white;
 
-    /// <summary>
-    /// Sets both the sprite color and the resonance baseline so UpdateVehiclePlacementResonance
-    /// lerps toward the player's chosen color instead of back to the prefab white.
-    /// </summary>
-    public void SetBaseColor(Color c)
-    {
-        _vehicleDefaultColor = c;
-        if (baseSprite != null) baseSprite.color = c;
-    }
     [Header("Dust Spawn Rest Pocket")]
     [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
     [SerializeField] private bool carveSpawnRestPocket = true;
@@ -238,6 +225,12 @@ public class Vehicle : MonoBehaviour
     }
 
     private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
+
+    public void ClearPendingNotesForBridge()
+    {
+        _pendingNotes.Clear();
+        _armedReleases.Clear();
+    }
 
     // ------------------------------------------------------------
     // Manual-release cue (visual guidance)
@@ -368,6 +361,7 @@ public class Vehicle : MonoBehaviour
         else
         {
             RefreshVehicleKeepClearIfNeeded();
+            DoPlowTick();
         }
         // --- Loop boundary check (null-safe) ---
         if (drumTrack != null)
@@ -886,7 +880,7 @@ public class Vehicle : MonoBehaviour
 
         releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
     }
-        private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
+    private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
     {
         if (!useVehiclePlacementResonance)
             return;
@@ -977,7 +971,7 @@ public class Vehicle : MonoBehaviour
     _hasSafeAnchor = true;
 }
 
-private void RecoverIfNeeded()
+    private void RecoverIfNeeded()
 {
     if (Time.time - _lastRecoverAt < minSecondsBetweenRecoveries) return;
     if (rb == null || drumTrack == null || gfm == null || gfm.dustGenerator == null) return;
@@ -1019,7 +1013,7 @@ private void RecoverIfNeeded()
     }
 }
 
-private bool IsFarOutsideViewport(float margin)
+    private bool IsFarOutsideViewport(float margin)
 {
     var cam = Camera.main;
     if (cam == null) return false;
@@ -1032,7 +1026,7 @@ private bool IsFarOutsideViewport(float margin)
     return (vp.x < -margin || vp.x > 1f + margin || vp.y < -margin || vp.y > 1f + margin);
 }
 
-private bool IsInsideGravityVoid(out Vector2 center, out float radius)
+    private bool IsInsideGravityVoid(out Vector2 center, out float radius)
 {
     center = default;
     radius = 0f;
@@ -1067,7 +1061,7 @@ private bool IsInsideGravityVoid(out Vector2 center, out float radius)
     return true;
 }
 
-private bool TryEjectFromVoid(Vector2 voidCenter, float voidRadius)
+    private bool TryEjectFromVoid(Vector2 voidCenter, float voidRadius)
 {
     if (!_hasSafeAnchor) return false;
 
@@ -1100,7 +1094,7 @@ private bool TryEjectFromVoid(Vector2 voidCenter, float voidRadius)
     return false;
 }
 
-private void DoSnapRespawn(string reason)
+    private void DoSnapRespawn(string reason)
 {
     if (!_hasSafeAnchor) return;
 
@@ -1130,9 +1124,8 @@ private void DoSnapRespawn(string reason)
     Debug.LogWarning($"[VEHICLE:RECOVER] {name} respawn to cell {respawnCell} (reason={reason})", this);
 }
 
-private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector2Int found)
-{
-    found = around;
+    private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector2Int found) {
+        found = around;
 
     var gen = gfm.dustGenerator;
     if (gen == null) return false;
@@ -1167,7 +1160,7 @@ private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector
     return false;
 }
 
-private bool IsCellEmpty(Vector2Int gp)
+    private bool IsCellEmpty(Vector2Int gp)
 {
     var gen = gfm.dustGenerator;
 
@@ -1201,8 +1194,8 @@ private bool IsCellEmpty(Vector2Int gp)
 
     ConsumeEnergy(amount);
 }
-    
-    public void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
+
+    private void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
         profile = p;
         // Movement
@@ -1514,7 +1507,6 @@ private bool IsCellEmpty(Vector2Int gp)
     
     void OnCollisionEnter2D(Collision2D coll)
     {
-        Debug.Log($"[VEHICLE:COLLISION] hit '{coll.collider.name}' layer={coll.collider.gameObject.layer}", this);
         var node = coll.gameObject.GetComponent<MineNode>();
 
         // 🎯 Apply impact damage
@@ -1536,230 +1528,41 @@ private bool IsCellEmpty(Vector2Int gp)
         {
             TriggerThud(coll.contacts[0].point);
         }
-        // ---- Impact dig (dust maze) ----
-        // Design intent: a single strike on collision entry triggers a chain reaction trench down a grid line.
-        if (!boosting) return;
+}
+
+    private void DoPlowTick()
+    {
         if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
+        if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
+        if (!boosting) return;
 
-        // Cooldown prevents multiple dust colliders from generating multiple chain reactions on one strike.
-        if (Time.time - _lastImpactDigAt < Mathf.Max(0.01f, impactDigCooldownSeconds))
-            return;
+        Vector2 vel = rb.linearVelocity;
+        if (vel.magnitude < plowMinSpeed) return;
+        if (Time.time < _nextPlowTickAt) return;
+        _nextPlowTickAt = Time.time + Mathf.Max(0.01f, plowTickSeconds);
 
-        _lastImpactDigAt = Time.time;
+        var gen = gfm.dustGenerator;
+        float cellSize = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+        Vector2 forward = vel.normalized;
+        Vector2 perp    = new Vector2(-forward.y, forward.x);
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        float fade = Mathf.Max(0.01f, plowFadeSeconds);
+        int halfW = Mathf.Max(0, plowHalfWidthCells);
+        int depth = Mathf.Max(0, plowDepthCells);
 
-        DoImpactDig(coll);
-}
-
-    // ------------------------------------------------------------------------
-    // Impact Dig (chain reaction trench)
-    // ------------------------------------------------------------------------
-private void DoImpactDig(Collision2D coll)
-{
-    if (coll == null) return;
-    if (coll.contactCount <= 0) return;
-    if (!boosting) return;
-    if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
-
-    var gen = gfm.dustGenerator;
-
-    // --- Choose the contact that best represents "into-surface" impact ---
-    Vector2 relV = coll.relativeVelocity;
-    if (rb != null && relV.sqrMagnitude < 0.0001f)
-        relV = rb.linearVelocity;
-
-    var best = coll.GetContact(0);
-    float bestInto = float.NegativeInfinity;
-
-    for (int i = 0; i < coll.contactCount; i++)
-    {
-        var c = coll.GetContact(i);
-        float into = Vector2.Dot(relV, -c.normal); // >0 means we're moving into the surface
-        if (into > bestInto)
+        for (int d = 0; d <= depth; d++)
         {
-            bestInto = into;
-            best = c;
-        }
-    }
-
-    Vector2 contactWorld = best.point;
-
-    // --- Impact measurement (only into-normal speed scales trench) ---
-    Vector2 v = (rb != null) ? rb.linearVelocity : relV;
-    float intoSpeed = Vector2.Dot(v, -best.normal);
-    if (intoSpeed < 0f) intoSpeed = 0f;
-
-    // --- Direction ---
-    // If you actually hit into the surface, dig straight into it.
-    // Otherwise (boxed-in / grazing), dig in the player's intended direction, but only 1 cell.
-    const float kMinIntoForMulti = 0.25f; // not a "tuning number" so much as noise floor; adjust if needed
-    bool hasMeaningfulImpact = intoSpeed >= kMinIntoForMulti;
-
-    Vector2 digDirWorld;
-    if (hasMeaningfulImpact)
-    {
-        digDirWorld = -best.normal;
-    }
-    else if (_moveInput.sqrMagnitude > 0.0001f)
-    {
-        digDirWorld = _moveInput.normalized;
-    }
-    else if (_lastNonZeroInput.sqrMagnitude > 0.0001f)
-    {
-        digDirWorld = _lastNonZeroInput.normalized;
-    }
-    else
-    {
-        digDirWorld = -best.normal;
-    }
-
-    if (digDirWorld.sqrMagnitude < 0.0001f) return;
-    digDirWorld.Normalize();
-
-    // --- Resolve entry cell ---
-    if (!TryFindEntryDustCell(contactWorld, resolveRadiusCells: 1, out var gp))
-        return;
-
-    // Quantize direction to 8-way grid step.
-    Vector2Int step = QuantizeDir8_ToGridStep(digDirWorld);
-    if (step == Vector2Int.zero) return;
-
-    // --- Determine intended trench length ---
-    // Rule: touching + boost always removes exactly 1 cell.
-    int cellsToCarve = 1;
-
-    if (hasMeaningfulImpact)
-    {
-        // Map intoSpeed -> extra cells.
-        // Shape: starts at 1, climbs with impact, clamped.
-        // You can change these later without changing the model.
-        const float kIntoForMax = 6.0f;     // "full-speed hit" reference
-        const int   kMaxCells   = 12;       // absolute cap per strike
-
-        float t = Mathf.InverseLerp(kMinIntoForMulti, kIntoForMax, intoSpeed);
-        t = Mathf.Clamp01(t);
-
-        // Slightly convex curve so small impacts don't explode into long trenches.
-        t = t * t;
-
-        int extra = Mathf.FloorToInt(t * (kMaxCells - 1));
-        cellsToCarve = 1 + Mathf.Clamp(extra, 0, kMaxCells - 1);
-    }
-
-    // --- Hardness shortens trenches ---
-    // Always carve the first cell. For subsequent cells, hardness may terminate.
-    // Impact helps push slightly through hardness (optional but feels good).
-    float impactT01 = 0f;
-    if (hasMeaningfulImpact)
-    {
-        const float kIntoForMax = 6.0f;
-        impactT01 = Mathf.InverseLerp(kMinIntoForMulti, kIntoForMax, intoSpeed);
-        impactT01 = Mathf.Clamp01(impactT01);
-    }
-
-    float ContinueChance(float hardness01)
-    {
-        float h = Mathf.Clamp01(hardness01);
-        float baseContinue = 1f - h;          // hard => low continue chance
-        float impactBonus  = 0.65f * impactT01 * h; // impact slightly counters hardness only when hard
-        return Mathf.Clamp01(baseContinue + impactBonus);
-    }
-
-    Vector2Int last = new Vector2Int(int.MinValue, int.MinValue);
-
-    for (int i = 0; i < cellsToCarve; i++)
-    {
-        if (gp == last) { gp += step; continue; }
-        last = gp;
-
-        if (!gen.TryGetDustAt(gp, out var dust) || dust == null)
-            break;
-
-        // First cell guaranteed.
-        if (i > 0 && hasMeaningfulImpact)
-        {
-            float p = ContinueChance(dust.clearing.hardness01);
-            if (UnityEngine.Random.value > p)
-                break;
-        }
-
-        gen.CarveDustAt(gp, fadeSeconds: 0.20f);
-        gp += step;
-    }
-
-    Debug.Log($"[VEHICLE:DIG] intoSpeed={intoSpeed:F2} meaningful={hasMeaningfulImpact} cells={cellsToCarve} step={step}");
-}
-    private bool TryFindEntryDustCell(Vector2 world, int resolveRadiusCells, out Vector2Int gp)
-{
-    gp = default;
-    if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return false;
-
-    var gen = gfm.dustGenerator;
-    var dt = drumTrack;
-
-    Vector2Int baseCell = dt.WorldToGridPosition(world);
-
-    // Fast path: direct hit.
-    if (gen.TryGetDustAt(baseCell, out var dust) && dust != null)
-    {
-        gp = baseCell;
-        return true;
-    }
-
-    int r = Mathf.Clamp(resolveRadiusCells, 0, 4);
-    if (r == 0) return false;
-
-    // Search ring (closest-first-ish). This avoids "neighbor resolution" for the whole line;
-    // it's only for finding an occupied entry cell when the contact lands between colliders.
-    for (int dy = -r; dy <= r; dy++)
-    {
-        for (int dx = -r; dx <= r; dx++)
-        {
-            if (dx == 0 && dy == 0) continue;
-            Vector2Int c = new Vector2Int(baseCell.x + dx, baseCell.y + dy);
-            if (gen.TryGetDustAt(c, out dust) && dust != null)
+            for (int s = -halfW; s <= halfW; s++)
             {
-                gp = c;
-                return true;
+                Vector2    sampleWorld = rb.position
+                    + forward * (d * cellSize)
+                    + perp    * (s * cellSize);
+                Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
+                if (gen.HasDustAt(cell))
+                    gen.CarveDustByVehicle(cell, fade, motif);
             }
         }
     }
-
-    return false;
-}
-    private static readonly Vector2Int[] _dir8 =
-    {
-    new Vector2Int( 1, 0),
-    new Vector2Int( 1, 1),
-    new Vector2Int( 0, 1),
-    new Vector2Int(-1, 1),
-    new Vector2Int(-1, 0),
-    new Vector2Int(-1,-1),
-    new Vector2Int( 0,-1),
-    new Vector2Int( 1,-1),
-};
-    private Vector2Int QuantizeDir8_ToGridStep(Vector2 worldDir)
-{
-    // Assumes your dust grid axes align with world X/Y.
-    // If your grid is rotated, convert worldDir to grid-local here.
-    if (worldDir.sqrMagnitude < 0.0001f) return Vector2Int.zero;
-    worldDir.Normalize();
-
-    float best = -999f;
-    Vector2Int bestStep = Vector2Int.zero;
-
-    for (int i = 0; i < _dir8.Length; i++)
-    {
-        Vector2 cand = ((Vector2)_dir8[i]).normalized;
-        float d = Vector2.Dot(worldDir, cand);
-        if (d > best)
-        {
-            best = d;
-            bestStep = _dir8[i];
-        }
-    }
-
-    return bestStep;
-}
 
     private void TriggerThud(Vector2 collisionPoint)
         {
@@ -1806,7 +1609,7 @@ private void DoImpactDig(Collision2D coll)
             flickerPulseRoutine = null;
         }
     // Enqueue a collected note for manual release. Returns true if queued.
-    public bool EnqueuePendingCollectedNote(PendingCollectedNote p)
+    private bool EnqueuePendingCollectedNote(PendingCollectedNote p)
     {
         if (!enableManualNoteRelease) return false;
 

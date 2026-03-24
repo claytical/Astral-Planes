@@ -34,10 +34,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
     [Tooltip("Ascend duration in drum loops (1 = one full loop).")]
     [Min(1)] public int ascendLoops = 8;
-
-    [Tooltip("Extra seconds added to the loop-based duration to avoid snapping on the boundary.")]
-    public float ascendPaddingSeconds = 0.15f;
-
+    
     [Tooltip("Small world-space Y padding to keep notes from sitting exactly on the line.")]
     public float ascendLineWorldPadding = 0f;
 
@@ -370,16 +367,6 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     // -------------------------------------------------------------------------
     // Public queries — used by NoteVisualizer without coupling to _ascendTasks
     // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Returns true if any marker for this track is currently mid-ascension.
-    /// NoteVisualizer calls this as the implementation of IsAscending(track)
-    /// so RecomputeTrackLayout never needs to touch _ascendTasks directly.
-    /// </summary>
-    public bool IsTrackAscending(InstrumentTrack track)
-    {
-        return track != null && _ascendTasks.ContainsKey(track);
-    }
 
     /// <summary>
     /// The world-space Y target that ascending markers travel toward.

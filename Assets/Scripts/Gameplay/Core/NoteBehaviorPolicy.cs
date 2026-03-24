@@ -4,20 +4,11 @@ public enum NoteBehavior
 {
     // Canonical, transformation-style behaviors
     None = 0,
-    RootShift,
-    ChordChange,
-    InvertVoicing,
-    RegisterExpand,
-    RegisterCompress,
-    AddNeighborOrnament,
-    AddPassingTones,
     HumanizeTiming,
     Staccatify,
     Legatify,
     VelocityShape,
     Swingify,
-    DensityPulse, // accent cycles (e.g., 2/3 over 4)
-
     // ---- Legacy aliases (compile-safe) ----
     // These used to be treated like styles/roles. Keep them to un-break references,
     // but we'll *map* them to the canonical behaviors at runtime.

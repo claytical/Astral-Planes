@@ -33,9 +33,6 @@ public class RoleMotifNoteSetConfig : ScriptableObject
     public List<Weighted<string>> chordFunctions;     // "I", "vi", "IV", "V", "iiø", "bVII", etc.
     [Range(1, 8)]
     public int chordsPerRegion = 2;                   // stochastic small cells (2–4 beats each)
-    [Header("Ascension Fuse")]
-    [Tooltip("How many extended loops notes for this role take to reach the line of ascension.")]
-    public int loopsToAscend = 1;
 
     [Header("Behaviors / Variation")]
     // Behaviors can stack; weights + cap keep it musical
