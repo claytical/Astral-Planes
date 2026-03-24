@@ -720,6 +720,20 @@ private Coroutine _jiggleRoutine;
         SetVisualsEnabled(true);
         ResetSpriteScaleTo(0f);
 
+        // Re-enable particle renderers (HideVisualsInstant disables them; PrepareForReuse must
+        // restore them so Begin()'s emission ramp is actually visible).
+        if (visual.particleSystem != null)
+        {
+            var systems = GetAllParticleSystems();
+            if (systems != null)
+                for (int _i = 0; _i < systems.Length; _i++)
+                {
+                    if (systems[_i] == null) continue;
+                    var _r = systems[_i].GetComponent<ParticleSystemRenderer>();
+                    if (_r != null) _r.enabled = true;
+                }
+        }
+
         // Keep particles running but quiet until Begin() restores default emission.
         EnsureParticlesPlaying();
         ApplyEmissionMultiplierImmediate(0f);

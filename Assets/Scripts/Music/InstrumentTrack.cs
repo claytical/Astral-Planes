@@ -542,6 +542,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         playheadBin = WrapIndex(playheadBin, leaderBins);
 
 // Play every missed step exactly once, in order.
+        // Guard: if the target wrapped below the last-played step without a bar change
+        // (float precision edge at bar boundary), reset the cursor so no steps are skipped.
+        if (targetCurLocal < _lastLocalStep)
+            _lastLocalStep = -1;
+
         int startStep = _lastLocalStep + 1;
         if (startStep < 0) startStep = 0;
 

@@ -134,9 +134,13 @@ public class PhaseStar : MonoBehaviour
 
     // ---- Flower / disarmed state ----
     private bool      _inFlowerMode;
-    private float     _flowerRotOffsetDeg;
-    private float     _flowerRotSpeedDeg;
+    private float     _flowerRotOffsetDeg;   // retained for prefab compat; no longer driven
+    private float     _flowerRotSpeedDeg;    // retained for prefab compat; no longer driven
     private float     _breathPhase;
+    // Flower-clock: running timer driving per-shard alternating rotation.
+    private float     _flowerClockSec;
+    [Tooltip("Alternate petals rotate CW / CCW so the flower opens and closes rather than spinning as one piece.")]
+    [SerializeField] private bool flowerAlternateRotation = true;
     private Vector3   _originalLocalScale = Vector3.one;
     private Coroutine _scaleCoroutine;
 
@@ -527,11 +531,10 @@ public class PhaseStar : MonoBehaviour
         float ready01 = GetChargeReady01();
 
         // start near neutral gray, then reveal the role color as charge rises
-        Color gray = Color.Lerp(Color.black, Color.gray, 0.65f);
+        Color gray = Color.Lerp(Color.gray, Color.lightGray, 0.65f);
         Color c = Color.Lerp(gray, role, ready01);
-
         // preserve role alpha if you want, but color identity should emerge with readiness
-        c.a = Mathf.Lerp(0.15f, role.a <= 0f ? 1f : role.a, ready01);
+        c.a = 1f;//Mathf.Lerp(0.5f, role.a <= 0f ? 1f : role.a, ready01);
         return c;
     }
     private float ComputeCellWorldSize()
@@ -604,32 +607,25 @@ public class PhaseStar : MonoBehaviour
         if (previewRing != null && previewRing.Count > 0)
         {
             // Resolve dominant shard with hysteresis + dwell penalty.
-            int prevShardIndex = currentShardIndex;
-            ResolveDominantRoleFromCharge();
-            if (currentShardIndex != prevShardIndex)
-                _highlightDwellSec = 0f;
-            else
-                _highlightDwellSec += dt;
-
-            // --- Flower rotation state update ---
-            if (_inFlowerMode)
+            // Skip while dormant: all shards use the flower clock and no sorting changes
+            // are needed, so resolving a dominant shard would only cause layer-order pops.
+            if (_isArmed)
             {
-                if (!_isArmed)
-                {
-                    float decayRate = disarmedFlowerRotStartDeg / Mathf.Max(0.001f, disarmedFlowerRotDecaySec);
-                    _flowerRotSpeedDeg = Mathf.MoveTowards(_flowerRotSpeedDeg, 0f, decayRate * dt);
-                    float breathOsc = Mathf.Sin(_breathPhase * Mathf.PI * 2f) * 5f;
-                    _flowerRotOffsetDeg += (_flowerRotSpeedDeg + breathOsc) * dt;
-                }
+                int prevShardIndex = currentShardIndex;
+                ResolveDominantRoleFromCharge();
+                if (currentShardIndex != prevShardIndex)
+                    _highlightDwellSec = 0f;
                 else
-                {
-                    // Armed + single-role maze: gentle continuous rotation
-                    _flowerRotOffsetDeg += 15f * dt;
-                }
-                _breathPhase = Mathf.Repeat(_breathPhase + dt / Mathf.Max(0.001f, disarmedBreathPeriod), 1f);
+                    _highlightDwellSec += dt;
             }
 
-            float petalStep = 360f / previewRing.Count;
+            // --- Flower-clock: advance timer and breath every frame regardless of state ---
+            _flowerClockSec += dt;
+            _breathPhase = Mathf.Repeat(_breathPhase + dt / Mathf.Max(0.001f, disarmedBreathPeriod), 1f);
+
+            // deg/sec so shards complete exactly one revolution per musical loop
+            float loopSpeed = _loopDuration > 0.001f ? 360f / _loopDuration : 15f;
+            float petalStep = previewRing.Count > 0 ? 360f / previewRing.Count : 360f;
 
             for (int i = 0; i < previewRing.Count; i++)
             {
@@ -638,13 +634,15 @@ public class PhaseStar : MonoBehaviour
 
                 var sr = shard.visual.GetComponent<SpriteRenderer>();
 
-                // --- Alpha: dim+breath in flower mode while disarmed, else charge-driven ---
+                // --- Alpha ---
                 if (sr != null)
                 {
-                    if (_inFlowerMode && !_isArmed)
+                    if (!_isArmed)
                     {
-                        float breath = (Mathf.Sin(_breathPhase * Mathf.PI * 2f) + 1f) * 0.5f;
-                        float targetAlpha = Mathf.Lerp(disarmedBreathAlphaMin, disarmedBreathAlphaMax, breath);
+                        // Dormant: staggered breath wave — each shard peaks at a different point in the cycle
+                        float shardPhase = Mathf.Repeat(_breathPhase + (float)i / previewRing.Count, 1f);
+                        float breath01   = (Mathf.Sin(shardPhase * Mathf.PI * 2f) + 1f) * 0.5f;
+                        float targetAlpha = Mathf.Lerp(disarmedBreathAlphaMin, disarmedBreathAlphaMax, breath01);
                         Color c = sr.color;
                         c.r = Mathf.Lerp(c.r, 0.12f, shardAlphaLerpSpeed * dt);
                         c.g = Mathf.Lerp(c.g, 0.12f, shardAlphaLerpSpeed * dt);
@@ -654,6 +652,7 @@ public class PhaseStar : MonoBehaviour
                     }
                     else
                     {
+                        // Armed: charge-driven alpha (unchanged)
                         _starCharge.TryGetValue(shard.role, out float charge);
                         float t = Mathf.Clamp01(charge);
 
@@ -674,27 +673,31 @@ public class PhaseStar : MonoBehaviour
                     }
                 }
 
-                // --- Rotation: flower petal spin or sniffer facing ---
-                if (_inFlowerMode)
-                {
-                    float totalAngle = petalStep * i + _flowerRotOffsetDeg;
-                    shard.visual.localRotation = Quaternion.Euler(0f, 0f, totalAngle);
-                }
-                else
+                // --- Rotation: dominant shard when armed = points toward dust; all others = flower clock ---
+                bool isDominantAndArmed = _isArmed && (i == currentShardIndex);
+                if (isDominantAndArmed)
                 {
                     Vector2 sniffDir = GetNearestDustDirForRole(shard.role, 8);
                     if (sniffDir.sqrMagnitude > 0.0001f)
                     {
                         float targetAngle = Mathf.Atan2(sniffDir.y, sniffDir.x) * Mathf.Rad2Deg - 90f;
-                        float curAngle = shard.visual.localEulerAngles.z;
-                        float newAngle = Mathf.MoveTowardsAngle(curAngle, targetAngle, shardSnifferTurnSpeed * dt);
+                        float curAngle    = shard.visual.localEulerAngles.z;
+                        float newAngle    = Mathf.MoveTowardsAngle(curAngle, targetAngle, shardSnifferTurnSpeed * dt);
                         shard.visual.localRotation = Quaternion.Euler(0f, 0f, newAngle);
                     }
                 }
+                else
+                {
+                    // Flower clock: alternate CW/CCW so the flower breathes open and closed
+                    float dir   = (flowerAlternateRotation && i % 2 != 0) ? -1f : 1f;
+                    float angle = petalStep * i + dir * loopSpeed * _flowerClockSec;
+                    shard.visual.localRotation = Quaternion.Euler(0f, 0f, angle);
+                }
             }
 
-            // --- Sorting order: highest charge on top ---
-            UpdateShardSortingByCharge();
+            // --- Sorting order: only update when armed (dormant uses stable clock rotation) ---
+            if (_isArmed)
+                UpdateShardSortingByCharge();
         }
         
         if (_starCharge.Count > 0 && passiveChargeDecayPerSec > 0f) { 
@@ -1267,7 +1270,6 @@ public class PhaseStar : MonoBehaviour
     private void EnterFlowerMode()
     {
         _inFlowerMode = true;
-        _flowerRotSpeedDeg = disarmedFlowerRotStartDeg;
         _breathPhase = 0f;
         motion?.SetSpeedMultiplier(0.04f);
         if (_scaleCoroutine != null) StopCoroutine(_scaleCoroutine);
@@ -1280,8 +1282,8 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     private void ExitFlowerModeOnRearm()
     {
-        if (!IsSingleRoleMaze())
-            _inFlowerMode = false;
+        // _inFlowerMode stays true permanently — flower look is always on.
+        // The dominant shard deviates to point at dust when armed; others keep the clock.
         motion?.SetSpeedMultiplier(1f);
         if (_scaleCoroutine != null) StopCoroutine(_scaleCoroutine);
         _scaleCoroutine = StartCoroutine(Co_ScaleTo(_originalLocalScale, disarmedScaleSeconds));

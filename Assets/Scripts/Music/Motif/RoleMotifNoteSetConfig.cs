@@ -41,4 +41,9 @@ public class RoleMotifNoteSetConfig : ScriptableObject
     public int maxBehaviorsStack = 2;
 
     public VariationProfile variation = new VariationProfile();
+
+    [Header("MineNode")]
+    [Tooltip("Number of CosmicDust cells this MineNode may tint before its budget is exhausted. 0 = unlimited.")]
+    [Min(0)]
+    public int mineNodeTintBudget = 20;
 }
