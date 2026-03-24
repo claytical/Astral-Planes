@@ -16,7 +16,7 @@ public class DrumTrack : MonoBehaviour
     private float _pendingBpm;
     private int _pendingTotalSteps;
     private bool _pendingTimingValid;
-    [SerializeField] private bool logBeatSeqGates = true;
+    [SerializeField] private bool logBeatSeqGates = false;
     private int _beatSeqGateSpamGuard = 0;
     private string _lastMotifSetBy = "never";
     private int _motifSetSerial = 0;
@@ -585,7 +585,7 @@ public class DrumTrack : MonoBehaviour
         double boundaryDsp = leaderStartDspTime;
 
         // Decide target clip based on what happened during the previous loop
-        Debug.Log($"[DRUM] Loop boundary dsp={boundaryDsp:F3} Handling Beat Sequence at Loop Boundary");
+        if (logBeatSeqGates) Debug.Log($"[DRUM] Loop boundary dsp={boundaryDsp:F3}");
         HandleBeatSequencingAtLoopBoundary((float)effLen);
 
         // Fire loop boundary event (expansion/commit handlers may modify EffectiveLoopLengthSec)
@@ -643,13 +643,13 @@ public class DrumTrack : MonoBehaviour
                 totalSteps  = Mathf.Max(1, _pendingTotalSteps);
                 _pendingTimingValid = false;
 
-                Debug.Log(
+                if (logBeatSeqGates) Debug.Log(
                     $"[DRUM][MOTIF] Committed pending timing at swap: bpm={drumLoopBPM} steps={totalSteps} " +
                     $"clip={(_currentDrumClip ? _currentDrumClip.name : "null")}"
                 );
             }
 
-            Debug.Log($"[DRUM] Finalized drum loop swap at dsp={_pendingDrumLoopDspStart:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM] Finalized drum loop swap at dsp={_pendingDrumLoopDspStart:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
 
             _pendingDrumLoopDspStart = -1.0;
         }
@@ -725,7 +725,7 @@ public class DrumTrack : MonoBehaviour
     }
 
     // 7) Housekeeping
-    if (activeMineNodes != null)
+    if (activeMineNodes != null && activeMineNodes.Count > 0)
         activeMineNodes.RemoveAll(n => n == null);
 }
     public bool TryGetNextBaseStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
@@ -767,24 +767,24 @@ public class DrumTrack : MonoBehaviour
         // --- hard gates (log on exit) ---
         if (!_driveFromEnergy)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: driveFromEnergy=false motif={(_motif ? _motif.motifId : "null")}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: driveFromEnergy=false motif={(_motif ? _motif.motifId : "null")}");
             return;
         }
         if (_gfm == null)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: _gfm==null motif={(_motif ? _motif.motifId : "null")}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: _gfm==null motif={(_motif ? _motif.motifId : "null")}");
             return;
         }
         if (_motif == null)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: _motif==null");
+            if (logBeatSeqGates) Debug.Log("[DRUM][BeatSeq] exit: _motif==null");
             return;
         }
 
         // 1) Respect entry window
         if (_entryLoopsRemaining > 0)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: entry window active remain={_entryLoopsRemaining} motif={_motif.motifId}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: entry window active remain={_entryLoopsRemaining} motif={_motif.motifId}");
             _entryLoopsRemaining--;
             return;
         }
@@ -793,7 +793,7 @@ public class DrumTrack : MonoBehaviour
         int loopsCt = (_intensityLoops != null) ? _intensityLoops.Count : 0;
         if (loopsCt == 0)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: intensityLoops=0 motif={_motif.motifId}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: intensityLoops=0 motif={_motif.motifId}");
             return;
         }
 
@@ -803,7 +803,7 @@ public class DrumTrack : MonoBehaviour
         if (_lastTotalSpentSample < 0f)
         {
             _lastTotalSpentSample = totalSpent;
-            Debug.Log($"[DRUM][BeatSeq] baseline acquired totalSpent={totalSpent:F3} motif={_motif.motifId}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] baseline acquired totalSpent={totalSpent:F3} motif={_motif.motifId}");
             return;
         }
 
@@ -835,7 +835,7 @@ public class DrumTrack : MonoBehaviour
             intensity01 = _lastIntensity01;
         _lastIntensity01 = intensity01;
 
-        Debug.Log(
+        if (logBeatSeqGates) Debug.Log(
             $"[DRUM][BeatSeq] motif={_motif.motifId} total={totalSpent:F3} delta={delta:F3} ema={_burnBaselineEma:F3} " +
             $"ratio={ratio:F3} intensity={intensity01:F3} loops={loopsCt}"
         );
@@ -848,28 +848,28 @@ public class DrumTrack : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[DRUM][BeatSeq] chose clip={targetClip.name} intensity={intensity01:F3}");
+        if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] chose clip={targetClip.name} intensity={intensity01:F3}");
 
         // 5) Avoid redundant scheduling
         if (_pendingDrumLoopArmed && _pendingDrumLoop == targetClip)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: already armed clip={targetClip.name}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: already armed clip={targetClip.name}");
             return;
         }
         if (!_pendingDrumLoopArmed && drumAudioSource != null && drumAudioSource.clip == targetClip)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: already playing clip={targetClip.name}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: already playing clip={targetClip.name}");
             return;
         }
-    // If a swap is already scheduled, don't stack another one.
+        // If a swap is already scheduled, don't stack another one.
         if (_pendingDrumLoopDspStart > 0.0)
         {
-            Debug.Log($"[DRUM][BeatSeq] exit: swap already scheduled dsp={_pendingDrumLoopDspStart:F3}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: swap already scheduled dsp={_pendingDrumLoopDspStart:F3}");
             return;
         }
         // 6) Schedule at boundary
         ScheduleDrumLoopChange(targetClip);
-        Debug.Log($"[DRUM][BeatSeq] scheduled clip={targetClip.name}");
+        if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] scheduled clip={targetClip.name}");
     }    
     private void EnsureDualDrumSources()
     {

@@ -717,6 +717,11 @@ public class InstrumentTrackController : MonoBehaviour
 
         double dspNow = AudioSettings.dspTime;
 
+        // Short-circuit: if called multiple times within the same DSP sample (multiple tracks per frame),
+        // return the cached result instead of recalculating.
+        if (_hasLastTransport && dspNow == _lastTransportDsp)
+            return _lastTransport;
+
         double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
         if (start <= 0.0) return default;
 
@@ -762,6 +767,7 @@ public class InstrumentTrackController : MonoBehaviour
         };
 
         _lastTransport = tf;
+        _lastTransportDsp = dspNow;
         _hasLastTransport = true;
         return tf;
     }

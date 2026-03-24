@@ -6,6 +6,7 @@ using Random = System.Random;
 public class MineNode : MonoBehaviour
 {
     public SpriteRenderer coreSprite;
+    public SpriteRenderer outlineSprite;
     public int maxStrength = 100;
 
     [Header("Dust Affinity")]
@@ -14,6 +15,12 @@ public class MineNode : MonoBehaviour
     public bool pruneCarvedPathOnLoopBoundary = true;
     [Tooltip("Minimum carved path length before pruning runs.")] 
     [Min(2)] public int pruneMinPathCount = 8;
+
+    [Header("Flee Behaviour")]
+    [Tooltip("Vehicle must be within this radius (world units) to trigger a flee response.")]
+    [SerializeField] private float fleeRadiusWorld = 5f;
+    [Tooltip("How strongly the flee direction overrides the current carve direction.")]
+    [SerializeField, Range(0f, 1f)] private float fleeBlendWeight = 0.25f;
 
     [Header("NoteSet-Driven Motion (Carving)")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
@@ -87,8 +94,13 @@ public class MineNode : MonoBehaviour
         if (dust != null) dust.SetLevelAuthority(_drumTrack); 
         _carvedPath.Clear(); 
         if (coreSprite != null) {
-            tint.a = 1; 
+            tint.a = 1;
             coreSprite.color = tint;
+        }
+        if (outlineSprite != null) {
+            Color outlineTint = tint;
+            outlineTint.a = 1f;
+            outlineSprite.color = outlineTint;
         }
         CacheAuthoredStepsFromNoteSet(); 
     }
@@ -123,6 +135,28 @@ public class MineNode : MonoBehaviour
         _originalScale = transform.localScale;
         _strength = maxStrength;
     }
+
+    private void Update()
+    {
+        UpdateBudgetAlpha();
+    }
+
+    /// <summary>
+    /// Sets coreSprite alpha to the fraction of this node's individual tint budget that remains
+    /// (1 = budget untouched / full alpha, 0 = budget exhausted / invisible core).
+    /// </summary>
+    private void UpdateBudgetAlpha()
+    {
+        if (coreSprite == null) return;
+        float alpha = (_dustInteractor != null) ? _dustInteractor.TintBudgetRemainingRatio : 1f;
+        var c = coreSprite.color;
+        if (!Mathf.Approximately(c.a, alpha))
+        {
+            c.a = alpha;
+            coreSprite.color = c;
+        }
+    }
+
     private void FixedUpdate()
 {
     if (!driveCarvingMotionFromNoteSet ||
@@ -223,7 +257,7 @@ public class MineNode : MonoBehaviour
     {
         Vector2 myPos = _rb.position;
         Vector2 flee = Vector2.zero;
-        float fleeRadiusSq = 25f; // 5 units
+        float fleeRadiusSq = fleeRadiusWorld * fleeRadiusWorld;
         foreach (var lp in vehicles)
         {
             var v = lp?.plane;
@@ -234,7 +268,7 @@ public class MineNode : MonoBehaviour
                 flee += away / dSq; // inverse-square falloff
         }
         if (flee.sqrMagnitude > 0.001f)
-            _carveDir = Vector2.Lerp(_carveDir, flee.normalized, 0.25f).normalized;
+            _carveDir = Vector2.Lerp(_carveDir, flee.normalized, fleeBlendWeight).normalized;
     }
     // --- NOTE-DRIVEN SPEED ---
     int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);

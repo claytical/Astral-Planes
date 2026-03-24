@@ -1489,31 +1489,11 @@ public class CosmicDustGenerator : MonoBehaviour
         {
             dust.SetTrackBundle(this, drums);
             dust.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), dustFootprintMul, cellClearanceWorld);
-            dust.PrepareForReuse();
-            dust.SetGrowInDuration(hexGrowInSeconds);
-            dust.clearing.hardness01 = GetCellHardness01(gp);
-
-            // Apply role (not just tint) so dust.Role is never left as MusicalRole.None.
-            Color initColor = GetCellVisualColor(gp);
-            if (_imprints != null && _imprints.TryGetValue(gp, out var initImprint) && initImprint.role != MusicalRole.None)
-                dust.ApplyRoleAndCharge(initImprint.role, initColor, initColor.a);
-            else
-                dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, _mazeTint.a);
-
-            Color denyColorGo = Color.darkGray;
-            if (_imprints != null && _imprints.TryGetValue(gp, out var impGo) && impGo.role != MusicalRole.None)
-            {
-                var rpGo = MusicalRoleProfileLibrary.GetProfile(impGo.role);
-                if (rpGo != null)
-                {
-                    var shadow = rpGo.dustColors.shadowColor;
-                    denyColorGo = (shadow != Color.clear && shadow != Color.magenta)
-                        ? shadow
-                        : Color.darkGray;
-                }
-            }
-            dust.SetFeedbackColors(Color.white, denyColorGo);
-            dust.Begin();
+            // Clear the Awake-state particle burst (ApplyEmissionMultiplierImmediate(100f)) and hide
+            // visuals so this new cell enters the same "clean hidden" state as reused cells that
+            // came through HideVisualsInstant(). The caller (StaggeredGrowthFitDuration, CommitRegrowCell,
+            // VoidGrowCellNow) handles PrepareForReuse + role setup + Begin().
+            dust.HideVisualsInstant();
             SetDustCollision(dust, false);
         }
 
@@ -1891,6 +1871,15 @@ public class CosmicDustGenerator : MonoBehaviour
         // after the gray-start change where all initial cells have role=None.
         return _allSolidCount;
     }
+
+    /// <summary>Returns the number of solid cells currently tinted to <paramref name="role"/>.</summary>
+    public int GetSolidCountForRole(MusicalRole role)
+    {
+        return _solidCountByRole.TryGetValue(role, out int c) ? c : 0;
+    }
+
+    /// <summary>Returns total solid cell count (all roles including None).</summary>
+    public int GetTotalSolidCount() => _allSolidCount;
 
     /// <summary>
     /// When a cell is eroded, immediately queue a frontier empty cell to regrow,

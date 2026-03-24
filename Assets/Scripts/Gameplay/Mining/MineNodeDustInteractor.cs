@@ -6,7 +6,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 {
     private bool InsideDust { get; set; }
     private CosmicDust CurrentDust { get; set; }
-   
+
     [Header("Multipliers while in dust (node-specific)")]
     [Tooltip("Clamp max speed while inside dust (multiplies your locomotion maxSpeed).")]
     public float speedCapMul = 0.9f;
@@ -75,6 +75,13 @@ public class MineNodeDustInteractor : MonoBehaviour
     private Vector2 _lastDustContactPoint;
 
     // ---------------------------------------------------------------
+    // Per-node tint budget
+    // ---------------------------------------------------------------
+    private int  _tintBudget        = 0;   // 0 = unlimited
+    private int  _tintedCellCount   = 0;
+    private bool _budgetInitialized = false;
+
+    // ---------------------------------------------------------------
     // Public API
     // ---------------------------------------------------------------
 
@@ -87,7 +94,14 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     /// <summary>Weight applied when blending hunt direction into _carveDir.</summary>
     public float HuntDirWeight => huntDirWeight;
-    
+
+    /// <summary>
+    /// Fraction of tint budget remaining: 1 = untouched, 0 = exhausted.
+    /// Always 1 when budget is unlimited (mineNodeTintBudget == 0).
+    /// </summary>
+    public float TintBudgetRemainingRatio =>
+        (_tintBudget <= 0) ? 1f : 1f - Mathf.Clamp01((float)_tintedCellCount / _tintBudget);
+
     void Awake()
     {
         _rb          = GetComponent<Rigidbody2D>();
@@ -122,8 +136,11 @@ public class MineNodeDustInteractor : MonoBehaviour
 
         if (!carveMaze) return;
 
+        EnsureBudgetInitialized();
+        bool budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
+
         // ---------------------------------------------------------------
-        // None-hunter: retarget tick
+        // None-hunter: retarget tick (suppress when budget exhausted)
         // ---------------------------------------------------------------
         _retargetTimer -= Time.fixedDeltaTime;
 
@@ -134,7 +151,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             _retargetTimer = 0f; // retarget immediately
         }
 
-        if (!_hasHuntTarget && _retargetTimer <= 0f)
+        if (!budgetExhausted && !_hasHuntTarget && _retargetTimer <= 0f)
         {
             _retargetTimer = retargetInterval;
             HuntTick(cell);
@@ -155,7 +172,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         }
 
         // ---------------------------------------------------------------
-        // Carve interval: tint adjacent None-role neighbors
+        // Carve interval: tint adjacent neighbors
         // ---------------------------------------------------------------
         _carveTimer += Time.fixedDeltaTime;
         if (_carveTimer < carveIntervalSeconds) return;
@@ -166,17 +183,21 @@ public class MineNodeDustInteractor : MonoBehaviour
 
         MusicalRole role = _node.GetImprintRole();
 
-        // Flip any adjacent dust to our role (including already-colored cells)
+        // Flip any adjacent dust to our role
         for (int dx = -1; dx <= 1; dx++)
         for (int dy = -1; dy <= 1; dy++)
         {
             if (dx == 0 && dy == 0) continue;
+            if (budgetExhausted) break; // no cells left to paint
+
             var neighbor = cell + new Vector2Int(dx, dy);
 
             if (!_drumTrack.HasDustAt(neighbor)) continue;
             if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
 
             gen.TintDustCellWithRole(neighbor, role);
+            _tintedCellCount++;
+            budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
         }
 
         // Edge-hugging (unchanged)
@@ -195,6 +216,31 @@ public class MineNodeDustInteractor : MonoBehaviour
         }
         if (dustNeighborCount > 0)
             _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
+    }
+
+    // ---------------------------------------------------------------
+    // Budget init
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// Reads mineNodeTintBudget from the first matching RoleMotifNoteSetConfig for this
+    /// node's role. Called lazily on first carve tick so the motif is guaranteed to be set.
+    /// </summary>
+    private void EnsureBudgetInitialized()
+    {
+        if (_budgetInitialized) return;
+        _budgetInitialized = true;
+        if (_node == null) return;
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif == null) return;
+        MusicalRole role = _node.GetImprintRole();
+        var configs = motif.roleNoteConfigs;
+        for (int i = 0; i < configs.Count; i++)
+            if (configs[i] != null && configs[i].role == role)
+            {
+                _tintBudget = configs[i].mineNodeTintBudget;
+                return;
+            }
     }
 
     // ---------------------------------------------------------------
@@ -247,7 +293,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             }
         }
 
-        // No None-role dust reachable within budget — clear target
+        // No untinted dust reachable within budget — clear target
         _hasHuntTarget = false;
     }
 
@@ -264,8 +310,12 @@ public class MineNodeDustInteractor : MonoBehaviour
         var gen = GameFlowManager.Instance?.dustGenerator;
         if (gen == null || _node == null) return;
 
+        bool budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
+        if (budgetExhausted) return;
+
         MusicalRole role = _node.GetImprintRole();
         gen.TintDustCellWithRole(_huntTargetCell, role);
+        _tintedCellCount++;
     }
 
     private bool IsArrived(Vector2Int currentCell, Vector2Int targetCell)
@@ -301,7 +351,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         InsideDust  = false;
         CurrentDust = null;
     }
-    
+
     public void SetLevelAuthority(DrumTrack drumTrack)
     {
         _drumTrack = drumTrack;
@@ -311,6 +361,4 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         _desiredSpeed = Mathf.Max(0f, desiredSpeed);
     }
-
-
 }

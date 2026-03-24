@@ -287,7 +287,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0.1
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -1369,7 +1369,7 @@ ParticleSystem:
         key0: {r: 0.36862746, g: 0.18431373, b: 0.52156866, a: 0.6431373}
         key1: {r: 1, g: 0.9349057, b: 0.2783019, a: 0.43137255}
         key2: {r: 0.003921569, g: 0.47058824, b: 0.19607843, a: 0.40392157}
-        key3: {r: 0, g: 0.5019608, b: 0.5019608, a: 1}
+        key3: {r: 0, g: 0.5019608, b: 0.5019608, a: 0}
         key4: {r: 1, g: 0.2688679, b: 0.3290789, a: 0}
         key5: {r: 1, g: 0.67352945, b: 0.25, a: 0}
         key6: {r: 1, g: 0.9349057, b: 0.2783019, a: 0}
@@ -4835,6 +4835,8 @@ ParticleSystemRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -4857,6 +4859,7 @@ ParticleSystemRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
