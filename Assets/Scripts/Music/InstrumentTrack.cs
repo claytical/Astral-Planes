@@ -7,8 +7,6 @@ using System.Linq;
 [System.Serializable]
 public class AscensionCohort
 {
-    public int windowStartInclusive;
-    public int windowEndExclusive;
 
     // Hidden in inspector — debug aid only; runtime truth is in stepsRemaining (HashSet).
     [HideInInspector] [SerializeField] private List<int> stepsRemainingSerialized = new();
@@ -636,7 +634,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int trackBins = Mathf.Max(1, loopMultiplier);
         if (playheadBin < 0 || playheadBin >= trackBins)
         {
-            Debug.Log($"[PLAYBACK] playheadBin {playheadBin} trackBins {trackBins}");
             return;
         }
 
@@ -650,7 +647,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         {
             var (note, duration, vel127f) = _tmpStepNotes[i];
             int vel127 = Mathf.Clamp(Mathf.RoundToInt(vel127f), 1, 127);
-            Debug.Log($"[PLAYBACK] Playing {note} at {duration} with {vel127} velocity");
             PlayNote127(note, duration, vel127);
         }
     }
@@ -1037,11 +1033,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 }
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
     {
-        if (ascensionCohort == null) ascensionCohort = new AscensionCohort();
-
-        ascensionCohort.windowStartInclusive = windowStartInclusive;
-        ascensionCohort.windowEndExclusive   = windowEndExclusive;
-
+        ascensionCohort ??= new AscensionCohort();
+        
         var loop = GetPersistentLoopNotes();
         if (loop == null)
         {
@@ -1586,6 +1579,12 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 _burstRemaining.Remove(burstId);
                 _burstLeaderBinsBeforeWrite.Remove(burstId);
                 _burstWroteBin.Remove(burstId);
+
+                // Notify listeners (e.g. PhaseStar) that the burst is complete, same as the
+                // auto-collect path does in OnCollectableCollected. This ensures the bridge
+                // wait fires at *placement* time rather than at the _awaitingCollectableClear
+                // timeout (which fires even if the note hasn't been placed yet).
+                OnCollectableBurstCleared?.Invoke(this, burstId);
             }
             else
             {
@@ -1702,43 +1701,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         return -1;
     }
-    private double NextOccurrenceDspForAbsoluteStep(int absoluteStep)
-    {
-        if (drumTrack == null) return AudioSettings.dspTime + 0.01;
-
-        // Use the SAME step space the DrumTrack transport uses once leader bins expand.
-        int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps()); // must exist in DrumTrack
-        double loopLen  = drumTrack.GetLoopLengthInSeconds();
-        if (loopLen <= 0.0001) loopLen = 0.1;
-
-        double start = drumTrack.leaderStartDspTime; // authoritative loop anchor
-        if (start <= 0.0001) start = drumTrack.startDspTime; // fallback if leader not initialized
-        if (start <= 0.0001) start = AudioSettings.dspTime;  // last resort
-
-        // Wrap the absolute step into leader step space
-        int step = ((absoluteStep % leaderSteps) + leaderSteps) % leaderSteps;
-
-        double stepDur    = loopLen / leaderSteps;
-        double now        = AudioSettings.dspTime;
-        double elapsed    = now - start;
-
-        // Normalize elapsed into [0, loopLen)
-        double nowInLoop = elapsed % loopLen;
-        if (nowInLoop < 0) nowInLoop += loopLen;
-
-        double targetTime = step * stepDur;
-        double dt = targetTime - nowInLoop;
-
-        // If we're already past it this loop, schedule next loop
-        if (dt <= 0.0) dt += loopLen;
-
-        // Optional safety: if you need a minimum scheduling lead, enforce it here.
-        // (Otherwise a near-zero dt yields a 1-frame "teleport".)
-        const double minLead = 0.010; // 10ms
-        if (dt < minLead) dt += loopLen;
-
-        return now + dt;
-    }
     public int GetHighestFilledBin()
     {
         EnsureBinList();
@@ -1839,15 +1801,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public void SetNoteSet(NoteSet noteSet)
     {
         _currentNoteSet = noteSet;
-    }
-    public NoteSet GetActiveNoteSet()
-    {
-        // Return the active NoteSet for this track; use your existing cache if you have it
-        if (_currentNoteSet == null)
-        {
-            Debug.LogWarning($"Instrument tracks should always have a noteset.");
-        }
-        return _currentNoteSet;
     }
     public int GetTotalSteps()
     {

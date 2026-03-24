@@ -13,7 +13,7 @@ public class LoopPattern : MonoBehaviour
     /// Rebuild the track's loop cache if the track marked it dirty.
     /// This is essentially your existing RebuildLoopCacheIfDirty moved out.
     /// </summary>
-    public void RebuildLoopCacheIfDirty(InstrumentTrack track)
+    private void RebuildLoopCacheIfDirty(InstrumentTrack track)
     {
         if (track == null) return;
         if (!track.LoopCacheDirtyPending) return;

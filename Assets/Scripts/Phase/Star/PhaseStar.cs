@@ -67,26 +67,19 @@ public class PhaseStar : MonoBehaviour
     [Header("Off-Screen Entry")]
     [Tooltip("World units outside the screen edge where the star spawns.")]
     [SerializeField] private float entryOffscreenMargin = 2f;
-    [Tooltip("Once a role's charge reaches this value, it is considered 'tasted' and decay is floored.")]
-    [SerializeField, Range(0f, 0.5f)] private float chargeTastedThreshold = 0.12f;
-
-    [Tooltip("Minimum charge for a tasted role. Prevents full bleed-out so the star remembers prior feeding.")]
-    [SerializeField, Range(0f, 0.3f)] private float chargeDecayFloor = 0.08f;
+    [Tooltip("Charge penalty applied per second to the currently-highlighted shard. " +
+             "Creates natural cycling: a shard yields highlight once rivals are close enough.")]
+    [SerializeField, Range(0f, 0.5f)] private float highlightDwellPenaltyPerSec = 0.15f;
+    private float _highlightDwellSec;
     [Tooltip("How close to the screen interior edge (world units) before the star is " +
              "considered 'arrived' and arms itself.")]
     [SerializeField] private float entryArriveThreshold = 1.5f;
-    private readonly HashSet<MusicalRole> _tastedRoles = new();
     [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
     [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
     [Header("Charge Readiness")]
     [SerializeField, Range(0f, 4f)] private float pokeChargeThreshold = 1.0f;
     private bool _cachedIsSuperNode = false;
-
-    private bool StarKeepsDustClear => !behaviorProfile || behaviorProfile.starKeepsDustClear;
-
-    private int StarKeepClearRadiusCells =>
-        behaviorProfile ? Mathf.Max(0, behaviorProfile.starKeepClearRadiusCells) : 2;
-
+    
     private bool SafetyBubbleEnabled => !behaviorProfile || behaviorProfile.enableSafetyBubble;
     private int SafetyBubbleRadiusCells => behaviorProfile ? Mathf.Max(0, behaviorProfile.safetyBubbleRadiusCells) : 4;
 
@@ -125,6 +118,7 @@ public class PhaseStar : MonoBehaviour
     private int _shardsEjectedCount; // how many shards have ejected so far
 
     private bool _awaitingLoopPhaseFinish;
+    private int  _bridgeWaitStartLoop = -1;
 
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
@@ -190,7 +184,7 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float disarmedBreathAlphaMax = 0.18f;
 
 
-    public enum DisarmReason
+    private enum DisarmReason
     {
         None = 0,
 
@@ -238,7 +232,6 @@ public class PhaseStar : MonoBehaviour
     private bool _isArmed;
     private int _baseSortingOrder;
     [SerializeField] private int _perPetalLayerStep;
-    public MotifProfile AssignedMotif => _assignedMotif;
 
     public List<MusicalRole> GetMotifActiveRoles() =>
         _assignedMotif != null ? _assignedMotif.GetActiveRoles() : null;
@@ -274,8 +267,6 @@ public class PhaseStar : MonoBehaviour
             add *= 0.5f;
 
         _starCharge[role] = Mathf.Min(1f, cur + add);
-        if (_starCharge[role] >= chargeTastedThreshold)
-            _tastedRoles.Add(role);
     }
     /// <summary>
     /// Returns 0..1 hunger for a specific role: 1 = starving (zero charge), 0 = fully charged.
@@ -291,7 +282,8 @@ public class PhaseStar : MonoBehaviour
         if (!s_bubbleActive) return false;
         return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
     }
-    public bool IsChargeReady()
+
+    private bool IsChargeReady()
     {
         // Any single shard at or above the per-role threshold makes the star pokeable.
         if (previewRing == null) return false;
@@ -341,7 +333,7 @@ public class PhaseStar : MonoBehaviour
     };
 }
 
-private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
+    private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 {
     var cam = Camera.main;
 
@@ -489,7 +481,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         // Clear charge state for this new star.
         _starCharge.Clear();
-        _tastedRoles.Clear();
 
         _shardsEjectedCount = 0;
 
@@ -502,6 +493,8 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
         if (visuals) visuals.Initialize(behaviorProfile, this);
         if (motion) motion.Initialize(behaviorProfile, this);
+        if (cravingNavigator) cravingNavigator.Initialize(this, motion, MusicalRole.None, behaviorProfile);
+        if (motion && cravingNavigator) motion.SetCravingNavigator(cravingNavigator);
 
         if (dust) dust.Initialize(behaviorProfile, this);
         if (drum != null && !_subscribedLoopBoundary)
@@ -589,19 +582,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     }
     void Update()
     {
-        if (StarKeepsDustClear)
-        {
-            if (gfm.dustGenerator != null && gfm.activeDrumTrack != null)
-            {
-                int radiusCells = _bubbleActive ? SafetyBubbleRadiusCells : StarKeepClearRadiusCells;
-
-                gfm.dustGenerator.SetStarKeepClear(
-                    gfm.activeDrumTrack.WorldToGridPosition(transform.position),
-                    radiusCells,
-                    forceRemoveExisting: false
-                );
-            }
-        }
 
 // ---- Keep bubble center locked to its activation position every frame ----
 // Gravity-void bubbles are anchored to the MineNode capture position, not the drifting star.
@@ -623,8 +603,13 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         if (previewRing != null && previewRing.Count > 0)
         {
-            // Resolve dominant shard with hysteresis + soft switch delta (BALANCE-E).
+            // Resolve dominant shard with hysteresis + dwell penalty.
+            int prevShardIndex = currentShardIndex;
             ResolveDominantRoleFromCharge();
+            if (currentShardIndex != prevShardIndex)
+                _highlightDwellSec = 0f;
+            else
+                _highlightDwellSec += dt;
 
             // --- Flower rotation state update ---
             if (_inFlowerMode)
@@ -721,12 +706,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                 var r = keys[i];
                 float cur = _starCharge[r];
                 float roleDec = (r == dominantRoleNow) ? dec * 3f : dec;
-                // [BALANCE-D] Decay floor: once a role has been tasted, charge
-                // never drops below the floor. The star remembers what it ate.
-                // Uses persistent _tastedRoles set (populated in AddCharge) so the
-                // floor survives even after charge decays below the tasted threshold.
-                float floor = _tastedRoles.Contains(r) ? chargeDecayFloor : 0f;
-                _starCharge[r] = Mathf.Max(floor, cur - roleDec);
+                _starCharge[r] = Mathf.Max(0f, cur - roleDec);
             }
         } 
         
@@ -800,10 +780,15 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         bool noShardsRemain = _shardsEjectedCount >= GetEffectiveNodesPerStar();
 
-        // Final shard: start bridge immediately on last collected note.
+        // Final shard: defer bridge by one full loop after the note lands in the track.
+        // _bridgeWaitStartLoop is intentionally left -1 here; it will be stamped at the
+        // FIRST loop boundary where _awaitingLoopPhaseFinish is observed, ensuring the
+        // wait is measured from a loop boundary rather than from collection time.
         if (noShardsRemain)
         {
-            BeginBridgeNow();
+            _awaitingLoopPhaseFinish = true;
+            _bridgeWaitStartLoop = -1;
+            Disarm(DisarmReason.AwaitBridge, _lockedTint);
             return;
         }
 
@@ -839,40 +824,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         return any;
     }
-
-    private void BeginBridgeNow()
-    {
-        if (_advanceStarted) return;
-
-        // HARD BLOCK: "no skip capture"
-        if (_activeNode != null || _ejectionInFlight)
-        {
-            DBG(
-                $"BeginBridgeNow: BLOCKED (outstanding node). activeNode={_activeNode?.name} ejectInFlight={_ejectionInFlight}");
-            // Ensure we are not accidentally left in a bridge-ish state.
-            _state = PhaseStarState.WaitingForPoke;
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
-            return;
-        }
-
-        // CIF is intentionally not gated here: once the last node is captured (_activeNode == null),
-        // remaining collectables from that node resolve independently of phase progression.
-        // Blocking on CIF here caused the bridge to never start when notes took time to clear.
-
-        if (AnyExpansionPendingGlobal())
-        {
-            DBG("BeginBridgeNow: BLOCKED (expansion pending)");
-            Disarm(DisarmReason.ExpansionPending, _lockedTint);
-            return;
-        }
-
-        _advanceStarted = true;
-        _awaitingLoopPhaseFinish = false;
-        _state = PhaseStarState.BridgeInProgress;
-        Disarm(DisarmReason.Bridge, _lockedTint);
-        StartCoroutine(CompleteAndAdvanceAsync());
-    }
-
+    
     private void ArmNext()
     {
         if (AnyCollectablesInFlightGlobal())
@@ -1088,8 +1040,12 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
             if (noShardsRemain)
             {
-                Debug.Log($"[PS:LB] Begin Bridge");
-                BeginBridgeNow();
+                // Route through the loop-wait so the player hears at least one full loop
+                // of the placed notes before the bridge fires, same as the normal path.
+                Debug.Log($"[PS:LB] Begin Bridge (via loop-wait)");
+                _awaitingLoopPhaseFinish = true;
+                _bridgeWaitStartLoop    = -1;
+                Disarm(DisarmReason.AwaitBridge, _lockedTint);
                 return;
             }
 
@@ -1133,6 +1089,54 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             return;
         }
 
+        // ------------------------------------------------------------
+        // 3a) Loop-wait bridge gate (checked before FORCE_BRIDGE so once the flag
+        //     is set it is always processed without FORCE_BRIDGE re-evaluating it)
+        // ------------------------------------------------------------
+        if (_awaitingLoopPhaseFinish)
+        {
+            var drumsLB = _drum ?? GameFlowManager.Instance?.activeDrumTrack;
+
+            // First boundary: stamp so the wait is measured from a loop boundary,
+            // not from the mid-loop moment the note was placed.
+            if (_bridgeWaitStartLoop < 0 && drumsLB != null)
+            {
+                _bridgeWaitStartLoop = drumsLB.completedLoops;
+                Disarm(DisarmReason.AwaitBridge, _lockedTint);
+                return;
+            }
+
+            // Wait one full loop after the stamp.
+            if (_bridgeWaitStartLoop >= 0 && drumsLB != null
+                && drumsLB.completedLoops - _bridgeWaitStartLoop < 1)
+            {
+                Disarm(DisarmReason.AwaitBridge, _lockedTint);
+                return;
+            }
+
+            if (!CanAdvancePhaseNow())
+            {
+                DBG($"[PS:LB] AwaitLoopPhaseFinish blocked; activeNode={_activeNode?.name} ejection={_ejectionInFlight}");
+                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                return;
+            }
+
+            DBG("[PS:LB] Await Loop Phase Finish → fire bridge");
+            _advanceStarted          = true;
+            _awaitingLoopPhaseFinish = false;
+            _bridgeWaitStartLoop     = -1;
+            _state = PhaseStarState.BridgeInProgress;
+            Disarm(DisarmReason.Bridge, _lockedTint);
+            Trace("LoopBoundary → Begin bridge");
+            StartCoroutine(CompleteAndAdvanceAsync());
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // 3b) FORCE_BRIDGE safety net: star complete but flag not yet set
+        //     (e.g. manual-release path where NotifyCollectableBurstCleared
+        //      didn't fire). Arms the loop-wait for one more boundary pass.
+        // ------------------------------------------------------------
         if (!_advanceStarted && _state != PhaseStarState.BridgeInProgress && !HasShardsRemaining() && noShardsRemain0
             && _activeNode == null && !_ejectionInFlight
             && !AnyExpansionPendingGlobal())
@@ -1142,14 +1146,16 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
                 $"preview={(previewRing != null ? previewRing.Count : -1)} armed={_isArmed} state={_state} " +
                 $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish}"
             );
-            BeginBridgeNow();
+            _awaitingLoopPhaseFinish = true;
+            _bridgeWaitStartLoop     = -1;
+            Disarm(DisarmReason.AwaitBridge, _lockedTint);
             return;
         }
 
         LogState("LoopBoundary entry");
 
         // ------------------------------------------------------------
-        // 3) Bridge logic (phase completion)
+        // 3c) Bridge already in progress
         // ------------------------------------------------------------
         if (_advanceStarted)
         {
@@ -1161,10 +1167,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         {
             if (!CanAdvancePhaseNow())
             {
-                DBG(
-                    $"[PS:LB] BridgeInProgress but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-                // Stay in BridgeInProgress if you want, but DO NOT start the coroutine.
-                // I recommend reverting to WaitingForPoke to avoid a stuck bridge state:
+                DBG($"[PS:LB] BridgeInProgress blocked; activeNode={_activeNode?.name} ejection={_ejectionInFlight}");
                 _state = PhaseStarState.WaitingForPoke;
                 Disarm(DisarmReason.NodeResolving, _lockedTint);
                 return;
@@ -1173,27 +1176,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             _advanceStarted = true;
             _awaitingLoopPhaseFinish = false;
             DBG("[PS:LB] Bridge In Progress");
-            StartCoroutine(CompleteAndAdvanceAsync());
-            return;
-        }
-
-        if (_awaitingLoopPhaseFinish)
-        {
-            if (!CanAdvancePhaseNow())
-            {
-                DBG(
-                    $"[PS:LB] AwaitLoopPhaseFinish but blocked; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
-                // Consume nothing; keep waiting.
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            DBG("[PS:LB] Await Loop Phase Finish");
-            _advanceStarted = true;
-            _awaitingLoopPhaseFinish = false;
-            _state = PhaseStarState.BridgeInProgress;
-            Disarm(DisarmReason.Bridge, _lockedTint);
-            Trace("LoopBoundary → Begin bridge");
             StartCoroutine(CompleteAndAdvanceAsync());
             return;
         }
@@ -1324,12 +1306,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
         SafeUnsubscribeAll();
-        if (!StarKeepsDustClear) return;
-        var gen = gfm != null ? gfm.dustGenerator : null;
-        if (gen == null) return;
-
-        gen.ClearStarKeepClear();
-        
     }
 
     private void OnDestroy()
@@ -1338,7 +1314,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         SafeUnsubscribeAll();
     }
 
-    public void WireBinSource(DrumTrack drum)
+    private void WireBinSource(DrumTrack drum)
     {
         _drum = drum;
         if (_drum == null) return;
@@ -1357,7 +1333,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         int target = Mathf.Max(1, shardCount);
         for (int i = 0; i < target; i++)
-            _phasePlanRoles.Add(activeRoles[i % activeRoles.Count]);
+            _phasePlanRoles.Add(activeRoles[(_shardsEjectedCount + i) % activeRoles.Count]);
 
     }
 
@@ -1557,27 +1533,29 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             if (_perPetalLayerStep <= 0) _perPetalLayerStep = 1;
         }
 
-        // Build a charge-sorted index list (descending: highest charge = lowest list index = highest sort order)
-        // We only need to sort once per frame, and previewRing is small (≤4 items).
+        // Sort shards by raw charge, but always place currentShardIndex on top.
+        // currentShardIndex is the single source of truth for which shard is active
+        // (highlight, sort, and eject all read it directly).
         int n = previewRing.Count;
-        // Simple insertion sort on small N
         var order = new int[n];
         for (int i = 0; i < n; i++) order[i] = i;
         for (int i = 1; i < n; i++)
         {
             int key = order[i];
             _starCharge.TryGetValue(previewRing[key].role, out float keyCharge);
+            float keyScore = (key == currentShardIndex) ? float.MaxValue : keyCharge;
             int j = i - 1;
             while (j >= 0)
             {
                 _starCharge.TryGetValue(previewRing[order[j]].role, out float jCharge);
-                if (jCharge <= keyCharge) break;
+                float jScore = (order[j] == currentShardIndex) ? float.MaxValue : jCharge;
+                if (jScore <= keyScore) break;
                 order[j + 1] = order[j];
                 j--;
             }
             order[j + 1] = key;
         }
-        // order[n-1] = index of highest-charge shard → gets top sorting order
+        // order[n-1] = currentShardIndex → gets top sorting order
         for (int rank = 0; rank < n; rank++)
         {
             int shardIdx = order[rank];
@@ -1586,8 +1564,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
             sr.sortingOrder = _baseSortingOrder + (rank * _perPetalLayerStep);
         }
 
-        // Sorting order only — dominance is resolved by ResolveDominantRoleFromCharge()
-        // which applies hysteresis and soft switch delta (BALANCE-E).
+        // Sorting order only — dominance is resolved by ResolveDominantRoleFromCharge().
     }
 
     private InstrumentTrack FindTrackByRole(MusicalRole role)
@@ -1643,15 +1620,20 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (previewRing == null || previewRing.Count == 0) return;
 
         int bestIdx = -1;
-        float bestCharge = -1f;
+        float bestScore = -1f;
 
         for (int i = 0; i < previewRing.Count; i++)
         {
             _starCharge.TryGetValue(previewRing[i].role, out float c);
-            if (c > bestCharge)
+            // Penalise the currently-highlighted shard by accumulated dwell time
+            // so rivals naturally take over after sustained dominance.
+            float score = (i == currentShardIndex)
+                ? c - _highlightDwellSec * highlightDwellPenaltyPerSec
+                : c;
+            if (score > bestScore)
             {
-                bestCharge = c;
-                bestIdx = i;
+                bestScore = score;
+                bestIdx   = i;
             }
         }
 
@@ -1659,28 +1641,17 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 
         if (currentShardIndex < 0 || currentShardIndex >= previewRing.Count)
         {
-            currentShardIndex = bestIdx;
-            activeShardVisual = previewRing[currentShardIndex].visual;
+            currentShardIndex  = bestIdx;
+            activeShardVisual  = previewRing[currentShardIndex].visual;
             return;
         }
 
         _starCharge.TryGetValue(previewRing[currentShardIndex].role, out float curCharge);
-        if (bestIdx != currentShardIndex)
+        float curScore = curCharge - _highlightDwellSec * highlightDwellPenaltyPerSec;
+        if (bestIdx != currentShardIndex && bestScore >= curScore + dominantRoleSwitchDelta)
         {
-            // [BALANCE-E] Soften the switch delta when the challenger is starving.
-            // A role the star hasn't fed on yet should flip dominance easily.
-            float effectiveDelta = dominantRoleSwitchDelta;
-            if (bestCharge < chargeTastedThreshold)
-            {
-                // Challenger is freshly encountered — almost no hysteresis needed.
-                effectiveDelta *= 0.15f;
-            }
-
-            if (bestCharge >= curCharge + effectiveDelta)
-            {
-                currentShardIndex = bestIdx;
-                activeShardVisual = previewRing[currentShardIndex].visual;
-            }
+            currentShardIndex = bestIdx;
+            activeShardVisual = previewRing[currentShardIndex].visual;
         }
     }
     public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
@@ -1826,7 +1797,7 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         var gen = gfm != null ? gfm.dustGenerator : null;
         if (gen != null)
         {
-            gen.RegrowPreviousCorridorOnNewNodeSpawn();
+//            gen.RegrowPreviousCorridorOnNewNodeSpawn();
         }
 
         _activeNode = node;
@@ -1871,18 +1842,9 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         if (previewRing == null || previewRing.Count == 0) return;
         if (!HasShardsRemaining()) return;
 
-        // At ejection, use the highest-charge shard directly — no hysteresis.
-        // This matches the sort order (highest on top) that the player reads as "what will fire."
-        int shardIdx = 0;
-        float bestEjectCharge = -1f;
-        for (int i = 0; i < previewRing.Count; i++)
-        {
-            _starCharge.TryGetValue(previewRing[i].role, out float c);
-            if (c > bestEjectCharge) { bestEjectCharge = c; shardIdx = i; }
-        }
-        // Snap the highlight to match so the visual is consistent post-eject.
-        currentShardIndex = shardIdx;
-        activeShardVisual = previewRing[shardIdx].visual;
+        // Eject whichever shard is currently highlighted — currentShardIndex is the
+        // authoritative "active" shard (dwell-penalty score, sort order, and highlight all agree).
+        int shardIdx = Mathf.Clamp(currentShardIndex, 0, previewRing.Count - 1);
         var shard = previewRing[shardIdx];
 
         MusicalRole ejectedRole = shard.role;
@@ -1894,7 +1856,6 @@ private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
         }
 
         _starCharge[ejectedRole] = 0f;
-        _tastedRoles.Remove(ejectedRole); // ejection spends the charge; role must re-earn its floor
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;

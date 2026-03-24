@@ -54,7 +54,7 @@ public class MidiVoice : MonoBehaviour
     /// Plays a normal note. Expects duration in TICKS (MPTK convention),
     /// converts to ms using drum BPM, and trims to the remaining audible window.
     /// </summary>
-    public void PlayNoteTicks(int note, int durationTicks, float velocity, bool trimToActiveWindow = true)
+    private void PlayNoteTicks(int note, int durationTicks, float velocity, bool trimToActiveWindow = true)
     {
         if (midiStreamPlayer == null || drumTrack == null || drumTrack.drumLoopBPM <= 0f)
         {
@@ -79,7 +79,6 @@ public class MidiVoice : MonoBehaviour
                 durationMs = Mathf.Min(durationMs, maxMs);
             }
         }
-        Debug.Log($"[MidiVoice] Playing note {note} ({durationMs} ms) using {preset}");
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
 
@@ -94,7 +93,6 @@ public class MidiVoice : MonoBehaviour
             Velocity = Mathf.Clamp(Mathf.RoundToInt(v127), 1, 127),
         };
 
-        Debug.Log($"[MIDIVoice] Playing note {note} on channel {channel} at {noteOn.Velocity} (raw={velocity}). trim={trimToActiveWindow} durMs={durationMs}");
         midiStreamPlayer.MPTK_PlayEvent(noteOn);
     }
 
@@ -108,36 +106,6 @@ public class MidiVoice : MonoBehaviour
         if (player != null) midiStreamPlayer = player;
     }
     
-
-
-    public void ScheduleNoteMs127(int note, int durationMs, int velocity127, double whenDSP)
-    {
-        if (midiStreamPlayer == null)
-        {
-            Debug.LogWarning("[MidiVoice] MIDI player is null; cannot schedule note.");
-            return;
-        }
-
-        midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
-        midiStreamPlayer.MPTK_Channels[channel].ForcedBank   = bank;
-
-        double now = AudioSettings.dspTime;
-        double sec = Mathf.Max(0f, (float)(whenDSP - now));
-        long delayMs = (long)Mathf.RoundToInt((float)(sec * 1000.0));
-
-        var ev = new MPTKEvent
-        {
-            Command  = MPTKCommand.NoteOn,
-            Value    = Mathf.Clamp(note, 0, 127),
-            Channel  = channel,
-            Duration = Mathf.Max(1, durationMs),
-            Velocity = Mathf.Clamp(velocity127, 1, 127),
-            Delay    = delayMs
-        };
-
-        midiStreamPlayer.MPTK_PlayEvent(ev);
-    }
-
     /// <summary>
     /// Temporary override program for one-shot FX without permanently changing the voice.
     /// </summary>

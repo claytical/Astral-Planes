@@ -52,56 +52,7 @@ private float   _totalLen;  // total curve length
 private int     _cachedCount = -1;
 private int     _cachedHash  = 0;
 
-private void RebuildArcLengthCacheIfNeeded()
-{
-    int n = _points != null ? _points.Length : 0;
-    if (n < 2)
-    {
-        _cumDist = null;
-        _totalLen = 0f;
-        _cachedCount = n;
-        _cachedHash = 0;
-        return;
-    }
-
-    // Lightweight "did the points change?" hash
-    // (good enough for runtime; avoids rebuilding every call)
-    unchecked
-    {
-        int h = 17;
-        // sample a few points to avoid O(n) hashing every time
-        int step = Mathf.Max(1, n / 8);
-        for (int k = 0; k < n; k += step)
-        {
-            var p = _points[k];
-            h = h * 31 + p.x.GetHashCode();
-            h = h * 31 + p.y.GetHashCode();
-            h = h * 31 + p.z.GetHashCode();
-        }
-
-        if (_cumDist != null && _cachedCount == n && _cachedHash == h && _totalLen > 0.0001f)
-            return; // cache still valid
-
-        _cachedCount = n;
-        _cachedHash = h;
-
-        if (_cumDist == null || _cumDist.Length != n)
-            _cumDist = new float[n];
-
-        _cumDist[0] = 0f;
-        float sum = 0f;
-
-        for (int i = 1; i < n; i++)
-        {
-            sum += Vector3.Distance(_points[i - 1], _points[i]);
-            _cumDist[i] = sum;
-        }
-
-        _totalLen = Mathf.Max(0.0001f, sum);
-    }
-}
-
-public Vector3 EvaluatePosition01(float t)
+    public Vector3 EvaluatePosition01(float t)
 {
     if (_points == null || _points.Length == 0)
         return (start ? start.position : transform.position);
@@ -137,12 +88,7 @@ public Vector3 EvaluatePosition01(float t)
         (-p0 + 3f * p1 - 3f * p2 + p3) * u3
     );
 }
-public float GetCurveLength()
-{
-    if (_points == null || _points.Length < 2) return 0f;
-    RebuildArcLengthCacheIfNeeded();
-    return _totalLen;
-}
+
     void Update()
 {
     // If either endpoint is missing, try to (re)acquire before destroying
@@ -200,7 +146,7 @@ public float GetCurveLength()
 
     EmitShimmer(Time.deltaTime);
 }
-private Vector3 ResolveEndWorldPosition()
+    private Vector3 ResolveEndWorldPosition()
 {
     if (end == null) return _lastEndWorld;
 
@@ -271,28 +217,10 @@ private Vector3 ResolveEndWorldPosition()
         // ✅ Make sure we actually have a PS ready
         EnsureShimmer();
     }
-
-
     public void BindByStep(InstrumentTrack track, int step, NoteVisualizer viz) {
         boundTrack = track; 
         boundStep  = step;
         boundVisualizer = viz;
-    }
-    public IEnumerator PulseToEnd(float seconds = 0.45f, System.Action onArrive = null)
-    {
-        // animate a bright tip running along the gradient
-        float t = 0f;
-        while (t < seconds)
-        {
-            t += Time.deltaTime;
-            float u = Mathf.Clamp01(t / seconds);
-            ApplyHeadGlow(u, 0.15f);
-            yield return null;
-        }
-        onArrive?.Invoke();
-        // fade out the whole line
-        yield return StartCoroutine(FadeOut(fadeAfterSeconds));
-        Destroy(gameObject);
     }
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
     {
@@ -392,7 +320,7 @@ private Vector3 ResolveEndWorldPosition()
             _shimmerPS.Emit(ep, 1);
         }
     }
-private void RebuildCurve()
+    private void RebuildCurve()
 {
     Vector3 aW = start.position;
     Vector3 dW = ResolveEndWorldPosition();
@@ -504,61 +432,5 @@ private void RebuildCurve()
     _lr.positionCount = _points.Length;
     _lr.SetPositions(_points);
 }
-    private void ApplyHeadGlow(float head, float headSpan)
-    {
-        // Build a gradient that brightens the leading segment [head-headSpan, head]
-        Gradient g = new Gradient();
-        var cks = new List<GradientColorKey>();
-        var aks = new List<GradientAlphaKey>();
-
-        for (int i = 0; i < 6; i++)
-        {
-            float t = i / 5f;
-            Color c = baseColor;
-            float a = baseColor.a;
-            litColor = Color.Lerp(c, litColor, .5f);
-            if (t <= head && t >= Mathf.Max(0, head - headSpan))
-            {
-                float k = Mathf.InverseLerp(head - headSpan, head, t);
-                c = Color.Lerp(baseColor, litColor, k * 0.9f + 0.1f);
-                a = Mathf.Lerp(baseColor.a, 1f, Mathf.Max(.25f, k));
-            }
-
-            cks.Add(new GradientColorKey(c, t));
-            aks.Add(new GradientAlphaKey(a, t));
-        }
-
-        g.SetKeys(cks.ToArray(), aks.ToArray());
-        _lr.colorGradient = g;
-    }
-    private void UpdateGradient(Color color, float alpha)
-    {
-        var g = new Gradient();
-        g.SetKeys(
-            new []
-            {
-                new GradientColorKey(color,0f),
-                new GradientColorKey(color,1f)
-            },
-            new []
-            {
-                new GradientAlphaKey(alpha,0f),
-                new GradientAlphaKey(alpha,1f)
-            }
-        );
-        _lr.colorGradient = g;
-    }
-    private IEnumerator FadeOut(float seconds)
-    {
-        float t = 0f;
-        while (t < seconds)
-        {
-            t += Time.deltaTime;
-            float a = Mathf.Lerp(baseColor.a, 0f, t / seconds);
-            UpdateGradient(baseColor, a);
-            _lr.widthMultiplier = Mathf.Lerp(baseWidth, 0f, t / seconds);
-            yield return null;
-        }
-    }
 
 }

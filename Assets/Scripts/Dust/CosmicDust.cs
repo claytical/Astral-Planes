@@ -76,22 +76,6 @@ public class CosmicDust : MonoBehaviour {
         [Range(0f, 1f)] public float hardness01; // 0 = soft/easy, 1 = hard/needs more boost
 
     }
-    private readonly struct PhaseDustConfig
-    {
-        public readonly float drainMul;
-        public readonly float lateral;
-        public readonly float turb;
-
-        public PhaseDustConfig(
-            float drainMul,
-            float lateral,
-            float turb)
-        {
-            this.drainMul   = drainMul;
-            this.lateral    = lateral;
-            this.turb       = turb;
-        }
-    }
     [SerializeField] private DustVisualSettings visual = new DustVisualSettings
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
@@ -142,7 +126,6 @@ public class CosmicDust : MonoBehaviour {
     [SerializeField] private float noseCompressBoostBonus = 0.20f;
     private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
     private Vector3 _dustSpriteBaseLocalPos;
-    private Vector3 _noseVisualScale = Vector3.one;
     private Vector3 _noseVisualOffsetLocal = Vector3.zero;
     private Vector2 _noseCompressDirWorld = Vector2.up;
     private float _noseCompressTarget01 = 0f;
@@ -365,7 +348,6 @@ private Coroutine _jiggleRoutine;
     // Restore to lifecycle-owned base scale/position, not hardcoded visible scale.
     if (_noseCompressCurrent01 <= 0.0001f)
     {
-        _noseVisualScale = _dustSpriteBaseVisualScale;
         _noseVisualOffsetLocal = Vector3.zero;
         srt.localScale = _dustSpriteBaseVisualScale;
         srt.localPosition = _dustSpriteBaseLocalPos;
@@ -502,11 +484,12 @@ private Coroutine _jiggleRoutine;
         {
             SetTerrainColliderEnabled(false);
             if (gen != null)
-                gen.OnDustDrainedBelowThreshold(this);
+                gen.ResetDustToNoneInPlace(this);
         }
 
         return take;
     }
+    
     public void Begin()
     {
         if (!gameObject.activeInHierarchy)
@@ -541,12 +524,6 @@ private Coroutine _jiggleRoutine;
         // Consume override so normal spawns aren't affected later
         _growInOverride = -1f;
     }
-    /// <summary>Re-applies _currentTint through ApplyDisplayedTint (e.g. after lifting regrowAlphaCapped).</summary>
-    public void RefreshDisplayedTint()
-    {
-        ApplyDisplayedTint(_currentTint);
-    }
-
     /// <summary>
     /// Syncs both the sprite renderer AND the particle system to _currentTint.
     /// Call after ApplyRoleAndCharge when the cell is already live (not growing in),
@@ -577,7 +554,6 @@ private Coroutine _jiggleRoutine;
             visual.sprite.color = applied;
         }
     }
-
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
         _currentTint = tint;
@@ -587,13 +563,11 @@ private Coroutine _jiggleRoutine;
         if (!_tintPulseActive || applyImmediatelyIfNoPulse)
             ApplyDisplayedTint(_currentTint);
     }
-
     private void RestoreDisplayToBaseTint()
     {
         _tintPulseActive = false;
         ApplyDisplayedTint(_currentTint);
     }
-
     private void CancelTintPulse(bool restoreToBase)
     {
         _tintPulseToken++;
@@ -626,7 +600,6 @@ private Coroutine _jiggleRoutine;
 
         col.enabled = true;
     }
-
     public void SetGrowInDuration(float seconds)
     {
         _growInOverride = Mathf.Max(0.05f, seconds);
@@ -925,7 +898,8 @@ private Coroutine _jiggleRoutine;
 
     _emissionMulRoutine = StartCoroutine(LerpEmissionMultiplier(_emissionMulCurrent, targetMul, seconds));
 }
-    public void SetVisualsEnabled(bool enabled)
+
+    private void SetVisualsEnabled(bool enabled)
 {
     // In the simplified model, we only toggle sprite visibility.
     // Particles stay enabled; their "presence" is driven by emission rate (SetEmissionMultiplier).
@@ -939,14 +913,24 @@ private Coroutine _jiggleRoutine;
         if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
+        // Jiggle resumes after bridge root-reactivation and overwrites the zero scale set below.
+        // Must be stopped here (not just in PrepareForReuse) because HideVisualsInstant is called
+        // for solid cells that may never go through PrepareForReuse if they aren't in the new maze.
+        if (_jiggleRoutine != null) { StopCoroutine(_jiggleRoutine); _jiggleRoutine = null; }
+        CancelTintPulse(restoreToBase: false);
 
         // Disable collisions immediately.
         SetTerrainColliderEnabled(false);
 
         // Hide sprite (authoritative for "solid" dust).
+        // Use SetBaseSpriteScale(zero) instead of directly writing transform.localScale so that
+        // _dustSpriteBaseVisualScale is also zeroed. TickVehicleCompression (Update) reads
+        // _dustSpriteBaseVisualScale and writes it to srt.localScale every frame; if only the
+        // transform is zeroed here, TickVehicleCompression will immediately restore a non-zero
+        // scale after RestoreNonCoralRenderersAfterBridge re-enables the SpriteRenderer.
         if (visual.sprite != null)
         {
-            visual.sprite.transform.localScale = Vector3.zero;
+            SetBaseSpriteScale(Vector3.zero);
             visual.sprite.enabled = false;
         }
 
@@ -1011,7 +995,7 @@ private Coroutine _jiggleRoutine;
     _tintPulseRoutine = StartCoroutine(ChargeTintPulseRoutine(token, kFadeIn, kFadeOut));
 }
 
-private IEnumerator ChargeTintPulseRoutine(int token, float fadeIn, float fadeOut)
+    private IEnumerator ChargeTintPulseRoutine(int token, float fadeIn, float fadeOut)
 {
     _tintPulseActive = true;
 
@@ -1058,7 +1042,7 @@ private IEnumerator ChargeTintPulseRoutine(int token, float fadeIn, float fadeOu
     }
 }
 
-private void TriggerDenyTintPulse(float seconds = -1f)
+    private void TriggerDenyTintPulse(float seconds = -1f)
 {
     float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
     if (dur <= 0f) return;
@@ -1070,7 +1054,7 @@ private void TriggerDenyTintPulse(float seconds = -1f)
     _tintPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
 }
 
-private IEnumerator DenyTintPulseRoutine(int token, float seconds)
+    private IEnumerator DenyTintPulseRoutine(int token, float seconds)
 {
     if (seconds <= 0f) yield break;
 
@@ -1142,7 +1126,7 @@ private IEnumerator DenyTintPulseRoutine(int token, float seconds)
     _jiggleRoutine = StartCoroutine(JiggleRoutine());
 }
 
-private IEnumerator JiggleRoutine()
+    private IEnumerator JiggleRoutine()
 {
     const float duration  = 0.28f;
     const float frequency = 28f;   // oscillations per second
@@ -1317,13 +1301,7 @@ private IEnumerator JiggleRoutine()
         }
 
     }
-    private float TicksToSecondsApprox(int ticks)
-    {
-        if (_drumTrack == null || _drumTrack.drumLoopBPM <= 0f)
-            return 0.12f;
 
-        return ticks * (60f / (_drumTrack.drumLoopBPM * 480f));
-    }
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {
         // Shader is retired; interpret workSigned01 as:

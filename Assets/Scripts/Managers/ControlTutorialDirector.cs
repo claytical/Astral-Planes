@@ -7,7 +7,7 @@ public class ControlTutorialDirector : MonoBehaviour
 {
     public static ControlTutorialDirector Instance { get; private set; }
 
-    public enum PrimaryMode
+    private enum PrimaryMode
     {
         Hidden,
         PressAnyAuto,
@@ -294,24 +294,7 @@ public class ControlTutorialDirector : MonoBehaviour
         if (!_primaryTutorialRunning || !primaryInstance) return;
         primaryInstance.SkipCurrentTimedStep();
     }
-
-    public bool AdvancePrimaryTutorial()
-    {
-        if (!_primaryTutorialRunning || !primaryInstance) return true;
-
-        // Manual advance (fallback / debug)
-        bool done = primaryInstance.AdvanceTutorial(immediate: false);
-        if (done)
-        {
-            _primaryTutorialRunning = false;
-            primaryInstance.HideAndClear(immediate: true);
-
-            if (GameFlowManager.Instance != null)
-                GameFlowManager.Instance.BeginGameAfterTutorial();
-        }
-        return done;
-    }
-
+    
     public void HidePrimary()
     {
         _desiredMode = PrimaryMode.Hidden;

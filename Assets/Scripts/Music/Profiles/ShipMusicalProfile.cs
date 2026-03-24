@@ -22,10 +22,7 @@ public class ShipMusicalProfile : ScriptableObject
     public float stopSpeed = 0.03f;
     public float stopAngularSpeed = 5f;
     public float inputDeadzone = 0.20f;
-
-    [Header("Environment Bias")]
-    [Range(0.5f,1f)] public float envScaleFloor = 0.60f; // dust can't slow below this
-
+    
     [Header("Dust Carving (Boost)")]
     [Tooltip("Carve radius multiplier when boosting. 1 = default.")]
     [Range(0.25f, 3f)] public float carveRadiusMul = 1.0f;

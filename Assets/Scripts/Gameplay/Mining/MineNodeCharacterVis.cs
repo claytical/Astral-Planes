@@ -10,7 +10,6 @@ public class MineNodeCharacterVis : MonoBehaviour
 
     [Header("Thinking (at intersections / planning)")]
     [SerializeField] float frenzySpinDegPerSec = 480f;   // fast spin while “deciding”
-    [SerializeField] Vector2 thinkBurstRange = new Vector2(0.12f, 0.25f); // sec
     [SerializeField] float thinkDampen = 7f;             // how quickly spin eases if planning stalls
 
     [Header("Swimming (on-rails wobble)")]

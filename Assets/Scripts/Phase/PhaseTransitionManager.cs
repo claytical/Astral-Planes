@@ -9,7 +9,7 @@ public class PhaseTransitionManager : MonoBehaviour
     [SerializeField] private bool holdOnLastChapter = false;
 
     // Phase index replaces MazeArchetype. Stub property kept for BridgeOrchestration compat.
-    public int currentPhaseIndex  { get; private set; } = -1;
+    private int currentPhaseIndex  { get; set; } = -1;
     public int previousPhaseIndex { get; private set; } = -1;
     public MazeArchetype currentPhase => MazeArchetype.Windows; // compat stub — remove when MazeArchetype is fully gone
 
@@ -159,7 +159,7 @@ public class PhaseTransitionManager : MonoBehaviour
         ConfigureTracksForCurrentPhaseAndMotif();
     }
 
-    public void ConfigureTracksForCurrentPhaseAndMotif()
+    private void ConfigureTracksForCurrentPhaseAndMotif()
     {
         var gfm = GameFlowManager.Instance;
         if (gfm == null || noteSetFactory == null) return;

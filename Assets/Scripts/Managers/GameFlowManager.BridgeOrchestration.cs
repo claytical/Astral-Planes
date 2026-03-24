@@ -16,9 +16,15 @@ public partial class GameFlowManager
         GhostCycleInProgress = true;
         BridgePending = true;
         FreezeGameplayForBridge();
-        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
+        // Stop regrowth coroutines BEFORE deactivating activeDustRoot so StopCoroutine
+        // calls inside HideVisualsInstant execute on active objects. Calling HardStop after
+        // SetBridgeCinematicMode(true) deactivates the root, which causes StopCoroutine to
+        // silently fail — handles are nulled but coroutines remain in flight. Those orphaned
+        // coroutines resume when the root is re-enabled and run scale ramps to completion,
+        // producing "sprite visible / emission off" artifacts at the next motif start.
         if (dustGenerator != null)
             dustGenerator.HardStopRegrowthForBridge(hideTransientDust: true);
+        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
 
         // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
         var allTracks = (controller?.tracks != null)
@@ -63,7 +69,7 @@ public partial class GameFlowManager
             yield return new WaitForSeconds(motifBridgeSec);
         }
 
-        // Advance motif — this calls BeginNewMotif() which clears track state.
+        // Advance motif — StartNextMotifInPhase calls controller.BeginNewMotif which clears track state.
         yield return StartCoroutine(StartNextMotifInPhase());
 
         SetBridgeCinematicMode(false); // restore maze, dust, vehicles
@@ -80,7 +86,11 @@ public partial class GameFlowManager
             dustGenerator.ResumeRegrowthAfterBridge();
         // 0) Hard reset only ONCE per motif boundary
         _motifStartTime = Time.time; // stamp before clearing tracks so coral height is correct
-        noteViz?.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
+        // Full controller reset: clears persistentLoopNotes, _binNoteSets, burst state, step cursors,
+        // calls DrumTrack.ResetBeatSequencingState, and internally calls noteViz.BeginNewMotif_ClearAll.
+        // Previously only noteViz.BeginNewMotif_ClearAll was called here, leaving stale track state
+        // that caused the ascension cohort to arm against old notes (stuck/unreleased note bug).
+        controller?.BeginNewMotif("MotifBridge");
 
         if (phaseTransitionManager == null)
         {
@@ -109,76 +119,7 @@ public partial class GameFlowManager
         // Motif advanced within same chapter: rebuild world only (no extra reset)
         yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
     }
-
-    /// <summary>
-    /// Averages the stick input from all active LocalPlayers for use in coral bridge steering.
-    /// Returns Vector2.zero if no players are present. Result is clamped to magnitude 1.
-    /// </summary>
-    private Vector2 ReadAveragedSteer()
-    {
-        if (localPlayers == null || localPlayers.Count == 0) return Vector2.zero;
-        Vector2 sum = Vector2.zero;
-        int n = 0;
-        foreach (var lp in localPlayers)
-        {
-            if (lp == null) continue;
-            sum += lp.GetMoveInput();
-            n++;
-        }
-
-        return n > 0 ? Vector2.ClampMagnitude(sum / n, 1f) : Vector2.zero;
-    }
-
-    private IEnumerator FadeSpiralCoralAlpha(Transform root, float target, float seconds)
-    {
-        if (root == null) yield break;
-
-        var meshRs = root.GetComponentsInChildren<MeshRenderer>(includeInactive: true);
-        var startA = new Dictionary<MeshRenderer, float>(meshRs.Length);
-
-        foreach (var mr in meshRs)
-        {
-            if (!mr) continue;
-            var mat = mr.material;
-            if (!mat || !mat.HasProperty("_Color")) continue;
-            startA[mr] = mat.color.a;
-        }
-
-        float t = 0f;
-        while (t < seconds)
-        {
-            if (root == null) yield break;
-            t += Time.deltaTime;
-            float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / Mathf.Max(0.0001f, seconds)));
-
-            foreach (var kvp in startA)
-            {
-                var mr = kvp.Key;
-                if (!mr) continue;
-                var mat = mr.material;
-                if (!mat || !mat.HasProperty("_Color")) continue;
-
-                var c = mat.color;
-                c.a = Mathf.Lerp(kvp.Value, target, u);
-                mat.color = c;
-            }
-
-            yield return null;
-        }
-
-        // final snap
-        foreach (var kvp in startA)
-        {
-            var mr = kvp.Key;
-            if (!mr) continue;
-            var mat = mr.material;
-            if (!mat || !mat.HasProperty("_Color")) continue;
-            var c = mat.color;
-            c.a = target;
-            mat.color = c;
-        }
-    }
-
+    
     private MotifSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum)
     {
         var snapshot = new MotifSnapshot { Timestamp = Time.time };
@@ -299,6 +240,14 @@ public partial class GameFlowManager
     private void FreezeGameplayForBridge()
     {
         CleanupAllNoteTethers();
+
+        // Clear any notes the player collected but hasn't released yet.
+        // Stale _pendingNotes entries (collectable destroyed) block TickNoteTrail
+        // from computing a non-zero pulse01, so the vehicle ring never highlights
+        // in the new motif.
+        if (vehicles != null)
+            foreach (var v in vehicles)
+                if (v != null) v.ClearPendingNotesForBridge();
 
         // Despawn collectables
         foreach (var c in FindObjectsOfType<Collectable>())

@@ -5,7 +5,6 @@ using UnityEngine;
 public class ChordProgressionProfile : ScriptableObject
 {
     public string progressionName = "I–IV–V";
-    public float beatsPerChord = 4f;
     public List<Chord> chordSequence = new();
 }
 

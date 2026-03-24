@@ -13,7 +13,6 @@ public class DrumTrack : MonoBehaviour
     private bool _hasLastPlayAreaForTileCache = false;
     public GameObject phaseStarPrefab;
     public GameObject mineNodePrefab;
-    private MotifProfile _pendingMotif;
     private float _pendingBpm;
     private int _pendingTotalSteps;
     private bool _pendingTimingValid;
@@ -142,7 +141,7 @@ public class DrumTrack : MonoBehaviour
 	/// Returns the world-space play area used to map SpawnGrid cells to world positions.
 	/// The play area is the visible camera region, clipped so it does not overlap the NoteVisualizer.
 	/// </summary>
-	public PlayArea GetPlayAreaWorld()
+    private PlayArea GetPlayAreaWorld()
 	{
 		TryGetPlayAreaWorld(out var area);
 		return area;
@@ -355,7 +354,6 @@ public class DrumTrack : MonoBehaviour
         }
 
         // Defer timing changes until the swap actually commits.
-        _pendingMotif = motif;
         _pendingBpm = (motif != null) ? motif.bpm : drumLoopBPM;
         _pendingTotalSteps = (motif != null) ? motif.stepsPerLoop : totalSteps;
         _pendingTimingValid = true;
@@ -379,7 +377,6 @@ public class DrumTrack : MonoBehaviour
             totalSteps  = _motif.stepsPerLoop;
         }
 
-        _pendingMotif = null;
         _pendingTimingValid = false;
 
         Debug.Log(
@@ -418,7 +415,6 @@ public class DrumTrack : MonoBehaviour
             drumLoopBPM = _motif.bpm;
             totalSteps  = _motif.stepsPerLoop;
         }
-        _pendingMotif = null;
         _pendingTimingValid = false;
 
         EnsureDualDrumSources();
@@ -1113,7 +1109,7 @@ public class DrumTrack : MonoBehaviour
         Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
     }   
 
-public void RequestPhaseStar(Vector2Int? cellHint = null)
+    public void RequestPhaseStar(Vector2Int? cellHint = null)
 {
     if (_star != null)
     {
@@ -1204,24 +1200,7 @@ public void RequestPhaseStar(Vector2Int? cellHint = null)
         dust = null;
         return _dust != null && _dust.TryGetDustAt(cell, out dust);
     }
-
-    public int CarveTemporaryCellFromMineNode(
-        Vector3 worldPos,
-        float healDelaySeconds,
-        MusicalRole removedRoleOverride = MusicalRole.None,
-        int resolveRadiusCells = 0,
-        float appetiteMul = 1f)
-    {
-        if (_dust == null) return 0;
-
-        return _dust.CarveTemporaryCellFromMineNode(
-            worldPos,
-            healDelaySeconds, removedRoleOverride,
-            resolveRadiusCells,
-            appetiteMul
-        );
-    }
-
+    
     private sealed class OnDestroyRelay : MonoBehaviour  {
         public System.Action onDestroyed;
         private void OnDestroy() { try { onDestroyed?.Invoke(); } catch {} }

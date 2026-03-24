@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 2 Strokes
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
   patternType: 4
-  regrowDelay: 8
+  regrowDelay: 1
   clearBoxCount: 4
   clearBoxWidth: 5
   clearBoxHeight: 5

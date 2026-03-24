@@ -9,7 +9,7 @@ public class HideParentTextForChild : MonoBehaviour
     {
         if (childToWatch.transform.childCount > 0)
         {
-     Debug.Log($"[TUTORIAL] Hiding Parent Text");
+            Debug.Log($"[TUTORIAL] Hiding Parent Text");
             gameObject.SetActive(false);
         }
         else

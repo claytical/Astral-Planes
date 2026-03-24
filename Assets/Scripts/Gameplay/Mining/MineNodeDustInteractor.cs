@@ -6,8 +6,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 {
     private bool InsideDust { get; set; }
     private CosmicDust CurrentDust { get; set; }
-    public int dustPhysicsLayer = -1;
-
+   
     [Header("Multipliers while in dust (node-specific)")]
     [Tooltip("Clamp max speed while inside dust (multiplies your locomotion maxSpeed).")]
     public float speedCapMul = 0.9f;
@@ -15,190 +14,303 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
     public float extraBrake = 0.25f;
 
-    [Header("Carving")]
-    [Tooltip("Whether this node is allowed to carve dust into the maze grid.")]
-    public bool enableCarving = true;
-    
-    [Tooltip("How many grid cells wide the carved strip should be (1 = single cell, 3 = trench).")]
-    public int carveWidthCells = 1;
-    // === NEW: Maze carving hooks ===
     [Header("Maze Tinting")]
-    [Tooltip("If true, this node will tint adjacent dust with its MusicalRole as it moves through corridors.")]
-    public bool carveMaze = true; // kept as carveMaze to avoid breaking prefab references; controls tinting
+    [Tooltip("If true, this node flips any adjacent dust to its MusicalRole as it moves.")]
+    public bool carveMaze = true;
 
     [SerializeField] private float edgeHugForce = 2f;
 
+    // ---------------------------------------------------------------
+    // Role-hunter: BFS to find nearest dust cell not already our role,
+    // steer toward it, tint it on arrival.
+    // ---------------------------------------------------------------
+    [Header("Role Hunter")]
+    [Tooltip("Max BFS cells visited when searching for the nearest untinted dust cell.")]
+    [SerializeField] private int huntBfsBudget = 600;
+
+    [Tooltip("How strongly the hunt direction biases _carveDir in MineNode. 0 = no bias, 1 = full override.")]
+    [SerializeField, Range(0f, 1f)] private float huntDirWeight = 0.55f;
+
+    [Tooltip("Grid-cell radius around the node's current cell that counts as 'arrived' at the target.")]
+    [SerializeField] private int arrivalRadiusCells = 1;
+
+    [Tooltip("Seconds between retarget BFS ticks when no target is held.")]
+    [SerializeField] private float retargetInterval = 0.35f;
+
+    private bool       _hasHuntTarget;
+    private Vector2Int _huntTargetCell;
+    private Vector2    _huntDir;          // normalized world-space direction toward target
+    private float      _retargetTimer;
+
+    // BFS reuse buffers (shared; not re-entrant but FixedUpdate is single-threaded)
+    private readonly Queue<Vector2Int>   _bfsQueue   = new Queue<Vector2Int>(256);
+    private readonly HashSet<Vector2Int> _bfsVisited = new HashSet<Vector2Int>(256);
+
+    private static readonly Vector2Int[] kNeighbours4 =
+    {
+        new( 1, 0), new(-1, 0), new( 0, 1), new( 0,-1)
+    };
+
+    // ---------------------------------------------------------------
+    // Existing carve state
+    // ---------------------------------------------------------------
     private float carveIntervalSeconds = 0.08f;
-    private float carveAppetiteMul     = 1.0f;
-    private bool _ignoredDustCollisions = false;
+
     [Header("Dust Collision Ignore (MineNode only)")]
-    [SerializeField] private LayerMask dustTerrainMask;   // should include CosmicDust (layer 7)
+    [SerializeField] private LayerMask dustTerrainMask;
     [SerializeField] private float dustIgnoreQueryRadiusWorld = 2.0f;
     [SerializeField] private int dustIgnoreMaxHits = 32;
 
-    private readonly Collider2D[] _dustIgnoreHits = new Collider2D[64];
-    [SerializeField] private int dustLayerIndex = 7; // CosmicDust
-    private Collider2D[] _myColliders;
-    private readonly HashSet<int> _ignoredDustColliderIds = new HashSet<int>();
+    [SerializeField] private int dustLayerIndex = 7;
 
     private float _carveTimer;
-    private int _dustCellsCarved = 0;
+    private int   _dustCellsCarved = 0;
     private Rigidbody2D _rb;
-    private DrumTrack _drumTrack;
-    private MineNode _node;
-    private float _desiredSpeed = 0f;
-    private float _desiredSpeedFloor = 0.25f; // prevents cap collapsing to ~0
-    // Track which cells we've already carved so we don't burn budget twice on the same spot.
-    private readonly HashSet<Vector2Int> _carvedCells = new HashSet<Vector2Int>();
-    private bool _hasDustContactPoint;
+    private DrumTrack   _drumTrack;
+    private MineNode    _node;
+    private float _desiredSpeed     = 0f;
+    private float _desiredSpeedFloor = 0.25f;
+
+    private bool    _hasDustContactPoint;
     private Vector2 _lastDustContactPoint;
 
+    // ---------------------------------------------------------------
+    // Public API
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// World-space direction toward the current MusicalRole.None hunt target.
+    /// Returns Vector2.zero when no target is known. MineNode.FixedUpdate blends
+    /// this into _carveDir each tick.
+    /// </summary>
+    public Vector2 GetHuntDir() => _hasHuntTarget ? _huntDir : Vector2.zero;
+
+    /// <summary>Weight applied when blending hunt direction into _carveDir.</summary>
+    public float HuntDirWeight => huntDirWeight;
+    
     void Awake()
     {
-        _rb = GetComponent<Rigidbody2D>();
+        _rb          = GetComponent<Rigidbody2D>();
         if (_rb == null) TryGetComponent(out _rb);
-        _myColliders = GetComponentsInChildren<Collider2D>();
-        _node = GetComponent<MineNode>();
-        _drumTrack = (_node != null) ? _node.DrumTrack : null;
-        // MineNode now physically collides with dust walls so it stays in corridors naturally.
-        // Layer-wide dust collision ignore removed.
-
+        _node        = GetComponent<MineNode>();
+        _drumTrack   = (_node != null) ? _node.DrumTrack : null;
     }
 
     void FixedUpdate()
-{
-    if (_rb == null) return;
-    if (_drumTrack == null) return;
-
-    // ------------------------------------------------------------
-    // GRID AUTHORITY: determine dust from grid, not collisions
-    // ------------------------------------------------------------
-    Vector2 worldPos = _rb.position;
-    Vector2Int cell = _drumTrack.CellOf(worldPos);
-    bool inDust = _drumTrack.HasDustAt(cell);
-
-    // ------------------------------------------------------------
-    // DUST FEEL (optional but recommended)
-    // Physics is "feel", not authority
-    // ------------------------------------------------------------
-    if (inDust)
     {
-        // Speed cap
-        float desired = Mathf.Max(_desiredSpeed, _desiredSpeedFloor);
-        float cap = desired * Mathf.Max(0.05f, speedCapMul);
+        if (_rb == null || _drumTrack == null) return;
 
-        float speed = _rb.linearVelocity.magnitude;
-        if (speed > cap && speed > 0.0001f)
-            _rb.linearVelocity = _rb.linearVelocity.normalized * cap;
+        Vector2    worldPos = _rb.position;
+        Vector2Int cell     = _drumTrack.CellOf(worldPos);
+        bool       inDust   = _drumTrack.HasDustAt(cell);
 
-        // Extra braking
-        if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
+        // ---------------------------------------------------------------
+        // Dust feel (unchanged)
+        // ---------------------------------------------------------------
+        if (inDust)
         {
-            Vector2 brake = -_rb.linearVelocity * extraBrake;
-            _rb.AddForce(brake, ForceMode2D.Force);
+            float desired = Mathf.Max(_desiredSpeed, _desiredSpeedFloor);
+            float cap     = desired * Mathf.Max(0.05f, speedCapMul);
+            float speed   = _rb.linearVelocity.magnitude;
+
+            if (speed > cap && speed > 0.0001f)
+                _rb.linearVelocity = _rb.linearVelocity.normalized * cap;
+
+            if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
+                _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
         }
-    }
 
-    // ------------------------------------------------------------
-    // CARVING (Phase 3A)
-    // ------------------------------------------------------------
-    if (!carveMaze) return;
+        if (!carveMaze) return;
 
-    _carveTimer += Time.fixedDeltaTime;
-    if (_carveTimer < carveIntervalSeconds) return;
-    _carveTimer = 0f;
+        // ---------------------------------------------------------------
+        // None-hunter: retarget tick
+        // ---------------------------------------------------------------
+        _retargetTimer -= Time.fixedDeltaTime;
 
-    // Tint adjacent solid dust with this node's MusicalRole
-    var gen = GameFlowManager.Instance?.dustGenerator;
-    if (gen != null && _node != null)
-    {
+        // Validate existing target each tick (it might have been tinted by us or another node)
+        if (_hasHuntTarget && IsAlreadyNodeRole(_huntTargetCell))
+        {
+            _hasHuntTarget = false;
+            _retargetTimer = 0f; // retarget immediately
+        }
+
+        if (!_hasHuntTarget && _retargetTimer <= 0f)
+        {
+            _retargetTimer = retargetInterval;
+            HuntTick(cell);
+        }
+
+        // Refresh direction to target each frame (node is moving)
+        if (_hasHuntTarget)
+        {
+            RefreshHuntDir();
+
+            // Arrival check: if we're within arrivalRadiusCells of the target, tint it now
+            if (IsArrived(cell, _huntTargetCell))
+            {
+                TintTargetCell();
+                _hasHuntTarget = false;
+                _retargetTimer = 0f; // find next target immediately
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Carve interval: tint adjacent None-role neighbors
+        // ---------------------------------------------------------------
+        _carveTimer += Time.fixedDeltaTime;
+        if (_carveTimer < carveIntervalSeconds) return;
+        _carveTimer = 0f;
+
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null || _node == null) return;
+
         MusicalRole role = _node.GetImprintRole();
+
+        // Flip any adjacent dust to our role (including already-colored cells)
+        for (int dx = -1; dx <= 1; dx++)
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            var neighbor = cell + new Vector2Int(dx, dy);
+
+            if (!_drumTrack.HasDustAt(neighbor)) continue;
+            if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
+
+            gen.TintDustCellWithRole(neighbor, role);
+        }
+
+        // Edge-hugging (unchanged)
+        Vector2 edgeDir          = Vector2.zero;
+        int     dustNeighborCount = 0;
         for (int dx = -1; dx <= 1; dx++)
         for (int dy = -1; dy <= 1; dy++)
         {
             if (dx == 0 && dy == 0) continue;
             var neighbor = cell + new Vector2Int(dx, dy);
             if (_drumTrack.HasDustAt(neighbor))
-                gen.TintDustCellWithRole(neighbor, role);
+            {
+                edgeDir += new Vector2(dx, dy);
+                dustNeighborCount++;
+            }
         }
+        if (dustNeighborCount > 0)
+            _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
     }
 
-    // Edge-hugging: apply small force toward nearest dust wall
-    Vector2 edgeDir = Vector2.zero;
-    int dustNeighborCount = 0;
-    for (int dx = -1; dx <= 1; dx++)
-    for (int dy = -1; dy <= 1; dy++)
+    // ---------------------------------------------------------------
+    // Hunt BFS
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// BFS outward from <paramref name="fromCell"/>.
+    /// Traverses open (non-dust) cells; evaluates dust boundary cells for Role == None.
+    /// First None-role cell found is nearest — sets as hunt target.
+    /// </summary>
+    private void HuntTick(Vector2Int fromCell)
     {
-        if (dx == 0 && dy == 0) continue;
-        var neighbor = cell + new Vector2Int(dx, dy);
-        if (_drumTrack.HasDustAt(neighbor))
+        int w = _drumTrack.GetSpawnGridWidth();
+        int h = _drumTrack.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        _bfsQueue.Clear();
+        _bfsVisited.Clear();
+        _bfsQueue.Enqueue(fromCell);
+        _bfsVisited.Add(fromCell);
+
+        int visited = 0;
+        while (_bfsQueue.Count > 0 && visited < huntBfsBudget)
         {
-            edgeDir += new Vector2(dx, dy);
-            dustNeighborCount++;
+            var cell = _bfsQueue.Dequeue();
+            visited++;
+
+            for (int i = 0; i < kNeighbours4.Length; i++)
+            {
+                var nb = cell + kNeighbours4[i];
+                if (nb.x < 0 || nb.y < 0 || nb.x >= w || nb.y >= h) continue;
+                if (_bfsVisited.Contains(nb)) continue;
+                _bfsVisited.Add(nb);
+
+                if (!_drumTrack.HasDustAt(nb))
+                {
+                    _bfsQueue.Enqueue(nb); // open cell — traverse
+                    continue;
+                }
+
+                // Dust boundary: skip cells already our role
+                if (IsAlreadyNodeRole(nb)) continue;
+
+                // Found the nearest untinted dust cell
+                _hasHuntTarget  = true;
+                _huntTargetCell = nb;
+                RefreshHuntDir();
+                return;
+            }
         }
+
+        // No None-role dust reachable within budget — clear target
+        _hasHuntTarget = false;
     }
-    if (dustNeighborCount > 0)
+
+    private void RefreshHuntDir()
     {
-        edgeDir = edgeDir.normalized;
-        _rb.AddForce(edgeDir * edgeHugForce, ForceMode2D.Force);
+        Vector2 cellWorld = _drumTrack.GridToWorldPosition(_huntTargetCell);
+        Vector2 dir       = cellWorld - _rb.position;
+        if (dir.sqrMagnitude > 0.0001f)
+            _huntDir = dir.normalized;
     }
-}
+
+    private void TintTargetCell()
+    {
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null || _node == null) return;
+
+        MusicalRole role = _node.GetImprintRole();
+        gen.TintDustCellWithRole(_huntTargetCell, role);
+    }
+
+    private bool IsArrived(Vector2Int currentCell, Vector2Int targetCell)
+    {
+        int dx = Mathf.Abs(currentCell.x - targetCell.x);
+        int dy = Mathf.Abs(currentCell.y - targetCell.y);
+        return dx <= arrivalRadiusCells && dy <= arrivalRadiusCells;
+    }
+
+    private bool IsAlreadyNodeRole(Vector2Int gp)
+    {
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null || _node == null) return false;
+        if (!gen.TryGetCellGo(gp, out var go) || go == null) return false;
+        if (!go.TryGetComponent<CosmicDust>(out var dust)) return false;
+        return dust.Role == _node.GetImprintRole();
+    }
+
+    // ---------------------------------------------------------------
+    // Existing helpers (unchanged)
+    // ---------------------------------------------------------------
+
     private bool TryGetDustFromCollision(Collision2D coll, out CosmicDust dust)
     {
-        // Colliders are often on a child under a CosmicDust parent.
         dust = coll.collider != null ? coll.collider.GetComponentInParent<CosmicDust>() : null;
         return dust != null;
     }
-    private void OnCollisionEnter2D(Collision2D coll)
-    {
-        // MineNode now physically collides with dust walls (they act as corridor boundaries).
-        // No dust ignore — collisions are handled naturally by the physics engine.
-    }
-    private void OnCollisionStay2D(Collision2D coll)
-    {
-        // No dust ignore needed.
-    }
+
     private void OnCollisionExit2D(Collision2D coll)
     {
         if (!InsideDust || CurrentDust == null) return;
         if (!TryGetDustFromCollision(coll, out var dust) || dust != CurrentDust) return;
-
         InsideDust  = false;
         CurrentDust = null;
     }
-    private bool TryIgnoreDustCollider(Collider2D dustCol)
-    {
-        if (dustCol == null) return false;
-        if (dustCol.gameObject.layer != dustLayerIndex) return false;
-
-        int id = dustCol.GetInstanceID();
-        if (_ignoredDustColliderIds.Contains(id)) return true;
-
-        if (_myColliders == null || _myColliders.Length == 0)
-            _myColliders = GetComponentsInChildren<Collider2D>();
-
-        for (int i = 0; i < _myColliders.Length; i++)
-        {
-            var mineCol = _myColliders[i];
-            if (mineCol == null) continue;
-            Physics2D.IgnoreCollision(mineCol, dustCol, true);
-        }
-
-        _ignoredDustColliderIds.Add(id);
-        return true;
-    }
+    
     public void SetLevelAuthority(DrumTrack drumTrack)
     {
         _drumTrack = drumTrack;
     }
+
     public void SetDesiredSpeed(float desiredSpeed)
     {
         _desiredSpeed = Mathf.Max(0f, desiredSpeed);
     }
-    public void ConfigureCarving(float intervalSeconds, float appetiteMul)
-    {
-        carveIntervalSeconds = Mathf.Max(0.01f, intervalSeconds);
-        carveAppetiteMul     = Mathf.Max(0.05f, appetiteMul);
-    }
-    
+
+
 }

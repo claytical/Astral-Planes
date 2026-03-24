@@ -152,7 +152,6 @@ public static class ChordProgressionGenerator
         var asset = ScriptableObject.CreateInstance<ChordProgressionProfile>();
         asset.progressionName = name;
         asset.chordSequence = chords;
-        asset.beatsPerChord = beatsPerChord;
 
         string fileName = SanitizeFileName(name) + ".asset";
         string path = Path.Combine(folder, fileName).Replace("\\", "/");

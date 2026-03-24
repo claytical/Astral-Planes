@@ -557,13 +557,7 @@ private IEnumerator SpawnArrivalRoutine(
     if (wdir.sqrMagnitude > 0f) wdir.Normalize();
     return wdir;
 }
-    private void StartDustPocket()
-    {
-        if (!keepDustPocketOpen) return;
-        if (isTrappedInDust) return; // Jail model.
-        if (_dustPocketRoutine != null) return;
-        _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
-    }
+
     private void StopDustPocket()
     {
         if (_dustPocketRoutine != null)
@@ -578,52 +572,14 @@ private IEnumerator SpawnArrivalRoutine(
         Vector2Int gp = dt.WorldToGridPosition(worldPos);
         return dustGen.HasDustAt(gp);
     }
-    private void StartDustPocketRoutineIfNeeded()
-    {
-        if (!keepDustPocketOpen) return;
-        if (isTrappedInDust) return;
-        if (_dustPocketRoutine != null) return;
-        _dustPocketRoutine = StartCoroutine(DustPocketRoutine());
-    }
+   
     private void StopDustPocketRoutineIfRunning()
     {
         if (_dustPocketRoutine == null) return;
         StopCoroutine(_dustPocketRoutine);
         _dustPocketRoutine = null;
     }
-
-    private IEnumerator DustPocketRoutine()
-    {
-        // Uses DrumTrack as level authority.
-        while (true)
-        {
-            yield return new WaitForSeconds(Mathf.Max(0.02f, dustPocketTickSeconds));
-
-            if (!keepDustPocketOpen) continue;
-            if (isTrappedInDust) continue;                 // jail model
-            if (assignedInstrumentTrack == null) continue;
-
-            var dt = assignedInstrumentTrack.drumTrack;
-            if (dt == null) continue;
-
-            var gfm = GameFlowManager.Instance;
-            var dustGen = (gfm != null) ? gfm.dustGenerator : null;
-            if (dustGen == null) continue;
-
-            Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
-
-            // We intentionally do NOT gate on "still inside dust".
-            // Carving makes it "not dust" — but we still need to keep the pocket held open.
-            float hold = Mathf.Max(dustPocketTickSeconds * 2f, dustPocketHoldSeconds);
-
-            dustGen.ClaimTemporaryDiskForCollectable(
-                cur,
-                dustPocketRadiusWorld,
-                hold,
-                _dustClaimOwnerId,
-                priority: 50);
-        }
-    }
+    
     private void ReleaseDustPocket()
     {
         var gfm = GameFlowManager.Instance;
@@ -637,11 +593,7 @@ private IEnumerator SpawnArrivalRoutine(
         // You implement this on the dust generator:
        // dustGen.ReleaseTemporaryDiskHold(transform.position, radiusWorld, phaseNow);
     }
-    static bool IsCellReservedByOther(Vector2Int cell, Collectable self)
-    {
-        if (_reservedByCell.TryGetValue(cell, out var res) && res != null && res != self) return true;
-        return false;
-    }
+
 
     public static bool IsCellFreeStatic(Vector2Int cell)
     {
@@ -814,7 +766,8 @@ private IEnumerator SpawnArrivalRoutine(
         if (explode != null)
             explode.SetTint(track.trackColor, multiply: true);
     }
-    public void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
+
+    private void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
     {
         assignedNote              = note;
         noteDurationTicks         = duration;
@@ -860,90 +813,6 @@ private IEnumerator SpawnArrivalRoutine(
                 dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
         }
         Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
-    }
-    public void AttachTetherAtSpawn(Transform marker, GameObject tetherPrefabGO, Color trackColor, int durationTicksOrSteps, int anchorStep) {
-        var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
-        if (!assignedInstrumentTrack) {
-            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: assignedInstrumentTrack is null.");
-            return;
-        }
-        if (!viz) {
-            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: NoteVisualizer is null.");
-            return;
-        }
-        if (!tetherPrefabGO) {
-            Debug.LogWarning("[Collectable] AttachTetherAtSpawn aborted: tether prefab is null.");
-            return;
-        }
-        ribbonMarker = marker;
-        Debug.Log($"[Collectable] AttachTetherAtSpawn track={assignedInstrumentTrack.name} " +
-              $"baseStep={intendedStep} anchorStep={anchorStep} " +
-              $"marker={(marker ? marker.name : "(null)")}");
-    // --- Resolve anchorStep to an ABSOLUTE track step for expanded tracks ---
-    int resolvedStep = anchorStep;
-    try
-    {
-        int binSize  = Mathf.Max(1, assignedInstrumentTrack.BinSize());
-        int total    = Mathf.Max(binSize, assignedInstrumentTrack.GetTotalSteps());
-        int mult     = Mathf.Max(1, total / binSize); 
-        int local    = ((anchorStep % binSize) + binSize) % binSize; // normalize 0..binSize-1
-        // Prefer an intendedStep if it matches the same bin-local index.
-        if (intendedStep >= 0 && (intendedStep % binSize) == local && intendedStep < total)
-        {
-            resolvedStep = intendedStep;
-        }
-        else
-        {
-            // Otherwise pick the first bin that actually has a marker for (track, absStep)
-            bool found = false;
-            for (int b = 0; b < mult; b++)
-            {
-                int abs = b * binSize + local;
-                if (abs < 0 || abs >= total) continue;
-                if (viz.noteMarkers != null &&
-                    viz.noteMarkers.TryGetValue((assignedInstrumentTrack, abs), out var tr) && tr) {
-                    resolvedStep = abs;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                // Last resort: if anchorStep already lies in absolute range, keep it; else map to bin 0
-                if (anchorStep < 0 || anchorStep >= total) resolvedStep = local; // bin 0
-                Debug.LogWarning($"[Collectable] Anchor rebind fallback: track={assignedInstrumentTrack.name} " +
-                                 $"anchorStep={anchorStep}→{resolvedStep} (no existing marker found for expanded bins).");
-            }
-        } 
-    } 
-    catch (System.Exception ex)    { 
-        Debug.LogWarning($"[Collectable] Anchor step resolution failed; using anchorStep={anchorStep}. {ex.Message}");
-            resolvedStep = anchorStep;     
-    } 
-    if (tether != null)
-    {
-        // already attached; refresh binding
-        tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
-        tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
-        return;
-    }
-
-    var go = Instantiate(tetherPrefabGO);
-    go.name = $"Tether_{assignedInstrumentTrack.name}_s{resolvedStep}";
-    tether = go.GetComponent<NoteTether>();
-    if (!tether) tether = go.AddComponent<NoteTether>();
-
-    // Set endpoints immediately (even if marker is temporarily unresolved)
-    tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
-
-    // 🔑 Provide (track, step, viz) so the tether can re-find the marker if it’s not ready yet
-    tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
-
-    // Optional: keep world space (don’t parent under UI/canvas)
-    // go.transform.SetParent(null, worldPositionStays: true);
-
-    // Particle drip hookup if present
-    if (TryGetComponent(out CollectableParticles cp) && tether != null)
-        cp.RegisterTether(tether, pull: 0.7f);
     }
 
     void Start()
@@ -1355,7 +1224,7 @@ private IEnumerator SpawnArrivalRoutine(
         }
     }
 
-    public void BeginCarryAndDepositAtDsp(
+    private void BeginCarryAndDepositAtDsp(
         double depositDspTime,
         int durationTicks,
         float force,

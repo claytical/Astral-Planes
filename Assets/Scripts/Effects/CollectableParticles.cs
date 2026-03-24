@@ -5,7 +5,6 @@ public class CollectableParticles : MonoBehaviour
     public ParticleSystem particleSystem; // Assign in prefab
     public ParticleSystem coreParticleSystem;
     public ParticleSystem outlineParticleSystem;
-    private ParticleSystem.EmissionModule _emission;
     private NoteTether _tetherRef;
     [SerializeField] private float pullStrength = 0.7f;  // force toward tether
     [SerializeField] private float baseUpSpeed  = 0.35f; // fountain upward component
@@ -14,12 +13,6 @@ public class CollectableParticles : MonoBehaviour
     {
         if (particleSystem == null)
             particleSystem = GetComponentInChildren<ParticleSystem>();
-
-        if (particleSystem != null)
-        {
-            _emission = particleSystem.emission;
-        }
-
     }
     void LateUpdate()
     {

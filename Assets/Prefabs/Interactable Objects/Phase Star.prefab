@@ -4983,7 +4983,7 @@ MonoBehaviour:
   bubbleEdgeParticles: {fileID: 4946073270184364620}
   bubbleFillAlpha: 0.08
   bubbleEdgeAlpha: 0.35
-  dimShardTint: {r: 0.1792453, g: 0.1792453, b: 0.1792453, a: 0.38431373}
+  dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
 --- !u!114 &4631393831486629443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5035,9 +5035,10 @@ MonoBehaviour:
     gradMin: 0.02
   steering:
     maxAccel: 4
+    huntAccel: 18
   navBlend:
-    densityWeight: 0.6
-    snifferWeight: 0.35
+    densityWeight: 0.412
+    snifferWeight: 0.734
   verbose: 0
 --- !u!114 &4892159809986813886
 MonoBehaviour:
@@ -5052,13 +5053,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
   replanIntervalSeconds: 0.5
-  spokeCount: 8
-  spokeLength: 5
-  spokeSamples: 4
+  retargetOnTargetLost: 1
   snifferIntervalSeconds: 0.3
-  snifferBfsBudget: 60
   hungerFloorWeight: 0.15
-  verbose: 0
+  verbose: 1
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0

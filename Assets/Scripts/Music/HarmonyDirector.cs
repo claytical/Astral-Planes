@@ -92,14 +92,12 @@ public class HarmonyDirector : MonoBehaviour
         }
     }
 }
-
     void OnDestroy()
 {
     var ptm = GameFlowManager.Instance?.phaseTransitionManager;
     if (ptm != null)
         ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
 }
-
     private void HandlePhaseChangedBridgeAware()
 {
     // 1) If enabled, stage the motif's chord progression as the next profile.
@@ -136,7 +134,6 @@ public class HarmonyDirector : MonoBehaviour
             break;
     }
 }
-
     private System.Collections.IEnumerator CommitOnNextBoundary()
 {
     // Debounced: wait one full loop, then commit
@@ -149,8 +146,6 @@ public class HarmonyDirector : MonoBehaviour
 
     CommitNextChordNow();
 }
-
-
     public void SetActiveProfile(ChordProgressionProfile profile, bool applyImmediately)
     {
         if (profile == null) return;
@@ -192,7 +187,6 @@ public class HarmonyDirector : MonoBehaviour
         chord = profile.chordSequence[i];
         return true;
     }
-
     public int ProgressionLength
     {
         get
@@ -201,12 +195,10 @@ public class HarmonyDirector : MonoBehaviour
             return profile.chordSequence.Count;
         }
     }
-    
-    public void CommitNextChordNow() {
+    private void CommitNextChordNow() {
         Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
         _forceCommitNextBoundary = true;
     }
-
     private void ApplyChordToAllTracks(int chordIndex)
     {
         if (profile == null || GameFlowManager.Instance.controller == null || GameFlowManager.Instance.controller.tracks == null) return;
@@ -222,7 +214,6 @@ public class HarmonyDirector : MonoBehaviour
             tr.RetuneLoopToChord(chord); // <-- new helper on InstrumentTrack (below)
         }
     }
-    
     private void ResetLoopFlags()
     {
         _previewActiveThisLoop     = false;
@@ -230,7 +221,6 @@ public class HarmonyDirector : MonoBehaviour
         _heldThroughBoundary       = false;
         _ringsArmedThisLoop        = 0;
     }
-
     private void OnLoopBoundary()
     {
         if (profile == null || GameFlowManager.Instance.controller.tracks == null)
@@ -275,9 +265,5 @@ public class HarmonyDirector : MonoBehaviour
             return; // Important: skip the player-build step this boundary
         }
     }
-
-
-
-
-
+    
 }

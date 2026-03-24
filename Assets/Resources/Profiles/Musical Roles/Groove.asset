@@ -21,5 +21,5 @@ MonoBehaviour:
   mineNodeSpeed: 0.5
   mineNodeClearing: 0.3
   mineNodeAgility: 0.2
-  midiPreset: 2
+  midiPreset: 3
   allowedMidiPresets: 0c000000
