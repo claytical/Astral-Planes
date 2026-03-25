@@ -315,7 +315,10 @@ public class DrumTrack : MonoBehaviour
         _lastSpentTanksSample = -1f;
         _lastTotalSpentSample = -1f;
         _burnBaselineEma = 0f;
-        _lastIntensity01 = 0f;
+        // Preserve intensity when timing is identical — same BPM and step count means the drum
+        // clips loop at the same rate, so there's no perceptual discontinuity to reset from.
+        if (stepsChanged || bpmChanged)
+            _lastIntensity01 = 0f;
     }
     // else: same motif being reapplied; do NOT reset entry/intensity counters.
 

@@ -21,7 +21,6 @@ MonoBehaviour:
   rhythms: []
   chordFunctions: []
   chordsPerRegion: 2
-  loopsToAscend: 1
   behaviors: []
   maxBehaviorsStack: 2
   variation:
@@ -29,3 +28,5 @@ MonoBehaviour:
     octaveMoveProb: 0.1
     restProb: 0.1
     durJitter: 1
+  mineNodeTintBudget: 20
+  ascendLoops: 8

@@ -30,6 +30,7 @@ public class Vehicle : MonoBehaviour
     public float capacity = 10f;
     private float _baseBurnAmount = 1f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
+    private bool _boostCostFree;           // When true, boost ignores energy requirement and skips burn
     // === Arcade RB2D tuning ===
     [Header("Arcade Movement")]
     [SerializeField]
@@ -420,7 +421,7 @@ public class Vehicle : MonoBehaviour
         }
 
         // Fuel burn only while boosting (keeps your baseBurnAmount/burnRateMultiplier economy)
-        if (boosting && energyLevel > 0f)
+        if (boosting && energyLevel > 0f && !_boostCostFree)
         {
             float burn = _burnRateMultiplier * _baseBurnAmount * dt;
             ConsumeEnergy(burn);
@@ -1191,7 +1192,7 @@ public class Vehicle : MonoBehaviour
     public void DrainEnergy(float amount, string source = "Unknown")
 {
     if (amount <= 0f) return;
-
+    if (_boostCostFree) return; // free boost phase: skip all external energy drains
     ConsumeEnergy(amount);
 }
 
@@ -1304,10 +1305,15 @@ public class Vehicle : MonoBehaviour
                 activeTrail.GetComponent<TrailRenderer>().emitting = true; // Enable the trail's emission
             }
         }
+    public void SetBoostFree(bool free)
+    {
+        _boostCostFree = free;
+    }
+
     public void TurnOnBoost(float triggerValue)
     {
-        
-        if (energyLevel > 0 && !boosting)        {
+
+        if ((energyLevel > 0 || _boostCostFree) && !boosting)        {
             boosting = true;
 
             if (audioManager != null && thrustClip != null)

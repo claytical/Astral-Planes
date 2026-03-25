@@ -18,9 +18,9 @@ public class MineNode : MonoBehaviour
 
     [Header("Flee Behaviour")]
     [Tooltip("Vehicle must be within this radius (world units) to trigger a flee response.")]
-    [SerializeField] private float fleeRadiusWorld = 5f;
+    [SerializeField] private float fleeRadiusWorld = 8f;
     [Tooltip("How strongly the flee direction overrides the current carve direction.")]
-    [SerializeField, Range(0f, 1f)] private float fleeBlendWeight = 0.25f;
+    [SerializeField, Range(0f, 1f)] private float fleeBlendWeight = 0.65f;
 
     [Header("NoteSet-Driven Motion (Carving)")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
@@ -252,24 +252,6 @@ public class MineNode : MonoBehaviour
 
         _carveDir = bestDir.normalized;
     }
-    var vehicles = GameFlowManager.Instance?.localPlayers;
-    if (vehicles != null)
-    {
-        Vector2 myPos = _rb.position;
-        Vector2 flee = Vector2.zero;
-        float fleeRadiusSq = fleeRadiusWorld * fleeRadiusWorld;
-        foreach (var lp in vehicles)
-        {
-            var v = lp?.plane;
-            if (v == null) continue;
-            Vector2 away = myPos - (Vector2)v.transform.position;
-            float dSq = away.sqrMagnitude;
-            if (dSq < fleeRadiusSq && dSq > 0.001f)
-                flee += away / dSq; // inverse-square falloff
-        }
-        if (flee.sqrMagnitude > 0.001f)
-            _carveDir = Vector2.Lerp(_carveDir, flee.normalized, fleeBlendWeight).normalized;
-    }
     // --- NOTE-DRIVEN SPEED ---
     int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
 
@@ -296,6 +278,26 @@ public class MineNode : MonoBehaviour
             float w = _dustInteractor.HuntDirWeight;
             _carveDir = Vector2.Lerp(_carveDir, huntDir, w).normalized;
         }
+    }
+
+    // --- FLEE (applied last so nothing overrides it) ---
+    var nearPlayers = GameFlowManager.Instance?.localPlayers;
+    if (nearPlayers != null)
+    {
+        Vector2 myPos = _rb.position;
+        Vector2 flee = Vector2.zero;
+        float fleeRadiusSq = fleeRadiusWorld * fleeRadiusWorld;
+        foreach (var lp in nearPlayers)
+        {
+            var v = lp?.plane;
+            if (v == null) continue;
+            Vector2 away = myPos - (Vector2)v.transform.position;
+            float dSq = away.sqrMagnitude;
+            if (dSq < fleeRadiusSq && dSq > 0.001f)
+                flee += away / dSq; // inverse-square falloff
+        }
+        if (flee.sqrMagnitude > 0.001f)
+            _carveDir = flee.normalized; // full override — flee takes absolute priority
     }
 
     // --- CONTINUOUS STEERING FORCE ---
@@ -457,9 +459,17 @@ public class MineNode : MonoBehaviour
     {
         _depletedHandled = true;
 
-        // burst spawn: your existing call site is good; just make it depend on (_track, _noteSet)
-        var origin = transform.position;
+        var origin    = transform.position;
         var repelFrom = vehicle != null ? vehicle.transform.position : origin;
+
+        // Blast direction: away from the vehicle, same as collectable spread direction.
+        Vector2 blastDir = ((Vector2)(origin - repelFrom)).sqrMagnitude > 0.0001f
+            ? ((Vector2)(origin - repelFrom)).normalized
+            : Vector2.up;
+
+        var explode = GetComponent<Explode>();
+        if (explode != null) explode.SetBurstDirection(blastDir);
+
         _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10);
 
         TriggerExplosion();
@@ -471,6 +481,10 @@ public class MineNode : MonoBehaviour
         int stepNow = _drumTrack.currentStep;
         int note = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         _track.PlayNote127(note, 200, 0.5f);
+        if (GetComponent<Explode>() != null)
+        {
+            GetComponent<Explode>().PreExplode();
+        }
     }
     private IEnumerator CleanupAndDestroy()
     {
@@ -534,7 +548,7 @@ public class MineNode : MonoBehaviour
         _strength = Mathf.Max(0, _strength);
 
         float normalized = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
-        float scaleFactor = Mathf.Lerp(0.2f, 1.1f, normalized);
+        float scaleFactor = Mathf.Lerp(0.3f, 1.1f, normalized);
         StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
         // Deplete -> burst -> resolve
         if(_strength <= 0)

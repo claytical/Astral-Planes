@@ -46,4 +46,9 @@ public class RoleMotifNoteSetConfig : ScriptableObject
     [Tooltip("Number of CosmicDust cells this MineNode may tint before its budget is exhausted. 0 = unlimited.")]
     [Min(0)]
     public int mineNodeTintBudget = 20;
+
+    [Header("Note Ascension")]
+    [Tooltip("How many drum loops collected notes take to rise to the ascension line. 0 = use NoteAscensionDirector default.")]
+    [Min(0)]
+    public int ascendLoops = 0;
 }

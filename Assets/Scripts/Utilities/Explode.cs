@@ -30,6 +30,37 @@ public class Explode : MonoBehaviour
     multiplyWithAuthoredColor = multiply;
 }
 
+    private Vector2 _burstDir = Vector2.zero;
+
+    public void SetBurstDirection(Vector2 worldDir)
+    {
+        _burstDir = worldDir.sqrMagnitude > 0.0001f ? worldDir.normalized : Vector2.zero;
+    }
+
+    private void ApplyDirectionToInstance(GameObject instance, Vector2 dir)
+    {
+        if (instance == null || dir.sqrMagnitude < 0.0001f) return;
+
+        float angleDeg = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        var systems = instance.GetComponentsInChildren<ParticleSystem>(true);
+        foreach (var ps in systems)
+        {
+            // Rotate the particle system transform so the shape cone faces the burst direction.
+            ps.transform.rotation = Quaternion.Euler(0f, 0f, angleDeg - 90f);
+
+            // Bias velocity over lifetime along the burst direction.
+            var vol = ps.velocityOverLifetime;
+            if (vol.enabled)
+            {
+                vol.space = ParticleSystemSimulationSpace.World;
+                float spd = vol.x.constant;
+                float mag = Mathf.Max(Mathf.Abs(spd), 1f);
+                vol.x = new ParticleSystem.MinMaxCurve(dir.x * mag);
+                vol.y = new ParticleSystem.MinMaxCurve(dir.y * mag);
+            }
+        }
+    }
+
     private void ApplyTintToInstance(GameObject instance, Color tint)
 {
     if (!tintExplosions) return;
@@ -49,7 +80,17 @@ public class Explode : MonoBehaviour
 
         var col = ps.colorOverLifetime;
         if (col.enabled)
-            col.color = TintMinMaxGradient(tint, Color.white, multiplyWithAuthoredColor);
+        {
+            // Build a predictable white-to-transparent fade.
+            // startColor already carries the role tint; colorOverLifetime only needs to
+            // control the alpha fade so particles are always visible and always dissipate.
+            var fadeGrad = new Gradient();
+            fadeGrad.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
+            );
+            col.color = new ParticleSystem.MinMaxGradient(fadeGrad);
+        }
 
         if (tintTrails)
         {
@@ -130,6 +171,12 @@ public class Explode : MonoBehaviour
         for (int i = 0; i < ak.Length; i++)
             ak[i].alpha = Mathf.Clamp01(ak[i].alpha * tint.a);
 
+        // Guarantee the gradient fully dissipates when the authored tail reaches end-of-life.
+        // Requires at least 2 keys so we don't zero the only alpha key (which would hide
+        // particles entirely for their whole lifetime).
+        if (ak.Length >= 2 && ak[ak.Length - 1].time >= 0.99f)
+            ak[ak.Length - 1].alpha = 0f;
+
         var ng = new Gradient();
         ng.SetKeys(ck, ak);
         return ng;
@@ -158,7 +205,20 @@ public class Explode : MonoBehaviour
             }
         }
     }
-    
+
+    public void PreExplode()
+    {
+        if (preExplosion != null)
+        {
+            Debug.Log("[EXPLODE] PreExplode");
+            var go = Instantiate(preExplosion, transform.position, Quaternion.identity);
+            ApplyTintToInstance(go, explosionTint);
+            if (_burstDir.sqrMagnitude > 0.0001f)
+                ApplyDirectionToInstance(go, _burstDir);
+  
+        }
+
+    }
 
 
     public void Permanent(bool permanent = true)
@@ -178,6 +238,8 @@ public class Explode : MonoBehaviour
         {
             var go = Instantiate(explosion, transform.position, Quaternion.identity);
             ApplyTintToInstance(go, explosionTint);
+            if (_burstDir.sqrMagnitude > 0.0001f)
+                ApplyDirectionToInstance(go, _burstDir);
         }
 
 

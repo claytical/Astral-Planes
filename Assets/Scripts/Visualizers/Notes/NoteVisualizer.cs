@@ -1445,10 +1445,22 @@ public class NoteVisualizer : MonoBehaviour
             track,
             burstId,
             seconds,
-            GetMarkersForTrackAndBurst   // local helper — see [6]
+            GetMarkersForTrackAndBurst,
+            ResolveAscendLoopsForTrack(track)
         );
     }
-    
+
+    private int ResolveAscendLoopsForTrack(InstrumentTrack track)
+    {
+        if (track == null) return -1;
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif?.roleNoteConfigs == null) return -1;
+        foreach (var cfg in motif.roleNoteConfigs)
+            if (cfg != null && cfg.ascendLoops > 0 && cfg.role == track.assignedRole)
+                return cfg.ascendLoops;
+        return -1; // fall back to NoteAscensionDirector's inspector default
+    }
+
     /// <summary>
     /// Defensive cleanup: removes the marker at stepAbs for the given track if it is not
     /// currently in the persistent loop and is not mid-ascension. Used after a discard to

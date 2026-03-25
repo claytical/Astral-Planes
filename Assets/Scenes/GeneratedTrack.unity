@@ -217,7 +217,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NoteAscensionDirector
   lineOfAscent: {fileID: 423220218}
   ascendLoops: 8
-  ascendPaddingSeconds: 0.15
   ascendLineWorldPadding: 0
   firstPlayConfirmEmitCount: 6
   lineChargeDecaySpeed: 0.5
@@ -15432,8 +15431,6 @@ MonoBehaviour:
     type: 3}
   collectableParent: {fileID: 342701840}
   ascensionCohort:
-    windowStartInclusive: 0
-    windowEndExclusive: 0
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 0
@@ -15570,7 +15567,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 120}
+  m_AnchoredPosition: {x: 0, y: 140}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1001 &480221059
@@ -15978,8 +15975,6 @@ MonoBehaviour:
     type: 3}
   collectableParent: {fileID: 627412778}
   ascensionCohort:
-    windowStartInclusive: 0
-    windowEndExclusive: 0
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 1
@@ -16105,8 +16100,6 @@ MonoBehaviour:
     type: 3}
   collectableParent: {fileID: 652946507}
   ascensionCohort:
-    windowStartInclusive: 0
-    windowEndExclusive: 0
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 3
@@ -17260,8 +17253,6 @@ MonoBehaviour:
     type: 3}
   mineNodePrefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8,
     type: 3}
-  phasePersonalityRegistry: {fileID: 11400000, guid: 327ccf1a269cd475eb42b24d454c63ce,
-    type: 2}
   logBeatSeqGates: 1
   sessionBurnEmaAlpha: 0.25
   burnMultipleAtFullIntensity: 2.5
@@ -18527,8 +18518,6 @@ MonoBehaviour:
     type: 3}
   collectableParent: {fileID: 1690824281}
   ascensionCohort:
-    windowStartInclusive: 0
-    windowEndExclusive: 0
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 2
