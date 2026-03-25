@@ -24,6 +24,26 @@ public partial class GameFlowManager
         // producing "sprite visible / emission off" artifacts at the next motif start.
         if (dustGenerator != null)
             dustGenerator.HardStopRegrowthForBridge(hideTransientDust: true);
+
+        // --- Final loop: player hears their creation; dust fades away; boost is free ---
+        float finalLoopSec = (controller != null)
+            ? Mathf.Max(1f, controller.GetEffectiveLoopLengthInSeconds())
+            : Mathf.Max(1f, motifBridgeHoldSeconds);
+
+        if (dustGenerator != null)
+            dustGenerator.BeginSlowFadeAllDust(finalLoopSec);
+
+        if (vehicles != null)
+            foreach (var v in vehicles)
+                v?.SetBoostFree(true);
+
+        yield return new WaitForSeconds(finalLoopSec);
+
+        if (vehicles != null)
+            foreach (var v in vehicles)
+                v?.SetBoostFree(false);
+        // --- End final loop ---
+
         SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
 
         // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.

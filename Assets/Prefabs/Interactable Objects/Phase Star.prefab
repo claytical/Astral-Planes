@@ -4928,8 +4928,7 @@ MonoBehaviour:
     type: 3}
   soloVoice: {fileID: 0}
   entryOffscreenMargin: 2
-  chargeTastedThreshold: 0.12
-  chargeDecayFloor: 0.08
+  highlightDwellPenaltyPerSec: 0.15
   entryArriveThreshold: 1.5
   entryFadeInSeconds: 0.6
   pokeChargeThreshold: 0.24
@@ -4939,6 +4938,7 @@ MonoBehaviour:
   cravingNavigator: {fileID: 4892159809986813886}
   disarmedPushScale: 0.1
   _tracePhaseStar: 1
+  flowerAlternateRotation: 1
   bubbleTint: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 0.2}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   passiveChargeDecayPerSec: 0
@@ -5054,7 +5054,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
   replanIntervalSeconds: 0.5
   retargetOnTargetLost: 1
-  snifferIntervalSeconds: 0.3
+  snifferIntervalSeconds: 2
   hungerFloorWeight: 0.15
   verbose: 1
 --- !u!58 &1335835332103871931

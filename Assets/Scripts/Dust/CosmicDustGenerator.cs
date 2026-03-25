@@ -1591,18 +1591,55 @@ public class CosmicDustGenerator : MonoBehaviour
         float fadeSeconds = 0.10f,
         float regrowDelaySeconds = -1f)
     {
-        // 1) Clear ONLY the center cell (the "jail cell" the note occupies).
+        // 1) Clear center cell (the "jail cell" the note occupies).
         ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds);
 
-        // 2) Claim ONLY the center so it stays empty while jailed.
+        // 2) Claim center so it stays empty while jailed.
         if (dustClaims != null && holdSeconds > 0f)
         {
             string owner = $"Collectable#{ownerId}";
             dustClaims.ClaimCell(owner, gpCenter, DustClaimType.TemporaryCarve, seconds: holdSeconds, refresh: true);
         }
+
+        // 3) Also clear the 4 cardinal neighbors so collectables get a visible pocket, not a trapped spawn.
+        float neighborRegrow = regrowDelaySeconds >= 0f ? regrowDelaySeconds : holdSeconds;
+        var neighbors = new Vector2Int[] { new(1,0), new(-1,0), new(0,1), new(0,-1) };
+        foreach (var n in neighbors)
+        {
+            var np = gpCenter + n;
+            if (!IsInBounds(np)) continue;
+            if (!HasDustAt(np)) continue;
+            ClearCell(np, mode, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: neighborRegrow);
+        }
     }
 
-    
+    /// <summary>
+    /// Gradually dissolves all solid dust cells over <paramref name="durationSeconds"/>,
+    /// with staggered start delays so they fade out as a wave rather than all at once.
+    /// No regrowth is scheduled — cells go permanently empty until the next motif reset.
+    /// </summary>
+    public void BeginSlowFadeAllDust(float durationSeconds)
+    {
+        if (_cellState == null || _cellGo == null || _cellW <= 0 || _cellH <= 0) return;
+
+        for (int x = 0; x < _cellW; x++)
+        for (int y = 0; y < _cellH; y++)
+        {
+            if (_cellState[x, y] != DustCellState.Solid) continue;
+            var go = _cellGo[x, y];
+            if (go == null) continue;
+            float delay = Random.Range(0f, durationSeconds * 0.75f);
+            StartCoroutine(DelayedFadeCell(new Vector2Int(x, y), delay));
+        }
+    }
+
+    private IEnumerator DelayedFadeCell(Vector2Int gp, float delay)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (_cellState == null || _cellState[gp.x, gp.y] != DustCellState.Solid) yield break;
+        ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.5f, scheduleRegrow: false);
+    }
+
     public float SampleDensity01(Vector3 worldPos)
     {
         if (drums == null) return 0f;

@@ -6,19 +6,28 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Shimmer Burst.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Shimmer Burst.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Rain.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Rain.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Collection/Energy Release.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Collection/Energy Release.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Mine Node.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/groove-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/groove-bounce.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce-alt.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce-alt.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RoleMotifNoteSetConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RoleMotifNoteSetConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/Explode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/Explode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/1x/Diamond Outline.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/1x/Diamond Outline.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -284,7 +293,7 @@
       <workItem from="1772925075412" duration="129106000" />
       <workItem from="1773520647025" duration="19910000" />
       <workItem from="1773851750158" duration="25817000" />
-      <workItem from="1774123628864" duration="91635000" />
+      <workItem from="1774123628864" duration="101703000" />
     </task>
     <servers />
   </component>

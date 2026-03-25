@@ -295,7 +295,8 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         InstrumentTrack track,
         int burstId,
         float totalSeconds,
-        Func<InstrumentTrack, int, IEnumerable<GameObject>> markerLookup)
+        Func<InstrumentTrack, int, IEnumerable<GameObject>> markerLookup,
+        int ascendLoopsOverride = -1)
     {
         if (track == null || markerLookup == null) return;
         if (_drum == null) return;
@@ -312,7 +313,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             float startY = go.transform.position.y;
             float totalY = (GetAscendTargetWorldY()) - startY;
 
-            int loops = Mathf.Max(1, ascendLoops);
+            int loops = Mathf.Max(1, ascendLoopsOverride > 0 ? ascendLoopsOverride : ascendLoops);
 
             float stepY = (loops > 0) ? totalY / loops : totalY;
 

@@ -164,6 +164,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     [SerializeField] private int _nextFillOrdinal = 1;
     private readonly Dictionary<int, int> _burstLeaderBinsBeforeWrite = new(); // burstId -> leaderBins
     private readonly Dictionary<int, int> _burstWroteBin             = new(); // burstId -> targetBin (cursor bin)
+    private readonly Dictionary<int, int> _burstTargetBin            = new(); // burstId -> allocated bin (for rollback on 0-note discard)
     private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
     [SerializeField] private bool[] binAllocated;
     [SerializeField] private int _binCursor = 0;    // counts bins allocated on this track, including silent skips
@@ -826,6 +827,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // If you track remaining per-burst, clear that too.
         _burstRemaining?.Clear();
         _burstSteps?.Clear();
+        _burstTargetBin?.Clear();
         return destroyed;
     }
     private float RemainingActiveWindowSec() {
@@ -1251,6 +1253,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             _burstRemaining.Remove(collectable.burstId);
             _burstTotalSpawned.Remove(collectable.burstId);
             _burstCollected.Remove(collectable.burstId);
+            _burstTargetBin.Remove(collectable.burstId);
 
             // --- D) Existing bin cursor + cross-track behavior ---
             AdvanceBinCursor(1); // only THIS track advances its cursor for the next spawn
@@ -1584,6 +1587,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 _burstRemaining.Remove(burstId);
                 _burstLeaderBinsBeforeWrite.Remove(burstId);
                 _burstWroteBin.Remove(burstId);
+                _burstTargetBin.Remove(burstId);
 
                 // Notify listeners (e.g. PhaseStar) that the burst is complete, same as the
                 // auto-collect path does in OnCollectableCollected. This ensures the bridge
@@ -1663,10 +1667,23 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (controller != null)
                 controller.AllowAdvanceNextBurst(this);
         }
+        else
+        {
+            // 0 notes committed — roll back the bin so the next burst retries it without expansion.
+            if (_burstTargetBin.TryGetValue(burstId, out int emptyBin))
+            {
+                SetBinAllocated(emptyBin, false);
+                if (GetBinCursor() > emptyBin)
+                    SetBinCursor(emptyBin);
+            }
+        }
 
         _burstRemaining.Remove(burstId);
         _burstLeaderBinsBeforeWrite.Remove(burstId);
         _burstWroteBin.Remove(burstId);
+        _burstTargetBin.Remove(burstId);
+
+        OnCollectableBurstCleared?.Invoke(this, burstId);
     }
 
     /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>
@@ -2337,6 +2354,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     _burstCollected[burstId] = 0;
 
     SetBinAllocated(targetBin, true);
+    _burstTargetBin[burstId] = targetBin; // track for rollback on 0-note discard
 
 // Keep cursor moving forward once we allocate a bin.
 // Without this, cursor can stay at 0 and repeatedly bias selection at boundaries.

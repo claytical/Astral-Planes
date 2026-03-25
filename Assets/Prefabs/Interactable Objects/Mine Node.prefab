@@ -58,6 +58,8 @@ MonoBehaviour:
   sameRoleDustAffinityRadiusCells: 2
   pruneCarvedPathOnLoopBoundary: 0
   pruneMinPathCount: 8
+  fleeRadiusWorld: 5
+  fleeBlendWeight: 0.25
   driveCarvingMotionFromNoteSet: 1
 --- !u!114 &2404411601338668691
 MonoBehaviour:
@@ -122,7 +124,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
     type: 3}
-  preExplosion: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
+  preExplosion: {fileID: 2567590292593330884, guid: ac7ca5ccdd7494bbe9493a7e2327bb65,
     type: 3}
   lifetime: 0
   randomizeLifetimer: 0
@@ -186,7 +188,7 @@ SpriteRenderer:
   m_Size: {x: 1.28, y: 1.15}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_MaskInteraction: 2
   m_SpriteSortPoint: 0
 --- !u!50 &4561843143948562615
@@ -254,8 +256,8 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.58, y: 3.1}
-    newSize: {x: 1.58, y: 3.1}
+    oldSize: {x: 0.4, y: 0.78}
+    newSize: {x: 1.28, y: 1.15}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
@@ -359,6 +361,6 @@ SpriteRenderer:
   m_Size: {x: 1, y: 0.5}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
