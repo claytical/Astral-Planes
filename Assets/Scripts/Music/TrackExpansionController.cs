@@ -177,20 +177,19 @@ public class TrackExpansionController
             int forcedBin = OverrideNextSpawnBin;
             var capBurst  = burst; // capture
 
-            _host.EnqueueNextFrame(() =>
-                _host.SpawnBurstNow(
-                    capBurst.noteSet,
-                    capBurst.maxToSpawn,
-                    capBurst.burstId,
-                    capBurst.originWorld,
-                    capBurst.repelFromWorld,
-                    capBurst.burstImpulse,
-                    capBurst.spreadAngleDeg,
-                    capBurst.spawnJitterRadius,
-                    capBurst.placementMode,
-                    capBurst.trapSearchRadiusCells,
-                    capBurst.trapBufferCells,
-                    forcedTargetBin: forcedBin));
+            _host.SpawnBurstNow(
+                capBurst.noteSet,
+                capBurst.maxToSpawn,
+                capBurst.burstId,
+                capBurst.originWorld,
+                capBurst.repelFromWorld,
+                capBurst.burstImpulse,
+                capBurst.spreadAngleDeg,
+                capBurst.spawnJitterRadius,
+                capBurst.placementMode,
+                capBurst.trapSearchRadiusCells,
+                capBurst.trapBufferCells,
+                forcedTargetBin: forcedBin);
 
             return true;
         }
@@ -332,16 +331,15 @@ public class TrackExpansionController
                     _pendingBurstAfterExpand = null;
 
                     int forcedBin = req.intendedTargetBin;
-                    _host.EnqueueNextFrame(() =>
-                        _host.SpawnBurstNow(
-                            req.noteSet, req.maxToSpawn, req.burstId,
-                            req.originWorld, req.repelFromWorld,
-                            req.burstImpulse, req.spreadAngleDeg,
-                            spawnJitterRadius: 0.25f,
-                            placementMode: InstrumentTrack.BurstPlacementMode.Free,
-                            trapSearchRadiusCells: 10,
-                            trapBufferCells: 1,
-                            forcedTargetBin: forcedBin));
+                    _host.SpawnBurstNow(
+                        req.noteSet, req.maxToSpawn, req.burstId,
+                        req.originWorld, req.repelFromWorld,
+                        req.burstImpulse, req.spreadAngleDeg,
+                        spawnJitterRadius: 0.25f,
+                        placementMode: InstrumentTrack.BurstPlacementMode.Free,
+                        trapSearchRadiusCells: 10,
+                        trapBufferCells: 1,
+                        forcedTargetBin: forcedBin);
                 }
 
                 UnhookExpandBoundary();
@@ -376,16 +374,15 @@ public class TrackExpansionController
                     OverrideNextSpawnBin = _host.PickRandomExistingBinForDensity();
                     int forcedBin = req.intendedTargetBin;
 
-                    _host.EnqueueNextFrame(() =>
-                        _host.SpawnBurstNow(
-                            req.noteSet, req.maxToSpawn, req.burstId,
-                            req.originWorld, req.repelFromWorld,
-                            req.burstImpulse, req.spreadAngleDeg,
-                            spawnJitterRadius: 0.25f,
-                            placementMode: InstrumentTrack.BurstPlacementMode.Free,
-                            trapSearchRadiusCells: 10,
-                            trapBufferCells: 1,
-                            forcedTargetBin: forcedBin));
+                    _host.SpawnBurstNow(
+                        req.noteSet, req.maxToSpawn, req.burstId,
+                        req.originWorld, req.repelFromWorld,
+                        req.burstImpulse, req.spreadAngleDeg,
+                        spawnJitterRadius: 0.25f,
+                        placementMode: InstrumentTrack.BurstPlacementMode.Free,
+                        trapSearchRadiusCells: 10,
+                        trapBufferCells: 1,
+                        forcedTargetBin: forcedBin);
                 }
 
                 _host.RecomputeAllTrackLayouts();
@@ -416,25 +413,9 @@ public class TrackExpansionController
             _host.SetBinAllocated(_host.LoopMultiplier - 1, true);
             _host.SetBinFilled(_host.LoopMultiplier - 1, false);
 
-            // ---- E) Spawn staged burst ----
-            if (_pendingBurstAfterExpand.HasValue)
-            {
-                var req = _pendingBurstAfterExpand.Value;
-                _pendingBurstAfterExpand = null;
-
-                _host.EnqueueNextFrame(() =>
-                    _host.SpawnBurstNow(
-                        req.noteSet, req.maxToSpawn, req.burstId,
-                        req.originWorld, req.repelFromWorld,
-                        req.burstImpulse, req.spreadAngleDeg,
-                        req.spawnJitterRadius,
-                        req.placementMode,
-                        req.trapSearchRadiusCells,
-                        req.trapBufferCells,
-                        forcedTargetBin: req.intendedTargetBin));
-            }
-
             // ---- G) Visual refresh for this track ----
+            // Must happen BEFORE the burst spawns so the new bin exists in the
+            // visualizer when SpawnBurstNow registers the collectable's placeholder.
             _host.UpdateControllerVisualizer();
             _host.CanonicalizeTrackMarkersOnVisualizer(0 /* currentBurstId resolved by host */);
             _host.MarkGhostPaddingOnVisualizer(OldTotalAtExpand, _host.TotalSteps - OldTotalAtExpand);
@@ -444,6 +425,23 @@ public class TrackExpansionController
                                  (_drumTrack != null ? _drumTrack.totalSteps : _host.BinSize);
             if (newLeaderSteps != oldLeaderSteps)
                 _host.RecomputeAllTrackLayouts();
+
+            // ---- E) Spawn staged burst ----
+            if (_pendingBurstAfterExpand.HasValue)
+            {
+                var req = _pendingBurstAfterExpand.Value;
+                _pendingBurstAfterExpand = null;
+
+                _host.SpawnBurstNow(
+                    req.noteSet, req.maxToSpawn, req.burstId,
+                    req.originWorld, req.repelFromWorld,
+                    req.burstImpulse, req.spreadAngleDeg,
+                    req.spawnJitterRadius,
+                    req.placementMode,
+                    req.trapSearchRadiusCells,
+                    req.trapBufferCells,
+                    forcedTargetBin: req.intendedTargetBin);
+            }
 
             // ---- I) Reset edge detector and unhook ----
             _host.ResetStepCursors();

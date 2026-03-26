@@ -831,8 +831,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return destroyed;
     }
     private float RemainingActiveWindowSec() {
-        float my  = BaseLoopSeconds() * MyMultiplier();
-        float L   = LeaderLengthSec();
+        float my = BaseLoopSeconds() * MyMultiplier();
+        float L  = LeaderLengthSec();
         if (L <= 0f) return float.MaxValue;
         float tin = TimeInLeader();
         return Mathf.Max(0f, my - tin);
@@ -2129,20 +2129,29 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         Vector3 voidPos = originWorld ?? repelFromWorld ?? transform.position;
 
-        if (controller != null && drumTrack != null)
+        bool staged = _expansionCtrl.TryStageExpand(stagedBurst, targetBin, voidPos);
+
+        if (staged)
         {
-            Vector2Int gp = drumTrack.WorldToGridPosition(voidPos);
-            controller.BeginGravityVoidForPendingExpand(this, voidPos, gp);
+            if (controller != null && drumTrack != null)
+            {
+                Vector2Int gp = drumTrack.WorldToGridPosition(voidPos);
+                controller.BeginGravityVoidForPendingExpand(this, voidPos, gp);
+            }
+
+            foreach (var t in controller.tracks)
+            {
+                Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
+                if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
+            }
+
+            return;
         }
 
-        foreach (var t in controller.tracks)
-        {
-            Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
-            if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
-        }
-
-        _expansionCtrl.TryStageExpand(stagedBurst, targetBin, voidPos);
-        return;
+        // TryStageExpand rejected (another expansion already pending for this track).
+        // Fall through to SPAWN_NOW on an existing bin so collectables still appear.
+        Debug.Log($"[TRK:BURST] STAGE_EXPAND rejected (already pending) → density spawn track={name} burstId={burstId}");
+        targetBin = Mathf.Clamp(GetNextBinForSpawn(), 0, Mathf.Max(0, loopMultiplier - 1));
     }
 
 
