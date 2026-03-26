@@ -7,7 +7,6 @@ public class Boundaries : MonoBehaviour
     public BoxCollider2D leftBoundary;
     public BoxCollider2D rightBoundary;
     public Camera mainCamera;
-    public DrumTrack track;
     void Awake()
     {
         Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");

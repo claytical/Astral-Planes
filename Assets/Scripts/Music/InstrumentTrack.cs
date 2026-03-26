@@ -207,6 +207,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     bool _loopCacheDirtyPending;   // authored changes happened
     bool _loopCacheDirtyCommitted; // safe to rebuild
     int  _lastCommittedBar = -1;
+    int  _lastCommittedBoundarySerial = -1;
     [SerializeField] private LayerMask spawnBlockedMask; // set to include Vehicle + PhaseStar
     [SerializeField] private int spawnPickMaxTries = 80;
 
@@ -245,11 +246,32 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     private void OnDisable()
     {
+        Debug.LogWarning(
+            $"[TRACK:LIFECYCLE] DISABLE name={name} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
+            $"componentEnabled={enabled}\n" +
+            Environment.StackTrace);
         _expansionCtrl?.UnhookExpandBoundary();
         if (controller != null)
             controller.EndGravityVoidForPendingExpand(this);
     }
-
+    private void OnEnable()
+    {
+        Debug.Log(
+            $"[TRACK:LIFECYCLE] ENABLE name={name} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
+            $"componentEnabled={enabled}");
+    }
+    private void OnTransformParentChanged()
+    {
+        Debug.LogWarning(
+            $"[TRACK:LIFECYCLE] PARENT_CHANGED name={name} " +
+            $"parent={(transform.parent != null ? transform.parent.name : "null")} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy}");
+    }
     private void OnDestroy()
     {
         _expansionCtrl?.UnhookExpandBoundary();
@@ -472,7 +494,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 // Defensive clamp: never allow negative barIndex to drive barStart math.
         int barIndex = tf.barIndex;
         int playheadBin = tf.playheadBin;
-
+        int boundarySerial = tf.boundarySerial;
+        
         if (barIndex < 0)
         {
             // If this ever happens again, do the safest thing:
@@ -515,22 +538,26 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
 
 // ----- BAR BOUNDARY COMMIT (cache + step reset) -----
-        if (barIndex != _lastCommittedBar)
+// ----- BOUNDARY COMMIT (cache + step reset) -----
+// IMPORTANT:
+// barIndex is no longer a reliable monotonic boundary signal once DrumTrack
+// advances leaderStartDspTime every effective loop. Use DrumTrack's boundarySerial
+// as the authority for cache commits.
+        if (boundarySerial != _lastCommittedBoundarySerial)
         {
-            _lastCommittedBar = barIndex;
+            _lastCommittedBoundarySerial = boundarySerial;
+            _lastCommittedBar = barIndex; // debug / inspector only
 
             // Commit any authored changes atomically at the boundary
             if (_loopCacheDirtyPending)
             {
-                // IMPORTANT: this must rebuild regardless of old _loopCacheDirty naming
                 RebuildLoopCache_FORCE();
                 _loopCacheDirtyPending = false;
             }
 
-            // Reset step cursor so step 0 is eligible this bar
+            // Reset step cursor so step 0 is eligible in the new bar/bin window
             _lastLocalStep = -1;
         }
-
 // ----- STEP INDEX (DSP-derived) -----
         int curStep = GetDspStepIndexInBar(dspNow, barStart, clipLen, drumSteps);
         int targetCurLocal = ((curStep % binSize) + binSize) % binSize;

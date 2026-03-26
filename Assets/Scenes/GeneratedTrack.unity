@@ -326,50 +326,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
---- !u!1 &51606785
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 51606787}
-  - component: {fileID: 51606786}
-  m_Layer: 0
-  m_Name: Phase Debug Display
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &51606786
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 51606785}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5d966e93db66a49938f11f061d1d1d85, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &51606787
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 51606785}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &67942256
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17995,7 +17951,6 @@ MonoBehaviour:
   leftBoundary: {fileID: 1532169432}
   rightBoundary: {fileID: 1596281813}
   mainCamera: {fileID: 269415559}
-  track: {fileID: 1354683682}
 --- !u!1 &1532169429
 GameObject:
   m_ObjectHideFlags: 0
@@ -20130,7 +20085,6 @@ SceneRoots:
   - {fileID: 1354683683}
   - {fileID: 318370297}
   - {fileID: 2130912947}
-  - {fileID: 51606787}
   - {fileID: 2067870202}
   - {fileID: 869126478}
   - {fileID: 1795146083}

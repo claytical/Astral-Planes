@@ -9,8 +9,8 @@ public struct TransportFrame
 {
     public int barIndex;
     public int playheadBin;
+    public int boundarySerial;
 }
-
 public class InstrumentTrackController : MonoBehaviour
 {
     public InstrumentTrack[] tracks;
@@ -131,7 +131,7 @@ public class InstrumentTrackController : MonoBehaviour
     /// </summary>
     public void NotifyCommitted(InstrumentTrack track, int stepIndex)
 {
-    Debug.Log($"[COMMITTED] {track.name} at {stepIndex}");
+    
 }
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
@@ -256,11 +256,6 @@ public class InstrumentTrackController : MonoBehaviour
         // Restarting here is what looks like "respawn at the boundary".
         if (sameOwner && routineRunning)
         {
-            Debug.Log(
-                $"[VOID] REFRESH (no-restart) track={ownerTrack.name} " +
-                $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)} " +
-                $"pos={centerWorld} gp={centerGP} grow={_gravityVoidGrowSecondsRuntime:F2}s rMax={_gravityVoidMaxRadiusRuntime}"
-            );
             return;
         }
 
@@ -329,7 +324,6 @@ public class InstrumentTrackController : MonoBehaviour
             var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
             if (star != null)
             {
-                Debug.Log($"[BUBBLE] EndGravityVoid → deactivating bubble on star={star.name}");
                 star.SetGravityVoidSafetyBubbleActive(false);
             }
         }
@@ -696,7 +690,6 @@ public class InstrumentTrackController : MonoBehaviour
                 t.RefreshRoleColorsFromProfile();
                 t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
                 t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
-                Debug.Log($"[CHORD][SUB] Controller subscribed to CohortCompleted for track={t.name} role={t.assignedRole} id={t.GetInstanceID()}");
             }
         // Subscribe to the drum’s loop boundary so we (re)arm each loop
         var drum = GameFlowManager.Instance.activeDrumTrack;
@@ -711,7 +704,6 @@ public class InstrumentTrackController : MonoBehaviour
     /// </summary>
     public TransportFrame GetTransportFrame()
     {
-        
         var drum = GameFlowManager.Instance?.activeDrumTrack;
         if (drum == null) return default;
 
@@ -728,42 +720,39 @@ public class InstrumentTrackController : MonoBehaviour
         float clipLen = drum.GetClipLengthInSeconds();
         if (clipLen <= 0f) return default;
 
-        // --- NEW: tolerate "start is slightly in the future" due to PlayScheduled lead time ---
-        const double kFutureStartEpsilon = 0.050; // 50ms; tune 0.02–0.08 if needed
+        // --- tolerate "start is slightly in the future" due to PlayScheduled lead time ---
+        const double kFutureStartEpsilon = 0.050; // 50ms
         double delta = dspNow - start;
 
         if (delta < 0.0)
         {
             if (delta > -kFutureStartEpsilon)
             {
-                // We're just a few ms early; treat as "at start" instead of invalid.
                 dspNow = start;
                 delta = 0.0;
             }
             else
             {
-                // Still genuinely not started (eg a big seek); you can either:
-                // 1) return a "pre-roll" frame (barIndex=0, playheadBin=0), or
-                // 2) return default.
-                // Pre-roll tends to look better than disappearing.
                 return new TransportFrame
                 {
                     barIndex = 0,
                     playheadBin = 0,
-                    // fill whatever else your struct needs (phaseT, localT, etc) as 0
+                    boundarySerial = drum.GetBoundarySerial()
                 };
             }
         }
+
         int barIndex = Mathf.FloorToInt((float)(delta / clipLen));
 
-        // IMPORTANT: use committed/audible bins, not "max active" unless you're 100% sure they match.
+        // IMPORTANT: use committed/audible bins, not visual bins.
         int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());
-
         int playheadBin = (leaderBins <= 1) ? 0 : (barIndex % leaderBins);
+
         var tf = new TransportFrame
         {
             barIndex = barIndex,
-            playheadBin = playheadBin
+            playheadBin = playheadBin,
+            boundarySerial = drum.GetBoundarySerial()
         };
 
         _lastTransport = tf;
@@ -771,7 +760,6 @@ public class InstrumentTrackController : MonoBehaviour
         _hasLastTransport = true;
         return tf;
     }
-
     /// <summary>
     /// Returns the current playhead position as an absolute step within the current leader loop.
     /// This is a continuous value (rawAbsStep) plus its floor (floorAbsStep) and total length (totalAbsSteps).
@@ -901,7 +889,6 @@ public class InstrumentTrackController : MonoBehaviour
         {
             tracks = src; // keep the exact instances we subscribed to
             _chordEventsSubscribed = true;
-            Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
         }
     }
     private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
@@ -919,11 +906,9 @@ public class InstrumentTrackController : MonoBehaviour
         // PhaseStar.NotifyCollectableBurstCleared() is also bridge-safe, but keep this guard to reduce noise.
         if (gfm.GhostCycleInProgress)
         {
-            Debug.Log("[CTRL:BURST_CLEARED] IGNORE (GhostCycleInProgress)");
             return;
         }
 
-        Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId} hadNotes={hadNotes}");
         star.NotifyCollectableBurstCleared(hadNotes);
     }
     private void UnsubscribeChordEvents()
@@ -996,9 +981,6 @@ public class InstrumentTrackController : MonoBehaviour
 
             t.ArmAscensionCohort(0, endTrack);
 
-            Debug.Log($"[CHORD][ARM] {t.name} role={t.assignedRole} window=[0,{endTrack}) " +
-                      $"trackSteps={trackSteps} leaderSteps={leaderSteps} " +
-                      $"armed={t.ascensionCohort.armed} remaining={(t.ascensionCohort.stepsRemaining!=null?t.ascensionCohort.stepsRemaining.Count:0)}");
         }
     }
     public int GetBinForNextSpawn(InstrumentTrack track)
@@ -1105,8 +1087,7 @@ public class InstrumentTrackController : MonoBehaviour
         } 
     public bool AnyExpansionPending() {
         var offenders = tracks.Where(t => t != null && t.IsExpansionPending).Select(t => t.name).ToArray();
-        Debug.Log($"[CTRLDBG] AnyExpansionPending={offenders.Length>0} offenders=[{string.Join(", ", offenders)}]");
-
+        
         if (tracks == null || tracks.Length == 0) return false; 
         foreach (var t in tracks) {
             if (t.IsExpansionPending) {
@@ -1206,7 +1187,6 @@ public class InstrumentTrackController : MonoBehaviour
     }
     private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
     {
-        Debug.Log($"[CHORD][CTRLR] CohortCompleted received from track={track.name} role={track.assignedRole} window=[{start},{end})");
 
         var h = GameFlowManager.Instance ? GameFlowManager.Instance.harmony : null;
         if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }

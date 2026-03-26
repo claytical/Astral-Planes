@@ -36,9 +36,38 @@ public class MidiVoice : MonoBehaviour
     {
         Debug.Log($"[MidiVoice] Setting preset to {value}");
         preset = value;
-        // Prime the channel immediately so the first note doesn't inherit the MPTK default (0).
-        if (midiStreamPlayer != null)
-            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
+
+        // Prime the channel immediately so the first note doesn't inherit the MPTK default (0),
+        // but only if the MIDI player and its channel table are actually ready.
+        if (midiStreamPlayer == null)
+            return;
+
+        if (midiStreamPlayer.MPTK_Channels == null)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] MPTK_Channels not ready yet on {name}; " +
+                $"preset {preset} cached and will be used on first play/bind.");
+            return;
+        }
+
+        if (channel < 0 || channel >= midiStreamPlayer.MPTK_Channels.Length)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] Channel out of range on {name}: channel={channel}, " +
+                $"channelsLength={midiStreamPlayer.MPTK_Channels.Length}. " +
+                $"Preset {preset} cached.");
+            return;
+        }
+
+        if (midiStreamPlayer.MPTK_Channels[channel] == null)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] Channel slot {channel} is null on {name}; " +
+                $"preset {preset} cached.");
+            return;
+        }
+
+        midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
     }
     
     public void Bind(
@@ -51,8 +80,10 @@ public class MidiVoice : MonoBehaviour
         drumTrack = drums;
         _remainingActiveWindowSec = remainingActiveWindowSec;
         preset = initialPreset;
-    }
 
+        // Apply cached preset now if the player is ready.
+        SetPreset(preset);
+    }
     /// <summary>
     /// Plays a normal note. Expects duration in TICKS (MPTK convention),
     /// converts to ms using drum BPM, and trims to the remaining audible window.

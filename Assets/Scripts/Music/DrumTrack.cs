@@ -225,7 +225,7 @@ public class DrumTrack : MonoBehaviour
 		return true;
 	}
     public int GetCommittedBinCount() => Mathf.Max(1, _binCount);
-
+    public int GetBoundarySerial() => _boundarySerial;
     public void SetBinCount(int bins)
     {
         // Bin count here is used for *visual/logic binning inside the leader loop* (OnBinChanged),
@@ -583,6 +583,7 @@ public class DrumTrack : MonoBehaviour
         // We crossed a boundary: advance the anchor to the start of the new loop.
         leaderStartDspTime += effLen;
         completedLoops++;
+        _boundarySerial++;
 
         // This is the boundary we just crossed (start of the *new* loop)
         double boundaryDsp = leaderStartDspTime;

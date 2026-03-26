@@ -2188,11 +2188,9 @@ public class CosmicDustGenerator : MonoBehaviour
             if (TryGetCellState(gridPos, out var st0) && st0 == DustCellState.Solid)
             {
                 _permanentClearCells.Remove(gridPos);
-                Debug.Log($"[DUST:CARVE] Stale permanent-clear on {gridPos}; removed flag and carving.");
             }
             else
             {
-                Debug.Log($"[DUST:CARVE] Reject {gridPos}: permanent clear");
                 return;
             }
         }
@@ -2461,7 +2459,6 @@ public class CosmicDustGenerator : MonoBehaviour
         MarkTintDirty(grid, tintDirtyMarkRadius);
 
         // (no composite collider rebuild)
-        Debug.Log($"[DUSTGEN] RemoveActiveAt grid={grid} hexMapHasAfter={HasDustAt(grid)} go={(go ? go.name : "null")}", this);
     }
     private void HideCellGO(GameObject go)
     {
