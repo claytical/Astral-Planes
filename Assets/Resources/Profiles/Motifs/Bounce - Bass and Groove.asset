@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Bass and Groove Bounce
   keyRootMidi: 60
   entryDrumLoops:
-  - {fileID: 8300000, guid: 8a64f814c188d4d348ad8d4b54986a90, type: 3}
+  - {fileID: 8300000, guid: f0961db8d0c3f44f0b32ae0659286d3e, type: 3}
   intensityDrumLoops:
   - {fileID: 8300000, guid: f0961db8d0c3f44f0b32ae0659286d3e, type: 3}
   - {fileID: 8300000, guid: 229ee4e306a2f4619b3e01eb63efc84d, type: 3}
@@ -24,7 +24,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 659e1c5e63a24435cb474ead32ce79a5, type: 3}
   - {fileID: 8300000, guid: d89e1873c3d7d45ae87e26f8f1755dc1, type: 3}
   - {fileID: 8300000, guid: 87150af2ac42e4e2d8ec025d5b7d9ead, type: 3}
-  entryLoopCount: 1
+  entryLoopCount: 0
   bpm: 175
   stepsPerLoop: 16
   nodesPerStar: 4

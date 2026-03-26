@@ -36,6 +36,9 @@ public class MidiVoice : MonoBehaviour
     {
         Debug.Log($"[MidiVoice] Setting preset to {value}");
         preset = value;
+        // Prime the channel immediately so the first note doesn't inherit the MPTK default (0).
+        if (midiStreamPlayer != null)
+            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
     }
     
     public void Bind(

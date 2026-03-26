@@ -304,23 +304,22 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         float loopLen = _drum.GetLoopLengthInSeconds();
         if (loopLen <= 0f) return;
 
-        var markers = new List<MarkerState>();
+        int loops = Mathf.Max(1, ascendLoopsOverride > 0 ? ascendLoopsOverride : ascendLoops);
+        float targetY = GetAscendTargetWorldY();
 
+        // Build marker list for the new burst.
+        var newMarkers = new List<MarkerState>();
         foreach (var go in markerLookup(track, burstId))
         {
             if (go == null) continue;
 
-            float startY = go.transform.position.y;
-            float totalY = (GetAscendTargetWorldY()) - startY;
-
-            int loops = Mathf.Max(1, ascendLoopsOverride > 0 ? ascendLoopsOverride : ascendLoops);
-
-            float stepY = (loops > 0) ? totalY / loops : totalY;
+            float totalY = targetY - go.transform.position.y;
+            float stepY = totalY / loops;
 
             var tag = go.GetComponent<MarkerTag>();
             if (tag != null) tag.isAscending = true;
 
-            markers.Add(new MarkerState
+            newMarkers.Add(new MarkerState
             {
                 go = go,
                 stepY = stepY,
@@ -330,14 +329,30 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             });
         }
 
-        if (markers.Count == 0) return;
+        if (newMarkers.Count == 0) return;
 
-        // Merge with any existing task for this track (restart/extend)
-        _ascendTasks[track] = new AscendTask
+        // If existing markers for this track are already ascending, reset their
+        // loopsRemaining and stepY so all notes on the track share the same countdown.
+        // This way a second burst for the same track refreshes the first burst's timer.
+        if (_ascendTasks.TryGetValue(track, out var existing))
         {
-            markers = markers,
-            delayLoopsRemaining = 0
-        };
+            var merged = new List<MarkerState>(existing.markers.Count + newMarkers.Count);
+            for (int i = 0; i < existing.markers.Count; i++)
+            {
+                var ms = existing.markers[i];
+                if (ms.go == null) continue; // prune destroyed markers
+                float remainingY = targetY - ms.go.transform.position.y;
+                ms.stepY = remainingY / loops;
+                ms.loopsRemaining = loops;
+                merged.Add(ms);
+            }
+            merged.AddRange(newMarkers);
+            _ascendTasks[track] = new AscendTask { markers = merged, delayLoopsRemaining = 0 };
+        }
+        else
+        {
+            _ascendTasks[track] = new AscendTask { markers = newMarkers, delayLoopsRemaining = 0 };
+        }
     }
 
     /// <summary>

@@ -904,28 +904,28 @@ public class InstrumentTrackController : MonoBehaviour
             Debug.Log($"[CHORD][SUB] Subscribed to CohortCompleted on {count} tracks");
         }
     }
-    private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId) {
-    
-    // We only want to advance when ALL collectables are gone (across tracks).
-    if (AnyCollectablesInFlight()) return;
-
-    var gfm = GameFlowManager.Instance;
-    if (gfm == null || gfm.activeDrumTrack == null) return;
-
-    var star = gfm.activeDrumTrack._star;
-    if (star == null) return;
-
-    // During/after bridge start we must not re-arm or spawn new directives.
-    // PhaseStar.NotifyCollectableBurstCleared() is also bridge-safe, but keep this guard to reduce noise.
-    if (gfm.GhostCycleInProgress)
+    private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
     {
-        Debug.Log("[CTRL:BURST_CLEARED] IGNORE (GhostCycleInProgress)");
-        return;
-    }
+        // We only want to advance when ALL collectables are gone (across tracks).
+        if (AnyCollectablesInFlight()) return;
 
-    Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId}");
-    star.NotifyCollectableBurstCleared();
-}
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null || gfm.activeDrumTrack == null) return;
+
+        var star = gfm.activeDrumTrack._star;
+        if (star == null) return;
+
+        // During/after bridge start we must not re-arm or spawn new directives.
+        // PhaseStar.NotifyCollectableBurstCleared() is also bridge-safe, but keep this guard to reduce noise.
+        if (gfm.GhostCycleInProgress)
+        {
+            Debug.Log("[CTRL:BURST_CLEARED] IGNORE (GhostCycleInProgress)");
+            return;
+        }
+
+        Debug.Log($"[CTRL:BURST_CLEARED] Notify PhaseStar: track={(track != null ? track.name : "null")} burstId={burstId} hadNotes={hadNotes}");
+        star.NotifyCollectableBurstCleared(hadNotes);
+    }
     private void UnsubscribeChordEvents()
     {
         if (tracks == null) return;

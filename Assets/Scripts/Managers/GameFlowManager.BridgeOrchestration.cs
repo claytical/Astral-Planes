@@ -43,14 +43,10 @@ public partial class GameFlowManager
             foreach (var v in vehicles)
                 v?.SetBoostFree(false);
         // --- End final loop ---
-
-        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
-
         // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
         var allTracks = (controller?.tracks != null)
             ? controller.tracks.Where(t => t != null).ToList()
             : new List<InstrumentTrack>();
-
         var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
 
         _motifSnapshots.Add(motifSnap);
@@ -58,6 +54,12 @@ public partial class GameFlowManager
 
         Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
                   $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
+
+        /*
+        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
+
+
+
 
         // Derive bridge duration from the actual musical loop length — same pattern as PlayPhaseBridge.
         // This makes the coral grow animation span exactly one full loop replay.
@@ -90,9 +92,11 @@ public partial class GameFlowManager
         }
 
         // Advance motif — StartNextMotifInPhase calls controller.BeginNewMotif which clears track state.
-        yield return StartCoroutine(StartNextMotifInPhase());
 
         SetBridgeCinematicMode(false); // restore maze, dust, vehicles
+        
+        */
+        yield return StartCoroutine(StartNextMotifInPhase());
         GhostCycleInProgress = false;
         BridgePending = false;
     }
