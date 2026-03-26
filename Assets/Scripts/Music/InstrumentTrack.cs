@@ -241,7 +241,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public  void AdvanceBinCursor(int by=1)  => _binCursor = Mathf.Max(0, _binCursor + Mathf.Max(1,by));
     private void ResetBinCursor()            => _binCursor = 0;
     public event Action<InstrumentTrack,int,int> OnAscensionCohortCompleted; // (track, start, end)
-    public event Action<InstrumentTrack, int> OnCollectableBurstCleared; // (track, burstId)
+    public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
 
     private void OnDisable()
     {
@@ -1285,7 +1285,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             });
             Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reported Step: {reportedStep}  remainingOnTrack={spawnedCollectables.Count} bin cursor: {_binCursor} ");
             
-            OnCollectableBurstCleared?.Invoke(this, collectable.burstId);
+            OnCollectableBurstCleared?.Invoke(this, collectable.burstId, true);
             Debug.Log($"[TRKDBG] {name} OnCollectableCollected: burstId={collectable.burstId} -> HandleCollectableBurstCleared (_burstRemaining={_burstRemaining?.Count ?? -1})");
 
         }
@@ -1593,7 +1593,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 // auto-collect path does in OnCollectableCollected. This ensures the bridge
                 // wait fires at *placement* time rather than at the _awaitingCollectableClear
                 // timeout (which fires even if the note hasn't been placed yet).
-                OnCollectableBurstCleared?.Invoke(this, burstId);
+                OnCollectableBurstCleared?.Invoke(this, burstId, true);
             }
             else
             {
@@ -1678,12 +1678,15 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             }
         }
 
+        // Capture before cleanup — _burstWroteBin entry exists iff at least one note was committed.
+        bool hadNotes = _burstWroteBin.ContainsKey(burstId);
+
         _burstRemaining.Remove(burstId);
         _burstLeaderBinsBeforeWrite.Remove(burstId);
         _burstWroteBin.Remove(burstId);
         _burstTargetBin.Remove(burstId);
 
-        OnCollectableBurstCleared?.Invoke(this, burstId);
+        OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
     }
 
     /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>
@@ -2342,7 +2345,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
 
-        OnCollectableBurstCleared?.Invoke(this, burstId);
+        OnCollectableBurstCleared?.Invoke(this, burstId, false);
         Debug.LogWarning($"[TRK:BURST] OUTCOME=SPAWN_EMPTY_CLEARED track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} steps={stepList.Count} gridW={gridW}");
         return;
     }
@@ -2482,8 +2485,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                     if (_burstWroteBin.TryGetValue(c.burstId, out var filledBin)) 
                         SetBinFilled(filledBin, true);
                     if (controller != null) controller.AllowAdvanceNextBurst(this); 
-                    AdvanceBinCursor(1); 
-                    OnCollectableBurstCleared?.Invoke(this, c.burstId);
+                    AdvanceBinCursor(1);
+                    OnCollectableBurstCleared?.Invoke(this, c.burstId, true);
                 } 
                 else { 
                     // Zero notes collected: the entire burst was lost.
@@ -2496,8 +2499,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                     _burstLeaderBinsBeforeWrite.Remove(c.burstId);
                     // Notify controller that collectables are cleared so the star can
                     // re-arm, but do not advance bin state.
-                    if (controller != null) controller.AllowAdvanceNextBurst(this); 
-                    OnCollectableBurstCleared?.Invoke(this, c.burstId);
+                    if (controller != null) controller.AllowAdvanceNextBurst(this);
+                    OnCollectableBurstCleared?.Invoke(this, c.burstId, false);
                 }
             }
             else { 

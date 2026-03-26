@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Bounce - Lead
+  m_Name: Bounce - Harmony
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
-  motifId: lead-bouncnig
-  displayName: Lead Bounce
+  motifId: harmony-bouncing
+  displayName: harmony Bounce
   keyRootMidi: 60
   entryDrumLoops:
   - {fileID: 8300000, guid: 8a64f814c188d4d348ad8d4b54986a90, type: 3}
@@ -32,7 +32,7 @@ MonoBehaviour:
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   chordProgression: {fileID: 11400000, guid: 2dbd76c1bfa6c49569e90a5939007775, type: 2}
   roleNoteConfigs:
-  - {fileID: 11400000, guid: e5c6d92508fe04aa3af50a206feb02e3, type: 2}
+  - {fileID: 11400000, guid: bd93d1e00f28144d29f7858ce75ba73a, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1

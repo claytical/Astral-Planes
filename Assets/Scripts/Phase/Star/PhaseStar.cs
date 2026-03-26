@@ -747,7 +747,7 @@ public class PhaseStar : MonoBehaviour
         }
     }
 
-    public void NotifyCollectableBurstCleared()
+    public void NotifyCollectableBurstCleared(bool hadNotes = true)
     {
         // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
         // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
@@ -765,7 +765,7 @@ public class PhaseStar : MonoBehaviour
         Debug.Log(
             $"[PS:BURST_CLEARED] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
             $"awaitClr(before)={_awaitingCollectableClear} shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
-            $"CIF={cif} EP={ep}"
+            $"CIF={cif} EP={ep} hadNotes={hadNotes}"
         );
 
         _awaitingCollectableClear = false;
@@ -778,6 +778,21 @@ public class PhaseStar : MonoBehaviour
             Debug.LogWarning(
                 $"[PS:BURST_CLEARED] IGNORE (still busy) star={name} CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
             );
+            return;
+        }
+
+        // If the player committed zero notes for this burst, roll back the shard so they must retry.
+        // This prevents bridging to the next motif when no notes were ever placed for this role.
+        if (!hadNotes)
+        {
+            _shardsEjectedCount = Mathf.Max(0, _shardsEjectedCount - 1);
+            // Clear loop-phase flags that may have been set on the final-shard ejection path.
+            _awaitingLoopPhaseFinish = false;
+            _bridgeWaitStartLoop = -1;
+            Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back shard. _shardsEjectedCount={_shardsEjectedCount}");
+            RebuildPreviewRingForRemainingShards(keepCurrentIndex: false);
+            PrepareNextDirective();
+            ArmNext();
             return;
         }
 

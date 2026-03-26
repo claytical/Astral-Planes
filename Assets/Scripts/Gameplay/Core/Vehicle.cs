@@ -575,6 +575,16 @@ public class Vehicle : MonoBehaviour
         if (occupied)
             commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
 
+        // Mark as collected and remove from spawnedCollectables BEFORE committing the note.
+        // This ensures that when CommitManualReleasedNote fires OnCollectableBurstCleared,
+        // AnyCollectablesInFlightGlobal() returns false and PhaseStar re-arms immediately
+        // rather than deferring to the next loop boundary.
+        // MarkAsReportedCollected must precede OnManualReleaseConsumed so that if the
+        // deferred Destroy fires OnCollectableDestroyed, it skips the "lost note" branch
+        // and does not double-decrement _burstRemaining.
+        if (p.collectable != null) p.collectable.MarkAsReportedCollected();
+        if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
+
         // Write the note to the loop (lights the marker via AddNoteToLoop reuse path).
         p.track.CommitManualReleasedNote(
             stepAbs: targetAbsStep,
@@ -600,11 +610,6 @@ public class Vehicle : MonoBehaviour
         // Occupied-step reward accent.
         if (occupied && occupiedStepOctaveAccent)
             p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
-
-        // Mark as collected BEFORE destroying so OnCollectableDestroyed skips the
-        // "lost note" branch and does not double-decrement _burstRemaining.
-        if (p.collectable != null) p.collectable.MarkAsReportedCollected();
-        if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
     }
     // ---- Note Trail Management ----
     private void RecordPositionHistory()
@@ -1565,6 +1570,7 @@ public class Vehicle : MonoBehaviour
                     + perp    * (s * cellSize);
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
                 if (gen.HasDustAt(cell))
+                    
                     gen.CarveDustByVehicle(cell, fade, motif);
             }
         }

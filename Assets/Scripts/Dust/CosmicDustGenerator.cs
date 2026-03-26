@@ -10,7 +10,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private bool _isBootstrappingMaze = false;
     public GameObject dustPrefab;
     public Transform activeDustRoot;
-    Dictionary<Vector2Int, DustImprint> _imprints; 
+    Dictionary<Vector2Int, DustImprint> _imprints;
+    private Dictionary<Vector2Int, MusicalRole> _hiddenImprints = new();
     private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
     private bool _cellGridReady;
     [Header("Maze Collision Shape")]
@@ -566,6 +567,23 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         if (_imprints == null)
             _imprints = new Dictionary<Vector2Int, DustImprint>();
+    }
+
+    /// <summary>
+    /// If <paramref name="gp"/> is a gray (None-role) cell and has a hidden Voronoi role,
+    /// promotes that role into the active imprint so regrowth uses it.
+    /// Returns true when a promotion occurred.
+    /// </summary>
+    private bool PromoteHiddenRole(Vector2Int gp)
+    {
+        if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var hiddenRole)) return false;
+        if (_imprints == null || !_imprints.TryGetValue(gp, out var imp)) return false;
+        if (imp.role != MusicalRole.None) return false; // already colored — no-op
+
+        imp.role = hiddenRole;
+        _imprints[gp] = imp;
+        _hiddenImprints.Remove(gp);
+        return true;
     }
     public bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
@@ -1164,7 +1182,51 @@ public class CosmicDustGenerator : MonoBehaviour
             };
         }
 
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}");
+        // Compute hidden Voronoi roles — revealed when a cell is first carved.
+        _hiddenImprints.Clear();
+        var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);
+        if (rolesList.Count > 0)
+        {
+            Vector2 starF  = new Vector2(starCell.x, starCell.y);
+            Vector2 center = new Vector2(w * 0.5f, h * 0.5f);
+            float halfDiag = Mathf.Sqrt(w * w + h * h) * 0.5f;
+            Vector2 dir    = (center - starF).sqrMagnitude > 0.001f ? (center - starF).normalized : Vector2.right;
+
+            int seedCount   = rolesList.Count;
+            var seeds       = new Vector2[seedCount];
+            var seedRoles   = new MusicalRole[seedCount];
+
+            // Dominant seed along star→center axis at 75% of half-diagonal.
+            seeds[0]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), starF + dir * halfDiag * 0.75f));
+            seedRoles[0] = rolesList[0];
+
+            float restRadius = halfDiag * 0.45f;
+            float angleStart = Mathf.Atan2(dir.y, dir.x) + Mathf.PI;
+            float angleStep  = (seedCount > 1) ? (2f * Mathf.PI / (seedCount - 1)) : 0f;
+            for (int i = 1; i < seedCount; i++)
+            {
+                float a  = angleStart + (i - 1) * angleStep;
+                Vector2 raw = starF + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * restRadius;
+                seeds[i]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), raw));
+                seedRoles[i] = rolesList[i];
+            }
+
+            // Assign each cell to its nearest seed (Voronoi).
+            foreach (var (gp, _) in cells)
+            {
+                float best    = float.MaxValue;
+                int   bestIdx = 0;
+                Vector2 cellF = new Vector2(gp.x, gp.y);
+                for (int i = 0; i < seedCount; i++)
+                {
+                    float d = (cellF - seeds[i]).sqrMagnitude;
+                    if (d < best) { best = d; bestIdx = i; }
+                }
+                _hiddenImprints[gp] = seedRoles[bestIdx];
+            }
+        }
+
+        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}");
     }
     public void ResetMazeGenerationFlag()
     {
@@ -1547,6 +1609,18 @@ public class CosmicDustGenerator : MonoBehaviour
             hardness01 = profile.GetDustHardness01(),
             healDelay = 0f
         };
+
+        var cellGo = _cellGo?[cell.x, cell.y];
+        if (cellGo != null)
+        {
+            var explode = cellGo.GetComponent<Explode>();
+            if (explode != null)
+            {
+                var dust = cellGo.GetComponent<CosmicDust>();
+                if (dust != null) explode.SetTint(dust.CurrentTint);
+                explode.PreExplode();
+            }
+        }
 
         ClearCell(
             cell,
@@ -2125,6 +2199,9 @@ public class CosmicDustGenerator : MonoBehaviour
         if (!TryGetCellState(gridPos, out var st) || st != DustCellState.Solid) return;
         if (!TryGetCellGo(gridPos, out var go) || go == null) return;
 
+        // Reveal hidden Voronoi role on first vehicle carve (Option D).
+        PromoteHiddenRole(gridPos);
+
         // Logical authority: the moment we carve, the cell stops being solid and must be removed
         // from legacy maps so queries cannot treat it as terrain.
         SetCellState(gridPos, DustCellState.Clearing);
@@ -2516,7 +2593,11 @@ public class CosmicDustGenerator : MonoBehaviour
 
                 if (removedRole != MusicalRole.None)
                     _regrowExcludeRoleByCell[gp] = removedRole;
-                _imprints?.Remove(gp);
+                // Reveal hidden Voronoi role on first MineNode carve (Option D).
+                // If promotion succeeds the imprint is now set to the Voronoi role; keep it so
+                // CommitRegrowCell uses Priority 1 (real-role imprint) instead of neighbor/least-dense.
+                if (!PromoteHiddenRole(gp))
+                    _imprints?.Remove(gp);
                 // Clear if present, respecting budget.
                 if (HasDustAt(gp))
                 {

@@ -103,7 +103,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosion: {fileID: 2567590292593330884, guid: 95e71e582f0ce4b44959d703d22207e9,
     type: 3}
-  preExplosion: {fileID: 0}
+  preExplosion: {fileID: 1461853990459934639, guid: 5a583006814b549ee920415843bae4de,
+    type: 3}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1

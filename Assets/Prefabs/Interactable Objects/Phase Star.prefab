@@ -4943,7 +4943,7 @@ MonoBehaviour:
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
   passiveChargeDecayPerSec: 0
   dustToStarChargeMul: 1
-  shardMinAlpha: 0.08
+  shardMinAlpha: 0.287
   shardDisarmedAlphaCeil: 0.1
   shardAlphaLerpSpeed: 6
   shardSnifferTurnSpeed: 180

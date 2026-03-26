@@ -456,6 +456,10 @@ private Coroutine _jiggleRoutine;
         // Do NOT floor it here — cells that aren't Solid yet must stay dim.
         // The generator enforces a visible-alpha floor when solidifying.
         SetTint(roleColorRgb);
+        if (GetComponent<Explode>() != null)
+        {
+            GetComponent<Explode>().SetTint(roleColorRgb);
+        }
     }
     
     public float DrainCharge(float amount)

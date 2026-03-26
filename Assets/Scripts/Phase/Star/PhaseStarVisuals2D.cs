@@ -35,7 +35,7 @@ private float alphaDirection = 1f;
     [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha  = 0.65f;  // crisp ring so it reads as a boundary
 
     [Header("Dim / Hidden Shard Tint")]
-    [SerializeField] private Color dimShardTint = new Color(0.05f, 0.05f, 0.05f, 0.1f);
+    [SerializeField] private Color dimShardTint = new Color(0.5f, 0.5f, 0.5f, 0.5f);
 
     PhaseStarBehaviorProfile _profile;
     private Color _lastTint = Color.white;
