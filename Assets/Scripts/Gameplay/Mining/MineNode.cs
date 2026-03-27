@@ -470,7 +470,7 @@ public class MineNode : MonoBehaviour
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetBurstDirection(blastDir);
 
-        _track.SpawnCollectableBurst(_noteSet, 8, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10);
+        _track.SpawnCollectableBurst(_noteSet, -1, -1, origin, repelFrom, 4.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10);
 
         TriggerExplosion();
     }
