@@ -582,7 +582,28 @@ public class CosmicDustGenerator : MonoBehaviour
 
         imp.role = hiddenRole;
         _imprints[gp] = imp;
-        _hiddenImprints.Remove(gp);
+        // _hiddenImprints entry is kept as permanent Voronoi ground-truth for the motif lifetime.
+        // RestoreVoronoiImprint() uses it to revert MineNode paint when a vehicle carves the cell.
+        return true;
+    }
+
+    /// <summary>
+    /// Clears any MineNode paint on a cell and re-promotes its permanent Voronoi role.
+    /// Use this instead of PromoteHiddenRole when carving should revert to Voronoi regardless
+    /// of whether a MineNode has already painted the cell.
+    /// Returns true if a Voronoi assignment existed and was applied, false otherwise.
+    /// </summary>
+    private bool RestoreVoronoiImprint(Vector2Int gp)
+    {
+        if (_hiddenImprints == null || !_hiddenImprints.ContainsKey(gp)) return false;
+
+        // Clear any MineNode paint so PromoteHiddenRole can re-apply the Voronoi role.
+        if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
+        {
+            imp.role = MusicalRole.None;
+            _imprints[gp] = imp;
+        }
+        PromoteHiddenRole(gp);
         return true;
     }
     public bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
@@ -1588,27 +1609,16 @@ public class CosmicDustGenerator : MonoBehaviour
                 results.Add(new Vector2Int(x, y));
         }
     }
-    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds, MotifProfile assignedMotif)
+    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
-        var roles = assignedMotif?.GetActiveRoles();
-        if (roles == null || roles.Count == 0) return;
-
-        var role = roles[UnityEngine.Random.Range(0, roles.Count)];
-        var profile = MusicalRoleProfileLibrary.GetProfile(role);
-        if (profile == null) return;
-
         _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-
-        _imprints[cell] = new DustImprint
-        {
-            role = role,
-            color = profile.GetBaseColor(),
-            hardness01 = profile.GetDustHardness01(),
-            healDelay = 0f
-        };
+        // Revert any MineNode paint — cell regrows as its original Voronoi color.
+        // Falls back to keeping the existing imprint if no Voronoi assignment exists.
+        if (!RestoreVoronoiImprint(cell))
+            PromoteHiddenRole(cell);
 
         var cellGo = _cellGo?[cell.x, cell.y];
         if (cellGo != null)
@@ -2168,6 +2178,8 @@ public class CosmicDustGenerator : MonoBehaviour
         finally
         {
         }
+        _imprints?.Clear();
+        _hiddenImprints?.Clear();
         _allSolidCount    = 0;
         _targetSolidCount = -1;
         _regrowingCount   = 0;
@@ -2590,10 +2602,10 @@ public class CosmicDustGenerator : MonoBehaviour
 
                 if (removedRole != MusicalRole.None)
                     _regrowExcludeRoleByCell[gp] = removedRole;
-                // Reveal hidden Voronoi role on first MineNode carve (Option D).
-                // If promotion succeeds the imprint is now set to the Voronoi role; keep it so
-                // CommitRegrowCell uses Priority 1 (real-role imprint) instead of neighbor/least-dense.
-                if (!PromoteHiddenRole(gp))
+                // Reveal the Voronoi role for this cell so CommitRegrowCell uses Priority 1
+                // (real-role imprint) instead of neighbor/least-dense. RestoreVoronoiImprint
+                // also clears any prior MineNode paint so the Voronoi role is always applied.
+                if (!RestoreVoronoiImprint(gp))
                     _imprints?.Remove(gp);
                 // Clear if present, respecting budget.
                 if (HasDustAt(gp))

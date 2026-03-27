@@ -210,6 +210,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     int  _lastCommittedBoundarySerial = -1;
     [SerializeField] private LayerMask spawnBlockedMask; // set to include Vehicle + PhaseStar
     [SerializeField] private int spawnPickMaxTries = 80;
+    [SerializeField] [Range(0f, 1f)] private float spawnColumnBandFraction = 0.25f; // fraction of grid width to search per step column band
 
     // ---- LoopPattern bridge (no state duplication) ----
     internal bool LoopCacheDirtyPending
@@ -2291,8 +2292,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (dustGen == null || drumTrack == null)
             continue;
 
+        int fullSteps = BinSize() * maxLoopMultiplier;
+        float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
+
         Vector2Int chosenCell;
-        if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCellsThisBurst, out chosenCell))
+        if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCellsThisBurst, out chosenCell, stepNorm))
             continue;
 
         usedCellsThisBurst.Add(chosenCell);
@@ -2408,7 +2412,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         CosmicDustGenerator dustGen,
         DrumTrack drumTrack,
         HashSet<Vector2Int> usedCellsThisBurst,
-        out Vector2Int chosenCell)
+        out Vector2Int chosenCell,
+        float preferredXNorm = -1f)
     {
         chosenCell = default;
 
@@ -2419,7 +2424,36 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 halfExtents = Vector2.one * (cellWorld * 0.45f);
 
-        for (int attempt = 0; attempt < Mathf.Max(8, spawnPickMaxTries); attempt++)
+        int xBandCenter = -1;
+        int xBandHalf   = 0;
+        bool useBand = preferredXNorm >= 0f && spawnColumnBandFraction > 0f;
+        if (useBand)
+        {
+            xBandCenter = Mathf.Clamp(Mathf.RoundToInt(preferredXNorm * (w - 1)), 0, w - 1);
+            xBandHalf   = Mathf.Max(1, Mathf.RoundToInt(spawnColumnBandFraction * 0.5f * w));
+        }
+
+        int maxTries = Mathf.Max(8, spawnPickMaxTries);
+
+        // First pass: constrained to step column band (skipped if no band preference).
+        if (useBand)
+        {
+            int xMin = Mathf.Max(0, xBandCenter - xBandHalf);
+            int xMax = Mathf.Min(w - 1, xBandCenter + xBandHalf);
+            for (int attempt = 0; attempt < maxTries; attempt++)
+            {
+                var gp = new Vector2Int(UnityEngine.Random.Range(xMin, xMax + 1), UnityEngine.Random.Range(0, h));
+                if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp)) continue;
+                if (!Collectable.IsCellFreeStatic(gp)) continue;
+                Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
+                if (Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask) != null) continue;
+                chosenCell = gp;
+                return true;
+            }
+        }
+
+        // Fallback (or default): unconstrained pick across full grid.
+        for (int attempt = 0; attempt < maxTries; attempt++)
         {
             var gp = new Vector2Int(UnityEngine.Random.Range(0, w), UnityEngine.Random.Range(0, h));
 

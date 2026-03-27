@@ -16,7 +16,7 @@ public class MidiToRiffImporterWindow : EditorWindow
     private int _beatsPerBar = 4;
 
     private int _channelFilter = -1;    // -1 = any
-    private bool _clampToBar = true;    // only import within first bar (0..15)
+    private bool _clampToBar = false;   // only import within first bar (0..15)
     private bool _dedupeSameStepSameNoteKeepLoudest = true;
 
     private bool _clampDurToNextOnset = true;
@@ -155,6 +155,11 @@ private void ImportAndCreateAsset()
     Selection.activeObject = asset;
 
     Debug.Log($"[MIDI→RIFF] Created {outPath} events={riff.events?.Count ?? 0} tq={ticksPerQuarter} stepsPerBar={_stepsPerBar} loopSteps={riff.loopSteps} clampToBar={_clampToBar}");
+    if (riff.events != null)
+        foreach (var ev in riff.events)
+            Debug.Log($"[MIDI→RIFF]   note={ev.midiNote} step={ev.step} dur={ev.durSteps} vel={ev.velocity01:F2}");
+    if (_stepsPerBar > 64)
+        Debug.LogWarning($"[MIDI→RIFF] Steps/Bar={_stepsPerBar} seems high. For a standard 4/4 grid: 16 = 16th notes, 32 = 32nd notes.");
 }
     // --------------------------------------------------------------------------------------------
     // MIDI loading via MidiPlayerTK reflection

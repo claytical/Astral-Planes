@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Descent
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: bounce-all
+  displayName: Bounce Together
+  keyRootMidi: 60
+  entryDrumLoops:
+  - {fileID: 8300000, guid: a3d75543643e94c08a9c329af1bdcb26, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: 654bb5b929c4c417baaf56d71057e3c7, type: 3}
+  - {fileID: 8300000, guid: 8068d0b2d74874427a91f238a413496f, type: 3}
+  - {fileID: 8300000, guid: 9d56afa31ad8e405794a38c66ab5f302, type: 3}
+  - {fileID: 8300000, guid: 0fb896d4a09a64a01a6d2feb8945acf5, type: 3}
+  entryLoopCount: 1
+  bpm: 161
+  stepsPerLoop: 32
+  nodesPerStar: 8
+  starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  mazePattern: {fileID: 11400000, guid: a6ec550cd7f5743ea8637890719fdde7, type: 2}
+  chordProgression: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 91a384b87b6b94151942f2412a3745eb, type: 2}
+  - {fileID: 11400000, guid: fe9a91ca913ba4fb6afaf7b809a4831f, type: 2}
+  - {fileID: 11400000, guid: 426ad3444404746d9853caa561578625, type: 2}
+  - {fileID: 11400000, guid: 838ccfdde7364419f8358cf3b179b947, type: 2}
+  - {fileID: 11400000, guid: 11167fa4617b441d7aa6dec4267a12b0, type: 2}
+  - {fileID: 11400000, guid: e318268b8e9cf41f7b785e9f4a14e1fa, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

@@ -19,3 +19,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: ca1df9ac4a9b34c2d891b97075141cae, type: 2}
     - {fileID: 11400000, guid: 01d5a06a93dbc4649989f03be242f088, type: 2}
     loopMotifs: 0
+  - phaseName: Descent
+    motifs:
+    - {fileID: 11400000, guid: 71d8771ade7c04484bf40e07a09dcb53, type: 2}
+    loopMotifs: 0
