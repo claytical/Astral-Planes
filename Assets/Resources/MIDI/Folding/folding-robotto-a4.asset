@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: folding-robotto-a4
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: folding-robotto-a4
+    authoredRootMidi: 69
+    loopSteps: 64
+    events:
+    - step: 0
+      midiNote: 81
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 1
+      midiNote: 78
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 2
+      midiNote: 74
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 16
+      midiNote: 81
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 17
+      midiNote: 77
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 18
+      midiNote: 74
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 32
+      midiNote: 81
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 33
+      midiNote: 78
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 34
+      midiNote: 74
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 48
+      midiNote: 74
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 49
+      midiNote: 77
+      durSteps: 1
+      velocity01: 0.78740156
+    - step: 50
+      midiNote: 81
+      durSteps: 1
+      velocity01: 0.78740156
+    overlapPolicy: 0
+    clampToTrackRange: 0
+    octaveShift: 0
