@@ -103,6 +103,8 @@ public class CosmicDustGenerator : MonoBehaviour
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
+    // Cells spawned by GrowVoidDustDiskFromGrid that should not regrow when carved by a vehicle.
+    private readonly HashSet<Vector2Int> _voidGrowCells = new HashSet<Vector2Int>();
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -415,6 +417,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (_voidGrowCoroutines.ContainsKey(gp))
                     continue;
 
+                _voidGrowCells.Add(gp);
                 _voidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
             }
         }
@@ -1632,11 +1635,15 @@ public class CosmicDustGenerator : MonoBehaviour
             }
         }
 
+        bool isVoidCell = _voidGrowCells.Remove(cell);
+        if (isVoidCell)
+            _imprints?.Remove(cell); // no imprint = no future regrow triggers for this cell
+
         ClearCell(
             cell,
             DustClearMode.FadeAndHide,
             fadeSeconds,
-            scheduleRegrow: true
+            scheduleRegrow: !isVoidCell
         );
     }
     public void ResetDustToNoneInPlace(CosmicDust dust)
@@ -2180,6 +2187,7 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         _imprints?.Clear();
         _hiddenImprints?.Clear();
+        _voidGrowCells.Clear();
         _allSolidCount    = 0;
         _targetSolidCount = -1;
         _regrowingCount   = 0;

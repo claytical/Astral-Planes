@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
-  m_Name: Harmony
+  m_Name: Light Keys
   m_EditorClassIdentifier: 
   role: 1
   dustColors:

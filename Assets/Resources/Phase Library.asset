@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: Phase Library
   m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
   phases:
+  - phaseName: Folding
+    motifs:
+    - {fileID: 11400000, guid: d128ad57d4e11486bba9dd57cd935bbc, type: 2}
+    loopMotifs: 0
   - phaseName: We Begin
     motifs:
     - {fileID: 11400000, guid: 7cd3c840123284cdeb5315ec555a42d1, type: 2}

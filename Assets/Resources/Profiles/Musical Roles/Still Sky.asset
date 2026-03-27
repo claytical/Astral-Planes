@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
-  m_Name: Bass
+  m_Name: Still Sky
   m_EditorClassIdentifier: 
-  role: 0
+  role: 3
   dustColors:
-    baseColor: {r: 0.23529412, g: 0, b: 1, a: 1}
-    shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
+    baseColor: {r: 0, g: 0.9764706, b: 1, a: 0.7607843}
+    shadowColor: {r: 0, g: 0.54350716, b: 0.5566038, a: 1}
   baseAlpha: 1
   dustHardness01: 0.5
   mineNodeSpeed: 0.5
   mineNodeAgility: 0.5
-  midiPreset: 0
+  midiPreset: 3

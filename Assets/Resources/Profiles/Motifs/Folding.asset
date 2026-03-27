@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Folding
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: folding
+  displayName: folding
+  keyRootMidi: 55
+  entryDrumLoops:
+  - {fileID: 8300000, guid: 66128132176a645fba37751d4e518bd8, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: 9bc37986ec4c0483b96d6c2d68654b44, type: 3}
+  - {fileID: 8300000, guid: 2360740bfa34e487b85ed58ee031042c, type: 3}
+  - {fileID: 8300000, guid: 0fe576a594c974a5bb2de5289a636806, type: 3}
+  entryLoopCount: 1
+  bpm: 168
+  stepsPerLoop: 64
+  nodesPerStar: 16
+  starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
+  chordProgression: {fileID: 11400000, guid: 5406d8891b5c641b3b1e738eba3930bf, type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: b885511eba2ca4777893fd8dfc7bfab4, type: 2}
+  - {fileID: 11400000, guid: af201b28fe51c4112a2b19f24aa9a5fa, type: 2}
+  - {fileID: 11400000, guid: 640214d84e26e4b26a605ce9d3192251, type: 2}
+  - {fileID: 11400000, guid: 814ee8fdd68654f05b49f93aef5d413e, type: 2}
+  - {fileID: 11400000, guid: 4f86ffb0dc2a74cb6828cc3d98427728, type: 2}
+  - {fileID: 11400000, guid: 18f4a309bf1b54f6691a97ed4b32463c, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1
