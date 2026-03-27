@@ -131,9 +131,7 @@ public partial class GameFlowManager
         if (newMotif == null)
         {
             // Phase motifs exhausted (loopMotifs==false) -> advance to next phase
-//            var nextPhase = phaseTransitionManager.ResolveNextPhase();
-  
-  //          phaseTransitionManager.StartPhase(nextPhase, "GFM/StartNextMotifInPhase(Exhausted)");
+            phaseTransitionManager.AdvancePhase("GFM/StartNextMotifInPhase(Exhausted)");
 
             // World rebuild only (doHardReset=false; we've already reset for motif boundary)
             yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));

@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Howler
   m_EditorClassIdentifier: 
   shipName: Howler
-  allowedMidiPresets: 03000000
   description: Aggressive and bold. Favors wild leads and gritty percussion.
   arcadeMaxSpeed: 16
   arcadeAccel: 14
@@ -25,7 +24,8 @@ MonoBehaviour:
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  envScaleFloor: 0.7
+  carveRadiusMul: 1.77
+  carvePowerMul: 2.32
   mass: 1.2
-  capacity: 10
-  burnEfficiency: 1
+  capacity: 100
+  burnEfficiency: 0.62

@@ -2788,7 +2788,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             if (_compositionSpawnEffect != null)
             {
-                Destroy(_compositionSpawnEffect.gameObject);
+                _compositionSpawnEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 _compositionSpawnEffect = null;
             }
         }
