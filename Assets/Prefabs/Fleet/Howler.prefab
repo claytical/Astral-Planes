@@ -36,7 +36,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: -4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 3778538305823564081}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1970310610805977373
@@ -141,11 +142,11 @@ MonoBehaviour:
   manualReleaseQueueCapacity: 9
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
-  maxDigCellsSoft: 10
-  minDigCellsWhenBoosting: 1
-  impactDigCooldownSeconds: 0.12
-  digBaseCellCost: 1
-  digHardnessCost: 1
+  plowHalfWidthCells: 1
+  plowDepthCells: 1
+  plowMinSpeed: 1.5
+  plowTickSeconds: 0.06
+  plowFadeSeconds: 0.15
   profile: {fileID: 0}
   capacity: 70
   arcadeMaxSpeed: 14
@@ -157,6 +158,12 @@ MonoBehaviour:
   coastBrakeForce: 6
   stopSpeed: 0.05
   stopAngularSpeed: 5
+  soulSprite: {fileID: 2059141339769553833}
+  soulMinScale: 0.3
+  soulMaxScale: 1.2
+  soulScaleLerpSpeed: 14
+  soulAlphaMin: 0
+  soulAlphaMax: 0.85
   inputDeadzone: 0.2
   inputTimeout: 0.15
   enableRecovery: 1
@@ -181,16 +188,22 @@ MonoBehaviour:
   keepDustClearAroundVehicle: 1
   vehicleKeepClearRadiusCells: 1
   vehicleKeepClearRefreshSeconds: 0.1
+  useVehiclePlacementResonance: 1
+  vehiclePlacementColorLerpSpeed: 10
+  vehiclePlacementMinTint: 0.08
+  vehiclePlacementOscillation: 0.18
+  vehiclePlacementOscillationSpeed: 1
   carveSpawnRestPocket: 1
   spawnRestPocketAutoRadius: 1
   spawnRestPocketRadiusCells: 1
   spawnRestPocketFadeSeconds: 0.05
   spawnRestPocketDelaySeconds: 0
   logScaleCalibrationOnAssign: 1
-  manualReleaseWindowSteps: 1.25
   manualReleaseUseArmLock: 1
   manualReleaseArmAheadSteps: 6
   manualReleaseAutoCommitEpsSteps: 0.35
+  manualReleaseGracePeriodSteps: 0.5
+  releaseCue: {fileID: 0}
   trailSlotSpacing: 0.55
   trailFirstSlotOffset: 0.7
   trailHistoryCapacity: 48
@@ -433,9 +446,109 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
-  ringSprite: {fileID: 0}
-  ringFillLerpSpeed: 8
-  dotPrefab: {fileID: 0}
-  dotRadius: 0.5
-  dotActiveColor: {r: 1, g: 1, b: 1, a: 1}
-  dotSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
+  circleMaxRadius: 0.65
+  circleMinRadius: 0.35
+  circleAlphaMin: 0.5
+  circleAlphaMax: 0.9
+  circleSortingLayer: Default
+  circleSortingOrder: -1
+  circleLerpSpeed: 10
+  circleSprite: {fileID: 0}
+  dotSprite: {fileID: 0}
+  dotOrbitRadius: 0.75
+  dotSize: 0.1
+  dotSortingLayer: Default
+  dotSortingOrder: 2
+  dotColorActive: {r: 1, g: 1, b: 1, a: 0.9}
+  dotColorSpent: {r: 1, g: 1, b: 1, a: 0.15}
+--- !u!1 &7076781707541423879
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3778538305823564081}
+  - component: {fileID: 2059141339769553833}
+  m_Layer: 0
+  m_Name: Soul
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3778538305823564081
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7076781707541423879}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 4}
+  m_LocalScale: {x: 0.14999999, y: 0.14999999, z: 0.29999998}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 2614095863033673403}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &2059141339769553833
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7076781707541423879}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 8563771761307995811, guid: 5a2c3287586914668b386b9d44a42033,
+    type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.62, y: 1.16}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0

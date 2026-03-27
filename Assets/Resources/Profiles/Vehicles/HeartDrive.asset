@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: HeartDrive
   m_EditorClassIdentifier: 
   shipName: HeartDrive
-  allowedMidiPresets: 00000000
   description: Expressive and melodic. Leans into solos and emotional tones.
   arcadeMaxSpeed: 12
   arcadeAccel: 8
@@ -25,7 +24,8 @@ MonoBehaviour:
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  envScaleFloor: 0.6
+  carveRadiusMul: 1
+  carvePowerMul: 2.02
   mass: 2.2
-  capacity: 10
-  burnEfficiency: 1.1
+  capacity: 100
+  burnEfficiency: 0.89

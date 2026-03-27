@@ -24,7 +24,42 @@ public class PhaseTransitionManager : MonoBehaviour
 
     public NoteSetFactory noteSetFactory;
 
-    public int FirstPhaseIndex => 0;
+    public int FirstPhaseIndex  => 0;
+    public int PhaseCount       => (chapterLibrary != null && chapterLibrary.phases != null) ? chapterLibrary.phases.Count : 0;
+
+    /// <summary>
+    /// Advances to the next phase, respecting loopChapters and holdOnLastChapter settings.
+    /// Calls StartChapter internally, which resets the motif index and applies the new motif.
+    /// </summary>
+    public void AdvancePhase(string who)
+    {
+        if (chapterLibrary == null || chapterLibrary.phases == null || chapterLibrary.phases.Count == 0)
+        {
+            Debug.LogWarning($"[CHAPTER] AdvancePhase: no phases in library, by {who}");
+            return;
+        }
+
+        int count = chapterLibrary.phases.Count;
+        int next  = currentPhaseIndex + 1;
+
+        if (next >= count)
+        {
+            if (loopChapters)
+            {
+                next = 0;
+            }
+            else
+            {
+                Debug.Log($"[CHAPTER] All phases exhausted (loopChapters=false holdOnLast={holdOnLastChapter}); by {who}");
+                if (holdOnLastChapter)
+                    next = count - 1; // restart last phase's motifs from top
+                else
+                    return;           // no-op: stay on final motif
+            }
+        }
+
+        StartChapter(next, who);
+    }
 
     // ---------------------------
     // CHAPTER START (PHASE)

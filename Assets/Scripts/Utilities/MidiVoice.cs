@@ -148,10 +148,11 @@ public class MidiVoice : MonoBehaviour
         if (midiStreamPlayer == null)
             return;
 
-        if (overridePreset != preset)
-        {
-            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = overridePreset;
-        }
+        // Set preset/bank unconditionally before queuing — MPTK processes events
+        // asynchronously, so restoring after MPTK_PlayEvent would clobber the
+        // override before the note is actually rendered.
+        midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = overridePreset;
+        midiStreamPlayer.MPTK_Channels[channel].ForcedBank   = overrideBank;
 
         var ev = new MPTKEvent
         {
@@ -163,11 +164,6 @@ public class MidiVoice : MonoBehaviour
         };
 
         midiStreamPlayer.MPTK_PlayEvent(ev);
-        if (overridePreset != preset)
-        {
-            midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
-        }
-
     }
     /// <summary>
     /// Short tactile confirmation. Duration is fixed and NOT trimmed.
