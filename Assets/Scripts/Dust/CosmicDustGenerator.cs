@@ -247,7 +247,8 @@ public class CosmicDustGenerator : MonoBehaviour
             _voidGrowCoroutines.Clear();
         }
 
-        // Hide/discard transient cells from the outgoing motif so nothing "pops" during coral.
+        // Dismiss transient cells from the outgoing motif using the same dissipation visual as
+        // vehicle carving — no abrupt pop/cut.
         EnsureCellGrid();
         if (_cellState != null && _cellGo != null)
         {
@@ -255,18 +256,27 @@ public class CosmicDustGenerator : MonoBehaviour
             {
                 for (int y = 0; y < _cellH; y++)
                 {
-                    var gp = new Vector2Int(x, y);
                     var st = _cellState[x, y];
-
-                    if (st == DustCellState.PendingRegrow ||
-                        st == DustCellState.Regrowing ||
-                        st == DustCellState.Clearing)
+                    if (st == DustCellState.PendingRegrow)
                     {
+                        // Not yet visible — instant hide is fine.
                         _cellState[x, y] = DustCellState.Empty;
-
                         var go = _cellGo[x, y];
                         if (hideTransientDust && go != null)
                             HideCellGO(go);
+                    }
+                    else if (st == DustCellState.Regrowing)
+                    {
+                        // Was growing in — fade out instead of cutting off.
+                        _cellState[x, y] = DustCellState.Clearing;
+                        var go = _cellGo[x, y];
+                        if (hideTransientDust && go != null)
+                            FadeAndHideCellGO(go);
+                    }
+                    else if (st == DustCellState.Clearing)
+                    {
+                        // DissipateAndHideVisualOnly is already running — let it complete.
+                        // OnDustVisualFadedOut will transition the state to Empty.
                     }
                 }
             }
@@ -1543,7 +1553,6 @@ public class CosmicDustGenerator : MonoBehaviour
             // leave it alone (defensive).
             if (TryGetCellState(gp, out var st) && st == DustCellState.Clearing)
                 SetCellState(gp, DustCellState.Empty);        }
-
         dust.FinalizeClearedVisuals();
     }
 

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: One Step Tunnel
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
   patternType: 6
-  regrowDelay: 8
+  regrowDelay: 4
   clearBoxCount: 4
   clearBoxWidth: 5
   clearBoxHeight: 5
