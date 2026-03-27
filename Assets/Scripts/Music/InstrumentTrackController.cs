@@ -11,8 +11,13 @@ public struct TransportFrame
     public int playheadBin;
     public int boundarySerial;
 }
+public enum NoteCommitMode { Performance, Composition }
+
 public class InstrumentTrackController : MonoBehaviour
 {
+    [Header("Note Commit Mode")]
+    [Tooltip("Performance: all collectables spawn at once; root-note fallback on mistimed release. Composition: collectables spawn step-by-step; collected note always placed at the release step.")]
+    public NoteCommitMode noteCommitMode = NoteCommitMode.Performance;
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();

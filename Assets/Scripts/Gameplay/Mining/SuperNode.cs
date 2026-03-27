@@ -6,6 +6,7 @@ public class SuperNode : MonoBehaviour
 {
     [SerializeField] private SoloVoice soloVoice;
     [SerializeField] public DrumTrack drumTrack;
+    private InstrumentTrack _track;
     [SerializeField] private float spawnCollisionGraceSeconds = 0.15f;
     [SerializeField] private float minImpactSpeed = 2.0f;   // tune
     [SerializeField] private bool despawnOnNextBoundary = true;
@@ -30,10 +31,11 @@ public class SuperNode : MonoBehaviour
                 drumTrack = FindAnyObjectByType<DrumTrack>();
         }
     }
-    public void Initialize(SoloVoice sv, DrumTrack drum)
+    public void Initialize(SoloVoice sv, DrumTrack drum, InstrumentTrack track = null)
     {
         soloVoice = sv;
         drumTrack = drum;
+        _track    = track;
     }
     private void OnEnable()
     {
@@ -84,10 +86,11 @@ public class SuperNode : MonoBehaviour
 
         _triggered = true;
 
-        var tracks = ResolveTracks();
-        if (soloVoice != null)
-            soloVoice.PlayImmediateQuantizedLickFromTracks(tracks);    
-        
+        if (_track != null)
+            _track.InstantFillAllBins();
+
+        Destroy(gameObject);
+
     }
     private void OnLoopBoundary()
     {
