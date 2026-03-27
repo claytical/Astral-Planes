@@ -839,6 +839,22 @@ public class DrumTrack : MonoBehaviour
             intensity01 = _lastIntensity01;
         _lastIntensity01 = intensity01;
 
+        // Empty-bin gate: if every track has no notes in the bin currently playing,
+        // force intensity to 0. Intentionally does NOT update _lastIntensity01 so the
+        // energy-burn history is preserved and intensity recovers smoothly when notes appear.
+        var _ctrl = _gfm?.controller;
+        if (_ctrl?.tracks != null)
+        {
+            bool allEmpty = true;
+            foreach (var track in _ctrl.tracks)
+            {
+                if (track == null) continue;
+                int bin = completedLoops % Mathf.Max(1, track.loopMultiplier);
+                if (track.HasAnyNoteInBin(bin)) { allEmpty = false; break; }
+            }
+            if (allEmpty) intensity01 = 0f;
+        }
+
         if (logBeatSeqGates) Debug.Log(
             $"[DRUM][BeatSeq] motif={_motif.motifId} total={totalSpent:F3} delta={delta:F3} ema={_burnBaselineEma:F3} " +
             $"ratio={ratio:F3} intensity={intensity01:F3} loops={loopsCt}"

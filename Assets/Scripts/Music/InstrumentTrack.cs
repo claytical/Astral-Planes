@@ -949,7 +949,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
         if (_compositionSpawnEffect != null)
         {
-            Destroy(_compositionSpawnEffect.gameObject);
+            _compositionSpawnEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             _compositionSpawnEffect = null;
         }
 
@@ -1819,6 +1819,17 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         for (int i = 0; i < persistentLoopNotes.Count; i++)
             if (persistentLoopNotes[i].stepIndex == stepAbs) return true;
+        return false;
+    }
+    public bool HasAnyNoteInBin(int binIndex)
+    {
+        int start = binIndex * BinSize();
+        int end   = start + BinSize();
+        for (int i = 0; i < persistentLoopNotes.Count; i++)
+        {
+            int s = persistentLoopNotes[i].stepIndex;
+            if (s >= start && s < end) return true;
+        }
         return false;
     }
     /// <summary>
@@ -2695,6 +2706,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             _compositionSpawnEffect = Instantiate(compositionSpawnEffectPrefab, effectPos, Quaternion.identity);
             var main = _compositionSpawnEffect.main;
             main.startColor = new ParticleSystem.MinMaxGradient(trackColor);
+            main.stopAction = ParticleSystemStopAction.Destroy;
             _compositionSpawnEffect.Play();
         }
 

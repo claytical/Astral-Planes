@@ -56,13 +56,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     // ---------------------------------------------------------------
     private float carveIntervalSeconds = 0.08f;
 
-    [Header("Dust Collision Ignore (MineNode only)")]
-    [SerializeField] private LayerMask dustTerrainMask;
-    [SerializeField] private float dustIgnoreQueryRadiusWorld = 2.0f;
-    [SerializeField] private int dustIgnoreMaxHits = 32;
-
-    [SerializeField] private int dustLayerIndex = 7;
-
     private float _carveTimer;
     private int   _dustCellsCarved = 0;
     private Rigidbody2D _rb;
