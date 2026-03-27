@@ -15408,6 +15408,8 @@ MonoBehaviour:
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
   binAllocated: 
   _binCursor: 0
   midiVoice: {fileID: 342701843}
@@ -15418,6 +15420,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!114 &342701842
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15952,6 +15955,8 @@ MonoBehaviour:
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
   binAllocated: 
   _binCursor: 0
   midiVoice: {fileID: 627412780}
@@ -15962,6 +15967,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -16077,6 +16083,8 @@ MonoBehaviour:
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
   binAllocated: 
   _binCursor: 0
   midiVoice: {fileID: 652946510}
@@ -16087,6 +16095,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!114 &652946509
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17261,6 +17270,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d477bd438cd9324ca89a2934c7d01ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noteCommitMode: 1
   tracks:
   - {fileID: 342701841}
   - {fileID: 1690824280}
@@ -18494,6 +18504,8 @@ MonoBehaviour:
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
   binAllocated: 
   _binCursor: 0
   midiVoice: {fileID: 1690824283}
@@ -18504,6 +18516,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: bass-folding
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: bass-folding
-  roleProfile: {fileID: 11400000, guid: b63a78a8afc9544ffaeacdd2306d6ee8, type: 2}
+  roleProfile: {fileID: 11400000, guid: 56fb4948a3b7c4c6f897bc4a78bd2c2d, type: 2}
   riff: {fileID: 11400000, guid: 09ab340744de14a47ae488f364f8b292, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []

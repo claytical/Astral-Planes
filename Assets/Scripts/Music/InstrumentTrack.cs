@@ -166,6 +166,24 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private readonly Dictionary<int, int> _burstWroteBin             = new(); // burstId -> targetBin (cursor bin)
     private readonly Dictionary<int, int> _burstTargetBin            = new(); // burstId -> allocated bin (for rollback on 0-note discard)
     private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
+
+    // ---- Composition Mode: step-sequenced burst spawning ----
+    private struct PendingCompositionLaunch
+    {
+        public int absStep;
+        public int note;
+        public int duration;
+        public Vector3 originWorld;
+        public Vector3 targetWorld;
+        public Vector2Int targetCell;
+        public bool cellHasDust;
+        public NoteSet noteSet;
+        public int burstId;
+    }
+    private readonly List<PendingCompositionLaunch> _pendingCompositionLaunches = new();
+    private bool _compositionStepListenerActive;
+    [SerializeField] private ParticleSystem compositionSpawnEffectPrefab;
+    private ParticleSystem _compositionSpawnEffect;
     [SerializeField] private bool[] binAllocated;
     [SerializeField] private int _binCursor = 0;    // counts bins allocated on this track, including silent skips
     [Header("Components")]
@@ -307,6 +325,71 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return _currentNoteSet;
     }
     
+    /// <summary>
+    /// Returns the authored MIDI note for the given absolute step by looking up
+    /// the NoteSet for the bin that owns that step. Falls back to authoredRootMidi
+    /// if no NoteSet or no event exists at that local step.
+    /// </summary>
+    public int GetAuthoredNoteAtAbsStep(int absStep)
+    {
+        int binSz = BinSize();
+        if (binSz <= 0) return authoredRootMidi;
+        int binIndex = absStep / binSz;
+        int localStep = absStep % binSz;
+        var noteSet = GetNoteSetForBin(binIndex);
+        if (noteSet != null)
+            return noteSet.GetNoteForPhaseAndRole(this, localStep);
+        return authoredRootMidi;
+    }
+
+    /// <summary>
+    /// Instantly overwrites the entire track with perfect authored notes for every bin,
+    /// following each bin's chord progression. Called by SuperNode on collision.
+    /// </summary>
+    public void InstantFillAllBins()
+    {
+        int binSz = BinSize();
+        int bins  = Mathf.Max(1, loopMultiplier);
+
+        // Clear all existing notes first
+        for (int b = 0; b < bins; b++)
+            ClearBinNotesKeepAllocated(b);
+
+        // Write authored notes bin-by-bin
+        for (int b = 0; b < bins; b++)
+        {
+            var ns = GetNoteSetForBin(b);
+            if (ns == null) continue;
+
+            int binStart = b * binSz;
+
+            if (ns.persistentTemplate != null && ns.persistentTemplate.Count > 0)
+            {
+                // Riff-authoritative: step is local to the bin (0..binSz-1)
+                foreach (var (step, note, dur, vel, authoredRoot) in ns.persistentTemplate)
+                {
+                    int absStep = binStart + step;
+                    AddNoteToLoop(absStep, note, dur, vel, lightMarkerNow: true, authoredRoot);
+                }
+            }
+            else
+            {
+                // Generative fallback
+                var steps = ns.GetStepList();
+                foreach (int localStep in steps)
+                {
+                    int absStep = binStart + localStep;
+                    int note    = ns.GetNoteForPhaseAndRole(this, localStep);
+                    AddNoteToLoop(absStep, note, 120, 1.0f, lightMarkerNow: true, authoredRootMidi);
+                }
+            }
+
+            SetBinFilled(b, true);
+        }
+
+        _loopCacheDirtyPending = true;
+    }
+
     public bool IsStepInFilledBin(int step)
     {
         EnsureBinList();
@@ -856,6 +939,20 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _burstRemaining?.Clear();
         _burstSteps?.Clear();
         _burstTargetBin?.Clear();
+
+        // Clear any pending composition-mode launches and unsubscribe the step listener.
+        _pendingCompositionLaunches.Clear();
+        if (_compositionStepListenerActive && drumTrack != null)
+        {
+            drumTrack.OnStepChanged -= OnCompositionStepFired;
+            _compositionStepListenerActive = false;
+        }
+        if (_compositionSpawnEffect != null)
+        {
+            Destroy(_compositionSpawnEffect.gameObject);
+            _compositionSpawnEffect = null;
+        }
+
         return destroyed;
     }
     private float RemainingActiveWindowSec() {
@@ -1532,7 +1629,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// Commit a released note into the persistent loop at an absolute step. This is where burst
     /// completion and bin fill logic occurs for manual release.
     /// </summary>
-    public void CommitManualReleasedNote(int stepAbs, int midiNote, int durationTicks, float velocity127, int authoredRootMidi, int burstId, bool lightMarkerNow)
+    public void CommitManualReleasedNote(int stepAbs, int midiNote, int durationTicks, float velocity127, int authoredRootMidi, int burstId, bool lightMarkerNow, bool skipChordQuantize = false)
     {
         if (drumTrack == null) return;
 
@@ -1565,7 +1662,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Replace-or-add: enforce one persistent note per (track, stepAbs) for stability.
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
 
-        AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi);
+        AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
 
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);
@@ -1909,9 +2006,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
     }
-    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue)
+    private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
     {
-        int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi); 
+        int qNote = skipChordQuantize ? note : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi); 
         Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
 
@@ -2185,6 +2282,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
 
     Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
+
+    // --- Composition mode: step-sequenced spawn (one collectable per loop step) ---
+    if (controller != null && controller.noteCommitMode == NoteCommitMode.Composition)
+    {
+        EnqueueCompositionSpawns(noteSet, localSteps, targetBin, binSize, maxToSpawn,
+            originWorld, spawnJitterRadius, burstId);
+        return;
+    }
 
     // --- Attempt spawns ---
     int spawnedCount = 0;
@@ -2475,6 +2580,206 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Composition Mode: step-sequenced burst helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Pre-allocates grid cells for a burst and queues one PendingCompositionLaunch per step.
+    /// Each collectable launches (with SFX) when the loop's step counter reaches its absStep.
+    /// </summary>
+    private void EnqueueCompositionSpawns(
+        NoteSet noteSet,
+        List<int> localSteps,
+        int targetBin,
+        int binSize,
+        int maxToSpawn,
+        Vector3? originWorld,
+        float spawnJitterRadius,
+        int burstId)
+    {
+        var dustGen   = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+        var nv        = controller?.noteVisualizer;
+        int gridW     = drumTrack != null ? drumTrack.GetSpawnGridWidth()  : 0;
+        int gridH     = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
+
+        if (gridW <= 0 || gridH <= 0 || dustGen == null || drumTrack == null)
+        {
+            _currentBurstArmed    = false;
+            _currentBurstRemaining = 0;
+            Debug.LogWarning($"[TRK:COMP] ABORT track={name} burstId={burstId} reason=grid_or_dust_invalid");
+            return;
+        }
+
+        var usedCells   = new HashSet<Vector2Int>();
+        var usedAbsSteps = new HashSet<int>();
+        int queued = 0;
+
+        int fullSteps = BinSize() * maxLoopMultiplier;
+
+        foreach (int step in localSteps)
+        {
+            if (maxToSpawn > 0 && queued >= maxToSpawn) break;
+
+            int absStep = targetBin * binSize + step;
+            if (!usedAbsSteps.Add(absStep)) continue;
+
+            int note = noteSet.GetNoteForPhaseAndRole(this, step);
+            int dur  = CalculateNoteDurationFromSteps(step, noteSet);
+
+            float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
+
+            Vector2Int cell;
+            if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCells, out cell, stepNorm)) continue;
+            usedCells.Add(cell);
+
+            bool hasDust = dustGen.HasDustAt(cell);
+            if (hasDust)
+            {
+                const float jailHold = 4f;
+                dustGen.CreateJailCenterForCollectable(cell, jailHold, ownerId: burstId);
+            }
+
+            Vector3 targetWorld = drumTrack.GridToWorldPosition(cell);
+            if (originWorld.HasValue && spawnJitterRadius > 0f)
+                targetWorld += (Vector3)(UnityEngine.Random.insideUnitCircle * spawnJitterRadius);
+
+            _pendingCompositionLaunches.Add(new PendingCompositionLaunch
+            {
+                absStep     = absStep,
+                note        = note,
+                duration    = dur,
+                originWorld = originWorld ?? transform.position,
+                targetWorld = targetWorld,
+                targetCell  = cell,
+                cellHasDust = hasDust,
+                noteSet     = noteSet,
+                burstId     = burstId,
+            });
+            queued++;
+        }
+
+        if (queued <= 0)
+        {
+            _currentBurstArmed    = false;
+            _currentBurstRemaining = 0;
+            OnCollectableBurstCleared?.Invoke(this, burstId, false);
+            Debug.LogWarning($"[TRK:COMP] EMPTY track={name} burstId={burstId}");
+            return;
+        }
+
+        // Burst bookkeeping (mirrors existing SPAWN_NOW path).
+        _burstRemaining[burstId]    = queued;
+        _burstTotalSpawned[burstId] = queued;
+        _burstCollected[burstId]    = 0;
+        _currentBurstRemaining      = queued;
+
+        SetBinAllocated(targetBin, true);
+        _burstTargetBin[burstId] = targetBin;
+        if (GetBinCursor() <= targetBin)  SetBinCursor(targetBin + 1);
+        if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
+
+        // Subscribe to per-step events (idempotent).
+        if (!_compositionStepListenerActive && drumTrack != null)
+        {
+            drumTrack.OnStepChanged += OnCompositionStepFired;
+            _compositionStepListenerActive = true;
+        }
+
+        // Spawn the origin effect at MineNode destruction time (now), not at first step launch.
+        if (_compositionSpawnEffect == null && compositionSpawnEffectPrefab != null)
+        {
+            Vector3 effectPos = originWorld ?? transform.position;
+            _compositionSpawnEffect = Instantiate(compositionSpawnEffectPrefab, effectPos, Quaternion.identity);
+            var main = _compositionSpawnEffect.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(trackColor);
+            _compositionSpawnEffect.Play();
+        }
+
+        Debug.Log($"[TRK:COMP] QUEUED track={name} burstId={burstId} count={queued} targetBin={targetBin}");
+    }
+
+    /// <summary>
+    /// Fires when the drum transport advances a step. Launches any pending collectable
+    /// whose absStep matches the current step index.
+    /// </summary>
+    private void OnCompositionStepFired(int step, int leaderSteps)
+    {
+        for (int i = _pendingCompositionLaunches.Count - 1; i >= 0; i--)
+        {
+            var launch = _pendingCompositionLaunches[i];
+            if (launch.absStep != step) continue;
+
+            _pendingCompositionLaunches.RemoveAt(i);
+
+            var nv = controller?.noteVisualizer;
+
+            // Instantiate collectable at the MineNode origin.
+            var go = Instantiate(collectablePrefab, launch.originWorld, Quaternion.identity, collectableParent);
+            if (!go) continue;
+            if (!go.TryGetComponent(out Collectable c)) { Destroy(go); continue; }
+
+            c.burstId                = launch.burstId;
+            c.intendedStep           = launch.absStep;
+            c.intendedBin            = _burstTargetBin.TryGetValue(launch.burstId, out var bin) ? bin : 0;
+            c.assignedInstrumentTrack = this;
+            c.isTrappedInDust        = launch.cellHasDust;
+
+            if (_destroyHandlers.TryGetValue(c, out var oldH) && oldH != null)
+            {
+                c.OnDestroyed -= oldH;
+                _destroyHandlers.Remove(c);
+            }
+            Action handler = () => OnCollectableDestroyed(c);
+            _destroyHandlers[c] = handler;
+            c.OnDestroyed += handler;
+
+            // Per-launch marker (appears as the collectable launches, not upfront).
+            if (nv != null)
+            {
+                var markerGO = nv.PlacePersistentNoteMarker(this, launch.absStep, lit: false, launch.burstId);
+                if (markerGO)
+                {
+                    var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
+                    tag.track         = this;
+                    tag.step          = launch.absStep;
+                    tag.burstId       = launch.burstId;
+                    tag.isPlaceholder = true;
+                    var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
+                    ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
+                    c.BindMarkerAtSpawn(markerGO.transform, launch.absStep);
+                }
+            }
+
+            c.ApplyTrackVisuals(this);
+
+            // SFX: play the authored note as the collectable launches (one-time MIDI playthrough).
+            PlayOneShotMidi(launch.note, 100f, launch.duration);
+
+            // Begin intro flight from origin to grid cell.
+            _scratchSteps.Clear();
+            _scratchSteps.Add(launch.absStep);
+            c.BeginSpawnArrival(launch.originWorld, launch.targetWorld,
+                launch.note, launch.duration, this, launch.noteSet, _scratchSteps);
+
+            spawnedCollectables.Add(go);
+        }
+
+        // Unsubscribe once all pending launches have fired.
+        if (_pendingCompositionLaunches.Count == 0 && _compositionStepListenerActive)
+        {
+            if (drumTrack != null) drumTrack.OnStepChanged -= OnCompositionStepFired;
+            _compositionStepListenerActive = false;
+            controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
+
+            if (_compositionSpawnEffect != null)
+            {
+                Destroy(_compositionSpawnEffect.gameObject);
+                _compositionSpawnEffect = null;
+            }
+        }
     }
 
     public float GetSecondsUntilNextLoopBoundaryDSP()

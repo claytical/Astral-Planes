@@ -564,11 +564,13 @@ public class Vehicle : MonoBehaviour
             return;
         }
 
-        int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
-        int targetLocal = ((targetAbsStep % binSize) + binSize) % binSize;
-        bool matchesAuthored = (p.authoredAbsStep < 0) || (targetAbsStep == p.authoredAbsStep);
-        bool localMatch = (targetLocal == p.authoredLocalStep);
-        int chosenMidi = (matchesAuthored || localMatch) ? p.collectedMidi : p.authoredRootMidi;
+        bool compositionMode = p.track.controller != null &&
+                               p.track.controller.noteCommitMode == NoteCommitMode.Composition;
+        // Composition mode: use the note the player physically collected.
+        // Performance mode: look up the authored note for whatever step the player released on.
+        int chosenMidi = compositionMode
+            ? p.collectedMidi
+            : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = p.velocity127;
@@ -593,7 +595,8 @@ public class Vehicle : MonoBehaviour
             velocity127: commitVel,
             authoredRootMidi: p.authoredRootMidi,
             burstId: p.burstId,
-            lightMarkerNow: true
+            lightMarkerNow: true,
+            skipChordQuantize: compositionMode
         );
 
         // Play the note immediately — the playhead is at this step right now.

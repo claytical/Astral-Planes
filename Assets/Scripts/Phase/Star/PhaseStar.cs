@@ -1953,7 +1953,7 @@ public class PhaseStar : MonoBehaviour
             Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
             return;
         }
-        sn.Initialize(soloVoice, _drum);
+        sn.Initialize(soloVoice, _drum, targetTrack);
 
     }
 
