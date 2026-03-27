@@ -4,14 +4,12 @@ using UnityEngine;
 [Serializable]
 public struct RiffNoteEvent
 {
-    [Range(0, 15)]
-    public int step;          // local step inside the 16-step bin
+    public int step;          // absolute step index within the riff loop (0..loopSteps-1)
 
     [Range(0, 127)]
     public int midiNote;      // authored pitch (in authoredRoot context)
 
-    [Range(1, 16)]
-    public int durSteps;      // authored duration (step units)
+    public int durSteps;      // authored duration in steps (1..loopSteps)
 
     [Range(0f, 1f)]
     public float velocity01;  // feeds persistentLoopNotes.velocity
@@ -30,7 +28,6 @@ public struct Riff
 
     [Range(0, 127)]
     public int authoredRootMidi;   // “this riff is a chord rooted at C”
-    [Range(16, 32)]
     public int loopSteps;
     public List<RiffNoteEvent> events;
 

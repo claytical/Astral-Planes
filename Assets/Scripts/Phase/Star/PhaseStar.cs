@@ -247,6 +247,9 @@ public class PhaseStar : MonoBehaviour
     }
 
     private GameFlowManager gfm;
+
+    [SerializeField] private float minDwellSeconds = 2f;
+
     // -------------------- Lifecycle --------------------
     void Start()
     {
@@ -1665,6 +1668,7 @@ public class PhaseStar : MonoBehaviour
 
         _starCharge.TryGetValue(previewRing[currentShardIndex].role, out float curCharge);
         float curScore = curCharge - _highlightDwellSec * highlightDwellPenaltyPerSec;
+        if (_highlightDwellSec < minDwellSeconds) return;   
         if (bestIdx != currentShardIndex && bestScore >= curScore + dominantRoleSwitchDelta)
         {
             currentShardIndex = bestIdx;

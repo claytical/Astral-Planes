@@ -17,9 +17,7 @@ MonoBehaviour:
     baseColor: {r: 0.99215686, g: 0, b: 1, a: 1}
     shadowColor: {r: 0.5619831, g: 0, b: 1, a: 0.72156864}
   baseAlpha: 1
-  dustHardness01: 0.1
-  mineNodeSpeed: 0.864
-  mineNodeClearing: 0.2
-  mineNodeAgility: 0.7
+  dustHardness01: 0.5
+  mineNodeSpeed: 0.5
+  mineNodeAgility: 0.5
   midiPreset: 8
-  allowedMidiPresets: 06000000

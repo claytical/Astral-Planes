@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 61c29f65464264bd8aaca35b6879dc9a, type: 3}
-  m_Name: 2 Strokes
+  m_Name: Rings at 6
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
-  patternType: 4
-  regrowDelay: 1
+  patternType: 3
+  regrowDelay: 3
   clearBoxCount: 4
   clearBoxWidth: 5
   clearBoxHeight: 5

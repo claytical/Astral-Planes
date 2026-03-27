@@ -1571,7 +1571,7 @@ public class Vehicle : MonoBehaviour
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
                 if (gen.HasDustAt(cell))
                     
-                    gen.CarveDustByVehicle(cell, fade, motif);
+                    gen.CarveDustByVehicle(cell, fade);
             }
         }
     }
