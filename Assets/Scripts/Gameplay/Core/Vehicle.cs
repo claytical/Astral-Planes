@@ -7,80 +7,22 @@ using Random = UnityEngine.Random;
 public class Vehicle : MonoBehaviour
 {
 
-    // ---------------------------------------------------------------------
-    // Manual Note Release (FIFO queue)
-    // ---------------------------------------------------------------------
-    [Header("Manual Note Release")]
-    private const bool enableManualNoteRelease = true;
-    [SerializeField] private int manualReleaseQueueCapacity = 9;
-
-    [Tooltip("When releasing onto an already-occupied step, multiply committed velocity by this factor.")]
-    [SerializeField] private float occupiedStepVelocityMultiplier = 1.25f;
-
-    [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
-    [SerializeField] private bool occupiedStepOctaveAccent = true;
-    [Header("Dust Plow")]
-    [SerializeField] private int   plowHalfWidthCells = 1;
-    [SerializeField] private int   plowDepthCells     = 1;
-    [SerializeField] private float plowMinSpeed       = 1.5f;
-    [SerializeField] private float plowTickSeconds    = 0.06f;
-    [SerializeField] private float plowFadeSeconds    = 0.15f;
     private float _nextPlowTickAt;
     public ShipMusicalProfile profile;
-    public float capacity = 10f;
-    private float _baseBurnAmount = 1f;
+    [SerializeField] private VehicleConfig vehicleConfig;
+    [HideInInspector] public float capacity = 10f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     private bool _boostCostFree;           // When true, boost ignores energy requirement and skips burn
-    // === Arcade RB2D tuning ===
-    [Header("Arcade Movement")]
-    [SerializeField]
-    public float arcadeMaxSpeed = 14f;
-    [SerializeField] private float arcadeAccel = 40f;
-    [SerializeField] private float arcadeBoostAccel = 80f;
-    [SerializeField] private float arcadeLinearDamping = 2f;   // typical 0–5
-    [SerializeField] private float arcadeAngularDamping = 0.5f; // optional: reduces spin after bumps
-    [SerializeField] private float coastBrakeForce   = 6f;   // N per (m/s). F = -k*v (independent of mass)
-    [SerializeField] private float stopSpeed         = 0.05f; // snap-to-rest threshold (m/s)
-    [SerializeField] private float stopAngularSpeed  = 5f;   // deg/s
+    [HideInInspector] public float arcadeMaxSpeed = 14f;
     private float _cumulativeEnergySpent = 0f;
 
     [Tooltip("Child SpriteRenderer clone of the vehicle art. Normally hidden. Scales up as placement becomes available.")]
     [SerializeField] private SpriteRenderer soulSprite;
 
-
-    [Tooltip("Local scale for the hidden soul sprite when inactive.")]
-    [SerializeField] private float soulMinScale = 0.3f;
-
-    [Tooltip("Local scale for the soul sprite at full placement readiness.")]
-    [SerializeField] private float soulMaxScale = 1.2f;
-
-    [Tooltip("How quickly the soul sprite scale follows the pulse.")]
-    [SerializeField] private float soulScaleLerpSpeed = 14f;
-
-    [Tooltip("Soul alpha at the first visible hint of placement availability.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float soulAlphaMin = 0.0f;
-
-    [Tooltip("Soul alpha at full placement readiness.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float soulAlphaMax = 0.85f;
-
     private Color _soulDefaultColor = Color.white;
-    [Header("Input Filtering")]
-    [SerializeField] float inputDeadzone = 0.20f;   // tune to your stick
-    [SerializeField] float inputTimeout  = 0.15f;   // seconds before we auto-zero if Move() isn’t called
-    [Header("Recovery / Out-of-Bounds")]
-    [SerializeField] private bool enableRecovery = true;
-    [SerializeField] private float viewportOobMargin = 0.15f; // allow some overshoot before recovery
-    [SerializeField] private float minSecondsBetweenRecoveries = 0.75f;
-    [SerializeField] private int respawnSearchRadiusCells = 8;
-    [SerializeField] private float stuckSpeedThreshold = 0.35f;   // "not moving"
-    [SerializeField] private float stuckSecondsInVoid = 0.60f;    // time inside void + not moving before eject
 
     [Header("Gravity Void Detection")]
-    [SerializeField] private LayerMask gravityVoidMask; // set in inspector OR leave 0 and use tag fallback below
-    [SerializeField] private string gravityVoidTag = "GravityVoid"; // optional fallback if you don’t want a layer
-    [SerializeField] private float voidProbeRadiusWorld = 0.6f; // around vehicle center
+    [SerializeField] private LayerMask gravityVoidMask; // set in inspector OR leave 0 and use tag fallback in VehicleConfig
 
     private Vector3 _lastSafeWorld;
     private Vector2Int _lastSafeCell;
@@ -104,71 +46,19 @@ public class Vehicle : MonoBehaviour
     public Rigidbody2D rb;
     private AudioManager audioManager;
     private SpriteRenderer baseSprite;
-    [SerializeField] private bool isLocked = false;
     private Vector3 lastPosition;
     private DrumTrack drumTrack;
-    private bool incapacitated = false;
     private double loopStartDSPTime;
     private float _lastDamageTime = -1f;
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
     
-    [Header("Dust Legibility Pocket")]
-    [SerializeField] private bool keepDustClearAroundVehicle = true;
-    [SerializeField] private int vehicleKeepClearRadiusCells = 0;
-    [SerializeField] private float vehicleKeepClearRefreshSeconds = 0.10f;
+    [HideInInspector] [SerializeField] private int vehicleKeepClearRadiusCells = 0;
     private float _nextVehicleKeepClearRefreshAt = 0f;
 
     private Coroutine _spawnRestPocketCo;
-    [Header("Vehicle Placement Resonance")]
-    [SerializeField] private bool useVehiclePlacementResonance = true;
-
-    [Tooltip("How quickly the vehicle sprite color moves toward the target color.")]
-    [SerializeField] private float vehiclePlacementColorLerpSpeed = 10f;
-
-    [Tooltip("Minimum tint amount once a valid placement window exists.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float vehiclePlacementMinTint = 0.08f;
-
-    [Tooltip("Extra rhythmic breathing layered on top of the placement pulse.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float vehiclePlacementOscillation = 0.18f;
-
-    [Tooltip("Oscillation speed multiplier.")]
-    [SerializeField] private float vehiclePlacementOscillationSpeed = 1f;
 
     private Color _vehicleDefaultColor = Color.white;
-
-    [Header("Dust Spawn Rest Pocket")]
-    [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
-    [SerializeField] private bool carveSpawnRestPocket = true;
-    [Tooltip("If true, compute the pocket radius from the vehicle collider bounds and the drum grid cell size.")]
-    [SerializeField] private bool spawnRestPocketAutoRadius = true;
-    [Tooltip("Used when Auto Radius is disabled.")]
-    [SerializeField] private int spawnRestPocketRadiusCells = 1;
-    [Tooltip("Fade time (seconds) for the initial pocket carve.")]
-    [SerializeField] private float spawnRestPocketFadeSeconds = 0.05f;
-    [Tooltip("Delay (seconds) before carving the pocket. Useful if spawn ordering is tight.")]
-    [SerializeField] private float spawnRestPocketDelaySeconds = 0.0f;
-
-    [Header("Scale Calibration (Debug)")] 
-    [SerializeField] private bool logScaleCalibrationOnAssign = true;
-    private bool _scaleCalibrationLogged = false;
-    [Header("Manual Release Timing")]
-    [Tooltip("If true, button press ARMS the next unlit placeholder if it is within Arm Ahead Steps, then the note auto-commits when the playhead reaches that step. This is less twitchy and supports mashy sequences.")]
-    [SerializeField] private bool manualReleaseUseArmLock = true;
-
-    [Tooltip("How far ahead (in steps, fractional) the next placeholder can be for the press to count as an ARM. If the next placeholder is farther, the press discards.")]
-    [Range(0.5f, 16f)]
-    [SerializeField] private float manualReleaseArmAheadSteps = 6f;
-
-    [Tooltip("How close (in steps) the playhead must be to the armed target for auto-commit. Keep small; this is NOT the player timing window.")]
-    [Range(0.05f, 1.0f)]
-    [SerializeField] private float manualReleaseAutoCommitEpsSteps = 0.35f;
-
-    [Tooltip("Grace period (in steps) after a commit window closes. Notes released this many steps late are still accepted and committed retroactively to the target step.")]
-    [Range(0f, 2f)]
-    [SerializeField] private float manualReleaseGracePeriodSteps = 0.5f;
     private struct ArmedRelease
     {
         public PendingCollectedNote note;
@@ -187,19 +77,6 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private VehicleReleaseCue releaseCue;
 
     // ---- Note Trail Position History ----
-    [Header("Note Trail")]
-    [Tooltip("World-space spacing between queued notes trailing behind the vehicle.")]
-    [SerializeField] private float trailSlotSpacing = 0.55f;
-
-    [Tooltip("How far behind the vehicle the first note trails (world units).")]
-    [SerializeField] private float trailFirstSlotOffset = 0.7f;
-
-    [Tooltip("Number of historical positions stored for trail direction sampling.")]
-    [SerializeField] private int trailHistoryCapacity = 48;
-
-    [Tooltip("Steps ahead within which the release pulse starts building (0 = no pulse until release).")]
-    [SerializeField] private float trailReleasePulseSteps = 4f;
-
     // Ring buffer of recent world positions (populated in Update)
     private Vector3[] _posHistory;
     private int _posHistoryHead;
@@ -208,7 +85,7 @@ public class Vehicle : MonoBehaviour
     private Vector3 _posHistoryLast;
     private Vector3 _lastTravelDir = Vector3.down; // fallback tail direction when stationary
 
-    public bool ManualNoteReleaseEnabled => enableManualNoteRelease;
+    public bool ManualNoteReleaseEnabled => true;
 
     public struct PendingCollectedNote
     {
@@ -253,7 +130,7 @@ public class Vehicle : MonoBehaviour
             if (soulSprite != null)
             {
                 _soulDefaultColor = soulSprite.color;
-                soulSprite.transform.localScale = Vector3.one * soulMinScale;
+                soulSprite.transform.localScale = Vector3.one * profile.soulMinScale;
 
                 var c = soulSprite.color;
                 c.a = 0f;
@@ -272,9 +149,6 @@ public class Vehicle : MonoBehaviour
             if (rb != null)
             {
                 rb.gravityScale    = 0f;
-
-                rb.linearDamping  = arcadeLinearDamping;
-                rb.angularDamping = arcadeAngularDamping;
                 // Safety: ensure we start truly at rest.
                 rb.linearVelocity = Vector2.zero;
                 rb.angularVelocity = 0f;
@@ -306,24 +180,19 @@ public class Vehicle : MonoBehaviour
             SyncEnergyUI();
 
             // Hook step events for the release-cue beat countdown.
-            if (enableManualNoteRelease)
-            {
-                var drum = GameFlowManager.Instance?.activeDrumTrack;
-                if (drum != null) drum.OnStepChanged += OnStepTickForReleaseCue;
-            }
+            var drum = GameFlowManager.Instance?.activeDrumTrack;
+            if (drum != null) drum.OnStepChanged += OnStepTickForReleaseCue;
 
             // --- Spawn rest pocket ---
             // The vehicle often spawns inside a solid dust tile by design (teaches boosting),
             // but we still need a tiny free volume so we don't start interpenetrating colliders.
-            if (carveSpawnRestPocket)
+            if (vehicleConfig.carveSpawnRestPocket)
             {
                 if (_spawnRestPocketCo != null) StopCoroutine(_spawnRestPocketCo);
                 _spawnRestPocketCo = StartCoroutine(Co_CarveSpawnRestPocket());
             }
         }
     void FixedUpdate() {
-
-        if (incapacitated) return;
 
         float dt = Time.fixedDeltaTime;
 
@@ -374,7 +243,7 @@ public class Vehicle : MonoBehaviour
         }
 
         // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
-        if (Time.time - _lastMoveStamp > inputTimeout) _moveInput = Vector2.zero;
+        if (Time.time - _lastMoveStamp > vehicleConfig.inputTimeout) _moveInput = Vector2.zero;
 
         bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
 
@@ -382,7 +251,7 @@ public class Vehicle : MonoBehaviour
         if (hasInput || boosting) {
             Vector2 steerDir   = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
             Vector2 desiredVel = steerDir * arcadeMaxSpeed;
-            float accelUsed    = boosting ? arcadeBoostAccel : arcadeAccel;
+            float accelUsed    = boosting ? profile.arcadeBoostAccel : profile.arcadeAccel;
 
             if (accelUsed > 0f)
             {
@@ -399,21 +268,21 @@ public class Vehicle : MonoBehaviour
             Vector2 v = rb.linearVelocity;
 
             // Viscous brake: F = -k * v  → a = -(k/m) v (heavier ships coast longer)
-            if (v.sqrMagnitude > 0f && coastBrakeForce > 0f)
-                rb.AddForce(-v * coastBrakeForce, ForceMode2D.Force);
+            if (v.sqrMagnitude > 0f && profile.coastBrakeForce > 0f)
+                rb.AddForce(-v * profile.coastBrakeForce, ForceMode2D.Force);
 
             // Snap to full rest near zero to kill jitter tails
-            if (v.magnitude < stopSpeed && Mathf.Abs(rb.angularVelocity) < stopAngularSpeed)
+            if (v.magnitude < profile.stopSpeed && Mathf.Abs(rb.angularVelocity) < profile.stopAngularSpeed)
             {
                 rb.linearVelocity        = Vector2.zero;
                 rb.angularVelocity = 0f;
             }
         }
 
-        // Fuel burn only while boosting (keeps your baseBurnAmount/burnRateMultiplier economy)
+        // Fuel burn only while boosting
         if (boosting && energyLevel > 0f && !_boostCostFree)
         {
-            float burn = _burnRateMultiplier * _baseBurnAmount * dt;
+            float burn = _burnRateMultiplier * profile.burnRate * dt;
             ConsumeEnergy(burn);
         }
 
@@ -429,7 +298,7 @@ public class Vehicle : MonoBehaviour
     UpdateDistanceCovered();
     ClampAngularVelocity();
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
-    if (enableRecovery)
+    if (vehicleConfig.enableRecovery)
     {
         UpdateSafeAnchor();
         RecoverIfNeeded();
@@ -446,8 +315,6 @@ public class Vehicle : MonoBehaviour
 
     private void TickManualReleaseCue()
 {
-    if (!enableManualNoteRelease) return;
-
     var gfm = GameFlowManager.Instance;
     var viz = (gfm != null) ? gfm.noteViz : null;
     if (viz == null) return;
@@ -493,7 +360,7 @@ public class Vehicle : MonoBehaviour
                 crossed = (a.targetAbsStep >= last) || (a.targetAbsStep <= now);
         }
 
-        if (crossed || fwd <= manualReleaseAutoCommitEpsSteps)
+        if (crossed || fwd <= vehicleConfig.manualReleaseAutoCommitEpsSteps)
         {
             CommitManualReleaseAtStep(armed, a.targetAbsStep);
             _armedReleases.Dequeue();
@@ -565,7 +432,7 @@ public class Vehicle : MonoBehaviour
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = p.velocity127;
         if (occupied)
-            commitVel = Mathf.Clamp(commitVel * occupiedStepVelocityMultiplier, 1f, 127f);
+            commitVel = Mathf.Clamp(commitVel * vehicleConfig.occupiedStepVelocityMultiplier, 1f, 127f);
 
         // Mark as collected and remove from spawnedCollectables BEFORE committing the note.
         // This ensures that when CommitManualReleasedNote fires OnCollectableBurstCleared,
@@ -601,15 +468,13 @@ public class Vehicle : MonoBehaviour
         }
 
         // Occupied-step reward accent.
-        if (occupied && occupiedStepOctaveAccent)
+        if (occupied && vehicleConfig.occupiedStepOctaveAccent)
             p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
     }
     // ---- Note Trail Management ----
     private void RecordPositionHistory()
     {
-        if (!enableManualNoteRelease) return;
-
-        int cap = Mathf.Max(8, trailHistoryCapacity);
+        int cap = Mathf.Max(8, vehicleConfig.trailHistoryCapacity);
         if (_posHistory == null || _posHistory.Length != cap)
         {
             _posHistory = new Vector3[cap];
@@ -626,7 +491,7 @@ public class Vehicle : MonoBehaviour
         _posHistoryLast = cur;
 
         // Record at a density of ~4 samples per slot-spacing so we have smooth curve data
-        float sampleDist = Mathf.Max(0.01f, trailSlotSpacing * 0.25f);
+        float sampleDist = Mathf.Max(0.01f, vehicleConfig.trailSlotSpacing * 0.25f);
         if (_posHistoryAccum >= sampleDist)
         {
             _posHistoryAccum -= sampleDist;
@@ -685,8 +550,6 @@ public class Vehicle : MonoBehaviour
     }
     private void TickNoteTrail()
     {
-        if (!enableManualNoteRelease) return;
-
         var gfm = GameFlowManager.Instance;
         var viz = gfm != null ? gfm.noteViz : null;
 
@@ -763,7 +626,7 @@ public class Vehicle : MonoBehaviour
                     // whether the target is in an expansion bin. The +lead gives a visible
                     // heads-up before the commit gate opens.
                     const float ringWindowLead = 1.5f;
-                    double windowDsp = (manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
+                    double windowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
                     pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
 
                     int nextLocal = ((nextStep % pBinSize) + pBinSize) % pBinSize;
@@ -800,7 +663,7 @@ public class Vehicle : MonoBehaviour
                 ar.note.collectable.SetTrailTarget(markerWorld);
             else
             {
-                float dist = trailFirstSlotOffset + armedSlot * trailSlotSpacing;
+                float dist = vehicleConfig.trailFirstSlotOffset + armedSlot * vehicleConfig.trailSlotSpacing;
                 ar.note.collectable.SetTrailTarget(SampleTrailPosition(dist));
             }
 
@@ -814,7 +677,7 @@ public class Vehicle : MonoBehaviour
         {
             if (p.collectable == null) { slot++; continue; }
 
-            float dist = trailFirstSlotOffset + slot * trailSlotSpacing;
+            float dist = vehicleConfig.trailFirstSlotOffset + slot * vehicleConfig.trailSlotSpacing;
             p.collectable.SetTrailTarget(SampleTrailPosition(dist));
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
             slot++;
@@ -881,7 +744,7 @@ public class Vehicle : MonoBehaviour
     }
     private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
     {
-        if (!useVehiclePlacementResonance)
+        if (!vehicleConfig.useVehiclePlacementResonance)
             return;
 
         Color roleColor = _vehicleDefaultColor;
@@ -890,7 +753,7 @@ public class Vehicle : MonoBehaviour
 
         float tint01 = 0f;
         if (cueTrack != null && pulse01 > 0f)
-            tint01 = Mathf.Clamp01(Mathf.Max(vehiclePlacementMinTint, pulse01));
+            tint01 = Mathf.Clamp01(Mathf.Max(vehicleConfig.vehiclePlacementMinTint, pulse01));
 
         // -----------------------------------------------------------------
         // Root vehicle sprite: color resonance only
@@ -901,7 +764,7 @@ public class Vehicle : MonoBehaviour
             baseSprite.color = Color.Lerp(
                 baseSprite.color,
                 targetVehicleColor,
-                vehiclePlacementColorLerpSpeed * Time.deltaTime
+                vehicleConfig.vehiclePlacementColorLerpSpeed * Time.deltaTime
             );
         }
 
@@ -916,15 +779,15 @@ public class Vehicle : MonoBehaviour
             {
                 soulSprite.transform.localScale = Vector3.Lerp(
                     soulSprite.transform.localScale,
-                    Vector3.one * soulMaxScale,
-                    soulScaleLerpSpeed * Time.deltaTime
+                    Vector3.one * profile.soulMaxScale,
+                    profile.soulScaleLerpSpeed * Time.deltaTime
                 );
 
                 Color soulFade = soulSprite.color;
                 soulFade.r = roleColor.r;
                 soulFade.g = roleColor.g;
                 soulFade.b = roleColor.b;
-                soulFade.a = Mathf.Lerp(soulFade.a, 0f, soulScaleLerpSpeed * Time.deltaTime);
+                soulFade.a = Mathf.Lerp(soulFade.a, 0f, profile.soulScaleLerpSpeed * Time.deltaTime);
                 soulSprite.color = soulFade;
 
                 if (soulFade.a <= 0.01f)
@@ -935,14 +798,14 @@ public class Vehicle : MonoBehaviour
 
             soulSprite.enabled = true;
 
-            float soulScale = Mathf.Lerp(soulMinScale, soulMaxScale, pulse01);
+            float soulScale = Mathf.Lerp(profile.soulMinScale, profile.soulMaxScale, pulse01);
             soulSprite.transform.localScale = Vector3.Lerp(
                 soulSprite.transform.localScale,
                 Vector3.one * soulScale,
-                soulScaleLerpSpeed * Time.deltaTime
+                profile.soulScaleLerpSpeed * Time.deltaTime
             );
 
-            float soulAlpha = Mathf.Lerp(soulAlphaMin, soulAlphaMax, pulse01);
+            float soulAlpha = Mathf.Lerp(profile.soulAlphaMin, profile.soulAlphaMax, pulse01);
 
             Color targetSoulColor = isAuthoritative ? Color.white : roleColor;
             targetSoulColor.a = soulAlpha;
@@ -950,7 +813,7 @@ public class Vehicle : MonoBehaviour
             soulSprite.color = Color.Lerp(
                 soulSprite.color,
                 targetSoulColor,
-                soulScaleLerpSpeed * Time.deltaTime
+                profile.soulScaleLerpSpeed * Time.deltaTime
             );
         }
     }
@@ -960,7 +823,7 @@ public class Vehicle : MonoBehaviour
 
     // Only record anchor when we are reasonably “in play”.
     // (Avoid recording while already offscreen or during a trap.)
-    if (IsFarOutsideViewport(viewportOobMargin * 0.5f)) return;
+    if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin * 0.5f)) return;
 
     // If you want, you can also avoid anchoring while inside a void:
     // if (IsInsideGravityVoid(out _, out _)) return;
@@ -972,11 +835,11 @@ public class Vehicle : MonoBehaviour
 
     private void RecoverIfNeeded()
 {
-    if (Time.time - _lastRecoverAt < minSecondsBetweenRecoveries) return;
+    if (Time.time - _lastRecoverAt < vehicleConfig.minSecondsBetweenRecoveries) return;
     if (rb == null || drumTrack == null || gfm == null || gfm.dustGenerator == null) return;
 
     // 1) Hard OOB: if we’re well outside camera viewport, snap back.
-    if (IsFarOutsideViewport(viewportOobMargin))
+    if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin))
     {
         DoSnapRespawn("viewport_oob");
         return;
@@ -987,12 +850,12 @@ public class Vehicle : MonoBehaviour
     {
         float speed = rb.linearVelocity.magnitude;
 
-        if (speed <= stuckSpeedThreshold)
+        if (speed <= vehicleConfig.stuckSpeedThreshold)
             _timeStuckInVoid += Time.fixedDeltaTime;
         else
             _timeStuckInVoid = 0f;
 
-        if (_timeStuckInVoid >= stuckSecondsInVoid)
+        if (_timeStuckInVoid >= vehicleConfig.stuckSecondsInVoid)
         {
             // Prefer local eject (feels physical), but fall back to snap if we can’t find a clean spot.
             if (!TryEjectFromVoid(voidCenter, voidRadius))
@@ -1037,7 +900,7 @@ public class Vehicle : MonoBehaviour
 
     Collider2D hit = Physics2D.OverlapCircle(
         pos,
-        voidProbeRadiusWorld,
+        vehicleConfig.voidProbeRadiusWorld,
         gravityVoidMask
     );
 
@@ -1071,7 +934,7 @@ public class Vehicle : MonoBehaviour
     else away.Normalize();
 
     // Candidate target position on rim + small margin
-    float margin = Mathf.Max(0.15f, voidProbeRadiusWorld * 0.5f);
+    float margin = Mathf.Max(0.15f, vehicleConfig.voidProbeRadiusWorld * 0.5f);
     Vector2 targetWorld = voidCenter + away * (voidRadius + margin);
 
     // Convert to a grid cell and look for a nearby empty cell (localized)
@@ -1098,7 +961,7 @@ public class Vehicle : MonoBehaviour
     if (!_hasSafeAnchor) return;
 
     // Try to find an empty cell near the last safe anchor.
-    if (!TryFindNearbyEmptyCell(_lastSafeCell, respawnSearchRadiusCells, out var respawnCell))
+    if (!TryFindNearbyEmptyCell(_lastSafeCell, vehicleConfig.respawnSearchRadiusCells, out var respawnCell))
     {
         // Absolute fallback: last safe world position.
         rb.position = _lastSafeWorld;
@@ -1197,35 +1060,16 @@ public class Vehicle : MonoBehaviour
     private void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
         profile = p;
-        // Movement
-        arcadeMaxSpeed       = p.arcadeMaxSpeed;
-        arcadeAccel          = p.arcadeAccel;
-        arcadeBoostAccel     = p.arcadeBoostAccel;
-        arcadeLinearDamping  = p.arcadeLinearDamping;
-        arcadeAngularDamping = p.arcadeAngularDamping;
 
-        // Coast / Stop / Input
-        coastBrakeForce      = p.coastBrakeForce;
-        stopSpeed            = p.stopSpeed;
-        stopAngularSpeed     = p.stopAngularSpeed;
-        inputDeadzone        = p.inputDeadzone;
+        arcadeMaxSpeed = p.arcadeMaxSpeed;
 
-        // Physics
-        rb.mass = p.mass;
+        rb.mass             = p.mass;
+        rb.linearDamping    = p.arcadeLinearDamping;
+        rb.angularDamping   = p.arcadeAngularDamping;
 
-        // Fuel tradeoffs (keep your semantics)
-        capacity = p.capacity;                    // tank size (you already track capacity/energyLevel)
-        _baseBurnAmount *= p.burnEfficiency;       // ship-specific efficiency multiplier
-        if (refillEnergy) energyLevel = capacity; // start full on selection
+        capacity = p.capacity;
+        if (refillEnergy) energyLevel = capacity;
 
-        // Apply damping now
-        rb.linearDamping  = arcadeLinearDamping;
-        rb.angularDamping = arcadeAngularDamping;
-
-        // Ecological role
-        plowHalfWidthCells = p.plowHalfWidthCells;
-        plowDepthCells     = p.plowDepthCells;
-        plowMinSpeed       = p.plowMinSpeed;
         if (p.vehicleKeepClearRadiusCells > 0)
             vehicleKeepClearRadiusCells = p.vehicleKeepClearRadiusCells;
     }
@@ -1241,7 +1085,6 @@ public class Vehicle : MonoBehaviour
     public void SetDrumTrack(DrumTrack drums)
         {
             drumTrack = drums;
-            LogScaleCalibrationOnce();
         }
     public int GetForceAsDamage()
         {
@@ -1282,9 +1125,7 @@ public class Vehicle : MonoBehaviour
 
     public void Move(Vector2 direction)
     {
-        if (isLocked) return;
-
-        if (direction.magnitude < inputDeadzone) direction = Vector2.zero;
+        if (direction.magnitude < profile.inputDeadzone) direction = Vector2.zero;
 
         _moveInput     = direction;
         if (direction.sqrMagnitude > 0f) _lastNonZeroInput = direction.normalized;
@@ -1342,39 +1183,16 @@ public class Vehicle : MonoBehaviour
         }
     }
     public float GetCumulativeSpentTanks() {
-        if (capacity <= 0f) return 0f; 
+        if (capacity <= 0f) return 0f;
         return _cumulativeEnergySpent / capacity;
-    }    
-    private void LogScaleCalibrationOnce() { 
-        if (_scaleCalibrationLogged || !logScaleCalibrationOnAssign) return; 
-        _scaleCalibrationLogged = true;
-        gfm = GameFlowManager.Instance; 
-        var drums = drumTrack != null ? drumTrack : (gfm != null ? gfm.activeDrumTrack : null); 
-        if (drums == null) { 
-            Debug.LogWarning($"[Scale] {name}: DrumTrack not assigned yet; cannot report vehicle↔cell scale.", this); 
-            return;
-        }
-        float cell = Mathf.Max(0.0001f, drums.GetCellWorldSize());
-        
-        // Vehicle size proxy: prefer a CircleCollider2D radius; otherwise use bounds extents.
-        float r = 0.5f; 
-        var cc = GetComponent<CircleCollider2D>();
-        if (cc != null)
-            r = cc.radius * Mathf.Abs(transform.lossyScale.x);
-        else { 
-            var col = GetComponent<Collider2D>(); 
-            if (col != null) r = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y);
-        } 
-        float diameter = r * 2f; 
-        float ratio = diameter / cell; // 1.0 means vehicle ~ 1 cell wide
     }
     private void RefreshVehicleKeepClearIfNeeded() {
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
-        if (!keepDustClearAroundVehicle) return;
+        if (!vehicleConfig.keepDustClearAroundVehicle) return;
 
         // Throttle refresh
         if (Time.time < _nextVehicleKeepClearRefreshAt) return;
-        _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleKeepClearRefreshSeconds);
+        _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleConfig.vehicleKeepClearRefreshSeconds);
         if (gfm == null) return;
 
         var gen = gfm.dustGenerator;
@@ -1406,8 +1224,8 @@ public class Vehicle : MonoBehaviour
     private IEnumerator Co_CarveSpawnRestPocket()
     {
         // Optional delay to allow spawn ordering (dust grid, drumTrack, etc.) to settle.
-        if (spawnRestPocketDelaySeconds > 0f)
-            yield return new WaitForSeconds(spawnRestPocketDelaySeconds);
+        if (vehicleConfig.spawnRestPocketDelaySeconds > 0f)
+            yield return new WaitForSeconds(vehicleConfig.spawnRestPocketDelaySeconds);
         else
             yield return null; // at least one frame so the dust grid exists
 
@@ -1422,8 +1240,8 @@ public class Vehicle : MonoBehaviour
         Vector2Int centerCell = drumTrack.WorldToGridPosition(pos);
 
         // Choose a radius that guarantees we are not born overlapping walls.
-        int radiusCells = Mathf.Max(0, spawnRestPocketRadiusCells);
-        if (spawnRestPocketAutoRadius)
+        int radiusCells = Mathf.Max(0, vehicleConfig.spawnRestPocketRadiusCells);
+        if (vehicleConfig.spawnRestPocketAutoRadius)
         {
             float cellWorld = Mathf.Max(0.01f, drumTrack.GetCellWorldSize());
             float rWorld = 0.0f;
@@ -1446,7 +1264,7 @@ public class Vehicle : MonoBehaviour
             centerCell,
             radiusCells,
             forceRemoveExisting: true,
-            forceRemoveFadeSeconds: Mathf.Max(0.01f, spawnRestPocketFadeSeconds)
+            forceRemoveFadeSeconds: Mathf.Max(0.01f, vehicleConfig.spawnRestPocketFadeSeconds)
         );
         gen.ReleaseVehicleKeepClear(ownerId);
     }
@@ -1459,11 +1277,8 @@ public class Vehicle : MonoBehaviour
     private void OnDestroy()
     {
         // Unhook step-tick before the object is gone.
-        if (enableManualNoteRelease)
-        {
-            var drum = GameFlowManager.Instance?.activeDrumTrack;
-            if (drum != null) drum.OnStepChanged -= OnStepTickForReleaseCue;
-        }
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum != null) drum.OnStepChanged -= OnStepTickForReleaseCue;
 
         var gfm = GameFlowManager.Instance;
         var gen = (gfm != null) ? gfm.dustGenerator : null;
@@ -1547,18 +1362,18 @@ public class Vehicle : MonoBehaviour
         if (!boosting) return;
 
         Vector2 vel = rb.linearVelocity;
-        if (vel.magnitude < plowMinSpeed) return;
+        if (vel.magnitude < profile.plowMinSpeed) return;
         if (Time.time < _nextPlowTickAt) return;
-        _nextPlowTickAt = Time.time + Mathf.Max(0.01f, plowTickSeconds);
+        _nextPlowTickAt = Time.time + Mathf.Max(0.01f, vehicleConfig.plowTickSeconds);
 
         var gen = gfm.dustGenerator;
         float cellSize = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 forward = vel.normalized;
         Vector2 perp    = new Vector2(-forward.y, forward.x);
         var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
-        float fade = Mathf.Max(0.01f, plowFadeSeconds);
-        int halfW = Mathf.Max(0, plowHalfWidthCells);
-        int depth = Mathf.Max(0, plowDepthCells);
+        float fade = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
+        int halfW = Mathf.Max(0, profile.plowHalfWidthCells);
+        int depth = Mathf.Max(0, profile.plowDepthCells);
 
         for (int d = 0; d <= depth; d++)
         {
@@ -1622,9 +1437,7 @@ public class Vehicle : MonoBehaviour
     // Enqueue a collected note for manual release. Returns true if queued.
     private bool EnqueuePendingCollectedNote(PendingCollectedNote p)
     {
-        if (!enableManualNoteRelease) return false;
-
-        int cap = Mathf.Max(1, manualReleaseQueueCapacity);
+        int cap = Mathf.Max(1, vehicleConfig.manualReleaseQueueCapacity);
 
         // If full, drop oldest (and clean up its visual carrier if still around)
         while (_pendingNotes.Count >= cap)
@@ -1644,7 +1457,6 @@ public class Vehicle : MonoBehaviour
     
     public bool TryReleaseQueuedNote()
 {
-    if (!enableManualNoteRelease) return false;
     if (_pendingNotes.Count <= 0) return false;
 
     var gfm = GameFlowManager.Instance;
@@ -1692,13 +1504,13 @@ public class Vehicle : MonoBehaviour
     int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
     double fwdToTarget = (targetAbsStep - rawAbs + effectiveTotal) % effectiveTotal;
 
-    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={manualReleaseArmAheadSteps:F1} effectiveTotal={effectiveTotal} PASS={fwdToTarget <= manualReleaseArmAheadSteps}");
+    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} effectiveTotal={effectiveTotal} PASS={fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps}");
 
-    if (fwdToTarget > manualReleaseArmAheadSteps)
+    if (fwdToTarget > vehicleConfig.manualReleaseArmAheadSteps)
     {
         // Check if the playhead just passed the target within the grace period.
         double backFromTarget = effectiveTotal - fwdToTarget;
-        if (manualReleaseGracePeriodSteps > 0f && backFromTarget <= manualReleaseGracePeriodSteps)
+        if (vehicleConfig.manualReleaseGracePeriodSteps > 0f && backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps)
         {
             // Late but within grace — consume and commit retroactively to targetAbsStep.
             _pendingNotes.Dequeue();
@@ -1718,7 +1530,7 @@ public class Vehicle : MonoBehaviour
     // Window passed — now consume the note.
     _pendingNotes.Dequeue();
 
-    if (manualReleaseUseArmLock)
+    if (vehicleConfig.manualReleaseUseArmLock)
     {
         // stepDur must use the full leader loop length (all bins × clip length), because
         // totalSteps from TryGetRawPlayheadAbsStep is also leader-scoped.

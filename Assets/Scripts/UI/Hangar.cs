@@ -61,10 +61,8 @@ public class Hangar : MonoBehaviour
         foreach (GameObject plane in planes)
         {
             Vehicle vehicle = plane.GetComponent<Vehicle>();
-            if (vehicle != null && vehicle.capacity > max)
-            {
-                max = vehicle.capacity;
-            }
+            float cap = (vehicle != null && vehicle.profile != null) ? vehicle.profile.capacity : (vehicle != null ? vehicle.capacity : 0f);
+            if (cap > max) max = cap;
         }
         return max;
     }

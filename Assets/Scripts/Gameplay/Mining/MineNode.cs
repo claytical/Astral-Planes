@@ -198,6 +198,24 @@ public class MineNode : MonoBehaviour
         if (_drumTrack.HasDustAt(probe)) { wallAhead = true; break; }
     }
 
+    // Also check cells in actual velocity direction — catches angled approaches where
+    // _carveDir has already turned away from a wall but inertia is still carrying us into it.
+    if (!wallAhead)
+    {
+        Vector2 velN = _rb.linearVelocity.sqrMagnitude > 0.04f
+            ? _rb.linearVelocity.normalized : Vector2.zero;
+        if (velN.sqrMagnitude > 0.0001f)
+        {
+            for (int i = 1; i <= 2; i++)
+            {
+                var probe = myCell + new Vector2Int(
+                    Mathf.RoundToInt(velN.x * i),
+                    Mathf.RoundToInt(velN.y * i));
+                if (_drumTrack.HasDustAt(probe)) { wallAhead = true; break; }
+            }
+        }
+    }
+
     if (wallAhead || _rescanTimer <= 0f)
     {
         _rescanTimer = 0.6f;
@@ -272,8 +290,11 @@ public class MineNode : MonoBehaviour
     if (_dustInteractor != null)
     {
         _dustInteractor.SetDesiredSpeed(targetSpeed);
+        // Only blend hunt direction when there is no wall directly ahead.
+        // If wallAhead is true, the lookahead just chose a redirect — letting hunt steer
+        // back toward the wall negates that decision and causes the node to oscillate.
         Vector2 huntDir = _dustInteractor.GetHuntDir();
-        if (huntDir.sqrMagnitude > 0.0001f)
+        if (!wallAhead && huntDir.sqrMagnitude > 0.0001f)
         {
             float w = _dustInteractor.HuntDirWeight;
             _carveDir = Vector2.Lerp(_carveDir, huntDir, w).normalized;

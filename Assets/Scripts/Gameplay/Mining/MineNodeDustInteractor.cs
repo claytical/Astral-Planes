@@ -20,6 +20,9 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [SerializeField] private float edgeHugForce = 2f;
 
+    [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
+    [SerializeField] private float escapePushForce = 12f;
+
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
     // steer toward it, tint it on arrival.
@@ -125,6 +128,19 @@ public class MineNodeDustInteractor : MonoBehaviour
 
             if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
                 _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
+
+            // Push back toward the nearest open (non-dust) neighboring cell so the node
+            // can't remain embedded in a wall — this is the complement of the edge-hug force.
+            Vector2 escapeDir = Vector2.zero;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                if (dx == 0 && dy == 0) continue;
+                if (!_drumTrack.HasDustAt(cell + new Vector2Int(dx, dy)))
+                    escapeDir += new Vector2(dx, dy);
+            }
+            if (escapeDir.sqrMagnitude > 0.0001f)
+                _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
         }
 
         if (!carveMaze) return;
@@ -193,22 +209,26 @@ public class MineNodeDustInteractor : MonoBehaviour
             budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
         }
 
-        // Edge-hugging (unchanged)
-        Vector2 edgeDir          = Vector2.zero;
-        int     dustNeighborCount = 0;
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
+        // Edge-hugging: only when NOT inside dust — inside dust the escape push handles steering,
+        // and edge-hug would directly cancel it by pushing back toward the wall.
+        if (!inDust)
         {
-            if (dx == 0 && dy == 0) continue;
-            var neighbor = cell + new Vector2Int(dx, dy);
-            if (_drumTrack.HasDustAt(neighbor))
+            Vector2 edgeDir           = Vector2.zero;
+            int     dustNeighborCount = 0;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
             {
-                edgeDir += new Vector2(dx, dy);
-                dustNeighborCount++;
+                if (dx == 0 && dy == 0) continue;
+                var neighbor = cell + new Vector2Int(dx, dy);
+                if (_drumTrack.HasDustAt(neighbor))
+                {
+                    edgeDir += new Vector2(dx, dy);
+                    dustNeighborCount++;
+                }
             }
+            if (dustNeighborCount > 0)
+                _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
-        if (dustNeighborCount > 0)
-            _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
     }
 
     // ---------------------------------------------------------------
@@ -335,6 +355,13 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         dust = coll.collider != null ? coll.collider.GetComponentInParent<CosmicDust>() : null;
         return dust != null;
+    }
+
+    private void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (!TryGetDustFromCollision(coll, out var dust)) return;
+        InsideDust  = true;
+        CurrentDust = dust;
     }
 
     private void OnCollisionExit2D(Collision2D coll)

@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 2442014530722922072}
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7086731306890036074}
-  m_Layer: 8
+  m_Layer: 7
   m_Name: Mine Node
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -77,16 +77,11 @@ MonoBehaviour:
   extraBrake: 0
   carveMaze: 1
   edgeHugForce: 2
+  escapePushForce: 12
   huntBfsBudget: 600
   huntDirWeight: 0.55
   arrivalRadiusCells: 1
   retargetInterval: 0.35
-  dustTerrainMask:
-    serializedVersion: 2
-    m_Bits: 128
-  dustIgnoreQueryRadiusWorld: 2
-  dustIgnoreMaxHits: 32
-  dustLayerIndex: 7
 --- !u!114 &1784781495894534207
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -283,7 +278,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8103028502377407328}
   - component: {fileID: 3197535283754970742}
-  m_Layer: 8
+  m_Layer: 7
   m_Name: Soul
   m_TagString: Untagged
   m_Icon: {fileID: 0}

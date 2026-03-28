@@ -1009,6 +1009,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             // Let controller update other tracks if needed (hash-driven).
             controller?.UpdateVisualizer();
+
+            // Sync DrumTrack._binCount so audio transport and committed-leader queries agree.
+            controller?.ResyncLeaderBinsNow();
         }
 
         _pendingCollapse = false;
@@ -1016,6 +1019,23 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _lastLocalStep = -1;
         _lastLoopSeen = -1;
     }
+
+    /// <summary>
+    /// Requests that this track's loop shrink by one bin at the next loop boundary.
+    /// Safe to call multiple times — ignored if already at minimum or a collapse is pending.
+    /// </summary>
+    public void RequestLoopCollapseByOne()
+    {
+        if (loopMultiplier <= 1 || _pendingCollapse) return;
+        _collapseTargetMultiplier = loopMultiplier - 1;
+        _pendingCollapse = true;
+        if (!_hookedBoundaryForCollapse && drumTrack != null)
+        {
+            drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitCollapse;
+            _hookedBoundaryForCollapse = true;
+        }
+    }
+
     private void Harmony_Bins_EnsureSize(int want)
 {
     if (want <= 0) want = 1;
