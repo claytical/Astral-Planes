@@ -213,6 +213,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         if (_ascendTasks.Count == 0) return;
 
         var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
+        HashSet<InstrumentTrackController> affectedControllers = null;
 
         foreach (var trk in keys)
         {
@@ -255,7 +256,15 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
                     // Remove the note from the persistent loop so it stops playing.
                     if (ms.tag != null && ms.tag.track != null)
+                    {
                         ms.tag.track.RemovePersistentNoteAtStep(ms.tag.step);
+                        var ctrl = ms.tag.track.controller;
+                        if (ctrl != null)
+                        {
+                            affectedControllers ??= new HashSet<InstrumentTrackController>();
+                            affectedControllers.Add(ctrl);
+                        }
+                    }
 
                     // Destroy the visual marker.
                     Destroy(ms.go);
@@ -273,6 +282,53 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             else
                 _ascendTasks.Remove(trk);
         }
+
+        // After all notes are removed this boundary: collapse the loop if the
+        // highest active bin is now empty on every track.
+        if (affectedControllers != null)
+            foreach (var ctrl in affectedControllers)
+                TryCollapseIfHighestBinEmpty(ctrl);
+    }
+
+    private void TryCollapseIfHighestBinEmpty(InstrumentTrackController ctrl)
+    {
+        if (ctrl?.tracks == null) return;
+
+        // Find the global highest loop multiplier across all tracks.
+        int globalMaxMult = 1;
+        foreach (var t in ctrl.tracks)
+            if (t != null) globalMaxMult = Mathf.Max(globalMaxMult, t.loopMultiplier);
+
+        if (globalMaxMult <= 1) return; // already at minimum, nothing to trim
+
+        // Determine the step range of the highest bin.
+        // All tracks share the same drum track, so BinSize() is uniform.
+        int binSize = 0;
+        foreach (var t in ctrl.tracks)
+        {
+            if (t != null) { binSize = t.BinSize(); break; }
+        }
+        if (binSize <= 0) return;
+
+        int highBinStart = (globalMaxMult - 1) * binSize;
+        int highBinEnd   = globalMaxMult * binSize;
+
+        // If any track still has a note in the highest bin, do not collapse.
+        foreach (var t in ctrl.tracks)
+        {
+            if (t == null) continue;
+            foreach (var n in t.GetPersistentLoopNotes())
+            {
+                if (n.stepIndex >= highBinStart && n.stepIndex < highBinEnd)
+                    return;
+            }
+        }
+
+        // Highest bin is empty on all tracks — collapse every track that owns it.
+        Debug.Log($"[ASCENSION] Highest bin {globalMaxMult - 1} empty on all tracks — collapsing loop by 1.");
+        foreach (var t in ctrl.tracks)
+            if (t != null && t.loopMultiplier >= globalMaxMult)
+                t.RequestLoopCollapseByOne();
     }
 
     // -------------------------------------------------------------------------

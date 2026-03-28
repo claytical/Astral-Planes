@@ -23,7 +23,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 0fe576a594c974a5bb2de5289a636806, type: 3}
   entryLoopCount: 1
   bpm: 168
-  stepsPerLoop: 64
+  stepsPerLoop: 32
   nodesPerStar: 10
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}

@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e263e1a76fbdd46d6ae4bdda8c952692, type: 3}
+  m_Name: DefaultVehicleConfig
+  m_EditorClassIdentifier: Assembly-CSharp::VehicleConfig
+  manualReleaseQueueCapacity: 9
+  occupiedStepVelocityMultiplier: 1.25
+  occupiedStepOctaveAccent: 1
+  manualReleaseUseArmLock: 1
+  manualReleaseArmAheadSteps: 6
+  manualReleaseAutoCommitEpsSteps: 0.35
+  manualReleaseGracePeriodSteps: 0.5
+  plowTickSeconds: 0.06
+  plowFadeSeconds: 0.15
+  inputTimeout: 0.15
+  enableRecovery: 1
+  viewportOobMargin: 0.15
+  minSecondsBetweenRecoveries: 0.75
+  respawnSearchRadiusCells: 8
+  stuckSpeedThreshold: 0.35
+  stuckSecondsInVoid: 0.6
+  gravityVoidTag: GravityVoid
+  voidProbeRadiusWorld: 0.6
+  keepDustClearAroundVehicle: 1
+  vehicleKeepClearRefreshSeconds: 0.1
+  useVehiclePlacementResonance: 1
+  vehiclePlacementColorLerpSpeed: 10
+  vehiclePlacementMinTint: 0.08
+  vehiclePlacementOscillation: 0.18
+  vehiclePlacementOscillationSpeed: 1
+  carveSpawnRestPocket: 1
+  spawnRestPocketAutoRadius: 1
+  spawnRestPocketRadiusCells: 1
+  spawnRestPocketFadeSeconds: 0.05
+  spawnRestPocketDelaySeconds: 0
+  trailSlotSpacing: 0.55
+  trailFirstSlotOffset: 0.7
+  trailHistoryCapacity: 48
+  trailReleasePulseSteps: 4
