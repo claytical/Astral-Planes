@@ -6,20 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Drifter.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Drifter.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/HeartDrive.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/HeartDrive.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scout.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scout.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/FloTilla.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/FloTilla.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/HeartDrive.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/HeartDrive.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Sandwave.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Sandwave.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Energy.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -286,7 +277,7 @@
       <workItem from="1773520647025" duration="19910000" />
       <workItem from="1773851750158" duration="25817000" />
       <workItem from="1774123628864" duration="127908000" />
-      <workItem from="1774554999022" duration="38299000" />
+      <workItem from="1774554999022" duration="47218000" />
     </task>
     <servers />
   </component>
