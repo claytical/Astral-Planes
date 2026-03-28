@@ -811,6 +811,13 @@ private IEnumerator SpawnArrivalRoutine(
             var dustClaims = FindObjectOfType<DustClaimManager>();
             if (dustClaims != null)
                 dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
+
+            // Re-carve the cell at arrival time. The jail created at enqueue may have expired
+            // (long step delay + travel), or the cell may have had no dust at enqueue but
+            // regrew before we arrived. The Occupancy claim above will veto any regrowth.
+            var dustGen = GameFlowManager.Instance?.dustGenerator;
+            if (dustGen != null)
+                dustGen.CreateJailCenterForCollectable(_currentCell, holdSeconds: 0f, ownerId: GetInstanceID());
         }
         Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }

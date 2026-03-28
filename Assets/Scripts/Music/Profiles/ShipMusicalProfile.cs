@@ -15,7 +15,6 @@ public class ShipMusicalProfile : ScriptableObject
     public float arcadeBoostAccel = 70f;
     public float arcadeLinearDamping = 0.10f;
     public float arcadeAngularDamping = 0.50f;
-    public bool  requireBoostForThrust = false;
 
     [Header("Coast / Stop")]
     public float coastBrakeForce = 1.0f;
@@ -35,4 +34,14 @@ public class ShipMusicalProfile : ScriptableObject
     [Header("Fuel Tradeoffs")]
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)
     [Range(0.25f, 2f)] public float burnEfficiency = 1.0f; // multiplies baseBurnAmount for this ship
+
+    [Header("Ecological Role")]
+    [Tooltip("Half-width of the forward plow in grid cells. 0 = plow disabled.")]
+    public int plowHalfWidthCells = 1;
+    [Tooltip("Depth (forward reach) of the plow in grid cells.")]
+    public int plowDepthCells = 2;
+    [Tooltip("Minimum speed (world units/s) before the plow activates.")]
+    public float plowMinSpeed = 2f;
+    [Tooltip("Radius around the vehicle kept clear of dust (cells). 0 = use Inspector value.")]
+    public int vehicleKeepClearRadiusCells = 0;
 }

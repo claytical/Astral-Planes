@@ -11,7 +11,7 @@ public class Vehicle : MonoBehaviour
     // Manual Note Release (FIFO queue)
     // ---------------------------------------------------------------------
     [Header("Manual Note Release")]
-    [SerializeField] private bool enableManualNoteRelease = false;
+    private const bool enableManualNoteRelease = true;
     [SerializeField] private int manualReleaseQueueCapacity = 9;
 
     [Tooltip("When releasing onto an already-occupied step, multiply committed velocity by this factor.")]
@@ -39,8 +39,6 @@ public class Vehicle : MonoBehaviour
     [SerializeField] private float arcadeBoostAccel = 80f;
     [SerializeField] private float arcadeLinearDamping = 2f;   // typical 0–5
     [SerializeField] private float arcadeAngularDamping = 0.5f; // optional: reduces spin after bumps
-    [SerializeField] private bool  requireBoostForThrust = false; // set true if you want “no boost, no thrust”
-    [Header("Coast/Stop (mass-dependent)")]
     [SerializeField] private float coastBrakeForce   = 6f;   // N per (m/s). F = -k*v (independent of mass)
     [SerializeField] private float stopSpeed         = 0.05f; // snap-to-rest threshold (m/s)
     [SerializeField] private float stopAngularSpeed  = 5f;   // deg/s
@@ -379,20 +377,12 @@ public class Vehicle : MonoBehaviour
         if (Time.time - _lastMoveStamp > inputTimeout) _moveInput = Vector2.zero;
 
         bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
-        bool canThrust = !requireBoostForThrust || boosting;
 
         // ---- movement ----
-        if(canThrust && (hasInput || boosting)) {
-            // Target velocity from input (single env scalar)
-            Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
-            // Target velocity from steer direction (sing env scalar)
+        if (hasInput || boosting) {
+            Vector2 steerDir   = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
             Vector2 desiredVel = steerDir * arcadeMaxSpeed;
-            // Acceleration pick (handles boost-only ships with accel=0)
-            float accelUsed;
-            if (requireBoostForThrust)
-                accelUsed = boosting ? arcadeBoostAccel : 0f;
-            else
-                accelUsed = (boosting ? arcadeBoostAccel : arcadeAccel);
+            float accelUsed    = boosting ? arcadeBoostAccel : arcadeAccel;
 
             if (accelUsed > 0f)
             {
@@ -1213,7 +1203,6 @@ public class Vehicle : MonoBehaviour
         arcadeBoostAccel     = p.arcadeBoostAccel;
         arcadeLinearDamping  = p.arcadeLinearDamping;
         arcadeAngularDamping = p.arcadeAngularDamping;
-        requireBoostForThrust= p.requireBoostForThrust;
 
         // Coast / Stop / Input
         coastBrakeForce      = p.coastBrakeForce;
@@ -1232,6 +1221,13 @@ public class Vehicle : MonoBehaviour
         // Apply damping now
         rb.linearDamping  = arcadeLinearDamping;
         rb.angularDamping = arcadeAngularDamping;
+
+        // Ecological role
+        plowHalfWidthCells = p.plowHalfWidthCells;
+        plowDepthCells     = p.plowDepthCells;
+        plowMinSpeed       = p.plowMinSpeed;
+        if (p.vehicleKeepClearRadiusCells > 0)
+            vehicleKeepClearRadiusCells = p.vehicleKeepClearRadiusCells;
     }
 
     public void SyncEnergyUI()

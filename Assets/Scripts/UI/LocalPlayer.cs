@@ -35,10 +35,11 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float mouseDeltaSmoothing = 12f; // higher = smoother (EMA rate per second)
     [SerializeField] private float maxPixelsPerFrame = 50f;   // clamp spikes from touchpad/mouse
     [SerializeField] private float angleSmoothTime = 0.08f;   // seconds to smooth heading changes
-    [Header("Keyboard Stick Emulation")]
-    [SerializeField] private float keyboardRisePerSec = .01f;   // how fast it ramps up to target
-    [SerializeField] private float keyboardFallPerSec = 10f;   // optional extra fall control (you can keep stickDecayPerSec)
-    [SerializeField] private float keyboardDeadzone = 1f;  // classify "digital" vs "analog"
+    [Header("Keyboard")]
+    [Tooltip("Degrees per second the heading rotates toward the held arrow direction.")]
+    [SerializeField] private float keyboardTurnRateDeg = 270f;
+    [Tooltip("Rate at which stick magnitude ramps from 0 to 1 when an arrow key is held (units/sec).")]
+    [SerializeField] private float keyboardAccelRate = 5f;
     [Header("Tutorial UI")]
     [SerializeField] private ControlTutorialHighlight miniTutorialPrefab;
     [SerializeField] private Vector3 miniTutorialScale = new Vector3(0.65f, 0.65f, 1f);
@@ -49,6 +50,7 @@ public class LocalPlayer : MonoBehaviour
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
     private bool _usingMouse;
+    private bool _gamepadDriving; // true while a gamepad stick is (or was last) driving _virtualStick
     private InputAction _moveAction;
 
     // --- Dust spawn pocket / keep-clear ---
@@ -302,54 +304,68 @@ public class LocalPlayer : MonoBehaviour
         Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
         raw = Vector2.ClampMagnitude(raw, 1f);
 
-        // Identify whether the current move input is coming from keyboard.
-        // (This is much more reliable than magnitude heuristics with 2DVector composites.)
-        bool isKeyboard =
-            _moveAction != null &&
-            _moveAction.activeControl != null &&
-            _moveAction.activeControl.device is Keyboard;
+        bool isGamepad = _moveAction?.activeControl?.device is Gamepad;
 
-        if (raw.sqrMagnitude > 0.0001f)
+        if (isGamepad)
         {
-            if (isKeyboard)
-            {
-                // Exponential approach to target: "keyboardRisePerSec" behaves like a rate (bigger = faster).
-                // alpha ~= 0..1 per tick, framerate-independent.
-                float alpha = 1f - Mathf.Exp(-keyboardRisePerSec * dt);
-                _virtualStick = Vector2.Lerp(_virtualStick, raw, alpha);
-            }
-            else
-            {
-                // Gamepad already feels good: follow directly.
-                _virtualStick = raw;
-            }
+            _virtualStick = raw;
+            _gamepadDriving = true;
         }
         else
         {
-            if (_virtualStick.sqrMagnitude > 0f)
+            _gamepadDriving = false;
+
+            if (Keyboard.current != null)
             {
-                if (isKeyboard)
+                Vector2 arrowTarget = Vector2.zero;
+                if (Keyboard.current.upArrowKey.isPressed)    arrowTarget.y += 1f;
+                if (Keyboard.current.downArrowKey.isPressed)  arrowTarget.y -= 1f;
+                if (Keyboard.current.leftArrowKey.isPressed)  arrowTarget.x -= 1f;
+                if (Keyboard.current.rightArrowKey.isPressed) arrowTarget.x += 1f;
+
+                if (arrowTarget.sqrMagnitude > 0.0001f)
                 {
-                    // Separate fall rate for keyboard so you can tune release feel independently.
-                    float alpha = 1f - Mathf.Exp(-keyboardFallPerSec * dt);
-                    _virtualStick = Vector2.Lerp(_virtualStick, Vector2.zero, alpha);
+                    arrowTarget.Normalize();
+                    float tgtAngle = Mathf.Atan2(arrowTarget.y, arrowTarget.x) * Mathf.Rad2Deg;
+                    float curMag   = _virtualStick.magnitude;
+                    float curAngle = curMag > 0.0001f
+                        ? Mathf.Atan2(_virtualStick.y, _virtualStick.x) * Mathf.Rad2Deg
+                        : tgtAngle;
+                    float newAngle = Mathf.MoveTowardsAngle(curAngle, tgtAngle, keyboardTurnRateDeg * dt);
+                    float newMag   = Mathf.MoveTowards(curMag, 1f, keyboardAccelRate * dt);
+                    float rad      = newAngle * Mathf.Deg2Rad;
+                    _virtualStick  = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * newMag;
                 }
                 else
                 {
-                    // Keep your existing exponential decay for analog if you like.
                     float k = Mathf.Exp(-stickDecayPerSec * dt);
                     _virtualStick *= k;
+                    if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
                 }
-
-                if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
             }
         }
 
-        // Apply friction AFTER smoothing, so your smoothing tuning isn't coupled to friction.
-        Vector2 finalMove = _virtualStick * friction;
-
-        plane.Move(finalMove);
+        plane.Move(_virtualStick * friction);
     }
+    private void Update()
+    {
+        if (plane == null) return;
+
+        if (Keyboard.current != null)
+        {
+            // Space held = boost.
+            if (Keyboard.current.spaceKey.wasPressedThisFrame)
+                plane.TurnOnBoost(1f);
+            else if (Keyboard.current.spaceKey.wasReleasedThisFrame)
+                plane.TurnOffBoost();
+
+            // Enter / numpad Enter = release note.
+            if (Keyboard.current.enterKey.wasPressedThisFrame ||
+                Keyboard.current.numpadEnterKey.wasPressedThisFrame)
+                plane.TryReleaseQueuedNote();
+        }
+    }
+
     private void HandleConfirm()
     {
         // If we're in the "primary tutorial gate" (post-ready, pre-game), confirm advances it.
@@ -417,40 +433,8 @@ public class LocalPlayer : MonoBehaviour
 
     public void OnMouseMove(InputValue value)
     {
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-
-        Vector2 raw = value.Get<Vector2>();        // pixels since last frame
-        if (raw.sqrMagnitude == 0f) return;
-
-        _usingMouse = true;
-
-        // 1) clamp per-frame spikes
-        raw = Vector2.ClampMagnitude(raw, maxPixelsPerFrame);
-
-        // 2) exponential moving average (frame-rate aware)
-        float a = 1f - Mathf.Exp(-mouseDeltaSmoothing * Time.unscaledDeltaTime);
-        _smoothedDelta = Vector2.Lerp(_smoothedDelta, raw, a);
-
-        // Convert to "stick units per second" and integrate per frame
-        Vector2 deltaStick = _smoothedDelta * mouseSensitivity * friction * Time.unscaledDeltaTime * 60f;
-
-        // Proposed stick (pre-clamp)
-        Vector2 proposed = _virtualStick + deltaStick;
-
-        // 3) optional angle smoothing to prevent twitchy heading changes
-        if (_virtualStick.sqrMagnitude > 0.000001f && proposed.sqrMagnitude > 0.000001f && angleSmoothTime > 0f)
-        {
-            float curAng = Mathf.Atan2(_virtualStick.y, _virtualStick.x) * Mathf.Rad2Deg;
-            float tgtAng = Mathf.Atan2(proposed.y, proposed.x) * Mathf.Rad2Deg;
-            float smAng  = Mathf.SmoothDampAngle(curAng, tgtAng, ref _angleVel, angleSmoothTime);
-            float mag    = proposed.magnitude;
-            proposed = new Vector2(Mathf.Cos(smAng * Mathf.Deg2Rad), Mathf.Sin(smAng * Mathf.Deg2Rad)) * mag;
-        }
-
-        // Final clamp to stick radius
-        _virtualStick = (proposed.sqrMagnitude > stickMax * stickMax)
-            ? proposed.normalized * stickMax
-            : proposed;
+        // Mouse delta is now read directly in Update() via Mouse.current.delta.
+        // This callback is kept to suppress Input System missing-binding warnings.
     }
 
     public void OnQuit(InputValue value)
