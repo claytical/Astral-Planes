@@ -1125,30 +1125,38 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Deterministic: absolute bin -> progression slot
         return ((binIndex % progLen) + progLen) % progLen;
     }
-    private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi) {
+    private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi = int.MinValue) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
 
-    int chordIdx = Harmony_GetChordIndexForBin(bin);
-    if (chordIdx < 0) return midiNote;
-    var hd = GameFlowManager.Instance?.harmony;
-    if (hd == null) return midiNote;
+    // Use the NoteSet's chordRegion — it carries delta-adjusted absolute roots
+    // (NoteSetFactory applies keyRootMidi − authoredFirst to every chord root).
+    // HarmonyDirector.profile stores the raw ScriptableObject values, which may be
+    // relative scale degrees and would therefore produce a wrong rootDelta.
+    var ns = GetNoteSetForBin(bin);
+    var region = ns?.chordRegion;
+    Chord chord, baseChord;
+    if (region != null && region.Count > 0)
+    {
+        int chordIdx = bin % region.Count;
+        chord     = region[chordIdx];
+        baseChord = region[0];
+    }
+    else
+    {
+        // Fallback: try HarmonyDirector (works when chordRegion is absent)
+        int chordIdx = Harmony_GetChordIndexForBin(bin);
+        if (chordIdx < 0) return midiNote;
+        var hd = GameFlowManager.Instance?.harmony;
+        if (hd == null) return midiNote;
+        if (!hd.TryGetChordAt(chordIdx, out chord)) return midiNote;
+        if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
+    }
 
-    if (!hd.TryGetChordAt(chordIdx, out var chord)) return midiNote;
-    // --- Determine transpose anchor (authored root for THIS note) ---
-    // If authoredRootMidi is not provided, fall back to previous behavior: bin-0 chord as proxy.
-    int rootDelta; 
-    if (authoredRootMidi != int.MinValue) { 
-        // Root delta in semitones (authored → current)
-        rootDelta = chord.rootNote - authoredRootMidi;
-    }
-    else {
-        int baseChordIdx = Harmony_GetChordIndexForBin(0);
-        if (baseChordIdx < 0) baseChordIdx = 0;
-        if (!hd.TryGetChordAt(baseChordIdx, out var baseChord))
-            baseChord = chord; // last resort
-        rootDelta = chord.rootNote - baseChord.rootNote;
-    }
+    // rootDelta: authored note's root → target chord's root
+    int rootDelta = (authoredRootMidi != int.MinValue)
+        ? chord.rootNote - authoredRootMidi
+        : chord.rootNote - baseChord.rootNote;
 
     // First: transpose by the chord-root delta (this is the part you *expect* to hear)
         int shifted = midiNote + rootDelta;
@@ -1351,8 +1359,19 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             _burstWroteBin[collectable.burstId]              = BinIndexForStep(finalTargetStep);
         }
         int note = collectable.GetNote();
+        // Look up the authoredRootMidi stored in the template for this step.
+        // NoteSetFactory pre-transposes riff notes to each bin's chord root and stores
+        // that root as authoredRootMidi, so QuantizeNoteToBinChord sees rootDelta = 0
+        // and only snaps the already-correct note to the nearest chord tone.
+        int authoredRootMidi = int.MinValue;
+        {
+            int binIdx    = BinIndexForStep(finalTargetStep);
+            int localStep = finalTargetStep % Mathf.Max(1, BinSize());
+            var ns        = GetNoteSetForBin(binIdx);
+            if (ns != null) authoredRootMidi = ns.GetAuthoredRootMidi(localStep);
+        }
         // IMPORTANT: this is what feeds the audible loop.
-        CollectNote(finalTargetStep, note, durationTicks, force /*, authoredRootMidi if your CollectNote supports it */);
+        CollectNote(finalTargetStep, note, durationTicks, force, authoredRootMidi);
 
         // Mark bin filled + hooks
         int targetBin = BinIndexForStep(finalTargetStep);
@@ -2052,18 +2071,29 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
 
-        var hd = GameFlowManager.Instance?.harmony;
-        if (hd == null) return;
-
         var modified = new List<(int step, int note, int dur, float vel)>(persistentLoopNotes.Count);
         foreach (var (step, note, dur, vel, _) in persistentLoopNotes)
         {
             int bin = BinIndexForStep(step);
-            int chordIdx = Harmony_GetChordIndexForBin(bin);
-            if (chordIdx < 0 || !hd.TryGetChordAt(chordIdx, out var chord))
+
+            // Use the NoteSet's chordRegion (adjusted absolute roots) — same reason as
+            // QuantizeNoteToBinChord: HarmonyDirector.profile may have unadjusted roots.
+            var ns = GetNoteSetForBin(bin);
+            var region = ns?.chordRegion;
+            Chord chord;
+            if (region != null && region.Count > 0)
             {
-                modified.Add((step, note, dur, vel));
-                continue;
+                chord = region[bin % region.Count];
+            }
+            else
+            {
+                int chordIdx = Harmony_GetChordIndexForBin(bin);
+                var hd = GameFlowManager.Instance?.harmony;
+                if (chordIdx < 0 || hd == null || !hd.TryGetChordAt(chordIdx, out chord))
+                {
+                    modified.Add((step, note, dur, vel));
+                    continue;
+                }
             }
 
             var allowed = new List<int>();
@@ -3036,11 +3066,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         spawnedCollectables.RemoveAll(go => go == null || !go.activeInHierarchy);
     }
 
-    private int CollectNote(int stepIndex, int note, int durationTicks, float force)
+    private int CollectNote(int stepIndex, int note, int durationTicks, float force, int authoredRootMidi = int.MinValue)
     {
         Debug.Log($"[COLLECT] Adding Note {note} to Loop at Index {stepIndex} for {durationTicks}");
         // Commit immediately (the loop evolves as notes are collected).
-        AddNoteToLoop(stepIndex, note, durationTicks, force, false);
+        AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
 
         // Immediate tactile feedback (short), then audition on-grid (full voice).
         PlayCollectionConfirm(note, force);

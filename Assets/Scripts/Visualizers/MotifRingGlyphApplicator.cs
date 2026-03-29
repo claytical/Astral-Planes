@@ -27,6 +27,15 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private readonly List<LineRenderer> _rings = new();
     private bool _fadingOut;
 
+    private struct NoteAnimInfo
+    {
+        public InstrumentTrack Track;
+        public int             AbsStep;
+        public float           NoteAngle;    // radians [0, 2π)
+        public Vector3         TugLocalPos;  // in ring-local space
+        public Color           DotColor;
+    }
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     void Start()
@@ -61,6 +70,14 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 fillDurs[key] = bin.FillDurationSeconds;
         }
 
+        // Resolve NoteVisualizer and build color→track lookup for travel dots
+        var noteViz = GameFlowManager.Instance?.controller?.noteVisualizer;
+        var tracks  = GameFlowManager.Instance?.controller?.tracks;
+        var trackByQColor = new Dictionary<Color, InstrumentTrack>();
+        if (tracks != null)
+            foreach (var tr in tracks)
+                if (tr != null) { Color32 q = tr.trackColor; trackByQColor[(Color)q] = tr; }
+
         for (int i = 0; i < polylines.Count; i++)
         {
             var poly = polylines[i];
@@ -89,9 +106,39 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             // Alternate clockwise / counterclockwise per ring for visual depth
             if (i % 2 == 1) rotDeg = -rotDeg;
 
+            // Build per-ring note infos for travel dot animation
+            int   binSize = Mathf.Max(1, snapshot.TotalSteps);
+            float tugR    = (config.innerRadius + i * (config.ringSpacing + config.lineWidth))
+                            * (1f - config.tugDepthFraction);
+
+            var noteInfos = new List<NoteAnimInfo>();
+            foreach (var n in snapshot.CollectedNotes)
+            {
+                if (n.BinIndex != poly.BinIndex) continue;
+                Color32 q = n.TrackColor;
+                if (!trackByQColor.TryGetValue((Color)q, out var track)) continue;
+
+                int   localStep = n.Step % binSize;
+                float angle     = (localStep / (float)binSize) * Mathf.PI * 2f;
+                float tx        = Mathf.Cos(angle) * tugR;
+                float ty        = Mathf.Sin(angle) * tugR;
+
+                noteInfos.Add(new NoteAnimInfo
+                {
+                    Track       = track,
+                    AbsStep     = n.Step,
+                    NoteAngle   = angle,
+                    TugLocalPos = new Vector3(tx, ty, 0f),
+                    DotColor    = poly.LineColor,
+                });
+            }
+
+            // Sort by angle so dots fire in draw-in order
+            noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
+
             float delay = i * config.ringStaggerDelay;
             StartCoroutine(AnimateSingleRing(lr, poly.Points, delay,
-                                             config.ringDrawInDuration, go.transform, rotDeg));
+                config.ringDrawInDuration, go.transform, rotDeg, noteInfos, noteViz));
         }
     }
 
@@ -189,20 +236,41 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float delay,
         float drawDuration,
         Transform ringTransform,
-        float rotDegPerSec)
+        float rotDegPerSec,
+        List<NoteAnimInfo> noteInfos,
+        NoteVisualizer noteViz)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
         // Phase 1: Draw-in — grow positionCount from 2 → total over drawDuration
-        int total = pts.Count;
+        int   total    = pts.Count;
+        int   nextNote = 0;
+        float elapsed  = 0f;
         lr.positionCount = 2;
-        float elapsed = 0f;
 
         while (elapsed < drawDuration)
         {
             elapsed += Time.deltaTime;
+            float progress   = Mathf.Clamp01(elapsed / drawDuration);
+            float drawnAngle = progress * Mathf.PI * 2f;
+
+            // Fire a travel dot for each note whose angle the trace has passed
+            while (nextNote < noteInfos.Count && drawnAngle >= noteInfos[nextNote].NoteAngle)
+            {
+                var info = noteInfos[nextNote++];
+                if (noteViz != null && noteViz.noteMarkers != null &&
+                    info.Track != null &&
+                    noteViz.noteMarkers.TryGetValue((info.Track, info.AbsStep), out var markerTr) &&
+                    markerTr != null)
+                {
+                    StartCoroutine(TravelNoteDot(
+                        markerTr.position, ringTransform, info.TugLocalPos,
+                        config.noteTravelDuration, info.DotColor));
+                }
+            }
+
             int count = Mathf.Clamp(
-                Mathf.RoundToInt(Mathf.Clamp01(elapsed / drawDuration) * total),
+                Mathf.RoundToInt(progress * total),
                 2, total);
             lr.positionCount = count;
             for (int i = 0; i < count; i++)
@@ -221,5 +289,44 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
+    }
+
+    private IEnumerator TravelNoteDot(
+        Vector3 startWorld, Transform ringTransform, Vector3 tugLocalPos,
+        float duration, Color color)
+    {
+        var go = new GameObject("NoteTravelDot");
+        go.transform.SetParent(transform, worldPositionStays: true);
+
+        var lr = go.AddComponent<LineRenderer>();
+        if (lineMaterial != null) lr.material = lineMaterial;
+        lr.startColor        = lr.endColor = color;
+        lr.widthMultiplier   = config.lineWidth * 2f;
+        lr.useWorldSpace     = false;
+        lr.loop              = false;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+
+        // Small circle in dot's own local space
+        const int segs = 8;
+        float r = config.noteDotRadius;
+        lr.positionCount = segs + 1;
+        for (int i = 0; i <= segs; i++)
+        {
+            float a = i / (float)segs * Mathf.PI * 2f;
+            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float   t   = Mathf.Clamp01(elapsed / duration);
+            Vector3 end = ringTransform.TransformPoint(tugLocalPos); // live world pos, tracks ring rotation
+            go.transform.position = Vector3.Lerp(startWorld, end, t);
+            yield return null;
+        }
+
+        Destroy(go);
     }
 }

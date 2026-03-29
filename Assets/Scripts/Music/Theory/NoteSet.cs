@@ -279,6 +279,17 @@ using Random = UnityEngine.Random;
         }
     }
 
+    /// <summary>
+    /// Returns the authoredRootMidi stored in the persistent template for the given local step.
+    /// Returns int.MinValue if the step has no template entry (generative path or step not authored).
+    /// </summary>
+    public int GetAuthoredRootMidi(int step)
+    {
+        if (_templateByStep.TryGetValue(step, out var e))
+            return e.authoredRootMidi;
+        return int.MinValue;
+    }
+
     private int GetNextArpeggiatedNote(int stepIndex)
     {
         if (_notes.Count == 0)

@@ -43,14 +43,15 @@ public class NoteSetFactory : MonoBehaviour
     }
 
     var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-b{binIndex}-n{entropy}"); string key = $"{motif.name}/{track.assignedRole}/bin{binIndex}";
-    return GenerateFromMotifConfig(track, motif, cfg, rng, key);
+    return GenerateFromMotifConfig(track, motif, cfg, rng, key, binIndex);
 }
     private NoteSet GenerateFromMotifConfig(
        InstrumentTrack track,
        MotifProfile motif,
        RoleMotifNoteSetConfig cfg,
       System.Random rng,
-      string debugKey)
+      string debugKey,
+      int binIndex = 0)
 {
     int rootMidi = ResolveRootMidiInRange(
         motif != null ? motif.keyRootMidi : track.lowestAllowedNote,
@@ -149,8 +150,8 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     // Debug: proves we’re actually reading the asset you think we are.
     Debug.Log(
         $"[NoteSetFactory] RIFF MODE track='{track.name}' cfg='{cfg.name}' riffAsset='{cfg.riff.name}' " +
-        $"events={riff.events.Count} authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} " +
-        $"totalSteps={totalSteps} debugKey={debugKey}"
+        $"events={riff.events.Count} riff.authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} " +
+        $"totalSteps={totalSteps} debugKey={debugKey} binIndex={binIndex}"
     );
 
     const int stepsPerBar = 16;
@@ -158,9 +159,21 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     const int ticksPerQuarter = 480;
     int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar); // 120 ticks/step
 
-    // Use first chord/root as the target transpose anchor.
-    int targetRoot = (chordSeq != null && chordSeq.Count > 0) ? chordSeq[0].rootNote : rootMidi;
-    int delta = targetRoot - riff.authoredRootMidi + (riff.octaveShift * 12);
+    // Use this bin's chord root as the transpose anchor so each bin produces
+    // the note that belongs to its chord slot in the progression.
+    // Use chordSeq[0].rootNote (= keyRootMidi, always correct) as the authoring anchor
+    // rather than riff.authoredRootMidi, which defaults to 0 in Unity's Inspector when
+    // not explicitly set — making delta wildly wrong (e.g. 65 - 0 = 65 → midi 125).
+    int authoredAnchor = (chordSeq != null && chordSeq.Count > 0) ? chordSeq[0].rootNote : rootMidi;
+    int targetRoot = (chordSeq != null && chordSeq.Count > 0)
+        ? chordSeq[binIndex % chordSeq.Count].rootNote
+        : rootMidi;
+    int delta = targetRoot - authoredAnchor + (riff.octaveShift * 12);
+
+    Debug.Log(
+        $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} authoredAnchor={authoredAnchor} " +
+        $"targetRoot={targetRoot} delta={delta} (riff.authoredRootMidi was {riff.authoredRootMidi})"
+    );
 
     var ordered = riff.events.OrderBy(e => e.step).ToList();
     var riffPersistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(ordered.Count);
@@ -171,7 +184,7 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
 
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
-        int midi = e.midiNote + (riff.octaveShift * 12);
+        int midi = e.midiNote + delta; // delta = (binChordRoot - riff.authoredRootMidi) + octaveShift
 
         if (riff.clampToTrackRange)
             midi = Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote);
@@ -190,7 +203,9 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
         }
 
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;
-        riffPersistent.Add((step, midi, durTicks, vel127, riff.authoredRootMidi));
+        // Store targetRoot as authoredRootMidi so QuantizeNoteToBinChord computes
+        // rootDelta = 0 at collection time (note is already at the right chord root).
+        riffPersistent.Add((step, midi, durTicks, vel127, targetRoot));
     }
 
     var riffNs = new NoteSet
