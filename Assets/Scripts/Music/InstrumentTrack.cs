@@ -53,7 +53,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     void IExpansionHost.ResetStepCursors()
     {
         _lastLocalStep = -1;
-        _lastLoopSeen  = -1;
     }
 
     void IExpansionHost.SetBinAllocated(int bin, bool v) => SetBinAllocated(bin, v);
@@ -141,8 +140,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private readonly List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)>();    List<GameObject> _spawnedNotes = new();
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
-    private int _lastLoopSeen = -1;
     private int _nextBurstId = 0;
+    private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
     private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
     private readonly Dictionary<int,int> _burstTotalSpawned = new(); // burstId -> total spawned
     private readonly Dictionary<int,int> _burstCollected    = new(); // burstId -> collected count
@@ -403,7 +402,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public bool IsExpansionPending => _expansionCtrl?.IsExpansionPending ?? false;
     public List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
-    }    
+    }
+
+    /// <summary>
+    /// Returns the Time.time value recorded when the note at <paramref name="stepIndex"/> was committed
+    /// to the persistent loop. Returns -1 if no commit time is recorded for that step.
+    /// </summary>
+    public float GetNoteCommitTime(int stepIndex) =>
+        _noteCommitTimes.TryGetValue(stepIndex, out var t) ? t : -1f;
     private bool IsOpenOrPermanentCell(CosmicDustGenerator dustGen, Vector2Int gp) {
         if (dustGen == null) return true;
         if (dustGen.IsPermanentlyClearCell(gp)) return true;
@@ -1017,7 +1023,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _pendingCollapse = false;
         UnhookCollapseBoundary();
         _lastLocalStep = -1;
-        _lastLoopSeen = -1;
     }
 
     /// <summary>
@@ -2037,11 +2042,61 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
     }
+
+    /// <summary>
+    /// Per-bin retune: snaps each note to the nearest tone in its bin's assigned chord
+    /// in the current HarmonyDirector progression. Use this instead of RetuneLoopToChord(chord0)
+    /// when a profile change should respect the full chord progression across bins.
+    /// </summary>
+    public void RetuneLoopToCurrentProgression()
+    {
+        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
+
+        var hd = GameFlowManager.Instance?.harmony;
+        if (hd == null) return;
+
+        var modified = new List<(int step, int note, int dur, float vel)>(persistentLoopNotes.Count);
+        foreach (var (step, note, dur, vel, _) in persistentLoopNotes)
+        {
+            int bin = BinIndexForStep(step);
+            int chordIdx = Harmony_GetChordIndexForBin(bin);
+            if (chordIdx < 0 || !hd.TryGetChordAt(chordIdx, out var chord))
+            {
+                modified.Add((step, note, dur, vel));
+                continue;
+            }
+
+            var allowed = new List<int>();
+            for (int oct = -2; oct <= 3; oct++)
+            {
+                foreach (var iv in chord.intervals)
+                {
+                    int n = chord.rootNote + iv + 12 * oct;
+                    if (n >= lowestAllowedNote && n <= highestAllowedNote) allowed.Add(n);
+                }
+            }
+
+            if (allowed.Count == 0) { modified.Add((step, note, dur, vel)); continue; }
+            allowed.Sort();
+
+            int best = allowed[0], bestDist = Mathf.Abs(best - note);
+            for (int i = 1; i < allowed.Count; i++)
+            {
+                int d = Mathf.Abs(allowed[i] - note);
+                if (d < bestDist) { bestDist = d; best = allowed[i]; }
+            }
+            modified.Add((step, best, dur, vel));
+        }
+
+        RebuildLoopFromModifiedNotes(modified, transform.position);
+    }
+
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
     {
-        int qNote = skipChordQuantize ? note : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi); 
+        int qNote = skipChordQuantize ? note : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
         Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
+        _noteCommitTimes[stepIndex] = Time.time;
 
         _loopCacheDirtyPending = true;
         GameObject noteMarker = null;
@@ -2949,7 +3004,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
             Environment.StackTrace);
 
+        // Preserve original commit times — chord retuning changes pitch but not when the
+        // player collected the note. Restoring these keeps CommitTime01 non-zero in the
+        // ring glyph so squiggles are visible after a chord change.
+        var savedCommitTimes = new Dictionary<int, float>(_noteCommitTimes);
+
         persistentLoopNotes.Clear();
+        _noteCommitTimes.Clear();
         _loopCacheDirtyPending = true;
         foreach (var obj in _spawnedNotes) if (obj) Destroy(obj);
         _spawnedNotes.Clear();
@@ -2957,7 +3018,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (modified != null)
         {
             foreach (var (step, note, dur, vel) in modified)
-                AddNoteToLoop(step, note, dur, vel, true);
+            {
+                // skipChordQuantize=true: notes in `modified` are already at their final pitch;
+                // re-quantizing here would double-process them and produce wrong results.
+                AddNoteToLoop(step, note, dur, vel, true, skipChordQuantize: true);
+                if (savedCommitTimes.TryGetValue(step, out float originalTime))
+                    _noteCommitTimes[step] = originalTime;
+            }
         }
     }
 

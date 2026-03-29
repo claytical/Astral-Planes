@@ -159,14 +159,13 @@ public class HarmonyDirector : MonoBehaviour
 
             if (GameFlowManager.Instance.controller?.tracks != null && this.profile.chordSequence.Count > 0)
             {
-                var chord0 = this.profile.chordSequence[0];
                 foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
                     if (tr == null) continue;
                     _trackSeq[tr] = new List<int> { 0 };
                     _trackPos[tr] = 0;
                     if (tr.GetPersistentLoopNotes().Count > 0)
-                        tr.RetuneLoopToChord(chord0);
+                        tr.RetuneLoopToCurrentProgression();
                 }
             }
         }
@@ -240,20 +239,19 @@ public class HarmonyDirector : MonoBehaviour
                 _hasPendingProfileSwap = false;
             }
 
-            // Snap every track’s personal sequence back to I (index 0), retune to chord 0
+            // Snap every track’s personal sequence back to I (index 0), retune per-bin
             if (profile.chordSequence != null && profile.chordSequence.Count > 0)
             {
-                var chord0 = profile.chordSequence[0];
-
                 foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
                     if (tr == null) continue;
                     _trackSeq[tr] = new List<int> { 0 };
                     _trackPos[tr] = 0;
 
-                    // If a loop exists, retune it so the whole band lands together
+                    // If a loop exists, retune it so the whole band lands together,
+                    // respecting each bin's chord assignment in the new progression.
                     if (tr.GetPersistentLoopNotes().Count > 0)
-                        tr.RetuneLoopToChord(chord0);
+                        tr.RetuneLoopToCurrentProgression();
                 }
 
                 _globalBuiltCount = 1; // I is now the built baseline again

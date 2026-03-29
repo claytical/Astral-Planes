@@ -9,6 +9,7 @@ public class SerializableNoteEntry
     public int note;
     public float velocity;
     public Color trackColor;
+    public float commitTime01; // 0 = first collected, 1 = last collected within bin
 }
 
 [Serializable]

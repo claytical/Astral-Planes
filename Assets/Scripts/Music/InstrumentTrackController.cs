@@ -77,8 +77,6 @@ public class InstrumentTrackController : MonoBehaviour
     private int   _gravityVoidMaxRadiusRuntime   = -1;
     // Inner radius (cells) where void ring growth begins — set to safety bubble radius so rings grow outward from the bubble perimeter.
     private int   _gravityVoidBubbleInnerR       = 0;
-    private bool _hasLastTransportFrame;
-    private TransportFrame _lastTransportFrame;
     private double _lastTransportDsp;
     private int _lastPlayheadBin;
 // ------------------------------------------------------------
@@ -86,6 +84,7 @@ public class InstrumentTrackController : MonoBehaviour
 // ------------------------------------------------------------
     private bool _hasLastTransport;
     private TransportFrame _lastTransport;
+    private double _lastTransportLeaderDsp; // leaderStartDspTime when the cache was written
     private GameFlowManager _gfm;
     // ---------------------------------------------------------------------
     // SFX: Commit "Placement Stinger" (A3)
@@ -716,10 +715,13 @@ public class InstrumentTrackController : MonoBehaviour
 
         // Short-circuit: if called multiple times within the same DSP sample (multiple tracks per frame),
         // return the cached result instead of recalculating.
-        if (_hasLastTransport && dspNow == _lastTransportDsp)
+        // Also invalidate if leaderStartDspTime advanced mid-frame (loop boundary fired after some
+        // InstrumentTracks already ran Update), which would cause stale barIndex + fresh start mismatch.
+        double leaderDspNow = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        if (_hasLastTransport && dspNow == _lastTransportDsp && leaderDspNow == _lastTransportLeaderDsp)
             return _lastTransport;
 
-        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        double start = leaderDspNow;
         if (start <= 0.0) return default;
 
         float clipLen = drum.GetClipLengthInSeconds();
@@ -762,6 +764,7 @@ public class InstrumentTrackController : MonoBehaviour
 
         _lastTransport = tf;
         _lastTransportDsp = dspNow;
+        _lastTransportLeaderDsp = leaderDspNow;
         _hasLastTransport = true;
         return tf;
     }

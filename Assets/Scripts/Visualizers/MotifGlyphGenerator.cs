@@ -26,6 +26,7 @@ public class GlyphPolyline
     public float         LineWidth;
     public Color         LineColor;
     public int           SortOrder;   // lower = drawn first (behind)
+    public int           BinIndex = -1; // ring bin index; -1 for non-ring glyphs
 }
 
 public class GlyphOutput
