@@ -34,6 +34,9 @@ public partial class GameFlowManager : MonoBehaviour
 
     [Header("Glyph (2D Bridge Visualizer)")]
     [SerializeField] private GlyphApplicator motifGlyphApplicator;
+
+    [Header("Ring Glyph (Motif Rings)")]
+    [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [SerializeField] private bool useSpiralCoralDuringBridge = true;
     [SerializeField] private Transform coralRoot; // scene object root
@@ -100,6 +103,11 @@ public partial class GameFlowManager : MonoBehaviour
     public void RegisterGlyphApplicator(GlyphApplicator applicator)
     {
         motifGlyphApplicator = applicator;
+    }
+
+    public void RegisterRingGlyphApplicator(MotifRingGlyphApplicator applicator)
+    {
+        motifRingGlyphApplicator = applicator;
     }
 
     public GameState CurrentState
@@ -263,7 +271,6 @@ public partial class GameFlowManager : MonoBehaviour
 
     Debug.Log("[GFM] [SETUP] Ship profiles resolved: " +
               string.Join(", ", shipProfiles.Select(sp => sp ? sp.name : "<null>")));
-
     // ------------------------------------------------------------
     // STEP 1: Configure tracks from selected ships
     // ------------------------------------------------------------

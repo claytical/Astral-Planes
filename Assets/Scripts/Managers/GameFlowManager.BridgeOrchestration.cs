@@ -16,6 +16,18 @@ public partial class GameFlowManager
         GhostCycleInProgress = true;
         BridgePending = true;
         FreezeGameplayForBridge();
+        // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
+        var allTracks = (controller?.tracks != null)
+            ? controller.tracks.Where(t => t != null).ToList()
+            : new List<InstrumentTrack>();
+        var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
+
+        _motifSnapshots.Add(motifSnap);
+        ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
+        motifRingGlyphApplicator?.AnimateApply(motifSnap);
+        Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
+                  $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
+        
         // Stop regrowth coroutines BEFORE deactivating activeDustRoot so StopCoroutine
         // calls inside HideVisualsInstant execute on active objects. Calling HardStop after
         // SetBridgeCinematicMode(true) deactivates the root, which causes StopCoroutine to
@@ -43,17 +55,6 @@ public partial class GameFlowManager
             foreach (var v in vehicles)
                 v?.SetBoostFree(false);
         // --- End final loop ---
-        // Snapshot BEFORE StartNextMotifInPhase → BeginNewMotif clears the tracks.
-        var allTracks = (controller?.tracks != null)
-            ? controller.tracks.Where(t => t != null).ToList()
-            : new List<InstrumentTrack>();
-        var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
-
-        _motifSnapshots.Add(motifSnap);
-        ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
-
-        Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
-                  $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
 
         /*
         SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
@@ -96,6 +97,11 @@ public partial class GameFlowManager
         SetBridgeCinematicMode(false); // restore maze, dust, vehicles
         
         */
+        // Fade rings out while the next motif scene loads (fire-and-forget overlap)
+        if (motifRingGlyphApplicator != null)
+            StartCoroutine(motifRingGlyphApplicator.FadeOutAndClear(
+                motifRingGlyphApplicator.config?.fadeOutDuration ?? 0.75f));
+
         yield return StartCoroutine(StartNextMotifInPhase());
         GhostCycleInProgress = false;
         BridgePending = false;
@@ -186,7 +192,19 @@ public partial class GameFlowManager
                 templateNoteByBinStep[b] = stepNoteMap;
             }
 
-            // Emit NoteEntries with BinIndex and IsMatched populated.
+            // Build per-bin commit-time ranges for CommitTime01 normalization.
+            // CommitTime01 = 0 (first collected in bin) … 1 (last collected).
+            var binTimeRange = new Dictionary<int, (float min, float max)>();
+            foreach (var n in notes)
+            {
+                float ct = track.GetNoteCommitTime(n.stepIndex);
+                if (ct < 0f) ct = motifStartTime;
+                int b = n.stepIndex / binSize;
+                if (!binTimeRange.TryGetValue(b, out var r)) r = (ct, ct);
+                binTimeRange[b] = (Mathf.Min(r.min, ct), Mathf.Max(r.max, ct));
+            }
+
+            // Emit NoteEntries with BinIndex, IsMatched, and CommitTime01 populated.
             // IsMatched = player hit the authored step AND played the authored note at that step.
             foreach (var n in notes.OrderBy(n => n.stepIndex))
             {
@@ -196,13 +214,25 @@ public partial class GameFlowManager
                                  && stepNoteMap.TryGetValue(localStep, out int authoredNote)
                                  && n.note == authoredNote;
 
+                float commitTime = track.GetNoteCommitTime(n.stepIndex);
+                if (commitTime < 0f) commitTime = motifStartTime;
+                var range = binTimeRange.TryGetValue(binIndex, out var r) ? r : (min: commitTime, max: commitTime);
+                float span = range.max - range.min;
+                // Fallback when all notes were collected within the same frame (rapid play,
+                // pre-seed, or chord rebuild): use normalised step position within the bin
+                // so every note still gets a distinct CommitTime01 and dips are visible.
+                float commitTime01 = span > 0.001f
+                    ? (commitTime - range.min) / span
+                    : (binSize > 1 ? localStep / (float)(binSize - 1) : 0.5f);
+
                 snapshot.CollectedNotes.Add(new MotifSnapshot.NoteEntry(
-                    step: n.stepIndex,
-                    note: n.note,
-                    velocity: n.velocity,
-                    trackColor: c,
-                    binIndex: binIndex,
-                    isMatched: isMatched
+                    step:         n.stepIndex,
+                    note:         n.note,
+                    velocity:     n.velocity,
+                    trackColor:   c,
+                    binIndex:     binIndex,
+                    isMatched:    isMatched,
+                    commitTime01: commitTime01
                 ));
             }
 

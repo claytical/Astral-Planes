@@ -208,6 +208,13 @@ public class MotifSnapshot
         public int   BinIndex;
         public bool  IsMatched;
 
+        /// <summary>
+        /// Normalized collection speed for this note within its bin.
+        /// 0 = collected first (fastest), 1 = collected last (slowest).
+        /// Drives ring tug depth in MotifRingGlyphGenerator.
+        /// </summary>
+        public float CommitTime01;
+
         /// <summary>Serializable backing. Use TrackColor property at runtime.</summary>
         public SerializableColor SerializedTrackColor;
 
@@ -230,14 +237,15 @@ public class MotifSnapshot
         public NoteEntry() { }
 
         public NoteEntry(int step, int note, float velocity, Color trackColor,
-                         int binIndex = 0, bool isMatched = false)
+                         int binIndex = 0, bool isMatched = false, float commitTime01 = 0f)
         {
-            Step      = step;
-            Note      = note;
-            Velocity  = velocity;
-            BinIndex  = binIndex;
-            IsMatched = isMatched;
-            TrackColor = trackColor; // writes through to SerializedTrackColor
+            Step         = step;
+            Note         = note;
+            Velocity     = velocity;
+            BinIndex     = binIndex;
+            IsMatched    = isMatched;
+            CommitTime01 = commitTime01;
+            TrackColor   = trackColor; // writes through to SerializedTrackColor
         }
     }
 

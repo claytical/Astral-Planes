@@ -20,10 +20,11 @@ public static class ConstellationMemoryStore
                 timestamp = (long)s.Timestamp,
                 collectedNotes = s.CollectedNotes.Select(n => new SerializableNoteEntry
                 {
-                    step = n.Step,
-                    note = n.Note,
-                    velocity = n.Velocity,
-                    trackColor = n.TrackColor
+                    step         = n.Step,
+                    note         = n.Note,
+                    velocity     = n.Velocity,
+                    trackColor   = n.TrackColor,
+                    commitTime01 = n.CommitTime01
                 }).ToList()
             }).ToList()
         };
@@ -38,7 +39,7 @@ public static class ConstellationMemoryStore
             Color = s.color,
             Timestamp = s.timestamp,
             CollectedNotes = s.collectedNotes.Select(n => new MotifSnapshot.NoteEntry(
-                n.step, n.note, n.velocity, n.trackColor
+                n.step, n.note, n.velocity, n.trackColor, commitTime01: n.commitTime01
             )).ToList()
         }).ToList();
     }
@@ -102,7 +103,7 @@ public static class ConstellationMemoryStore
             Color = s.Color,
             Timestamp = s.Timestamp,
             CollectedNotes = s.CollectedNotes
-                .Select(n => new MotifSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor))
+                .Select(n => new MotifSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor, commitTime01: n.CommitTime01))
                 .ToList()
         }).ToList(); // Deep copy for safety
     }
