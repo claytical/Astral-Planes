@@ -42,4 +42,10 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Seconds for all rings to fade out when the bridge ends.")]
     public float fadeOutDuration = 0.75f;
+
+    [Tooltip("Radius of the mini-ring dot that travels from note marker to tug point (in ring-local units).")]
+    public float noteDotRadius = 0.02f;
+
+    [Tooltip("Duration in seconds for each note-to-tug travel animation.")]
+    public float noteTravelDuration = 0.35f;
 }

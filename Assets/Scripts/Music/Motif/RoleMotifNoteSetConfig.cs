@@ -9,7 +9,7 @@ using UnityEngine;
 [CreateAssetMenu(
     fileName = "RoleMotifNoteSetConfig",
     menuName = "Astral Planes/Motif/Role Motif NoteSet Config")]
-public class RoleMotifNoteSetConfig : ScriptableObject
+public class  RoleMotifNoteSetConfig : ScriptableObject
 {
     [Header("Identity")]
     public string id;                   // Optional stable ID (e.g. "MotifA_BassMain")

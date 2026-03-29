@@ -20,6 +20,8 @@ MonoBehaviour:
   tugHalfWidthRad: 0.5
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08
-  rotSpeedBase: 50
+  rotSpeedBase: 25
   rotSpeedMax: 300
   fadeOutDuration: 0.75
+  noteDotRadius: 0.02
+  noteTravelDuration: 0.35
