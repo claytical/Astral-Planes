@@ -59,8 +59,24 @@ public class Boundaries : MonoBehaviour
                 new Vector2(screenHalfWidth * 2f, bottomBoundary.size.y);
         }
         Debug.Log($"[BOUNDARIES] Boundaries constructed");
+
+        // Wire up screen-wrap triggers (opposite boundary provides the reappearance edge).
+        AddWrap(leftBoundary,   BoundaryWrap.WrapAxis.Horizontal, rightBoundary);
+        AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, leftBoundary);
+        AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   bottomBoundary);
+        AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   topBoundary);
+
         // ✅ Defer precise alignment to when NoteVisualizer is ready
         StartCoroutine(AlignBottomToNoteVisualizerWhenReady());
+    }
+
+    private void AddWrap(BoxCollider2D boundary, BoundaryWrap.WrapAxis axis, BoxCollider2D opposite)
+    {
+        if (boundary == null || opposite == null) return;
+        var wrap = boundary.gameObject.GetComponent<BoundaryWrap>()
+                   ?? boundary.gameObject.AddComponent<BoundaryWrap>();
+        wrap.axis = axis;
+        wrap.oppositeBoundary = opposite;
     }
 
     private System.Collections.IEnumerator AlignBottomToNoteVisualizerWhenReady()

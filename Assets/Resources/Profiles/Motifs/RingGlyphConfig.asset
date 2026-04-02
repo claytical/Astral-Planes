@@ -15,7 +15,7 @@ MonoBehaviour:
   innerRadius: 0.1
   ringSpacing: 0.5
   lineWidth: 0.012
-  segments: 128
+  segments: 64
   tugDepthFraction: 0.436
   tugHalfWidthRad: 0.5
   ringDrawInDuration: 0.5

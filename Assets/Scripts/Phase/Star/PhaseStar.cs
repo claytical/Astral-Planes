@@ -129,6 +129,11 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
     private bool _awaitingCollectableClear;
 
+    // True while the star is parked off-screen during a collectable burst.
+    // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
+    private bool _burstOffScreen;
+    private Coroutine _burstOffScreenWaitCo;
+
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration; // seconds (time authority)
 
@@ -795,7 +800,7 @@ public class PhaseStar : MonoBehaviour
             Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back shard. _shardsEjectedCount={_shardsEjectedCount}");
             RebuildPreviewRingForRemainingShards(keepCurrentIndex: false);
             PrepareNextDirective();
-            ArmNext();
+            OnBurstNotesReleased();
             return;
         }
 
@@ -813,8 +818,8 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        // Shards remain: re-arm so the star becomes hittable again.
-        ArmNext();
+        // Shards remain: return from off-screen and re-arm when colored dust is available.
+        OnBurstNotesReleased();
     }
 
     private bool AnyCollectablesInFlightGlobal()
@@ -848,6 +853,10 @@ public class PhaseStar : MonoBehaviour
     
     private void ArmNext()
     {
+        // Burst notes have been collected but not yet released — OnBurstNotesReleased handles re-entry.
+        if (_burstOffScreen)
+            return;
+
         if (AnyCollectablesInFlightGlobal())
         {
             Disarm(DisarmReason.CollectablesInFlight);
@@ -879,31 +888,79 @@ public class PhaseStar : MonoBehaviour
         ExitFlowerModeOnRearm();
         OnArmed?.Invoke(this);
     }
+    // Teleport the star off-screen and freeze it for the duration of a burst.
+    // Guarded — safe to call repeatedly; only executes on the first call per burst.
+    private void MoveOffScreenForBurst()
+    {
+        if (_burstOffScreen) return;
+        _burstOffScreen = true;
+
+        Vector2 offPos = PickOffScreenSpawnPoint();
+        transform.position = (Vector3)offPos + Vector3.forward * transform.position.z;
+        motion?.Enable(false);
+        visuals?.HideAll();
+        Debug.Log($"[PhaseStar] Burst in flight — moved off-screen to {offPos}");
+    }
+
+    // Called when all burst notes have been committed to the loop (or discarded).
+    // Checks for colored dust and re-enters the play area if any exists.
+    private void OnBurstNotesReleased()
+    {
+        if (!_burstOffScreen)
+        {
+            ArmNext();
+            return;
+        }
+
+        _burstOffScreen = false;
+        if (_burstOffScreenWaitCo != null)
+        {
+            StopCoroutine(_burstOffScreenWaitCo);
+            _burstOffScreenWaitCo = null;
+        }
+
+        // Zero all accumulated charge so the star must drain energy before it can
+        // eject another MineNode after returning to the play area.
+        _starCharge.Clear();
+
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        bool hasDust = gen != null && gen.HasAnyDustWithRole();
+        Debug.Log($"[PhaseStar] Burst notes released — charges reset, hasDust={hasDust}");
+
+        if (hasDust)
+            EnterFromOffScreen(transform.position);
+        else
+            _burstOffScreenWaitCo = StartCoroutine(Co_WaitForDustThenReturn());
+    }
+
+    // Polls off-screen until colored dust exists, then re-enters the play area.
+    private IEnumerator Co_WaitForDustThenReturn()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(0.5f);
+            var gen = GameFlowManager.Instance?.dustGenerator;
+            if (gen != null && gen.HasAnyDustWithRole()) break;
+        }
+        _burstOffScreenWaitCo = null;
+        EnterFromOffScreen(transform.position);
+    }
+
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
         _disarmReason = reason;
         Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
 
-        var tint = tintOverride ?? ResolvePreviewColorByReadiness();
+        DisableColliders();
 
-        switch (reason)
-        {
-            case DisarmReason.AwaitBridge:
-            case DisarmReason.Bridge:
-            case DisarmReason.NodeResolving:
-            case DisarmReason.CollectablesInFlight:
-            case DisarmReason.ExpansionPending:
-            default:
-                // Keep colliders enabled during ordinary disarm so the star stays
-                // bounded by the physical boundary walls while it continues to drift.
-                // OnCollisionEnter2D already guards against pokes when !_isArmed,
-                // and preserving collider state keeps Physics2D.IgnoreCollision dust
-                // pairs intact (Unity clears them when a collider is disabled/re-enabled).
-                DisableColliders();
-                SetVisual(VisualMode.Dim, tint);
-                break;
-        }
+        // CollectablesInFlight: move off-screen for the burst duration.
+        if (reason == DisarmReason.CollectablesInFlight)
+            MoveOffScreenForBurst();
+
+        // Suppress the dim visual when the star is parked off-screen — it's invisible.
+        if (!_burstOffScreen)
+            SetVisual(VisualMode.Dim, tintOverride ?? ResolvePreviewColorByReadiness());
 
         OnDisarmed?.Invoke(this);
     }
@@ -1845,10 +1902,18 @@ public class PhaseStar : MonoBehaviour
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            // If this was the final shard, keep the star hidden (AwaitBridge) rather than
-            // flashing back to Dim (NodeResolving), which would make an empty-shard star visible.
-            var postResolveReason = HasShardsRemaining() ? DisarmReason.NodeResolving : DisarmReason.AwaitBridge;
-            Disarm(postResolveReason, spawnTint);
+            // Non-final shard: move off-screen immediately so the star isn't visible
+            // while collectables are in flight or being released by the vehicle.
+            // Final shard: stay hidden via AwaitBridge — bridge sequence owns visibility.
+            if (HasShardsRemaining())
+            {
+                MoveOffScreenForBurst();
+                Disarm(DisarmReason.NodeResolving, spawnTint);
+            }
+            else
+            {
+                Disarm(DisarmReason.AwaitBridge, spawnTint);
+            }
             LogState("OnResolved");
         };
 
