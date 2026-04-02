@@ -39,6 +39,13 @@ public class MusicalRoleProfile : ScriptableObject
 
     [Header("Presets")] public int midiPreset;
 
+    [Header("Ripeness / Decay")]
+    [Tooltip("How long (seconds) the revealed role color stays visible before fading back to gray. Must be > 0.")]
+    public float ripeDuration = 8f;
+
+    [Tooltip("Per-role regrowth delay override (seconds). -1 = use maze pattern default.")]
+    public float regrowthDelay = -1f;
+
     // ---------- Color helpers (authority) ----------
 
     public Color GetBaseColor()

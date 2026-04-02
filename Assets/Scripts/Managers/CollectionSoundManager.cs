@@ -6,7 +6,7 @@ public enum SoundEffectPreset
     Aether = 1,
     Bloom = 10,
     Dust = 11,
-    Boundary = 13
+    Boundary = 9
 }
 
 public class CollectionSoundManager : MonoBehaviour
@@ -79,6 +79,26 @@ public class CollectionSoundManager : MonoBehaviour
         fxVoice.PlayOneShotMs127(note, durationMs: 180, velocity127: vel, overridePreset: track.Preset, overrideBank: track.Bank);
     }
     
+    public void PlayReleaseFailure()
+    {
+        if (fxVoice == null) return;
+
+        // Derive dissonance from the active motif's authored MIDI root.
+        int keyRoot = 60; // C4 fallback
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif != null) keyRoot = motif.keyRootMidi;
+
+        // Normalize to octave 3 so the register is consistent regardless of authored root.
+        int rootOct3 = (keyRoot % 12) + 48;
+        int tritone  = rootOct3 + 6;  // tritone: maximally dissonant against any root
+        int flatNine = rootOct3 - 1;  // half-step below root: adds cluster crunch against the tritone
+
+        fxVoice.PlayOneShotMs127(tritone,  durationMs: 80, velocity127: 127,
+            overridePreset: (int)SoundEffectPreset.Boundary, overrideBank: fxBank);
+        fxVoice.PlayOneShotMs127(flatNine, durationMs: 80, velocity127: 127,
+            overridePreset: (int)SoundEffectPreset.Boundary, overrideBank: fxBank);
+    }
+
     private void BindFxVoiceAuthorityIfNeeded()
     {
         if (fxVoice == null) return;

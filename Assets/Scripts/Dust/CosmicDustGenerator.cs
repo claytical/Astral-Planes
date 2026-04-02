@@ -105,6 +105,12 @@ public class CosmicDustGenerator : MonoBehaviour
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     // Cells spawned by GrowVoidDustDiskFromGrid that should not regrow when carved by a vehicle.
     private readonly HashSet<Vector2Int> _voidGrowCells = new HashSet<Vector2Int>();
+    // Ripeness: cells currently showing their true role color after a player carve.
+    private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
+    // Cells carved by the vehicle plow — only these start ripe on regrowth.
+    private readonly HashSet<Vector2Int> _playerCarvedCells = new();
+    // Reusable snapshot buffer for TickRipeness to avoid per-frame allocation.
+    private List<Vector2Int> _ripenessKeys;
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -411,7 +417,7 @@ public class CosmicDustGenerator : MonoBehaviour
                     existingGo.TryGetComponent<CosmicDust>(out var existingDust) && existingDust != null &&
                     HasDustAt(gp))
                 {
-                    existingDust.ApplyRoleAndCharge(imprintRole, c, c.a);
+                    existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
                     existingDust.clearing.hardness01 = imprintHardness01;
                     continue;
                 }
@@ -516,7 +522,7 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.SetGrowInDuration(growInSeconds);
 
             dust.clearing.hardness01 = hardness01;
-            dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
+            dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();
 
@@ -842,6 +848,7 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
+        TickRipeness(Time.deltaTime);
 
         if (drums == null) return;
 
@@ -911,6 +918,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // Visual comes back first.
         SetCellState(gp, DustCellState.Regrowing);
         CosmicDust dust = null;
+        MusicalRole regrowRole = MusicalRole.None;
         if (go.TryGetComponent<CosmicDust>(out dust) && dust != null)
         {
             dust.PrepareForReuse();
@@ -926,7 +934,6 @@ public class CosmicDustGenerator : MonoBehaviour
             if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
                 excludedRole = ex;
 
-            MusicalRole regrowRole;
             if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
             {
                 if (existingImp.role == MusicalRole.None)
@@ -1004,7 +1011,7 @@ public class CosmicDustGenerator : MonoBehaviour
             yield break;
         }
 
-        SetCellState(gp, DustCellState.Solid);        
+        SetCellState(gp, DustCellState.Solid);
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
@@ -1012,6 +1019,20 @@ public class CosmicDustGenerator : MonoBehaviour
             SetDustCollision(dust, true);
         }
         _regrowExcludeRoleByCell.Remove(gp);
+
+        // Ripeness fork: player-carved cells start ripe; all other regrowth stays gray.
+        if (_playerCarvedCells.Remove(gp))
+        {
+            // Player-carved: ApplyRoleAndCharge already set the true role color above.
+            // Only add to ripenessByCell if the cell has a real role.
+            if (regrowRole != MusicalRole.None)
+                _ripenessByCell[gp] = 1f;
+        }
+        else if (dust != null)
+        {
+            // Non-player-carved (MineNode drain, bridge reset, etc.): override to gray.
+            dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
+        }
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -1632,6 +1653,8 @@ public class CosmicDustGenerator : MonoBehaviour
         if (!RestoreVoronoiImprint(cell))
             PromoteHiddenRole(cell);
 
+        _playerCarvedCells.Add(cell);
+
         var cellGo = _cellGo?[cell.x, cell.y];
         if (cellGo != null)
         {
@@ -1654,6 +1677,13 @@ public class CosmicDustGenerator : MonoBehaviour
             fadeSeconds,
             scheduleRegrow: !isVoidCell
         );
+
+        if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+        {
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
+            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
+        }
     }
     public void ResetDustToNoneInPlace(CosmicDust dust)
     {
@@ -2197,6 +2227,8 @@ public class CosmicDustGenerator : MonoBehaviour
         _imprints?.Clear();
         _hiddenImprints?.Clear();
         _voidGrowCells.Clear();
+        _ripenessByCell.Clear();
+        _playerCarvedCells.Clear();
         _allSolidCount    = 0;
         _targetSolidCount = -1;
         _regrowingCount   = 0;
@@ -2454,6 +2486,54 @@ public class CosmicDustGenerator : MonoBehaviour
         if (_tintDiffusionSystem == null) return;
         _tintDiffusionSystem.MarkDirty(center, radius);
     }
+    private void TickRipeness(float dt)
+    {
+        if (_ripenessByCell.Count == 0) return;
+
+        _ripenessKeys ??= new List<Vector2Int>(64);
+        _ripenessKeys.Clear();
+        _ripenessKeys.AddRange(_ripenessByCell.Keys);
+
+        for (int i = 0; i < _ripenessKeys.Count; i++)
+        {
+            var gp = _ripenessKeys[i];
+
+            if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid
+                || !TryGetDustAt(gp, out var dust) || dust == null)
+            {
+                _ripenessByCell.Remove(gp);
+                continue;
+            }
+
+            if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var trueRole)
+                || trueRole == MusicalRole.None)
+            {
+                _ripenessByCell.Remove(gp);
+                continue;
+            }
+
+            var profile = MusicalRoleProfileLibrary.GetProfile(trueRole);
+            float duration = profile != null ? Mathf.Max(0.01f, profile.ripeDuration) : 8f;
+            float ripeness = _ripenessByCell[gp] - (1f / duration) * dt;
+
+            if (ripeness <= 0f)
+            {
+                // Fully decayed: revert to gray, role becomes None for all external queries.
+                dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
+                _ripenessByCell.Remove(gp);
+            }
+            else
+            {
+                _ripenessByCell[gp] = ripeness;
+                // Mid-decay: lerp color only (Role stays set so PhaseStar can still drain).
+                Color roleColor = profile != null ? profile.GetBaseColor() : Color.white;
+                Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
+                Color gray = new Color(_mazeTint.r, _mazeTint.g, _mazeTint.b, dust.Charge01);
+                dust.SetTint(Color.Lerp(gray, full, ripeness));
+            }
+        }
+    }
+
     private void ProcessTintDiffusion(float dt)
     {
         if (!enableTintDiffusion) return;

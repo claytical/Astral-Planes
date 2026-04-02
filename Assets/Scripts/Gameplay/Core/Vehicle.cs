@@ -108,6 +108,27 @@ public class Vehicle : MonoBehaviour
         _armedReleases.Clear();
     }
 
+    /// <summary>
+    /// Called after a screen-wrap teleport. Resets the position history ring buffer and
+    /// clears the TrailRenderer so no line is drawn across the screen between the old
+    /// and new positions.
+    /// </summary>
+    public void ClearTrailForWrap()
+    {
+        // Reset ring buffer — RecordPositionHistory seeds itself from the new position next Update.
+        _posHistoryCount = 0;
+        _posHistoryHead  = 0;
+        _posHistoryAccum = 0f;
+        _posHistoryLast  = transform.position;
+
+        // Clear the rendered trail geometry.
+        if (activeTrail != null)
+        {
+            var tr = activeTrail.GetComponent<TrailRenderer>();
+            if (tr != null) tr.Clear();
+        }
+    }
+
     // ------------------------------------------------------------
     // Manual-release cue (visual guidance)
     // ------------------------------------------------------------
@@ -1478,7 +1499,7 @@ public class Vehicle : MonoBehaviour
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        viz?.BlastManualReleaseCue(transform);
+        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
         return false;
     }
 
@@ -1497,7 +1518,8 @@ public class Vehicle : MonoBehaviour
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        viz?.BlastManualReleaseCue(transform);
+        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
+        CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
 
@@ -1523,7 +1545,8 @@ public class Vehicle : MonoBehaviour
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        viz?.BlastManualReleaseCue(transform);
+        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
+        CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
 

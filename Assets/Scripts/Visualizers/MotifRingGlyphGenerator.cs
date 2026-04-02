@@ -42,6 +42,12 @@ public static class MotifRingGlyphGenerator
         var seen = new HashSet<(int binIndex, MusicalRole role)>();
         var ringKeys = new List<(int binIndex, MusicalRole role, Color color)>();
 
+        // Debug: log every TrackBin and whether it passes the filter
+        foreach (var bin in snap.TrackBins)
+            UnityEngine.Debug.Log($"[RingGlyphGen] bin={bin.BinIndex} role={bin.Role} " +
+                $"isFilled={bin.IsFilled} collectedSteps={bin.CollectedSteps.Count} " +
+                $"→ passes={(bin.IsFilled || bin.CollectedSteps.Count > 0)}");
+
         foreach (var bin in snap.TrackBins
                      .Where(b => b.IsFilled || b.CollectedSteps.Count > 0)
                      .OrderBy(b => b.BinIndex)
@@ -52,6 +58,7 @@ public static class MotifRingGlyphGenerator
                 ringKeys.Add((bin.BinIndex, bin.Role, bin.TrackColor));
         }
 
+        UnityEngine.Debug.Log($"[RingGlyphGen] totalBins={snap.TrackBins.Count} ringKeys={ringKeys.Count}");
         if (ringKeys.Count == 0) return result;
 
         // ── Pre-group notes by (BinIndex, TrackColor) ─────────────────────────

@@ -22,12 +22,25 @@ public partial class GameFlowManager
             : new List<InstrumentTrack>();
         var motifSnap = BuildPhaseSnapshotForBridge(allTracks, activeDrumTrack);
 
+        // Capture remaining time in the current loop NOW, before any yields, so the
+        // glyph animation begins immediately and the bridge exits exactly at the boundary.
+        float effectiveLoopSec = (controller != null)
+            ? Mathf.Max(1f, controller.GetEffectiveLoopLengthInSeconds())
+            : Mathf.Max(1f, motifBridgeHoldSeconds);
+        float remainingInLoop = effectiveLoopSec;
+        if (activeDrumTrack != null && activeDrumTrack.leaderStartDspTime > 0)
+        {
+            float elapsed = (float)(AudioSettings.dspTime - activeDrumTrack.leaderStartDspTime);
+            remainingInLoop = Mathf.Max(0.1f, effectiveLoopSec - Mathf.Clamp(elapsed, 0f, effectiveLoopSec));
+        }
+
         _motifSnapshots.Add(motifSnap);
         ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
         motifRingGlyphApplicator?.AnimateApply(motifSnap);
         Debug.Log($"[MOTIF-BRIDGE] Snapshot committed: notes={motifSnap.CollectedNotes.Count} " +
-                  $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count}");
-        
+                  $"bins={motifSnap.TrackBins.Count} snapshots={_motifSnapshots.Count} " +
+                  $"remainingInLoop={remainingInLoop:F2}s effectiveLoop={effectiveLoopSec:F2}s");
+
         // Stop regrowth coroutines BEFORE deactivating activeDustRoot so StopCoroutine
         // calls inside HideVisualsInstant execute on active objects. Calling HardStop after
         // SetBridgeCinematicMode(true) deactivates the root, which causes StopCoroutine to
@@ -37,24 +50,20 @@ public partial class GameFlowManager
         if (dustGenerator != null)
             dustGenerator.HardStopRegrowthForBridge(hideTransientDust: true);
 
-        // --- Final loop: player hears their creation; dust fades away; boost is free ---
-        float finalLoopSec = (controller != null)
-            ? Mathf.Max(1f, controller.GetEffectiveLoopLengthInSeconds())
-            : Mathf.Max(1f, motifBridgeHoldSeconds);
-
+        // --- Wait to boundary: glyph is already animating; dust fades; boost is free ---
         if (dustGenerator != null)
-            dustGenerator.BeginSlowFadeAllDust(finalLoopSec);
+            dustGenerator.BeginSlowFadeAllDust(remainingInLoop);
 
         if (vehicles != null)
             foreach (var v in vehicles)
                 v?.SetBoostFree(true);
 
-        yield return new WaitForSeconds(finalLoopSec);
+        yield return new WaitForSeconds(remainingInLoop);
 
         if (vehicles != null)
             foreach (var v in vehicles)
                 v?.SetBoostFree(false);
-        // --- End final loop ---
+        // --- End wait to boundary ---
 
         /*
         SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
@@ -238,6 +247,7 @@ public partial class GameFlowManager
 
             // Emit TrackBinData entries — one per allocated bin on this track.
             int allocatedBins = Mathf.Max(1, track.loopMultiplier);
+            Debug.Log($"[MOTIF-BRIDGE] track={track.name} loopMultiplier={track.loopMultiplier} allocatedBins={allocatedBins} notes={notes.Count} binSize={binSize}");
             for (int b = 0; b < allocatedBins; b++)
             {
                 var binNotes = notes.Where(n => n.stepIndex / binSize == b).ToList();

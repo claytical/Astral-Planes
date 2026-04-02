@@ -29,6 +29,9 @@ public class NoteVisualizer : MonoBehaviour
     [Header("Manual Release Cue")]
     [Tooltip("Prefab for the ghost/cue that travels between the vehicle and the next unlit placeholder marker.")]
     public GameObject releaseCuePrefab;
+    [Tooltip("Particle prefab instantiated at the release cue position when a manual release fails.")]
+    [SerializeField] private ParticleSystem failureExplosionPrefab;
+    [SerializeField] private Color failureColor = new Color(1f, 0.12f, 0.05f, 1f);
     [Tooltip("How many steps ahead (max) the cue starts moving toward the target. Beyond this distance it stays near the vehicle.")]
     [Min(1)] public int releaseCueLookaheadSteps = 8;
     [Tooltip("World-space arc height for the cue path (0 = straight line).")]
@@ -318,6 +321,25 @@ public class NoteVisualizer : MonoBehaviour
     public void BlastManualReleaseCue(Transform vehicle)
     {
         ClearManualReleaseCue(vehicle);
+    }
+
+    public void BlastManualReleaseCueFailure(Transform vehicle, InstrumentTrack track, int absStep)
+    {
+        // Prefer the placeholder marker's world position; fall back to vehicle.
+        Vector3 blastPos = vehicle != null ? vehicle.position : Vector3.zero;
+        if (track != null && noteMarkers.TryGetValue((track, absStep), out var markerTr) && markerTr != null)
+            blastPos = markerTr.position;
+
+        ClearManualReleaseCue(vehicle);
+
+        if (failureExplosionPrefab != null)
+        {
+            var ps = Instantiate(failureExplosionPrefab, blastPos, Quaternion.identity);
+            var main = ps.main;
+            main.startColor = failureColor;
+            ps.Play();
+            Destroy(ps.gameObject, main.duration + main.startLifetime.constantMax);
+        }
     }
 
     public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)

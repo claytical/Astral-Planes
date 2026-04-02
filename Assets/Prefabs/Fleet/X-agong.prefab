@@ -41,6 +41,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -86,6 +87,7 @@ SpriteRenderer:
   m_SortingLayerID: 263648039
   m_SortingLayer: 1
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -3495420660709828112, guid: 98dc647eed501477390caeb1a1e26ac4,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -96,7 +98,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!114 &6267414685674281640
 MonoBehaviour:
@@ -110,45 +111,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enableManualNoteRelease: 1
-  manualReleaseQueueCapacity: 9
-  occupiedStepVelocityMultiplier: 1.25
-  occupiedStepOctaveAccent: 1
-  plowHalfWidthCells: 1
-  plowDepthCells: 1
-  plowMinSpeed: 1.5
-  plowTickSeconds: 0.06
-  plowFadeSeconds: 0.15
   profile: {fileID: 11400000, guid: bdb1431dc92e34997a403d7c5c34162b, type: 2}
+  vehicleConfig: {fileID: 0}
   capacity: 80
   arcadeMaxSpeed: 14
-  arcadeAccel: 40
-  arcadeBoostAccel: 80
-  arcadeLinearDamping: 2
-  arcadeAngularDamping: 0.5
-  requireBoostForThrust: 0
-  coastBrakeForce: 6
-  stopSpeed: 0.05
-  stopAngularSpeed: 5
   soulSprite: {fileID: 5580386508361132524}
-  soulMinScale: 0.3
-  soulMaxScale: 1.2
-  soulScaleLerpSpeed: 14
-  soulAlphaMin: 0
-  soulAlphaMax: 0.85
-  inputDeadzone: 0.2
-  inputTimeout: 0.15
-  enableRecovery: 1
-  viewportOobMargin: 0.15
-  minSecondsBetweenRecoveries: 0.75
-  respawnSearchRadiusCells: 8
-  stuckSpeedThreshold: 0.35
-  stuckSecondsInVoid: 0.6
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 0
-  gravityVoidTag: GravityVoid
-  voidProbeRadiusWorld: 0.6
   energyLevel: 80
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: 953239f7f217f244caa872490dea92e6, type: 3}
@@ -156,30 +126,8 @@ MonoBehaviour:
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   rb: {fileID: 0}
-  isLocked: 0
-  keepDustClearAroundVehicle: 1
   vehicleKeepClearRadiusCells: 1
-  vehicleKeepClearRefreshSeconds: 0.1
-  useVehiclePlacementResonance: 1
-  vehiclePlacementColorLerpSpeed: 10
-  vehiclePlacementMinTint: 0.08
-  vehiclePlacementOscillation: 0.18
-  vehiclePlacementOscillationSpeed: 1
-  carveSpawnRestPocket: 1
-  spawnRestPocketAutoRadius: 1
-  spawnRestPocketRadiusCells: 1
-  spawnRestPocketFadeSeconds: 0.05
-  spawnRestPocketDelaySeconds: 0
-  logScaleCalibrationOnAssign: 1
-  manualReleaseUseArmLock: 1
-  manualReleaseArmAheadSteps: 6
-  manualReleaseAutoCommitEpsSteps: 0.35
-  manualReleaseGracePeriodSteps: 0.5
   releaseCue: {fileID: 0}
-  trailSlotSpacing: 0.55
-  trailFirstSlotOffset: 0.7
-  trailHistoryCapacity: 48
-  trailReleasePulseSteps: 4
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -215,7 +163,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.5
+  m_Volume: 0.2
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -549,6 +497,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &5580386508361132524
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -594,6 +543,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -3495420660709828112, guid: 98dc647eed501477390caeb1a1e26ac4,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -604,5 +554,4 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0

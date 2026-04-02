@@ -195,16 +195,16 @@ MonoBehaviour:
   clickFx: {fileID: 8300000, guid: 53ecfd42442a5de49ab20834c2e97578, type: 3}
   confirmFx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
   friction: 0.5
+  releaseActionName: ReleaseNote
   mouseSensitivity: 0.008
   stickMax: 1
-  stickDecayPerSec: 2.5
+  stickDecayPerSec: 3.5
   uiBlockRadius: 0
   mouseDeltaSmoothing: 6
   maxPixelsPerFrame: 50
   angleSmoothTime: 0.08
-  keyboardRisePerSec: 0.01
-  keyboardFallPerSec: 10
-  keyboardDeadzone: 1
+  keyboardTurnRateDeg: 360
+  keyboardAccelRate: 1
   miniTutorialPrefab: {fileID: 1743201695570324546, guid: 8fbe942bf3e9e427388555fa3d793b4a,
     type: 3}
   miniTutorialScale: {x: 0.25, y: 0.25, z: 1}
