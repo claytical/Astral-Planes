@@ -15,8 +15,14 @@ public class MineNodeDustInteractor : MonoBehaviour
     public float extraBrake = 0.25f;
 
     [Header("Maze Tinting")]
-    [Tooltip("If true, this node flips any adjacent dust to its MusicalRole as it moves.")]
+    [Tooltip("If true, this node applies a temporary overlay to adjacent dust as it moves.")]
     public bool carveMaze = true;
+
+    [Header("Overlay Settings")]
+    [Tooltip("Seconds the overlay persists after the node moves away from a cell.")]
+    [SerializeField] private float overlayDecaySeconds = 2.0f;
+    [Tooltip("Multiplier applied to dust carve resistance while overlay is active (0.5 = 50% easier to carve).")]
+    [SerializeField, Range(0.1f, 1f)] private float overlayResistanceMult = 0.5f;
 
     [SerializeField] private float edgeHugForce = 2f;
 
@@ -204,7 +210,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             if (!_drumTrack.HasDustAt(neighbor)) continue;
             if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
 
-            gen.TintDustCellWithRole(neighbor, role);
+            gen.ApplyMineNodeOverlay(neighbor, role, overlayResistanceMult, overlayDecaySeconds);
             _tintedCellCount++;
             budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
         }
@@ -327,7 +333,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (budgetExhausted) return;
 
         MusicalRole role = _node.GetImprintRole();
-        gen.TintDustCellWithRole(_huntTargetCell, role);
+        gen.ApplyMineNodeOverlay(_huntTargetCell, role, overlayResistanceMult, overlayDecaySeconds);
         _tintedCellCount++;
     }
 
@@ -342,9 +348,8 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         var gen = GameFlowManager.Instance?.dustGenerator;
         if (gen == null || _node == null) return false;
-        if (!gen.TryGetCellGo(gp, out var go) || go == null) return false;
-        if (!go.TryGetComponent<CosmicDust>(out var dust)) return false;
-        return dust.Role == _node.GetImprintRole();
+        // Check overlay rather than dust.Role — MineNode no longer writes authoritative role.
+        return gen.HasMineNodeOverlayWithRole(gp, _node.GetImprintRole());
     }
 
     // ---------------------------------------------------------------
@@ -380,5 +385,17 @@ public class MineNodeDustInteractor : MonoBehaviour
     public void SetDesiredSpeed(float desiredSpeed)
     {
         _desiredSpeed = Mathf.Max(0f, desiredSpeed);
+    }
+
+    private void OnDestroy()
+    {
+        // Best-effort cleanup: remove overlays from the node's last known vicinity.
+        // Any cells missed here will decay naturally within overlayDecaySeconds.
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null || _drumTrack == null) return;
+        Vector2Int cell = _drumTrack.CellOf(_rb != null ? _rb.position : (Vector2)transform.position);
+        for (int dx = -1; dx <= 1; dx++)
+        for (int dy = -1; dy <= 1; dy++)
+            gen.RemoveMineNodeOverlay(cell + new Vector2Int(dx, dy));
     }
 }

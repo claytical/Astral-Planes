@@ -12,7 +12,15 @@ public class CosmicDustGenerator : MonoBehaviour
     public Transform activeDustRoot;
     Dictionary<Vector2Int, DustImprint> _imprints;
     private Dictionary<Vector2Int, MusicalRole> _hiddenImprints = new();
+    private readonly Dictionary<Vector2Int, MineNodeOverlay> _mineNodeOverlays   = new Dictionary<Vector2Int, MineNodeOverlay>(64);
+    private readonly List<Vector2Int>                        _overlayExpiredBuffer = new List<Vector2Int>(32);
+    private const float kMineNodeOverlayVisualStrength = 0.35f;
+    // Per-cell accumulated carve damage. Progress resets when cell clears or regrows.
+    private readonly Dictionary<Vector2Int, float>  _carveProgress        = new Dictionary<Vector2Int, float>(256);
     private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
+    // Motif role chain cache (sorted by hardness descending). Invalidated when motif changes.
+    private MotifProfile         _cachedChainMotif;
+    private List<MusicalRole>    _cachedRoleChain = new List<MusicalRole>(8);
     private bool _cellGridReady;
     [Header("Maze Collision Shape")]
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
@@ -29,6 +37,17 @@ public class CosmicDustGenerator : MonoBehaviour
         public float healDelay;
         public float hardness01;
         public MusicalRole role;
+    }
+
+    // Temporary per-cell overlay applied by MineNodes.
+    // Does NOT modify _imprints — the authoritative role/hardness live there.
+    // Decays over time; blends color visually and weakens carve resistance while active.
+    private struct MineNodeOverlay
+    {
+        public MusicalRole role;
+        public Color       color;
+        public float       resistanceMult; // multiplied against hardness01 in carving (0.5 = 50% weaker)
+        public float       timeRemaining;  // seconds until this overlay expires
     }
     [SerializeField] private CosmicDust.DustVisualTimings dustTimings = new CosmicDust.DustVisualTimings
     {
@@ -105,12 +124,6 @@ public class CosmicDustGenerator : MonoBehaviour
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     // Cells spawned by GrowVoidDustDiskFromGrid that should not regrow when carved by a vehicle.
     private readonly HashSet<Vector2Int> _voidGrowCells = new HashSet<Vector2Int>();
-    // Ripeness: cells currently showing their true role color after a player carve.
-    private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
-    // Cells carved by the vehicle plow — only these start ripe on regrowth.
-    private readonly HashSet<Vector2Int> _playerCarvedCells = new();
-    // Reusable snapshot buffer for TickRipeness to avoid per-frame allocation.
-    private List<Vector2Int> _ripenessKeys;
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -188,8 +201,9 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         // Immediately stop being terrain.
-        SetCellState(gp, DustCellState.Clearing); 
-        if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){ 
+        SetCellState(gp, DustCellState.Clearing);
+        RemoveMineNodeOverlay(gp); // clear any active overlay so ghost cells don't show stale paint
+        if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){
            SetDustCollision(dust, false);
         }
 
@@ -848,7 +862,7 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
-        TickRipeness(Time.deltaTime);
+        TickMineNodeOverlays(Time.deltaTime);
 
         if (drums == null) return;
 
@@ -926,25 +940,31 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.SetGrowInDuration(dustTimings.particleGrowInSeconds);
 
             // --- Role resolution ---
-            // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
-            // Priority 2: no imprint → prefer the plurality role among solid imprinted neighbors
-            //             (maintains spatial cohesion with the Voronoi layout). Fall back to
-            //             least-dense when neighbors are split or absent (global balance).
+            // Bootstrap: use existing Voronoi/priority-chain logic for initial maze fill.
+            // Gameplay: always regrow as hardest motif role — roles are earned by carving, not regrowth.
             MusicalRole excludedRole = MusicalRole.None;
             if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
                 excludedRole = ex;
 
-            if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
+            if (_isBootstrappingMaze)
             {
-                if (existingImp.role == MusicalRole.None)
+                if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
                 {
-                    // Maze cells (gray start) stay gray on regrowth.
-                    // Roles are only earned through GravityVoid or MineNode, not regrowth.
-                    regrowRole = MusicalRole.None;
-                }
-                else if (IsRoleActive(existingImp.role))
-                {
-                    regrowRole = existingImp.role;
+                    if (existingImp.role == MusicalRole.None)
+                    {
+                        regrowRole = MusicalRole.None;
+                    }
+                    else if (IsRoleActive(existingImp.role))
+                    {
+                        regrowRole = existingImp.role;
+                    }
+                    else
+                    {
+                        var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
+                        regrowRole = neighborRole != MusicalRole.None
+                            ? neighborRole
+                            : GetLeastDenseRoleExcluding(excludedRole);
+                    }
                 }
                 else
                 {
@@ -956,10 +976,7 @@ public class CosmicDustGenerator : MonoBehaviour
             }
             else
             {
-                var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
-                regrowRole = neighborRole != MusicalRole.None
-                    ? neighborRole
-                    : GetLeastDenseRoleExcluding(excludedRole);
+                regrowRole = GetHardestMotifRole();
             }
             // --- Color from role profile (authoritative source) ---
             
@@ -1012,27 +1029,16 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         SetCellState(gp, DustCellState.Solid);
+        _carveProgress.Remove(gp);         // new cell starts undamaged
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
+            dust.SetCarveProgress(0f); // reset desaturation visual
             dust.EnsureMinSolidAlpha(0.55f);
             SetDustCollision(dust, true);
         }
         _regrowExcludeRoleByCell.Remove(gp);
 
-        // Ripeness fork: player-carved cells start ripe; all other regrowth stays gray.
-        if (_playerCarvedCells.Remove(gp))
-        {
-            // Player-carved: ApplyRoleAndCharge already set the true role color above.
-            // Only add to ripenessByCell if the cell has a real role.
-            if (regrowRole != MusicalRole.None)
-                _ripenessByCell[gp] = 1f;
-        }
-        else if (dust != null)
-        {
-            // Non-player-carved (MineNode drain, bridge reset, etc.): override to gray.
-            dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
-        }
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -1642,19 +1648,113 @@ public class CosmicDustGenerator : MonoBehaviour
                 results.Add(new Vector2Int(x, y));
         }
     }
-    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds)
+    /// <summary>
+    /// Returns the number of plow/collision hits required to step a role down once.
+    /// Gray (None) returns 0 — clear immediately.
+    /// </summary>
+    private static int GetHitsRequired(MusicalRole role) => role switch
+    {
+        MusicalRole.Lead    => 1,
+        MusicalRole.Groove  => 2,
+        MusicalRole.Harmony => 3,
+        MusicalRole.Bass    => 4,
+        _                   => 0,  // None / gray: immediate clear
+    };
+
+    /// <summary>
+    /// Called by Vehicle.DoPlowTick each plow tick and by CosmicDust.OnCollisionStay2D
+    /// while boosting. Accumulates carve hits against the cell's role resistance.
+    /// When hits reach the threshold the role steps down (Lead→Groove→Harmony→Bass→None→clear).
+    /// Gray cells always clear immediately.
+    /// </summary>
+    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds, float damagePerTick = 1f)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-        // Revert any MineNode paint — cell regrows as its original Voronoi color.
-        // Falls back to keeping the existing imprint if no Voronoi assignment exists.
-        if (!RestoreVoronoiImprint(cell))
-            PromoteHiddenRole(cell);
 
-        _playerCarvedCells.Add(cell);
+        _imprints.TryGetValue(cell, out var imp);
+        int hitsRequired = GetHitsRequired(imp.role);
 
+        // Gray / unimprinted cells: clear immediately.
+        if (hitsRequired == 0)
+        {
+            _carveProgress.Remove(cell);
+            ExecuteFullCarve(cell, fadeSeconds);
+            return;
+        }
+
+        _carveProgress.TryGetValue(cell, out float progress);
+        progress += damagePerTick;
+
+        if (progress >= hitsRequired)
+        {
+            // Threshold reached: step role down, reset progress.
+            _carveProgress.Remove(cell);
+            MusicalRole nextRole = GetNextStepDownRole(imp.role);
+
+            if (nextRole == MusicalRole.None)
+            {
+                // Was Bass → step to gray visually, then clear on NEXT tick via zero-hardness path.
+                // (Or was already None → clear now.)
+                if (imp.role == MusicalRole.None)
+                {
+                    ExecuteFullCarve(cell, fadeSeconds);
+                }
+                else
+                {
+                    // Step to gray: update imprint and visual only; do NOT clear yet.
+                    // On the next carve tick (zero-hardness path), ExecuteFullCarve will fire.
+                    // CommitRegrowCell always regrows to hardest motif role, so no special flag needed.
+                    imp.role       = MusicalRole.None;
+                    imp.hardness01 = 0f;
+                    imp.color      = _mazeTint;
+                    _imprints[cell] = imp;
+                    if (TryGetDustAt(cell, out var d))
+                    {
+                        d.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, d.Charge01);
+                        d.SyncParticleColor();
+                        d.SetCarveProgress(0f);
+                    }
+                }
+            }
+            else
+            {
+                // Step to next role (e.g. Lead → Groove).
+                var nextProfile = MusicalRoleProfileLibrary.GetProfile(nextRole);
+                if (nextProfile == null) { ExecuteFullCarve(cell, fadeSeconds); return; }
+
+                imp.role       = nextRole;
+                imp.color      = nextProfile.GetBaseColor();
+                imp.hardness01 = nextProfile.GetDustHardness01();
+                _imprints[cell] = imp;
+
+                if (TryGetDustAt(cell, out var d))
+                {
+                    Color fromColor = d.CurrentTint;
+                    d.ApplyRoleAndCharge(nextRole, imp.color, d.Charge01);
+                    d.SyncParticleColor();
+                    d.SetCarveProgress(0f);
+                    d.StartColorLerp(fromColor, imp.color, 0.18f);
+                }
+            }
+        }
+        else
+        {
+            // Partial hit: store progress and show visual damage.
+            _carveProgress[cell] = progress;
+            if (TryGetDustAt(cell, out var d))
+                d.SetCarveProgress(progress / hitsRequired);
+        }
+    }
+
+    /// <summary>
+    /// Immediately clears a solid cell and schedules regrow.
+    /// Extracted from the original CarveDustByVehicle for reuse by the multi-hit path.
+    /// </summary>
+    private void ExecuteFullCarve(Vector2Int cell, float fadeSeconds)
+    {
         var cellGo = _cellGo?[cell.x, cell.y];
         if (cellGo != null)
         {
@@ -1669,14 +1769,9 @@ public class CosmicDustGenerator : MonoBehaviour
 
         bool isVoidCell = _voidGrowCells.Remove(cell);
         if (isVoidCell)
-            _imprints?.Remove(cell); // no imprint = no future regrow triggers for this cell
+            _imprints?.Remove(cell);
 
-        ClearCell(
-            cell,
-            DustClearMode.FadeAndHide,
-            fadeSeconds,
-            scheduleRegrow: !isVoidCell
-        );
+        ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: !isVoidCell);
 
         if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
         {
@@ -2227,8 +2322,6 @@ public class CosmicDustGenerator : MonoBehaviour
         _imprints?.Clear();
         _hiddenImprints?.Clear();
         _voidGrowCells.Clear();
-        _ripenessByCell.Clear();
-        _playerCarvedCells.Clear();
         _allSolidCount    = 0;
         _targetSolidCount = -1;
         _regrowingCount   = 0;
@@ -2486,54 +2579,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (_tintDiffusionSystem == null) return;
         _tintDiffusionSystem.MarkDirty(center, radius);
     }
-    private void TickRipeness(float dt)
-    {
-        if (_ripenessByCell.Count == 0) return;
-
-        _ripenessKeys ??= new List<Vector2Int>(64);
-        _ripenessKeys.Clear();
-        _ripenessKeys.AddRange(_ripenessByCell.Keys);
-
-        for (int i = 0; i < _ripenessKeys.Count; i++)
-        {
-            var gp = _ripenessKeys[i];
-
-            if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid
-                || !TryGetDustAt(gp, out var dust) || dust == null)
-            {
-                _ripenessByCell.Remove(gp);
-                continue;
-            }
-
-            if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var trueRole)
-                || trueRole == MusicalRole.None)
-            {
-                _ripenessByCell.Remove(gp);
-                continue;
-            }
-
-            var profile = MusicalRoleProfileLibrary.GetProfile(trueRole);
-            float duration = profile != null ? Mathf.Max(0.01f, profile.ripeDuration) : 8f;
-            float ripeness = _ripenessByCell[gp] - (1f / duration) * dt;
-
-            if (ripeness <= 0f)
-            {
-                // Fully decayed: revert to gray, role becomes None for all external queries.
-                dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
-                _ripenessByCell.Remove(gp);
-            }
-            else
-            {
-                _ripenessByCell[gp] = ripeness;
-                // Mid-decay: lerp color only (Role stays set so PhaseStar can still drain).
-                Color roleColor = profile != null ? profile.GetBaseColor() : Color.white;
-                Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
-                Color gray = new Color(_mazeTint.r, _mazeTint.g, _mazeTint.b, dust.Charge01);
-                dust.SetTint(Color.Lerp(gray, full, ripeness));
-            }
-        }
-    }
-
     private void ProcessTintDiffusion(float dt)
     {
         if (!enableTintDiffusion) return;
@@ -2769,6 +2814,134 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.ApplyRoleAndCharge(role, color, dust.Charge01);
             dust.SyncParticleColor(); // ApplyRoleAndCharge only updates the sprite; sync particles too
         }
+    }
+
+    // ---------------------------------------------------------------
+    // MineNode overlay — temporary per-cell paint that does NOT change
+    // authoritative imprint/role. PhaseStar and ecology read _imprints,
+    // not these overlays.
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// Applies a temporary color overlay to a solid dust cell from a MineNode.
+    /// Does NOT modify _imprints. Decays automatically after decaySeconds.
+    /// Exception: if MineNode's role already matches the cell's imprint role,
+    /// no overlay is applied (matching role provides no mechanical benefit).
+    /// </summary>
+    public void ApplyMineNodeOverlay(Vector2Int cell, MusicalRole role, float resistanceMult, float decaySeconds)
+    {
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+
+        // Same-role exception: imprint role == overlay role → skip (no weakening, no visual change)
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.role == role) return;
+
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (profile == null) return;
+
+        Color overlayColor = profile.GetBaseColor();
+        _mineNodeOverlays[cell] = new MineNodeOverlay
+        {
+            role          = role,
+            color         = overlayColor,
+            resistanceMult = Mathf.Clamp(resistanceMult, 0.01f, 1f),
+            timeRemaining  = Mathf.Max(0.01f, decaySeconds),
+        };
+
+        if (TryGetDustAt(cell, out var dust))
+            dust.SetOverlay(overlayColor, kMineNodeOverlayVisualStrength);
+    }
+
+    /// <summary>Removes overlay from a cell and reverts dust to its base tint.</summary>
+    public void RemoveMineNodeOverlay(Vector2Int cell)
+    {
+        if (_mineNodeOverlays.Remove(cell))
+        {
+            if (TryGetDustAt(cell, out var dust))
+                dust.ClearOverlay();
+        }
+    }
+
+    /// <summary>Returns true when a MineNode overlay for the given role is active on this cell.</summary>
+    public bool HasMineNodeOverlayWithRole(Vector2Int cell, MusicalRole role)
+    {
+        return _mineNodeOverlays.TryGetValue(cell, out var o) && o.role == role;
+    }
+
+    /// <summary>
+    /// Returns the resistance multiplier contributed by any active MineNode overlay.
+    /// Returns 1.0 (no reduction) when no overlay exists.
+    /// </summary>
+    public float GetMineNodeOverlayResistanceMult(Vector2Int cell)
+    {
+        return _mineNodeOverlays.TryGetValue(cell, out var o) ? o.resistanceMult : 1f;
+    }
+
+    private void TickMineNodeOverlays(float dt)
+    {
+        if (_mineNodeOverlays.Count == 0) return;
+        _overlayExpiredBuffer.Clear();
+        // Tick down all active overlays; collect expired ones.
+        // Can't remove during foreach so batch into a temp list first.
+        var keys = new List<Vector2Int>(_mineNodeOverlays.Keys); // allocation acceptable — overlays are sparse
+        foreach (var cell in keys)
+        {
+            if (!_mineNodeOverlays.TryGetValue(cell, out var o)) continue;
+            o.timeRemaining -= dt;
+            if (o.timeRemaining <= 0f)
+                _overlayExpiredBuffer.Add(cell);
+            else
+                _mineNodeOverlays[cell] = o;
+        }
+        foreach (var cell in _overlayExpiredBuffer)
+            RemoveMineNodeOverlay(cell);
+    }
+
+    // ---------------------------------------------------------------
+    // Multi-hit carving helpers
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the distinct MusicalRoles active in the current motif, sorted by dust hardness
+    /// descending (hardest first). Cached until the motif changes.
+    /// </summary>
+    private List<MusicalRole> GetCurrentMotifRoleChain()
+    {
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif == null) return _cachedRoleChain;
+        if (motif == _cachedChainMotif) return _cachedRoleChain;
+
+        _cachedChainMotif = motif;
+        _cachedRoleChain.Clear();
+        var roles = motif.GetActiveRoles();
+        roles.Sort((a, b) => GetRoleHardness01(b).CompareTo(GetRoleHardness01(a)));
+        _cachedRoleChain.AddRange(roles);
+        return _cachedRoleChain;
+    }
+
+    /// <summary>Returns dustHardness01 for a role via MusicalRoleProfileLibrary.</summary>
+    private static float GetRoleHardness01(MusicalRole role)
+    {
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        return profile != null ? profile.GetDustHardness01() : 0f;
+    }
+
+    /// <summary>Returns the hardest (first) role in the current motif chain, or None if empty.</summary>
+    private MusicalRole GetHardestMotifRole()
+    {
+        var chain = GetCurrentMotifRoleChain();
+        return chain.Count > 0 ? chain[0] : MusicalRole.None;
+    }
+
+    /// <summary>
+    /// Returns the next weaker role in the motif chain after <paramref name="current"/>.
+    /// Returns MusicalRole.None when <paramref name="current"/> is the weakest or not in the chain.
+    /// </summary>
+    private MusicalRole GetNextStepDownRole(MusicalRole current)
+    {
+        var chain = GetCurrentMotifRoleChain();
+        int idx = chain.IndexOf(current);
+        if (idx < 0) return MusicalRole.None;
+        return (idx + 1 < chain.Count) ? chain[idx + 1] : MusicalRole.None;
     }
 
     // Add to CosmicDustGenerator

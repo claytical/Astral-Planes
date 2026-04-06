@@ -401,7 +401,55 @@ public class MineNode : MonoBehaviour
         // Dampen velocity to help separate from the boundary in the next solver step.
         _rb.linearVelocity *= 0.5f;
     }
+
+    ClampToBounds();
 }
+    private void ClampToBounds()
+    {
+        if (_drumTrack == null) return;
+        if (!_drumTrack.TryGetPlayAreaWorld(out var area)) return;
+
+        Vector2 pos = _rb.position;
+        Vector2 vel = _rb.linearVelocity;
+        bool clamped = false;
+
+        if (pos.x < area.left)
+        {
+            pos.x = area.left;
+            if (vel.x < 0f) vel.x = 0f;
+            if (_carveDir.x < 0f) _carveDir.x = -_carveDir.x;
+            clamped = true;
+        }
+        else if (pos.x > area.right)
+        {
+            pos.x = area.right;
+            if (vel.x > 0f) vel.x = 0f;
+            if (_carveDir.x > 0f) _carveDir.x = -_carveDir.x;
+            clamped = true;
+        }
+
+        if (pos.y < area.bottom)
+        {
+            pos.y = area.bottom;
+            if (vel.y < 0f) vel.y = 0f;
+            if (_carveDir.y < 0f) _carveDir.y = -_carveDir.y;
+            clamped = true;
+        }
+        else if (pos.y > area.top)
+        {
+            pos.y = area.top;
+            if (vel.y > 0f) vel.y = 0f;
+            if (_carveDir.y > 0f) _carveDir.y = -_carveDir.y;
+            clamped = true;
+        }
+
+        if (clamped)
+        {
+            _rb.position = pos;
+            _rb.linearVelocity = vel;
+            _carveDir = _carveDir.normalized;
+        }
+    }
     private Vector2 ComputeLocalSameRoleAffinityDir(int radiusCells)
     {
         if (_drumTrack == null) return Vector2.zero;
@@ -569,7 +617,7 @@ public class MineNode : MonoBehaviour
         _strength = Mathf.Max(0, _strength);
 
         float normalized = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
-        float scaleFactor = Mathf.Lerp(0.3f, 1.1f, normalized);
+        float scaleFactor = Mathf.Lerp(0.5f, 1.1f, normalized);
         StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
         // Deplete -> burst -> resolve
         if(_strength <= 0)

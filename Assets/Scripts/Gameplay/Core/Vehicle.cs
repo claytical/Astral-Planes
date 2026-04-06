@@ -105,7 +105,10 @@ public class Vehicle : MonoBehaviour
     public void ClearPendingNotesForBridge()
     {
         _pendingNotes.Clear();
+        foreach (var ar in _armedReleases)
+            ar.note.collectable.tether?.SetArmed(false);
         _armedReleases.Clear();
+        releaseCue?.ClearCue();
     }
 
     /// <summary>
@@ -357,6 +360,7 @@ public class Vehicle : MonoBehaviour
 
         if (armed.track == null || armed.track.controller == null)
         {
+            armed.collectable.tether?.SetArmed(false);
             _armedReleases.Dequeue();
             return;
         }
@@ -383,6 +387,7 @@ public class Vehicle : MonoBehaviour
 
         if (crossed || fwd <= vehicleConfig.manualReleaseAutoCommitEpsSteps)
         {
+            armed.collectable.tether?.SetArmed(false);
             CommitManualReleaseAtStep(armed, a.targetAbsStep);
             _armedReleases.Dequeue();
             spokenFor.Remove(a.targetAbsStep); // it's committed now, free it for cue
@@ -749,7 +754,11 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        if (targetStep < 0 || drum == null) return;
+        if (targetStep < 0 || drum == null)
+        {
+            releaseCue.ClearCue();
+            return;
+        }
 
         int binSize    = Mathf.Max(1, drum.totalSteps);
         int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
@@ -761,6 +770,13 @@ public class Vehicle : MonoBehaviour
         double fwd      = (targetStep - stepIndex + (double)leaderSteps) % leaderSteps;
         int stepsLeft   = Mathf.Max(0, Mathf.RoundToInt((float)fwd));
 
+        // Pass track color so the circle tints correctly.
+        Color cueColor = Color.white;
+        if (_armedReleases.Count > 0)
+            cueColor = _armedReleases.Peek().note.track?.trackColor ?? Color.white;
+        else if (_pendingNotes.Count > 0)
+            cueColor = _pendingNotes.Peek().track?.trackColor ?? Color.white;
+        releaseCue.SetTrackColor(cueColor);
         releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
     }
     private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
@@ -1405,8 +1421,7 @@ public class Vehicle : MonoBehaviour
                     + perp    * (s * cellSize);
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
                 if (gen.HasDustAt(cell))
-                    
-                    gen.CarveDustByVehicle(cell, fade);
+                    gen.CarveDustByVehicle(cell, fade, profile.plowStrength);
             }
         }
     }
@@ -1572,6 +1587,7 @@ public class Vehicle : MonoBehaviour
             totalAbsSteps  = effectiveTotal,
             gapDurationDsp = gapDsp
         });
+        p.collectable.tether?.SetArmed(true);
         return true;
     }
 

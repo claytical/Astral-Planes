@@ -31,7 +31,10 @@ public class NoteTether : MonoBehaviour
     public Color baseColor = new Color(1f,1f,1f,0.35f);
     public Color litColor  = Color.white;
     public float fadeAfterSeconds = 0.4f;
+    [Tooltip("Width multiplier applied when the attached note is armed (held). Stacks on top of baseWidth.")]
+    public float armedWidthMultiplier = 2.5f;
 
+    private bool _isArmed;
     private LineRenderer _lr;
     private Vector3[] _points;
     private CollectableParticles _dripEmitter;
@@ -259,6 +262,18 @@ private int     _cachedHash  = 0;
                 Color.white
             );
         }
+    }
+
+    /// <summary>
+    /// Thickens the tether while the note is armed (held by the vehicle).
+    /// Call with true on arm, false on commit or cancel.
+    /// </summary>
+    public void SetArmed(bool armed)
+    {
+        if (_isArmed == armed) return;
+        _isArmed = armed;
+        if (_lr != null)
+            _lr.widthMultiplier = baseWidth * (armed ? armedWidthMultiplier : 1f);
     }
 
     private void EnsureShimmer()

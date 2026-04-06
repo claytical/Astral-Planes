@@ -67,7 +67,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!120 &4541917544919608688
 LineRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -91,7 +91,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 58d6035d7002d4111bccf85d8f03f298, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -113,6 +113,7 @@ LineRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Positions:
   - {x: 0, y: 0, z: 0}
   - {x: 0, y: 0, z: 1}
@@ -124,7 +125,7 @@ LineRenderer:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.09836006
+        value: 1
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -171,7 +172,6 @@ LineRenderer:
     textureScale: {x: 1, y: 1}
     shadowBias: 0.5
     generateLightingData: 0
-  m_MaskInteraction: 0
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
@@ -189,6 +189,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   start: {fileID: 0}
   end: {fileID: 0}
+  boundTrack: {fileID: 0}
+  boundStep: -1
+  boundVisualizer: {fileID: 0}
   segments: 57
   sag: 0.2
   noiseAmp: 0.3
@@ -202,5 +205,10 @@ MonoBehaviour:
   baseColor: {r: 1, g: 1, b: 1, a: 0.35}
   litColor: {r: 1, g: 1, b: 1, a: 1}
   fadeAfterSeconds: 0.4
+  armedWidthMultiplier: 2.5
   dripBaseSpeed: 0.6
   dripGravity: 0.5
+  _endpointNullGrace: 0.6
+  worldCamera: {fileID: 0}
+  uiCamera: {fileID: 0}
+  worldZOverride: NaN

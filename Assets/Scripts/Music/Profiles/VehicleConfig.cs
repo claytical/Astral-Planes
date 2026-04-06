@@ -25,6 +25,12 @@ public class VehicleConfig : ScriptableObject
     public float plowTickSeconds = 0.06f;
     public float plowFadeSeconds = 0.15f;
 
+    [Header("Multi-Hit Carving")]
+    [Tooltip("Damage applied to a dust cell per plow tick. Accumulates against the cell's role resistance.")]
+    public float plowDamagePerTick = 1.0f;
+    [Tooltip("Multiplied by hardness01 to compute carve threshold. Higher = harder to carve all roles. Lead≈0.15, Bass≈0.75.")]
+    public float carveThresholdBase = 5.0f;
+
     [Header("Input Filtering")]
     [Tooltip("Seconds before auto-zero if Move() isn't called.")]
     public float inputTimeout = 0.15f;

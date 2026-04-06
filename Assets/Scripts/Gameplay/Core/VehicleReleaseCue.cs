@@ -2,14 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Vehicle-local release cue: a filled circle that grows behind the vehicle,
+/// Vehicle-local release cue: a filled circle that shrinks as the commit approaches,
 /// colored with the pending note's track color, plus a ring of beat dots that
 /// count down remaining steps to the armed target.
 ///
 /// Setup — add this component to the vehicle GameObject (or a child).
 /// Assign the <see cref="releaseCue"/> field on Vehicle to this component.
 ///
-/// The growing circle is a SpriteRenderer drawn BEHIND the vehicle (lower
+/// The shrinking circle is a SpriteRenderer drawn BEHIND the vehicle (lower
 /// sorting order), so white-outline vehicles remain visible on top of it.
 /// Each beat dot is a small SpriteRenderer quad spawned at runtime from a
 /// configurable sprite (or Unity's built-in circle if left null).
@@ -20,17 +20,17 @@ public class VehicleReleaseCue : MonoBehaviour
     // ------------------------------------------------------------------
     // Inspector
     // ------------------------------------------------------------------
-    [Header("Growing Circle")]
-    [Tooltip("Maximum world-space radius of the filled circle at pulse = 1.")]
+    [Header("Shrinking Circle")]
+    [Tooltip("World-space radius of the filled circle when fully armed (remaining == total).")]
     [SerializeField] private float circleMaxRadius = 0.65f;
 
-    [Tooltip("Minimum world-space radius when the circle first becomes visible.")]
-    [SerializeField] private float circleMinRadius = 0.35f;
+    [Tooltip("World-space radius of the filled circle at the moment of commit (remaining == 0).")]
+    [SerializeField] private float circleMinRadius = 0.15f;
 
-    [Tooltip("Alpha of the circle at pulse = 0 (just appeared).")]
+    [Tooltip("Alpha of the circle at commit (pulse = 0).")]
     [SerializeField] private float circleAlphaMin = 0.50f;
 
-    [Tooltip("Alpha of the circle at pulse = 1 (fully grown).")]
+    [Tooltip("Alpha of the circle when fully armed (pulse = 1).")]
     [SerializeField] private float circleAlphaMax = 0.90f;
 
     [Tooltip("Sorting layer shared with the vehicle sprite.")]
@@ -113,14 +113,15 @@ public class VehicleReleaseCue : MonoBehaviour
     // Public API — called by Vehicle
     // ------------------------------------------------------------------
 
-
-
     /// <summary>
-    /// Update the beat-dot countdown display.
+    /// Update the beat-dot countdown and shrinking circle.
     /// Called on every musical step tick while a note is armed.
     /// </summary>
     public void SetBeatsRemaining(int remaining, int total)
     {
+        total = Mathf.Max(1, total);
+        _targetPulse = Mathf.Clamp01(remaining / (float)total);
+
         if (total != _lastTotalBeats)
             RebuildDots(total);
 
@@ -133,6 +134,18 @@ public class VehicleReleaseCue : MonoBehaviour
             _dots[i].color = isActive ? dotColorActive : dotColorSpent;
             _dots[i].gameObject.SetActive(true);
         }
+    }
+
+    /// <summary>Sets the track color used to tint the shrinking circle.</summary>
+    public void SetTrackColor(Color color) => _trackColor = color;
+
+    /// <summary>Hides the cue immediately (call on commit or cancel).</summary>
+    public void ClearCue()
+    {
+        _targetPulse = 0f;
+        _currentPulse = 0f;
+        ClearDots();
+        SetVisible(false);
     }
 
     // ------------------------------------------------------------------

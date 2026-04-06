@@ -76,6 +76,8 @@ MonoBehaviour:
   speedCapMul: 100
   extraBrake: 0
   carveMaze: 1
+  overlayDecaySeconds: 2
+  overlayResistanceMult: 0.5
   edgeHugForce: 2
   escapePushForce: 12
   huntBfsBudget: 600
@@ -129,6 +131,7 @@ MonoBehaviour:
   tintTrails: 1
 --- !u!212 &2442014530722922072
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -174,7 +177,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 100
-  m_Sprite: {fileID: 1211849485947851915, guid: cb35d248eb2024670b99d050f204beda,
+  m_MaskInteraction: 2
+  m_Sprite: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -184,7 +188,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 2
   m_SpriteSortPoint: 0
 --- !u!50 &4561843143948562615
 Rigidbody2D:
@@ -302,6 +305,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &3197535283754970742
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -347,6 +351,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -357,5 +362,4 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0

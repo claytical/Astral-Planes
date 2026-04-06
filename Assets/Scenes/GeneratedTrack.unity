@@ -16473,6 +16473,7 @@ MonoBehaviour:
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  freezeRipeness: 1
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256

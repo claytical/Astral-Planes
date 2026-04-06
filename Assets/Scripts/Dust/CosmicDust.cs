@@ -32,6 +32,7 @@ public class CosmicDust : MonoBehaviour {
         particleGrowInSeconds = 1.00f,
         fadeOutSeconds = 0.20f
     };
+    private float _nextBoostCarveAt = 0f;
     private float _nextDustPluckTime = -999f;
     private Vehicle _currentPluckVehicle = null;
     public float Charge01 { get; private set; } = 1f;
@@ -44,6 +45,15 @@ public class CosmicDust : MonoBehaviour {
 // Currently displayed tint on the sprite.
 // Temporary pulses modify this, but must not overwrite _currentTint.
     private Color _displayTint = Color.white;
+
+    // MineNode overlay: temporary color blend applied over base role tint.
+    // Does NOT change Role or _currentTint — purely visual + resistance hint.
+    private Color _overlayColor    = Color.clear;
+    private float _overlayStrength = 0f;
+
+    // Carve progress: [0, 1] fraction toward next role step-down.
+    // Drives a partial desaturation effect. Does NOT change Role.
+    private float _carveProgressRatio = 0f;
     [Header("Dust Musical Swell")]
     [SerializeField] private float dustPluckSwellSeconds = 1.4f;
 
@@ -548,16 +558,97 @@ private Coroutine _jiggleRoutine;
     }
     private void ApplyDisplayedTint(Color tint)
     {
-        _displayTint = tint;
+        // Blend MineNode overlay into the displayed color (RGB only — preserve charge-driven alpha).
+        Color blended = tint;
+        if (_overlayStrength > 0f)
+        {
+            blended.r = Mathf.Lerp(tint.r, _overlayColor.r, _overlayStrength);
+            blended.g = Mathf.Lerp(tint.g, _overlayColor.g, _overlayStrength);
+            blended.b = Mathf.Lerp(tint.b, _overlayColor.b, _overlayStrength);
+            // alpha stays from base tint (charge state, not role color)
+        }
+
+        // Desaturate + fade alpha based on carve progress (role does NOT change, but dust looks worn).
+        if (_carveProgressRatio > 0f)
+        {
+            const float kMaxDesaturation = 0.55f;
+            const float kMaxAlphaDrain   = 0.50f;
+            float gray = (blended.r + blended.g + blended.b) / 3f;
+            float t    = _carveProgressRatio * kMaxDesaturation;
+            blended.r  = Mathf.Lerp(blended.r, gray, t);
+            blended.g  = Mathf.Lerp(blended.g, gray, t);
+            blended.b  = Mathf.Lerp(blended.b, gray, t);
+            blended.a  = Mathf.Lerp(blended.a, blended.a * (1f - kMaxAlphaDrain), _carveProgressRatio);
+        }
+
+        _displayTint = blended;
 
         if (visual.sprite != null)
         {
-            Color applied = tint;
+            Color applied = blended;
             if (regrowAlphaCapped)
                 applied.a = Mathf.Min(applied.a, kRegrowAlphaCap);
             visual.sprite.color = applied;
         }
     }
+
+    /// <summary>
+    /// Sets a temporary MineNode overlay color blend. Does NOT change Role or _currentTint.
+    /// Call RemoveOverlay() or ClearOverlay() to restore base tint.
+    /// </summary>
+    public void SetOverlay(Color color, float strength)
+    {
+        _overlayColor    = color;
+        _overlayStrength = Mathf.Clamp01(strength);
+        ApplyDisplayedTint(_currentTint);
+    }
+
+    /// <summary>Removes any active MineNode overlay and restores base tint display.</summary>
+    public void ClearOverlay()
+    {
+        if (_overlayStrength <= 0f) return;
+        _overlayStrength = 0f;
+        ApplyDisplayedTint(_currentTint);
+    }
+
+    /// <summary>
+    /// Sets partial carve damage [0..1] for visual feedback during multi-hit carving.
+    /// Role does NOT change — only the displayed color desaturates.
+    /// Pass 0 to clear (e.g. on regrow or after step-down).
+    /// </summary>
+    public void SetCarveProgress(float progressRatio)
+    {
+        _carveProgressRatio = Mathf.Clamp01(progressRatio);
+        ApplyDisplayedTint(_currentTint);
+    }
+
+    private Coroutine _colorLerpCoroutine;
+
+    /// <summary>
+    /// Smoothly lerps the displayed tint from <paramref name="fromColor"/> to
+    /// <paramref name="toColor"/> over <paramref name="duration"/> seconds.
+    /// Cancels any in-progress lerp. Role and Charge01 are unaffected.
+    /// </summary>
+    public void StartColorLerp(Color fromColor, Color toColor, float duration)
+    {
+        if (_colorLerpCoroutine != null) StopCoroutine(_colorLerpCoroutine);
+        _colorLerpCoroutine = StartCoroutine(ColorLerpRoutine(fromColor, toColor, duration));
+    }
+
+    private IEnumerator ColorLerpRoutine(Color from, Color to, float duration)
+    {
+        SetTint(from);
+        float t = 0f;
+        while (t < duration)
+        {
+            yield return null;
+            t += Time.deltaTime;
+            SetTint(Color.Lerp(from, to, t / duration));
+        }
+        SetTint(to);
+        _colorLerpCoroutine = null;
+    }
+
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
         _currentTint = tint;
@@ -1223,37 +1314,22 @@ private Coroutine _jiggleRoutine;
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return;
         DriveVehicleCompression(vehicle, collision);
-        float h  = Mathf.Clamp01(clearing.hardness01);
         float dt = Time.fixedDeltaTime;
 
         if (vehicle.boosting)
         {
             // ---------------------------------------------------------------
-            // BOOST PATH: vehicle bleaches this cell's charge.
-            //
-            // The vehicle invests its own energy to sap dust charge so the
-            // PhaseStar gains little or nothing from cells already worked.
-            //
-            // Drain rate is inversely scaled by hardness:
-            //   soft (h=0) -> drains at full rate  (resistMul = 1.0)
-            //   hard (h=1) -> drains at 1/3 rate   (resistMul = 0.33)
-            //
-            // Vehicle energy cost mirrors hardness in the other direction --
-            // hard-role dust costs proportionally more boost to neutralize.
+            // BOOST PATH: tick-rate carve while pressing against dust.
+            // Fires at most once every 0.5 s so the player gets clear
+            // discrete hit feedback (alpha steps, then role step-down).
             // ---------------------------------------------------------------
-            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-            float resistMul   = Mathf.Lerp(1.0f, 0.33f, h);
-            float chargeDrain = drainPerSec * resistMul * dt;
-
-            float taken = DrainCharge(chargeDrain); // lowers alpha visually
-
-            // Hard dust fights back -- pay more boost energy to bleach it.
-            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, h);
-            vehicle.DrainEnergy(drainPerSec * hardnessCost * dt);
-
-            // Flash charge color so the player sees the cell losing its color.
-            if (taken > 0.001f)
-                TriggerChargeTintPulse();
+            if (Time.time >= _nextBoostCarveAt)
+            {
+                _nextBoostCarveAt = Time.time + 0.5f;
+                float ps = vehicle.profile != null ? vehicle.profile.plowStrength : 1f;
+                Vector2Int cell = _drumTrack.WorldToGridPosition(transform.position);
+                gen.CarveDustByVehicle(cell, _timings.fadeOutSeconds, ps);
+            }
         }
         else
         {

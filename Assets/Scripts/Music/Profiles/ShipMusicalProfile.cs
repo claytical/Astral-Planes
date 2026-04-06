@@ -36,6 +36,8 @@ public class ShipMusicalProfile : ScriptableObject
     public int plowDepthCells = 2;
     [Tooltip("Minimum speed (world units/s) before the plow activates.")]
     public float plowMinSpeed = 2f;
+    [Tooltip("Damage delivered per plow tick and per boost-collision tick. 1 = standard; 2 = double.")]
+    public float plowStrength = 1f;
     [Tooltip("Radius around the vehicle kept clear of dust (cells). 0 = use Inspector value.")]
     public int vehicleKeepClearRadiusCells = 0;
 
