@@ -84,5 +84,10 @@ public class BoundaryWrap : MonoBehaviour
 
         rb.position       = pos;
         rb.linearVelocity = vel;
+
+        // MineNode steers by _carveDir, not velocity — reflect it so the node turns away.
+        var mine = rb.GetComponent<MineNode>();
+        if (mine != null)
+            mine.ReflectCarveDir(reflectX: axis == WrapAxis.Horizontal);
     }
 }

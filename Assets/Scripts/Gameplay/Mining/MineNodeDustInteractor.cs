@@ -14,9 +14,12 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
     public float extraBrake = 0.25f;
 
-    [Header("Maze Tinting")]
-    [Tooltip("If true, this node flips any adjacent dust to its MusicalRole as it moves.")]
+    [Header("Maze Exhaust Painting")]
+    [Tooltip("If true, this node paints adjacent dust cells with its role at reduced energy.")]
     public bool carveMaze = true;
+
+    [Tooltip("Fraction of maxEnergyUnits to assign when exhaust-painting a cell (0=empty, 1=full).")]
+    [SerializeField, Range(0f, 1f)] private float exhaustEnergyFraction = 0.4f;
 
     [SerializeField] private float edgeHugForce = 2f;
 
@@ -25,7 +28,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
-    // steer toward it, tint it on arrival.
+    // steer toward it, paint it on arrival.
     // ---------------------------------------------------------------
     [Header("Role Hunter")]
     [Tooltip("Max BFS cells visited when searching for the nearest untinted dust cell.")]
@@ -71,13 +74,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     private Vector2 _lastDustContactPoint;
 
     // ---------------------------------------------------------------
-    // Per-node tint budget
-    // ---------------------------------------------------------------
-    private int  _tintBudget        = 0;   // 0 = unlimited
-    private int  _tintedCellCount   = 0;
-    private bool _budgetInitialized = false;
-
-    // ---------------------------------------------------------------
     // Public API
     // ---------------------------------------------------------------
 
@@ -90,13 +86,6 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     /// <summary>Weight applied when blending hunt direction into _carveDir.</summary>
     public float HuntDirWeight => huntDirWeight;
-
-    /// <summary>
-    /// Fraction of tint budget remaining: 1 = untouched, 0 = exhausted.
-    /// Always 1 when budget is unlimited (mineNodeTintBudget == 0).
-    /// </summary>
-    public float TintBudgetRemainingRatio =>
-        (_tintBudget <= 0) ? 1f : 1f - Mathf.Clamp01((float)_tintedCellCount / _tintBudget);
 
     void Awake()
     {
@@ -145,22 +134,19 @@ public class MineNodeDustInteractor : MonoBehaviour
 
         if (!carveMaze) return;
 
-        EnsureBudgetInitialized();
-        bool budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
-
         // ---------------------------------------------------------------
-        // None-hunter: retarget tick (suppress when budget exhausted)
+        // None-hunter: retarget tick (no budget gate — runs indefinitely)
         // ---------------------------------------------------------------
         _retargetTimer -= Time.fixedDeltaTime;
 
-        // Validate existing target each tick (it might have been tinted by us or another node)
+        // Validate existing target each tick (it might have been painted by us or another node)
         if (_hasHuntTarget && IsAlreadyNodeRole(_huntTargetCell))
         {
             _hasHuntTarget = false;
             _retargetTimer = 0f; // retarget immediately
         }
 
-        if (!budgetExhausted && !_hasHuntTarget && _retargetTimer <= 0f)
+        if (!_hasHuntTarget && _retargetTimer <= 0f)
         {
             _retargetTimer = retargetInterval;
             HuntTick(cell);
@@ -171,17 +157,17 @@ public class MineNodeDustInteractor : MonoBehaviour
         {
             RefreshHuntDir();
 
-            // Arrival check: if we're within arrivalRadiusCells of the target, tint it now
+            // Arrival check: if we're within arrivalRadiusCells of the target, paint it now
             if (IsArrived(cell, _huntTargetCell))
             {
-                TintTargetCell();
+                PaintTargetCell();
                 _hasHuntTarget = false;
                 _retargetTimer = 0f; // find next target immediately
             }
         }
 
         // ---------------------------------------------------------------
-        // Carve interval: tint adjacent neighbors
+        // Carve interval: exhaust-paint adjacent neighbors
         // ---------------------------------------------------------------
         _carveTimer += Time.fixedDeltaTime;
         if (_carveTimer < carveIntervalSeconds) return;
@@ -192,21 +178,19 @@ public class MineNodeDustInteractor : MonoBehaviour
 
         MusicalRole role = _node.GetImprintRole();
 
-        // Flip any adjacent dust to our role
+        // Paint any adjacent dust with our role at reduced energy (exhaust trail)
         for (int dx = -1; dx <= 1; dx++)
         for (int dy = -1; dy <= 1; dy++)
         {
             if (dx == 0 && dy == 0) continue;
-            if (budgetExhausted) break; // no cells left to paint
 
             var neighbor = cell + new Vector2Int(dx, dy);
 
             if (!_drumTrack.HasDustAt(neighbor)) continue;
             if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
 
-            gen.TintDustCellWithRole(neighbor, role);
-            _tintedCellCount++;
-            budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
+            gen.PaintDustExhaust(neighbor, role, exhaustEnergyFraction);
+            _dustCellsCarved++;
         }
 
         // Edge-hugging: only when NOT inside dust — inside dust the escape push handles steering,
@@ -229,31 +213,6 @@ public class MineNodeDustInteractor : MonoBehaviour
             if (dustNeighborCount > 0)
                 _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
-    }
-
-    // ---------------------------------------------------------------
-    // Budget init
-    // ---------------------------------------------------------------
-
-    /// <summary>
-    /// Reads mineNodeTintBudget from the first matching RoleMotifNoteSetConfig for this
-    /// node's role. Called lazily on first carve tick so the motif is guaranteed to be set.
-    /// </summary>
-    private void EnsureBudgetInitialized()
-    {
-        if (_budgetInitialized) return;
-        _budgetInitialized = true;
-        if (_node == null) return;
-        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
-        if (motif == null) return;
-        MusicalRole role = _node.GetImprintRole();
-        var configs = motif.roleNoteConfigs;
-        for (int i = 0; i < configs.Count; i++)
-            if (configs[i] != null && configs[i].role == role)
-            {
-                _tintBudget = configs[i].mineNodeTintBudget;
-                return;
-            }
     }
 
     // ---------------------------------------------------------------
@@ -284,7 +243,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 
             for (int i = 0; i < kNeighbours4.Length; i++)
             {
-                var nb = cell + kNeighbours4[i];
+                var nb = _drumTrack.WrapGridCell(cell + kNeighbours4[i]);
                 if (nb.x < 0 || nb.y < 0 || nb.x >= w || nb.y >= h) continue;
                 if (_bfsVisited.Contains(nb)) continue;
                 _bfsVisited.Add(nb);
@@ -298,7 +257,7 @@ public class MineNodeDustInteractor : MonoBehaviour
                 // Dust boundary: skip cells already our role
                 if (IsAlreadyNodeRole(nb)) continue;
 
-                // Found the nearest untinted dust cell
+                // Found the nearest unpainted dust cell
                 _hasHuntTarget  = true;
                 _huntTargetCell = nb;
                 RefreshHuntDir();
@@ -306,7 +265,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             }
         }
 
-        // No untinted dust reachable within budget — clear target
+        // No unpainted dust reachable within budget — clear target
         _hasHuntTarget = false;
     }
 
@@ -318,17 +277,14 @@ public class MineNodeDustInteractor : MonoBehaviour
             _huntDir = dir.normalized;
     }
 
-    private void TintTargetCell()
+    private void PaintTargetCell()
     {
         var gen = GameFlowManager.Instance?.dustGenerator;
         if (gen == null || _node == null) return;
 
-        bool budgetExhausted = _tintBudget > 0 && _tintedCellCount >= _tintBudget;
-        if (budgetExhausted) return;
-
         MusicalRole role = _node.GetImprintRole();
-        gen.TintDustCellWithRole(_huntTargetCell, role);
-        _tintedCellCount++;
+        gen.PaintDustExhaust(_huntTargetCell, role, exhaustEnergyFraction);
+        _dustCellsCarved++;
     }
 
     private bool IsArrived(Vector2Int currentCell, Vector2Int targetCell)

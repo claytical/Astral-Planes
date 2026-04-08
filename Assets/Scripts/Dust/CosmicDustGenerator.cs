@@ -27,7 +27,10 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         public Color color;
         public float healDelay;
-        public float hardness01;
+        public float hardness01;          // Legacy — kept for migration.
+        public float carveResistance01;
+        public float drainResistance01;
+        public int   maxEnergyUnits;
         public MusicalRole role;
     }
     [SerializeField] private CosmicDust.DustVisualTimings dustTimings = new CosmicDust.DustVisualTimings
@@ -81,6 +84,9 @@ public class CosmicDustGenerator : MonoBehaviour
     private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
     private MazePatternConfig _activeMazePattern;
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
+    [Header("Topology")]
+    [Tooltip("When enabled, the dust grid wraps toroidally — cells at one edge connect to the opposite edge.")]
+    [SerializeField] public bool toroidal = false;
     private PhaseStarBehaviorProfile _activeProfile;
     [Header("Tint Diffusion (Option 2)")]
     [Tooltip("If enabled, recently modified dust cells will gradually blend toward their neighbors over time (local diffusion).")]
@@ -970,14 +976,20 @@ public class CosmicDustGenerator : MonoBehaviour
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
             _imprints[gp] = new DustImprint
             {
-                color      = regrowTint,
-                hardness01 = roleProfile != null ? roleProfile.GetDustHardness01() : defaultMazeHardness01,
-                role       = regrowRole,
-                healDelay  = 0f
+                color               = regrowTint,
+                hardness01          = roleProfile != null ? roleProfile.GetDustHardness01() : defaultMazeHardness01,
+                carveResistance01   = roleProfile != null ? roleProfile.GetCarveResistance01() : 0f,
+                drainResistance01   = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f,
+                maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : 1,
+                role                = regrowRole,
+                healDelay           = 0f
             };
 
-            dust.clearing.hardness01 = _imprints[gp].hardness01;
-            dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a);
+            dust.clearing.hardness01        = _imprints[gp].hardness01;
+            dust.clearing.carveResistance01 = roleProfile != null ? roleProfile.GetCarveResistance01() : 0f;
+            dust.clearing.drainResistance01 = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f;
+            int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
+            dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
             Color denyColor = Color.darkGray;
             if (roleProfile != null)
@@ -1120,7 +1132,8 @@ public class CosmicDustGenerator : MonoBehaviour
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeCellForBfs: includeCellForBfs,
-                    includeWorld: includeWorld);
+                    includeWorld: includeWorld,
+                    normalizeCell: toroidal ? WrapCell : (Func<Vector2Int, Vector2Int>)null);
                 break;
             }
 
@@ -1255,13 +1268,17 @@ public class CosmicDustGenerator : MonoBehaviour
             seeds[0]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), starF + dir * halfDiag * 0.75f));
             seedRoles[0] = rolesList[0];
 
-            float restRadius = halfDiag * 0.45f;
-            float angleStart = Mathf.Atan2(dir.y, dir.x) + Mathf.PI;
+            // Secondary seeds orbit the GRID CENTER at half-diagonal radius so they land
+            // inside the playfield regardless of where the star spawns.
+            // Starting angle points from center toward the star (away from seed[0]) so
+            // seed[1] is on the opposite side of the grid from seed[0].
+            float restRadius = halfDiag * 0.5f;
+            float angleStart = Mathf.Atan2(-dir.y, -dir.x); // center → star direction
             float angleStep  = (seedCount > 1) ? (2f * Mathf.PI / (seedCount - 1)) : 0f;
             for (int i = 1; i < seedCount; i++)
             {
-                float a  = angleStart + (i - 1) * angleStep;
-                Vector2 raw = starF + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * restRadius;
+                float a     = angleStart + (i - 1) * angleStep;
+                Vector2 raw = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * restRadius;
                 seeds[i]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), raw));
                 seedRoles[i] = rolesList[i];
             }
@@ -1508,6 +1525,7 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureCellGrid();
         go = null;
         if (_cellGo == null) return false;
+        if (toroidal) gp = WrapCell(gp);
         if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
         go = _cellGo[gp.x, gp.y];
         return go != null;
@@ -1517,6 +1535,7 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureCellGrid();
         st = DustCellState.Empty;
         if (_cellState == null) return false;
+        if (toroidal) gp = WrapCell(gp);
         if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
         st = _cellState[gp.x, gp.y];
         return true;
@@ -1525,6 +1544,7 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         EnsureCellGrid();
         if (_cellState == null) return;
+        if (toroidal) gp = WrapCell(gp);
         if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return;
 
         // Track role density when a cell enters or leaves Solid state.
@@ -1685,6 +1705,53 @@ public class CosmicDustGenerator : MonoBehaviour
                 RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
         }
     }
+    // Incremental plow carve: removes energyAmount units from the cell, scaled by carveResistance01.
+    // Full removal triggers ClearCell + regrowth + ripeness — same as CarveDustByVehicle.
+    // Partial chips leave the cell solid at reduced energy.
+    public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds)
+    {
+        if (!IsInBounds(cell)) return;
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+
+        var cellGo = _cellGo?[cell.x, cell.y];
+        if (cellGo == null) return;
+        if (!cellGo.TryGetComponent<CosmicDust>(out var dust) || dust == null) return;
+
+        // Scale chip amount by carve resistance: high resistance = fewer units removed per tick.
+        float resistMul = 1f - dust.clearing.carveResistance01;
+        int effectiveChip = Mathf.Max(1, Mathf.RoundToInt(energyAmount * resistMul));
+
+        int removed = dust.ChipEnergy(effectiveChip);
+        if (removed <= 0) return;
+
+        // Units hit 0: physically clear the cell and handle ripeness + imprint bookkeeping.
+        // ChipEnergy has already disabled the collider; we now handle the generator-level teardown.
+        if (dust.currentEnergyUnits <= 0)
+        {
+            _imprints ??= new Dictionary<Vector2Int, DustImprint>();
+            if (!RestoreVoronoiImprint(cell))
+                PromoteHiddenRole(cell);
+
+            _playerCarvedCells.Add(cell);
+
+            var explode = cellGo.GetComponent<Explode>();
+            if (explode != null)
+                explode.SetTint(dust.CurrentTint);
+
+            bool isVoidCell = _voidGrowCells.Remove(cell);
+            if (isVoidCell) _imprints?.Remove(cell);
+
+            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: !isVoidCell);
+
+            if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+            {
+                var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
+                if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                    RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
+            }
+        }
+    }
+
     public void ResetDustToNoneInPlace(CosmicDust dust)
     {
         if (dust == null) return;
@@ -1814,12 +1881,25 @@ public class CosmicDustGenerator : MonoBehaviour
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
     }
     
-    private bool IsInBounds(Vector2Int gp) { 
-        if (drums == null) return false; 
-        int w = drums.GetSpawnGridWidth(); 
-        int h = drums.GetSpawnGridHeight(); 
-        if (w <= 0 || h <= 0) return false; 
+    private bool IsInBounds(Vector2Int gp) {
+        if (drums == null) return false;
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return false;
+        if (toroidal) return true; // every coordinate is valid after wrapping
         return gp.x >= 0 && gp.y >= 0 && gp.x < w && gp.y < h;
+    }
+
+    /// <summary>
+    /// Wraps a grid coordinate toroidally when <see cref="toroidal"/> is enabled.
+    /// Returns the input unchanged in non-toroidal mode.
+    /// </summary>
+    public Vector2Int WrapCell(Vector2Int gp)
+    {
+        if (!toroidal || _cellW <= 0 || _cellH <= 0) return gp;
+        return new Vector2Int(
+            ((gp.x % _cellW) + _cellW) % _cellW,
+            ((gp.y % _cellH) + _cellH) % _cellH);
     }
     
     public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting)
@@ -2771,7 +2851,39 @@ public class CosmicDustGenerator : MonoBehaviour
         }
     }
 
-    // Add to CosmicDustGenerator
+    // Paints existing dust with a role at reduced energy (MineNode exhaust trail).
+    // Does NOT create new dust — only paints cells that already have solid terrain.
+    // energyFraction: 0-1, fraction of the role's maxEnergyUnits to assign (e.g. 0.4 = 40% charge).
+    public void PaintDustExhaust(Vector2Int cell, MusicalRole role, float energyFraction = 0.4f)
+    {
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (profile == null) return;
+
+        Color color = profile.GetBaseColor();
+        int maxUnits = profile.maxEnergyUnits;
+        int exhaustUnits = Mathf.Max(1, Mathf.RoundToInt(maxUnits * Mathf.Clamp01(energyFraction)));
+
+        // Update imprint so regrowth remembers the role assignment.
+        _imprints[cell] = new DustImprint
+        {
+            role               = role,
+            color              = color,
+            hardness01         = profile.GetDustHardness01(),
+            carveResistance01  = profile.GetCarveResistance01(),
+            drainResistance01  = profile.GetDrainResistance01(),
+            maxEnergyUnits     = maxUnits
+        };
+
+        if (TryGetDustAt(cell, out var dust))
+        {
+            dust.clearing.carveResistance01 = profile.GetCarveResistance01();
+            dust.clearing.drainResistance01 = profile.GetDrainResistance01();
+            dust.ApplyRoleAndCharge(role, color, (float)exhaustUnits / maxUnits, maxUnits);
+            dust.SyncParticleColor();
+        }
+    }
+
     [ContextMenu("Debug: Find Phantom Colliders")]
     public void DebugFindPhantomColliders()
     {

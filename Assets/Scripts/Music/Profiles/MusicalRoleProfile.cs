@@ -28,9 +28,21 @@ public class MusicalRoleProfile : ScriptableObject
     public float baseAlpha = 0.25f;
 
 
-    [Header("Dust Mining")]
+    [Header("Dust Energy")]
+    [Tooltip("Maximum energy units this role's dust holds. Default=1, Lead=2, Groove=3, Harmony=4, Bass=5.")]
+    [Min(1)] public int maxEnergyUnits = 1;
+
     [Range(0f, 1f)]
-    [Tooltip("How hard dust imprinted/regrown with this role should be. 0 = soft/easy, 1 = hard/resists digging.")]
+    [Tooltip("How hard vehicle plow carving is against this dust. 0=instant, 1=nearly indestructible by vehicle.")]
+    public float carveResistance01 = 0.50f;
+
+    [Range(0f, 1f)]
+    [Tooltip("How hard PhaseStar draining is against this dust. 0=drains instantly, 1=very slow. Invert carveResistance for ecological tension.")]
+    public float drainResistance01 = 0.50f;
+
+    [Header("Dust Mining (Legacy)")]
+    [Range(0f, 1f)]
+    [Tooltip("Legacy single-axis hardness. Superseded by carveResistance01 + drainResistance01. Kept for migration.")]
     public float dustHardness01 = 0.50f;
 
     [Header("MineNode Balance")]
@@ -60,5 +72,7 @@ public class MusicalRoleProfile : ScriptableObject
         c.a = baseAlpha;
         return c;
     }
-    public float GetDustHardness01() => Mathf.Clamp01(dustHardness01);
+    public float GetDustHardness01()    => Mathf.Clamp01(dustHardness01);
+    public float GetCarveResistance01() => Mathf.Clamp01(carveResistance01);
+    public float GetDrainResistance01() => Mathf.Clamp01(drainResistance01);
 }

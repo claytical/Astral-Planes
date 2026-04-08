@@ -34,7 +34,12 @@ public class CosmicDust : MonoBehaviour {
     };
     private float _nextDustPluckTime = -999f;
     private Vehicle _currentPluckVehicle = null;
-    public float Charge01 { get; private set; } = 1f;
+    // Energy unit backing fields. Charge01 is derived — do NOT write to it directly.
+    private int _maxEnergyUnits = 1;
+    private int _currentEnergyUnits = 1;
+    public int maxEnergyUnits => _maxEnergyUnits;
+    public int currentEnergyUnits => _currentEnergyUnits;
+    public float Charge01 => (float)_currentEnergyUnits / Mathf.Max(1, _maxEnergyUnits);
     public MusicalRole Role { get; private set; } = MusicalRole.None;
 
 // Authoritative/resting tint of this dust cell.
@@ -73,8 +78,11 @@ public class CosmicDust : MonoBehaviour {
     public struct DustClearingSettings
     {
         [Header("Imprint (from MineNodes)")]
-        [Range(0f, 1f)] public float hardness01; // 0 = soft/easy, 1 = hard/needs more boost
+        [Range(0f, 1f)] public float hardness01; // Legacy — kept for migration. Use carveResistance01 / drainResistance01.
 
+        [Header("Two-Axis Resistance")]
+        [Range(0f, 1f)] public float carveResistance01; // Vehicle plow resistance. 0=instant, 1=nearly indestructible.
+        [Range(0f, 1f)] public float drainResistance01; // PhaseStar drain resistance. 0=drains fast, 1=very slow.
     }
     [SerializeField] private DustVisualSettings visual = new DustVisualSettings
     {
@@ -152,9 +160,6 @@ public class CosmicDust : MonoBehaviour {
     private float _baseSize;
     private float _baseAlpha;
     private bool _baseCaptured;
-    private bool  _hasImprint;
-    private Color _imprintBaseTint;
-    private Color _imprintShadowTint;
 
     private bool _isDespawned;
     private bool _shrinkingFromStar;
@@ -262,7 +267,9 @@ private Coroutine _jiggleRoutine;
         if (_currentTint.a < minAlpha)
         {
             _currentTint.a = minAlpha;
-            Charge01 = Mathf.Clamp01(_currentTint.a);
+            // Ensure at least 1 energy unit so the cell is solid.
+            if (_currentEnergyUnits <= 0)
+                _currentEnergyUnits = 1;
         }
         ApplyDisplayedTint(_currentTint);
     }
@@ -446,10 +453,13 @@ private Coroutine _jiggleRoutine;
         return Mathf.Max(bounds.extents.x, bounds.extents.y);
     }
 
-    public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge)
+    // maxUnits: pass > 0 to update the cell's max energy units (from a role profile).
+    // Pass -1 (default) to keep the current max.
+    public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge, int maxUnits = -1)
     {
-        Role     = r;
-        Charge01 = Mathf.Clamp01(charge);
+        Role = r;
+        if (maxUnits > 0) _maxEnergyUnits = maxUnits;
+        SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
         roleColorRgb.a = visibleAlpha;
         // Alpha comes from the caller (roleProfile.baseAlpha via GetBaseColor()).
@@ -461,14 +471,26 @@ private Coroutine _jiggleRoutine;
             GetComponent<Explode>().SetTint(roleColorRgb);
         }
     }
-    
-    public float DrainCharge(float amount)
-    {
-        float take = Mathf.Min(Charge01, Mathf.Max(0f, amount));
-        if (take <= 0f) return 0f;
-        Charge01 -= take;
 
-        // Lerp RGB toward gray as charge depletes, and drop alpha too.
+    // Sets current energy units, clamped [0, max]. Updates tint alpha accordingly.
+    public void SetEnergyUnits(int units)
+    {
+        _currentEnergyUnits = Mathf.Clamp(units, 0, _maxEnergyUnits);
+        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
+        _currentTint.a = visibleAlpha;
+        ApplyDisplayedTint(_currentTint);
+    }
+
+    // Decrements energy units by amount. Drives visual drain. Returns actual units removed.
+    // When units hit 0, disables the terrain collider — but does NOT call the generator.
+    // Callers are responsible for generator-level cleanup (ClearCell vs ResetDustToNoneInPlace).
+    public int ChipEnergy(int amount)
+    {
+        int actual = Mathf.Min(_currentEnergyUnits, Mathf.Max(0, amount));
+        if (actual <= 0) return 0;
+        _currentEnergyUnits -= actual;
+
+        // Lerp RGB toward gray as energy depletes, and drop alpha too.
         // At Charge01=1: full role color. At Charge01=0: gray at low alpha.
         Color gray = new Color(0.3f, 0.3f, 0.3f, 0f);
         Color full = _currentTint;
@@ -476,22 +498,25 @@ private Coroutine _jiggleRoutine;
         Color drained = Color.Lerp(gray, full, Charge01);
         drained.a = Mathf.Lerp(0.05f, _currentTint.a, Charge01);
 
-        // Write back to _currentTint so subsequent drains start from the right base.
         _currentTint = drained;
-        // Apply immediately — the star is actively consuming this cell, player needs visual feedback.
         ApplyDisplayedTint(_currentTint);
 
-        // Enforce solid-visibility threshold: if alpha has dropped below the floor
-        // where dust should read as terrain, kill collision and tell the generator
-        // to transition this cell out of Solid.
-        if (drained.a < kSolidAlphaFloor)
-        {
+        if (_currentEnergyUnits <= 0)
             SetTerrainColliderEnabled(false);
-            if (gen != null)
-                gen.ResetDustToNoneInPlace(this);
-        }
 
-        return take;
+        return actual;
+    }
+
+    // Deprecated shim — converts a 0-1 charge fraction to integer units and delegates to ChipEnergy.
+    // Does NOT call the generator on depletion — callers are responsible for post-depletion cleanup.
+    public float DrainCharge(float amount)
+    {
+        if (amount <= 0f) return 0f;
+        int chipAmount = Mathf.RoundToInt(amount * _maxEnergyUnits);
+        // Guard against sub-unit precision: always chip at least 1 when amount is nonzero.
+        if (chipAmount <= 0 && _currentEnergyUnits > 0) chipAmount = 1;
+        int actual = ChipEnergy(chipAmount);
+        return (float)actual / Mathf.Max(1, _maxEnergyUnits);
     }
     
     public void Begin()
@@ -560,9 +585,11 @@ private Coroutine _jiggleRoutine;
     }
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
+        // Preserve _currentTint.a — it is authoritative charge state managed only by
+        // DrainCharge, ApplyRoleAndCharge, and EnsureMinSolidAlpha. Callers of SetBaseTint
+        // (diffusion, retinting) must not reset drain progress.
+        tint.a = _currentTint.a;
         _currentTint = tint;
-        // Charge01 is game state managed by DrainCharge / ApplyRoleAndCharge / EnsureMinSolidAlpha.
-        // Do NOT overwrite it here — diffusion and other visual-only callers must not reset drain progress.
 
         if (!_tintPulseActive || applyImmediatelyIfNoPulse)
             ApplyDisplayedTint(_currentTint);
@@ -744,7 +771,11 @@ private Coroutine _jiggleRoutine;
         var dormantTint = _currentTint;
         dormantTint.a = 0.35f;
         ApplyDisplayedTint(dormantTint);
-        clearing.hardness01 = 0f;
+        clearing.hardness01        = 0f;
+        clearing.carveResistance01 = 0f;
+        clearing.drainResistance01 = 0f;
+        _maxEnergyUnits            = 1;
+        _currentEnergyUnits        = 1;
     }
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
@@ -1223,7 +1254,7 @@ private Coroutine _jiggleRoutine;
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return;
         DriveVehicleCompression(vehicle, collision);
-        float h  = Mathf.Clamp01(clearing.hardness01);
+        float drainRes = Mathf.Clamp01(clearing.drainResistance01);
         float dt = Time.fixedDeltaTime;
 
         if (vehicle.boosting)
@@ -1234,26 +1265,34 @@ private Coroutine _jiggleRoutine;
             // The vehicle invests its own energy to sap dust charge so the
             // PhaseStar gains little or nothing from cells already worked.
             //
-            // Drain rate is inversely scaled by hardness:
-            //   soft (h=0) -> drains at full rate  (resistMul = 1.0)
-            //   hard (h=1) -> drains at 1/3 rate   (resistMul = 0.33)
+            // Drain rate is inversely scaled by drainResistance01:
+            //   drainRes=0 -> drains at full rate  (resistMul = 1.0)
+            //   drainRes=1 -> drains at 1/3 rate   (resistMul = 0.33)
             //
-            // Vehicle energy cost mirrors hardness in the other direction --
-            // hard-role dust costs proportionally more boost to neutralize.
+            // Vehicle energy cost mirrors resistance in the other direction --
+            // high-resistance dust costs proportionally more boost to neutralize.
             // ---------------------------------------------------------------
             float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-            float resistMul   = Mathf.Lerp(1.0f, 0.33f, h);
+            float resistMul   = Mathf.Lerp(1.0f, 0.33f, drainRes);
             float chargeDrain = drainPerSec * resistMul * dt;
 
             float taken = DrainCharge(chargeDrain); // lowers alpha visually
 
-            // Hard dust fights back -- pay more boost energy to bleach it.
-            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, h);
+            // High-resistance dust fights back -- pay more boost energy to bleach it.
+            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, drainRes);
             vehicle.DrainEnergy(drainPerSec * hardnessCost * dt);
 
             // Flash charge color so the player sees the cell losing its color.
             if (taken > 0.001f)
                 TriggerChargeTintPulse();
+
+            // If the boost fully drained this cell, clear it from the generator.
+            if (_currentEnergyUnits <= 0 && gen != null && _drumTrack != null)
+            {
+                var gp = _drumTrack.WorldToGridPosition(transform.position);
+                gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
+                    fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true);
+            }
         }
         else
         {

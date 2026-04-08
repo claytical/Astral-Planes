@@ -1414,10 +1414,31 @@ public class DrumTrack : MonoBehaviour
         int ix = Mathf.FloorToInt(gx);
         int iy = Mathf.FloorToInt(gy);
 
-        ix = Mathf.Clamp(ix, 0, w - 1);
-        iy = Mathf.Clamp(iy, 0, h - 1);
+        if (_dust != null && _dust.toroidal)
+        {
+            ix = ((ix % w) + w) % w;
+            iy = ((iy % h) + h) % h;
+        }
+        else
+        {
+            ix = Mathf.Clamp(ix, 0, w - 1);
+            iy = Mathf.Clamp(iy, 0, h - 1);
+        }
 
         return new Vector2Int(ix, iy);
+    }
+
+    /// <summary>
+    /// Wraps a grid coordinate toroidally when the dust generator is in toroidal mode.
+    /// Returns the input clamped to grid bounds otherwise.
+    /// </summary>
+    public Vector2Int WrapGridCell(Vector2Int gp)
+    {
+        if (_dust != null && _dust.toroidal)
+            return _dust.WrapCell(gp);
+        int w = Mathf.Max(1, GetSpawnGridWidth());
+        int h = Mathf.Max(1, GetSpawnGridHeight());
+        return new Vector2Int(Mathf.Clamp(gp.x, 0, w - 1), Mathf.Clamp(gp.y, 0, h - 1));
     }
     public float GetTimeToLoopEnd(bool effective = true) { 
         float L = effective ? EffectiveLoopLengthSec : _clipLengthSec; 

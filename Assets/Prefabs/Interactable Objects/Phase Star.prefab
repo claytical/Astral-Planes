@@ -4791,7 +4791,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &6586779521431452345
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -4837,6 +4837,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -4868,7 +4869,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &2312498068821558259
 GameObject:
   m_ObjectHideFlags: 0
@@ -4921,42 +4921,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dominantRoleSwitchDelta: 0.1
   behaviorProfile: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   shardReadyThreshold: 0.5
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
   entryOffscreenMargin: 2
-  highlightDwellPenaltyPerSec: 0.15
-  entryArriveThreshold: 1.5
-  entryFadeInSeconds: 0.6
-  pokeChargeThreshold: 0.24
+  entryArriveThreshold: 1
+  entryFadeInSeconds: 0.2
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
   cravingNavigator: {fileID: 4892159809986813886}
   disarmedPushScale: 0.1
   _tracePhaseStar: 1
-  flowerAlternateRotation: 1
   bubbleTint: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 0.2}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
-  passiveChargeDecayPerSec: 0
-  dustToStarChargeMul: 1
   shardMinAlpha: 0.287
-  shardDisarmedAlphaCeil: 0.1
-  shardAlphaLerpSpeed: 6
-  shardSnifferTurnSpeed: 180
-  shardShedDuration: 0.35
-  disarmedScaleMul: 2.4
-  disarmedScaleSeconds: 0.18
-  disarmedFlowerRotStartDeg: 50
-  disarmedFlowerRotDecaySec: 5
-  disarmedBreathPeriod: 2.5
-  disarmedBreathAlphaMin: 0.04
-  disarmedBreathAlphaMax: 0.18
+  accumulatorRotSpeed: 90
+  drainTiltDeg: 5
+  drainTiltSpeed: 1.8
   _assignedMotif: {fileID: 0}
-  _perPetalLayerStep: 0
 --- !u!114 &6754461597857711404
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5000,11 +4985,18 @@ MonoBehaviour:
   drainTick: 0.08
   drainRatePerSec: 0.6
   probeDepthCells: 2
-  dustLayerMask:
-    serializedVersion: 2
-    m_Bits: 128
-  dustIgnoreSearchRadius: 40
-  dustIgnoreMaxHits: 256
+  scoutVisualRoot: {fileID: 0}
+  scoutSprite: {fileID: 0}
+  scoutTravelSpeed: 1
+  scoutDrainFraction: 0.25
+  scoutPulseSpeed: 0.3
+  scoutPulseMinScale: 0.4
+  scoutRotSpeed: 90
+  scoutIdleAlpha: 0.55
+  scoutWobbleAmplitudeDeg: 18
+  scoutPatrolCellsPerPause: 2.5
+  scoutPatrolSniffSeconds: 0.55
+  scoutPatrolSniffSpinMul: 3.5
   starDrainRegrowDelay: 6
 --- !u!114 &6224665215610089654
 MonoBehaviour:
@@ -5019,6 +5011,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
   pushDecayPerSecond: 5
+  stuckThresholdSeconds: 0.22
+  unstickImpulseSpeed: 6
   bounds:
     kinematicMode: 0
     edgeBounce: 0.9
@@ -5147,7 +5141,7 @@ Transform:
   m_GameObject: {fileID: 6090321477331913616}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -1}
   m_LocalScale: {x: 0.8, y: 0.8, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9879,7 +9873,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &1256448414632657313
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -9922,9 +9916,10 @@ ParticleSystemRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: -98977089
+  m_SortingLayer: -1
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -9956,7 +9951,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &6150576379399551421
 GameObject:
   m_ObjectHideFlags: 0
@@ -9991,6 +9985,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &2552610199592648178
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -10036,6 +10031,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b,
     type: 3}
   m_Color: {r: 0.084905684, g: 0.084905684, b: 0.084905684, a: 0.02745098}
@@ -10046,5 +10042,4 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0

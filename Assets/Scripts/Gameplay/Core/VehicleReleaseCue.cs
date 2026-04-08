@@ -45,6 +45,25 @@ public class VehicleReleaseCue : MonoBehaviour
     [Tooltip("Sprite to use for the filled circle. Assign Unity's built-in 'Knob' or any filled circle sprite. Leave null for a white quad fallback (less round).")]
     [SerializeField] private Sprite circleSprite;
 
+    [Header("Step Bar")]
+    [Tooltip("Sprite for the horizontal step-countdown bar. A 1×1 white quad works well.")]
+    [SerializeField] private Sprite stepBarSprite;
+
+    [Tooltip("Full width of the bar in world units (at max beats remaining).")]
+    [SerializeField] private float stepBarWidth = 0.80f;
+
+    [Tooltip("Height of the step bar in world units.")]
+    [SerializeField] private float stepBarHeight = 0.07f;
+
+    [Tooltip("World-space Y offset from the vehicle center (negative = below).")]
+    [SerializeField] private float stepBarYOffset = -0.55f;
+
+    [Tooltip("Sorting order for the step bar.")]
+    [SerializeField] private int stepBarSortingOrder = 3;
+
+    private SpriteRenderer _stepBar;
+    private float _stepBarFullWidth = 1f;
+
     [Header("Beat Dots")]
     [Tooltip("Sprite for each beat dot. Leave null for a plain quad.")]
     [SerializeField] private Sprite dotSprite;
@@ -84,6 +103,7 @@ public class VehicleReleaseCue : MonoBehaviour
     private void Awake()
     {
         BuildCircle();
+        BuildStepBar();
         SetVisible(false);
     }
 
@@ -122,7 +142,10 @@ public class VehicleReleaseCue : MonoBehaviour
     public void SetBeatsRemaining(int remaining, int total)
     {
         if (total != _lastTotalBeats)
+        {
             RebuildDots(total);
+            _stepBarFullWidth = stepBarWidth;
+        }
 
         for (int i = 0; i < _dots.Count; i++)
         {
@@ -132,6 +155,19 @@ public class VehicleReleaseCue : MonoBehaviour
             bool isActive = i >= (_dots.Count - remaining);
             _dots[i].color = isActive ? dotColorActive : dotColorSpent;
             _dots[i].gameObject.SetActive(true);
+        }
+
+        // Shrink step bar proportionally to beats remaining.
+        if (_stepBar != null && total > 0)
+        {
+            float fraction = Mathf.Clamp01((float)remaining / total);
+            float barW = Mathf.Max(0f, _stepBarFullWidth * fraction);
+            _stepBar.transform.localScale = new Vector3(barW, stepBarHeight, 1f);
+            // Anchor left edge so bar drains left-to-right.
+            _stepBar.transform.localPosition = new Vector3(
+                -(_stepBarFullWidth - barW) * 0.5f,
+                stepBarYOffset,
+                0f);
         }
     }
 
@@ -207,6 +243,23 @@ public class VehicleReleaseCue : MonoBehaviour
         _lastTotalBeats = -1;
     }
 
+    private void BuildStepBar()
+    {
+        var go = new GameObject("StepBar");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = new Vector3(0f, stepBarYOffset, 0f);
+        go.transform.localScale = new Vector3(stepBarWidth, stepBarHeight, 1f);
+
+        _stepBar = go.AddComponent<SpriteRenderer>();
+        _stepBar.sprite           = stepBarSprite;
+        _stepBar.sortingLayerName = circleSortingLayer;
+        _stepBar.sortingOrder     = stepBarSortingOrder;
+        _stepBar.color            = new Color(1f, 1f, 1f, 0.75f);
+        _stepBar.enabled          = false;
+
+        _stepBarFullWidth = stepBarWidth;
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
@@ -214,6 +267,9 @@ public class VehicleReleaseCue : MonoBehaviour
     {
         if (_circle != null)
             _circle.enabled = visible;
+
+        if (_stepBar != null)
+            _stepBar.enabled = visible;
 
         foreach (var sr in _dots)
             if (sr != null) sr.gameObject.SetActive(visible);

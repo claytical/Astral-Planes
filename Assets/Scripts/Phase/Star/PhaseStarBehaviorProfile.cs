@@ -37,12 +37,15 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public float collectableClearTimeoutSeconds = 0f;
 
     // =====================================================================
-    // Preview ring & tempo coupling (visual + readability)
+    // Charge accumulation (PhaseStar.cs)
     // =====================================================================
-    [Header("Preview Ring (visual rhythm)")]
-    [Range(0f, 1f)]    public float starAlphaMin = 0.10f;
-    [Range(0f, 1f)]    public float starAlphaMax = 1.00f;
-    
+    [Header("Charge Accumulation (PhaseStar.cs)")]
+    [Tooltip("Multiplier applied to all energy delivered to the star. Raise to make charge build faster.")]
+    [Min(0f)] public float dustToStarChargeMul = 1.0f;
+
+    [Tooltip("Energy units lost per second per role (passive decay). 0 disables decay.")]
+    [Min(0f)] public float passiveChargeDecayPerSec = 0.02f;
+
     // =====================================================================
     // Star body motion (PhaseStarMotion2D)
     // =====================================================================

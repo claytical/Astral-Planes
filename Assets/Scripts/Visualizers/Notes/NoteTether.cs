@@ -222,6 +222,23 @@ private int     _cachedHash  = 0;
         boundStep  = step;
         boundVisualizer = viz;
     }
+    [Header("Release Progress")]
+    [Tooltip("Width multiplier at t01=0 (plenty of time).")]
+    [SerializeField] private float releaseWidthMin = 1f;
+    [Tooltip("Width multiplier at t01=1 (release now).")]
+    [SerializeField] private float releaseWidthMax = 3.5f;
+
+    private float _releaseProgress01 = 0f;
+
+    // t01=0: window is open, normal width. t01=1: window closing, thick urgent width.
+    // Called each frame during manual-release carry by Vehicle.TickNoteTrail.
+    public void SetReleaseProgress(float t01)
+    {
+        _releaseProgress01 = Mathf.Clamp01(t01);
+        if (_lr != null)
+            _lr.widthMultiplier = baseWidth * Mathf.Lerp(releaseWidthMin, releaseWidthMax, _releaseProgress01);
+    }
+
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
     {
         start = a; end = b; baseColor = c;

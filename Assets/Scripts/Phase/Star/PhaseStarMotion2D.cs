@@ -66,8 +66,16 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     }
 
     [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f;
+
+    [Tooltip("Seconds of near-zero velocity while hunting before an unstick impulse fires.")]
+    [SerializeField, Min(0.05f)] private float stuckThresholdSeconds = 0.22f;
+
+    [Tooltip("Speed of the unstick impulse (world units/sec). Mostly perpendicular to hunt dir.")]
+    [SerializeField, Min(0f)] private float unstickImpulseSpeed = 6f;
+
     private Vector2 _pushVelocity = Vector2.zero;
     private float   _speedMul = 1f;
+    private float   _stuckTimer;
 
     public void SetSpeedMultiplier(float mul) => _speedMul = Mathf.Max(0f, mul);
 
@@ -262,6 +270,32 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
             KeepInsideScreenAndBounce();
             OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVel : _rb.linearVelocity);
+
+            // Unstick: if the star is pressing toward a target but actual velocity is
+            // near zero, a dust cell is blocking it. Fire a sideways impulse after a
+            // short delay so the star can slip around the obstacle organically.
+            if (!bounds.kinematicMode && unstickImpulseSpeed > 0.001f)
+            {
+                bool isStuck = _rb.linearVelocity.sqrMagnitude < (speed * 0.12f) * (speed * 0.12f);
+                if (isStuck)
+                {
+                    _stuckTimer += dt;
+                    if (_stuckTimer >= stuckThresholdSeconds)
+                    {
+                        _stuckTimer = 0f;
+                        Vector2 perp  = Vector2.Perpendicular(huntDir);
+                        if (Random.value > 0.5f) perp = -perp;
+                        // Bias slightly forward so it doesn't orbit endlessly
+                        Vector2 nudge = (perp * 0.75f + huntDir * 0.25f).normalized * unstickImpulseSpeed;
+                        ApplyPushImpulse(nudge);
+                    }
+                }
+                else
+                {
+                    _stuckTimer = 0f;
+                }
+            }
+
             return; // skip drift path entirely
         }
 

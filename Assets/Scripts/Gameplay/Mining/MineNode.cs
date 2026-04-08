@@ -63,7 +63,8 @@ public class MineNode : MonoBehaviour
     {
         return _role;
     }
-    public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell) {
+    public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell,
+                           Sprite diamondSprite = null) {
         _track = track;
         _spawnCell = spawnCell;
         _role = track != null ? track.assignedRole : default;
@@ -81,28 +82,29 @@ public class MineNode : MonoBehaviour
         {
             explode.SetTint(_lockedColor, multiply: true);
         }
-        
-        float a = UnityEngine.Random.Range(0f, 360f); 
-        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized; 
+
+        float a = UnityEngine.Random.Range(0f, 360f);
+        _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
         _lastProcessedStep = -1;
-        if (_drumTrack != null) { 
-            _drumTrack.RegisterMineNode(this); 
+        if (_drumTrack != null) {
+            _drumTrack.RegisterMineNode(this);
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
         }
-        
-        var dust = GetComponent<MineNodeDustInteractor>(); 
-        if (dust != null) dust.SetLevelAuthority(_drumTrack); 
-        _carvedPath.Clear(); 
+
+        var dust = GetComponent<MineNodeDustInteractor>();
+        if (dust != null) dust.SetLevelAuthority(_drumTrack);
+        _carvedPath.Clear();
         if (coreSprite != null) {
             tint.a = 1;
             coreSprite.color = tint;
+            if (diamondSprite != null) coreSprite.sprite = diamondSprite;
         }
         if (outlineSprite != null) {
             Color outlineTint = tint;
             outlineTint.a = 1f;
             outlineSprite.color = outlineTint;
         }
-        CacheAuthoredStepsFromNoteSet(); 
+        CacheAuthoredStepsFromNoteSet();
     }
 
     private void HandleLoopBoundary()
@@ -138,22 +140,16 @@ public class MineNode : MonoBehaviour
 
     private void Update()
     {
-        UpdateBudgetAlpha();
-    }
-
-    /// <summary>
-    /// Sets coreSprite alpha to the fraction of this node's individual tint budget that remains
-    /// (1 = budget untouched / full alpha, 0 = budget exhausted / invisible core).
-    /// </summary>
-    private void UpdateBudgetAlpha()
-    {
-        if (coreSprite == null) return;
-        float alpha = (_dustInteractor != null) ? _dustInteractor.TintBudgetRemainingRatio : 1f;
-        var c = coreSprite.color;
-        if (!Mathf.Approximately(c.a, alpha))
+        // Core sprite stays at full alpha while the node is alive.
+        // Visual feedback of activity comes from the exhaust-painted dust cells, not the node sprite.
+        if (coreSprite != null)
         {
-            c.a = alpha;
-            coreSprite.color = c;
+            var c = coreSprite.color;
+            if (!Mathf.Approximately(c.a, 1f))
+            {
+                c.a = 1f;
+                coreSprite.color = c;
+            }
         }
     }
 
@@ -468,6 +464,16 @@ public class MineNode : MonoBehaviour
     int bar = 16;
     if (_stepsPerLoop % bar != 0) _stepsPerLoop = ((_stepsPerLoop / bar) + 1) * bar;
 }
+
+    /// <summary>
+    /// Called by BoundaryWrap when this node hits a boundary trigger.
+    /// Reflects the carve direction so the node steers away from the wall.
+    /// </summary>
+    public void ReflectCarveDir(bool reflectX)
+    {
+        if (reflectX) _carveDir.x = -_carveDir.x;
+        else          _carveDir.y = -_carveDir.y;
+    }
 
     private static Vector2 Rotate(Vector2 v, float degrees)
     {

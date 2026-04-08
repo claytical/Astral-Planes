@@ -399,13 +399,11 @@ private IEnumerator SpawnArrivalRoutine(
             if (tg) Destroy(tg);
         }
 
-        // quick red flash + pop (use what you already have)
         var ex = GetComponent<Explode>();
         if (ex != null)
         {
-            // If your Explode supports tinting, do it; otherwise just pop.
+            ex.SetTint(new Color(1f, 0.2f, 0.2f), multiply: false);
             ex.Permanent(false);
-//            ex.Pop(); // replace with whatever your one-shot is called
         }
 
         if (energySprite != null)
