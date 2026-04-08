@@ -11,9 +11,12 @@ public class SuperNode : MonoBehaviour
     [SerializeField] private float minImpactSpeed = 2.0f;   // tune
     [SerializeField] private bool despawnOnNextBoundary = true;
 
+    public System.Action OnResolved;
+
     private float _spawnTime;
     private bool _sawFirstBoundary;
     private bool _triggered;
+    private bool _resolvedFired;
 
     private void Awake()
     {
@@ -47,6 +50,13 @@ public class SuperNode : MonoBehaviour
         if (drumTrack != null)
             drumTrack.OnLoopBoundary -= OnLoopBoundary;
     }
+    private void FireResolvedOnce()
+    {
+        if (_resolvedFired) return;
+        _resolvedFired = true;
+        OnResolved?.Invoke();
+    }
+
     private void TrySubscribeToBoundary()
     {
         if (drumTrack == null)
@@ -89,6 +99,7 @@ public class SuperNode : MonoBehaviour
         if (_track != null)
             _track.InstantFillAllBins();
 
+        FireResolvedOnce();
         Destroy(gameObject);
 
     }
@@ -100,6 +111,7 @@ public class SuperNode : MonoBehaviour
             _sawFirstBoundary = true;
             if (despawnOnNextBoundary)
             {
+                FireResolvedOnce();
                 Destroy(gameObject);
             }
             return;
@@ -107,7 +119,10 @@ public class SuperNode : MonoBehaviour
 
         // If you ever decide to keep it for >1 loop, you can use _triggered here.
         if (_triggered)
+        {
+            FireResolvedOnce();
             Destroy(gameObject);
+        }
     }
     private IEnumerable<InstrumentTrack> ResolveTracks()
     {

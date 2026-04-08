@@ -689,6 +689,9 @@ public class Vehicle : MonoBehaviour
             }
 
             ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
+            // Drive tether thickness: t01=0 = open window, t01=1 = release now.
+            if (armedSlot == 0)
+                ar.note.collectable.tether?.SetReleaseProgress(pulse01);
             armedSlot++;
         }
 
@@ -1396,6 +1399,7 @@ public class Vehicle : MonoBehaviour
         int halfW = Mathf.Max(0, profile.plowHalfWidthCells);
         int depth = Mathf.Max(0, profile.plowDepthCells);
 
+        int chipAmount = Mathf.Max(1, profile.plowChipAmount);
         for (int d = 0; d <= depth; d++)
         {
             for (int s = -halfW; s <= halfW; s++)
@@ -1405,8 +1409,7 @@ public class Vehicle : MonoBehaviour
                     + perp    * (s * cellSize);
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
                 if (gen.HasDustAt(cell))
-                    
-                    gen.CarveDustByVehicle(cell, fade);
+                    gen.ChipDustByVehicle(cell, chipAmount, fade);
             }
         }
     }

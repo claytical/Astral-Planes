@@ -54,9 +54,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private bool       _hasLockOnCell;
     private Vector2Int _lockOnCell;
 
-    // Dominant role for sniffer blend (set externally by PhaseStar each frame)
-    private MusicalRole _dominantRole = MusicalRole.None;
-
     // Sniffer: per-role direction toward nearest dust of that role
     private readonly Dictionary<MusicalRole, Vector2> _snifferDirs = new();
     private Vector2 _nearestColoredDustDir = Vector2.zero;
@@ -71,7 +68,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     public void Initialize(
         PhaseStar star,
         PhaseStarMotion2D motionComponent,
-        MusicalRole ignoredInitialCraving,   // kept for call-site compat; unused
         PhaseStarBehaviorProfile profile)
     {
         if (profile != null)
@@ -127,14 +123,25 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     /// <summary>World-space direction toward the current hunt target, or zero if none.</summary>
     public Vector2 GetDensitySteerDir() => _hasTarget ? _targetDir : Vector2.zero;
 
-    /// <summary>Direction toward the dominant shard's nearest dust, for diamond rotation.</summary>
+    /// <summary>True when a hunt target cell is currently selected.</summary>
+    public bool HasTarget => _hasTarget;
+
+    /// <summary>Current target cell grid coordinate. Valid only when <see cref="HasTarget"/> is true.</summary>
+    public Vector2Int GetTargetCell() => _targetCell;
+
+    /// <summary>World-space position of the current hunt target. Returns zero when <see cref="HasTarget"/> is false.</summary>
+    public Vector2 GetTargetWorldPos()
+    {
+        if (!_hasTarget) return Vector2.zero;
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        return drum != null ? drum.GridToWorldPosition(_targetCell) : Vector2.zero;
+    }
+
+    /// <summary>Direction toward the nearest colored dust, for diamond rotation.</summary>
     public Vector2 GetDominantSnifferDir()
     {
         if (_hasLockOnCell || _hasTarget)
             return _hasTarget ? _targetDir : Vector2.zero;
-
-        if (_dominantRole != MusicalRole.None)
-            return _snifferDirs.TryGetValue(_dominantRole, out var d) ? d : Vector2.zero;
 
         return _nearestColoredDustDir;
     }
@@ -212,6 +219,13 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             var dust = GetDust(gen, cell);
             if (dust == null || dust.Role == MusicalRole.None) continue;
 
+            // Only hunt cells matching the role the star currently needs.
+            MusicalRole needed = _star != null ? _star.GetPreviewRole() : MusicalRole.None;
+            if (needed != MusicalRole.None && dust.Role != needed) continue;
+
+            // Skip roles the star already has enough charge to eject.
+            if (_star != null && _star.IsRoleReady(dust.Role)) continue;
+
             float hunger = _star != null ? _star.GetRoleHunger(dust.Role) : 1f;
             float score  = Mathf.Lerp(hungerFloorWeight, 1f, hunger);
 
@@ -267,6 +281,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             var cell = _coloredCellsScratch[i];
             var dust = GetDust(gen, cell);
             if (dust == null || dust.Role == MusicalRole.None) continue;
+
+            MusicalRole neededS = _star != null ? _star.GetPreviewRole() : MusicalRole.None;
+            if (neededS != MusicalRole.None && dust.Role != neededS) continue;
+
+            if (_star != null && _star.IsRoleReady(dust.Role)) continue;
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
             float   sqDist    = (cellWorld - starWorld).sqrMagnitude;

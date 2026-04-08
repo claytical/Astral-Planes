@@ -13,9 +13,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     public Sprite diamond;
     public Sprite activeDiamond;
 
-    private float __pulseAlphaMax = 1f;
-    private float __pulseAlphaMin = 0.5f;
-private float alphaDirection = 1f;
     [Header("Dim (Disarmed) Look")]
     [SerializeField, Range(0f, 1f)] private float dimAlpha = 0.06f;     // very faint
     [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.08f;    // nearly gray/black
@@ -37,28 +34,11 @@ private float alphaDirection = 1f;
     [Header("Dim / Hidden Shard Tint")]
     [SerializeField] private Color dimShardTint = new Color(0.5f, 0.5f, 0.5f, 0.5f);
 
-    PhaseStarBehaviorProfile _profile;
-    private Color _lastTint = Color.white;
-
     // Cache shard renderers (exclude bubble visuals)
     private SpriteRenderer[] _shardSpriteRenderers;
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
-        _profile = profile;
-
-        // Pulse tuning (driven by profile; sensible fallbacks)
-        if (_profile != null)
-        {
-            __pulseAlphaMin = Mathf.Clamp01(_profile.starAlphaMin);
-            __pulseAlphaMax = Mathf.Clamp01(_profile.starAlphaMax);
-            if (__pulseAlphaMax < __pulseAlphaMin)
-            {
-                // Guard against inverted ranges
-                float tmp = __pulseAlphaMax; __pulseAlphaMax = __pulseAlphaMin; __pulseAlphaMin = tmp;
-            }
-        }
-
         // Existing event hookups
         star.OnArmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true; };
         star.OnDisarmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = false; };
@@ -83,36 +63,65 @@ private float alphaDirection = 1f;
     {
         var srs = GetComponentsInChildren<SpriteRenderer>(true);
 
-        // Exclude bubble sprite, if any
-        if (bubbleSprite)
+        var list = new System.Collections.Generic.List<SpriteRenderer>(srs.Length);
+        for (int i = 0; i < srs.Length; i++)
         {
-            var list = new System.Collections.Generic.List<SpriteRenderer>(srs.Length);
-            for (int i = 0; i < srs.Length; i++)
-            {
-                var sr = srs[i];
-                if (!sr) continue;
-                if (sr == bubbleSprite) continue;
-                list.Add(sr);
-            }
-            _shardSpriteRenderers = list.ToArray();
+            var sr = srs[i];
+            if (!sr) continue;
+            if (bubbleSprite && sr == bubbleSprite) continue;
+            // Exclude the scout's own renderer — it is managed by PhaseStarDustAffect
+            // and must never be tinted/hidden by the visuals component.
+            if (sr.gameObject.name == "Scout Visual") continue;
+            list.Add(sr);
         }
-        else
-        {
-            _shardSpriteRenderers = srs;
-        }
+        _shardSpriteRenderers = list.ToArray();
     }
 
-    public void EjectParticles()
+    /// <summary>
+    /// Forces a re-cache of shard renderers on next access.
+    /// Call after BuildPreviewRing destroys old shards and creates new ones.
+    /// </summary>
+    public void InvalidateShardCache() => _shardSpriteRenderers = null;
+
+    public void EjectParticles(GameObject ejectionPrefab)
     {
-        if (_profile != null && _profile.ejectionPrefab != null)
-            Instantiate(_profile.ejectionPrefab, transform.position, Quaternion.identity);
+        if (ejectionPrefab != null)
+            Instantiate(ejectionPrefab, transform.position, Quaternion.identity);
     }
 
 
-    public void SetPreviewTint(Color c, Color shadowC)
+    /// <summary>
+    /// Per-frame update for the single accumulator diamond.
+    /// Drives color (gray → roleColor), alpha (shardMinAlpha → 1), rotation, and scale pulse
+    /// so the accumulator mirrors the scout's pulse phase and spins in the opposite direction.
+    /// </summary>
+    public void UpdateAccumulator(Color roleColor, float charge01, float rotDeg)
     {
-        _lastTint = c;
-            }
+        // Re-cache if empty or if the first entry was destroyed by a ring rebuild.
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0
+            || _shardSpriteRenderers[0] == null)
+            CacheShardRenderers();
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0) return;
+
+        var sr = _shardSpriteRenderers[0];
+        if (sr == null) return;
+
+        // Color: lerp from visible gray to role color as charge builds.
+        // Alpha is directly proportional to charge (25% charge → 25% alpha) so the
+        // PreviewShard stays near-invisible until charge is substantial.
+        // At zero charge keep the inspector-assigned gray visible at dimShardTint.a.
+        Color startGray = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
+        Color target = Color.Lerp(startGray, roleColor, charge01);
+        target.a = charge01 > 0.001f ? charge01 : dimShardTint.a;
+        sr.color = target;
+        sr.sprite = diamond;
+
+        // Rotation: opposite direction to scout.
+        sr.transform.localRotation = Quaternion.Euler(0f, 0f, -rotDeg);
+
+        // Scale: accumulator stays at full size — only the scout pulses in scale.
+        sr.transform.localScale = Vector3.one;
+    }
 
     public void ShowBright(Color c)
     {
@@ -144,11 +153,7 @@ private float alphaDirection = 1f;
         else
         {
             // Dim the provided tint aggressively.
-            Color baseTint = tint;
-            if (baseTint.r <= 0.001f && baseTint.g <= 0.001f && baseTint.b <= 0.001f)
-                baseTint = _lastTint;
-
-            c = baseTint;
+            c = tint;
             c.r *= dimRgbMul;
             c.g *= dimRgbMul;
             c.b *= dimRgbMul;
@@ -174,15 +179,17 @@ private float alphaDirection = 1f;
         SetShardTint(rejectFlashColor);
         ApplyParticleAlpha(0.3f);
         yield return new WaitForSeconds(rejectFlashSeconds);
-        ShowDim(_lastTint);   // restore dim grey state
+        ShowDim(Color.gray);   // restore dim grey state
         _rejectFlashRoutine = null;
     }
 
     public void HideAll()
     {
         ToggleShardRenderers(false);
-        // Bubble should be hidden when the star is truly hidden
         HideSafetyBubble();
+
+        if (particles && particles.isPlaying)
+            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
     public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default)
     {
@@ -287,7 +294,8 @@ private float alphaDirection = 1f;
 
     private void SetShardTint(Color c)
     {
-        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0)
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0
+            || _shardSpriteRenderers[0] == null)
             CacheShardRenderers();
 
         for (int i = 0; i < _shardSpriteRenderers.Length; i++)
@@ -347,7 +355,8 @@ private float alphaDirection = 1f;
     private void ToggleShardRenderers(bool on)
     {
         // Do NOT use Renderer[] anymore; we only want to affect shards.
-        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0)
+        if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0
+            || _shardSpriteRenderers[0] == null)
             CacheShardRenderers();
 
         for (int i = 0; i < _shardSpriteRenderers.Length; i++)
@@ -365,5 +374,6 @@ private float alphaDirection = 1f;
 
         return angles;
     }
+
 
 }

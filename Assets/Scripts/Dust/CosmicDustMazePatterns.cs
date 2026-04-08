@@ -180,7 +180,8 @@ public static class CosmicDustMazePatterns
         Func<Vector2Int, Vector3> gridToWorld,
         Func<int, int, bool> isCellAvailable,
         Func<Vector2Int, bool> includeCellForBfs = null,
-        Func<Vector3, bool> includeWorld = null)
+        Func<Vector3, bool> includeWorld = null,
+        Func<Vector2Int, Vector2Int> normalizeCell = null)
     {
         var growth = new List<(Vector2Int, Vector3)>();
         if (width <= 0 || height <= 0) return growth;
@@ -215,6 +216,7 @@ public static class CosmicDustMazePatterns
             for (int i = 0; i < dirs.Count; i++)
             {
                 var n = p + dirs[i];
+                if (normalizeCell != null) n = normalizeCell(n);
                 if ((uint)n.x >= (uint)width || (uint)n.y >= (uint)height) continue;
                 if (!isCellAvailable(n.x, n.y)) continue;
                 if (seen.Contains(n)) continue;
