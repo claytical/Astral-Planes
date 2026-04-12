@@ -7,6 +7,7 @@ public class Boundaries : MonoBehaviour
     public BoxCollider2D leftBoundary;
     public BoxCollider2D rightBoundary;
     public Camera mainCamera;
+    public GameObject warpPrefab;
     void Awake()
     {
         Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
@@ -75,6 +76,7 @@ public class Boundaries : MonoBehaviour
         if (boundary == null || opposite == null) return;
         var wrap = boundary.gameObject.GetComponent<BoundaryWrap>()
                    ?? boundary.gameObject.AddComponent<BoundaryWrap>();
+        wrap.warpPrefab = warpPrefab;
         wrap.axis = axis;
         wrap.oppositeBoundary = opposite;
     }

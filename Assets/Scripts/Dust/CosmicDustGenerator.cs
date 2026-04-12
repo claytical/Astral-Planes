@@ -1032,10 +1032,11 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         _regrowExcludeRoleByCell.Remove(gp);
 
-        // Ripeness fork: player-carved cells start ripe; all other regrowth stays gray.
+        // Ripeness fork: player-carved cells start ripe with their true role color;
+        // all other regrowth (tentacle drain, bridge reset, etc.) overrides back to gray.
         if (_playerCarvedCells.Remove(gp))
         {
-            // Player-carved: ApplyRoleAndCharge already set the true role color above.
+            // ApplyRoleAndCharge already set the true role color above.
             // Only add to ripenessByCell if the cell has a real role.
             if (regrowRole != MusicalRole.None)
                 _ripenessByCell[gp] = 1f;
@@ -2609,7 +2610,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 Color roleColor = profile != null ? profile.GetBaseColor() : Color.white;
                 Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
                 Color gray = new Color(_mazeTint.r, _mazeTint.g, _mazeTint.b, dust.Charge01);
-                dust.SetTint(Color.Lerp(gray, full, ripeness));
+                float effectiveRipeness = Mathf.Max(ripeness, dust.Charge01);
+                dust.SetTint(Color.Lerp(gray, full, effectiveRipeness));
             }
         }
     }
@@ -2809,6 +2811,31 @@ public class CosmicDustGenerator : MonoBehaviour
     public void ClearImprintAt(Vector2Int cell)
     {
         _imprints?.Remove(cell);
+    }
+
+    /// <summary>
+    /// Promotes all hidden Voronoi cells assigned to <paramref name="role"/> into the
+    /// active imprint layer, then triggers a fade-and-regrow on any solid gray cell so
+    /// it re-emerges with the role color through the standard visual pipeline.
+    /// Cells are invisible (HasDustAt == false) during the fade, so the navigator
+    /// cannot target them until they fully regrow — preventing tentacles from latching
+    /// onto gray dust. Regrow delays are staggered to avoid a mass simultaneous pop-in.
+    /// </summary>
+    public void RevealHiddenRoleVisuals(MusicalRole role)
+    {
+        if (role == MusicalRole.None || _hiddenImprints == null) return;
+
+        foreach (var kvp in _hiddenImprints)
+        {
+            if (kvp.Value != role) continue;
+            var gp = kvp.Key;
+
+            // Promote hidden → active imprint so HasAnyDustWithRole() returns true,
+            // waking the star from dormancy. The dust component's Role stays None until
+            // the vehicle carves the cell and it regrows colored — keeping gray cells out
+            // of GetColoredDustCells() so the navigator never targets uncarved dust.
+            PromoteHiddenRole(gp);
+        }
     }
 
     /// <summary>

@@ -16473,6 +16473,7 @@ MonoBehaviour:
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  toroidal: 0
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256
@@ -18128,6 +18129,8 @@ MonoBehaviour:
   leftBoundary: {fileID: 1532169432}
   rightBoundary: {fileID: 1596281813}
   mainCamera: {fileID: 269415559}
+  warpPrefab: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
+    type: 3}
 --- !u!1 &1532169429
 GameObject:
   m_ObjectHideFlags: 0

@@ -11,6 +11,7 @@ public class BoundaryWrap : MonoBehaviour
 
     public WrapAxis axis;
     public BoxCollider2D oppositeBoundary;
+    public GameObject warpPrefab;
 
     // Per-rigidbody cooldown shared across ALL BoundaryWrap instances.
     // Prevents ping-pong: right boundary wraps the vehicle, left boundary sees the
@@ -25,7 +26,10 @@ public class BoundaryWrap : MonoBehaviour
 
         var vehicle = rb.GetComponentInParent<Vehicle>();
         if (vehicle != null)
+        {
             WrapVehicle(rb, vehicle);
+            Instantiate(warpPrefab, vehicle.transform.position, Quaternion.identity);
+        }
         else
             BounceRigidbody(rb);
     }
