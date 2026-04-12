@@ -925,6 +925,7 @@ public class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Regrowing);
         CosmicDust dust = null;
         MusicalRole regrowRole = MusicalRole.None;
+        bool playerCarved = _playerCarvedCells.Remove(gp);
         if (go.TryGetComponent<CosmicDust>(out dust) && dust != null)
         {
             dust.PrepareForReuse();
@@ -967,8 +968,15 @@ public class CosmicDustGenerator : MonoBehaviour
                     ? neighborRole
                     : GetLeastDenseRoleExcluding(excludedRole);
             }
+
+            // --- Ripeness gate (applied before visual coloring) ---
+            // Only player-carved cells earn their role color on regrowth.
+            // All other regrowth (initial maze spawn, tentacle drain, bridge reset, etc.)
+            // must stay gray so no role-color flash occurs during the grow-in animation.
+            if (!playerCarved && regrowRole != MusicalRole.None)
+                regrowRole = MusicalRole.None;
+
             // --- Color from role profile (authoritative source) ---
-            
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
 
@@ -1032,20 +1040,11 @@ public class CosmicDustGenerator : MonoBehaviour
         }
         _regrowExcludeRoleByCell.Remove(gp);
 
-        // Ripeness fork: player-carved cells start ripe with their true role color;
-        // all other regrowth (tentacle drain, bridge reset, etc.) overrides back to gray.
-        if (_playerCarvedCells.Remove(gp))
-        {
-            // ApplyRoleAndCharge already set the true role color above.
-            // Only add to ripenessByCell if the cell has a real role.
-            if (regrowRole != MusicalRole.None)
-                _ripenessByCell[gp] = 1f;
-        }
-        else if (dust != null)
-        {
-            // Non-player-carved (MineNode drain, bridge reset, etc.): override to gray.
-            dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
-        }
+        // Ripeness: player-carved cells that regrew with a real role start fully ripe.
+        // Non-player-carved cells already have regrowRole = None (forced above) so no
+        // late override is needed — the cell is already gray from ApplyRoleAndCharge.
+        if (playerCarved && regrowRole != MusicalRole.None)
+            _ripenessByCell[gp] = 1f;
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -2828,28 +2827,28 @@ public class CosmicDustGenerator : MonoBehaviour
         foreach (var kvp in _hiddenImprints)
         {
             if (kvp.Value != role) continue;
-            var gp = kvp.Key;
-
-            // Promote hidden → active imprint so HasAnyDustWithRole() returns true,
-            // waking the star from dormancy. The dust component's Role stays None until
-            // the vehicle carves the cell and it regrows colored — keeping gray cells out
-            // of GetColoredDustCells() so the navigator never targets uncarved dust.
-            PromoteHiddenRole(gp);
+            // Promote hidden → active imprint so CommitRegrowCell uses the correct role
+            // when a vehicle-carved cell regrows. HasAnyDustWithRole() and GetColoredDustCells()
+            // both gate on dust.Role (component), so cells stay gray and untargetable until
+            // the vehicle actually carves them and they regrow colored.
+            PromoteHiddenRole(kvp.Key);
         }
     }
 
     /// <summary>
-    /// Returns true if any solid dust cell currently has a non-None MusicalRole.
-    /// Used by PhaseStar to detect when to wake from dormancy.
+    /// Returns true if any solid dust cell's component Role is non-None.
+    /// Consistent with GetColoredDustCells so the star arms only when actual colored
+    /// (vehicle-carved) cells exist — not just when imprints have been promoted.
     /// </summary>
     public bool HasAnyDustWithRole()
     {
-        if (_imprints == null) return false;
-        foreach (var kvp in _imprints)
+        if (_cellState == null || _cellDust == null) return false;
+        for (int y = 0; y < _cellH; y++)
+        for (int x = 0; x < _cellW; x++)
         {
-            if (kvp.Value.role == MusicalRole.None) continue;
-            if (TryGetCellState(kvp.Key, out var st) && st == DustCellState.Solid)
-                return true;
+            if (_cellState[x, y] != DustCellState.Solid) continue;
+            var dust = _cellDust[x, y];
+            if (dust != null && dust.Role != MusicalRole.None) return true;
         }
         return false;
     }
