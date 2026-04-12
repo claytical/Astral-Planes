@@ -92,7 +92,7 @@ public class CosmicDust : MonoBehaviour {
 
     [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
     {
-        energyDrainPerSecond  = 0.25f
+        energyDrainPerSecond  = 0.01f
     };
 
     [SerializeField] public DustClearingSettings clearing = new DustClearingSettings

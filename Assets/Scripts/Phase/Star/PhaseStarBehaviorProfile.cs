@@ -23,8 +23,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Header("Safety Bubble (gravity void only)")]
     [Tooltip("If enabled, the star can display a temporary refuge bubble during gravity void expansion.")]
     public bool enableSafetyBubble = true;
-    [Tooltip("Speed when the star is hungry (no shard at threshold). Blends down to starDriftSpeed when satiated.")]
-    public float starHungrySpeed = 2.5f;
     [Min(0)]
     [Tooltip("Bubble radius in grid cells for the gravity-void refuge zone.")]
     public int safetyBubbleRadiusCells = 4;
@@ -52,6 +50,9 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Header("Star Motion (PhaseStarMotion2D)")]
     [Tooltip("Base drift speed of the PhaseStar body (not the nodes).")]
     public float starDriftSpeed = 0.6f;
+
+    [Tooltip("Speed when the star is hungry (no role at threshold). Blends down to starDriftSpeed when satiated.")]
+    public float starHungrySpeed = 2.5f;
 
     [Tooltip("Random steering jitter; higher feels erratic/trickster.")]
     public float starDriftJitter = 0.15f;

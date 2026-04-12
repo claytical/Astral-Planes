@@ -4927,8 +4927,11 @@ MonoBehaviour:
     type: 3}
   soloVoice: {fileID: 0}
   entryOffscreenMargin: 2
-  entryArriveThreshold: 1
+  entryArriveThreshold: 6
   entryFadeInSeconds: 0.2
+  entryDriftSeconds: 2
+  entryDriftSpeedMul: 0.4
+  readyRotSpeedMul: 2.5
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
@@ -4941,6 +4944,8 @@ MonoBehaviour:
   accumulatorRotSpeed: 90
   drainTiltDeg: 5
   drainTiltSpeed: 1.8
+  chargeDisplayLerpSpeed: 2.5
+  readyDisplayThreshold: 0.99
   _assignedMotif: {fileID: 0}
 --- !u!114 &6754461597857711404
 MonoBehaviour:
@@ -4954,8 +4959,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  diamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000, type: 3}
-  activeDiamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
+  diamond: {fileID: 3722791801018086938, guid: 5b5be5cacb1b746859dac8088ce467eb, type: 3}
+  activeDiamond: {fileID: 3722791801018086938, guid: 5b5be5cacb1b746859dac8088ce467eb,
     type: 3}
   dimAlpha: 0.06
   dimRgbMul: 0.08
@@ -4968,6 +4973,7 @@ MonoBehaviour:
   bubbleEdgeParticles: {fileID: 4946073270184364620}
   bubbleFillAlpha: 0.08
   bubbleEdgeAlpha: 0.35
+  dualMaxSeparationDeg: 45
   dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
 --- !u!114 &4631393831486629443
 MonoBehaviour:
@@ -4984,20 +4990,24 @@ MonoBehaviour:
   keepClearTick: 0.1
   drainTick: 0.08
   drainRatePerSec: 0.6
-  probeDepthCells: 2
-  scoutVisualRoot: {fileID: 0}
-  scoutSprite: {fileID: 0}
-  scoutTravelSpeed: 1
-  scoutDrainFraction: 0.25
-  scoutPulseSpeed: 0.3
-  scoutPulseMinScale: 0.4
-  scoutRotSpeed: 90
-  scoutIdleAlpha: 0.55
-  scoutWobbleAmplitudeDeg: 18
-  scoutPatrolCellsPerPause: 2.5
-  scoutPatrolSniffSeconds: 0.55
-  scoutPatrolSniffSpinMul: 3.5
+  minContactTime: 1
+  colorTransitionTime: 0.5
+  drainFlashDuration: 0.08
   starDrainRegrowDelay: 6
+  tentacleGrowSpeed: 4
+  tentacleRetractSpeed: 12
+  tentacleFlowSpeed: 1.1
+  tentacleWidth: 0.03
+  diamondTipOffset: 0.3
+  dissolveDuration: 1.1
+  tentacleMaterial: {fileID: 0}
+  vineCtrlPointCount: 5
+  vineSplinePoints: 16
+  vineNoiseAmplitude: 2.3
+  vineBreathePeriod: 1.6
+  vineDustRepulsionRadius: 2
+  vineDustRepulsionStrength: 0.9
+  vineCtrlRebuildInterval: 0.15
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5031,7 +5041,6 @@ MonoBehaviour:
     maxAccel: 4
     huntAccel: 18
   navBlend:
-    densityWeight: 0.412
     snifferWeight: 0.734
   verbose: 0
 --- !u!114 &4892159809986813886
@@ -5341,7 +5350,7 @@ ParticleSystem:
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
-        key1: {r: 1, g: 1, b: 1, a: 0}
+        key1: {r: 1, g: 1, b: 1, a: 0.65984654}
         key2: {r: 1, g: 0.36320752, b: 0.8351832, a: 0}
         key3: {r: 0.57535505, g: 0, b: 0.9811321, a: 1}
         key4: {r: 1, g: 0.2688679, b: 0.3290789, a: 0}
@@ -5357,8 +5366,8 @@ ParticleSystem:
         ctime6: 20624
         ctime7: 24287
         atime0: 0
-        atime1: 65535
-        atime2: 55981
+        atime1: 4525
+        atime2: 65535
         atime3: 41399
         atime4: 65535
         atime5: 0
@@ -5367,7 +5376,7 @@ ParticleSystem:
         m_Mode: 0
         m_ColorSpace: 0
         m_NumColorKeys: 2
-        m_NumAlphaKeys: 2
+        m_NumAlphaKeys: 3
       minGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -5985,7 +5994,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 100
+      scalar: 50
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -9049,8 +9058,8 @@ ParticleSystem:
         m_RotationOrder: 4
     maxLights: 20
   TrailModule:
-    enabled: 0
-    mode: 0
+    enabled: 1
+    mode: 1
     ratio: 1
     lifetime:
       serializedVersion: 2
@@ -9122,7 +9131,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 1}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.5529412}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -9898,6 +9907,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

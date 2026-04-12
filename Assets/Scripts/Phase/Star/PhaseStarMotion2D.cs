@@ -77,7 +77,24 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private float   _speedMul = 1f;
     private float   _stuckTimer;
 
+    // True while the scout is in flight; star holds position until it docks.
+    private bool _frozen;
+
     public void SetSpeedMultiplier(float mul) => _speedMul = Mathf.Max(0f, mul);
+
+    /// <summary>
+    /// Freezes or unfreezes the star in place.
+    /// Called by PhaseStarDustAffect when the scout launches (freeze) and docks (unfreeze).
+    /// </summary>
+    public void SetFrozen(bool frozen)
+    {
+        _frozen = frozen;
+        if (frozen && _rb)
+        {
+            _rb.linearVelocity  = Vector2.zero;
+            _rb.angularVelocity = 0f;
+        }
+    }
 
     [Serializable]
     private sealed class ScreenBoundsTuning
@@ -93,17 +110,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         public float focusSpeedMul = 0.5f;
     }
 
-    // NavigatorBlendTuning is kept for inspector serialization compat but is only
-    // used during the fallback drift path (no hunt target). When the navigator has a
-    // committed target, motion drives directly toward it — no blending.
     [Serializable]
     private sealed class NavigatorBlendTuning
     {
-        [Tooltip("Weight of density/sniffer direction when falling back to drift (no hunt target active). " +
-                 "Has no effect while a hunt target is locked — the star drives directly then.")]
-        [Range(0f, 1f)]
-        public float densityWeight = 0.6f;
-
+        [Tooltip("Weight of sniffer direction during free drift (no committed hunt target).")]
         [Range(0f, 1f)]
         public float snifferWeight = 0.35f;
     }
@@ -122,7 +132,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private Rigidbody2D _rb;
     private PhaseStarBehaviorProfile _profile;
     private bool _enabled;
-    private bool _focus;
     private Vector2 _driftDir;
     private float _rechooseTimer;
     private Camera _cam;
@@ -219,6 +228,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     {
         if (!_enabled || _profile == null || !_rb) return;
 
+        // Hold position while the scout is in flight.
+        if (_frozen)
+        {
+            _rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         float dt = Time.fixedDeltaTime;
 
         float hunger = (_star != null) ? _star.GetHungerLevel() : 0f;
@@ -228,12 +244,14 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             hunger
         ) * _speedMul;
         float jitter = Mathf.Max(0f, _profile.starDriftJitter) * _speedMul;
-        if (_focus) speed *= bounds.focusSpeedMul;
 
         // ---------------------------------------------------------------
         // HUNT MODE: navigator has a committed target — drive directly at it.
         // Avoidance still applies so the star doesn't clip through vehicles,
         // but drift, jitter, and blend weights are bypassed entirely.
+        //
+        // The navigator itself gates whether it returns a steer direction —
+        // it only does so when the scout has docked. See PhaseStarCravingNavigator.
         // ---------------------------------------------------------------
         Vector2 huntDir = _navigator != null ? _navigator.GetDensitySteerDir() : Vector2.zero;
         bool isHunting  = huntDir.sqrMagnitude > 0.0001f;
@@ -343,7 +361,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         Vector2 desiredVelDrift = desiredDirDrift * speed;
         Vector2 curVel          = _rb.linearVelocity;
-        Vector2 newVelDrift     = Vector2.MoveTowards(curVel, desiredVelDrift, steering.maxAccel * dt);
+        float driftAccel = (curVel.sqrMagnitude > speed * speed * 1.5f)
+            ? steering.huntAccel   // quickly shed hunt velocity after leaving hunt mode
+            : steering.maxAccel;
+        Vector2 newVelDrift     = Vector2.MoveTowards(curVel, desiredVelDrift, driftAccel * dt);
 
         if (_pushVelocity.sqrMagnitude > 0.0001f)
         {
@@ -460,5 +481,23 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         float   bias = Mathf.Clamp01(_profile != null ? _profile.orbitBias : 0f);
         _driftDir      = Vector2.Lerp(rnd, Vector2.Perpendicular(rnd).normalized, bias).normalized;
         _rechooseTimer = Random.Range(1.2f, 2.4f);
+    }
+
+    /// <summary>
+    /// Snap the star center below the top-of-screen minus <paramref name="topInset"/> world units.
+    /// Safe to call mid-coroutine (sets RB position directly).
+    /// </summary>
+    public void ClampToScreenTop(float topInset)
+    {
+        if (_cam == null) _cam = Camera.main;
+        if (_cam == null || _rb == null) return;
+        float topY = ((Vector2)_cam.ViewportToWorldPoint(new Vector3(0.5f, 1f, 0f))).y;
+        var pos = _rb.position;
+        if (pos.y > topY - topInset)
+        {
+            pos.y = topY - topInset;
+            _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, 0f);
+            _rb.position = pos;
+        }
     }
 }

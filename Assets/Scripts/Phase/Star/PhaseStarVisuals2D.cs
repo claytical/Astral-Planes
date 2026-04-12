@@ -31,6 +31,10 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float bubbleFillAlpha  = 0.14f;  // soft interior glow
     [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha  = 0.65f;  // crisp ring so it reads as a boundary
 
+    [Header("Dual Diamond")]
+    [Tooltip("Max angular separation between the two counter-rotating diamonds at zero charge.")]
+    [SerializeField] private float dualMaxSeparationDeg = 45f;
+
     [Header("Dim / Hidden Shard Tint")]
     [SerializeField] private Color dimShardTint = new Color(0.5f, 0.5f, 0.5f, 0.5f);
 
@@ -91,36 +95,46 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
 
     /// <summary>
-    /// Per-frame update for the single accumulator diamond.
-    /// Drives color (gray → roleColor), alpha (shardMinAlpha → 1), rotation, and scale pulse
-    /// so the accumulator mirrors the scout's pulse phase and spins in the opposite direction.
+    /// Per-frame update for the two counter-rotating accumulator diamonds.
+    /// DiamondA (index 0) spins CW; DiamondB (index 1) spins CCW with a separation
+    /// offset that shrinks from <see cref="dualMaxSeparationDeg"/> to 0 as charge fills.
+    /// When isReady, both align and rotDeg is scaled by readyRotMul for a faster spin.
     /// </summary>
-    public void UpdateAccumulator(Color roleColor, float charge01, float rotDeg)
+    public void UpdateDualDiamonds(Color roleColor, float charge01, float rotDeg,
+                                    bool isReady, float readyRotMul = 2.5f)
     {
-        // Re-cache if empty or if the first entry was destroyed by a ring rebuild.
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0
             || _shardSpriteRenderers[0] == null)
             CacheShardRenderers();
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0) return;
 
-        var sr = _shardSpriteRenderers[0];
-        if (sr == null) return;
-
         // Color: lerp from visible gray to role color as charge builds.
-        // Alpha is directly proportional to charge (25% charge → 25% alpha) so the
-        // PreviewShard stays near-invisible until charge is substantial.
-        // At zero charge keep the inspector-assigned gray visible at dimShardTint.a.
         Color startGray = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
-        Color target = Color.Lerp(startGray, roleColor, charge01);
-        target.a = charge01 > 0.001f ? charge01 : dimShardTint.a;
-        sr.color = target;
-        sr.sprite = diamond;
+        Color tint      = Color.Lerp(startGray, roleColor, charge01);
+        tint.a          = charge01 > 0.001f ? charge01 : dimShardTint.a;
 
-        // Rotation: opposite direction to scout.
-        sr.transform.localRotation = Quaternion.Euler(0f, 0f, -rotDeg);
+        float baseAngle = isReady ? rotDeg * readyRotMul : rotDeg;
+        float sep       = isReady ? 0f : Mathf.Lerp(dualMaxSeparationDeg, 0f, charge01);
 
-        // Scale: accumulator stays at full size — only the scout pulses in scale.
-        sr.transform.localScale = Vector3.one;
+        // Diamond A — CW
+        if (_shardSpriteRenderers[0] != null)
+        {
+            var srA = _shardSpriteRenderers[0];
+            srA.color  = tint;
+            srA.sprite = diamond;
+            srA.transform.localRotation = Quaternion.Euler(0f, 0f,  baseAngle + sep);
+            srA.transform.localScale    = Vector3.one;
+        }
+
+        // Diamond B — CCW (gracefully skipped if only one renderer exists)
+        if (_shardSpriteRenderers.Length > 1 && _shardSpriteRenderers[1] != null)
+        {
+            var srB = _shardSpriteRenderers[1];
+            srB.color  = tint;
+            srB.sprite = activeDiamond;
+            srB.transform.localRotation = Quaternion.Euler(0f, 0f, -baseAngle - sep);
+            srB.transform.localScale    = Vector3.one;
+        }
     }
 
     public void ShowBright(Color c)
@@ -258,40 +272,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         bubbleRoot.position = new Vector3(worldPos.x, worldPos.y, bubbleRoot.position.z);
     }
     
-    public void HighlightActive(Transform active, Color c, float alpha = 0.95f)
-    {
-        if (!active) return;
-        var sr = active.GetComponent<SpriteRenderer>();
-        if (!sr) return;
-
-        sr.sprite = activeDiamond;
-        c.a = alpha;
-        sr.color = c;
-        active.localScale = active.localScale; // leaving your scale logic intact
-    }
-
-    public void SetVeilOnNonActive(Color veil, Transform active)
-    {
-        var srs = GetComponentsInChildren<SpriteRenderer>(true);
-        for (int i = 0; i < srs.Length; i++)
-        {
-            var sr = srs[i];
-            if (!sr) continue;
-
-            // keep bubble alone
-            if (bubbleSprite && sr == bubbleSprite) continue;
-
-            sr.sprite = diamond;
-
-            if (active != null && sr.transform == active) continue;
-
-            var c = sr.color;
-            c.a = veil.a;
-            sr.color = c;
-            srs[i].transform.localScale = Vector3.one;
-        }
-    }
-
     private void SetShardTint(Color c)
     {
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0
