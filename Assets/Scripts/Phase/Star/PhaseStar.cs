@@ -751,6 +751,9 @@ public class PhaseStar : MonoBehaviour
     
     private void ArmNext()
     {
+        // Never arm while a MineNode/SuperNode is still alive — the star must stay hidden.
+        if (_activeNode != null || _activeSuperNode != null) return;
+
         // Burst notes have been collected but not yet released — OnBurstNotesReleased handles re-entry.
         if (_burstOffScreen)
             return;
