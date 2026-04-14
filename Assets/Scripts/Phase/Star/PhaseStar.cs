@@ -123,6 +123,8 @@ public class PhaseStar : MonoBehaviour
     // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
     private bool _burstOffScreen;
     private Coroutine _burstOffScreenWaitCo;
+    private Coroutine _entryApproachCo;
+    private Coroutine _waitForDustCo;
 
     [SerializeField] private bool _tracePhaseStar = true;
     private float _loopDuration; // seconds (time authority)
@@ -306,70 +308,84 @@ public class PhaseStar : MonoBehaviour
     }
     public void EnterFromOffScreen(Vector2 targetWorldPos)
     {
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+
         _entryInProgress = true;
+        _state = PhaseStarState.Dormant;
 
         // Hide visuals and disable colliders until arrival.
         visuals?.HideAll();
         DisableColliders();
 
         // Ensure tentacles and armed state are off during entry and Dormant phase.
-        // ArmNext fires in Initialize (before _entryInProgress is set), so we must
-        // explicitly undo it here: tentacles must not run while the star is descending
-        // or waiting for colored dust, or they drain all maze cells before the star can arm.
         dust?.SetTentaclesActive(false);
+        cravingNavigator?.SetActive(false);
         _isArmed = false;
+        _disarmReason = DisarmReason.None;
         _starCharge.Clear();
         _displayedCharge01 = 0f;
 
-        // Place star just outside a random screen edge.
         Vector2 offPos = PickOffScreenSpawnPoint();
         transform.position = (Vector3)offPos + Vector3.forward * transform.position.z;
 
-        // Motion is already initialized by this point — enable it so the star drifts inward.
-        if (motion != null) motion.Enable(true);
+        if (motion != null)
+        {
+            motion.Enable(true);
+            motion.SetSpeedMultiplier(1f);
+            motion.SetOverrideTarget(targetWorldPos);
+        }
 
-        StartCoroutine(Co_EntryApproach(targetWorldPos));
+        _entryApproachCo = StartCoroutine(Co_EntryApproach(targetWorldPos));
     }
+
     private Vector2 PickOffScreenSpawnPoint()
-{
-    var cam = Camera.main;
-    if (cam == null) return Vector2.zero;
+    {
+        var cam = Camera.main;
+        if (cam == null) return Vector2.zero;
 
-    float margin = Mathf.Max(0.5f, entryOffscreenMargin);
-    const float z = 0f;
+        float margin = Mathf.Max(0.5f, entryOffscreenMargin);
+        const float z = 0f;
 
-    Vector2 min = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
-    Vector2 max = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        Vector2 min = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
+        Vector2 max = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
 
-    // Always descend from the top edge.
-    return new Vector2(Random.Range(min.x + 1f, max.x - 1f), max.y + margin);
-}
+        // Always descend from the top edge.
+        return new Vector2(Random.Range(min.x + 1f, max.x - 1f), max.y + margin);
+    }
 
     private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
-{
-    var cam = Camera.main;
-    
-    // ── Arrived ──────────────────────────────────────────────
-    _entryInProgress = false;
+    {
+        visuals?.ShowDim(Color.gray);
 
-    // Drift slowly for a moment before settling.
-    motion?.SetSpeedMultiplier(entryDriftSpeedMul);
-    visuals?.ShowDim(Color.gray);
-    yield return new WaitForSeconds(entryDriftSeconds);
+        float arriveThresholdSq = entryArriveThreshold * entryArriveThreshold;
+        float failSafeUntil = Time.time + 8f;
 
-    // Clamp so no shard can remain at or above the viewport top after drift.
-    motion?.ClampToScreenTop(entrySettleInset);
-    // Drift slowly toward the grid center while waiting for the player to carve colored dust.
-    motion?.SetOverrideTarget(ComputeDormantRestPosition());
-    motion?.SetSpeedMultiplier(0.35f);
-    cravingNavigator?.SetActive(false);
+        while (Time.time < failSafeUntil)
+        {
+            Vector2 delta = targetWorldPos - (Vector2)transform.position;
+            if (delta.sqrMagnitude <= arriveThresholdSq)
+                break;
+            yield return null;
+        }
 
-    // Re-enable colliders; enter dormant state until colored dust exists.
-    EnableColliders();
-    _state = PhaseStarState.Dormant;
-    StartCoroutine(Co_WaitForColoredDust());
-    LogState("EntryComplete+Dormant");
-}
+        if (entryFadeInSeconds > 0f)
+            yield return new WaitForSeconds(entryFadeInSeconds);
+
+        motion?.SetSpeedMultiplier(entryDriftSpeedMul);
+        motion?.SetOverrideTarget(ComputeDormantRestPosition());
+
+        if (entryDriftSeconds > 0f)
+            yield return new WaitForSeconds(entryDriftSeconds);
+
+        motion?.ClampToScreenTop(entrySettleInset);
+
+        _entryInProgress = false;
+        _entryApproachCo = null;
+
+        EnterDormantWaitState();
+        LogState("EntryComplete+Dormant");
+    }
 
     private Vector2 ComputeDormantRestPosition()
     {
@@ -380,23 +396,62 @@ public class PhaseStar : MonoBehaviour
         return drum.GridToWorldPosition(new Vector2Int(gw / 2, gh / 2));
     }
 
-    private IEnumerator Co_WaitForColoredDust()
+    private void EnterDormantWaitState()
     {
-        // Always poll — re-fetch gen each iteration in case it isn't ready yet.
-        // The original single-fetch bug: if gen was null at coroutine start,
-        // "while (gen != null && ...)" exited immediately and the star armed prematurely.
-        while (true)
-        {
-            yield return new WaitForSeconds(0.5f);
-            var gen = GameFlowManager.Instance?.dustGenerator;
-            if (gen != null && gen.HasAnyDustWithRole())
-                break;
-        }
+        StopManagedCoroutine(ref _entryApproachCo);
 
+        _entryInProgress = false;
+        _state = PhaseStarState.Dormant;
+        _isArmed = false;
+        _disarmReason = DisarmReason.None;
+
+        visuals?.ShowDim(Color.gray);
+        EnableColliders();
+        dust?.SetTentaclesActive(false);
+        cravingNavigator?.SetActive(false);
+        motion?.SetOverrideTarget(ComputeDormantRestPosition());
+        motion?.SetSpeedMultiplier(0.35f);
+
+        if (_waitForDustCo == null)
+            _waitForDustCo = StartCoroutine(Co_WaitForColoredDust());
+    }
+
+    private void TransitionDormantToActive()
+    {
+        if (_entryInProgress || _state != PhaseStarState.Dormant)
+            return;
+
+        StopManagedCoroutine(ref _waitForDustCo);
         _state = PhaseStarState.WaitingForPoke;
         cravingNavigator?.SetActive(true);
         ArmNext();
         LogState("DormantWake+Armed");
+    }
+
+    private IEnumerator Co_WaitForColoredDust()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (HasColoredDustAvailable())
+                break;
+        }
+
+        _waitForDustCo = null;
+        TransitionDormantToActive();
+    }
+
+    private bool HasColoredDustAvailable()
+    {
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        return gen != null && gen.HasAnyDustWithRole();
+    }
+
+    private void StopManagedCoroutine(ref Coroutine co)
+    {
+        if (co == null) return;
+        StopCoroutine(co);
+        co = null;
     }
 
     private float GetTotalCharge()
@@ -630,8 +685,7 @@ public class PhaseStar : MonoBehaviour
             motion?.SetOverrideTarget(ComputeDormantRestPosition());
             motion?.SetSpeedMultiplier(0.35f);
             cravingNavigator?.SetActive(false);
-            _state = PhaseStarState.Dormant;
-            StartCoroutine(Co_WaitForColoredDust());
+            EnterDormantWaitState();
         }
     }
 }
@@ -766,6 +820,9 @@ public class PhaseStar : MonoBehaviour
     
     private void ArmNext()
     {
+        if (_state != PhaseStarState.WaitingForPoke) return;
+        if (_entryInProgress) return;
+        if (_waitForDustCo != null) return;
         if (_activeNode != null || _activeSuperNode != null) return;
         if (_awaitingCollectableClear) return;
         if (_burstOffScreen) return;
@@ -821,12 +878,6 @@ public class PhaseStar : MonoBehaviour
     // Checks for colored dust and re-enters the play area if any exists.
     private void OnBurstNotesReleased()
     {
-        if (!_burstOffScreen)
-        {
-            ArmNext();
-            return;
-        }
-
         _burstOffScreen = false;
         if (_burstOffScreenWaitCo != null)
         {
@@ -839,12 +890,12 @@ public class PhaseStar : MonoBehaviour
         _starCharge.Clear();
         _displayedCharge01 = 0f;
 
-        var gen = GameFlowManager.Instance?.dustGenerator;
-        bool hasDust = gen != null && gen.HasAnyDustWithRole();
+        bool hasDust = HasColoredDustAvailable();
         Debug.Log($"[PhaseStar] Burst notes released — charges reset, hasDust={hasDust}");
 
+        Vector2 returnTarget = ComputeDormantRestPosition();
         if (hasDust)
-            EnterFromOffScreen(transform.position);
+            EnterFromOffScreen(returnTarget);
         else
             _burstOffScreenWaitCo = StartCoroutine(Co_WaitForDustThenReturn());
     }
@@ -859,7 +910,7 @@ public class PhaseStar : MonoBehaviour
             if (gen != null && gen.HasAnyDustWithRole()) break;
         }
         _burstOffScreenWaitCo = null;
-        EnterFromOffScreen(transform.position);
+        EnterFromOffScreen(ComputeDormantRestPosition());
     }
 
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
@@ -1055,8 +1106,8 @@ public class PhaseStar : MonoBehaviour
                 return;
             }
 
-            Debug.Log($"[PS:LB] Arm Next");
-            ArmNext();
+            Debug.Log($"[PS:LB] Recovery -> Dormant wait");
+            EnterDormantWaitState();
             return;
         }
 
@@ -1205,7 +1256,10 @@ public class PhaseStar : MonoBehaviour
             }
 
             DBG("[PS:LB] -> Armed, Ejected Shards");
-            ArmNext();
+            if (_state == PhaseStarState.WaitingForPoke)
+                ArmNext();
+            else
+                EnterDormantWaitState();
         }
         else
         {
@@ -1246,12 +1300,18 @@ public class PhaseStar : MonoBehaviour
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
         SafeUnsubscribeAll();
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+        StopManagedCoroutine(ref _burstOffScreenWaitCo);
     }
 
     private void OnDestroy()
     {
         _isDisposing = true;
         SafeUnsubscribeAll();
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+        StopManagedCoroutine(ref _burstOffScreenWaitCo);
     }
 
     private void WireBinSource(DrumTrack drum)
