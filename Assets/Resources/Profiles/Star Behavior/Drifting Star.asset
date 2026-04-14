@@ -16,13 +16,13 @@ MonoBehaviour:
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 3
   enableSafetyBubble: 1
-  starHungrySpeed: 2.5
   safetyBubbleRadiusCells: 5
   collectableClearTimeoutLoops: 2
   collectableClearTimeoutSeconds: 0
-  starAlphaMin: 0.1
-  starAlphaMax: 0.659
-  starDriftSpeed: 0.8
+  dustToStarChargeMul: 1
+  passiveChargeDecayPerSec: 0.02
+  starDriftSpeed: 0.5
+  starHungrySpeed: 1.1
   starDriftJitter: 0.2
   orbitBias: 0
   teleportChancePerSec: 0

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 77d43200dcc0742699b7b608603f6ac0
+guid: e6b4e136a0c964d99bd7db5f767521d6
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -7233868419342923855
-    second: Diamond Ful_0
+      213: 5193296100496959142
+    second: PhaseStarShard_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Diamond Ful_0
+      name: PhaseStarShard_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 30
-        height: 59
+        width: 42
+        height: 82
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 1b70621dff22c9b90800000000000000
-      internalID: -7233868419342923855
+      spriteID: 6a6ea83c94b421840800000000000000
+      internalID: 5193296100496959142
       vertices: []
       indices: 
       edges: []
@@ -151,7 +151,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: b50c02d2a883443c9ad2225da35a15fa
+    spriteID: da11c6754f22240239a289ec96b231c6
     internalID: 0
     vertices: []
     indices: 
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Diamond Ful_0: -7233868419342923855
+      PhaseStarShard_0: 5193296100496959142
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

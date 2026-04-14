@@ -1,73 +1,40 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Drives PhaseStar movement as a committed hunter.
-///
-/// Every replan interval the navigator scans all colored (role != None) dust cells
-/// directly from the grid, picks the nearest one (weighted by the star's hunger for
-/// that role), and exposes it as the hunt direction.  No BFS required — the grid
-/// query is O(cells) and immune to gray-dust blocking or budget exhaustion.
-///
-/// Lock-on (NotifyDraining / ClearLockOn) pins the target while a cell is actively
-/// being drained so the star does not wander mid-drain.
-/// </summary>
 [DisallowMultipleComponent]
 public sealed class PhaseStarCravingNavigator : MonoBehaviour
 {
-    // ----------------------------------------------------------------
-    // Inspector
-    // ----------------------------------------------------------------
     [Header("Hunter Targeting")]
-    [Tooltip("Seconds between target re-evaluations when no lock-on is active.")]
     [SerializeField] private float replanIntervalSeconds = 0.3f;
-
-    [Tooltip("If the current target cell loses its colored dust (eaten by vehicle, etc.), " +
-             "pick a new target immediately rather than waiting for replan interval.")]
     [SerializeField] private bool retargetOnTargetLost = true;
 
     [Header("Sniffer (per-role diamond facing)")]
-    [Tooltip("Seconds between sniffer ticks.")]
     [SerializeField] private float snifferIntervalSeconds = 0.25f;
 
     [Header("Hunger-Weighted Targeting")]
-    [Tooltip("Weight given to a role the star is already full on (0 = never target it, 1 = no hunger bias).")]
     [SerializeField, Range(0f, 1f)] private float hungerFloorWeight = 0.15f;
 
     [Header("Debug")]
     [SerializeField] private bool verbose = false;
 
-    // ----------------------------------------------------------------
-    // State
-    // ----------------------------------------------------------------
     private PhaseStar _star;
     private bool _active;
     private float _replanTimer;
     private float _snifferTimer;
 
-    // Hunt target
-    private bool       _hasTarget;
+    private bool _hasTarget;
     private Vector2Int _targetCell;
-    private Vector2    _targetDir;   // normalized world-space direction; refreshed each frame
+    private Vector2 _targetDir;
 
-    // Lock-on from PhaseStarDustAffect (draining a specific cell)
-    private bool       _hasLockOnCell;
+    private bool _hasLockOnCell;
     private Vector2Int _lockOnCell;
 
-    // Sniffer: per-role direction toward nearest dust of that role
     private readonly Dictionary<MusicalRole, Vector2> _snifferDirs = new();
     private Vector2 _nearestColoredDustDir = Vector2.zero;
 
-    // Reusable scratch list for grid queries
     private readonly List<Vector2Int> _coloredCellsScratch = new(512);
 
-    // Set by PhaseStarDustAffect: true only while the scout is Docked.
-    // When false, all steer outputs return zero so the star drifts freely.
     private bool _huntingEnabled;
-
-    // ----------------------------------------------------------------
-    // Public API
-    // ----------------------------------------------------------------
 
     public void Initialize(
         PhaseStar star,
@@ -77,111 +44,98 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         if (profile != null)
             replanIntervalSeconds = Mathf.Max(0.1f, profile.mazeNavReplanInterval);
 
-        _star           = star;
-        _active         = true;
-        _replanTimer    = 0f;   // hunt immediately on first Update
-        _snifferTimer   = 0f;
-        _hasTarget      = false;
-        _hasLockOnCell  = false;
+        _star = star;
+        _active = true;
+        _replanTimer = 0f;
+        _snifferTimer = 0f;
+        _hasTarget = false;
+        _hasLockOnCell = false;
         _huntingEnabled = false;
-
-        if (verbose) Debug.Log("[HuntNav] Initialized.");
     }
-
 
     public void SetActive(bool active)
     {
         _active = active;
         if (!active)
         {
-            _hasTarget       = false;
-            _hasLockOnCell   = false;
-            _huntingEnabled  = false;
+            _hasTarget = false;
+            _hasLockOnCell = false;
+            _huntingEnabled = false;
         }
     }
 
-    /// <summary>
-    /// Called by PhaseStarDustAffect to enable hunt output when the scout docks,
-    /// and disable it when the scout launches or the star is disarmed.
-    /// When disabled, GetDensitySteerDir and GetDominantSnifferDir return zero
-    /// so PhaseStarMotion2D falls through to pure random drift.
-    /// </summary>
     public void SetHuntingEnabled(bool enabled)
     {
         _huntingEnabled = enabled;
     }
 
-    /// <summary>
-    /// Returns the nearest valid dust cell for the given role.
-    /// Used by the tentacle system so each tentacle can independently locate its target.
-    /// </summary>
     public bool TryGetTargetForRole(MusicalRole role, out Vector2Int cell)
+        => TryGetTargetForRole(role, out cell, null);
+
+    public bool TryGetTargetForRole(
+        MusicalRole role,
+        out Vector2Int cell,
+        HashSet<Vector2Int> excludedCells)
     {
         cell = default;
-        var gfm  = GameFlowManager.Instance;
-        var gen  = gfm?.dustGenerator;
+
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drum = gfm?.activeDrumTrack;
         if (gen == null || drum == null) return false;
 
         gen.GetColoredDustCells(_coloredCellsScratch);
 
-        Vector2 starWorld  = transform.position;
-        float   bestSqDist = float.MaxValue;
-        bool    found      = false;
+        Vector2 starWorld = transform.position;
+        float bestSqDist = float.MaxValue;
+        bool found = false;
 
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
         {
-            var c    = _coloredCellsScratch[i];
+            var c = _coloredCellsScratch[i];
+            if (excludedCells != null && excludedCells.Contains(c)) continue;
+
             var dust = GetDust(gen, c);
             if (dust == null || dust.Role != role) continue;
             if (!gen.HasDustAt(c)) continue;
             if (dust.currentEnergyUnits <= 0) continue;
 
             float sqd = ((Vector2)drum.GridToWorldPosition(c) - starWorld).sqrMagnitude;
-            if (sqd < bestSqDist) { bestSqDist = sqd; cell = c; found = true; }
+            if (sqd < bestSqDist)
+            {
+                bestSqDist = sqd;
+                cell = c;
+                found = true;
+            }
         }
+
         return found;
     }
 
-    /// <summary>
-    /// Called by PhaseStarDustAffect when it begins draining a specific cell.
-    /// Pins the hunt target to this cell until it is fully drained.
-    /// </summary>
     public void NotifyDraining(Vector2Int cell)
     {
         _hasLockOnCell = true;
-        _lockOnCell    = cell;
-        _hasTarget     = true;
-        _targetCell    = cell;
-        _replanTimer   = replanIntervalSeconds; // don't immediately replan over a fresh lock
+        _lockOnCell = cell;
+        _hasTarget = true;
+        _targetCell = cell;
+        _replanTimer = replanIntervalSeconds;
     }
 
-    /// <summary>
-    /// Called by PhaseStarDustAffect when a cell is fully drained.
-    /// Only clears if it matches the locked cell; triggers an immediate retarget.
-    /// </summary>
     public void ClearLockOn(Vector2Int cell)
     {
         if (_hasLockOnCell && _lockOnCell == cell)
         {
             _hasLockOnCell = false;
-            _replanTimer   = 0f; // hunt next cell immediately
+            _replanTimer = 0f;
         }
     }
 
-    /// <summary>
-    /// World-space direction toward the current hunt target, or zero if none.
-    /// Returns zero when hunting is disabled (scout is not yet docked).
-    /// </summary>
     public Vector2 GetDensitySteerDir() => (_huntingEnabled && _hasTarget) ? _targetDir : Vector2.zero;
 
-    /// <summary>True when a hunt target cell is currently selected.</summary>
     public bool HasTarget => _hasTarget;
 
-    /// <summary>Current target cell grid coordinate. Valid only when <see cref="HasTarget"/> is true.</summary>
     public Vector2Int GetTargetCell() => _targetCell;
 
-    /// <summary>World-space position of the current hunt target. Returns zero when <see cref="HasTarget"/> is false.</summary>
     public Vector2 GetTargetWorldPos()
     {
         if (!_hasTarget) return Vector2.zero;
@@ -189,11 +143,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         return drum != null ? drum.GridToWorldPosition(_targetCell) : Vector2.zero;
     }
 
-    /// <summary>
-    /// Direction toward the nearest colored dust, for diamond rotation.
-    /// Returns _nearestColoredDustDir (ambient sniffer) when hunting is disabled
-    /// so the accumulator still faces toward dust even while the scout is out.
-    /// </summary>
     public Vector2 GetDominantSnifferDir()
     {
         if (_huntingEnabled && (_hasLockOnCell || _hasTarget))
@@ -210,19 +159,15 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
         RefreshTargetDir();
 
-        // If the lock-on cell is no longer valid (e.g. externally carved by a vehicle
-        // before the drain probe could call ClearLockOn), release the lock so HuntTick
-        // can retarget. Without this, _hasLockOnCell stays true forever and HuntTick
-        // always returns early, leaving the star stuck in drift mode.
         if (_hasLockOnCell && !IsTargetValid(_lockOnCell))
         {
             _hasLockOnCell = false;
-            _hasTarget     = false;
-            _replanTimer   = 0f;
+            _hasTarget = false;
+            _replanTimer = 0f;
         }
         else if (_hasTarget && retargetOnTargetLost && !IsTargetValid(_targetCell))
         {
-            _hasTarget   = false;
+            _hasTarget = false;
             _replanTimer = 0f;
         }
 
@@ -241,17 +186,12 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         }
     }
 
-    // ----------------------------------------------------------------
-    // Hunt: scan all colored cells, pick nearest (hunger-weighted)
-    // ----------------------------------------------------------------
-
     private void HuntTick()
     {
-        // Stay committed to a cell that is actively being drained.
         if (_hasLockOnCell) return;
 
-        var gfm  = GameFlowManager.Instance;
-        var gen  = gfm?.dustGenerator;
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drum = gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
@@ -260,38 +200,33 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         if (_coloredCellsScratch.Count == 0)
         {
             _hasTarget = false;
-            if (verbose) Debug.Log("[HuntNav] No colored dust found.");
             return;
         }
 
-        Vector2    starWorld    = transform.position;
-        Vector2Int bestCell     = default;
-        float      bestEffDist  = float.MaxValue;
-        bool       found        = false;
+        Vector2 starWorld = transform.position;
+        Vector2Int bestCell = default;
+        float bestEffDist = float.MaxValue;
+        bool found = false;
 
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
         {
             var cell = _coloredCellsScratch[i];
             var dust = GetDust(gen, cell);
             if (dust == null || dust.Role == MusicalRole.None) continue;
-
-            // Only hunt cells matching the role the star currently needs.
-            MusicalRole needed = _star != null ? _star.GetPreviewRole() : MusicalRole.None;
-            if (needed != MusicalRole.None && dust.Role != needed) continue;
+            if (dust.currentEnergyUnits <= 0) continue;
 
             float hunger = _star != null ? _star.GetRoleHunger(dust.Role) : 1f;
-            float score  = Mathf.Lerp(hungerFloorWeight, 1f, hunger);
+            float score = Mathf.Lerp(hungerFloorWeight, 1f, hunger);
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
-            float   dist      = (cellWorld - starWorld).magnitude;
-            // Divide distance by score so hungry roles appear effectively closer.
-            float   effDist   = dist / score;
+            float dist = (cellWorld - starWorld).magnitude;
+            float effDist = dist / Mathf.Max(0.001f, score);
 
             if (effDist < bestEffDist)
             {
-                bestCell    = cell;
+                bestCell = cell;
                 bestEffDist = effDist;
-                found       = true;
+                found = true;
             }
         }
 
@@ -301,19 +236,15 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             return;
         }
 
-        _hasTarget  = true;
+        _hasTarget = true;
         _targetCell = bestCell;
         RefreshTargetDir();
     }
 
-    // ----------------------------------------------------------------
-    // Sniffer: nearest cell per role (for diamond rotation)
-    // ----------------------------------------------------------------
-
     private void SnifferTick()
     {
-        var gfm  = GameFlowManager.Instance;
-        var gen  = gfm?.dustGenerator;
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drum = gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
@@ -321,12 +252,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
         _snifferDirs.Clear();
 
-        Vector2    starWorld        = transform.position;
-        bool       foundAny         = false;
-        float      nearestSqDist    = float.MaxValue;
-        Vector2Int nearestCell      = default;
+        Vector2 starWorld = transform.position;
+        bool foundAny = false;
+        float nearestSqDist = float.MaxValue;
+        Vector2Int nearestCell = default;
 
-        // Scratch: nearest sqDist per role
         var nearestSqDistPerRole = new Dictionary<MusicalRole, float>(4);
 
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
@@ -334,14 +264,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             var cell = _coloredCellsScratch[i];
             var dust = GetDust(gen, cell);
             if (dust == null || dust.Role == MusicalRole.None) continue;
-
-            MusicalRole neededS = _star != null ? _star.GetPreviewRole() : MusicalRole.None;
-            if (neededS != MusicalRole.None && dust.Role != neededS) continue;
+            if (dust.currentEnergyUnits <= 0) continue;
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
-            float   sqDist    = (cellWorld - starWorld).sqrMagnitude;
+            float sqDist = (cellWorld - starWorld).sqrMagnitude;
 
-            // Per-role nearest
             if (!nearestSqDistPerRole.TryGetValue(dust.Role, out float best) || sqDist < best)
             {
                 nearestSqDistPerRole[dust.Role] = sqDist;
@@ -350,12 +277,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
                     _snifferDirs[dust.Role] = dir.normalized;
             }
 
-            // Overall nearest
             if (sqDist < nearestSqDist)
             {
                 nearestSqDist = sqDist;
-                nearestCell   = cell;
-                foundAny      = true;
+                nearestCell = cell;
+                foundAny = true;
             }
         }
 
@@ -363,17 +289,14 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             Vector2 cellWorld = drum.GridToWorldPosition(nearestCell);
             Vector2 dir = cellWorld - starWorld;
-            if (dir.sqrMagnitude > 0.0001f) _nearestColoredDustDir = dir.normalized;
+            if (dir.sqrMagnitude > 0.0001f)
+                _nearestColoredDustDir = dir.normalized;
         }
         else
         {
             _nearestColoredDustDir = Vector2.zero;
         }
     }
-
-    // ----------------------------------------------------------------
-    // Helpers
-    // ----------------------------------------------------------------
 
     private void RefreshTargetDir()
     {
@@ -387,15 +310,18 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
         if (dir.sqrMagnitude > 0.0001f)
             _targetDir = dir.normalized;
-        // else: star is on top of target; keep last direction until cell clears
     }
 
     private bool IsTargetValid(Vector2Int cell)
     {
         var gen = GameFlowManager.Instance?.dustGenerator;
         if (gen == null) return false;
+
         var dust = GetDust(gen, cell);
-        return dust != null && dust.Role != MusicalRole.None && gen.HasDustAt(cell);
+        return dust != null &&
+               dust.Role != MusicalRole.None &&
+               dust.currentEnergyUnits > 0 &&
+               gen.HasDustAt(cell);
     }
 
     private static CosmicDust GetDust(CosmicDustGenerator gen, Vector2Int gp)
@@ -404,10 +330,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         go.TryGetComponent<CosmicDust>(out var dust);
         return dust;
     }
-
-    // ----------------------------------------------------------------
-    // Gizmos
-    // ----------------------------------------------------------------
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()

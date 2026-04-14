@@ -4926,12 +4926,13 @@ MonoBehaviour:
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
   soloVoice: {fileID: 0}
-  entryOffscreenMargin: 2
+  entryOffscreenMargin: 5
   entryArriveThreshold: 6
   entryFadeInSeconds: 0.2
-  entryDriftSeconds: 2
+  entryDriftSeconds: 8
   entryDriftSpeedMul: 0.4
-  readyRotSpeedMul: 2.5
+  entrySettleInset: 4
+  readyRotSpeedMul: 1.2
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
@@ -4959,10 +4960,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  diamond: {fileID: 3722791801018086938, guid: 5b5be5cacb1b746859dac8088ce467eb, type: 3}
-  activeDiamond: {fileID: 3722791801018086938, guid: 5b5be5cacb1b746859dac8088ce467eb,
+  diamond: {fileID: 5193296100496959142, guid: e6b4e136a0c964d99bd7db5f767521d6, type: 3}
+  activeDiamond: {fileID: 5193296100496959142, guid: e6b4e136a0c964d99bd7db5f767521d6,
     type: 3}
-  dimAlpha: 0.06
+  diamondAngleSmoothTime: 0.06
+  dimAlpha: 0.063
   dimRgbMul: 0.08
   dimUsesFixedTint: 1
   rejectFlashColor: {r: 0.9, g: 0.25, b: 0.05, a: 0.55}
@@ -4994,20 +4996,23 @@ MonoBehaviour:
   colorTransitionTime: 0.5
   drainFlashDuration: 0.08
   starDrainRegrowDelay: 6
-  tentacleGrowSpeed: 4
+  tentacleGrowSpeed: 2
   tentacleRetractSpeed: 12
-  tentacleFlowSpeed: 1.1
-  tentacleWidth: 0.03
+  tentacleFlowSpeed: 2.5
+  tentacleWidth: 0.1
   diamondTipOffset: 0.3
+  rootDirSmoothSpeed: 8
   dissolveDuration: 1.1
-  tentacleMaterial: {fileID: 0}
-  vineCtrlPointCount: 5
-  vineSplinePoints: 16
+  tentacleMaterial: {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
+  vineCtrlPointCount: 4
+  vineSplinePoints: 32
   vineNoiseAmplitude: 2.3
   vineBreathePeriod: 1.6
   vineDustRepulsionRadius: 2
   vineDustRepulsionStrength: 0.9
   vineCtrlRebuildInterval: 0.15
+  branchSpawnAtProgress: 0.4
+  maxBranchDepth: 3
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5021,8 +5026,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
   pushDecayPerSecond: 5
+  enableUnstickImpulse: 0
   stuckThresholdSeconds: 0.22
-  unstickImpulseSpeed: 6
+  unstickImpulseSpeed: 1
+  hardClampOvershootWorld: 1
+  softEdgeVelocityDamp: 8
   bounds:
     kinematicMode: 0
     edgeBounce: 0.9

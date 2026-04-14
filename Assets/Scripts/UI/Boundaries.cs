@@ -8,6 +8,16 @@ public class Boundaries : MonoBehaviour
     public BoxCollider2D rightBoundary;
     public Camera mainCamera;
     public GameObject warpPrefab;
+
+    [Header("Vehicle Wrap Feel")]
+    [Range(0.05f, 0.95f)]
+    [SerializeField] private float commitDepth01 = 0.55f;
+    [SerializeField] private float minCommitSpeed = 2.25f;
+    [SerializeField] private float outwardSpeedBleed = 18f;
+    [SerializeField] private float returnToPlaySpeed = 8f;
+    [SerializeField] private float innerSettleBuffer = 0.08f;
+    [SerializeField] private float settleSpeedThreshold = 1.0f;
+
     void Awake()
     {
         Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
@@ -23,7 +33,6 @@ public class Boundaries : MonoBehaviour
         if (mainCamera == null)
             mainCamera = Camera.main;
 
-        // --- existing camera-based setup (safe at Start) ---
         float screenHalfHeight = mainCamera.orthographicSize;
         float screenHalfWidth  = screenHalfHeight * mainCamera.aspect;
 
@@ -51,7 +60,6 @@ public class Boundaries : MonoBehaviour
                 new Vector2(rightBoundary.size.x, screenHalfHeight * 2f);
         }
 
-        // Bottom: temporary camera-based placement so we have *something*
         if (bottomBoundary != null)
         {
             bottomBoundary.transform.position =
@@ -59,36 +67,40 @@ public class Boundaries : MonoBehaviour
             bottomBoundary.size =
                 new Vector2(screenHalfWidth * 2f, bottomBoundary.size.y);
         }
+
         Debug.Log($"[BOUNDARIES] Boundaries constructed");
 
-        // Wire up screen-wrap triggers (opposite boundary provides the reappearance edge).
-        AddWrap(leftBoundary,   BoundaryWrap.WrapAxis.Horizontal, rightBoundary);
-        AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, leftBoundary);
-        AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   bottomBoundary);
-        AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   topBoundary);
-
-        // ✅ Defer precise alignment to when NoteVisualizer is ready
+        AddWrap(leftBoundary,   BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Left,   rightBoundary);
+        AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Right,  leftBoundary);
+        AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Top,    bottomBoundary);
+        AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Bottom, topBoundary);
         StartCoroutine(AlignBottomToNoteVisualizerWhenReady());
     }
 
-    private void AddWrap(BoxCollider2D boundary, BoundaryWrap.WrapAxis axis, BoxCollider2D opposite)
+    private void AddWrap(
+        BoxCollider2D boundary,
+        BoundaryWrap.WrapAxis axis,
+        BoundaryWrap.BoundarySide side,
+        BoxCollider2D opposite)
     {
         if (boundary == null || opposite == null) return;
+
         var wrap = boundary.gameObject.GetComponent<BoundaryWrap>()
                    ?? boundary.gameObject.AddComponent<BoundaryWrap>();
+
         wrap.warpPrefab = warpPrefab;
         wrap.axis = axis;
+        wrap.side = side;
         wrap.oppositeBoundary = opposite;
     }
-
     private System.Collections.IEnumerator AlignBottomToNoteVisualizerWhenReady()
     {
-        // Wait until we have a GameFlowManager and a NoteVisualizer
         while (GameFlowManager.Instance == null ||
                GameFlowManager.Instance.noteViz == null)
         {
             yield return null;
         }
+
         yield return null;
         Debug.Log("[BOUNDARIES] Aligning to NoteViz");
         AlignBottomToVisualizer(GameFlowManager.Instance.noteViz);
@@ -99,20 +111,15 @@ public class Boundaries : MonoBehaviour
         if (!bottomBoundary || viz == null || mainCamera == null)
             return;
 
-        // Recompute camera extents here so we don’t depend on Start() locals
         float screenHalfHeight = mainCamera.orthographicSize;
         float screenHalfWidth  = screenHalfHeight * mainCamera.aspect;
 
-        // Use the *current* thickness of the collider as the vertical size
         float thickness = bottomBoundary.size.y;
         if (thickness <= 0f) thickness = 1f;
 
-        // NoteVisualizer gives us the *top edge* Y in world space
         float topY = viz.GetTopWorldY();
         Debug.Log($"[BOUNDARIES] NoteViz at {topY}");
 
-        // BoxCollider2D.position is its CENTER, so:
-        //   centerY = topY - (thickness / 2)
         float centerY = topY - (thickness * 0.5f);
 
         bottomBoundary.transform.position =

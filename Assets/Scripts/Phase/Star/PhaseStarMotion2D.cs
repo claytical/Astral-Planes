@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -8,90 +7,68 @@ using Random = UnityEngine.Random;
 [DisallowMultipleComponent]
 public sealed class PhaseStarMotion2D : MonoBehaviour
 {
-    // ============================================================
-    // Public API / hooks
-    // ============================================================
     public event Action<Vector2> OnVelocityChanged;
-    private PhaseStar _star;
-    /// <summary>Optional provider for vehicle world positions (for avoidance).</summary>
-    public Func<IReadOnlyList<Vector2>> VehiclePositionsProvider;
 
-    /// <summary>
-    /// Optional sampler for dust density (0..1). Used only when edge-seeking is enabled.
-    /// </summary>
+    private PhaseStar _star;
+
+    public Func<IReadOnlyList<Vector2>> VehiclePositionsProvider;
     public Func<Vector2, float> DustDensitySampler;
 
-    // ============================================================
-    // Inspector tuning
-    // ============================================================
     [Serializable]
     private sealed class VehicleAvoidanceTuning
     {
-        [Tooltip("Repulsion range (world units).")]
         public float radius = 3.0f;
-
-        [Tooltip("Higher = sharper near players.")]
         public float exponent = 2.0f;
-
-        [Tooltip("Weight of avoidance vs drift.")]
         public float strength = 1.0f;
     }
 
     [Serializable]
     private sealed class DustEdgeSeekingTuning
     {
-        [Tooltip("Finite diff step (world units).")]
         public float sampleStep = 0.35f;
-
-        [Range(0f, 1f)]
-        [Tooltip("Target density band (0 empty .. 1 dust).")]
-        public float band = 0.5f;
-
-        [Tooltip("Weight of edge seeking vs drift.")]
+        [Range(0f, 1f)] public float band = 0.5f;
         public float strength = 1.0f;
-
-        [Tooltip("Ignore very flat gradients (not near an edge).")]
         public float gradMin = 0.02f;
     }
 
     [Serializable]
     private sealed class SteeringTuning
     {
-        [Tooltip("Max velocity change per second during free drift.")]
         public float maxAccel = 4.0f;
-
-        [Tooltip("Max velocity change per second while actively hunting a target. " +
-                 "Should be significantly higher than maxAccel so the star commits hard.")]
         public float huntAccel = 18.0f;
     }
 
     [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f;
 
-    [Tooltip("Seconds of near-zero velocity while hunting before an unstick impulse fires.")]
+    [Header("Anti-Jump")]
+    [SerializeField] private bool enableUnstickImpulse = false;
     [SerializeField, Min(0.05f)] private float stuckThresholdSeconds = 0.22f;
-
-    [Tooltip("Speed of the unstick impulse (world units/sec). Mostly perpendicular to hunt dir.")]
     [SerializeField, Min(0f)] private float unstickImpulseSpeed = 6f;
+    [SerializeField, Min(0f)] private float hardClampOvershootWorld = 1.0f;
+    [SerializeField, Min(0f)] private float softEdgeVelocityDamp = 8f;
 
     private Vector2 _pushVelocity = Vector2.zero;
-    private float   _speedMul = 1f;
-    private float   _stuckTimer;
+    private float _speedMul = 1f;
+    private float _stuckTimer;
 
-    // True while the scout is in flight; star holds position until it docks.
     private bool _frozen;
+
+    private Vector2? _overrideTarget;
+    public void SetOverrideTarget(Vector2? target) { _overrideTarget = target; }
 
     public void SetSpeedMultiplier(float mul) => _speedMul = Mathf.Max(0f, mul);
 
-    /// <summary>
-    /// Freezes or unfreezes the star in place.
-    /// Called by PhaseStarDustAffect when the scout launches (freeze) and docks (unfreeze).
-    /// </summary>
     public void SetFrozen(bool frozen)
     {
+        if (_frozen == frozen) return;
+
         _frozen = frozen;
+        _stuckTimer = 0f;
+        _pushVelocity = Vector2.zero;
+
         if (frozen && _rb)
         {
-            _rb.linearVelocity  = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
             _rb.angularVelocity = 0f;
         }
     }
@@ -100,35 +77,25 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private sealed class ScreenBoundsTuning
     {
         public bool kinematicMode = false;
-
-        [Range(0f, 1f)]
-        public float edgeBounce = 0.9f;
-
+        [Range(0f, 1f)] public float edgeBounce = 0.9f;
         public float screenPadding = 0.5f;
-
-        [Range(0.1f, 1f)]
-        public float focusSpeedMul = 0.5f;
+        [Range(0.1f, 1f)] public float focusSpeedMul = 0.5f;
     }
 
     [Serializable]
     private sealed class NavigatorBlendTuning
     {
-        [Tooltip("Weight of sniffer direction during free drift (no committed hunt target).")]
-        [Range(0f, 1f)]
-        public float snifferWeight = 0.35f;
+        [Range(0f, 1f)] public float snifferWeight = 0.35f;
     }
 
     [Header("Motion Tuning")]
-    [SerializeField] private ScreenBoundsTuning     bounds    = new();
+    [SerializeField] private ScreenBoundsTuning bounds = new();
     [SerializeField] private VehicleAvoidanceTuning avoidance = new();
-    [SerializeField] private DustEdgeSeekingTuning  edgeSeek  = new();
-    [SerializeField] private SteeringTuning         steering  = new();
-    [SerializeField] private NavigatorBlendTuning   navBlend  = new();
+    [SerializeField] private DustEdgeSeekingTuning edgeSeek = new();
+    [SerializeField] private SteeringTuning steering = new();
+    [SerializeField] private NavigatorBlendTuning navBlend = new();
     [SerializeField] private bool verbose = false;
 
-    // ============================================================
-    // State
-    // ============================================================
     private Rigidbody2D _rb;
     private PhaseStarBehaviorProfile _profile;
     private bool _enabled;
@@ -138,9 +105,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private PhaseStarCravingNavigator _navigator;
 
-    // ============================================================
-    // Unity
-    // ============================================================
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -162,7 +126,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _rb.angularVelocity = 0f;
         _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
     }
-    
+
     public void ApplyPushImpulse(Vector2 velocity)
     {
         _pushVelocity = velocity;
@@ -178,11 +142,12 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _profile = profile;
         _enabled = true;
         _star = star;
+
         if (DustDensitySampler == null)
         {
             DustDensitySampler = pos =>
             {
-                var gfm  = GameFlowManager.Instance;
+                var gfm = GameFlowManager.Instance;
                 var dust = gfm ? gfm.dustGenerator : null;
                 return dust == null ? 0f : dust.SampleDensity01(pos);
             };
@@ -214,10 +179,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _enabled = on;
         if (!_rb) return;
 
+        _pushVelocity = Vector2.zero;
+        _stuckTimer = 0f;
         _rb.linearVelocity = Vector2.zero;
         _rb.angularVelocity = 0f;
+
         if (on)
-            KeepInsideScreenAndBounce();
+            SoftContainInsideScreen();
 
         _rb.constraints = on
             ? RigidbodyConstraints2D.FreezeRotation
@@ -228,7 +196,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     {
         if (!_enabled || _profile == null || !_rb) return;
 
-        // Hold position while the scout is in flight.
         if (_frozen)
         {
             _rb.linearVelocity = Vector2.zero;
@@ -238,31 +205,22 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         float dt = Time.fixedDeltaTime;
 
         float hunger = (_star != null) ? _star.GetHungerLevel() : 0f;
-        float speed  = Mathf.Lerp(
+        float speed = Mathf.Lerp(
             Mathf.Max(0f, _profile.starDriftSpeed),
             Mathf.Max(0f, _profile.starHungrySpeed),
             hunger
         ) * _speedMul;
+
         float jitter = Mathf.Max(0f, _profile.starDriftJitter) * _speedMul;
 
-        // ---------------------------------------------------------------
-        // HUNT MODE: navigator has a committed target — drive directly at it.
-        // Avoidance still applies so the star doesn't clip through vehicles,
-        // but drift, jitter, and blend weights are bypassed entirely.
-        //
-        // The navigator itself gates whether it returns a steer direction —
-        // it only does so when the scout has docked. See PhaseStarCravingNavigator.
-        // ---------------------------------------------------------------
         Vector2 huntDir = _navigator != null ? _navigator.GetDensitySteerDir() : Vector2.zero;
-        bool isHunting  = huntDir.sqrMagnitude > 0.0001f;
+        bool isHunting = huntDir.sqrMagnitude > 0.0001f;
 
         if (isHunting)
         {
-            Vector2 avoid      = ComputeVehicleAvoidance(_rb.position);
+            Vector2 avoid = ComputeVehicleAvoidance(_rb.position);
             Vector2 desiredDir = huntDir;
 
-            // Allow avoidance to deflect but not fully override —
-            // the star should push past vehicles to reach its target.
             if (avoid.sqrMagnitude > 0.0001f)
                 desiredDir = (huntDir + avoid * avoidance.strength * 0.4f).normalized;
 
@@ -271,14 +229,12 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
                 desiredDir = (desiredDir + edgeRepulsion).normalized;
 
             Vector2 desiredVel = desiredDir * speed;
-            Vector2 newVel     = Vector2.MoveTowards(
-                _rb.linearVelocity, desiredVel, steering.huntAccel * dt);
+            Vector2 newVel = Vector2.MoveTowards(_rb.linearVelocity, desiredVel, steering.huntAccel * dt);
 
             if (_pushVelocity.sqrMagnitude > 0.0001f)
             {
-                newVel       += _pushVelocity;
-                _pushVelocity = Vector2.MoveTowards(
-                    _pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
+                newVel += _pushVelocity;
+                _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
             }
 
             if (bounds.kinematicMode)
@@ -286,13 +242,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             else
                 _rb.linearVelocity = newVel;
 
-            KeepInsideScreenAndBounce();
+            SoftContainInsideScreen();
             OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVel : _rb.linearVelocity);
 
-            // Unstick: if the star is pressing toward a target but actual velocity is
-            // near zero, a dust cell is blocking it. Fire a sideways impulse after a
-            // short delay so the star can slip around the obstacle organically.
-            if (!bounds.kinematicMode && unstickImpulseSpeed > 0.001f)
+            if (enableUnstickImpulse && !bounds.kinematicMode && unstickImpulseSpeed > 0.001f)
             {
                 bool isStuck = _rb.linearVelocity.sqrMagnitude < (speed * 0.12f) * (speed * 0.12f);
                 if (isStuck)
@@ -301,9 +254,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
                     if (_stuckTimer >= stuckThresholdSeconds)
                     {
                         _stuckTimer = 0f;
-                        Vector2 perp  = Vector2.Perpendicular(huntDir);
+                        Vector2 perp = Vector2.Perpendicular(huntDir);
                         if (Random.value > 0.5f) perp = -perp;
-                        // Bias slightly forward so it doesn't orbit endlessly
                         Vector2 nudge = (perp * 0.75f + huntDir * 0.25f).normalized * unstickImpulseSpeed;
                         ApplyPushImpulse(nudge);
                     }
@@ -313,19 +265,33 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
                     _stuckTimer = 0f;
                 }
             }
+            else
+            {
+                _stuckTimer = 0f;
+            }
 
-            return; // skip drift path entirely
+            return;
         }
 
-        // ---------------------------------------------------------------
-        // DRIFT MODE: no hunt target — original weighted-blend behavior.
-        // Used when the star is disarmed, all dust is gray, or briefly
-        // between targets while the next BFS fires.
-        // ---------------------------------------------------------------
-        _rechooseTimer -= dt;
-        if (_rechooseTimer <= 0f) PickNewDriftDir();
+        if (_overrideTarget.HasValue)
+        {
+            Vector2 toTarget = _overrideTarget.Value - _rb.position;
+            if (toTarget.sqrMagnitude < 0.5f * 0.5f)
+            {
+                _overrideTarget = null;
+            }
+            else
+            {
+                _driftDir = toTarget.normalized;
+                _rechooseTimer = 1f;
+            }
+        }
 
-        Vector2 j     = Random.insideUnitCircle * jitter;
+        _rechooseTimer -= dt;
+        if (_rechooseTimer <= 0f)
+            PickNewDriftDir();
+
+        Vector2 j = Random.insideUnitCircle * jitter;
         Vector2 drift = _driftDir + j;
         if (drift.sqrMagnitude > 0.0001f) drift.Normalize();
 
@@ -335,7 +301,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             ? Vector2.Perpendicular(avoidDrift).normalized * Mathf.Clamp01(_profile.orbitBias)
             : Vector2.zero;
 
-        // Fallback nav blend (sniffer directions only — no committed target)
         Vector2 navContrib = Vector2.zero;
         if (_navigator != null)
         {
@@ -348,29 +313,30 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             ? navContrib.normalized
             : drift;
 
-        Vector2 desiredDirDrift = baseDrift
-                                  + avoidDrift    * avoidance.strength
-                                  + avoidTangent;
+        Vector2 desiredDirDrift = baseDrift + avoidDrift * avoidance.strength + avoidTangent;
 
-        if (desiredDirDrift.sqrMagnitude < 0.0001f) desiredDirDrift = drift;
-        else desiredDirDrift.Normalize();
+        if (desiredDirDrift.sqrMagnitude < 0.0001f)
+            desiredDirDrift = drift;
+        else
+            desiredDirDrift.Normalize();
 
         Vector2 edgeRepulsionDrift = ComputeEdgeRepulsion(_rb.position);
         desiredDirDrift += edgeRepulsionDrift;
-        if (desiredDirDrift.sqrMagnitude > 0.0001f) desiredDirDrift.Normalize();
+        if (desiredDirDrift.sqrMagnitude > 0.0001f)
+            desiredDirDrift.Normalize();
 
         Vector2 desiredVelDrift = desiredDirDrift * speed;
-        Vector2 curVel          = _rb.linearVelocity;
+        Vector2 curVel = _rb.linearVelocity;
         float driftAccel = (curVel.sqrMagnitude > speed * speed * 1.5f)
-            ? steering.huntAccel   // quickly shed hunt velocity after leaving hunt mode
+            ? steering.huntAccel
             : steering.maxAccel;
-        Vector2 newVelDrift     = Vector2.MoveTowards(curVel, desiredVelDrift, driftAccel * dt);
+
+        Vector2 newVelDrift = Vector2.MoveTowards(curVel, desiredVelDrift, driftAccel * dt);
 
         if (_pushVelocity.sqrMagnitude > 0.0001f)
         {
-            newVelDrift   += _pushVelocity;
-            _pushVelocity  = Vector2.MoveTowards(
-                _pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
+            newVelDrift += _pushVelocity;
+            _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
         }
 
         if (bounds.kinematicMode)
@@ -378,16 +344,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         else
             _rb.linearVelocity = newVelDrift;
 
-        KeepInsideScreenAndBounce();
+        SoftContainInsideScreen();
         OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVelDrift : _rb.linearVelocity);
-
-        if (_profile.teleportChancePerSec > 0f &&
-            Random.value < _profile.teleportChancePerSec * dt)
-        {
-            Vector2 off = Random.insideUnitCircle * 1.5f;
-            _rb.position += off;
-            OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVelDrift : _rb.linearVelocity);
-        }
     }
 
     private Vector2 ComputeEdgeRepulsion(Vector2 pos)
@@ -417,36 +375,62 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         return push * 3.0f;
     }
 
-    private void KeepInsideScreenAndBounce()
+    private void SoftContainInsideScreen()
     {
         if (_cam == null) _cam = Camera.main;
-        if (_cam == null) return;
+        if (_cam == null || _rb == null) return;
 
-        var    pos = _rb.position;
         const float z = 0f;
+        Vector2 min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)) + Vector2.one * bounds.screenPadding;
+        Vector2 max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z)) - Vector2.one * bounds.screenPadding;
 
-        var min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)) + Vector2.one * bounds.screenPadding;
-        var max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z)) - Vector2.one * bounds.screenPadding;
+        Vector2 pos = _rb.position;
 
-        bool hit = false;
-        if      (pos.x < min.x) { pos.x = min.x; _driftDir.x =  Mathf.Abs(_driftDir.x) * bounds.edgeBounce; hit = true; }
-        else if (pos.x > max.x) { pos.x = max.x; _driftDir.x = -Mathf.Abs(_driftDir.x) * bounds.edgeBounce; hit = true; }
+        if (bounds.kinematicMode)
+        {
+            bool changed = false;
 
-        if      (pos.y < min.y) { pos.y = min.y; _driftDir.y =  Mathf.Abs(_driftDir.y) * bounds.edgeBounce; hit = true; }
-        else if (pos.y > max.y) { pos.y = max.y; _driftDir.y = -Mathf.Abs(_driftDir.y) * bounds.edgeBounce; hit = true; }
+            if (pos.x < min.x) { pos.x = min.x; changed = true; }
+            else if (pos.x > max.x) { pos.x = max.x; changed = true; }
 
-        if (!hit) return;
-        _driftDir.Normalize();
+            if (pos.y < min.y) { pos.y = min.y; changed = true; }
+            else if (pos.y > max.y) { pos.y = max.y; changed = true; }
+
+            if (changed) _rb.position = pos;
+            return;
+        }
 
         Vector2 vel = _rb.linearVelocity;
-        if (pos.x <= min.x && vel.x < 0f) vel.x = 0f;
-        if (pos.x >= max.x && vel.x > 0f) vel.x = 0f;
-        if (pos.y <= min.y && vel.y < 0f) vel.y = 0f;
-        if (pos.y >= max.y && vel.y > 0f) vel.y = 0f;
-        _rb.linearVelocity = vel;
 
-        if (bounds.kinematicMode) _rb.position  = pos;
-        else                       _rb.MovePosition(pos);
+        if (pos.x < min.x)
+        {
+            vel.x = Mathf.Max(vel.x, 0f);
+            if (min.x - pos.x > hardClampOvershootWorld)
+                pos.x = min.x;
+        }
+        else if (pos.x > max.x)
+        {
+            vel.x = Mathf.Min(vel.x, 0f);
+            if (pos.x - max.x > hardClampOvershootWorld)
+                pos.x = max.x;
+        }
+
+        if (pos.y < min.y)
+        {
+            vel.y = Mathf.Max(vel.y, 0f);
+            if (min.y - pos.y > hardClampOvershootWorld)
+                pos.y = min.y;
+        }
+        else if (pos.y > max.y)
+        {
+            vel.y = Mathf.Min(vel.y, 0f);
+            if (pos.y - max.y > hardClampOvershootWorld)
+                pos.y = max.y;
+        }
+
+        vel = Vector2.MoveTowards(_rb.linearVelocity, vel, softEdgeVelocityDamp * Time.fixedDeltaTime);
+        _rb.linearVelocity = vel;
+        _rb.position = pos;
     }
 
     private Vector2 ComputeVehicleAvoidance(Vector2 starPos)
@@ -458,17 +442,17 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         if (vehicles == null || vehicles.Count == 0) return Vector2.zero;
 
         float R = Mathf.Max(0.01f, avoidance.radius);
-        float p = Mathf.Max(0.1f,  avoidance.exponent);
+        float p = Mathf.Max(0.1f, avoidance.exponent);
 
         Vector2 sum = Vector2.zero;
         for (int i = 0; i < vehicles.Count; i++)
         {
             Vector2 d = starPos - vehicles[i];
-            float   r = d.magnitude;
+            float r = d.magnitude;
             if (r <= 0.0001f || r >= R) continue;
 
             Vector2 dir = d / r;
-            float   t   = Mathf.Clamp01(1f - (r / R));
+            float t = Mathf.Clamp01(1f - (r / R));
             sum += dir * Mathf.Pow(t, p);
         }
 
@@ -477,20 +461,17 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private void PickNewDriftDir()
     {
-        Vector2 rnd  = Random.insideUnitCircle.normalized;
-        float   bias = Mathf.Clamp01(_profile != null ? _profile.orbitBias : 0f);
-        _driftDir      = Vector2.Lerp(rnd, Vector2.Perpendicular(rnd).normalized, bias).normalized;
+        Vector2 rnd = Random.insideUnitCircle.normalized;
+        float bias = Mathf.Clamp01(_profile != null ? _profile.orbitBias : 0f);
+        _driftDir = Vector2.Lerp(rnd, Vector2.Perpendicular(rnd).normalized, bias).normalized;
         _rechooseTimer = Random.Range(1.2f, 2.4f);
     }
 
-    /// <summary>
-    /// Snap the star center below the top-of-screen minus <paramref name="topInset"/> world units.
-    /// Safe to call mid-coroutine (sets RB position directly).
-    /// </summary>
     public void ClampToScreenTop(float topInset)
     {
         if (_cam == null) _cam = Camera.main;
         if (_cam == null || _rb == null) return;
+
         float topY = ((Vector2)_cam.ViewportToWorldPoint(new Vector3(0.5f, 1f, 0f))).y;
         var pos = _rb.position;
         if (pos.y > topY - topInset)

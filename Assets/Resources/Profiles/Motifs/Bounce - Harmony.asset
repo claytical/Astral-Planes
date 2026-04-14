@@ -29,7 +29,7 @@ MonoBehaviour:
   stepsPerLoop: 16
   nodesPerStar: 2
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
+  mazePattern: {fileID: 11400000, guid: a6ec550cd7f5743ea8637890719fdde7, type: 2}
   chordProgression: {fileID: 11400000, guid: 2dbd76c1bfa6c49569e90a5939007775, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: bd93d1e00f28144d29f7858ce75ba73a, type: 2}
