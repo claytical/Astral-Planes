@@ -2,187 +2,141 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// <summary>
-/// Manages the PhaseStar's tentacle system.
-///
-/// One tentacle line per MusicalRole in the motif grows from the stationary star
-/// toward the nearest dust cell of that role. The line follows an organic Catmull-Rom
-/// spline that curves away from other CosmicDust. When the tip reaches the cell,
-/// the vine breathes for a brief contact delay before energy begins draining. The
-/// animated role-color gradient flows back toward the star during drain. When fully
-/// drained, the line dissolves in place. If a target becomes invalid mid-flight, the
-/// line snaps back (Retracting).
-///
-/// Star motion is frozen while any tentacle is Growing, Draining, or Dissolving.
-/// </summary>
 [DisallowMultipleComponent]
 public sealed class PhaseStarDustAffect : MonoBehaviour
 {
-    // ---------------------------------------------------------------
-    // Inspector
-    // ---------------------------------------------------------------
     [Header("Keep-Clear Pocket (optional)")]
     [SerializeField] private float keepClearTick = 0.15f;
 
     [Header("Drain")]
-    [Tooltip("How often the drain probe fires (seconds).")]
     [SerializeField] private float drainTick = 0.08f;
-
-    [Tooltip("Energy units drained per second from the target cell.")]
     [SerializeField] private float drainRatePerSec = 1.0f;
-
-    [Tooltip("Minimum seconds the tentacle must be attached before energy drain begins.")]
     [SerializeField] private float minContactTime = 1.0f;
-
-    [Tooltip("Seconds for the role-color front to sweep from tip to root on arrival.")]
     [SerializeField] private float colorTransitionTime = 0.5f;
-
-    [Tooltip("Seconds the tentacle tip flashes bright after each energy chip.")]
     [SerializeField] private float drainFlashDuration = 0.08f;
-
-    [Tooltip("Regrow delay after a tentacle fully drains a cell.")]
     [SerializeField] private float starDrainRegrowDelay = 6f;
 
     [Header("Tentacle")]
-    [Tooltip("World units per second while the tentacle tip grows toward the target.")]
     [SerializeField] private float tentacleGrowSpeed = 5f;
-
-    [Tooltip("World units per second while the tentacle tip retracts back to the star.")]
     [SerializeField] private float tentacleRetractSpeed = 12f;
-
-    [Tooltip("How many drain-pulse cycles per second animate along the line during draining.")]
     [SerializeField] private float tentacleFlowSpeed = 1.2f;
-
-    [Tooltip("Width of the tentacle line in world units.")]
     [SerializeField] private float tentacleWidth = 0.07f;
-
-    [Tooltip("World units to offset the line root from the star center toward the target, " +
-             "so the vine appears to emerge from the nearest diamond tip rather than the center.")]
     [SerializeField] private float diamondTipOffset = 0.3f;
-
-    [Tooltip("How quickly the vine root swings to face the target. Higher = crisper tracking, lower = lazy appendage feel.")]
     [SerializeField, Min(1f)] private float rootDirSmoothSpeed = 8f;
-
-    [Tooltip("Seconds for the tentacle to dissolve in place after fully draining a cell.")]
     [SerializeField] private float dissolveDuration = 0.8f;
-
-    [Tooltip("Optional material for tentacle LineRenderers. Falls back to Sprites/Default.")]
     [SerializeField] private Material tentacleMaterial;
 
     [Header("Vine Spline")]
-    [Tooltip("Number of intermediate control points between star and target (3–6 recommended).")]
     [SerializeField] private int vineCtrlPointCount = 4;
-
-    [Tooltip("Number of LineRenderer positions along the Catmull-Rom spline.")]
     [SerializeField] private int vineSplinePoints = 16;
-
-    [Tooltip("Max perpendicular Perlin-noise offset on control points (world units).")]
     [SerializeField] private float vineNoiseAmplitude = 0.6f;
-
-    [Tooltip("Seconds per Perlin noise breathe cycle (subtle per-frame wiggle on top of base).")]
     [SerializeField] private float vineBreathePeriod = 2.2f;
-
-    [Tooltip("World-unit radius within which non-target colored dust repels control points.")]
     [SerializeField] private float vineDustRepulsionRadius = 1.8f;
-
-    [Tooltip("Max repulsion push strength at contact (world units).")]
     [SerializeField] private float vineDustRepulsionStrength = 0.9f;
-
-    [Tooltip("Interval (seconds) between obstacle-pushed base-point recomputations.")]
     [SerializeField] private float vineCtrlRebuildInterval = 0.15f;
 
-    // ---------------------------------------------------------------
-    // Tentacle state machine
-    // ---------------------------------------------------------------
+    [Header("Branches")]
+    [SerializeField, Range(0f, 1f)] private float branchSpawnAtProgress = 0.4f;
+    [SerializeField, Min(0)] private int maxBranchDepth = 3;
+
     private enum TentacleState { Idle, Growing, Draining, Retracting, Dissolving }
 
     private class Tentacle
     {
-        public MusicalRole   role;
-        public TentacleState state         = TentacleState.Idle;
-        public Vector2Int    targetCell;
-        public Vector2       targetWorldPos;
-        public Vector2       tipPos;
-        public LineRenderer  line;
-        public float         drainTimer;
-        public float         flowOffset;       // per-tentacle phase so lines don't pulse in sync
+        public MusicalRole role;
+        public int tipIndex;
+        public TentacleState state = TentacleState.Idle;
+        public Vector2Int targetCell;
+        public Vector2 targetWorldPos;
+        public Vector2 tipPos;
+        public LineRenderer line;
+        public float drainTimer;
+        public float flowOffset;
 
-        // Spline buffers — allocated once in AllocateTentacleBuffers
-        public Vector2[] baseControlPts;       // [vineCtrlPointCount] obstacle-pushed base positions
-        public Vector2[] ctrlBuf;              // [vineCtrlPointCount + 2] star + intermediates + target
-        public Vector2[] splineBuf;            // [vineSplinePoints] final sampled spline positions
-        public Gradient  gradient;             // cached Gradient (reused via SetKeys to avoid GC)
+        public Vector2[] baseControlPts;
+        public Vector2[] ctrlBuf;
+        public Vector2[] splineBuf;
+        public Gradient gradient;
 
-        public float ctrlRebuildTimer;         // countdown to next obstacle-pushed base recompute
+        public Vector2[] navWorldPts;
+        public int navPtCount;
+        public bool hasNavPath;
 
-        // Growing — how far along the spline the vine has reached (0..1)
+        public float ctrlRebuildTimer;
         public float growProgress;
 
-        // Drain gate — vine must be attached this long before energy chips
+        public bool isSubBranch;
+        public Tentacle parentTentacle;
+        public Tentacle childBranch;
+        public int branchDepth;
+
         public float contactTimer;
-
-        // Dissolve
         public float dissolveTimer;
-        public float alphaScale = 1f;          // multiplied into all gradient alpha keys
-
-        // Drain flash — > 0 for drainFlashDuration seconds after each energy chip
+        public float alphaScale = 1f;
         public float drainFlashTimer;
-
-        // Smoothed world-space direction from diamond center toward current target.
-        // Lerped each frame so the vine root swings toward the dust rather than jumping.
         public Vector2 smoothedRootDir;
+
+        public bool notifiedDrainLock;
     }
 
-    // ---------------------------------------------------------------
-    // Fired when energy units are delivered to PhaseStar.
-    // Payload: (role, rawEnergyUnits).
-    // ---------------------------------------------------------------
     public System.Action<MusicalRole, float> onDelivery;
 
-    // ---------------------------------------------------------------
-    // Internal references
-    // ---------------------------------------------------------------
-    private PhaseStarBehaviorProfile  _profile;
-    private PhaseStar                 _star;
+    private PhaseStarBehaviorProfile _profile;
+    private PhaseStar _star;
     private PhaseStarCravingNavigator _navigator;
-    private PhaseStarMotion2D         _motion;
+    private PhaseStarMotion2D _motion;
 
-    private bool           _tentaclesActive;
-    private List<Tentacle> _tentacles = new();
+    private bool _tentaclesActive;
+    private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
 
-    // Scratch list for dust obstacle queries (populated inside RebuildBaseControlPts)
     private readonly List<Vector2Int> _dustScratch = new(256);
+    private readonly List<Vector2Int> _bfsPathScratch = new(128);
+    private readonly List<Vector2Int> _simplifiedPathScratch = new(64);
+    private readonly Queue<Vector2Int> _bfsQueue = new(512);
+    private readonly Dictionary<Vector2Int, Vector2Int> _bfsPrev = new(512);
 
-    // ---------------------------------------------------------------
-    // Public API
-    // ---------------------------------------------------------------
+    private static readonly Vector2Int[] BfsDirs =
+    {
+        Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down
+    };
+
+    private readonly List<Tentacle> _branchTentacles = new();
+    private readonly HashSet<Vector2Int> _branchExcludeScratch = new();
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
-        _profile   = profile;
-        _star      = star;
+        _profile = profile;
+        _star = star;
         _navigator = GetComponent<PhaseStarCravingNavigator>();
-        _motion    = GetComponent<PhaseStarMotion2D>();
+        _motion = GetComponent<PhaseStarMotion2D>();
 
-        // Build one tentacle per motif role.
         var roles = star.GetMotifActiveRoles();
         if (roles == null || roles.Count == 0)
+        {
             roles = new List<MusicalRole>
-                { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+            {
+                MusicalRole.Bass,
+                MusicalRole.Harmony,
+                MusicalRole.Lead,
+                MusicalRole.Groove
+            };
+        }
 
         _tentacles.Clear();
+
         for (int i = 0; i < roles.Count; i++)
         {
             var t = new Tentacle
             {
-                role       = roles[i],
+                role = roles[i],
+                tipIndex = i % 4,
                 flowOffset = Random.value,
-                tipPos     = transform.position,
+                tipPos = transform.position
             };
+
             AllocateTentacleBuffers(t);
-            // Stagger rebuild timers so not all tentacles query the grid on the same frame.
             t.ctrlRebuildTimer = i * (vineCtrlRebuildInterval / Mathf.Max(1, roles.Count));
             t.line = CreateTentacleLine(roles[i]);
             _tentacles.Add(t);
@@ -194,74 +148,156 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private void AllocateTentacleBuffers(Tentacle t)
     {
         t.baseControlPts = new Vector2[vineCtrlPointCount];
-        t.ctrlBuf        = new Vector2[vineCtrlPointCount + 2];
-        t.splineBuf      = new Vector2[vineSplinePoints];
-        t.gradient       = new Gradient();
-        t.alphaScale     = 1f;
+        t.ctrlBuf = new Vector2[Mathf.Max(vineCtrlPointCount + 2, 16)];
+        t.splineBuf = new Vector2[vineSplinePoints];
+        t.gradient = new Gradient();
+        t.alphaScale = 1f;
+        t.navWorldPts = null;
+        t.navPtCount = 0;
+        t.hasNavPath = false;
+        t.notifiedDrainLock = false;
     }
 
-    /// <summary>
-    /// Enables or disables all tentacles. Called by PhaseStar on arm (true) and disarm (false).
-    /// </summary>
     public void SetTentaclesActive(bool active)
     {
         _tentaclesActive = active;
-        if (!active) ResetTentacles();
+        _navigator?.SetHuntingEnabled(active);
+
+        if (!active)
+            ResetTentacles();
     }
 
-    /// <summary>
-    /// Immediately snaps all tentacles back to the star and sets them Idle.
-    /// Called on MineNode ejection and disarm.
-    /// </summary>
     public void ResetTentacles()
     {
         Vector2 starPos = transform.position;
+
         foreach (var t in _tentacles)
         {
-            t.state                = TentacleState.Idle;
-            t.tipPos               = starPos;
-            t.growProgress         = 0f;
-            t.contactTimer         = 0f;
-            t.dissolveTimer        = 0f;
-            t.alphaScale           = 1f;
-            t.drainTimer           = 0f;
-            t.ctrlRebuildTimer     = 0f;
-            t.drainFlashTimer      = 0f;
-            t.smoothedRootDir      = Vector2.zero;
-            t.line.enabled         = false;
+            if (t.notifiedDrainLock)
+            {
+                _navigator?.ClearLockOn(t.targetCell);
+                t.notifiedDrainLock = false;
+            }
+
+            t.state = TentacleState.Idle;
+            t.tipPos = starPos;
+            t.growProgress = 0f;
+            t.contactTimer = 0f;
+            t.dissolveTimer = 0f;
+            t.alphaScale = 1f;
+            t.drainTimer = 0f;
+            t.ctrlRebuildTimer = 0f;
+            t.drainFlashTimer = 0f;
+            t.smoothedRootDir = Vector2.zero;
+            t.hasNavPath = false;
+            t.navPtCount = 0;
+            t.line.enabled = false;
             t.line.widthMultiplier = tentacleWidth;
         }
+
+        for (int i = 0; i < _branchTentacles.Count; i++)
+        {
+            var bt = _branchTentacles[i];
+            if (bt.notifiedDrainLock)
+                _navigator?.ClearLockOn(bt.targetCell);
+
+            if (bt.line != null)
+                Destroy(bt.line.gameObject);
+        }
+
+        _branchTentacles.Clear();
+
+        foreach (var t in _tentacles)
+            t.childBranch = null;
+
         _motion?.SetFrozen(false);
     }
 
-    /// <summary>True while any tentacle is actively draining a cell.</summary>
     public bool IsAnyTentacleDraining
     {
         get
         {
             foreach (var t in _tentacles)
                 if (t.state == TentacleState.Draining) return true;
+
+            foreach (var t in _branchTentacles)
+                if (t.state == TentacleState.Draining) return true;
+
             return false;
         }
     }
 
-    /// <summary>True while any tentacle is Growing, Draining, or Dissolving.</summary>
     public bool HasActiveTentacles
     {
         get
         {
             foreach (var t in _tentacles)
-                if (t.state == TentacleState.Growing
-                 || t.state == TentacleState.Draining
-                 || t.state == TentacleState.Dissolving)
+            {
+                if (t.state == TentacleState.Growing ||
+                    t.state == TentacleState.Draining ||
+                    t.state == TentacleState.Dissolving)
                     return true;
+            }
+
+            foreach (var t in _branchTentacles)
+            {
+                if (t.state == TentacleState.Growing ||
+                    t.state == TentacleState.Draining ||
+                    t.state == TentacleState.Dissolving)
+                    return true;
+            }
+
             return false;
         }
     }
 
-    // ---------------------------------------------------------------
-    // Unity
-    // ---------------------------------------------------------------
+    public void GetDiamondLockState(int diamondIndex, out bool locked, out float lockAngleDeg, out bool isDraining)
+    {
+        locked = false;
+        lockAngleDeg = 0f;
+        isDraining = false;
+
+        Tentacle best = null;
+        int bestPriority = -1;
+
+        foreach (var t in _tentacles)
+        {
+            if (t.isSubBranch) continue;
+
+            int di = (t.tipIndex == 0 || t.tipIndex == 2) ? 0 : 1;
+            if (di != diamondIndex) continue;
+
+            int pri = t.state == TentacleState.Draining ? 2 :
+                      t.state == TentacleState.Growing ? 1 : -1;
+
+            if (pri < 0) continue;
+
+            if (pri > bestPriority)
+            {
+                best = t;
+                bestPriority = pri;
+            }
+        }
+
+        if (best == null) return;
+
+        locked = true;
+        isDraining = best.state == TentacleState.Draining;
+
+        var diamond = diamondIndex == 0
+            ? _star?.PrimaryDiamondTransform
+            : _star?.SecondaryDiamondTransform;
+
+        Vector2 center = diamond != null ? (Vector2)diamond.position : (Vector2)transform.position;
+        Vector2 dir = best.targetWorldPos - center;
+
+        float baseAngle = dir.sqrMagnitude > 0.0001f
+            ? Mathf.Atan2(-dir.x, dir.y) * Mathf.Rad2Deg
+            : 0f;
+
+        lockAngleDeg = (best.tipIndex >= 2) ? baseAngle + 180f : baseAngle;
+    }
+
     private void Update()
     {
         if (!_tentaclesActive) return;
@@ -275,26 +311,36 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             TickKeepClear();
         }
 
-        bool anyActive = false;
         foreach (var t in _tentacles)
-        {
             TickTentacle(t, dt);
-            if (t.state == TentacleState.Growing
-             || t.state == TentacleState.Draining
-             || t.state == TentacleState.Dissolving)
-                anyActive = true;
+
+        for (int bi = 0; bi < _branchTentacles.Count; bi++)
+            TickTentacle(_branchTentacles[bi], dt);
+
+        for (int bi = _branchTentacles.Count - 1; bi >= 0; bi--)
+        {
+            var bt = _branchTentacles[bi];
+            if (bt.state != TentacleState.Idle) continue;
+
+            if (bt.parentTentacle != null && bt.parentTentacle.childBranch == bt)
+                bt.parentTentacle.childBranch = null;
+
+            if (bt.notifiedDrainLock)
+                _navigator?.ClearLockOn(bt.targetCell);
+
+            if (bt.line != null)
+                Destroy(bt.line.gameObject);
+
+            _branchTentacles.RemoveAt(bi);
         }
 
-        _motion?.SetFrozen(anyActive);
+        _motion?.SetFrozen(false);
     }
 
-    // ---------------------------------------------------------------
-    // Per-tentacle tick
-    // ---------------------------------------------------------------
     private void TickTentacle(Tentacle t, float dt)
     {
-        var gfm   = GameFlowManager.Instance;
-        var gen   = gfm?.dustGenerator;
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drums = gfm?.activeDrumTrack;
 
         Vector2 starPos = transform.position;
@@ -303,27 +349,31 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         {
             case TentacleState.Idle:
             {
+                if (t.isSubBranch) break;
                 if (gen == null || drums == null) return;
                 if (_navigator == null) return;
 
-                if (_navigator.TryGetTargetForRole(t.role, out var cell)
-                    && IsTargetValid(cell, t.role))
+                if (_navigator.TryGetTargetForRole(t.role, out var cell) && IsTargetValid(cell, t.role))
                 {
-                    t.targetCell       = cell;
-                    t.targetWorldPos   = drums.GridToWorldPosition(cell);
-                    t.tipPos           = starPos;
-                    t.drainTimer       = 0f;
-                    t.growProgress     = 0f;
-                    t.ctrlRebuildTimer = 0f; // force immediate base rebuild on first frame
+                    t.targetCell = cell;
+                    t.targetWorldPos = drums.GridToWorldPosition(cell);
+                    t.tipPos = starPos;
+                    t.drainTimer = 0f;
+                    t.growProgress = 0f;
+                    t.ctrlRebuildTimer = 0f;
+                    t.contactTimer = 0f;
+                    t.dissolveTimer = 0f;
+                    t.alphaScale = 1f;
+                    t.notifiedDrainLock = false;
 
-                    // Pre-fill splineBuf so arc-length is valid before EvaluateVineSpline runs.
                     for (int i = 0; i < vineSplinePoints; i++)
                         t.splineBuf[i] = starPos;
 
-                    t.state          = TentacleState.Growing;
-                    t.line.enabled   = true;
+                    t.state = TentacleState.Growing;
+                    t.line.enabled = true;
                     UpdateTentacleLine(t, starPos);
                 }
+
                 break;
             }
 
@@ -332,49 +382,60 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (drums != null)
                     t.targetWorldPos = drums.GridToWorldPosition(t.targetCell);
 
-                // Validate target — redirect or retract if it's gone.
                 if (!IsTargetValid(t.targetCell, t.role))
                 {
-                    if (_navigator != null && drums != null
-                        && _navigator.TryGetTargetForRole(t.role, out var newCell)
-                        && newCell != t.targetCell && IsTargetValid(newCell, t.role))
+                    if (_navigator != null &&
+                        drums != null &&
+                        _navigator.TryGetTargetForRole(t.role, out var newCell) &&
+                        newCell != t.targetCell &&
+                        IsTargetValid(newCell, t.role))
                     {
-                        t.targetCell       = newCell;
-                        t.targetWorldPos   = drums.GridToWorldPosition(newCell);
-                        t.ctrlRebuildTimer = 0f; // redirect — rebuild base immediately
+                        t.targetCell = newCell;
+                        t.targetWorldPos = drums.GridToWorldPosition(newCell);
+                        t.ctrlRebuildTimer = 0f;
                     }
                     else
                     {
+                        if (t.notifiedDrainLock)
+                        {
+                            _navigator?.ClearLockOn(t.targetCell);
+                            t.notifiedDrainLock = false;
+                        }
+
                         t.state = TentacleState.Retracting;
                         break;
                     }
                 }
 
-                // Rebuild obstacle-pushed base control points on timer.
                 t.ctrlRebuildTimer -= dt;
                 if (t.ctrlRebuildTimer <= 0f)
                 {
                     t.ctrlRebuildTimer = vineCtrlRebuildInterval;
-                    RebuildBaseControlPts(t, starPos);
+                    RebuildBaseControlPts(t, GetLineRoot(t));
                 }
 
-                // Advance growth: speed in world-units/sec along the spline arc.
-                // Use last frame's splineBuf for arc length (valid from frame 2 onward;
-                // frame 1 is clamped so the vine doesn't jump to completion).
                 float arcLen = ApproxSplineLength(t.splineBuf, vineSplinePoints);
                 t.growProgress = Mathf.Clamp01(
                     t.growProgress + tentacleGrowSpeed * dt / Mathf.Max(0.5f, arcLen));
 
                 UpdateTentacleLine(t, starPos);
+                ManageBranchSpawn(t);
 
                 if (t.growProgress >= 1f)
                 {
-                    t.tipPos           = t.targetWorldPos;
-                    t.state            = TentacleState.Draining;
-                    t.contactTimer     = 0f;
-                    t.drainTimer       = drainTick; // first drain waits a full interval
+                    t.tipPos = t.targetWorldPos;
+                    t.state = TentacleState.Draining;
+                    t.contactTimer = 0f;
+                    t.drainTimer = drainTick;
                     t.ctrlRebuildTimer = 0f;
+
+                    if (!t.notifiedDrainLock)
+                    {
+                        _navigator?.NotifyDraining(t.targetCell);
+                        t.notifiedDrainLock = true;
+                    }
                 }
+
                 break;
             }
 
@@ -382,25 +443,29 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 if (!IsTargetValid(t.targetCell, t.role))
                 {
+                    if (t.notifiedDrainLock)
+                    {
+                        _navigator?.ClearLockOn(t.targetCell);
+                        t.notifiedDrainLock = false;
+                    }
+
                     t.state = TentacleState.Retracting;
                     break;
                 }
 
                 t.tipPos = t.targetWorldPos;
-
                 t.drainFlashTimer = Mathf.Max(0f, t.drainFlashTimer - dt);
 
-                // Keep vine alive and breathing while draining.
                 t.ctrlRebuildTimer -= dt;
                 if (t.ctrlRebuildTimer <= 0f)
                 {
                     t.ctrlRebuildTimer = vineCtrlRebuildInterval;
-                    RebuildBaseControlPts(t, starPos);
+                    RebuildBaseControlPts(t, GetLineRoot(t));
                 }
 
                 UpdateTentacleLine(t, starPos);
+                ManageBranchSpawn(t);
 
-                // Minimum contact time gate — vine must be attached before energy chips.
                 t.contactTimer += dt;
                 if (t.contactTimer >= minContactTime)
                 {
@@ -411,111 +476,213 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                         DrainTick(t, gen);
                     }
                 }
+
                 break;
             }
 
             case TentacleState.Retracting:
             {
-                // Simple 2-point snap-back; no spline needed for an interrupted/invalid retract.
-                t.tipPos = Vector2.MoveTowards(t.tipPos, starPos, tentacleRetractSpeed * dt);
+                if (t.childBranch != null && t.childBranch.state != TentacleState.Idle)
+                    t.childBranch.state = TentacleState.Retracting;
+
+                if (t.notifiedDrainLock)
+                {
+                    _navigator?.ClearLockOn(t.targetCell);
+                    t.notifiedDrainLock = false;
+                }
+
+                Vector2 retractTarget = t.isSubBranch ? GetLineRoot(t) : starPos;
+                t.tipPos = Vector2.MoveTowards(t.tipPos, retractTarget, tentacleRetractSpeed * dt);
                 UpdateTentacleLine(t, starPos);
 
-                if (Vector2.Distance(t.tipPos, starPos) < 0.05f)
+                if (Vector2.Distance(t.tipPos, retractTarget) < 0.05f)
                 {
-                    t.state        = TentacleState.Idle;
+                    t.state = TentacleState.Idle;
                     t.line.enabled = false;
                 }
+
                 break;
             }
 
             case TentacleState.Dissolving:
             {
-                t.dissolveTimer   += dt;
-                t.drainFlashTimer  = Mathf.Max(0f, t.drainFlashTimer - dt);
-                t.alphaScale       = Mathf.Clamp01(1f - t.dissolveTimer / dissolveDuration);
-                t.tipPos           = t.targetWorldPos;
+                if (t.notifiedDrainLock)
+                {
+                    _navigator?.ClearLockOn(t.targetCell);
+                    t.notifiedDrainLock = false;
+                }
+
+                t.dissolveTimer += dt;
+                t.drainFlashTimer = Mathf.Max(0f, t.drainFlashTimer - dt);
+                t.alphaScale = Mathf.Clamp01(1f - t.dissolveTimer / dissolveDuration);
+                t.tipPos = t.targetWorldPos;
                 UpdateTentacleLine(t, starPos);
 
                 if (t.dissolveTimer >= dissolveDuration)
                 {
-                    t.state                = TentacleState.Idle;
-                    t.alphaScale           = 1f;
-                    t.dissolveTimer        = 0f;
-                    t.growProgress         = 0f;
-                    t.line.enabled         = false;
-                    t.line.widthMultiplier = tentacleWidth; // restore for next use
+                    t.state = TentacleState.Idle;
+                    t.alphaScale = 1f;
+                    t.dissolveTimer = 0f;
+                    t.growProgress = 0f;
+                    t.line.enabled = false;
+                    t.line.widthMultiplier = tentacleWidth;
                 }
+
                 break;
             }
         }
     }
 
-    // ---------------------------------------------------------------
-    // Drain a single tick from the target cell
-    // ---------------------------------------------------------------
     private void DrainTick(Tentacle t, CosmicDustGenerator gen)
     {
         if (gen == null) return;
         if (!gen.TryGetDustAt(t.targetCell, out var dust) || dust == null) return;
 
-        int chipUnits   = Mathf.Max(1, Mathf.RoundToInt(drainRatePerSec * drainTick));
+        int chipUnits = Mathf.Max(1, Mathf.RoundToInt(drainRatePerSec * drainTick));
         int actualUnits = dust.ChipEnergy(chipUnits);
 
         if (actualUnits > 0 && _star != null)
         {
-            _star.AddCharge(t.role, (float)actualUnits);
-            onDelivery?.Invoke(t.role, (float)actualUnits);
-            t.drainFlashTimer = drainFlashDuration; // brief tip sparkle on each chip
+            _star.AddCharge(t.role, actualUnits);
+            onDelivery?.Invoke(t.role, actualUnits);
+            t.drainFlashTimer = drainFlashDuration;
         }
 
         if (dust.currentEnergyUnits <= 0)
         {
-            // Do not schedule regrow — the maze grows once and drained cells stay empty
-            // until the Vehicle carves new paths through them (or the motif ends and resets).
-            // Regrowing with Role.None would block Co_WaitForColoredDust indefinitely.
-            gen.ClearCell(t.targetCell,
+            gen.ClearCell(
+                t.targetCell,
                 CosmicDustGenerator.DustClearMode.FadeAndHide,
                 fadeSeconds: 1.5f,
                 scheduleRegrow: false);
-            t.state         = TentacleState.Dissolving;
+
+            t.state = TentacleState.Dissolving;
             t.dissolveTimer = 0f;
-            t.alphaScale    = 1f;
+            t.alphaScale = 1f;
         }
     }
 
-    // ---------------------------------------------------------------
-    // Vine spline — obstacle-pushed base rebuild (slow tick, ~0.15s)
-    // ---------------------------------------------------------------
-    private void RebuildBaseControlPts(Tentacle t, Vector2 starPos)
+    private void RebuildBaseControlPts(Tentacle t, Vector2 rootPos)
     {
-        var gfm  = GameFlowManager.Instance;
-        var gen  = gfm?.dustGenerator;
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drum = gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
+        Vector2Int rootCell = drum.WorldToGridPosition(rootPos);
+
+        if (TryFindGridPath(rootCell, t.targetCell, gen, _bfsPathScratch))
+            BuildNavPath(_bfsPathScratch, t, rootPos, drum);
+        else
+        {
+            t.hasNavPath = false;
+            BuildControlPtsRepulsionFallback(t, rootPos, gen, drum);
+        }
+    }
+
+    private bool TryFindGridPath(Vector2Int start, Vector2Int end, CosmicDustGenerator gen, List<Vector2Int> outPath, int budget = 400)
+    {
+        outPath.Clear();
+        if (start == end)
+        {
+            outPath.Add(start);
+            return true;
+        }
+
+        _bfsQueue.Clear();
+        _bfsPrev.Clear();
+        _bfsQueue.Enqueue(start);
+        _bfsPrev[start] = start;
+
+        int expanded = 0;
+        bool found = false;
+
+        while (_bfsQueue.Count > 0 && expanded < budget)
+        {
+            var cur = _bfsQueue.Dequeue();
+            expanded++;
+
+            if (cur == end)
+            {
+                found = true;
+                break;
+            }
+
+            for (int d = 0; d < BfsDirs.Length; d++)
+            {
+                var next = cur + BfsDirs[d];
+                if (_bfsPrev.ContainsKey(next)) continue;
+                if (gen.HasDustAt(next) && next != end) continue;
+
+                _bfsPrev[next] = cur;
+                _bfsQueue.Enqueue(next);
+            }
+        }
+
+        if (!found) return false;
+
+        var cell = end;
+        while (cell != start)
+        {
+            outPath.Add(cell);
+            cell = _bfsPrev[cell];
+        }
+
+        outPath.Add(start);
+        outPath.Reverse();
+        return true;
+    }
+
+    private void BuildNavPath(List<Vector2Int> rawPath, Tentacle t, Vector2 rootPos, DrumTrack drum)
+    {
+        _simplifiedPathScratch.Clear();
+        _simplifiedPathScratch.Add(rawPath[0]);
+
+        for (int i = 1; i < rawPath.Count - 1; i++)
+        {
+            if (rawPath[i] - rawPath[i - 1] != rawPath[i + 1] - rawPath[i])
+                _simplifiedPathScratch.Add(rawPath[i]);
+        }
+
+        _simplifiedPathScratch.Add(rawPath[rawPath.Count - 1]);
+
+        int n = _simplifiedPathScratch.Count;
+
+        if (t.navWorldPts == null || t.navWorldPts.Length < n)
+            t.navWorldPts = new Vector2[Mathf.Max(n, 16)];
+
+        if (t.ctrlBuf == null || t.ctrlBuf.Length < n)
+            t.ctrlBuf = new Vector2[Mathf.Max(n, 16)];
+
+        t.navPtCount = n;
+        t.hasNavPath = true;
+
+        t.navWorldPts[0] = rootPos;
+        for (int i = 1; i < n - 1; i++)
+            t.navWorldPts[i] = drum.GridToWorldPosition(_simplifiedPathScratch[i]);
+        t.navWorldPts[n - 1] = t.targetWorldPos;
+    }
+
+    private void BuildControlPtsRepulsionFallback(Tentacle t, Vector2 rootPos, CosmicDustGenerator gen, DrumTrack drum)
+    {
         gen.GetColoredDustCells(_dustScratch);
 
-        Vector2 path = t.targetWorldPos - starPos;
-        float   len  = path.magnitude;
-        Vector2 perp = len > 0.0001f
-            ? new Vector2(-path.y, path.x) / len
-            : Vector2.up;
+        Vector2 path = t.targetWorldPos - rootPos;
+        float len = path.magnitude;
+        Vector2 perp = len > 0.0001f ? new Vector2(-path.y, path.x) / len : Vector2.up;
 
         for (int i = 0; i < vineCtrlPointCount; i++)
         {
-            float   baseT   = (i + 1f) / (vineCtrlPointCount + 1f);
-            Vector2 basePos = starPos + path * baseT;
+            float baseT = (i + 1f) / (vineCtrlPointCount + 1f);
+            Vector2 basePos = rootPos + path * baseT;
 
-            // Slow Perlin shift that changes between rebuilds, giving the vine a wandering base shape.
-            float seed     = (float)t.role * 31.4f + i * 7.3f;
+            float seed = (float)t.role * 31.4f + i * 7.3f;
             float noiseVal = Mathf.PerlinNoise(seed, Time.time * 0.15f) * 2f - 1f;
-            // Arc envelope: offset peaks at midpoint and tapers to 0 at endpoints.
-            float offset   = noiseVal * vineNoiseAmplitude * baseT * (1f - baseT) * 4f;
+            float offset = noiseVal * vineNoiseAmplitude * baseT * (1f - baseT) * 4f;
 
             t.baseControlPts[i] = basePos + perp * offset;
         }
 
-        // Repulsion: push each control point away from nearby non-target colored dust.
         for (int ci = 0; ci < _dustScratch.Count; ci++)
         {
             Vector2Int cell = _dustScratch[ci];
@@ -526,97 +693,110 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             for (int pi = 0; pi < vineCtrlPointCount; pi++)
             {
                 Vector2 delta = t.baseControlPts[pi] - cellWorld;
-                float   dist  = delta.magnitude;
+                float dist = delta.magnitude;
                 if (dist < vineDustRepulsionRadius && dist > 0.001f)
                 {
-                    float strength        = (1f - dist / vineDustRepulsionRadius) * vineDustRepulsionStrength;
+                    float strength = (1f - dist / vineDustRepulsionRadius) * vineDustRepulsionStrength;
                     t.baseControlPts[pi] += (delta / dist) * strength;
                 }
             }
         }
     }
 
-    // ---------------------------------------------------------------
-    // Vine spline — per-frame evaluation (fast breathe, fills splineBuf)
-    // ---------------------------------------------------------------
-    private void EvaluateVineSpline(Tentacle t, Vector2 starPos)
+    private void EvaluateVineSpline(Tentacle t, Vector2 rootPos)
     {
-        Vector2 path = t.targetWorldPos - starPos;
-        float   len  = path.magnitude;
-        Vector2 perp = len > 0.0001f
-            ? new Vector2(-path.y, path.x) / len
-            : Vector2.up;
-
-        // Anchor points
-        t.ctrlBuf[0]                    = starPos;
-        t.ctrlBuf[vineCtrlPointCount + 1] = t.targetWorldPos;
-
-        // Intermediate points: base position + subtle per-frame breathe
-        for (int i = 0; i < vineCtrlPointCount; i++)
+        if (t.hasNavPath && t.navPtCount >= 2)
         {
-            float seed       = (float)t.role * 31.4f + i * 7.3f;
-            float breatheVal = Mathf.PerlinNoise(seed, Time.time / vineBreathePeriod) * 2f - 1f;
-            t.ctrlBuf[i + 1] = t.baseControlPts[i] + perp * (breatheVal * vineNoiseAmplitude * 0.15f);
-        }
+            t.navWorldPts[0] = rootPos;
+            t.navWorldPts[t.navPtCount - 1] = t.targetWorldPos;
 
-        CatmullRomChain(t.ctrlBuf, vineCtrlPointCount + 2, t.splineBuf, vineSplinePoints);
+            for (int i = 0; i < t.navPtCount; i++)
+            {
+                int pi = Mathf.Max(0, i - 1);
+                int ni = Mathf.Min(t.navPtCount - 1, i + 1);
+                Vector2 tan = t.navWorldPts[ni] - t.navWorldPts[pi];
+                Vector2 perp = tan.sqrMagnitude > 0.0001f
+                    ? new Vector2(-tan.y, tan.x).normalized
+                    : Vector2.up;
+
+                float seed = (float)t.role * 31.4f + i * 7.3f;
+                float breathe = Mathf.PerlinNoise(seed, Time.time / vineBreathePeriod) * 2f - 1f;
+                t.ctrlBuf[i] = t.navWorldPts[i] + perp * (breathe * vineNoiseAmplitude * 0.08f);
+            }
+
+            CatmullRomChain(t.ctrlBuf, t.navPtCount, t.splineBuf, vineSplinePoints);
+        }
+        else
+        {
+            Vector2 path = t.targetWorldPos - rootPos;
+            float len = path.magnitude;
+            Vector2 perp = len > 0.0001f ? new Vector2(-path.y, path.x) / len : Vector2.up;
+
+            t.ctrlBuf[0] = rootPos;
+            t.ctrlBuf[vineCtrlPointCount + 1] = t.targetWorldPos;
+
+            for (int i = 0; i < vineCtrlPointCount; i++)
+            {
+                float seed = (float)t.role * 31.4f + i * 7.3f;
+                float breatheVal = Mathf.PerlinNoise(seed, Time.time / vineBreathePeriod) * 2f - 1f;
+                t.ctrlBuf[i + 1] = t.baseControlPts[i] + perp * (breatheVal * vineNoiseAmplitude * 0.15f);
+            }
+
+            CatmullRomChain(t.ctrlBuf, vineCtrlPointCount + 2, t.splineBuf, vineSplinePoints);
+        }
     }
 
-    // ---------------------------------------------------------------
-    // Line visual
-    // ---------------------------------------------------------------
-    // Returns the world-space point where the line root should appear.
-    // Uses a smoothed direction from the diamond center toward the target so the root
-    // always faces the dust and arcs smoothly rather than flipping with the diamond spin.
-    private Vector2 GetLineRoot(Tentacle t, Vector2 targetWorldPos)
+    private Vector2 GetLineRoot(Tentacle t)
     {
-        var diamond = _star?.PrimaryDiamondTransform;
-        if (diamond == null) return (Vector2)transform.position;
+        if (t.isSubBranch && t.parentTentacle != null && t.parentTentacle.splineBuf != null)
+        {
+            int midIdx = Mathf.Clamp(vineSplinePoints / 2, 0, t.parentTentacle.splineBuf.Length - 1);
+            return t.parentTentacle.splineBuf[midIdx];
+        }
+
+        var diamond = (t.tipIndex == 0 || t.tipIndex == 2)
+            ? _star?.PrimaryDiamondTransform
+            : _star?.SecondaryDiamondTransform;
+
+        if (diamond == null) return transform.position;
 
         var sr = diamond.GetComponent<SpriteRenderer>();
         float tipDist = (sr != null && sr.sprite != null)
             ? sr.sprite.bounds.extents.y
             : diamondTipOffset;
 
-        // Anchor to the physical top of the spinning diamond sprite.
-        // diamond.up reflects the localRotation set each frame by UpdateDualDiamonds,
-        // so the root whips around with the diamond as it spins.
-        return (Vector2)diamond.position + (Vector2)diamond.up * tipDist;
+        float pole = (t.tipIndex < 2) ? 1f : -1f;
+        return (Vector2)diamond.position + (Vector2)diamond.up * (tipDist * pole);
     }
 
     private void UpdateTentacleLine(Tentacle t, Vector2 starPos)
     {
-        Vector2 lineRoot = GetLineRoot(t, t.targetWorldPos);
+        Vector2 lineRoot = GetLineRoot(t);
 
-        // Retracting: simple 2-point gray snap-back (organic path not needed).
         if (t.state == TentacleState.Retracting)
         {
-            t.line.positionCount   = 2;
+            t.line.positionCount = 2;
             t.line.widthMultiplier = tentacleWidth;
-            t.line.SetPosition(0, (Vector3)lineRoot);
-            t.line.SetPosition(1, (Vector3)t.tipPos);
+            t.line.SetPosition(0, lineRoot);
+            t.line.SetPosition(1, t.tipPos);
             BuildGradient(t, GetRoleColor(t.role));
             t.line.colorGradient = t.gradient;
             return;
         }
 
-        // All other states: organic Catmull-Rom spline.
-        // EvaluateVineSpline uses the true star center so control-point math is stable;
-        // we replace only the first rendered position with the tip-offset root.
-        EvaluateVineSpline(t, starPos);
+        EvaluateVineSpline(t, lineRoot);
 
         int renderCount = (t.state == TentacleState.Growing)
             ? Mathf.Max(2, Mathf.RoundToInt(t.growProgress * (vineSplinePoints - 1)) + 1)
-            : vineSplinePoints; // Draining or Dissolving: full spline
+            : vineSplinePoints;
 
-        t.line.positionCount   = renderCount;
-        t.line.widthMultiplier = tentacleWidth * t.alphaScale; // Dissolving shrinks the line
+        t.line.positionCount = renderCount;
+        t.line.widthMultiplier = tentacleWidth * t.alphaScale;
 
-        t.line.SetPosition(0, (Vector3)lineRoot); // override root to diamond tip
+        t.line.SetPosition(0, lineRoot);
         for (int i = 1; i < renderCount; i++)
-            t.line.SetPosition(i, (Vector3)t.splineBuf[i]);
+            t.line.SetPosition(i, t.splineBuf[i]);
 
-        // Sample dust charge so the tip taper matches the drain state.
         float dustCharge01 = 1f;
         if (t.state == TentacleState.Draining || t.state == TentacleState.Dissolving)
         {
@@ -635,25 +815,23 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (t.state == TentacleState.Draining)
         {
-            // Phase 1: color front sweeps from tip (pos 1) toward root (pos 0).
-            float colorFill  = Mathf.Clamp01(t.contactTimer / Mathf.Max(0.001f, colorTransitionTime));
-            float colorFront = 1f - colorFill; // 1.0 at arrival, 0.0 when fully colored
+            float colorFill = Mathf.Clamp01(t.contactTimer / Mathf.Max(0.001f, colorTransitionTime));
+            float colorFront = 1f - colorFill;
 
             if (colorFill < 0.999f)
             {
                 float edge0 = Mathf.Max(0f, colorFront - 0.08f);
                 float edge1 = Mathf.Min(1f, colorFront + 0.08f);
-                // Tip fades to match the dust's current drain color, tapers to transparent.
                 Color dustTipColor = Color.Lerp(Color.gray, roleColor, dustCharge01);
 
                 t.gradient.SetKeys(
                     new[]
                     {
-                        new GradientColorKey(Color.gray,    0f),
-                        new GradientColorKey(Color.gray,    edge0),
-                        new GradientColorKey(roleColor,     edge1),
-                        new GradientColorKey(dustTipColor,  0.92f),
-                        new GradientColorKey(dustTipColor,  1f),
+                        new GradientColorKey(Color.gray, 0f),
+                        new GradientColorKey(Color.gray, edge0),
+                        new GradientColorKey(roleColor, edge1),
+                        new GradientColorKey(dustTipColor, 0.92f),
+                        new GradientColorKey(dustTipColor, 1f),
                     },
                     new[]
                     {
@@ -661,23 +839,20 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                         new GradientAlphaKey(0.45f * a, edge0),
                         new GradientAlphaKey(0.85f * a, edge1),
                         new GradientAlphaKey(dustCharge01 * 0.5f * a, 0.92f),
-                        new GradientAlphaKey(0f, 1f),   // fade to transparent at dust end
+                        new GradientAlphaKey(0f, 1f),
                     }
                 );
                 return;
             }
 
-            // Phase 2: fully colored — animated pulse flowing from tip to root.
             BuildDrainPulseGradient(t, roleColor, a, dustCharge01);
         }
         else if (t.state == TentacleState.Dissolving)
         {
-            // Dissolving always starts fully colored.
             BuildDrainPulseGradient(t, roleColor, a, dustCharge01);
         }
         else
         {
-            // Growing / Retracting: neutral gray probe.
             t.gradient.SetKeys(
                 new[]
                 {
@@ -695,37 +870,36 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void BuildDrainPulseGradient(Tentacle t, Color roleColor, float a, float dustCharge01 = 1f)
     {
-        float rawT  = (Time.time * tentacleFlowSpeed + t.flowOffset) % 1f;
+        float rawT = (Time.time * tentacleFlowSpeed + t.flowOffset) % 1f;
         float pulse = 1f - rawT;
-        float hw    = 0.1f;
-        float p0    = Mathf.Clamp01(pulse - hw);
-        float p1    = pulse;
-        float p2    = Mathf.Clamp01(pulse + hw);
+        float hw = 0.1f;
+        float p0 = Mathf.Clamp01(pulse - hw);
+        float p1 = pulse;
+        float p2 = Mathf.Clamp01(pulse + hw);
 
         float flashBoost = t.drainFlashTimer > 0f ? 0.5f : 0.4f;
         Color bright = Color.Lerp(roleColor, Color.white, flashBoost);
 
-        // Tip color matches the dust's current drain state; fades to transparent at the dust end.
         Color dustTipColor = Color.Lerp(Color.gray, roleColor, dustCharge01);
-        float tipAlpha     = dustCharge01 * 0.6f * a;
+        float tipAlpha = dustCharge01 * 0.6f * a;
 
         t.gradient.SetKeys(
             new[]
             {
-                new GradientColorKey(roleColor,    0f),
-                new GradientColorKey(bright,       p1),
-                new GradientColorKey(roleColor,    p2),
+                new GradientColorKey(roleColor, 0f),
+                new GradientColorKey(bright, p1),
+                new GradientColorKey(roleColor, p2),
                 new GradientColorKey(dustTipColor, 0.92f),
                 new GradientColorKey(dustTipColor, 1f),
             },
             new[]
             {
                 new GradientAlphaKey(0.35f * a, 0f),
-                new GradientAlphaKey(0.2f  * a, p0),
-                new GradientAlphaKey(1.0f  * a, p1),
-                new GradientAlphaKey(0.2f  * a, p2),
-                new GradientAlphaKey(tipAlpha,  0.92f),
-                new GradientAlphaKey(0f,        1f),   // fade to transparent at dust end
+                new GradientAlphaKey(0.2f * a, p0),
+                new GradientAlphaKey(1.0f * a, p1),
+                new GradientAlphaKey(0.2f * a, p2),
+                new GradientAlphaKey(tipAlpha, 0.92f),
+                new GradientAlphaKey(0f, 1f),
             }
         );
     }
@@ -738,13 +912,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             : Color.white;
     }
 
-    // ---------------------------------------------------------------
-    // Catmull-Rom spline math (inlined — no external dependency)
-    // ---------------------------------------------------------------
-
     private static Vector2 CatmullRom(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
     {
-        float t2 = t * t, t3 = t2 * t;
+        float t2 = t * t;
+        float t3 = t2 * t;
         return 0.5f * (
             2f * p1 +
             (-p0 + p2) * t +
@@ -753,23 +924,18 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         );
     }
 
-    /// <summary>
-    /// Evaluates a Catmull-Rom chain into <paramref name="outPts"/> (exactly <paramref name="outCount"/> samples).
-    /// Ghost endpoints are reflected inward so the curve passes cleanly through ctrl[0] and ctrl[ctrlCount-1].
-    /// </summary>
     private static void CatmullRomChain(Vector2[] ctrl, int ctrlCount, Vector2[] outPts, int outCount)
     {
         int spans = ctrlCount - 1;
+
         for (int i = 0; i < outCount; i++)
         {
             float globalT = (outCount > 1) ? (float)i / (outCount - 1) : 0f;
-            float spanF   = globalT * spans;
-            int   spanIdx = Mathf.Min((int)spanF, spans - 1);
-            float localT  = spanF - spanIdx;
+            float spanF = globalT * spans;
+            int spanIdx = Mathf.Min((int)spanF, spans - 1);
+            float localT = spanF - spanIdx;
 
-            Vector2 p0 = (spanIdx == 0)
-                ? 2f * ctrl[0] - ctrl[1]
-                : ctrl[spanIdx - 1];
+            Vector2 p0 = (spanIdx == 0) ? 2f * ctrl[0] - ctrl[1] : ctrl[spanIdx - 1];
             Vector2 p1 = ctrl[spanIdx];
             Vector2 p2 = ctrl[spanIdx + 1];
             Vector2 p3 = (spanIdx + 2 >= ctrlCount)
@@ -788,10 +954,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         return total;
     }
 
-    // ---------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------
-
     private bool IsTargetValid(Vector2Int cell, MusicalRole role)
     {
         var gen = GameFlowManager.Instance?.dustGenerator;
@@ -801,6 +963,59 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         return dust.Role == role && dust.currentEnergyUnits > 0;
     }
 
+    private void ManageBranchSpawn(Tentacle t)
+    {
+        if (maxBranchDepth <= 0) return;
+        if (t.childBranch != null) return;
+        if (t.branchDepth >= maxBranchDepth) return;
+        if (t.state == TentacleState.Growing && t.growProgress < branchSpawnAtProgress) return;
+        if (t.state != TentacleState.Growing && t.state != TentacleState.Draining) return;
+        if (_navigator == null) return;
+
+        _branchExcludeScratch.Clear();
+        var chain = t;
+        while (chain != null)
+        {
+            if (chain.state != TentacleState.Idle)
+                _branchExcludeScratch.Add(chain.targetCell);
+
+            chain = chain.parentTentacle;
+        }
+
+        if (!_navigator.TryGetTargetForRole(t.role, out var cell, _branchExcludeScratch))
+            return;
+
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return;
+
+        var branch = new Tentacle
+        {
+            role = t.role,
+            tipIndex = t.tipIndex,
+            isSubBranch = true,
+            parentTentacle = t,
+            branchDepth = t.branchDepth + 1,
+            flowOffset = Random.value,
+            targetCell = cell,
+            targetWorldPos = drum.GridToWorldPosition(cell),
+            state = TentacleState.Growing
+        };
+
+        AllocateTentacleBuffers(branch);
+        branch.ctrlRebuildTimer = 0f;
+        branch.line = CreateTentacleLine(t.role);
+
+        Vector2 branchRoot = GetLineRoot(branch);
+        for (int i = 0; i < vineSplinePoints; i++)
+            branch.splineBuf[i] = branchRoot;
+
+        branch.tipPos = branchRoot;
+        branch.line.enabled = true;
+
+        t.childBranch = branch;
+        _branchTentacles.Add(branch);
+    }
+
     private LineRenderer CreateTentacleLine(MusicalRole role)
     {
         var go = new GameObject($"Tentacle_{role}");
@@ -808,29 +1023,37 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         go.transform.localPosition = Vector3.zero;
 
         var lr = go.AddComponent<LineRenderer>();
-        lr.useWorldSpace      = true;
-        lr.positionCount      = 2;
-        lr.widthMultiplier    = tentacleWidth;
-        lr.shadowCastingMode  = ShadowCastingMode.Off;
-        lr.receiveShadows     = false;
-        lr.material           = tentacleMaterial != null
+        lr.useWorldSpace = true;
+        lr.positionCount = 2;
+        lr.widthMultiplier = tentacleWidth;
+        lr.shadowCastingMode = ShadowCastingMode.Off;
+        lr.receiveShadows = false;
+        lr.material = tentacleMaterial != null
             ? tentacleMaterial
             : new Material(Shader.Find("Sprites/Default"));
+
+        lr.numCornerVertices = 5;
+        lr.numCapVertices = 5;
+
+        lr.widthCurve = new AnimationCurve(
+            new Keyframe(0f, 0.3f),
+            new Keyframe(0.2f, 1.0f),
+            new Keyframe(0.65f, 0.9f),
+            new Keyframe(1f, 0.0f)
+        );
+
         lr.SetPosition(0, transform.position);
         lr.SetPosition(1, transform.position);
         lr.enabled = false;
         return lr;
     }
 
-    // ---------------------------------------------------------------
-    // Keep-clear pocket
-    // ---------------------------------------------------------------
     private void TickKeepClear()
     {
         if (_profile == null || !_profile.starKeepsDustClear) return;
 
-        var gfm   = GameFlowManager.Instance;
-        var gen   = gfm?.dustGenerator;
+        var gfm = GameFlowManager.Instance;
+        var gen = gfm?.dustGenerator;
         var drums = gfm?.activeDrumTrack;
         if (gen == null || drums == null) return;
 

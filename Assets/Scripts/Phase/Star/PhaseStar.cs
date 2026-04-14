@@ -252,6 +252,10 @@ public class PhaseStar : MonoBehaviour
     /// the tentacle root to the diamond tip so it whips with the rotation.</summary>
     public Transform PrimaryDiamondTransform => _previewVisual;
 
+    /// <summary>The secondary (CCW) diamond's Transform. Used by PhaseStarDustAffect for
+    /// tentacle tips assigned to Diamond B (tipIndex 1 and 3).</summary>
+    public Transform SecondaryDiamondTransform => _previewVisualB;
+
     // energyUnitsDelivered: raw energy units (or Charge01-fraction via legacy shim — both work).
     // No upper cap — _starCharge is now unbounded cumulative units.
     public void AddCharge(MusicalRole role, float energyUnitsDelivered)
@@ -344,30 +348,7 @@ public class PhaseStar : MonoBehaviour
     private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
 {
     var cam = Camera.main;
-
-    // Wait until the star is inside the screen boundary (with a small inset).
-    while (true)
-    {
-        if (cam == null) cam = Camera.main;
-
-        if (cam != null)
-        {
-            const float z = 0f;
-            Vector2 sMax = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-
-            float threshold = Mathf.Max(0f, entryArriveThreshold);
-            Vector2 p = transform.position;
-
-            // Entry is always top-down; only test the top edge so the star
-            // descends far enough into the play area before settling.
-            bool inside = p.y < sMax.y - threshold;
-
-            if (inside) break;
-        }
-
-        yield return null;
-    }
-
+    
     // ── Arrived ──────────────────────────────────────────────
     _entryInProgress = false;
 
@@ -378,8 +359,9 @@ public class PhaseStar : MonoBehaviour
 
     // Clamp so no shard can remain at or above the viewport top after drift.
     motion?.ClampToScreenTop(entrySettleInset);
-    // Come to a stop and wait for the player to carve colored dust.
-    motion?.SetSpeedMultiplier(0f);
+    // Drift slowly toward the grid center while waiting for the player to carve colored dust.
+    motion?.SetOverrideTarget(ComputeDormantRestPosition());
+    motion?.SetSpeedMultiplier(0.35f);
     cravingNavigator?.SetActive(false);
 
     // Re-enable colliders; enter dormant state until colored dust exists.
@@ -388,6 +370,15 @@ public class PhaseStar : MonoBehaviour
     StartCoroutine(Co_WaitForColoredDust());
     LogState("EntryComplete+Dormant");
 }
+
+    private Vector2 ComputeDormantRestPosition()
+    {
+        var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return transform.position;
+        int gw = drum.GetSpawnGridWidth();
+        int gh = drum.GetSpawnGridHeight();
+        return drum.GridToWorldPosition(new Vector2Int(gw / 2, gh / 2));
+    }
 
     private IEnumerator Co_WaitForColoredDust()
     {
@@ -425,17 +416,38 @@ public class PhaseStar : MonoBehaviour
         float threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1);
         return Mathf.Clamp01(c / Mathf.Max(0.001f, threshold));
     }
-
-    private bool TryGetDominantRole(out MusicalRole role, out int shardIndex, out float charge)
+    public bool GetDominantRoleRaw(out MusicalRole role, out float rawCharge, out float threshold)
     {
-        role       = _previewRole;
-        shardIndex = 0;
-        charge     = 0f;
-        if (_previewRole == MusicalRole.None) return false;
-        _starCharge.TryGetValue(_previewRole, out charge);
-        charge = Mathf.Max(0f, charge);
+        role = MusicalRole.None;
+        rawCharge = 0f;
+        threshold = 1f;
+
+        float bestCharge = 0f;
+        foreach (var kv in _starCharge)
+        {
+            if (kv.Value > bestCharge)
+            {
+                bestCharge = kv.Value;
+                role = kv.Key;
+            }
+        }
+
+        if (role == MusicalRole.None)
+            return false;
+
+        rawCharge = bestCharge;
+        var rp = MusicalRoleProfileLibrary.GetProfile(role);
+        threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1f);
         return true;
     }
+
+    public bool HasDominantRoleEjectable()
+    {
+        return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
+               rawCharge >= threshold;
+    }
+
+
     public void Initialize(
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
@@ -514,112 +526,115 @@ public class PhaseStar : MonoBehaviour
         c.a = 1f;
         return c;
     }
+
     void Update()
+{
+    if (_bubbleActive)
     {
-
-// ---- Keep bubble center locked to its activation position every frame ----
-// Gravity-void bubbles are anchored to the MineNode capture position, not the drifting star.
-        if (_bubbleActive)
-        {
-            s_bubbleCenter = _bubbleCenterWorld;
-            // Also nudge the bubble root so its shimmer particles stay centred.
-            visuals?.UpdateBubblePosition(_bubbleCenterWorld);
-        }
-
-        float dt = Time.deltaTime;
-
-        // Accumulator rotation is state-driven:
-        //   • Scout in flight  → tip faces the scout (watches it travel)
-        //   • Star at target   → oscillates ±drainTiltDeg (eating/drain animation)
-        //   • Otherwise        → free spin opposite to scout
-        float accRotDeg;
-        if (dust != null && dust.IsAnyTentacleDraining)
-        {
-            // Oscillate while actively draining to signal the energy transfer.
-            _accumulatorDrainTimer += dt;
-            accRotDeg = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
-        }
-        else
-        {
-            _accumulatorRotAngle += accumulatorRotSpeed * dt;
-            accRotDeg = _accumulatorRotAngle;
-        }
-
-        // ── Dominant-role tracking ────────────────────────────────────────
-        // The role that will eject is always whichever has the most accumulated
-        // charge right now. Scan every frame so the preview updates live.
-        {
-            MusicalRole dominant = MusicalRole.None;
-            float       maxCharge = 0f;
-            foreach (var kv in _starCharge)
-            {
-                if (kv.Value > maxCharge) { maxCharge = kv.Value; dominant = kv.Key; }
-            }
-
-            if (dominant != _previewRole)
-            {
-                _previewRole     = dominant;
-                _displayedCharge01 = 0f; // reset smoothed display on role switch
-                if (dominant != MusicalRole.None)
-                {
-                    var rp = MusicalRoleProfileLibrary.GetProfile(dominant);
-                    _previewColor = rp != null
-                        ? new Color(rp.dustColors.baseColor.r, rp.dustColors.baseColor.g,
-                                    rp.dustColors.baseColor.b, 1f)
-                        : Color.white;
-                    _cachedTrack = FindTrackByRole(dominant);
-                }
-                _wasChargeReady = false;
-            }
-        }
-
-        if (_previewVisual != null)
-        {
-            // Drive the dual accumulator diamonds — always spin, regardless of arm state.
-            // Renderer visibility is controlled by SetVisual — UpdateDualDiamonds never force-enables.
-            bool nowReady = false;
-            if (_isArmed && !_burstOffScreen)
-            {
-                // Normalize dominant-role charge against threshold so display reads 0→1.
-                var rp2 = _previewRole != MusicalRole.None
-                    ? MusicalRoleProfileLibrary.GetProfile(_previewRole) : null;
-                float maxUnits  = rp2 != null ? rp2.maxEnergyUnits : 1f;
-                float threshold = shardReadyThreshold * maxUnits;
-                _starCharge.TryGetValue(_previewRole, out float chargeRaw);
-                // Once IsChargeReady() fires, lock the lerp target to 1.0 so passive
-                // decay cannot prevent _displayedCharge01 from reaching readyDisplayThreshold.
-                float charge01  = IsChargeReady() ? 1.0f
-                                  : Mathf.Clamp01(chargeRaw / Mathf.Max(0.001f, threshold));
-                _displayedCharge01 = Mathf.Lerp(_displayedCharge01, charge01, dt * chargeDisplayLerpSpeed);
-
-                // Detect charge-ready transition: wait until the displayed alpha has
-                // actually reached full opacity before enabling locomotion and pokes.
-                nowReady = _displayedCharge01 >= readyDisplayThreshold;
-                if (nowReady && !_wasChargeReady)
-                    motion?.SetSpeedMultiplier(1f);
-                _wasChargeReady = nowReady;
-            }
-
-            visuals?.UpdateDualDiamonds(_previewColor, _displayedCharge01, accRotDeg,
-                                         nowReady, readyRotSpeedMul);
-        }
-        
-        float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
-        if (_starCharge.Count > 0 && passiveDecay > 0f) {
-            float dec = passiveDecay * dt;
-            // [BALANCE-B] Dominant role decays 3× faster to compress the charge gap.
-            TryGetDominantRole(out var dominantRoleNow, out _, out _);
-            var keys = _starCharge.Keys.ToList();
-            for (int i = 0; i < keys.Count; i++) {
-                var r = keys[i];
-                float cur = _starCharge[r];
-                float roleDec = (r == dominantRoleNow) ? dec * 3f : dec;
-                _starCharge[r] = Mathf.Max(0f, cur - roleDec);
-            }
-        } 
-        
+        s_bubbleCenter = _bubbleCenterWorld;
+        visuals?.UpdateBubblePosition(_bubbleCenterWorld);
     }
 
+    float dt = Time.deltaTime;
+
+    _accumulatorRotAngle += accumulatorRotSpeed * dt;
+
+    float rotA, rotB;
+    bool aLocked = false, bLocked = false;
+
+    if (dust != null)
+    {
+        dust.GetDiamondLockState(0, out aLocked, out float aLockDeg, out bool aDraining);
+        dust.GetDiamondLockState(1, out bLocked, out float bLockDeg, out bool bDraining);
+
+        if (aDraining || bDraining)
+            _accumulatorDrainTimer += dt;
+        else
+            _accumulatorDrainTimer = 0f;
+
+        float sway = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
+
+        rotA = aLocked ? aLockDeg + (aDraining ? sway : 0f) : _accumulatorRotAngle;
+        rotB = bLocked ? bLockDeg + (bDraining ? sway : 0f) : -_accumulatorRotAngle;
+    }
+    else
+    {
+        rotA = _accumulatorRotAngle;
+        rotB = -_accumulatorRotAngle;
+    }
+
+    // Passive decay first.
+    float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
+    if (_starCharge.Count > 0 && passiveDecay > 0f)
+    {
+        float dec = passiveDecay * dt;
+        var keys = _starCharge.Keys.ToList();
+        for (int i = 0; i < keys.Count; i++)
+        {
+            var r = keys[i];
+            _starCharge[r] = Mathf.Max(0f, _starCharge[r] - dec);
+        }
+    }
+
+    // Dominant-role tracking after decay.
+    if (GetDominantRoleRaw(out var dominantRole, out float dominantRawCharge, out float dominantThreshold))
+    {
+        if (dominantRole != _previewRole)
+        {
+            _previewRole = dominantRole;
+
+            var rp = MusicalRoleProfileLibrary.GetProfile(dominantRole);
+            _previewColor = rp != null
+                ? new Color(rp.dustColors.baseColor.r,
+                            rp.dustColors.baseColor.g,
+                            rp.dustColors.baseColor.b,
+                            1f)
+                : Color.white;
+
+            _cachedTrack = FindTrackByRole(dominantRole);
+            visuals?.ResetDualDiamondVisualState();
+        }
+
+        float dominantCharge01 = Mathf.Clamp01(dominantRawCharge / Mathf.Max(0.001f, dominantThreshold));
+        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, dominantCharge01, dt * chargeDisplayLerpSpeed);
+    }
+    else
+    {
+        _previewRole = MusicalRole.None;
+        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, 0f, dt * chargeDisplayLerpSpeed);
+    }
+
+    bool dominantReady = HasDominantRoleEjectable();
+
+    if (_previewVisual != null)
+    {
+        visuals?.UpdateDualDiamonds(
+            _previewColor,
+            _displayedCharge01,
+            rotA, aLocked,
+            rotB, bLocked,
+            dominantReady,
+            readyRotSpeedMul);
+    }
+
+    if (_isArmed &&
+        !_burstOffScreen &&
+        _disarmReason == DisarmReason.None &&
+        GetTotalCharge() < 0.01f &&
+        !(dust?.HasActiveTentacles ?? false))
+    {
+        var genCheck = GameFlowManager.Instance?.dustGenerator;
+        if (genCheck != null && !genCheck.HasAnyDustWithRole())
+        {
+            Disarm(DisarmReason.None);
+            motion?.SetOverrideTarget(ComputeDormantRestPosition());
+            motion?.SetSpeedMultiplier(0.35f);
+            cravingNavigator?.SetActive(false);
+            _state = PhaseStarState.Dormant;
+            StartCoroutine(Co_WaitForColoredDust());
+        }
+    }
+}
     private void SafeUnsubscribeAll()
     {
         // Unhook both places we subscribe OnLoopBoundary:
@@ -751,12 +766,9 @@ public class PhaseStar : MonoBehaviour
     
     private void ArmNext()
     {
-        // Never arm while a MineNode/SuperNode is still alive — the star must stay hidden.
         if (_activeNode != null || _activeSuperNode != null) return;
-
-        // Burst notes have been collected but not yet released — OnBurstNotesReleased handles re-entry.
-        if (_burstOffScreen)
-            return;
+        if (_awaitingCollectableClear) return;
+        if (_burstOffScreen) return;
 
         if (AnyCollectablesInFlightGlobal())
         {
@@ -776,19 +788,18 @@ public class PhaseStar : MonoBehaviour
             Disarm(DisarmReason.AwaitBridge);
             return;
         }
+
         _disarmReason = DisarmReason.None;
         _isArmed = true;
 
-        // Bubble is a gravity-void refuge — deactivate when returning to armed/ready state.
         DeactivateSafetyBubble();
 
-        // Pokeability no longer controls locomotion.
         EnableColliders();
         dust?.SetTentaclesActive(true);
-        // Sync ready-state: if the displayed alpha is already at threshold (re-arm scenario), start moving now.
-        bool alreadyReady = _displayedCharge01 >= readyDisplayThreshold;
-        motion?.SetSpeedMultiplier(alreadyReady ? 1f : 0f);
-        _wasChargeReady = alreadyReady;
+
+        motion?.SetOverrideTarget(null);
+        motion?.SetSpeedMultiplier(1f);
+
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
     }
@@ -1280,6 +1291,9 @@ public class PhaseStar : MonoBehaviour
 
         if (_previewVisual != null)
         {
+            // Detach from hierarchy before destroying so GetComponentsInChildren
+            // can never find this pending-destroy GO in the same frame.
+            _previewVisual.SetParent(null);
             Destroy(_previewVisual.gameObject);
             _previewVisual = null;
         }
@@ -1324,98 +1338,110 @@ public class PhaseStar : MonoBehaviour
         _cachedIsSuperNode = (planned != null && _cachedTrack != null) && ShouldSpawnSuperNodeForTrack(_cachedTrack);
     }
     void BuildPreviewRing()
+{
+    _buildingPreview = true;
+
+    if (_previewVisual != null)
     {
-        _buildingPreview = true;
-
-        if (_previewVisual != null)
-        {
-            Destroy(_previewVisual.gameObject);
-            _previewVisual = null;
-        }
-
-        if (_previewVisualB != null)
-        {
-            Destroy(_previewVisualB.gameObject);
-            _previewVisualB = null;
-        }
-
-        _wasChargeReady = false; // reset so the ready-drift edge fires again for this role
-
-        if (_baseSortingOrder == 0)
-        {
-            var baseSr = GetComponentInChildren<SpriteRenderer>(true);
-            _baseSortingOrder = baseSr ? baseSr.sortingOrder : 2000;
-        }
-
-        if (_phasePlanRoles == null || _phasePlanRoles.Count == 0 || visuals == null)
-        {
-            _buildingPreview = false;
-            visuals?.InvalidateShardCache();
-            return;
-        }
-
-        var role = _phasePlanRoles[0];
-        var track = FindTrackByRole(role);
-
-        Color roleColor;
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
-        if (roleProfile != null)
-            roleColor = new Color(roleProfile.dustColors.baseColor.r, roleProfile.dustColors.baseColor.g, roleProfile.dustColors.baseColor.b, 1f);
-        else if (track != null)
-            roleColor = new Color(track.trackColor.r, track.trackColor.g, track.trackColor.b, 1f);
-        else
-            roleColor = Color.white;
-
-        _previewRole  = role;
-        _previewColor = roleColor;
-
-        // Reveal all Voronoi cells for this role immediately so the navigator can
-        // see them without requiring the vehicle to carve that territory first.
-        GameFlowManager.Instance?.dustGenerator?.RevealHiddenRoleVisuals(role);
-
-        var go = new GameObject($"PreviewShard_0_{role}");
-        go.transform.SetParent(transform);
-        go.transform.localPosition = Vector3.zero;
-        go.transform.localRotation = Quaternion.identity;
-        go.transform.localScale    = Vector3.one;
-
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = visuals.diamond;
-        sr.color        = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
-        sr.sortingOrder = _baseSortingOrder;
-
-        // If the star is currently hidden (MineNode alive), start the new shard invisible.
-        if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving
-                          || _disarmReason == DisarmReason.AwaitBridge))
-            sr.enabled = false;
-
-        _previewVisual = go.transform;
-
-        // Diamond B — counter-rotating twin, same position as A.
-        var goB = new GameObject($"PreviewShardB_0_{role}");
-        goB.transform.SetParent(transform);
-        goB.transform.localPosition = Vector3.zero;
-        goB.transform.localRotation = Quaternion.identity;
-        goB.transform.localScale    = Vector3.one;
-
-        var srB = goB.AddComponent<SpriteRenderer>();
-        srB.sprite       = visuals.diamond;
-        srB.color        = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
-        srB.sortingOrder = _baseSortingOrder;
-
-        if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving
-                          || _disarmReason == DisarmReason.AwaitBridge))
-            srB.enabled = false;
-
-        _previewVisualB = goB.transform;
-
-        _buildingPreview = false;
-
-        // New shards replaced the old ones — PhaseStarVisuals2D must re-cache its renderer list.
-        visuals.InvalidateShardCache();
+        _previewVisual.SetParent(null);
+        Destroy(_previewVisual.gameObject);
+        _previewVisual = null;
     }
 
+    if (_previewVisualB != null)
+    {
+        _previewVisualB.SetParent(null);
+        Destroy(_previewVisualB.gameObject);
+        _previewVisualB = null;
+    }
 
+    _wasChargeReady = false;
+
+    if (_baseSortingOrder == 0)
+    {
+        var baseSr = GetComponentInChildren<SpriteRenderer>(true);
+        _baseSortingOrder = baseSr ? baseSr.sortingOrder : 2000;
+    }
+
+    if (_phasePlanRoles == null || _phasePlanRoles.Count == 0 || visuals == null)
+    {
+        _buildingPreview = false;
+        visuals?.InvalidateShardCache();
+        return;
+    }
+
+    // BuildPreviewRing is now VISUAL ONLY.
+    // It should not mutate hidden-role promotion in CosmicDustGenerator.
+    // The active ecology must come from motif setup + carving/regrowth, not from preview state.
+    var role = _phasePlanRoles[0];
+    var track = FindTrackByRole(role);
+
+    Color roleColor;
+    var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+    if (roleProfile != null)
+    {
+        roleColor = new Color(
+            roleProfile.dustColors.baseColor.r,
+            roleProfile.dustColors.baseColor.g,
+            roleProfile.dustColors.baseColor.b,
+            1f);
+    }
+    else if (track != null)
+    {
+        roleColor = new Color(
+            track.trackColor.r,
+            track.trackColor.g,
+            track.trackColor.b,
+            1f);
+    }
+    else
+    {
+        roleColor = Color.white;
+    }
+
+    // Seed preview values for the initial visual state only.
+    // Runtime dominant-role logic in Update() is still allowed to replace these later.
+    _previewRole = role;
+    _previewColor = roleColor;
+
+    var go = new GameObject($"PreviewShard_0_{role}");
+    go.transform.SetParent(transform);
+    go.transform.localPosition = Vector3.zero;
+    go.transform.localRotation = Quaternion.identity;
+    go.transform.localScale = Vector3.one;
+
+    var sr = go.AddComponent<SpriteRenderer>();
+    sr.sprite = visuals.diamond;
+    sr.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
+    sr.sortingOrder = _baseSortingOrder;
+
+    if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving || _disarmReason == DisarmReason.AwaitBridge))
+        sr.enabled = false;
+
+    _previewVisual = go.transform;
+
+    var goB = new GameObject($"PreviewShardB_0_{role}");
+    goB.transform.SetParent(transform);
+    goB.transform.localPosition = Vector3.zero;
+    goB.transform.localRotation = Quaternion.identity;
+    goB.transform.localScale = Vector3.one;
+
+    var srB = goB.AddComponent<SpriteRenderer>();
+    srB.sprite = visuals.diamond;
+    srB.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
+    srB.sortingOrder = _baseSortingOrder;
+
+    if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving || _disarmReason == DisarmReason.AwaitBridge))
+        srB.enabled = false;
+
+    _previewVisualB = goB.transform;
+
+    _buildingPreview = false;
+
+    visuals?.InvalidateShardCache();
+    visuals?.BindDualDiamondRenderers(_previewVisual, _previewVisualB);
+    visuals?.ResetDualDiamondVisualState();
+}
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
         var controller = GameFlowManager.Instance?.controller;
@@ -1483,9 +1509,9 @@ public class PhaseStar : MonoBehaviour
             Trace("OnCollision: ignored, busy flags");
             return;
         }
-        if (_displayedCharge01 < readyDisplayThreshold)
+        if (!HasDominantRoleEjectable())
         {
-            Trace("OnCollisionEnter2D: ignored poke — diamonds not yet at full opacity");
+            Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
             return;
         }
         if (_activeNode != null)
@@ -1599,10 +1625,14 @@ public class PhaseStar : MonoBehaviour
     void EjectActivePreviewShardAndFlow(Collision2D coll)
     {
         if (behaviorProfile == null || visuals == null) return;
-        if (_previewRole == MusicalRole.None) return;
         if (!HasShardsRemaining()) return;
 
-        MusicalRole ejectedRole = _previewRole;
+        if (!GetDominantRoleRaw(out MusicalRole ejectedRole, out float rawCharge, out float threshold))
+            return;
+
+        if (rawCharge < threshold)
+            return;
+
         InstrumentTrack ejectedTrack = FindTrackByRole(ejectedRole);
         if (ejectedTrack == null)
         {
@@ -1610,7 +1640,8 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        _starCharge.Clear(); // clear all roles so incidental charge doesn't skip the next target
+        // Consume only the dominant role’s charge for the ejection.
+        _starCharge[ejectedRole] = Mathf.Max(0f, rawCharge - threshold);
         _displayedCharge01 = 0f;
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;

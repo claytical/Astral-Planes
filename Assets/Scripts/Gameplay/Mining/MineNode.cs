@@ -58,6 +58,7 @@ public class MineNode : MonoBehaviour
     private float _rescanTimer = 0f;
     private Vector2 _carveDir = Vector2.right; // will be randomized on init
     private MineNodeDustInteractor _dustInteractor;
+    private Camera _cam;
     private float _currentDesiredSpeed;
         public MusicalRole GetImprintRole()
     {
@@ -314,7 +315,7 @@ public class MineNode : MonoBehaviour
                 flee += away / dSq; // inverse-square falloff
         }
         if (flee.sqrMagnitude > 0.001f)
-            _carveDir = flee.normalized; // full override — flee takes absolute priority
+            _carveDir = Vector2.Lerp(_carveDir, flee.normalized, fleeBlendWeight).normalized;
     }
 
     // --- CONTINUOUS STEERING FORCE ---
@@ -396,6 +397,31 @@ public class MineNode : MonoBehaviour
 
         // Dampen velocity to help separate from the boundary in the next solver step.
         _rb.linearVelocity *= 0.5f;
+    }
+
+    // --- SCREEN BOUNDARY CLAMP ---
+    // Prevent the node from leaving the play area. Applied after all steering so
+    // flee/stall-escape cannot push the node off-screen.
+    if (_cam == null) _cam = Camera.main;
+    if (_cam != null)
+    {
+        const float boundaryPad = 0.5f;
+        Vector2 pos = _rb.position;
+        Vector2 minB = _cam.ViewportToWorldPoint(new Vector3(0f, 0f, 0f));
+        Vector2 maxB = _cam.ViewportToWorldPoint(new Vector3(1f, 1f, 0f));
+        bool hitBoundary = false;
+
+        if (pos.x < minB.x + boundaryPad) { pos.x = minB.x + boundaryPad; _carveDir.x =  Mathf.Abs(_carveDir.x); hitBoundary = true; }
+        else if (pos.x > maxB.x - boundaryPad) { pos.x = maxB.x - boundaryPad; _carveDir.x = -Mathf.Abs(_carveDir.x); hitBoundary = true; }
+
+        if (pos.y < minB.y + boundaryPad) { pos.y = minB.y + boundaryPad; _carveDir.y =  Mathf.Abs(_carveDir.y); hitBoundary = true; }
+        else if (pos.y > maxB.y - boundaryPad) { pos.y = maxB.y - boundaryPad; _carveDir.y = -Mathf.Abs(_carveDir.y); hitBoundary = true; }
+
+        if (hitBoundary)
+        {
+            _rb.position = pos;
+            _rb.linearVelocity = _carveDir * _rb.linearVelocity.magnitude;
+        }
     }
 }
     private Vector2 ComputeLocalSameRoleAffinityDir(int radiusCells)

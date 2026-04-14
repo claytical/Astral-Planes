@@ -696,11 +696,11 @@ public class CosmicDustGenerator : MonoBehaviour
             if (HasDustAt(cell))
             {
                 // This path handles visual fade + authoritative state.
-                CarveDustAt(cell, fade);
+                CarveDustByVehicle(cell, fade);
             }
 
             // Optional: remove any persistent imprint so the pocket reads clean.
-            _imprints?.Remove(cell);
+//            _imprints?.Remove(cell);
             _fillMap[cell] = false;
 
             // Ensure a regrow attempt exists (it will self-delay while the keep-clear claim is active).
