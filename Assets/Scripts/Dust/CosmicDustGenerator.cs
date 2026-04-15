@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -178,7 +179,7 @@ public class CosmicDustGenerator : MonoBehaviour
         FadeAndHide,
         HideInstant
     }
-    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds = -1f) {
+    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds = -1f, bool runPreExplode = false) {
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
@@ -200,13 +201,33 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
          // Visual policy
-         if (dust != null) { 
-             if (mode == DustClearMode.HideInstant){ 
-                 dust.HideVisualsInstant();
-                SetCellState(gp, DustCellState.Empty); 
+         if (dust != null) {
+             if (runPreExplode)
+             {
+                 var explode = go.GetComponent<Explode>();
+                 if (explode != null)
+                 {
+                     var tint = dust.CurrentTint;
+                     tint.a = 1f;
+                     explode.SetTint(tint);
+                     explode.PreExplode();
+                 }
+             }
+
+             if (mode == DustClearMode.HideInstant){
+                 if (runPreExplode)
+                     StartCoroutine(DeferredHideAfterPreExplode(gp, dust));
+                 else
+                 {
+                     dust.HideVisualsInstant();
+                     SetCellState(gp, DustCellState.Empty);
+                 }
              }
              else {
-                dust.DissipateAndHideVisualOnly(dustTimings.spriteScaleOutSeconds);
+                if (runPreExplode)
+                    StartCoroutine(DeferredDissipateAfterPreExplode(dust, dustTimings.spriteScaleOutSeconds));
+                else
+                    dust.DissipateAndHideVisualOnly(dustTimings.spriteScaleOutSeconds);
                 // OnDustVisualFadedOut will finalize Empty + hide visuals
              }
          }
@@ -226,6 +247,21 @@ public class CosmicDustGenerator : MonoBehaviour
 //             TryQueueFrontierCompensation();
          }
     }
+    private IEnumerator DeferredDissipateAfterPreExplode(CosmicDust dust, float fadeSeconds)
+    {
+        yield return null;
+        if (dust == null) yield break;
+        dust.DissipateAndHideVisualOnly(fadeSeconds);
+    }
+
+    private IEnumerator DeferredHideAfterPreExplode(Vector2Int gp, CosmicDust dust)
+    {
+        yield return null;
+        if (dust == null) yield break;
+        dust.HideVisualsInstant();
+        SetCellState(gp, DustCellState.Empty);
+    }
+
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
     {
         _regrowthSuppressed = true;
@@ -1222,84 +1258,174 @@ public class CosmicDustGenerator : MonoBehaviour
     /// archetype-specific layout), then writes a DustImprint for each cell so that
     /// GetCellHardness01 and GetCellVisualColor return per-cell role values during spawn.
     /// </summary>
-    private void BuildMazeRoleImprints(
-        Vector2Int starCell,
-        List<(Vector2Int cell, Vector3 world)> cells)
+private void BuildMazeRoleImprints(
+    Vector2Int starCell,
+    List<(Vector2Int cell, Vector3 world)> cells)
+{
+    if (cells == null || cells.Count == 0) return;
+    if (drums == null) return;
+
+    _imprints ??= new Dictionary<Vector2Int, DustImprint>(cells.Count * 2);
+
+    // Resolve active roles from motif; fall back to all 4 roles.
+    IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
+        ? _activeRoles
+        : new List<MusicalRole>
+        {
+            MusicalRole.Bass,
+            MusicalRole.Harmony,
+            MusicalRole.Lead,
+            MusicalRole.Groove
+        };
+
+    var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);
+    if (rolesList.Count == 0)
+        return;
+
+    // All dust starts gray (MusicalRole.None); hidden Voronoi roles are revealed later.
+    foreach (var (gp, _) in cells)
     {
-        if (cells == null || cells.Count == 0) return;
-        if (drums == null) return;
-
-        _imprints ??= new Dictionary<Vector2Int, DustImprint>(cells.Count * 2);
-
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-
-        // Resolve active roles from motif; fall back to all 4 roles.
-        IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
-            ? _activeRoles
-            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
-
-        // All dust starts gray (MusicalRole.None); roles are earned through vehicle carving + regrowth.
-        foreach (var (gp, _) in cells)
+        _imprints[gp] = new DustImprint
         {
-            _imprints[gp] = new DustImprint
-            {
-                role       = MusicalRole.None,
-                color      = _mazeTint,
-                hardness01 = defaultMazeHardness01
-            };
-        }
-
-        // Compute hidden Voronoi roles — revealed when a cell is first carved.
-        _hiddenImprints.Clear();
-        var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);
-        if (rolesList.Count > 0)
-        {
-            Vector2 starF  = new Vector2(starCell.x, starCell.y);
-            Vector2 center = new Vector2(w * 0.5f, h * 0.5f);
-            float halfDiag = Mathf.Sqrt(w * w + h * h) * 0.5f;
-            Vector2 dir    = (center - starF).sqrMagnitude > 0.001f ? (center - starF).normalized : Vector2.right;
-
-            int seedCount   = rolesList.Count;
-            var seeds       = new Vector2[seedCount];
-            var seedRoles   = new MusicalRole[seedCount];
-
-            // Dominant seed along star→center axis at 75% of half-diagonal.
-            seeds[0]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), starF + dir * halfDiag * 0.75f));
-            seedRoles[0] = rolesList[0];
-
-            // Secondary seeds orbit the GRID CENTER at half-diagonal radius so they land
-            // inside the playfield regardless of where the star spawns.
-            // Starting angle points from center toward the star (away from seed[0]) so
-            // seed[1] is on the opposite side of the grid from seed[0].
-            float restRadius = halfDiag * 0.5f;
-            float angleStart = Mathf.Atan2(-dir.y, -dir.x); // center → star direction
-            float angleStep  = (seedCount > 1) ? (2f * Mathf.PI / (seedCount - 1)) : 0f;
-            for (int i = 1; i < seedCount; i++)
-            {
-                float a     = angleStart + (i - 1) * angleStep;
-                Vector2 raw = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * restRadius;
-                seeds[i]     = Vector2.Max(Vector2.zero, Vector2.Min(new Vector2(w - 1, h - 1), raw));
-                seedRoles[i] = rolesList[i];
-            }
-
-            // Assign each cell to its nearest seed (Voronoi).
-            foreach (var (gp, _) in cells)
-            {
-                float best    = float.MaxValue;
-                int   bestIdx = 0;
-                Vector2 cellF = new Vector2(gp.x, gp.y);
-                for (int i = 0; i < seedCount; i++)
-                {
-                    float d = (cellF - seeds[i]).sqrMagnitude;
-                    if (d < best) { best = d; bestIdx = i; }
-                }
-                _hiddenImprints[gp] = seedRoles[bestIdx];
-            }
-        }
-
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}");
+            role               = MusicalRole.None,
+            color              = _mazeTint,
+            hardness01         = defaultMazeHardness01,
+            carveResistance01  = 0f,
+            drainResistance01  = 0f,
+            maxEnergyUnits     = 1,
+            healDelay          = 0f
+        };
     }
+
+    _hiddenImprints.Clear();
+
+    // Use only the ACTUAL occupied maze cells as the Voronoi domain.
+    var occupied = new List<Vector2Int>(cells.Count);
+    for (int i = 0; i < cells.Count; i++)
+        occupied.Add(cells[i].cell);
+
+    // Single-role motif: trivial assignment.
+    if (rolesList.Count == 1)
+    {
+        MusicalRole onlyRole = rolesList[0];
+        for (int i = 0; i < occupied.Count; i++)
+            _hiddenImprints[occupied[i]] = onlyRole;
+
+        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // Seed selection over occupied cells only
+    // ------------------------------------------------------------
+    //
+    // Strategy:
+    // 1) Seed 0 (dominant role) = occupied cell farthest from the star.
+    //    This preserves the idea that the first motif role has the strongest territory,
+    //    but only within the actual maze footprint.
+    // 2) Remaining seeds use farthest-point sampling over occupied cells so roles
+    //    spread across the real pattern instead of empty grid space.
+    //
+    // This fixes patterns like blobs, strokes, tunnels, and rings where the occupied
+    // region is only a subset of the full spawn grid.
+    // ------------------------------------------------------------
+
+    int seedCount = Mathf.Min(rolesList.Count, occupied.Count);
+    var seedCells = new Vector2Int[seedCount];
+    var seedRoles = new MusicalRole[seedCount];
+
+    // Seed 0: farthest occupied cell from the star.
+    int firstSeedIdx = 0;
+    float bestStarDist = float.MinValue;
+    for (int i = 0; i < occupied.Count; i++)
+    {
+        float d = (occupied[i] - starCell).sqrMagnitude;
+        if (d > bestStarDist)
+        {
+            bestStarDist = d;
+            firstSeedIdx = i;
+        }
+    }
+
+    seedCells[0] = occupied[firstSeedIdx];
+    seedRoles[0] = rolesList[0];
+
+    // Remaining seeds: farthest-point sampling from already chosen seeds.
+    var chosen = new HashSet<Vector2Int> { seedCells[0] };
+
+    for (int s = 1; s < seedCount; s++)
+    {
+        int bestIdx = -1;
+        float bestMinDist = float.MinValue;
+
+        for (int i = 0; i < occupied.Count; i++)
+        {
+            Vector2Int candidate = occupied[i];
+            if (chosen.Contains(candidate)) continue;
+
+            float minDistToChosen = float.MaxValue;
+            for (int c = 0; c < s; c++)
+            {
+                float d = (candidate - seedCells[c]).sqrMagnitude;
+                if (d < minDistToChosen)
+                    minDistToChosen = d;
+            }
+
+            if (minDistToChosen > bestMinDist)
+            {
+                bestMinDist = minDistToChosen;
+                bestIdx = i;
+            }
+        }
+
+        if (bestIdx < 0)
+            break;
+
+        seedCells[s] = occupied[bestIdx];
+        seedRoles[s] = rolesList[s];
+        chosen.Add(seedCells[s]);
+    }
+
+    // If there are more roles than distinct available seed positions, assign only the seeds
+    // we could actually place. This is defensive and should be rare.
+    int actualSeedCount = chosen.Count;
+
+    // Assign each occupied cell to the nearest chosen seed.
+    for (int i = 0; i < occupied.Count; i++)
+    {
+        Vector2Int gp = occupied[i];
+
+        float best = float.MaxValue;
+        int bestSeed = 0;
+
+        for (int s = 0; s < actualSeedCount; s++)
+        {
+            float d = (gp - seedCells[s]).sqrMagnitude;
+            if (d < best)
+            {
+                best = d;
+                bestSeed = s;
+            }
+        }
+
+        _hiddenImprints[gp] = seedRoles[bestSeed];
+    }
+
+    // Helpful distribution log for validation.
+    var counts = new Dictionary<MusicalRole, int>();
+    for (int i = 0; i < actualSeedCount; i++)
+        counts[seedRoles[i]] = 0;
+
+    foreach (var kv in _hiddenImprints)
+    {
+        if (!counts.ContainsKey(kv.Value))
+            counts[kv.Value] = 0;
+        counts[kv.Value]++;
+    }
+
+    string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
+    Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
+}
     public void ResetMazeGenerationFlag()
     {
         _mazeAlreadyGenerated = false;
@@ -1676,26 +1802,18 @@ public class CosmicDustGenerator : MonoBehaviour
         _playerCarvedCells.Add(cell);
 
         var cellGo = _cellGo?[cell.x, cell.y];
-        if (cellGo != null)
-        {
-            var explode = cellGo.GetComponent<Explode>();
-            if (explode != null)
-            {
-                var dust = cellGo.GetComponent<CosmicDust>();
-                if (dust != null) explode.SetTint(dust.CurrentTint);
-                explode.PreExplode();
-            }
-        }
 
         bool isVoidCell = _voidGrowCells.Remove(cell);
         if (isVoidCell)
             _imprints?.Remove(cell); // no imprint = no future regrow triggers for this cell
-
+        var explode = cellGo.GetComponentInChildren<Explode>(true);
+        Debug.Log($"[DUST-CLEAR] explode={(explode != null ? explode.name : "NULL")} cell={cell} go={cellGo.name}");
         ClearCell(
             cell,
             DustClearMode.FadeAndHide,
             fadeSeconds,
-            scheduleRegrow: !isVoidCell
+            scheduleRegrow: !isVoidCell,
+            runPreExplode: true
         );
 
         if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
@@ -1734,14 +1852,10 @@ public class CosmicDustGenerator : MonoBehaviour
 
             _playerCarvedCells.Add(cell);
 
-            var explode = cellGo.GetComponent<Explode>();
-            if (explode != null)
-                explode.SetTint(dust.CurrentTint);
-
             bool isVoidCell = _voidGrowCells.Remove(cell);
             if (isVoidCell) _imprints?.Remove(cell);
 
-            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: !isVoidCell);
+            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: !isVoidCell, runPreExplode: true);
 
             if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
             {

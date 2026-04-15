@@ -55,7 +55,7 @@ public class PhaseStar : MonoBehaviour
     [Tooltip("World units outside the screen edge where the star spawns.")]
     [SerializeField] private float entryOffscreenMargin = 2f;
     [Tooltip("How close to the screen interior edge (world units) before the star is " +
-             "considered 'arrived' and arms itself.")]
+             "considered 'arrived' and transitions into its dormant on-screen wait.")]
     [SerializeField] private float entryArriveThreshold = 1.5f;
     [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
     [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
@@ -101,7 +101,6 @@ public class PhaseStar : MonoBehaviour
     private MusicalRole _previewRole;
     private Transform   _previewVisual;
     private Transform   _previewVisualB;   // second counter-rotating diamond
-    private bool        _wasChargeReady;   // edge-detect: false→true triggers drift resume
     private bool _isDisposing;
     private bool _entryInProgress;
     private bool _buildingPreview;
@@ -234,17 +233,14 @@ public class PhaseStar : MonoBehaviour
         return behaviorProfile != null ? behaviorProfile.nodesPerStar : 1;
     }
 
-    private GameFlowManager gfm;
-
 
     // -------------------- Lifecycle --------------------
     void Start()
     {
-        gfm = GameFlowManager.Instance;
         EnsurePreviewRing();
         if (!_buildingPreview)
         {
-            InitializeTimingAndSpeeds();
+            RefreshLoopDuration();
         }
     }
     /// <summary>The role the star is currently accumulating charge for. Navigator uses this to target the right dust.</summary>
@@ -298,16 +294,9 @@ public class PhaseStar : MonoBehaviour
         return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
     }
 
-    private bool IsChargeReady()
-    {
-        if (_previewRole == MusicalRole.None) return false;
-        _starCharge.TryGetValue(_previewRole, out float c);
-        var rp = MusicalRoleProfileLibrary.GetProfile(_previewRole);
-        float threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1);
-        return c >= threshold;
-    }
     public void EnterFromOffScreen(Vector2 targetWorldPos)
     {
+        EnsureSubcomponents();
         StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
 
@@ -409,8 +398,7 @@ public class PhaseStar : MonoBehaviour
         EnableColliders();
         dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(false);
-        motion?.SetOverrideTarget(ComputeDormantRestPosition());
-        motion?.SetSpeedMultiplier(0.35f);
+        EnterDormantMotionPose();
 
         if (_waitForDustCo == null)
             _waitForDustCo = StartCoroutine(Co_WaitForColoredDust());
@@ -503,6 +491,51 @@ public class PhaseStar : MonoBehaviour
     }
 
 
+    private void EnsureSubcomponents()
+    {
+        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
+        if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
+        if (!dust) dust = GetComponentInChildren<PhaseStarDustAffect>(true);
+        if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
+    }
+
+    private void CleanupManagedCoroutines()
+    {
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+        StopManagedCoroutine(ref _burstOffScreenWaitCo);
+    }
+
+    private void EnterDormantMotionPose()
+    {
+        motion?.SetOverrideTarget(ComputeDormantRestPosition());
+        motion?.SetSpeedMultiplier(0.35f);
+    }
+
+    private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
+    {
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (roleProfile != null)
+        {
+            return new Color(
+                roleProfile.dustColors.baseColor.r,
+                roleProfile.dustColors.baseColor.g,
+                roleProfile.dustColors.baseColor.b,
+                1f);
+        }
+
+        if (fallbackTrack != null)
+        {
+            return new Color(
+                fallbackTrack.trackColor.r,
+                fallbackTrack.trackColor.g,
+                fallbackTrack.trackColor.b,
+                1f);
+        }
+
+        return Color.white;
+    }
+
     public void Initialize(
         DrumTrack drum,
         IEnumerable<InstrumentTrack> targets,
@@ -544,11 +577,7 @@ public class PhaseStar : MonoBehaviour
 
         BuildPhasePlan(GetEffectiveNodesPerStar());
         PrepareNextDirective();
-        // ensure subcomponents are present if assigned
-        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
-        if (!dust) dust = GetComponentInChildren<PhaseStarDustAffect>(true);
-        if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
+        EnsureSubcomponents();
         if (visuals) visuals.Initialize(behaviorProfile, this);
         if (motion) motion.Initialize(behaviorProfile, this);
         if (cravingNavigator) cravingNavigator.Initialize(this, motion, behaviorProfile);
@@ -638,13 +667,7 @@ public class PhaseStar : MonoBehaviour
         {
             _previewRole = dominantRole;
 
-            var rp = MusicalRoleProfileLibrary.GetProfile(dominantRole);
-            _previewColor = rp != null
-                ? new Color(rp.dustColors.baseColor.r,
-                            rp.dustColors.baseColor.g,
-                            rp.dustColors.baseColor.b,
-                            1f)
-                : Color.white;
+            _previewColor = ResolveRoleColor(dominantRole);
 
             _cachedTrack = FindTrackByRole(dominantRole);
             visuals?.ResetDualDiamondVisualState();
@@ -682,8 +705,6 @@ public class PhaseStar : MonoBehaviour
         if (genCheck != null && !genCheck.HasAnyDustWithRole())
         {
             Disarm(DisarmReason.None);
-            motion?.SetOverrideTarget(ComputeDormantRestPosition());
-            motion?.SetSpeedMultiplier(0.35f);
             cravingNavigator?.SetActive(false);
             EnterDormantWaitState();
         }
@@ -764,7 +785,7 @@ public class PhaseStar : MonoBehaviour
             _awaitingLoopPhaseFinish = false;
             _bridgeWaitStartLoop = -1;
             Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back shard. _shardsEjectedCount={_shardsEjectedCount}");
-            RebuildPreviewRingForRemainingShards(keepCurrentIndex: false);
+            RebuildPreviewRingForRemainingShards();
             PrepareNextDirective();
             OnBurstNotesReleased();
             return;
@@ -865,6 +886,10 @@ public class PhaseStar : MonoBehaviour
     private void MoveOffScreenForBurst()
     {
         if (_burstOffScreen) return;
+
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+
         _burstOffScreen = true;
 
         Vector2 offPos = PickOffScreenSpawnPoint();
@@ -945,7 +970,7 @@ public class PhaseStar : MonoBehaviour
 
         OnDisarmed?.Invoke(this);
     }
-    void InitializeTimingAndSpeeds()
+    private void RefreshLoopDuration()
     {
         // Prefer the DrumTrack that actually spawned this star.
         // Fall back to the globally active drum track if needed.
@@ -1276,23 +1301,13 @@ public class PhaseStar : MonoBehaviour
                   $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
     }
     
-    void BuildOrRefreshPreviewRing()
-    {
-        if (_previewVisual != null)
-        {
-            _previewVisual.localRotation = Quaternion.identity;
-            var sr = _previewVisual.GetComponent<SpriteRenderer>();
-            if (sr) { var c = sr.color; c.a = shardMinAlpha; sr.color = c; }
-        }
-        InitializeTimingAndSpeeds();
-    }
 
     private void EnsurePreviewRing()
     {
         if (_previewInitialized) return;
         _previewInitialized = true;
 
-        RebuildPreviewRingForRemainingShards(keepCurrentIndex:false);
+        RebuildPreviewRingForRemainingShards();
     }
 
 
@@ -1300,26 +1315,22 @@ public class PhaseStar : MonoBehaviour
     {
         var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
         SafeUnsubscribeAll();
-        StopManagedCoroutine(ref _entryApproachCo);
-        StopManagedCoroutine(ref _waitForDustCo);
-        StopManagedCoroutine(ref _burstOffScreenWaitCo);
+        CleanupManagedCoroutines();
     }
 
     private void OnDestroy()
     {
         _isDisposing = true;
         SafeUnsubscribeAll();
-        StopManagedCoroutine(ref _entryApproachCo);
-        StopManagedCoroutine(ref _waitForDustCo);
-        StopManagedCoroutine(ref _burstOffScreenWaitCo);
+        CleanupManagedCoroutines();
     }
 
     private void WireBinSource(DrumTrack drum)
     {
         _drum = drum;
         if (_drum == null) return;
-        InitializeTimingAndSpeeds();
-        BuildOrRefreshPreviewRing();
+        RefreshLoopDuration();
+        EnsurePreviewRing();
     }
     
     private void BuildPhasePlan(int shardCount)
@@ -1345,7 +1356,7 @@ public class PhaseStar : MonoBehaviour
         return Mathf.Clamp(rem, 0, total);
     }
 
-    private void RebuildPreviewRingForRemainingShards(bool keepCurrentIndex = true)
+    private void RebuildPreviewRingForRemainingShards()
     {
         if (behaviorProfile == null || visuals == null) return;
 
@@ -1415,8 +1426,6 @@ public class PhaseStar : MonoBehaviour
         _previewVisualB = null;
     }
 
-    _wasChargeReady = false;
-
     if (_baseSortingOrder == 0)
     {
         var baseSr = GetComponentInChildren<SpriteRenderer>(true);
@@ -1436,28 +1445,7 @@ public class PhaseStar : MonoBehaviour
     var role = _phasePlanRoles[0];
     var track = FindTrackByRole(role);
 
-    Color roleColor;
-    var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
-    if (roleProfile != null)
-    {
-        roleColor = new Color(
-            roleProfile.dustColors.baseColor.r,
-            roleProfile.dustColors.baseColor.g,
-            roleProfile.dustColors.baseColor.b,
-            1f);
-    }
-    else if (track != null)
-    {
-        roleColor = new Color(
-            track.trackColor.r,
-            track.trackColor.g,
-            track.trackColor.b,
-            1f);
-    }
-    else
-    {
-        roleColor = Color.white;
-    }
+    Color roleColor = ResolveRoleColor(role, track);
 
     // Seed preview values for the initial visual state only.
     // Runtime dominant-role logic in Update() is still allowed to replace these later.
@@ -1729,7 +1717,7 @@ public class PhaseStar : MonoBehaviour
         else
             SpawnNodeCommon(contact, ejectedTrack);
 
-        RebuildPreviewRingForRemainingShards(keepCurrentIndex: true);
+        RebuildPreviewRingForRemainingShards();
         PrepareNextDirective();
     }
     /// <summary>
@@ -2014,8 +2002,13 @@ public class PhaseStar : MonoBehaviour
     private void LogState(string where)
     {
         if (_isDisposing || this == null || !_tracePhaseStar) return;
-        string targRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
 
+        string targetRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
+        int total = Mathf.Max(0, GetEffectiveNodesPerStar());
+        Debug.Log(
+            $"[PhaseStar][{where}] state={_state} armed={_isArmed} entry={_entryInProgress} burstOff={_burstOffScreen} " +
+            $"awaitClr={_awaitingCollectableClear} awaitLoop={_awaitingLoopPhaseFinish} disarm={_disarmReason} " +
+            $"role={targetRole} shards={_shardsEjectedCount}/{total} charge={GetTotalCharge():0.00}");
     }
 
     private void ActivateSafetyBubble(Vector3 center = default)

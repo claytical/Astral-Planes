@@ -12,7 +12,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private PhaseStar _star;
 
     public Func<IReadOnlyList<Vector2>> VehiclePositionsProvider;
-    public Func<Vector2, float> DustDensitySampler;
 
     [Serializable]
     private sealed class VehicleAvoidanceTuning
@@ -22,14 +21,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         public float strength = 1.0f;
     }
 
-    [Serializable]
-    private sealed class DustEdgeSeekingTuning
-    {
-        public float sampleStep = 0.35f;
-        [Range(0f, 1f)] public float band = 0.5f;
-        public float strength = 1.0f;
-        public float gradMin = 0.02f;
-    }
 
     [Serializable]
     private sealed class SteeringTuning
@@ -77,9 +68,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private sealed class ScreenBoundsTuning
     {
         public bool kinematicMode = false;
-        [Range(0f, 1f)] public float edgeBounce = 0.9f;
         public float screenPadding = 0.5f;
-        [Range(0.1f, 1f)] public float focusSpeedMul = 0.5f;
     }
 
     [Serializable]
@@ -91,10 +80,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     [Header("Motion Tuning")]
     [SerializeField] private ScreenBoundsTuning bounds = new();
     [SerializeField] private VehicleAvoidanceTuning avoidance = new();
-    [SerializeField] private DustEdgeSeekingTuning edgeSeek = new();
     [SerializeField] private SteeringTuning steering = new();
     [SerializeField] private NavigatorBlendTuning navBlend = new();
-    [SerializeField] private bool verbose = false;
 
     private Rigidbody2D _rb;
     private PhaseStarBehaviorProfile _profile;
@@ -143,15 +130,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _enabled = true;
         _star = star;
 
-        if (DustDensitySampler == null)
-        {
-            DustDensitySampler = pos =>
-            {
-                var gfm = GameFlowManager.Instance;
-                var dust = gfm ? gfm.dustGenerator : null;
-                return dust == null ? 0f : dust.SampleDensity01(pos);
-            };
-        }
 
         VehiclePositionsProvider ??= () =>
         {
@@ -181,15 +159,17 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         _pushVelocity = Vector2.zero;
         _stuckTimer = 0f;
-        _rb.linearVelocity = Vector2.zero;
-        _rb.angularVelocity = 0f;
 
-        if (on)
-            SoftContainInsideScreen();
+        if (!on)
+        {
+            _rb.linearVelocity = Vector2.zero;
+            _rb.angularVelocity = 0f;
+            _rb.constraints = RigidbodyConstraints2D.FreezeAll;
+            return;
+        }
 
-        _rb.constraints = on
-            ? RigidbodyConstraints2D.FreezeRotation
-            : RigidbodyConstraints2D.FreezeAll;
+        SoftContainInsideScreen();
+        _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
     }
 
     private void FixedUpdate()
@@ -203,7 +183,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
 
         float dt = Time.fixedDeltaTime;
-
         float hunger = (_star != null) ? _star.GetHungerLevel() : 0f;
         float speed = Mathf.Lerp(
             Mathf.Max(0f, _profile.starDriftSpeed),
@@ -218,64 +197,49 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         if (isHunting)
         {
-            Vector2 avoid = ComputeVehicleAvoidance(_rb.position);
-            Vector2 desiredDir = huntDir;
-
-            if (avoid.sqrMagnitude > 0.0001f)
-                desiredDir = (huntDir + avoid * avoidance.strength * 0.4f).normalized;
-
-            Vector2 edgeRepulsion = ComputeEdgeRepulsion(_rb.position);
-            if (edgeRepulsion.sqrMagnitude > 0.0001f)
-                desiredDir = (desiredDir + edgeRepulsion).normalized;
-
+            Vector2 desiredDir = ResolveDesiredHuntDirection(huntDir, _rb.position);
             Vector2 desiredVel = desiredDir * speed;
             Vector2 newVel = Vector2.MoveTowards(_rb.linearVelocity, desiredVel, steering.huntAccel * dt);
-
-            if (_pushVelocity.sqrMagnitude > 0.0001f)
-            {
-                newVel += _pushVelocity;
-                _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
-            }
-
-            if (bounds.kinematicMode)
-                _rb.MovePosition(_rb.position + newVel * dt);
-            else
-                _rb.linearVelocity = newVel;
-
-            SoftContainInsideScreen();
-            OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVel : _rb.linearVelocity);
-
-            if (enableUnstickImpulse && !bounds.kinematicMode && unstickImpulseSpeed > 0.001f)
-            {
-                bool isStuck = _rb.linearVelocity.sqrMagnitude < (speed * 0.12f) * (speed * 0.12f);
-                if (isStuck)
-                {
-                    _stuckTimer += dt;
-                    if (_stuckTimer >= stuckThresholdSeconds)
-                    {
-                        _stuckTimer = 0f;
-                        Vector2 perp = Vector2.Perpendicular(huntDir);
-                        if (Random.value > 0.5f) perp = -perp;
-                        Vector2 nudge = (perp * 0.75f + huntDir * 0.25f).normalized * unstickImpulseSpeed;
-                        ApplyPushImpulse(nudge);
-                    }
-                }
-                else
-                {
-                    _stuckTimer = 0f;
-                }
-            }
-            else
-            {
-                _stuckTimer = 0f;
-            }
-
+            newVel = ApplyPushVelocity(newVel, dt);
+            ApplyVelocity(newVel, dt);
+            HandleUnstickImpulse(huntDir, speed, dt);
             return;
         }
 
+        Vector2 desiredDirDrift = ResolveDesiredDriftDirection(_rb.position, jitter);
+        Vector2 desiredVelDrift = desiredDirDrift * speed;
+        Vector2 curVel = _rb.linearVelocity;
+        float driftAccel = (curVel.sqrMagnitude > speed * speed * 1.5f)
+            ? steering.huntAccel
+            : steering.maxAccel;
+
+        Vector2 newVelDrift = Vector2.MoveTowards(curVel, desiredVelDrift, driftAccel * dt);
+        newVelDrift = ApplyPushVelocity(newVelDrift, dt);
+        ApplyVelocity(newVelDrift, dt);
+        _stuckTimer = 0f;
+    }
+
+
+    private Vector2 ResolveDesiredHuntDirection(Vector2 huntDir, Vector2 currentPos)
+    {
+        Vector2 avoid = ComputeVehicleAvoidance(currentPos);
+        Vector2 desiredDir = huntDir;
+
+        if (avoid.sqrMagnitude > 0.0001f)
+            desiredDir = (huntDir + avoid * avoidance.strength * 0.4f).normalized;
+
+        Vector2 edgeRepulsion = ComputeEdgeRepulsion(currentPos);
+        if (edgeRepulsion.sqrMagnitude > 0.0001f)
+            desiredDir = (desiredDir + edgeRepulsion).normalized;
+
+        return desiredDir;
+    }
+
+    private Vector2 ResolveDesiredDriftDirection(Vector2 currentPos, float jitter)
+    {
         if (_overrideTarget.HasValue)
         {
-            Vector2 toTarget = _overrideTarget.Value - _rb.position;
+            Vector2 toTarget = _overrideTarget.Value - currentPos;
             if (toTarget.sqrMagnitude < 0.5f * 0.5f)
             {
                 _overrideTarget = null;
@@ -287,7 +251,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             }
         }
 
-        _rechooseTimer -= dt;
+        _rechooseTimer -= Time.fixedDeltaTime;
         if (_rechooseTimer <= 0f)
             PickNewDriftDir();
 
@@ -295,8 +259,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         Vector2 drift = _driftDir + j;
         if (drift.sqrMagnitude > 0.0001f) drift.Normalize();
 
-        Vector2 avoidDrift = ComputeVehicleAvoidance(_rb.position);
-
+        Vector2 avoidDrift = ComputeVehicleAvoidance(currentPos);
         Vector2 avoidTangent = (avoidDrift.sqrMagnitude > 0.0001f)
             ? Vector2.Perpendicular(avoidDrift).normalized * Mathf.Clamp01(_profile.orbitBias)
             : Vector2.zero;
@@ -320,32 +283,59 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         else
             desiredDirDrift.Normalize();
 
-        Vector2 edgeRepulsionDrift = ComputeEdgeRepulsion(_rb.position);
+        Vector2 edgeRepulsionDrift = ComputeEdgeRepulsion(currentPos);
         desiredDirDrift += edgeRepulsionDrift;
         if (desiredDirDrift.sqrMagnitude > 0.0001f)
             desiredDirDrift.Normalize();
 
-        Vector2 desiredVelDrift = desiredDirDrift * speed;
-        Vector2 curVel = _rb.linearVelocity;
-        float driftAccel = (curVel.sqrMagnitude > speed * speed * 1.5f)
-            ? steering.huntAccel
-            : steering.maxAccel;
+        return desiredDirDrift;
+    }
 
-        Vector2 newVelDrift = Vector2.MoveTowards(curVel, desiredVelDrift, driftAccel * dt);
+    private Vector2 ApplyPushVelocity(Vector2 baseVelocity, float dt)
+    {
+        if (_pushVelocity.sqrMagnitude <= 0.0001f)
+            return baseVelocity;
 
-        if (_pushVelocity.sqrMagnitude > 0.0001f)
-        {
-            newVelDrift += _pushVelocity;
-            _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
-        }
+        Vector2 result = baseVelocity + _pushVelocity;
+        _pushVelocity = Vector2.MoveTowards(_pushVelocity, Vector2.zero, pushDecayPerSecond * dt);
+        return result;
+    }
 
+    private void ApplyVelocity(Vector2 velocity, float dt)
+    {
         if (bounds.kinematicMode)
-            _rb.MovePosition(_rb.position + newVelDrift * dt);
+            _rb.MovePosition(_rb.position + velocity * dt);
         else
-            _rb.linearVelocity = newVelDrift;
+            _rb.linearVelocity = velocity;
 
         SoftContainInsideScreen();
-        OnVelocityChanged?.Invoke(bounds.kinematicMode ? newVelDrift : _rb.linearVelocity);
+        OnVelocityChanged?.Invoke(bounds.kinematicMode ? velocity : _rb.linearVelocity);
+    }
+
+    private void HandleUnstickImpulse(Vector2 huntDir, float speed, float dt)
+    {
+        if (!enableUnstickImpulse || bounds.kinematicMode || unstickImpulseSpeed <= 0.001f)
+        {
+            _stuckTimer = 0f;
+            return;
+        }
+
+        bool isStuck = _rb.linearVelocity.sqrMagnitude < (speed * 0.12f) * (speed * 0.12f);
+        if (!isStuck)
+        {
+            _stuckTimer = 0f;
+            return;
+        }
+
+        _stuckTimer += dt;
+        if (_stuckTimer < stuckThresholdSeconds)
+            return;
+
+        _stuckTimer = 0f;
+        Vector2 perp = Vector2.Perpendicular(huntDir);
+        if (Random.value > 0.5f) perp = -perp;
+        Vector2 nudge = (perp * 0.75f + huntDir * 0.25f).normalized * unstickImpulseSpeed;
+        ApplyPushImpulse(nudge);
     }
 
     private Vector2 ComputeEdgeRepulsion(Vector2 pos)

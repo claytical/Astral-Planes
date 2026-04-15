@@ -14,11 +14,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     [Header("Hunger-Weighted Targeting")]
     [SerializeField, Range(0f, 1f)] private float hungerFloorWeight = 0.15f;
 
-    [Header("Debug")]
-    [SerializeField] private bool verbose = false;
-
     private PhaseStar _star;
     private bool _active;
+    private bool _huntingEnabled;
     private float _replanTimer;
     private float _snifferTimer;
 
@@ -31,10 +29,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private readonly Dictionary<MusicalRole, Vector2> _snifferDirs = new();
     private Vector2 _nearestColoredDustDir = Vector2.zero;
-
     private readonly List<Vector2Int> _coloredCellsScratch = new(512);
-
-    private bool _huntingEnabled;
 
     public void Initialize(
         PhaseStar star,
@@ -46,27 +41,25 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
         _star = star;
         _active = true;
-        _replanTimer = 0f;
-        _snifferTimer = 0f;
-        _hasTarget = false;
-        _hasLockOnCell = false;
-        _huntingEnabled = false;
+        ResetTargetingState(clearSniffer: true);
     }
 
     public void SetActive(bool active)
     {
         _active = active;
         if (!active)
-        {
-            _hasTarget = false;
-            _hasLockOnCell = false;
-            _huntingEnabled = false;
-        }
+            ResetTargetingState(clearSniffer: false);
     }
 
     public void SetHuntingEnabled(bool enabled)
     {
         _huntingEnabled = enabled;
+        if (!enabled)
+        {
+            _hasTarget = false;
+            _hasLockOnCell = false;
+            _targetDir = Vector2.zero;
+        }
     }
 
     public bool TryGetTargetForRole(MusicalRole role, out Vector2Int cell)
@@ -118,6 +111,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         _lockOnCell = cell;
         _hasTarget = true;
         _targetCell = cell;
+        RefreshTargetDir();
         _replanTimer = replanIntervalSeconds;
     }
 
@@ -158,18 +152,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         float dt = Time.deltaTime;
 
         RefreshTargetDir();
-
-        if (_hasLockOnCell && !IsTargetValid(_lockOnCell))
-        {
-            _hasLockOnCell = false;
-            _hasTarget = false;
-            _replanTimer = 0f;
-        }
-        else if (_hasTarget && retargetOnTargetLost && !IsTargetValid(_targetCell))
-        {
-            _hasTarget = false;
-            _replanTimer = 0f;
-        }
+        ValidateCurrentTarget();
 
         _replanTimer -= dt;
         if (_replanTimer <= 0f)
@@ -200,6 +183,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         if (_coloredCellsScratch.Count == 0)
         {
             _hasTarget = false;
+            _targetDir = Vector2.zero;
             return;
         }
 
@@ -233,6 +217,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         if (!found)
         {
             _hasTarget = false;
+            _targetDir = Vector2.zero;
             return;
         }
 
@@ -289,8 +274,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             Vector2 cellWorld = drum.GridToWorldPosition(nearestCell);
             Vector2 dir = cellWorld - starWorld;
-            if (dir.sqrMagnitude > 0.0001f)
-                _nearestColoredDustDir = dir.normalized;
+            _nearestColoredDustDir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.zero;
         }
         else
         {
@@ -300,16 +284,57 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private void RefreshTargetDir()
     {
-        if (!_hasTarget) return;
+        if (!_hasTarget)
+        {
+            _targetDir = Vector2.zero;
+            return;
+        }
 
         var drum = GameFlowManager.Instance?.activeDrumTrack;
-        if (drum == null) return;
+        if (drum == null)
+        {
+            _targetDir = Vector2.zero;
+            return;
+        }
 
         Vector2 cellWorld = drum.GridToWorldPosition(_targetCell);
         Vector2 dir = cellWorld - (Vector2)transform.position;
+        _targetDir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.zero;
+    }
 
-        if (dir.sqrMagnitude > 0.0001f)
-            _targetDir = dir.normalized;
+    private void ValidateCurrentTarget()
+    {
+        if (_hasLockOnCell && !IsTargetValid(_lockOnCell))
+        {
+            _hasLockOnCell = false;
+            _hasTarget = false;
+            _targetDir = Vector2.zero;
+            _replanTimer = 0f;
+            return;
+        }
+
+        if (_hasTarget && retargetOnTargetLost && !IsTargetValid(_targetCell))
+        {
+            _hasTarget = false;
+            _targetDir = Vector2.zero;
+            _replanTimer = 0f;
+        }
+    }
+
+    private void ResetTargetingState(bool clearSniffer)
+    {
+        _replanTimer = 0f;
+        _snifferTimer = 0f;
+        _hasTarget = false;
+        _targetDir = Vector2.zero;
+        _hasLockOnCell = false;
+        _huntingEnabled = false;
+
+        if (clearSniffer)
+        {
+            _snifferDirs.Clear();
+            _nearestColoredDustDir = Vector2.zero;
+        }
     }
 
     private bool IsTargetValid(Vector2Int cell)

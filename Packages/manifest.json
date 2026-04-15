@@ -10,6 +10,8 @@
     "com.unity.multiplayer.center": "1.0.1",
     "com.unity.purchasing": "5.0.1",
     "com.unity.render-pipelines.universal": "17.4.0",
+    "com.unity.sdk.linux-x86_64": "1.0.2",
+    "com.unity.toolchain.macos-arm64-linux": "1.0.2",
     "com.unity.ugui": "2.0.0",
     "com.unity.visualeffectgraph": "17.4.0",
     "com.unity.modules.accessibility": "1.0.0",

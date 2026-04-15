@@ -54,21 +54,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
-        star.OnArmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = true; };
-        star.OnDisarmed += s => { GameFlowManager.Instance.activeDrumTrack.isPhaseStarActive = false; };
-
-        if (!bubbleRoot)
-        {
-            var t = transform.Find("Bubble Root");
-            if (t) bubbleRoot = t;
-        }
-
-        if (bubbleRoot)
-        {
-            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
-            if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
-        }
-
+        ResolveBubbleReferences();
         CacheShardRenderers();
         HideSafetyBubble();
     }
@@ -87,6 +73,22 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         _diamondAAngleVelocity = 0f;
         _diamondBAngleVelocity = 0f;
     }
+
+    private void ResolveBubbleReferences()
+    {
+        if (!bubbleRoot)
+        {
+            var t = transform.Find("Bubble Root");
+            if (t) bubbleRoot = t;
+        }
+
+        if (bubbleRoot)
+        {
+            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
+            if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
+        }
+    }
+
 
     private void CacheShardRenderers()
     {
