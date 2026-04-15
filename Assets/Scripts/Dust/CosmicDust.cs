@@ -1291,7 +1291,7 @@ private Coroutine _jiggleRoutine;
             {
                 var gp = _drumTrack.WorldToGridPosition(transform.position);
                 gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
-                    fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true);
+                    fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
             }
         }
         else

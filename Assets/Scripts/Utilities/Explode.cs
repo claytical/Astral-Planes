@@ -208,16 +208,17 @@ public class Explode : MonoBehaviour
 
     public void PreExplode()
     {
-        if (preExplosion != null)
+        if (preExplosion == null)
         {
-            Debug.Log("[EXPLODE] PreExplode");
-            var go = Instantiate(preExplosion, transform.position, Quaternion.identity);
-            ApplyTintToInstance(go, explosionTint);
-            if (_burstDir.sqrMagnitude > 0.0001f)
-                ApplyDirectionToInstance(go, _burstDir);
-  
+            Debug.LogWarning($"[EXPLODE] PreExplode skipped: preExplosion is null on {name}", this);
+            return;
         }
 
+        Debug.Log("[EXPLODE] PreExplode");
+        var go = Instantiate(preExplosion, transform.position, Quaternion.identity);
+        ApplyTintToInstance(go, explosionTint);
+        if (_burstDir.sqrMagnitude > 0.0001f)
+            ApplyDirectionToInstance(go, _burstDir);
     }
 
 
