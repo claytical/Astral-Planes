@@ -104,11 +104,6 @@ public class PhaseStar : MonoBehaviour
     private bool _isDisposing;
     private bool _entryInProgress;
     private bool _buildingPreview;
-    private int _shardsEjectedCount; // how many shards have ejected so far
-
-    private bool _awaitingLoopPhaseFinish;
-    private int  _bridgeWaitStartLoop = -1;
-
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
     float _lastImpactStrength = 0f;
@@ -166,7 +161,11 @@ public class PhaseStar : MonoBehaviour
         AwaitBridge,
 
         // The bridge is actively running (coral/transition).
-        Bridge
+        Bridge,
+
+        // A sibling Star has ejected and its MineNode is being processed.
+        // Star freezes in place, goes gray, disables collision.
+        SiblingActive
     }
 
     private DisarmReason _disarmReason = DisarmReason.None;
@@ -201,38 +200,30 @@ public class PhaseStar : MonoBehaviour
     private float _displayedCharge01;
 
     private bool _ejectionInFlight;
-    private bool _advanceStarted;
     private int _spawnTicket;
+    private float _ejectableTimer;
     private int _lastPokeFrame = -999999;
     private InstrumentTrack _cachedTrack;
     private MineNode _activeNode;
     private SuperNode _activeSuperNode;
     private readonly List<InstrumentTrack> _targets = new(4);
-    private List<MusicalRole> _phasePlanRoles;
+    private MusicalRole _attunedRole = MusicalRole.None;
+    public MusicalRole AttunedRole => _attunedRole;
+    public bool LastNodeWasSuperNode { get; private set; }
     [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
     public event Action<PhaseStar> OnArmed;
     public event Action<PhaseStar> OnDisarmed;
+    public event Action<PhaseStar, MusicalRole> OnEjected;
+    public event Action<PhaseStar> OnBurstRolledBack;
+    // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
+    // Safe to fire from a destroyed star (C# delegate, not Unity message).
+    public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
     private bool _isArmed;
     private int _baseSortingOrder;
 
     public List<MusicalRole> GetMotifActiveRoles() =>
         _assignedMotif != null ? _assignedMotif.GetActiveRoles() : null;
-
-    private int GetEffectiveNodesPerStar()
-    {
-        if (_assignedMotif != null)
-        {
-            // Each RoleMotifNoteSetConfig represents one bin/ejection.
-            // Use whichever is larger so authored overrides can still increase the count,
-            // but a mismatch never silently drops bins.
-            int configCount = _assignedMotif.roleNoteConfigs?.Count ?? 0;
-            int authored    = Mathf.Max(1, _assignedMotif.nodesPerStar);
-            return Mathf.Max(configCount, authored);
-        }
-        return behaviorProfile != null ? behaviorProfile.nodesPerStar : 1;
-    }
-
 
     // -------------------- Lifecycle --------------------
     void Start()
@@ -259,6 +250,7 @@ public class PhaseStar : MonoBehaviour
     public void AddCharge(MusicalRole role, float energyUnitsDelivered)
     {
         if (role == MusicalRole.None) return;
+        if (_attunedRole != MusicalRole.None && role != _attunedRole) return;
         float add = Mathf.Max(0f, energyUnitsDelivered) * (behaviorProfile != null ? behaviorProfile.dustToStarChargeMul : 1f);
         if (add <= 0f) return;
 
@@ -294,6 +286,11 @@ public class PhaseStar : MonoBehaviour
         return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
     }
 
+    public bool IsPointInsideMyBubble(Vector2 worldPos)
+    {
+        return _bubbleActive && (worldPos - _bubbleCenterWorld).sqrMagnitude <= _bubbleRadiusWorld * _bubbleRadiusWorld;
+    }
+
     public void EnterFromOffScreen(Vector2 targetWorldPos)
     {
         EnsureSubcomponents();
@@ -312,6 +309,9 @@ public class PhaseStar : MonoBehaviour
         cravingNavigator?.SetActive(false);
         _isArmed = false;
         _disarmReason = DisarmReason.None;
+        _burstOffScreen = false;
+        _awaitingCollectableClear = false;
+        _ejectableTimer = 0f;
         _starCharge.Clear();
         _displayedCharge01 = 0f;
 
@@ -573,10 +573,6 @@ public class PhaseStar : MonoBehaviour
         _starCharge.Clear();
         _displayedCharge01 = 0f;
 
-        _shardsEjectedCount = 0;
-
-        BuildPhasePlan(GetEffectiveNodesPerStar());
-        PrepareNextDirective();
         EnsureSubcomponents();
         if (visuals) visuals.Initialize(behaviorProfile, this);
         if (motion) motion.Initialize(behaviorProfile, this);
@@ -584,7 +580,10 @@ public class PhaseStar : MonoBehaviour
         if (motion && cravingNavigator) motion.SetCravingNavigator(cravingNavigator);
 
         if (dust)
+        {
             dust.Initialize(behaviorProfile, this);
+            dust.OnAttuned += OnAttuned_SetRole;
+        }
         if (drum != null && !_subscribedLoopBoundary)
         {
             drum.OnLoopBoundary += OnLoopBoundary_RearmIfNeeded;
@@ -600,6 +599,15 @@ public class PhaseStar : MonoBehaviour
          LogState("Initialized+Armed");
         }
     }
+    private void OnAttuned_SetRole(MusicalRole role)
+    {
+        if (_attunedRole != MusicalRole.None) return;
+        _attunedRole = role;
+        cravingNavigator?.SetAttunedRole(role);
+        dust?.SetAttunedRole(role);
+        Debug.Log($"[PhaseStar] Attuned to {role}");
+    }
+
     private Color ResolvePreviewColorByReadiness()
     {
         if (_previewRole == MusicalRole.None) return Color.gray;
@@ -615,7 +623,6 @@ public class PhaseStar : MonoBehaviour
 {
     if (_bubbleActive)
     {
-        s_bubbleCenter = _bubbleCenterWorld;
         visuals?.UpdateBubblePosition(_bubbleCenterWorld);
     }
 
@@ -684,7 +691,26 @@ public class PhaseStar : MonoBehaviour
 
     bool dominantReady = HasDominantRoleEjectable();
 
-    if (_previewVisual != null)
+    // Armed timeout: if fully charged but not ejected, reset and restart the drain cycle.
+    if (dominantReady && _isArmed && _disarmReason == DisarmReason.None && !_burstOffScreen)
+    {
+        _ejectableTimer += dt;
+        float timeout = behaviorProfile != null ? behaviorProfile.armedTimeoutSeconds : 0f;
+        if (timeout > 0f && _ejectableTimer >= timeout)
+        {
+            _ejectableTimer = 0f;
+            _starCharge.Clear();
+            _displayedCharge01 = 0f;
+            Debug.Log($"[PhaseStar] Armed timeout — resetting charge and re-entering dormant cycle.");
+            EnterDormantWaitState();
+        }
+    }
+    else
+    {
+        _ejectableTimer = 0f;
+    }
+
+    if (_previewVisual != null && _disarmReason != DisarmReason.SiblingActive)
     {
         visuals?.UpdateDualDiamonds(
             _previewColor,
@@ -693,6 +719,13 @@ public class PhaseStar : MonoBehaviour
             rotB, bLocked,
             dominantReady,
             readyRotSpeedMul);
+    }
+
+    // Continuously lerp body color between dim and role color using charge level.
+    if (visuals != null && !_burstOffScreen && _disarmReason != DisarmReason.SiblingActive)
+    {
+        Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
+        visuals.LerpBodyColor(bodyColor, _displayedCharge01);
     }
 
     if (_isArmed &&
@@ -744,9 +777,7 @@ public class PhaseStar : MonoBehaviour
 
     public void NotifyCollectableBurstCleared(bool hadNotes = true)
     {
-        // This callback comes from InstrumentTrackController when the *global* collectable set is empty.
-        // It is allowed to fire multiple times (per-track), so it must be idempotent and bridge-safe.
-        if (_advanceStarted || _state == PhaseStarState.BridgeInProgress)
+        if (_state == PhaseStarState.BridgeInProgress)
         {
             _awaitingCollectableClear = false;
             _awaitingCollectableClearSinceLoop = -1;
@@ -754,58 +785,29 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        bool cif = AnyCollectablesInFlightGlobal();
-        bool ep = AnyExpansionPendingGlobal();
-
         Debug.Log(
             $"[PS:BURST_CLEARED] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
-            $"awaitClr(before)={_awaitingCollectableClear} shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
-            $"CIF={cif} EP={ep} hadNotes={hadNotes}"
+            $"awaitClr(before)={_awaitingCollectableClear} CIF={AnyCollectablesInFlightGlobal()} hadNotes={hadNotes}"
         );
 
         _awaitingCollectableClear = false;
         _awaitingCollectableClearSinceLoop = -1;
         _awaitingCollectableClearSinceDsp = -1.0;
 
-        // If we’re still not clean, do nothing (controller should not be calling us in this case, but stay defensive).
         if (AnyCollectablesInFlightGlobal() || AnyExpansionPendingGlobal())
         {
-            Debug.LogWarning(
-                $"[PS:BURST_CLEARED] IGNORE (still busy) star={name} CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
-            );
+            Debug.LogWarning($"[PS:BURST_CLEARED] IGNORE (still busy) star={name}");
             return;
         }
 
-        // If the player committed zero notes for this burst, roll back the shard so they must retry.
-        // This prevents bridging to the next motif when no notes were ever placed for this role.
         if (!hadNotes)
         {
-            _shardsEjectedCount = Mathf.Max(0, _shardsEjectedCount - 1);
-            // Clear loop-phase flags that may have been set on the final-shard ejection path.
-            _awaitingLoopPhaseFinish = false;
-            _bridgeWaitStartLoop = -1;
-            Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back shard. _shardsEjectedCount={_shardsEjectedCount}");
-            RebuildPreviewRingForRemainingShards();
-            PrepareNextDirective();
+            Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back.");
+            OnBurstRolledBack?.Invoke(this);
             OnBurstNotesReleased();
             return;
         }
 
-        bool noShardsRemain = _shardsEjectedCount >= GetEffectiveNodesPerStar();
-
-        // Final shard: defer bridge by one full loop after the note lands in the track.
-        // _bridgeWaitStartLoop is intentionally left -1 here; it will be stamped at the
-        // FIRST loop boundary where _awaitingLoopPhaseFinish is observed, ensuring the
-        // wait is measured from a loop boundary rather than from collection time.
-        if (noShardsRemain)
-        {
-            _awaitingLoopPhaseFinish = true;
-            _bridgeWaitStartLoop = -1;
-            Disarm(DisarmReason.AwaitBridge, _lockedTint);
-            return;
-        }
-
-        // Shards remain: return from off-screen and re-arm when colored dust is available.
         OnBurstNotesReleased();
     }
 
@@ -861,12 +863,6 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        if (!HasShardsRemaining())
-        {
-            Disarm(DisarmReason.AwaitBridge);
-            return;
-        }
-
         _disarmReason = DisarmReason.None;
         _isArmed = true;
 
@@ -881,6 +877,37 @@ public class PhaseStar : MonoBehaviour
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
     }
+    public void Pause()
+    {
+        Disarm(DisarmReason.SiblingActive);
+        motion?.SetFrozen(true);
+        visuals?.ShowDim(Color.gray);
+    }
+
+    public void Resume()
+    {
+        if (_isDisposing) return;
+        _disarmReason = DisarmReason.None;
+        if (_burstOffScreen)
+        {
+            _burstOffScreen = false;
+            EnterFromOffScreen(ComputeDormantRestPosition());
+            return;
+        }
+        motion?.SetFrozen(false);
+        motion?.Enable(true);
+        if (HasDominantRoleEjectable())
+            ArmNext();
+        else
+            visuals?.ShowDim(ResolvePreviewColorByReadiness());
+    }
+
+    public void PreAttuneTo(MusicalRole role)
+    {
+        if (role == MusicalRole.None || _attunedRole != MusicalRole.None) return;
+        OnAttuned_SetRole(role);
+    }
+
     // Teleport the star off-screen and freeze it for the duration of a burst.
     // Guarded — safe to call repeatedly; only executes on the first call per burst.
     private void MoveOffScreenForBurst()
@@ -1006,23 +1033,18 @@ public class PhaseStar : MonoBehaviour
         bool ep = AnyExpansionPendingGlobal();
 
         Debug.Log(
-            $"[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
-            $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} advStarted={_advanceStarted} " +
-            $"shards={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} hasRem={HasShardsRemaining()} " +
-            $"activeNode={(_activeNode ? _activeNode.name : "null")} ejectInFlight={_ejectionInFlight} " +
-            $"CIF={cif} EP={ep}"
-        );
+            "$[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
+            $"awaitClr={_awaitingCollectableClear} " +
+            $"activeNode={(_activeNode ? _activeNode.name : null)} ejectInFlight={_ejectionInFlight} CIF={cif} EP={ep}");
 
         if (_isDisposing || this == null) return;
+        if (_disarmReason == DisarmReason.SiblingActive) return;
 
         // ------------------------------------------------------------
         // 1) Awaiting collectable clear (post-node-resolution latch)
         // ------------------------------------------------------------
         if (_awaitingCollectableClear)
         {
-            // If collectables exist AND the last node is still live, wait.
-            // But if the node is already captured (_activeNode == null), fall through to
-            // bridge logic even with stray collectables still in flight.
             if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _activeSuperNode != null || _ejectionInFlight))
             {
                 Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
@@ -1030,15 +1052,12 @@ public class PhaseStar : MonoBehaviour
                 return;
             }
 
-            // No collectables in flight, but we're still "awaiting".
-            // We must eventually recover; otherwise the PhaseStar can deadlock (commonly on last shard).
             var drums = _drum != null
                 ? _drum
                 : (GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null);
 
             bool timedOut = false;
 
-            // Loop-based timeout
             if (CollectableClearTimeoutLoops > 0 && drums != null)
             {
                 int nowLoop = drums.completedLoops;
@@ -1051,83 +1070,34 @@ public class PhaseStar : MonoBehaviour
 
                 Debug.Log(
                     $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
-
             }
 
-            Debug.Log(
-                $"[PhaseStar][Await] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
-                $"sinceLoop={_awaitingCollectableClearSinceLoop} " +
-                $"waited={(drums != null && _awaitingCollectableClearSinceLoop >= 0 ? drums.completedLoops - _awaitingCollectableClearSinceLoop : -1)} " +
-                $"loopsTimeout={CollectableClearTimeoutLoops} " +
-                $"dspNow={AudioSettings.dspTime:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} " +
-                $"collectablesInFlight={AnyCollectablesInFlightGlobal()} activeNode={(_activeNode != null)}"
-            );
-
-            // Seconds-based timeout (optional)
             if (!timedOut && CollectableClearTimeoutSeconds > 0f)
             {
-                DBG("LoopBoundary: awaitingCollectableClear seconds-check running");
                 double nowDsp = AudioSettings.dspTime;
                 if (_awaitingCollectableClearSinceDsp < 0.0)
                     _awaitingCollectableClearSinceDsp = nowDsp;
 
                 if ((nowDsp - _awaitingCollectableClearSinceDsp) >= CollectableClearTimeoutSeconds)
                     timedOut = true;
-                Debug.Log(
-                    $"[PS:LB/AWAIT.SECS] nowDsp={nowDsp:F2} sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} -> timedOut={timedOut}");
             }
 
-            Debug.Log(
-                $"[PS:LB/AWAIT] nowLoop={(drums != null ? drums.completedLoops : -1)} " +
-                $"sinceLoop={_awaitingCollectableClearSinceLoop} loopsTimeout={CollectableClearTimeoutLoops} " +
-                $"sinceDsp={_awaitingCollectableClearSinceDsp:F2} secTimeout={CollectableClearTimeoutSeconds:F2} " +
-                $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()} activeNode={(_activeNode != null)}"
-            );
-
-            // If we have not timed out, stay disarmed and keep waiting.
             if (!timedOut)
             {
-                Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out) hasRem={HasShardsRemaining()}");
+                Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
                 Disarm(DisarmReason.NodeResolving, _lockedTint);
                 return;
             }
 
-            // Timeout recovery: clear latch and proceed immediately.
-            Debug.LogWarning(
-                $"[PhaseStar][Timeout] AwaitingCollectableClear timed out but no collectables are in flight. " +
-                $"Forcing recovery. star={name} shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar}"
-            );
-            Debug.LogWarning(
-                $"[PS:LB/RECOVERY] clearing awaitClr latch (before) awaitClr={_awaitingCollectableClear} sinceLoop={_awaitingCollectableClearSinceLoop} sinceDsp={_awaitingCollectableClearSinceDsp:F2}");
+            Debug.LogWarning($"[PhaseStar][Timeout] AwaitingCollectableClear timed out. Forcing recovery. star={name}");
 
             _awaitingCollectableClear = false;
             _awaitingCollectableClearSinceLoop = -1;
             _awaitingCollectableClearSinceDsp = -1.0;
 
-            bool noShardsRemain = _shardsEjectedCount >= GetEffectiveNodesPerStar();
-            int nps = GetEffectiveNodesPerStar();
-
-            Debug.LogWarning(
-                $"[PS:LB/RECOVERY] timedOut={timedOut} shardsEjected={_shardsEjectedCount}/{nps} " +
-                $"previewRole={_previewRole} noShardsRemain={noShardsRemain} " +
-                $"CIF={AnyCollectablesInFlightGlobal()} EP={AnyExpansionPendingGlobal()}"
-            );
             if (!CanAdvancePhaseNow())
             {
-                DBG(
-                    $"[PS:LB/RECOVERY] block; outstanding node. activeNode={_activeNode?.name} ejectionInFlight={_ejectionInFlight}");
                 Disarm(DisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            if (noShardsRemain)
-            {
-                // Route through the loop-wait so the player hears at least one full loop
-                // of the placed notes before the bridge fires, same as the normal path.
-                Debug.Log($"[PS:LB] Begin Bridge (via loop-wait)");
-                _awaitingLoopPhaseFinish = true;
-                _bridgeWaitStartLoop    = -1;
-                Disarm(DisarmReason.AwaitBridge, _lockedTint);
                 return;
             }
 
@@ -1151,136 +1121,21 @@ public class PhaseStar : MonoBehaviour
             if (_displayedCharge01 >= readyDisplayThreshold)
             {
                 Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
-                return; // stay armed; player can poke as soon as expansion clears
+                return;
             }
             Debug.Log($"[PS:LB] Any Expanding Global True");
             Disarm(DisarmReason.ExpansionPending, _lockedTint);
             return;
         }
 
-        // ------------------------------------------------------------
-        // 3) Deterministic bridge trigger (end-of-star)
-        // ------------------------------------------------------------
-        // If the star is complete, we should bridge on the next clean loop boundary
-        // even if a specific latch flag was not set (prevents “stuck not bridging”).
-        int _nps = GetEffectiveNodesPerStar();
-        bool shardsComplete = _nps > 0 && _shardsEjectedCount >= _nps;
-        bool noShardsRemain0 = (_previewRole == MusicalRole.None) ||
-                               (_shardsEjectedCount >= _nps);
-        // HARD BLOCK: if a MineNode or SuperNode is still active, we cannot advance.
-        // This enforces "no skip capture" as a player choice.
-        if (_activeNode != null || _activeSuperNode != null || _ejectionInFlight)
-        {
-            DBG(
-                $"LoopBoundary: block bridge; outstanding node. activeNode={_activeNode?.name} superNode={_activeSuperNode?.name} ejectionInFlight={_ejectionInFlight}");
-            return;
-        }
-
-        // ------------------------------------------------------------
-        // 3a) Loop-wait bridge gate (checked before FORCE_BRIDGE so once the flag
-        //     is set it is always processed without FORCE_BRIDGE re-evaluating it)
-        // ------------------------------------------------------------
-        if (_awaitingLoopPhaseFinish)
-        {
-            var drumsLB = _drum ?? GameFlowManager.Instance?.activeDrumTrack;
-
-            // First boundary: stamp so the wait is measured from a loop boundary,
-            // not from the mid-loop moment the note was placed.
-            if (_bridgeWaitStartLoop < 0 && drumsLB != null)
-            {
-                _bridgeWaitStartLoop = drumsLB.completedLoops;
-                Disarm(DisarmReason.AwaitBridge, _lockedTint);
-                return;
-            }
-
-            // Wait one full loop after the stamp.
-            if (_bridgeWaitStartLoop >= 0 && drumsLB != null
-                && drumsLB.completedLoops - _bridgeWaitStartLoop < 1)
-            {
-                Disarm(DisarmReason.AwaitBridge, _lockedTint);
-                return;
-            }
-
-            if (!CanAdvancePhaseNow())
-            {
-                DBG($"[PS:LB] AwaitLoopPhaseFinish blocked; activeNode={_activeNode?.name} ejection={_ejectionInFlight}");
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            DBG("[PS:LB] Await Loop Phase Finish → fire bridge");
-            _advanceStarted          = true;
-            _awaitingLoopPhaseFinish = false;
-            _bridgeWaitStartLoop     = -1;
-            _state = PhaseStarState.BridgeInProgress;
-            Disarm(DisarmReason.Bridge, _lockedTint);
-            Trace("LoopBoundary → Begin bridge");
-            StartCoroutine(CompleteAndAdvanceAsync());
-            return;
-        }
-
-        // ------------------------------------------------------------
-        // 3b) FORCE_BRIDGE safety net: star complete but flag not yet set
-        //     (e.g. manual-release path where NotifyCollectableBurstCleared
-        //      didn't fire). Arms the loop-wait for one more boundary pass.
-        // ------------------------------------------------------------
-        if (!_advanceStarted && _state != PhaseStarState.BridgeInProgress && !HasShardsRemaining() && noShardsRemain0
-            && _activeNode == null && _activeSuperNode == null && !_ejectionInFlight
-            && !_awaitingCollectableClear   // don't bridge while collectables are still outstanding
-            && !AnyExpansionPendingGlobal())
-        {
-            Debug.LogWarning(
-                $"[PS:LB] FORCE_BRIDGE shardsEjected={_shardsEjectedCount}/{behaviorProfile.nodesPerStar} " +
-                $"previewRole={_previewRole} armed={_isArmed} state={_state} " +
-                $"awaitClr={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish}"
-            );
-            _awaitingLoopPhaseFinish = true;
-            _bridgeWaitStartLoop     = -1;
-            Disarm(DisarmReason.AwaitBridge, _lockedTint);
-            return;
-        }
-
         LogState("LoopBoundary entry");
 
         // ------------------------------------------------------------
-        // 3c) Bridge already in progress
-        // ------------------------------------------------------------
-        if (_advanceStarted)
-        {
-            Debug.Log("[PS:LB] Advance Started");
-            return;
-        }
-
-        if (_state == PhaseStarState.BridgeInProgress)
-        {
-            if (!CanAdvancePhaseNow())
-            {
-                DBG($"[PS:LB] BridgeInProgress blocked; activeNode={_activeNode?.name} ejection={_ejectionInFlight}");
-                _state = PhaseStarState.WaitingForPoke;
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            _advanceStarted = true;
-            _awaitingLoopPhaseFinish = false;
-            DBG("[PS:LB] Bridge In Progress");
-            StartCoroutine(CompleteAndAdvanceAsync());
-            return;
-        }
-
-        // ------------------------------------------------------------
-        // 4) Normal re-arm path
+        // 3) Normal re-arm path
         // ------------------------------------------------------------
         if (!_isArmed)
         {
-            // If the plan is fully completed, stay quiet and let the bridge path take over.
-            if (_shardsEjectedCount >= GetEffectiveNodesPerStar() && GetEffectiveNodesPerStar() > 0)
-            {
-                Debug.Log($"[PS:LB] -> Not Armed, Ejected Shards ");
-                return;
-            }
-
-            DBG("[PS:LB] -> Armed, Ejected Shards");
+            DBG("[PS:LB] -> re-arm");
             if (_state == PhaseStarState.WaitingForPoke)
                 ArmNext();
             else
@@ -1290,14 +1145,12 @@ public class PhaseStar : MonoBehaviour
         {
             DBG("[PS:LB] -> No need to arm");
         }
-
     }
     
     private void DBG(string msg)
     {
-        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} advStarted={_advanceStarted} " +
-                  $"awaitCollectClear={_awaitingCollectableClear} awaitLoopFinish={_awaitingLoopPhaseFinish} " +
-                  $"shards={_shardsEjectedCount}/{behaviorProfile?.nodesPerStar} preview={(_previewVisual != null ? 1 : 0)} " +
+        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} " +
+                  $"awaitCollectClear={_awaitingCollectableClear} preview={(_previewVisual != null ? 1 : 0)} " +
                   $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
     }
     
@@ -1307,7 +1160,7 @@ public class PhaseStar : MonoBehaviour
         if (_previewInitialized) return;
         _previewInitialized = true;
 
-        RebuildPreviewRingForRemainingShards();
+        BuildPreviewRing();
     }
 
 
@@ -1333,48 +1186,6 @@ public class PhaseStar : MonoBehaviour
         EnsurePreviewRing();
     }
     
-    private void BuildPhasePlan(int shardCount)
-    {
-        _phasePlanRoles = new List<MusicalRole>();
-
-        var activeRoles = _assignedMotif?.GetActiveRoles();
-        if (activeRoles == null || activeRoles.Count == 0)
-            activeRoles = new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
-
-        int target = Mathf.Max(1, shardCount);
-        for (int i = 0; i < target; i++)
-            _phasePlanRoles.Add(activeRoles[(_shardsEjectedCount + i) % activeRoles.Count]);
-
-    }
-
-    private bool HasShardsRemaining() => _shardsEjectedCount < GetEffectiveNodesPerStar();
-
-    private int GetRemainingShardCount()
-    {
-        int total = Mathf.Max(0, GetEffectiveNodesPerStar());
-        int rem = total - Mathf.Max(0, _shardsEjectedCount);
-        return Mathf.Clamp(rem, 0, total);
-    }
-
-    private void RebuildPreviewRingForRemainingShards()
-    {
-        if (behaviorProfile == null || visuals == null) return;
-
-        if (_previewVisual != null)
-        {
-            // Detach from hierarchy before destroying so GetComponentsInChildren
-            // can never find this pending-destroy GO in the same frame.
-            _previewVisual.SetParent(null);
-            Destroy(_previewVisual.gameObject);
-            _previewVisual = null;
-        }
-
-        int remaining = GetRemainingShardCount();
-        if (remaining <= 0) return;
-
-        BuildPhasePlan(remaining);
-        BuildPreviewRing();
-    }
     private void PrepareNextDirective()
     {
         Trace("PrepareNextDirective() begin");
@@ -1432,24 +1243,16 @@ public class PhaseStar : MonoBehaviour
         _baseSortingOrder = baseSr ? baseSr.sortingOrder : 2000;
     }
 
-    if (_phasePlanRoles == null || _phasePlanRoles.Count == 0 || visuals == null)
+    if (visuals == null)
     {
         _buildingPreview = false;
-        visuals?.InvalidateShardCache();
         return;
     }
 
-    // BuildPreviewRing is now VISUAL ONLY.
-    // It should not mutate hidden-role promotion in CosmicDustGenerator.
-    // The active ecology must come from motif setup + carving/regrowth, not from preview state.
-    var role = _phasePlanRoles[0];
-    var track = FindTrackByRole(role);
-
-    Color roleColor = ResolveRoleColor(role, track);
-
-    // Seed preview values for the initial visual state only.
-    // Runtime dominant-role logic in Update() is still allowed to replace these later.
-    _previewRole = role;
+    // Role is determined at runtime via attunement; start gray until the star drains its first colored dust.
+    var role = _previewRole;
+    var track = role != MusicalRole.None ? FindTrackByRole(role) : null;
+    Color roleColor = role != MusicalRole.None ? ResolveRoleColor(role, track) : Color.gray;
     _previewColor = roleColor;
 
     var go = new GameObject($"PreviewShard_0_{role}");
@@ -1503,8 +1306,7 @@ public class PhaseStar : MonoBehaviour
     }
     private MusicalRole GetPlannedRoleForHighlightedShard()
     {
-        return _previewRole != MusicalRole.None ? _previewRole
-            : (_phasePlanRoles != null && _phasePlanRoles.Count > 0 ? _phasePlanRoles[0] : MusicalRole.Bass);
+        return _previewRole != MusicalRole.None ? _previewRole : MusicalRole.Bass;
     }
     public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
     {
@@ -1519,11 +1321,8 @@ public class PhaseStar : MonoBehaviour
     {
         if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
 
-        // Disarmed push: bypass the CIF/EP gates so the vehicle always shoves the star
-        // while it is waiting between ejections. Collectables are in-flight during this
-        // window, so the old order (CIF check first) was preventing the push entirely.
+        // Disarmed push: bypass the CIF/EP gates so the vehicle always shoves the star.
         if (!_isArmed
-            && HasShardsRemaining()
             && _state == PhaseStarState.WaitingForPoke
             && !_ejectionInFlight)
         {
@@ -1545,7 +1344,6 @@ public class PhaseStar : MonoBehaviour
         }
 
         // --- Safety & gating ---
-        if (!HasShardsRemaining()) return;
         if (_state != PhaseStarState.WaitingForPoke)
         {
             Trace($"OnCollision: ignored, state={_state}");
@@ -1588,12 +1386,11 @@ public class PhaseStar : MonoBehaviour
         }
         if (_previewRole != MusicalRole.None)
         {
-            if (_bubbleActive) s_bubbleCenter = transform.position;
+            if (_disarmReason == DisarmReason.SiblingActive) return;
             EjectActivePreviewShardAndFlow(coll);
             return;
         }
 
-        if (_bubbleActive) s_bubbleCenter = transform.position;
         EjectCachedDirectiveAndFlow(coll);
     }
 
@@ -1614,6 +1411,7 @@ public class PhaseStar : MonoBehaviour
 
     void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
+        LastNodeWasSuperNode = false;
         int ticket = ++_spawnTicket;
         _ejectionInFlight = true;
         visuals?.EjectParticles(behaviorProfile?.ejectionPrefab);
@@ -1643,25 +1441,23 @@ public class PhaseStar : MonoBehaviour
 
             _activeNode = null;
 
-            if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
+            // Fire before any Unity component access — safe even when the star
+            // GameObject was already destroyed by DestroyStarAfterDelay.
+            OnMineNodeResolved?.Invoke(this, _attunedRole);
+
+            // Guard Unity component access: star may be destroyed if the player
+            // took longer than starExitDuration to kill the node.
+            if (this == null) return;
+
+            if (_state == PhaseStarState.BridgeInProgress) return;
 
             _awaitingCollectableClear = true;
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            // Non-final shard: move off-screen immediately so the star isn't visible
-            // while collectables are in flight or being released by the vehicle.
-            // Final shard: stay hidden via AwaitBridge — bridge sequence owns visibility.
-            if (HasShardsRemaining())
-            {
-                MoveOffScreenForBurst();
-                Disarm(DisarmReason.NodeResolving, spawnTint);
-            }
-            else
-            {
-                Disarm(DisarmReason.AwaitBridge, spawnTint);
-            }
+            MoveOffScreenForBurst();
+            Disarm(DisarmReason.NodeResolving, spawnTint);
             LogState("OnResolved");
         };
 
@@ -1673,7 +1469,6 @@ public class PhaseStar : MonoBehaviour
     void EjectActivePreviewShardAndFlow(Collision2D coll)
     {
         if (behaviorProfile == null || visuals == null) return;
-        if (!HasShardsRemaining()) return;
 
         if (!GetDominantRoleRaw(out MusicalRole ejectedRole, out float rawCharge, out float threshold))
             return;
@@ -1699,17 +1494,10 @@ public class PhaseStar : MonoBehaviour
         _lastImpactDir = (incoming.sqrMagnitude > 0.0001f) ? incoming.normalized : Vector2.right;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
-        _shardsEjectedCount++;
-        int remainingAfter = GetRemainingShardCount();
-        bool isFinalShardEjection = (remainingAfter <= 0);
-
-        // Hide PhaseStar immediately — the MineNode IS the diamond visually.
-        // Zero frames of overlap between the diamond and the freshly-ejected node.
         visuals?.HideAll();
         dust?.ResetTentacles();
 
-        Disarm(isFinalShardEjection ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving,
-            ejectedTrack.trackColor);
+        Disarm(DisarmReason.NodeResolving, ejectedTrack.trackColor);
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
@@ -1717,8 +1505,8 @@ public class PhaseStar : MonoBehaviour
         else
             SpawnNodeCommon(contact, ejectedTrack);
 
-        RebuildPreviewRingForRemainingShards();
-        PrepareNextDirective();
+        _isDisposing = true;
+        OnEjected?.Invoke(this, ejectedRole);
     }
     /// <summary>
     /// 0 = satiated (at least one shard is above shardReadyThreshold).
@@ -1732,6 +1520,7 @@ public class PhaseStar : MonoBehaviour
     }
     private void SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
     {
+        LastNodeWasSuperNode = true;
         if (superNodePrefab == null)
         {
             Debug.LogError("[PhaseStar] superNodePrefab is null.");
@@ -1765,21 +1554,20 @@ public class PhaseStar : MonoBehaviour
         sn.OnResolved += () =>
         {
             _activeSuperNode = null;
-            if (_state == PhaseStarState.BridgeInProgress || _advanceStarted) return;
+
+            // Fire before any Unity component access — safe even when star is destroyed.
+            OnMineNodeResolved?.Invoke(this, _attunedRole);
+
+            if (this == null) return;
+
+            if (_state == PhaseStarState.BridgeInProgress) return;
             _awaitingCollectableClear = true;
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            if (HasShardsRemaining())
-            {
-                MoveOffScreenForBurst();
-                Disarm(DisarmReason.NodeResolving, spawnTint);
-            }
-            else
-            {
-                Disarm(DisarmReason.AwaitBridge, spawnTint);
-            }
+            MoveOffScreenForBurst();
+            Disarm(DisarmReason.NodeResolving, spawnTint);
             LogState("OnSuperNodeResolved");
         };
 
@@ -1789,21 +1577,21 @@ public class PhaseStar : MonoBehaviour
     void EjectCachedDirectiveAndFlow(Collision2D coll)
     {
         var contact = coll.GetContact(0).point;
-        // Compute impact direction & strength
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
 
         _lastImpactDir = (starPos - vehiclePos).normalized;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-        _shardsEjectedCount++;
 
-        bool isFinal = (_shardsEjectedCount >= GetEffectiveNodesPerStar());
-        Disarm(isFinal ? DisarmReason.AwaitBridge : DisarmReason.NodeResolving, _cachedTrack.trackColor);
+        Disarm(DisarmReason.NodeResolving, _cachedTrack.trackColor);
         ActivateSafetyBubble();
         if (_cachedIsSuperNode)
             SpawnSuperNodeCommon(contact, _cachedTrack);
         else
             SpawnNodeCommon(contact, _cachedTrack);
+
+        _isDisposing = true;
+        OnEjected?.Invoke(this, _attunedRole);
     }
     private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
     {
@@ -1887,90 +1675,6 @@ public class PhaseStar : MonoBehaviour
     private int CurrentEntropyForSelection() {
         return 0;
     }
-    private IEnumerator CompleteAndAdvanceAsync()
-    {
-        Trace("Bridge: enter");
-        _advanceStarted = true;
-        _awaitingLoopPhaseFinish = false;
-        Disarm(DisarmReason.Bridge);
-        if (_drum) _drum.isPhaseStarActive = false;
-
-        // Decide the next phase based on the PhaseStar's assigned phase.
-        // The star itself encodes where we’re going next.
-
-        GameFlowManager.Instance?.BeginMotifBridge("PhaseStar/CompleteAdvanceAsync");
-
-        // --- Wait for the bridge to start (be defensive) ---
-        float start = Time.time;
-        const float maxStartWait = 2.0f;
-        while (GameFlowManager.Instance &&
-               !GameFlowManager.Instance.GhostCycleInProgress &&
-               (Time.time - start) < maxStartWait)
-        {
-            yield return null;
-        }
-
-        if (!(GameFlowManager.Instance && GameFlowManager.Instance.GhostCycleInProgress))
-        {
-            Debug.LogWarning("[PhaseStar] Bridge never started; aborting advancement safely.");
-            _state = PhaseStarState.Completed;
-            try
-            {
-                if (_drum) _drum._star = null;
-            }
-            catch
-            {
-            }
-
-            Destroy(gameObject);
-            yield break; // once destroyed, bail out immediately
-        }
-
-
-        Trace("Bridge started (GhostCycleInProgress = true)");
-
-        // --- Decide a safe timeout, once, using DrumTrack’s new loop helpers ---
-        float timeoutSec = 0f;
-        if (_drum)
-        {
-            timeoutSec = _drum.GetTimeToLoopEnd(); // uses effective loop length internally
-            if (timeoutSec <= 0f)
-                timeoutSec = _loopDuration > 0f ? _loopDuration : 2f;
-        }
-        else
-        {
-            timeoutSec = _loopDuration > 0f ? _loopDuration : 2f;
-        }
-
-        float startedAt = Time.time;
-        while (GameFlowManager.Instance &&
-               GameFlowManager.Instance.GhostCycleInProgress &&
-               (Time.time - startedAt) < timeoutSec)
-        {
-            yield return null;
-        }
-
-        if (GameFlowManager.Instance && GameFlowManager.Instance.GhostCycleInProgress)
-        {
-            Debug.LogWarning("[PhaseStar] Bridge timed out; forcing completion to avoid soft-lock.");
-            // We don’t try to force the GFM flag here; we just exit gracefully.
-        }
-
-        _state = PhaseStarState.Completed;
-        _isDisposing = true;
-        SafeUnsubscribeAll();
-        try
-        {
-            if (_drum) _drum._star = null;
-        }
-        catch
-        {
-        }
-
-        Destroy(gameObject);
-        yield break;
-    }
-
     private void EnableColliders()
     {
         if (_isDisposing || this == null) return;
@@ -2004,11 +1708,10 @@ public class PhaseStar : MonoBehaviour
         if (_isDisposing || this == null || !_tracePhaseStar) return;
 
         string targetRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
-        int total = Mathf.Max(0, GetEffectiveNodesPerStar());
         Debug.Log(
             $"[PhaseStar][{where}] state={_state} armed={_isArmed} entry={_entryInProgress} burstOff={_burstOffScreen} " +
-            $"awaitClr={_awaitingCollectableClear} awaitLoop={_awaitingLoopPhaseFinish} disarm={_disarmReason} " +
-            $"role={targetRole} shards={_shardsEjectedCount}/{total} charge={GetTotalCharge():0.00}");
+            $"awaitClr={_awaitingCollectableClear} disarm={_disarmReason} " +
+            $"role={targetRole} attunedRole={_attunedRole} charge={GetTotalCharge():0.00}");
     }
 
     private void ActivateSafetyBubble(Vector3 center = default)
@@ -2028,10 +1731,6 @@ public class PhaseStar : MonoBehaviour
         // falling back to star position for non-void calls.
         _bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
 
-        s_bubbleActive = true;
-        s_bubbleCenter = _bubbleCenterWorld;
-        s_bubbleRadiusWorld = _bubbleRadiusWorld;
-
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint, _bubbleCenterWorld);
 
@@ -2045,10 +1744,6 @@ public class PhaseStar : MonoBehaviour
 
         Debug.Log($"[BUBBLE] DeactivateSafetyBubble star={name} frame={Time.frameCount}");
         _bubbleActive = false;
-
-        s_bubbleActive = false;
-        s_bubbleCenter = Vector2.zero;
-        s_bubbleRadiusWorld = 0f;
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.HideSafetyBubble();

@@ -311,6 +311,21 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         bubbleRoot.position = new Vector3(worldPos.x, worldPos.y, bubbleRoot.position.z);
     }
 
+    // Called every frame from PhaseStar.Update() to continuously lerp body color.
+    public void LerpBodyColor(Color roleColor, float t)
+    {
+        Color dimColor = dimUsesFixedTint ? dimShardTint : roleColor;
+        dimColor.r *= dimRgbMul;
+        dimColor.g *= dimRgbMul;
+        dimColor.b *= dimRgbMul;
+        dimColor.a = dimAlpha;
+
+        Color brightColor = roleColor;
+        brightColor.a = 0.85f;
+
+        SetShardTint(Color.Lerp(dimColor, brightColor, t));
+    }
+
     private void SetShardTint(Color c)
     {
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0 || _shardSpriteRenderers[0] == null)

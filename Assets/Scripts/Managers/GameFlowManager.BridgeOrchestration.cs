@@ -323,16 +323,12 @@ public partial class GameFlowManager
             if (n != null) Destroy(n.gameObject);
         }
 
-        // Optional but recommended: remove all existing PhaseStars during the bridge
-        foreach (var s in FindObjectsOfType<PhaseStar>())
+        // Despawn all Stars and destroy the pool.
+        if (activeDrumTrack?._starPool != null)
         {
-            if (s != null) Destroy(s.gameObject);
-        }
-
-        // Ensure DrumTrack doesn't keep an old reference
-        if (activeDrumTrack != null)
-        {
-            activeDrumTrack.isPhaseStarActive = false;
+            activeDrumTrack._starPool.DespawnAll();
+            Destroy(activeDrumTrack._starPool.gameObject);
+            activeDrumTrack._starPool = null;
         }
     }
 }

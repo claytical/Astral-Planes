@@ -84,10 +84,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     }
 
     public Action<MusicalRole, float> onDelivery;
+    public event Action<MusicalRole> OnAttuned;
 
     private PhaseStarBehaviorProfile _profile;
     private PhaseStar _star;
     private PhaseStarCravingNavigator _navigator;
+    private MusicalRole _attunedRole = MusicalRole.None;
 
     private bool _tentaclesActive;
     private readonly List<Tentacle> _tentacles = new();
@@ -148,6 +150,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
 
         star.OnDisarmed += _ => SetTentaclesActive(false);
+    }
+
+    public void SetAttunedRole(MusicalRole role)
+    {
+        _attunedRole = role;
+        ResetTentacles();
     }
 
     public void SetTentaclesActive(bool active)
@@ -312,6 +320,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             case TentacleState.Idle:
             {
                 if (tentacle.isSubBranch || gen == null || drum == null || _navigator == null)
+                    break;
+                if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole)
                     break;
 
                 if (_navigator.TryGetTargetForRole(tentacle.role, out var cell) && IsTargetValid(cell, tentacle.role))
@@ -491,9 +501,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (actualUnits > 0 && _star != null)
         {
+            bool wasUnattned = _star.AttunedRole == MusicalRole.None;
             _star.AddCharge(tentacle.role, actualUnits);
             onDelivery?.Invoke(tentacle.role, actualUnits);
             tentacle.drainFlashTimer = drainFlashDuration;
+            if (wasUnattned)
+                OnAttuned?.Invoke(tentacle.role);
         }
 
         if (dust.currentEnergyUnits <= 0)

@@ -16,6 +16,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private PhaseStar _star;
     private bool _active;
+    private MusicalRole _attunedRole = MusicalRole.None;
     private bool _huntingEnabled;
     private float _replanTimer;
     private float _snifferTimer;
@@ -51,6 +52,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             ResetTargetingState(clearSniffer: false);
     }
 
+    public void SetAttunedRole(MusicalRole role)
+    {
+        _attunedRole = role;
+    }
+
     public void SetHuntingEnabled(bool enabled)
     {
         _huntingEnabled = enabled;
@@ -71,6 +77,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         HashSet<Vector2Int> excludedCells)
     {
         cell = default;
+        if (_attunedRole != MusicalRole.None && role != _attunedRole) return false;
 
         var gfm = GameFlowManager.Instance;
         var gen = gfm?.dustGenerator;

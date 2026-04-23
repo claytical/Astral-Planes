@@ -864,6 +864,24 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         steps = null;
         return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
     }
+
+    /// <summary>
+    /// Returns true if any burst with outstanding notes (collectables not yet committed or
+    /// discarded) has at least one step in [stepStart, stepEnd).
+    /// Used by NoteAscensionDirector to defer loop collapse when notes are in transit.
+    /// </summary>
+    public bool HasOutstandingNotesInRange(int stepStart, int stepEnd)
+    {
+        if (_burstRemaining == null || _burstSteps == null) return false;
+        foreach (var kv in _burstRemaining)
+        {
+            if (kv.Value <= 0) continue;
+            if (!_burstSteps.TryGetValue(kv.Key, out var steps) || steps == null) continue;
+            foreach (int step in steps)
+                if (step >= stepStart && step < stepEnd) return true;
+        }
+        return false;
+    }
     private int PickRandomExistingBinForDensity() { 
         // Only choose among bins that currently exist on THIS track.
         int binsAvailable = Mathf.Clamp(loopMultiplier, 1, Mathf.Max(1, maxLoopMultiplier));

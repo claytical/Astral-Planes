@@ -42,7 +42,10 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Min(0f)] public float dustToStarChargeMul = 1.0f;
 
     [Tooltip("Energy units lost per second per role (passive decay). 0 disables decay.")]
-    [Min(0f)] public float passiveChargeDecayPerSec = 0.02f;
+    [Min(0f)] public float passiveChargeDecayPerSec = 1f;
+
+    [Tooltip("Seconds the star can remain fully charged without being ejected before charge resets and the drain/charge cycle restarts. 0 disables.")]
+    [Min(0f)] public float armedTimeoutSeconds = 15f;
 
     // =====================================================================
     // Star body motion (PhaseStarMotion2D)
