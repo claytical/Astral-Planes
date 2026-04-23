@@ -227,17 +227,4 @@ public class PhaseTransitionManager : MonoBehaviour
         }
     }
 
-    private void HandlePhaseStarSpawned(PhaseStarBehaviorProfile profile) { }
-
-    void OnEnable()
-    {
-        var drums = GameFlowManager.Instance?.activeDrumTrack;
-        if (drums != null) drums.OnPhaseStarSpawned += HandlePhaseStarSpawned;
-    }
-
-    void OnDisable()
-    {
-        var drums = GameFlowManager.Instance?.activeDrumTrack;
-        if (drums != null) drums.OnPhaseStarSpawned -= HandlePhaseStarSpawned;
-    }
 }

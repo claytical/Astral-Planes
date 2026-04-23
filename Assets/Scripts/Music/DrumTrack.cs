@@ -50,7 +50,6 @@ public class DrumTrack : MonoBehaviour
     public List<MotifSnapshot> SessionPhases = new();
     [HideInInspector]
     public List<MineNode> activeMineNodes = new List<MineNode>();
-    [HideInInspector] public bool isPhaseStarActive;
     [HideInInspector]
     public int currentStep;
 
@@ -85,7 +84,7 @@ public class DrumTrack : MonoBehaviour
     private CosmicDustGenerator _dust;
     private InstrumentTrackController _trackController;
     [HideInInspector]
-    public PhaseStar _star;
+    public StarPool _starPool;
     private PhaseTransitionManager _phaseTransitionManager;
 
     private float _cachedTileDiameterWorld = -1f;
@@ -984,7 +983,6 @@ public class DrumTrack : MonoBehaviour
             Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / Mathf.Max(0.0001f, scrW):F3}");
         }
 
-        isPhaseStarActive = false;
         if (_started) return;
 
         if (drumAudioSource == null)
@@ -1130,100 +1128,47 @@ public class DrumTrack : MonoBehaviour
     }   
 
     public void RequestPhaseStar(Vector2Int? cellHint = null)
-{
-    if (_star != null)
     {
-        Debug.Log("[SpawnGuard] PhaseStar already active; abort.");
-        return;
+        if (_starPool != null)
+        {
+            Debug.Log("[SpawnGuard] StarPool already active; abort.");
+            return;
+        }
+
+        if (!phaseStarPrefab)
+        {
+            Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
+            return;
+        }
+
+        if (!_trackController || _trackController.tracks == null || _trackController.tracks.Length == 0)
+        {
+            Debug.LogError("[Spawn] No instrument tracks available.");
+            return;
+        }
+
+        var profileAsset = _phaseTransitionManager?.currentMotif?.starBehavior;
+        if (_dust && profileAsset) _dust.ApplyProfile(profileAsset);
+        if (_gfm && _dust)        _dust.RetintExisting(0.4f);
+
+        IEnumerable<InstrumentTrack> targets = _trackController.tracks.Where(t => t != null);
+
+        MotifProfile motif = _phaseTransitionManager?.currentMotif;
+        if (motif == null)
+            Debug.LogWarning("[Spawn] No current motif found on PhaseTransitionManager.");
+
+        var poolGo = new GameObject("StarPool");
+        _starPool = poolGo.AddComponent<StarPool>();
+        _starPool.Initialize(this, motif, profileAsset, targets);
+
+        OnPhaseStarSpawned?.Invoke(profileAsset);
+        Debug.Log("[DrumTrack] StarPool created and initialized.");
     }
 
-    if (!phaseStarPrefab)
-    {
-        Debug.LogError("[Spawn] PhaseStar prefab is NULL.");
-        return;
-    }
-
-    if (!_trackController || _trackController.tracks == null || _trackController.tracks.Length == 0)
-    {
-        Debug.LogError("[Spawn] No instrument tracks available.");
-        return;
-    }
-
-    // The grid cell remains the star's logical "home" for navigator seeding and
-    // keep-clear registration — we just don't place the GO there at spawn time.
-    Vector2Int cell = cellHint ?? (_spawnGrid != null
-        ? _spawnGrid.GetRandomAvailableCell()
-        : GetRandomAvailableCell());
-
-    if (cell.x < 0)
-    {
-        Debug.LogWarning("[Spawn] No available cell for PhaseStar.");
-        return;
-    }
-
-    // World-space destination the navigator will steer toward from off-screen.
-    Vector2 targetWorldPos = GridToWorldPosition(cell);
-
-
-    var go = Instantiate(phaseStarPrefab, (Vector3)targetWorldPos, Quaternion.identity);
-    _star = go.GetComponent<PhaseStar>();
-    if (!_star)
-    {
-        Debug.LogError("[Spawn] Prefab missing PhaseStar component.");
-        Destroy(go);
-        return;
-    }
-
-    isPhaseStarActive = true;
-
-    var killer = go.AddComponent<OnDestroyRelay>();
-    killer.onDestroyed += () =>
-    {
-        isPhaseStarActive = false;
-        _star = null;
-        if (_spawnGrid != null) _spawnGrid.FreeCell(cell.x, cell.y);
-    };
-
-    // Behavior profile from active motif.
-    var profileAsset = _phaseTransitionManager?.currentMotif?.starBehavior;
-    if (_dust && profileAsset) _dust.ApplyProfile(profileAsset);
-    if (_gfm && _dust)        _dust.RetintExisting(0.4f);
-
-    // Instrument tracks.
-    IEnumerable<InstrumentTrack> targets = _trackController.tracks.Where(t => t != null);
-
-    // Motif.
-    MotifProfile motif = null;
-    if (_phaseTransitionManager?.currentMotif != null)
-    {
-        motif = _phaseTransitionManager.currentMotif;
-    }
-    else
-    {
-        Debug.LogWarning("[Spawn] No current motif found on PhaseTransitionManager.");
-    }
-
-    // Initialize all subcomponents (motion, visuals, dust, navigator).
-    // Initialize internally sets _entryInProgress = false by default;
-    // EnterFromOffScreen flips it to true before ArmNext() runs.
-    _star.Initialize(this, targets, profileAsset, motif);
-
-    // ── Hand off entry sequence ──────────────────────────────────────────────
-    // EnterFromOffScreen repositions the GO to a screen-edge point, hides
-    // visuals, disables colliders, and defers ArmNext until arrival.
-    _star.EnterFromOffScreen(targetWorldPos);
-
-    OnPhaseStarSpawned?.Invoke(profileAsset);
-}
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust)
     {
         dust = null;
         return _dust != null && _dust.TryGetDustAt(cell, out dust);
-    }
-    
-    private sealed class OnDestroyRelay : MonoBehaviour  {
-        public System.Action onDestroyed;
-        private void OnDestroy() { try { onDestroyed?.Invoke(); } catch {} }
     }
 
     public float GetCellWorldSize()

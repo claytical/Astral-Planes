@@ -76,8 +76,9 @@ public class Explode : MonoBehaviour
         if (ps == null) return;
 
         var main = ps.main;
-        main.startColor = tint;
-
+        var visibleTint = tint;
+        visibleTint.a = 1f;
+        main.startColor = visibleTint;
         var col = ps.colorOverLifetime;
         if (col.enabled)
         {

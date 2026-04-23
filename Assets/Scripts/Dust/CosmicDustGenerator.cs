@@ -210,6 +210,7 @@ public class CosmicDustGenerator : MonoBehaviour
                      var tint = dust.CurrentTint;
                      tint.a = 1f;
                      explode.SetTint(tint);
+                     Debug.Log($"[CLEARCELL] preexplode tint={dust.CurrentTint} forcedVisible={(new Color(dust.CurrentTint.r, dust.CurrentTint.g, dust.CurrentTint.b, 1f))}");
                      explode.PreExplode();
                  }
              }
@@ -2963,6 +2964,19 @@ private void BuildMazeRoleImprints(
             if (_cellState[x, y] != DustCellState.Solid) continue;
             var dust = _cellDust[x, y];
             if (dust != null && dust.Role != MusicalRole.None) return true;
+        }
+        return false;
+    }
+
+    public bool HasAnyDustWithRole(MusicalRole role)
+    {
+        if (role == MusicalRole.None || _cellState == null || _cellDust == null) return false;
+        for (int y = 0; y < _cellH; y++)
+        for (int x = 0; x < _cellW; x++)
+        {
+            if (_cellState[x, y] != DustCellState.Solid) continue;
+            var dust = _cellDust[x, y];
+            if (dust != null && dust.Role == role) return true;
         }
         return false;
     }

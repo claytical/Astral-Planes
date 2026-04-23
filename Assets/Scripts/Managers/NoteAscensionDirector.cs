@@ -88,6 +88,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
     private readonly Dictionary<InstrumentTrack, AscendTask> _ascendTasks = new();
     private readonly List<FirstPlayTask> _firstPlayTasks = new();
+    private HashSet<InstrumentTrackController> _deferredCollapseControllers;
 
     private DrumTrack _drum;
     private bool _subscribed;
@@ -130,6 +131,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
         _ascendTasks.Clear();
         _firstPlayTasks.Clear();
+        _deferredCollapseControllers?.Clear();
         LineCharge01 = 0f;
     }
 
@@ -141,6 +143,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     {
         _ascendTasks.Clear();
         _firstPlayTasks.Clear();
+        _deferredCollapseControllers?.Clear();
         LineCharge01 = 0f;
     }
 
@@ -210,6 +213,15 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
     private void OnLoopBoundary()
     {
+        // Retry any collapses that were deferred because notes were in transit.
+        if (_deferredCollapseControllers != null && _deferredCollapseControllers.Count > 0)
+        {
+            var deferred = new List<InstrumentTrackController>(_deferredCollapseControllers);
+            _deferredCollapseControllers.Clear();
+            foreach (var ctrl in deferred)
+                TryCollapseIfHighestBinEmpty(ctrl);
+        }
+
         if (_ascendTasks.Count == 0) return;
 
         var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
@@ -321,6 +333,22 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             {
                 if (n.stepIndex >= highBinStart && n.stepIndex < highBinEnd)
                     return;
+            }
+        }
+
+        // If any track has in-transit notes (collectables or in Vehicle queue) in the
+        // highest bin, defer collapse until those notes are resolved. Without this guard,
+        // ForceSyncMarkersToPersistentLoop would destroy placeholder markers that the
+        // Vehicle still needs for manual note release.
+        foreach (var t in ctrl.tracks)
+        {
+            if (t == null) continue;
+            if (t.HasOutstandingNotesInRange(highBinStart, highBinEnd))
+            {
+                _deferredCollapseControllers ??= new HashSet<InstrumentTrackController>();
+                _deferredCollapseControllers.Add(ctrl);
+                Debug.Log($"[ASCENSION] Collapse deferred — track '{t.name}' has in-transit notes in bin [{highBinStart},{highBinEnd}). Will retry at next loop boundary.");
+                return;
             }
         }
 

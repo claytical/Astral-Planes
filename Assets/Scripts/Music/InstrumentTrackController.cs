@@ -271,19 +271,18 @@ public class InstrumentTrackController : MonoBehaviour
         }
 
         // Safety bubble: activate at the MineNode capture position while the void is expanding.
-        // The bubble is the refuge zone; the void will grow outward from its perimeter.
         {
             var gfm = GameFlowManager.Instance;
-            var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
-            if (star != null)
+            var pool = gfm?.activeDrumTrack?._starPool;
+            if (pool != null)
             {
-                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at MineNode pos={_gravityVoidCenterWorld} star={star.name}");
-                star.SetGravityVoidSafetyBubbleActive(true, _gravityVoidCenterWorld);
-                _gravityVoidBubbleInnerR = star.GetSafetyBubbleRadiusCells();
+                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at pos={_gravityVoidCenterWorld}");
+                pool.SetGravityVoidSafetyBubbleActive(true, _gravityVoidCenterWorld);
+                _gravityVoidBubbleInnerR = pool.GetSafetyBubbleRadiusCells();
             }
             else
             {
-                Debug.Log("[BUBBLE] BeginGravityVoid → no active PhaseStar found; bubble skipped");
+                Debug.Log("[BUBBLE] BeginGravityVoid → no active StarPool found; bubble skipped");
                 _gravityVoidBubbleInnerR = 0;
             }
 
@@ -292,7 +291,7 @@ public class InstrumentTrackController : MonoBehaviour
                 gfm?.dustGenerator?.ClearBubbleZone(_gravityVoidCenterGP, _gravityVoidBubbleInnerR);
 
             // Compute max outer radius from ring formula so VFX sizes correctly.
-            var motifRoles = gfm?.activeDrumTrack?._star?.GetMotifActiveRoles();
+            var motifRoles = pool?.GetAnyActiveStarMotifRoles();
             int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
             int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
             int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
@@ -321,15 +320,9 @@ public class InstrumentTrackController : MonoBehaviour
             _gravityVoidRoutine = null;
         }
         // Safety bubble: deactivate when the void resolves.
-        // ArmNext will also call DeactivateSafetyBubble, but this ensures
-        // it clears even if the star never re-arms (e.g. bridge follows immediately).
         {
-            var gfm = GameFlowManager.Instance;
-            var star = gfm != null && gfm.activeDrumTrack != null ? gfm.activeDrumTrack._star : null;
-            if (star != null)
-            {
-                star.SetGravityVoidSafetyBubbleActive(false);
-            }
+            var pool = GameFlowManager.Instance?.activeDrumTrack?._starPool;
+            pool?.SetGravityVoidSafetyBubbleActive(false);
         }
         DespawnGravityVoid();
     }
@@ -344,8 +337,8 @@ public class InstrumentTrackController : MonoBehaviour
         if (dustGen == null) yield break;
 
         // Get motif-active roles (falls back to all 4 if no motif).
-        var star = gfm?.activeDrumTrack?._star;
-        IReadOnlyList<MusicalRole> activeRoles = star?.GetMotifActiveRoles();
+        var pool = gfm?.activeDrumTrack?._starPool;
+        IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
         if (activeRoles == null || activeRoles.Count == 0)
             activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
 
@@ -901,23 +894,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     private void HandleCollectableBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
     {
-        // We only want to advance when ALL collectables are gone (across tracks).
-        if (AnyCollectablesInFlight()) return;
-
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null || gfm.activeDrumTrack == null) return;
-
-        var star = gfm.activeDrumTrack._star;
-        if (star == null) return;
-
-        // During/after bridge start we must not re-arm or spawn new directives.
-        // PhaseStar.NotifyCollectableBurstCleared() is also bridge-safe, but keep this guard to reduce noise.
-        if (gfm.GhostCycleInProgress)
-        {
-            return;
-        }
-
-        star.NotifyCollectableBurstCleared(hadNotes);
+        // StarPool subscribes directly to each track's OnCollectableBurstCleared event and
+        // handles re-arming and bridge-gate logic. Nothing to do here.
     }
     private void UnsubscribeChordEvents()
     {

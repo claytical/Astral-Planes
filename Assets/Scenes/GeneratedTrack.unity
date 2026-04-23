@@ -17238,13 +17238,12 @@ MonoBehaviour:
   startDspTime: 0
   SessionPhases: []
   activeMineNodes: []
-  isPhaseStarActive: 0
   currentStep: 0
   referenceWidthPx: 1920
   referenceColumns: 40
   uiBottomPaddingPx: 250
   autoSizeSpawnGridToScreen: 1
-  _star: {fileID: 0}
+  _starPool: {fileID: 0}
   tanksPerLoopAtFullIntensity: 0.35
   intensityHysteresis: 0.08
   lockPlayAreaAfterInit: 1
@@ -18131,6 +18130,12 @@ MonoBehaviour:
   mainCamera: {fileID: 269415559}
   warpPrefab: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
     type: 3}
+  commitDepth01: 0.55
+  minCommitSpeed: 2.25
+  outwardSpeedBleed: 18
+  returnToPlaySpeed: 8
+  innerSettleBuffer: 0.08
+  settleSpeedThreshold: 1
 --- !u!1 &1532169429
 GameObject:
   m_ObjectHideFlags: 0

@@ -224,7 +224,7 @@ public class Vehicle : MonoBehaviour
         // Energy drain from dust contact is suppressed in CosmicDust.OnCollisionStay2D
         // because that method checks Vehicle.boosting; inside the bubble the player
         // still pilots normally, so no change is needed there.
-        if (PhaseStar.IsPointInsideSafetyBubble(transform.position))
+        if (StarPool.IsPointInsideAnySafetyBubble(transform.position))
         {
             // Release any existing keep-clear claim so refuge cells can regrow.
             if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
@@ -236,7 +236,7 @@ public class Vehicle : MonoBehaviour
             // but skip keep-clear refresh entirely.
         }
 // After the safety bubble block, before RefreshVehicleKeepClearIfNeeded:
-        bool insideBubble = PhaseStar.IsPointInsideSafetyBubble(transform.position);
+        bool insideBubble = StarPool.IsPointInsideAnySafetyBubble(transform.position);
 
         if (insideBubble)
         {
@@ -384,6 +384,10 @@ public class Vehicle : MonoBehaviour
         if (crossed || fwd <= vehicleConfig.manualReleaseAutoCommitEpsSteps)
         {
             CommitManualReleaseAtStep(armed, a.targetAbsStep);
+            // CommitManualReleaseAtStep may fire the bridge, which calls
+            // ClearPendingNotesForBridge() and empties _armedReleases. Return
+            // immediately in that case rather than dequeuing a cleared queue.
+            if (_armedReleases.Count == 0) return;
             _armedReleases.Dequeue();
             spokenFor.Remove(a.targetAbsStep); // it's committed now, free it for cue
         }
