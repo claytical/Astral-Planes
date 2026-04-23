@@ -195,7 +195,7 @@ public sealed class StarPool : MonoBehaviour
         if (roles == null || roles.Count == 0) return;
 
         string activeSnapshot = string.Join(",", _activeStars.Select(kv => $"{kv.Key}:{(kv.Value == null ? "NULL" : kv.Value.name)}"));
-        Debug.Log($"[StarPool] Tick activeStars=[{activeSnapshot}] remainingTotal={_remainingEjectionsTotal}");
+//        Debug.Log($"[StarPool] Tick activeStars=[{activeSnapshot}] remainingTotal={_remainingEjectionsTotal}");
 
         foreach (var role in roles)
         {
@@ -351,14 +351,18 @@ public sealed class StarPool : MonoBehaviour
     {
         _mineNodeResolved = true;
         bool wasSuperNode = star != null && star.LastNodeWasSuperNode;
-        Debug.Log($"[StarPool] MineNode resolved for role={role} ejectedBurstWasEmpty={_ejectedBurstWasEmpty} wasSuperNode={wasSuperNode} CIF={AnyCollectablesInFlight()}");
+        bool wasExpired   = star != null && star.LastNodeWasExpired;
+        Debug.Log($"[StarPool] MineNode resolved for role={role} ejectedBurstWasEmpty={_ejectedBurstWasEmpty} wasSuperNode={wasSuperNode} wasExpired={wasExpired} CIF={AnyCollectablesInFlight()}");
 
-        // Clear the gate immediately for a confirmed empty burst OR a SuperNode (no burst spawned).
-        // The empty-burst flag was set by HandleCollectableBurstCleared when hadNotes=false fired
-        // before _mineNodeResolved (SpawnCollectableBurst runs synchronously before TriggerExplosion).
-        // SuperNode never calls SpawnCollectableBurst so HandleCollectableBurstCleared never fires.
-        if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode))
+        // Clear the gate immediately for a confirmed empty burst, a SuperNode (no burst spawned),
+        // or an expired MineNode (player never captured it — no burst, refund the ejection slot).
+        if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired))
         {
+            if (wasExpired)
+            {
+                _remainingEjectionsTotal++;
+                Debug.Log($"[StarPool] MineNode expired — ejection slot refunded (total now {_remainingEjectionsTotal})");
+            }
             _mineNodeResolved = false;
             _mineNodePending = false;
             _ejectedBurstWasEmpty = false;

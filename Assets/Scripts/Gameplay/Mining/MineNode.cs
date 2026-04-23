@@ -25,7 +25,14 @@ public class MineNode : MonoBehaviour
     [Header("NoteSet-Driven Motion (Carving)")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
 
+    [Header("Expiry")]
+    [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
+    [SerializeField, Min(0)] private int expireAfterLoops = 3;
+
     public event System.Action<MineNode> OnResolved;
+
+    /// <summary>True when the vehicle actually captured this node (HandleDepleted ran).</summary>
+    public bool WasCaptured { get; private set; }
     public DrumTrack DrumTrack => _drumTrack;
 
     private Vector2Int _spawnCell;
@@ -41,6 +48,7 @@ public class MineNode : MonoBehaviour
     private Vector3 _originalScale;
     private Color _lockedColor;
     private bool _depletedHandled, _resolvedFired;
+    private int _loopsSinceSpawn;
     private Collider2D _col;
     private Rigidbody2D _rb;
     // Cached normalized pitch (0 = lowest note, 1 = highest note)
@@ -109,8 +117,22 @@ public class MineNode : MonoBehaviour
     }
 
     private void HandleLoopBoundary()
-    { if (_drumTrack == null) return;
-        if (!pruneCarvedPathOnLoopBoundary) return; 
+    {
+        if (_drumTrack == null) return;
+
+        // Expiry: if the player hasn't captured the node after N boundaries, resolve without a burst.
+        if (!_depletedHandled)
+        {
+            _loopsSinceSpawn++;
+            if (expireAfterLoops > 0 && _loopsSinceSpawn >= expireAfterLoops)
+            {
+                Debug.Log($"[MineNode] Expired after {_loopsSinceSpawn} loops without capture — resolving.");
+                TriggerExplosion();
+                return;
+            }
+        }
+
+        if (!pruneCarvedPathOnLoopBoundary) return;
         if (_carvedPath == null || _carvedPath.Count < pruneMinPathCount) return; 
         int before = _carvedPath.Count;
         // Keep only cells that are still clear (no dust present).
@@ -511,6 +533,7 @@ public class MineNode : MonoBehaviour
     private void HandleDepleted(Vehicle vehicle)
     {
         _depletedHandled = true;
+        WasCaptured = true;
 
         var origin    = transform.position;
         var repelFrom = vehicle != null ? vehicle.transform.position : origin;
