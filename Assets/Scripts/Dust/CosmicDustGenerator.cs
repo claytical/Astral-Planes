@@ -538,7 +538,7 @@ public class CosmicDustGenerator : MonoBehaviour
         // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
         if (veto0_perm || veto0_spawnBlocked || veto0_claim)
         {
-            Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
+//            Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
             _voidGrowCoroutines.Remove(gp);
             yield break;
         }
@@ -546,12 +546,12 @@ public class CosmicDustGenerator : MonoBehaviour
         var go = GetOrCreateCellGO(gp);
         if (go == null)
         {
-            Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
+//            Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
             _voidGrowCoroutines.Remove(gp);
             yield break;
         }
 
-        Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
+//        Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
 
         SetCellState(gp, DustCellState.Regrowing);
 
@@ -575,8 +575,6 @@ public class CosmicDustGenerator : MonoBehaviour
         if (dust != null)
         {
             var sr = dust.GetComponentInChildren<SpriteRenderer>(true);
-            if (sr != null)
-                Debug.Log($"[VOID_SPR] enabled={sr.enabled} color={sr.color} scale={sr.transform.localScale}");
         }
         float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
         yield return new WaitForSeconds(enableDelay);
@@ -617,7 +615,7 @@ public class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Solid);
         if (dust != null) SetDustCollision(dust, true);
 
-        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
+//        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
         _voidGrowCoroutines.Remove(gp);
     }
     private void SetDustCollision(CosmicDust dust, bool _enabled)

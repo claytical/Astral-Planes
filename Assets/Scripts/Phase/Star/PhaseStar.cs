@@ -210,6 +210,7 @@ public class PhaseStar : MonoBehaviour
     private MusicalRole _attunedRole = MusicalRole.None;
     public MusicalRole AttunedRole => _attunedRole;
     public bool LastNodeWasSuperNode { get; private set; }
+    public bool LastNodeWasExpired   { get; private set; }
     [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
     public event Action<PhaseStar> OnArmed;
@@ -1412,6 +1413,7 @@ public class PhaseStar : MonoBehaviour
     void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
         LastNodeWasSuperNode = false;
+        LastNodeWasExpired   = false;
         int ticket = ++_spawnTicket;
         _ejectionInFlight = true;
         visuals?.EjectParticles(behaviorProfile?.ejectionPrefab);
@@ -1440,6 +1442,9 @@ public class PhaseStar : MonoBehaviour
             handledResolve = true;
 
             _activeNode = null;
+
+            if (!resolvedNode.WasCaptured)
+                LastNodeWasExpired = true;
 
             // Fire before any Unity component access — safe even when the star
             // GameObject was already destroyed by DestroyStarAfterDelay.
