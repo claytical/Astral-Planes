@@ -18,6 +18,9 @@ public class Collectable : MonoBehaviour
     [Header("Spawn Arrival")]
     [SerializeField] private float spawnArrivalSeconds = 2.5f;
     [SerializeField] private AnimationCurve spawnArrivalEase = null;
+    [SerializeField] private float spawnArrivalConeAngleDeg = 25f;
+    [SerializeField] private float spawnArrivalNoiseStrength = 0.5f;
+    [SerializeField] private float spawnArrivalNoiseFrequency = 0.5f;
     private Coroutine _spawnArrivalRoutine;
     private bool _spawnArrivalInProgress;
 // ---- Dust pocket (collectable visibility) ----
@@ -343,7 +346,18 @@ private IEnumerator SpawnArrivalRoutine(
 
     Vector3 start = originWorld;
     Vector3 end = targetWorld;
-// Simple lerp — energy drifts from the MineNode to its resting place.
+
+    // Bezier control point: offset mid-point sideways by cone angle (mirrors Cosmic Radiation 25° cone)
+    Vector3 baseDir = (end - start).normalized;
+    float coneAngle = UnityEngine.Random.Range(-spawnArrivalConeAngleDeg, spawnArrivalConeAngleDeg);
+    Vector3 perpDir = new Vector3(-baseDir.y, baseDir.x, 0f);
+    float sideOffset = Mathf.Tan(coneAngle * Mathf.Deg2Rad) * dist * 0.5f;
+    Vector3 controlPoint = Vector3.Lerp(start, end, 0.5f) + perpDir * sideOffset;
+
+    // Per-instance noise seeds so simultaneous collectables don't wiggle in sync
+    float noiseSeedX = UnityEngine.Random.value * 100f;
+    float noiseSeedY = UnityEngine.Random.value * 100f;
+
     while (t < dur)
     {
         t += Time.deltaTime;
@@ -354,7 +368,18 @@ private IEnumerator SpawnArrivalRoutine(
         else
             u = Mathf.SmoothStep(0f, 1f, u);
 
-        transform.position = Vector3.Lerp(start, end, u);
+        // Quadratic bezier along cone arc
+        float inv = 1f - u;
+        Vector3 bezierPos = inv * inv * start + 2f * inv * u * controlPoint + u * u * end;
+
+        // Perlin noise displacement (mirrors Cosmic Radiation noise: strength=1, freq=0.5, position_amount=1)
+        float noiseTime = t * spawnArrivalNoiseFrequency;
+        float nx = (Mathf.PerlinNoise(noiseSeedX + noiseTime, 0f) - 0.5f) * 2f;
+        float ny = (Mathf.PerlinNoise(0f, noiseSeedY + noiseTime) - 0.5f) * 2f;
+        float noiseFade = 1f - u * u; // fade to zero near target so collectable arrives exactly
+        Vector3 noiseDisp = new Vector3(nx, ny, 0f) * spawnArrivalNoiseStrength * noiseFade;
+
+        transform.position = bezierPos + noiseDisp;
 
         yield return null;
     }

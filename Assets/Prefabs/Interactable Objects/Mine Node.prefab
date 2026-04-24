@@ -60,7 +60,10 @@ MonoBehaviour:
   pruneMinPathCount: 8
   fleeRadiusWorld: 5
   fleeBlendWeight: 0.25
+  driftSpeedMultiplier: 0.1
+  fleeTowardBoundaryWeight: 0.45
   driveCarvingMotionFromNoteSet: 1
+  expireAfterLoops: 3
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -76,6 +79,7 @@ MonoBehaviour:
   speedCapMul: 100
   extraBrake: 0
   carveMaze: 1
+  exhaustEnergyFraction: 0.4
   edgeHugForce: 2
   escapePushForce: 12
   huntBfsBudget: 600
@@ -96,13 +100,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   outerSprite: {fileID: 2442014530722922072}
   innerSprite: {fileID: 2442014530722922072}
-  frenzySpinDegPerSec: 480
+  frenzySpinDegPerSec: 240
   thinkDampen: 7
   faceTurnDegPerSec: 420
   wobbleDeg: 12
   wobbleHzRange: {x: 2.5, y: 4.5}
   innerCounterFactor: -0.4
-  minSpeedForSwim: 0.05
+  minSpeedForSwim: 0.02
   spritePivotOuter: {fileID: 0}
   spritePivotInner: {fileID: 0}
 --- !u!114 &8668376557347016044
@@ -199,7 +203,7 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 10
+  m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 0
@@ -212,7 +216,7 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 0
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 0
 --- !u!60 &7086731306890036074
 PolygonCollider2D:
@@ -252,7 +256,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.4, y: 0.78}
+    oldSize: {x: 0.3, y: 0.59}
     newSize: {x: 1.28, y: 1.15}
     adaptiveTilingThreshold: 0.5
     drawMode: 0

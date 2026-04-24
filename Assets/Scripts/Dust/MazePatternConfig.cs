@@ -61,4 +61,8 @@ public class MazePatternConfig : ScriptableObject
     [Min(1)] public int tunnelCorridorStep  = 1;
     [Tooltip("Width of each open corridor in cells.")]
     [Min(1)] public int tunnelCorridorWidth = 3;
+
+    [Header("Porous Border")]
+    [Tooltip("Number of evenly-distributed gap openings in the 3-edge border ring (left, right, top). 0 = solid border.")]
+    [Min(0)] public int borderExitCount = 3;
 }

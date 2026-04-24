@@ -64,7 +64,33 @@ public class BoundaryWrap : MonoBehaviour
         if (vehicle != null)
             return; // vehicles handled continuously in OnTriggerStay2D
 
+        var mine = rb.GetComponent<MineNode>();
+        if (mine != null) { HandleMineNodeBoundary(mine, rb); return; }
+
         BounceRigidbody(rb);
+    }
+
+    private void HandleMineNodeBoundary(MineNode mine, Rigidbody2D rb)
+    {
+        bool isHorizontal = side == BoundarySide.Left || side == BoundarySide.Right;
+
+        // Top/Bottom: always hard bounce
+        if (!isHorizontal) { BounceRigidbody(rb); return; }
+
+        // If there is a dust cell at the boundary position, deny exit regardless of state —
+        // the node hit a solid border cell and must find a gap opening to escape.
+        var dt = mine.DrumTrack;
+        if (dt != null && dt.HasDustAt(dt.CellOf(rb.position)))
+        {
+            BounceRigidbody(rb);
+            return;
+        }
+
+        // Left/Right + Drifting: bounce to keep it in play
+        if (mine.State == MineNodeState.Drifting) { BounceRigidbody(rb); return; }
+
+        // Left/Right + Fleeing + no dust at this position (gap): let it escape
+        mine.HandleEscape();
     }
 
     private void OnTriggerStay2D(Collider2D other)
