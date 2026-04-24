@@ -294,6 +294,41 @@ public class PhaseStar : MonoBehaviour
         return _bubbleActive && (worldPos - _bubbleCenterWorld).sqrMagnitude <= _bubbleRadiusWorld * _bubbleRadiusWorld;
     }
 
+    public void EnterInMaze(Vector2 worldPos)
+    {
+        EnsureSubcomponents();
+        StopManagedCoroutine(ref _entryApproachCo);
+        StopManagedCoroutine(ref _waitForDustCo);
+
+        _entryInProgress = false;
+        _state = PhaseStarState.Dormant;
+
+        transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
+
+        visuals?.HideAll();
+        DisableColliders();
+        dust?.SetTentaclesActive(false);
+        cravingNavigator?.SetActive(false);
+        _isArmed = false;
+        _disarmReason = DisarmReason.None;
+        _burstOffScreen = false;
+        _awaitingCollectableClear = false;
+        _ejectableTimer = 0f;
+        _starCharge.Clear();
+        _displayedCharge01 = 0f;
+
+        if (motion != null)
+        {
+            motion.Enable(true);
+            motion.SetFrozen(true);
+            motion.SetSpeedMultiplier(0f);
+            motion.SetOverrideTarget(null);
+        }
+
+        EnterDormantWaitState();
+        LogState("EnterInMaze+Dormant");
+    }
+
     public void EnterFromOffScreen(Vector2 targetWorldPos)
     {
         EnsureSubcomponents();
@@ -397,11 +432,16 @@ public class PhaseStar : MonoBehaviour
         _isArmed = false;
         _disarmReason = DisarmReason.None;
 
-        visuals?.ShowDim(Color.gray);
-        EnableColliders();
-        dust?.SetTentaclesActive(false);
-        cravingNavigator?.SetActive(false);
-        EnterDormantMotionPose();
+        visuals?.HideAll();
+        DisableColliders();
+
+        // Tentacles + navigator active during Dormant — they drain dust to build charge.
+        dust?.SetTentaclesActive(true);
+        cravingNavigator?.SetActive(true);
+
+        // Stay pinned in place while charging.
+        motion?.SetFrozen(true);
+        motion?.SetOverrideTarget(null);
 
         if (_waitForDustCo == null)
             _waitForDustCo = StartCoroutine(Co_WaitForColoredDust());
@@ -414,7 +454,12 @@ public class PhaseStar : MonoBehaviour
 
         StopManagedCoroutine(ref _waitForDustCo);
         _state = PhaseStarState.WaitingForPoke;
+
+        // Star earned free movement — unfreeze and retract tentacles.
+        motion?.SetFrozen(false);
+        dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(true);
+
         ArmNext();
         LogState("DormantWake+Armed");
     }
@@ -424,7 +469,7 @@ public class PhaseStar : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(0.5f);
-            if (HasColoredDustAvailable())
+            if (HasColoredDustAvailable() && HasDominantRoleEjectable())
                 break;
         }
 
@@ -724,8 +769,22 @@ public class PhaseStar : MonoBehaviour
             readyRotSpeedMul);
     }
 
+    // Charge-driven visibility during Dormant charging phase.
+    if (_state == PhaseStarState.Dormant && !_burstOffScreen)
+    {
+        if (_displayedCharge01 < 0.01f)
+        {
+            visuals?.ToggleShardRenderers(false);
+        }
+        else
+        {
+            visuals?.ToggleShardRenderers(true);
+            if (_previewRole != MusicalRole.None)
+                visuals?.LerpBodyColor(_previewColor, _displayedCharge01);
+        }
+    }
     // Continuously lerp body color between dim and role color using charge level.
-    if (visuals != null && !_burstOffScreen && _disarmReason != DisarmReason.SiblingActive)
+    else if (visuals != null && !_burstOffScreen && _disarmReason != DisarmReason.SiblingActive)
     {
         Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
         visuals.LerpBodyColor(bodyColor, _displayedCharge01);
@@ -744,6 +803,19 @@ public class PhaseStar : MonoBehaviour
             cravingNavigator?.SetActive(false);
             EnterDormantWaitState();
         }
+    }
+
+    // If passive decay drains charge below ejection threshold while roaming, re-enter Dormant.
+    if (_isArmed
+        && _state == PhaseStarState.WaitingForPoke
+        && _disarmReason == DisarmReason.None
+        && !_burstOffScreen
+        && !HasDominantRoleEjectable()
+        && GetTotalCharge() < 0.01f)
+    {
+        _starCharge.Clear();
+        _displayedCharge01 = 0f;
+        EnterDormantWaitState();
     }
 }
     private void SafeUnsubscribeAll()
@@ -872,7 +944,7 @@ public class PhaseStar : MonoBehaviour
         DeactivateSafetyBubble();
 
         EnableColliders();
-        dust?.SetTentaclesActive(true);
+        dust?.SetTentaclesActive(false);
 
         motion?.SetOverrideTarget(null);
         motion?.SetSpeedMultiplier(1f);
@@ -894,7 +966,8 @@ public class PhaseStar : MonoBehaviour
         if (_burstOffScreen)
         {
             _burstOffScreen = false;
-            EnterFromOffScreen(ComputeDormantRestPosition());
+            motion?.Enable(true);
+            EnterDormantWaitState();
             return;
         }
         motion?.SetFrozen(false);
@@ -911,9 +984,9 @@ public class PhaseStar : MonoBehaviour
         OnAttuned_SetRole(role);
     }
 
-    // Teleport the star off-screen and freeze it for the duration of a burst.
+    // Hide the star in place for the duration of a burst — it stays at its world position.
     // Guarded — safe to call repeatedly; only executes on the first call per burst.
-    private void MoveOffScreenForBurst()
+    private void HideInPlaceForBurst()
     {
         if (_burstOffScreen) return;
 
@@ -922,41 +995,52 @@ public class PhaseStar : MonoBehaviour
 
         _burstOffScreen = true;
 
-        Vector2 offPos = PickOffScreenSpawnPoint();
-        transform.position = (Vector3)offPos + Vector3.forward * transform.position.z;
+        // Stay at current world position — do NOT teleport off-screen.
         motion?.Enable(false);
+        motion?.SetFrozen(true);
         visuals?.HideAll();
-        Debug.Log($"[PhaseStar] Burst in flight — moved off-screen to {offPos}");
+        dust?.SetTentaclesActive(false);
+        DisableColliders();
+        Debug.Log($"[PhaseStar] Burst in flight — hidden in place at {transform.position}");
     }
 
     // Called when all burst notes have been committed to the loop (or discarded).
-    // Checks for colored dust and re-enters the play area if any exists.
+    // Relocates the star to a dust-free cell and re-enters the Dormant charging phase.
     private void OnBurstNotesReleased()
     {
         _burstOffScreen = false;
-        if (_burstOffScreenWaitCo != null)
-        {
-            StopCoroutine(_burstOffScreenWaitCo);
-            _burstOffScreenWaitCo = null;
-        }
+        StopManagedCoroutine(ref _burstOffScreenWaitCo);
 
-        // Zero all accumulated charge so the star must drain energy before it can
-        // eject another MineNode after returning to the play area.
+        // Zero charge so the star must drain again before the next ejection.
         _starCharge.Clear();
         _displayedCharge01 = 0f;
 
         bool hasDust = HasColoredDustAvailable();
         Debug.Log($"[PhaseStar] Burst notes released — charges reset, hasDust={hasDust}");
 
-        Vector2 returnTarget = ComputeDormantRestPosition();
         if (hasDust)
-            EnterFromOffScreen(returnTarget);
+        {
+            RelocateToAvailableCell();
+            EnterDormantWaitState();
+        }
         else
-            _burstOffScreenWaitCo = StartCoroutine(Co_WaitForDustThenReturn());
+        {
+            _burstOffScreenWaitCo = StartCoroutine(Co_WaitForDustThenReenterDormant());
+        }
     }
 
-    // Polls off-screen until colored dust exists, then re-enters the play area.
-    private IEnumerator Co_WaitForDustThenReturn()
+    private void RelocateToAvailableCell()
+    {
+        var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
+        if (drum == null) return;
+        Vector2Int cell = drum.GetRandomAvailableCell();
+        if (cell.x < 0) return;
+        Vector2 worldPos = drum.GridToWorldPosition(cell);
+        transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
+    }
+
+    // Polls until colored dust exists, then relocates and re-enters Dormant in the maze.
+    private IEnumerator Co_WaitForDustThenReenterDormant()
     {
         while (true)
         {
@@ -965,7 +1049,8 @@ public class PhaseStar : MonoBehaviour
             if (gen != null && gen.HasAnyDustWithRole()) break;
         }
         _burstOffScreenWaitCo = null;
-        EnterFromOffScreen(ComputeDormantRestPosition());
+        RelocateToAvailableCell();
+        EnterDormantWaitState();
     }
 
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
@@ -978,7 +1063,7 @@ public class PhaseStar : MonoBehaviour
 
         // CollectablesInFlight: move off-screen for the burst duration.
         if (reason == DisarmReason.CollectablesInFlight)
-            MoveOffScreenForBurst();
+            HideInPlaceForBurst();
 
         // Scout should not be visible while disarmed.
         dust?.SetTentaclesActive(false);
@@ -1468,7 +1553,7 @@ public class PhaseStar : MonoBehaviour
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            MoveOffScreenForBurst();
+            HideInPlaceForBurst();
             Disarm(DisarmReason.NodeResolving, spawnTint);
             LogState("OnResolved");
         };
@@ -1578,7 +1663,7 @@ public class PhaseStar : MonoBehaviour
                 ? _drum.completedLoops
                 : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            MoveOffScreenForBurst();
+            HideInPlaceForBurst();
             Disarm(DisarmReason.NodeResolving, spawnTint);
             LogState("OnSuperNodeResolved");
         };
