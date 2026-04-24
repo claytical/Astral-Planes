@@ -216,6 +216,19 @@ public sealed class StarPool : MonoBehaviour
 
     // ── Star spawning ─────────────────────────────────────────────────────────
 
+    private Vector2Int PickSpawnCellAvoidingDust()
+    {
+        int w = _drum.GetSpawnGridWidth();
+        int h = _drum.GetSpawnGridHeight();
+        var candidates = new List<Vector2Int>(w * h);
+        for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+            if (_drum.IsSpawnCellAvailable(x, y))
+                candidates.Add(new Vector2Int(x, y));
+        if (candidates.Count == 0) return new Vector2Int(-1, -1);
+        return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+    }
+
     private void SpawnStarForRole(MusicalRole role)
     {
         if (_drum == null || !_drum.phaseStarPrefab)
@@ -224,11 +237,11 @@ public sealed class StarPool : MonoBehaviour
             return;
         }
 
-        // Pick a grid cell for the Star's logical home.
-        Vector2Int cell = _drum.GetRandomAvailableCell();
+        // Pick a dust-free grid cell for the Star's starting position.
+        Vector2Int cell = PickSpawnCellAvoidingDust();
         if (cell.x < 0)
         {
-            Debug.LogWarning($"[StarPool] No available grid cell for {role} Star.");
+            Debug.LogWarning($"[StarPool] No available dust-free grid cell for {role} Star.");
             return;
         }
 
@@ -252,10 +265,10 @@ public sealed class StarPool : MonoBehaviour
         star.OnEjected += OnStarEjected;
         star.OnMineNodeResolved += OnStarMineNodeResolved;
 
-        // Initialize and enter from off-screen.
+        // Initialize and enter in-maze (already at target position, invisible, tentacles will grow).
         star.Initialize(_drum, _tracks, _behaviorProfile, _activeMotif);
         star.PreAttuneTo(role);
-        star.EnterFromOffScreen(targetWorldPos);
+        star.EnterInMaze(targetWorldPos);
 
         _activeStars[role] = star;
         Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");

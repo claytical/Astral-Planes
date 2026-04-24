@@ -385,7 +385,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
-    private void ToggleShardRenderers(bool on)
+    public void ToggleShardRenderers(bool on)
     {
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0 || _shardSpriteRenderers[0] == null)
             CacheShardRenderers();
