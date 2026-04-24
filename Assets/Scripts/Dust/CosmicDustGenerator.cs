@@ -1238,6 +1238,27 @@ public class CosmicDustGenerator : MonoBehaviour
         if (growth == null)
             growth = new List<(Vector2Int, Vector3)>();
 
+        // Porous border: union border-wall cells into growth before the final filter.
+        if (config != null && config.borderExitCount >= 0)
+        {
+            var borderCells = CosmicDustMazePatterns.BuildPorousBorderCells(
+                width: w,
+                height: h,
+                exitCount: config.borderExitCount,
+                isCellAvailable: isCellAvailable);
+
+            var growthSet = new HashSet<Vector2Int>(growth.Count);
+            for (int i = 0; i < growth.Count; i++)
+                growthSet.Add(growth[i].cell);
+
+            foreach (var cell in borderCells)
+            {
+                if (growthSet.Contains(cell)) continue;
+                growth.Add((cell, gridToWorld(cell)));
+                growthSet.Add(cell);
+            }
+        }
+
         // Final filter: enforce reserved/permanent/keep-clear even if a pattern emitted them.
         var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
         for (int i = 0; i < growth.Count; i++)

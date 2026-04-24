@@ -71,9 +71,9 @@ public class Boundaries : MonoBehaviour
         Debug.Log($"[BOUNDARIES] Boundaries constructed");
 
         AddWrap(leftBoundary,   BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Left,   rightBoundary);
-        AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Right,  leftBoundary);
-        AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Top,    bottomBoundary);
-        AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Bottom, topBoundary);
+        AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Right,  leftBoundary); 
+        // AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Top,    bottomBoundary);
+        // AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Bottom, topBoundary);
         StartCoroutine(AlignBottomToNoteVisualizerWhenReady());
     }
 

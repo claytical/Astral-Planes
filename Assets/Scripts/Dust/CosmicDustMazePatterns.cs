@@ -517,6 +517,65 @@ public static class CosmicDustMazePatterns
     /// <returns>Dictionary mapping each cell to its assigned MusicalRole.</returns>
 
 
+    /// <summary>
+    /// Builds the set of border cells that should be filled as dust walls.
+    /// Covers the 3 non-bottom edges: top row, right column, left column (y=1..h-2).
+    /// <paramref name="exitCount"/> evenly-spaced gaps are punched out using segment-based
+    /// distribution so exits are spread across the perimeter rather than clustered.
+    /// </summary>
+    public static HashSet<Vector2Int> BuildPorousBorderCells(
+        int width,
+        int height,
+        int exitCount,
+        Func<int, int, bool> isCellAvailable)
+    {
+        var result = new HashSet<Vector2Int>();
+        if (width <= 0 || height <= 0 || isCellAvailable == null) return result;
+
+        var perimeter = new List<Vector2Int>(width + 2 * Mathf.Max(0, height - 2));
+
+        // Top row: left to right
+        for (int x = 0; x < width; x++)
+            perimeter.Add(new Vector2Int(x, height - 1));
+
+        // Right column: descending, skipping top-right corner already added
+        if (height >= 2)
+            for (int y = height - 2; y >= 1; y--)
+                perimeter.Add(new Vector2Int(width - 1, y));
+
+        // Left column: descending, skipping top-left corner already added
+        if (height >= 2)
+            for (int y = height - 2; y >= 1; y--)
+                perimeter.Add(new Vector2Int(0, y));
+
+        if (perimeter.Count == 0) return result;
+
+        exitCount = Mathf.Max(0, exitCount);
+        var gapCells = new HashSet<Vector2Int>();
+
+        if (exitCount > 0)
+        {
+            int n = perimeter.Count;
+            for (int seg = 0; seg < exitCount; seg++)
+            {
+                int segStart = Mathf.RoundToInt(seg       * (n / (float)exitCount));
+                int segEnd   = Mathf.RoundToInt((seg + 1) * (n / (float)exitCount));
+                segEnd = Mathf.Min(segEnd, n);
+                if (segEnd <= segStart) segEnd = Mathf.Min(segStart + 1, n);
+                gapCells.Add(perimeter[Random.Range(segStart, segEnd)]);
+            }
+        }
+
+        foreach (var cell in perimeter)
+        {
+            if (!isCellAvailable(cell.x, cell.y)) continue;
+            if (gapCells.Contains(cell)) continue;
+            result.Add(cell);
+        }
+
+        return result;
+    }
+
     private static int CountFilledNeighbors(
         Vector2Int cell,
         Dictionary<Vector2Int, bool> fillMap,

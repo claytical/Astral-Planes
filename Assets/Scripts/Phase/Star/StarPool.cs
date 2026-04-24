@@ -29,6 +29,8 @@ public sealed class StarPool : MonoBehaviour
     // Total MineNode/SuperNode ejections still needed this motif (role-agnostic).
     // The player drives which roles eject by carving role-colored dust.
     private int _remainingEjectionsTotal;
+    // Nodes the Vehicle successfully captured (burst had notes placed into the loop) this motif.
+    private int _nodesCapturedThisMotif;
 
     // ── Active Stars ──────────────────────────────────────────────────────────
     // At most one live Star per role.
@@ -179,6 +181,7 @@ public sealed class StarPool : MonoBehaviour
     private void BuildPhasePlan()
     {
         _remainingEjectionsTotal = _activeMotif?.nodesPerStar ?? 1;
+        _nodesCapturedThisMotif = 0;
         Debug.Log($"[StarPool] BuildPhasePlan: total ejections={_remainingEjectionsTotal} roles=[{string.Join(",", _activeMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>())}]");
     }
 
@@ -350,19 +353,34 @@ public sealed class StarPool : MonoBehaviour
     private void OnStarMineNodeResolved(PhaseStar star, MusicalRole role)
     {
         _mineNodeResolved = true;
-        bool wasSuperNode = star != null && star.LastNodeWasSuperNode;
-        bool wasExpired   = star != null && star.LastNodeWasExpired;
-        Debug.Log($"[StarPool] MineNode resolved for role={role} ejectedBurstWasEmpty={_ejectedBurstWasEmpty} wasSuperNode={wasSuperNode} wasExpired={wasExpired} CIF={AnyCollectablesInFlight()}");
+        // Use ReferenceEquals rather than Unity's == operator: the PhaseStar GameObject may
+        // already be destroyed (DestroyStarAfterDelay runs 0.4s after ejection), but the C#
+        // object remains alive in memory with valid property values. Unity's == override
+        // returns false for destroyed objects, incorrectly hiding all outcome flags.
+        bool hasRef       = !ReferenceEquals(star, null);
+        bool wasSuperNode = hasRef && star.LastNodeWasSuperNode;
+        bool wasExpired   = hasRef && star.LastNodeWasExpired;
+        bool wasEscaped   = hasRef && star.LastNodeWasEscaped;
+        bool wasCaptured  = hasRef && star.LastNodeWasCaptured;
+        Debug.Log($"[StarPool] MineNode resolved role={role} captured={wasCaptured} escaped={wasEscaped} expired={wasExpired} superNode={wasSuperNode} emptyBurst={_ejectedBurstWasEmpty} CIF={AnyCollectablesInFlight()}");
 
-        // Clear the gate immediately for a confirmed empty burst, a SuperNode (no burst spawned),
-        // or an expired MineNode (player never captured it — no burst, refund the ejection slot).
-        if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired))
+        if (wasCaptured)
         {
-            if (wasExpired)
+            _nodesCapturedThisMotif++;
+            Debug.Log($"[StarPool] Node captured — capturedThisMotif={_nodesCapturedThisMotif}");
+        }
+
+        // Clear the gate immediately for:
+        //   empty burst, SuperNode, expired (player ignored it), or escaped (node fled successfully).
+        // Expired refunds the slot; escaped does NOT — the ejection was consumed as a missed opportunity.
+        if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired || wasEscaped))
+        {
+            if (wasExpired || wasEscaped)
             {
                 _remainingEjectionsTotal++;
-                Debug.Log($"[StarPool] MineNode expired — ejection slot refunded (total now {_remainingEjectionsTotal})");
+                Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — ejection slot refunded (total now {_remainingEjectionsTotal})");
             }
+
             _mineNodeResolved = false;
             _mineNodePending = false;
             _ejectedBurstWasEmpty = false;
@@ -452,8 +470,29 @@ public sealed class StarPool : MonoBehaviour
         var gfm = GameFlowManager.Instance;
         if (gfm == null) return;
 
-        Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 — triggering bridge.");
+        // If no nodes were captured this motif and all track loops are still empty,
+        // the player had no successful interaction — restart the same motif instead of bridging.
+        if (_nodesCapturedThisMotif == 0 && AllTracksEmpty())
+        {
+            Debug.Log($"[StarPool] CheckBridgeGate: zero captures, empty loops — restarting motif.");
+            BuildPhasePlan();
+            return;
+        }
+
+        Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 captured={_nodesCapturedThisMotif} — triggering bridge.");
         gfm.BeginMotifBridge("StarPool");
+    }
+
+    private bool AllTracksEmpty()
+    {
+        if (_tracks == null) return true;
+        foreach (var track in _tracks)
+        {
+            if (track == null) continue;
+            var notes = track.GetPersistentLoopNotes();
+            if (notes != null && notes.Count > 0) return false;
+        }
+        return true;
     }
 
     private void OnDisable()

@@ -74,6 +74,8 @@ MonoBehaviour:
     energyDrainPerSecond: 0
   clearing:
     hardness01: 0
+    carveResistance01: 0
+    drainResistance01: 0
   useWorkShaderParams: 1
   terrainCollider: {fileID: 0}
   enableVehicleCompression: 1
@@ -155,7 +157,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 1.1, y: 1.1}
   m_EdgeRadius: 0
 --- !u!1 &2371707622271433480
 GameObject:
@@ -4915,7 +4917,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &3560996001435967828
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -4961,6 +4963,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -4992,7 +4995,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &6293350662635880757
 GameObject:
   m_ObjectHideFlags: 0
@@ -5027,6 +5029,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &8999714297043290424
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5072,6 +5075,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 6485846461334653488, guid: 43dc102d976b24668a4c8bf47427b57d,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.49803922}
@@ -5082,7 +5086,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &8081140791669243937
 GameObject:
@@ -5163,6 +5166,7 @@ SpriteMask:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 4412486014302810088, guid: d74e19106b29d4bfab46b0e4cd838279,
     type: 3}
   m_MaskAlphaCutoff: 0.67

@@ -165,23 +165,24 @@ public class DrumTrack : MonoBehaviour
 		if (cam == null) return false;
 
 		// Prefer orthographic projection (your game is 2D). If not orthographic, fall back to viewport corners.
-		Vector3 camPos = cam.transform.position;
+		float halfH = cam.orthographicSize;
+		float halfW = halfH * cam.aspect;
 		float left, right, bottom, top;
-        float z = Mathf.Abs(camPos.z);
+		float z = cam.orthographic ? 0f : Mathf.Abs(cam.transform.position.z);
+
 		if (cam.orthographic)
 		{
-			float halfH = cam.orthographicSize;
-			float halfW = halfH * cam.aspect;
-
-			left   = camPos.x - halfW;
-			right  = camPos.x + halfW;
-			bottom = camPos.y - halfH;
-			top    = camPos.y + halfH;
+			// Anchor to world origin (0,0) so the play area aligns with Boundaries.cs,
+			// which positions all four boundary colliders at ±halfW/±halfH from world
+			// origin — independent of where the camera happens to sit.
+			left   = -halfW;
+			right  = +halfW;
+			bottom = -halfH;
+			top    = +halfH;
 		}
 		else
 		{
 			// Perspective camera safety path.
-
 			Vector3 bl = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
 			Vector3 tr = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
 			left   = bl.x;
@@ -189,25 +190,27 @@ public class DrumTrack : MonoBehaviour
 			bottom = bl.y;
 			top    = tr.y;
 		}
-        z = cam.orthographic ? 0f : Mathf.Abs(cam.transform.position.z);
+
 		// Optional padding to keep spawns away from the very edge of the screen.
-		// This is *not* UI-aware; it's a conservative safety margin.
 		if (gridPadding > 0f)
 		{
 			left   += gridPadding;
 			right  -= gridPadding;
 			bottom += gridPadding;
 			top    -= gridPadding;
-		} 
-// --- UI safe area clamp (viewport -> world) ---
-// Reserve a bottom viewport band for UI derived from uiBottomPaddingPx.
-        float uiBotV = Screen.height > 0 ? Mathf.Clamp01(uiBottomPaddingPx / (float)Screen.height) : 0f;
+		}
 
-        if (uiBotV > 0f)
-        {
-            float uiBottomWorld = cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y;
-            bottom = Mathf.Max(bottom, uiBottomWorld);
-        }
+		// Reserve a bottom viewport band for UI derived from uiBottomPaddingPx.
+		float uiBotV = Screen.height > 0 ? Mathf.Clamp01(uiBottomPaddingPx / (float)Screen.height) : 0f;
+		if (uiBotV > 0f)
+		{
+			// For orthographic cameras map the viewport fraction from world origin,
+			// consistent with the world-anchored bounds above.
+			float uiBottomWorld = cam.orthographic
+				? Mathf.Lerp(-halfH, halfH, uiBotV)
+				: cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y;
+			bottom = Mathf.Max(bottom, uiBottomWorld);
+		}
 		// Validate.
 		if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
 		if (right <= left || top <= bottom) return false;
@@ -1311,8 +1314,8 @@ public class DrumTrack : MonoBehaviour
 
         GetTileSizeWorld(out float tileX, out float tileY);
 
-        float x = area.left   + (cell.x + 0.5f) * tileX;
-        float y = area.bottom + (cell.y + 0.5f) * tileY;
+        float x = area.left   + cell.x * tileX;
+        float y = area.bottom + cell.y * tileY;
 
         return new Vector2(x, y);
     }
@@ -1332,8 +1335,10 @@ public class DrumTrack : MonoBehaviour
         int w = Mathf.Max(1, GetSpawnGridWidth());
         int h = Mathf.Max(1, GetSpawnGridHeight());
 
-        tileX = area.width / w;
-        tileY = area.height / h;
+        // Divide by (count - 1) so cell 0 lands on area.left and cell w-1 lands on area.right,
+        // aligning outermost dust cells with the physical boundary colliders.
+        tileX = area.width  / Mathf.Max(1, w - 1);
+        tileY = area.height / Mathf.Max(1, h - 1);
 
         if (tileX <= 0.00001f) tileX = 1f;
         if (tileY <= 0.00001f) tileY = 1f;
@@ -1437,8 +1442,8 @@ public class DrumTrack : MonoBehaviour
 
             if (_cachedTileDiameterWorld <= 0f)
             {
-                float tileX = area.width  / w;
-                float tileY = area.height / h;
+                float tileX = area.width  / Mathf.Max(1, w - 1);
+                float tileY = area.height / Mathf.Max(1, h - 1);
                 float tile  = Mathf.Min(tileX, tileY);
                 _cachedTileDiameterWorld = (tile > 0f) ? tile : 1f;
             }
@@ -1456,6 +1461,7 @@ public class DrumTrack : MonoBehaviour
     {
         _cachedTileDiameterWorld = 0f;
         _hasLastPlayAreaForTileCache = false;
+        _hasLockedPlayArea = false;
     }
     private bool ApproximatelyEqual(PlayArea a, PlayArea b)
     {

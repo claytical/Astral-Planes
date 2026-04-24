@@ -4,9 +4,6 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody2D))]
 public class MineNodeDustInteractor : MonoBehaviour
 {
-    private bool InsideDust { get; set; }
-    private CosmicDust CurrentDust { get; set; }
-
     [Header("Multipliers while in dust (node-specific)")]
     [Tooltip("Clamp max speed while inside dust (multiplies your locomotion maxSpeed).")]
     public float speedCapMul = 0.9f;
@@ -16,7 +13,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [Header("Maze Exhaust Painting")]
     [Tooltip("If true, this node paints adjacent dust cells with its role at reduced energy.")]
-    public bool carveMaze = true;
+    public bool carveMaze = false;
 
     [Tooltip("Fraction of maxEnergyUnits to assign when exhaust-painting a cell (0=empty, 1=full).")]
     [SerializeField, Range(0f, 1f)] private float exhaustEnergyFraction = 0.4f;
@@ -70,8 +67,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     private float _desiredSpeed     = 0f;
     private float _desiredSpeedFloor = 0.25f;
 
-    private bool    _hasDustContactPoint;
-    private Vector2 _lastDustContactPoint;
+    private bool _prevInDust;
 
     // ---------------------------------------------------------------
     // Public API
@@ -103,6 +99,10 @@ public class MineNodeDustInteractor : MonoBehaviour
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
         bool       inDust   = _drumTrack.HasDustAt(cell);
 
+        if (inDust && !_prevInDust)
+            OnDustEnterGrid(cell);
+        _prevInDust = inDust;
+
         // ---------------------------------------------------------------
         // Dust feel (unchanged)
         // ---------------------------------------------------------------
@@ -129,7 +129,16 @@ public class MineNodeDustInteractor : MonoBehaviour
                     escapeDir += new Vector2(dx, dy);
             }
             if (escapeDir.sqrMagnitude > 0.0001f)
+            {
                 _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
+
+                // Hard wall: cancel any velocity component pushing deeper into the dust wall.
+                // This prevents driving forces from overpowering the escape push and tunneling through.
+                Vector2 wallNormal  = escapeDir.normalized;
+                float   intoWallVel = Vector2.Dot(_rb.linearVelocity, wallNormal);
+                if (intoWallVel < 0f)
+                    _rb.linearVelocity -= wallNormal * intoWallVel;
+            }
         }
 
         if (!carveMaze) return;
@@ -213,6 +222,32 @@ public class MineNodeDustInteractor : MonoBehaviour
             if (dustNeighborCount > 0)
                 _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Grid-based dust contact
+    // ---------------------------------------------------------------
+
+    private void OnDustEnterGrid(Vector2Int cell)
+    {
+        if (_node == null || _drumTrack == null) return;
+
+        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (gen == null) return;
+        if (!gen.TryGetCellGo(cell, out var go) || go == null) return;
+        if (!go.TryGetComponent<CosmicDust>(out var dust)) return;
+
+        MusicalRole role = _node.GetImprintRole();
+        var         prof = MusicalRoleProfileLibrary.GetProfile(role);
+        if (prof == null) return;
+
+        Color roleColor = prof.GetBaseColor();
+        roleColor.a = 1f;
+        dust.ApplyRoleAndCharge(role, roleColor, 1f, prof.maxEnergyUnits);
+        dust.clearing.carveResistance01 = prof.GetCarveResistance01();
+        dust.clearing.drainResistance01 = prof.GetDrainResistance01();
+
+        gen.PaintDustExhaust(cell, role, 1f);
     }
 
     // ---------------------------------------------------------------
@@ -301,31 +336,6 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (!gen.TryGetCellGo(gp, out var go) || go == null) return false;
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return false;
         return dust.Role == _node.GetImprintRole();
-    }
-
-    // ---------------------------------------------------------------
-    // Existing helpers (unchanged)
-    // ---------------------------------------------------------------
-
-    private bool TryGetDustFromCollision(Collision2D coll, out CosmicDust dust)
-    {
-        dust = coll.collider != null ? coll.collider.GetComponentInParent<CosmicDust>() : null;
-        return dust != null;
-    }
-
-    private void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (!TryGetDustFromCollision(coll, out var dust)) return;
-        InsideDust  = true;
-        CurrentDust = dust;
-    }
-
-    private void OnCollisionExit2D(Collision2D coll)
-    {
-        if (!InsideDust || CurrentDust == null) return;
-        if (!TryGetDustFromCollision(coll, out var dust) || dust != CurrentDust) return;
-        InsideDust  = false;
-        CurrentDust = null;
     }
 
     public void SetLevelAuthority(DrumTrack drumTrack)
