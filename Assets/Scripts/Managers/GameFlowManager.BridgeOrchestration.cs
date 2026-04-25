@@ -58,54 +58,12 @@ public partial class GameFlowManager
             foreach (var v in vehicles)
                 v?.SetBoostFree(true);
 
-        yield return new WaitForSeconds(remainingInLoop);
+        yield return new WaitForSeconds(remainingInLoop*2);
 
         if (vehicles != null)
             foreach (var v in vehicles)
                 v?.SetBoostFree(false);
-        // --- End wait to boundary ---
 
-        /*
-        SetBridgeCinematicMode(true); // hide maze, dust, vehicles — coral will be the only thing visible
-
-
-
-
-        // Derive bridge duration from the actual musical loop length — same pattern as PlayPhaseBridge.
-        // This makes the coral grow animation span exactly one full loop replay.
-        float motifBridgeSec = (controller != null)
-            ? Mathf.Max(1f, controller.GetEffectiveLoopLengthInSeconds())
-            : Mathf.Max(1f, motifBridgeHoldSeconds);
-
-        Debug.Log($"[MOTIF-BRIDGE] Bridge duration: {motifBridgeSec:F2}s (motifBridgeHoldSeconds fallback={motifBridgeHoldSeconds})");
-
-        // Show GlyphApplicator — instant 2D glyph held for bridge duration.
-        if (motifGlyphApplicator != null)
-        {
-            motifGlyphApplicator.gameObject.SetActive(true);
-            if (activeDrumTrack != null && activeDrumTrack.TryGetPlayAreaWorld(out var playArea))
-            {
-                motifGlyphApplicator.FitToPlayArea(
-                    playArea.width, playArea.height,
-                    (playArea.left + playArea.right) * 0.5f,
-                    (playArea.bottom + playArea.top) * 0.5f);
-            }
-            motifGlyphApplicator.Apply(motifSnap);
-            yield return new WaitForSeconds(motifBridgeSec);
-            motifGlyphApplicator.Clear();
-            motifGlyphApplicator.gameObject.SetActive(false);
-        }
-        else
-        {
-            Debug.LogWarning("[MOTIF-BRIDGE] No GlyphApplicator assigned — holding without visual.");
-            yield return new WaitForSeconds(motifBridgeSec);
-        }
-
-        // Advance motif — StartNextMotifInPhase calls controller.BeginNewMotif which clears track state.
-
-        SetBridgeCinematicMode(false); // restore maze, dust, vehicles
-        
-        */
         // Fade rings out while the next motif scene loads (fire-and-forget overlap)
         if (motifRingGlyphApplicator != null)
             StartCoroutine(motifRingGlyphApplicator.FadeOutAndClear(

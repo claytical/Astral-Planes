@@ -4941,7 +4941,7 @@ MonoBehaviour:
   _tracePhaseStar: 1
   bubbleTint: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 0.2}
   bubbleShardInnerTint: {r: 0.05, g: 0.05, b: 0.05, a: 0.9}
-  shardMinAlpha: 0.287
+  shardMinAlpha: 0.5
   accumulatorRotSpeed: 90
   drainTiltDeg: 5
   drainTiltSpeed: 1.8
@@ -4989,27 +4989,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
-  keepClearTick: 0.1
-  drainTick: 0.08
-  drainRatePerSec: 0.6
+  drainRatePerSec: 0.8
   minContactTime: 1
   colorTransitionTime: 0.5
-  drainFlashDuration: 0.08
-  starDrainRegrowDelay: 6
   tentacleGrowSpeed: 2
   tentacleRetractSpeed: 12
-  tentacleFlowSpeed: 2.5
-  tentacleWidth: 0.1
-  diamondTipOffset: 0.3
-  rootDirSmoothSpeed: 8
+  tentacleFlowSpeed: 5.1
+  tentacleWidth: 0.075
   dissolveDuration: 1.1
   tentacleMaterial: {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
-  vineCtrlPointCount: 4
-  vineSplinePoints: 32
-  vineNoiseAmplitude: 2.3
+  growingRootAlpha: 0.65
+  growingTipAlpha: 0.4
+  drainingBaseAlpha: 0.751
+  vineNavSway: 0.05
   vineBreathePeriod: 1.6
-  vineDustRepulsionRadius: 2
-  vineDustRepulsionStrength: 0.9
   vineCtrlRebuildInterval: 0.15
   branchSpawnAtProgress: 0.4
   maxBranchDepth: 3
@@ -5033,24 +5026,16 @@ MonoBehaviour:
   softEdgeVelocityDamp: 8
   bounds:
     kinematicMode: 0
-    edgeBounce: 0.9
     screenPadding: 0.5
-    focusSpeedMul: 0.5
   avoidance:
     radius: 3
     exponent: 2
     strength: 1
-  edgeSeek:
-    sampleStep: 0.35
-    band: 0.5
-    strength: 1
-    gradMin: 0.02
   steering:
     maxAccel: 4
     huntAccel: 18
   navBlend:
     snifferWeight: 0.734
-  verbose: 0
 --- !u!114 &4892159809986813886
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5067,7 +5052,6 @@ MonoBehaviour:
   retargetOnTargetLost: 1
   snifferIntervalSeconds: 2
   hungerFloorWeight: 0.15
-  verbose: 1
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0

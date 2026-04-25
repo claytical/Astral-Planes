@@ -83,7 +83,6 @@ public partial class GameFlowManager : MonoBehaviour
     private bool _remixArmed = false;                  // true once previous star’s set is completed
     private bool _nextPhaseLoopArmed = false;
     private bool hasGameOverStarted = false;
-    private readonly List<Renderer> _bridgeHiddenRenderers = new();
 
     [Header("Phase Bridge Audio")]
     [Tooltip("Seconds to fade out the outgoing motif during the bridge cinematic.")]

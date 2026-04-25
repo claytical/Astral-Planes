@@ -6,37 +6,41 @@ using UnityEngine.Rendering;
 [DisallowMultipleComponent]
 public sealed class PhaseStarDustAffect : MonoBehaviour
 {
-    [Header("Keep-Clear Pocket (optional)")]
-    [SerializeField] private float keepClearTick = 0.15f;
-
     [Header("Drain")]
-    [SerializeField] private float drainTick = 0.08f;
-    [SerializeField] private float drainRatePerSec = 1.0f;
+    [SerializeField] private float drainRatePerSec = 5.0f;
     [SerializeField] private float minContactTime = 1.0f;
     [SerializeField] private float colorTransitionTime = 0.5f;
-    [SerializeField] private float drainFlashDuration = 0.08f;
 
     [Header("Tentacle")]
     [SerializeField] private float tentacleGrowSpeed = 5f;
     [SerializeField] private float tentacleRetractSpeed = 12f;
     [SerializeField] private float tentacleFlowSpeed = 1.2f;
-    [SerializeField] private float tentacleWidth = 0.07f;
-    [SerializeField] private float diamondTipOffset = 0.3f;
+    [SerializeField] private float tentacleWidth = 0.13f;
     [SerializeField] private float dissolveDuration = 0.8f;
     [SerializeField] private Material tentacleMaterial;
 
-    [Header("Vine Spline")]
-    [SerializeField] private int vineCtrlPointCount = 4;
-    [SerializeField] private int vineSplinePoints = 16;
-    [SerializeField] private float vineNoiseAmplitude = 0.6f;
+    [Header("Line Visual")]
+    [SerializeField, Range(0f, 1f)] private float growingRootAlpha = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float growingTipAlpha  = 0.40f;
+    [SerializeField, Range(0f, 1f)] private float drainingBaseAlpha = 0.45f;
+    [SerializeField] private float vineNavSway = 0.05f;
     [SerializeField] private float vineBreathePeriod = 2.2f;
-    [SerializeField] private float vineDustRepulsionRadius = 1.8f;
-    [SerializeField] private float vineDustRepulsionStrength = 0.9f;
-    [SerializeField] private float vineCtrlRebuildInterval = 0.15f;
+
+    [Header("Path")]
+    [SerializeField] private float vineCtrlRebuildInterval = 0.5f;
 
     [Header("Branches")]
     [SerializeField, Range(0f, 1f)] private float branchSpawnAtProgress = 0.4f;
     [SerializeField, Min(0)] private int maxBranchDepth = 3;
+
+    private const int    SplinePoints             = 32;
+    private const int    FallbackCtrlPoints       = 4;
+    private const float  KeepClearTick            = 0.15f;
+    private const float  DrainFlashDuration       = 0.15f;
+    private const float  DiamondTipOffset         = 0.3f;
+    private const float  FallbackNoiseAmplitude   = 0.6f;
+    private const float  FallbackRepulsionRadius  = 1.8f;
+    private const float  FallbackRepulsionStrength = 0.9f;
 
     private enum TentacleState
     {
@@ -99,7 +103,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private readonly List<Vector2Int> _dustScratch = new(256);
     private readonly List<Vector2Int> _bfsPathScratch = new(128);
-    private readonly List<Vector2Int> _simplifiedPathScratch = new(64);
     private readonly Queue<Vector2Int> _bfsQueue = new(512);
     private readonly Dictionary<Vector2Int, Vector2Int> _bfsPrev = new(512);
     private readonly HashSet<Vector2Int> _branchExcludeScratch = new();
@@ -278,7 +281,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         float dt = Time.deltaTime;
 
         _keepClearTimer += dt;
-        if (_keepClearTimer >= keepClearTick)
+        if (_keepClearTimer >= KeepClearTick)
         {
             _keepClearTimer = 0f;
             TickKeepClear();
@@ -361,7 +364,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     RebuildBaseControlPts(tentacle, GetLineRoot(tentacle));
                 }
 
-                float arcLen = ApproxSplineLength(tentacle.splineBuf, vineSplinePoints);
+                float arcLen = ApproxSplineLength(tentacle.splineBuf, SplinePoints);
                 tentacle.growProgress = Mathf.Clamp01(
                     tentacle.growProgress + tentacleGrowSpeed * dt / Mathf.Max(0.5f, arcLen));
 
@@ -373,7 +376,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     tentacle.tipPos = tentacle.targetWorldPos;
                     tentacle.state = TentacleState.Draining;
                     tentacle.contactTimer = 0f;
-                    tentacle.drainTimer = drainTick;
+                    tentacle.drainTimer = 0f;
                     tentacle.ctrlRebuildTimer = 0f;
 
                     if (!tentacle.notifiedDrainLock)
@@ -411,10 +414,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 tentacle.contactTimer += dt;
                 if (tentacle.contactTimer >= minContactTime)
                 {
-                    tentacle.drainTimer += dt;
-                    if (tentacle.drainTimer >= drainTick)
+                    tentacle.drainTimer += drainRatePerSec * dt;
+                    while (tentacle.drainTimer >= 1f)
                     {
-                        tentacle.drainTimer = 0f;
+                        tentacle.drainTimer -= 1f;
                         DrainTick(tentacle, gen);
                     }
                 }
@@ -471,7 +474,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         tentacle.targetCell = cell;
         tentacle.targetWorldPos = drum.GridToWorldPosition(cell);
-        tentacle.tipPos = starPos;
+
+        // Anchor tip at the actual diamond tip, not the star center, so the vine
+        // starts from the correct point on the first frame.
+        Vector2 rootPos = GetLineRoot(tentacle);
+        tentacle.tipPos = rootPos;
         tentacle.drainTimer = 0f;
         tentacle.growProgress = 0f;
         tentacle.ctrlRebuildTimer = 0f;
@@ -480,8 +487,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.alphaScale = 1f;
         tentacle.notifiedDrainLock = false;
 
-        for (int i = 0; i < vineSplinePoints; i++)
-            tentacle.splineBuf[i] = starPos;
+        for (int i = 0; i < SplinePoints; i++)
+            tentacle.splineBuf[i] = rootPos;
 
         tentacle.state = TentacleState.Growing;
         tentacle.line.enabled = true;
@@ -496,15 +503,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (!gen.TryGetDustAt(tentacle.targetCell, out var dust) || dust == null)
             return;
 
-        int chipUnits = Mathf.Max(1, Mathf.RoundToInt(drainRatePerSec * drainTick));
-        int actualUnits = dust.ChipEnergy(chipUnits);
+        int actualUnits = dust.ChipEnergy(1);
 
         if (actualUnits > 0 && _star != null)
         {
             bool wasUnattned = _star.AttunedRole == MusicalRole.None;
             _star.AddCharge(tentacle.role, actualUnits);
             onDelivery?.Invoke(tentacle.role, actualUnits);
-            tentacle.drainFlashTimer = drainFlashDuration;
+            tentacle.drainFlashTimer = DrainFlashDuration;
             if (wasUnattned)
                 OnAttuned?.Invoke(tentacle.role);
         }
@@ -533,7 +539,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         Vector2Int rootCell = drum.WorldToGridPosition(rootPos);
 
-        if (TryFindGridPath(rootCell, tentacle.targetCell, gen, _bfsPathScratch))
+        if (TryFindGridPath(rootCell, tentacle.targetCell, gen, drum, _bfsPathScratch))
         {
             BuildNavPath(_bfsPathScratch, tentacle, rootPos, drum);
         }
@@ -544,7 +550,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
     }
 
-    private bool TryFindGridPath(Vector2Int start, Vector2Int end, CosmicDustGenerator gen, List<Vector2Int> outPath, int budget = 400)
+    private bool TryFindGridPath(Vector2Int start, Vector2Int end, CosmicDustGenerator gen, DrumTrack drum, List<Vector2Int> outPath)
     {
         outPath.Clear();
         if (start == end)
@@ -552,6 +558,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             outPath.Add(start);
             return true;
         }
+
+        int w = drum.GetSpawnGridWidth();
+        int h = drum.GetSpawnGridHeight();
+        int budget = w * h;
 
         _bfsQueue.Clear();
         _bfsPrev.Clear();
@@ -576,6 +586,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 var next = cur + BfsDirs[d];
                 if (_bfsPrev.ContainsKey(next))
+                    continue;
+                if ((uint)next.x >= (uint)w || (uint)next.y >= (uint)h)
                     continue;
                 if (gen.HasDustAt(next) && next != end)
                     continue;
@@ -602,18 +614,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void BuildNavPath(List<Vector2Int> rawPath, Tentacle tentacle, Vector2 rootPos, DrumTrack drum)
     {
-        _simplifiedPathScratch.Clear();
-        _simplifiedPathScratch.Add(rawPath[0]);
-
-        for (int i = 1; i < rawPath.Count - 1; i++)
-        {
-            if (rawPath[i] - rawPath[i - 1] != rawPath[i + 1] - rawPath[i])
-                _simplifiedPathScratch.Add(rawPath[i]);
-        }
-
-        _simplifiedPathScratch.Add(rawPath[rawPath.Count - 1]);
-
-        int n = _simplifiedPathScratch.Count;
+        int n = rawPath.Count;
         if (tentacle.navWorldPts == null || tentacle.navWorldPts.Length < n)
             tentacle.navWorldPts = new Vector2[Mathf.Max(n, 16)];
         if (tentacle.ctrlBuf == null || tentacle.ctrlBuf.Length < n)
@@ -624,7 +625,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.navWorldPts[0] = rootPos;
 
         for (int i = 1; i < n - 1; i++)
-            tentacle.navWorldPts[i] = drum.GridToWorldPosition(_simplifiedPathScratch[i]);
+            tentacle.navWorldPts[i] = drum.GridToWorldPosition(rawPath[i]);
 
         tentacle.navWorldPts[n - 1] = tentacle.targetWorldPos;
     }
@@ -637,14 +638,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         float len = path.magnitude;
         Vector2 perp = len > 0.0001f ? new Vector2(-path.y, path.x) / len : Vector2.up;
 
-        for (int i = 0; i < vineCtrlPointCount; i++)
+        for (int i = 0; i < FallbackCtrlPoints; i++)
         {
-            float baseT = (i + 1f) / (vineCtrlPointCount + 1f);
+            float baseT = (i + 1f) / (FallbackCtrlPoints + 1f);
             Vector2 basePos = rootPos + path * baseT;
 
             float seed = (float)tentacle.role * 31.4f + i * 7.3f;
             float noiseVal = Mathf.PerlinNoise(seed, Time.time * 0.15f) * 2f - 1f;
-            float offset = noiseVal * vineNoiseAmplitude * baseT * (1f - baseT) * 4f;
+            float offset = noiseVal * FallbackNoiseAmplitude * baseT * (1f - baseT) * 4f;
             tentacle.baseControlPts[i] = basePos + perp * offset;
         }
 
@@ -655,13 +656,13 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 continue;
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
-            for (int pointIndex = 0; pointIndex < vineCtrlPointCount; pointIndex++)
+            for (int pointIndex = 0; pointIndex < FallbackCtrlPoints; pointIndex++)
             {
                 Vector2 delta = tentacle.baseControlPts[pointIndex] - cellWorld;
                 float dist = delta.magnitude;
-                if (dist < vineDustRepulsionRadius && dist > 0.001f)
+                if (dist < FallbackRepulsionRadius && dist > 0.001f)
                 {
-                    float strength = (1f - dist / vineDustRepulsionRadius) * vineDustRepulsionStrength;
+                    float strength = (1f - dist / FallbackRepulsionRadius) * FallbackRepulsionStrength;
                     tentacle.baseControlPts[pointIndex] += (delta / dist) * strength;
                 }
             }
@@ -686,10 +687,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 float seed = (float)tentacle.role * 31.4f + i * 7.3f;
                 float breathe = Mathf.PerlinNoise(seed, Time.time / vineBreathePeriod) * 2f - 1f;
-                tentacle.ctrlBuf[i] = tentacle.navWorldPts[i] + perp * (breathe * vineNoiseAmplitude * 0.08f);
+                tentacle.ctrlBuf[i] = tentacle.navWorldPts[i] + perp * (breathe * vineNavSway);
             }
 
-            CatmullRomChain(tentacle.ctrlBuf, tentacle.navPtCount, tentacle.splineBuf, vineSplinePoints);
+            CatmullRomChain(tentacle.ctrlBuf, tentacle.navPtCount, tentacle.splineBuf, SplinePoints);
             return;
         }
 
@@ -698,26 +699,29 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         Vector2 perpFallback = len > 0.0001f ? new Vector2(-path.y, path.x) / len : Vector2.up;
 
         tentacle.ctrlBuf[0] = rootPos;
-        tentacle.ctrlBuf[vineCtrlPointCount + 1] = tentacle.targetWorldPos;
+        tentacle.ctrlBuf[FallbackCtrlPoints + 1] = tentacle.targetWorldPos;
 
-        for (int i = 0; i < vineCtrlPointCount; i++)
+        for (int i = 0; i < FallbackCtrlPoints; i++)
         {
             float seed = (float)tentacle.role * 31.4f + i * 7.3f;
             float breatheVal = Mathf.PerlinNoise(seed, Time.time / vineBreathePeriod) * 2f - 1f;
-            tentacle.ctrlBuf[i + 1] = tentacle.baseControlPts[i] + perpFallback * (breatheVal * vineNoiseAmplitude * 0.15f);
+            tentacle.ctrlBuf[i + 1] = tentacle.baseControlPts[i] + perpFallback * (breatheVal * FallbackNoiseAmplitude * 0.15f);
         }
 
-        CatmullRomChain(tentacle.ctrlBuf, vineCtrlPointCount + 2, tentacle.splineBuf, vineSplinePoints);
+        CatmullRomChain(tentacle.ctrlBuf, FallbackCtrlPoints + 2, tentacle.splineBuf, SplinePoints);
     }
 
     private Vector2 GetLineRoot(Tentacle tentacle)
     {
         if (tentacle.isSubBranch && tentacle.parentTentacle != null && tentacle.parentTentacle.splineBuf != null)
         {
-            int midIndex = Mathf.Clamp(vineSplinePoints / 2, 0, tentacle.parentTentacle.splineBuf.Length - 1);
+            int midIndex = Mathf.Clamp(SplinePoints / 2, 0, tentacle.parentTentacle.splineBuf.Length - 1);
             return tentacle.parentTentacle.splineBuf[midIndex];
         }
 
+        // tipIndex 0,2 → primary diamond (CW); tipIndex 1,3 → secondary diamond (CCW).
+        // Within each diamond, tipIndex 0,1 use the up-axis tip and 2,3 use the right-axis tip,
+        // giving a vine from each of the four visible points of the diamond shape.
         var diamond = (tentacle.tipIndex == 0 || tentacle.tipIndex == 2)
             ? _star?.PrimaryDiamondTransform
             : _star?.SecondaryDiamondTransform;
@@ -726,12 +730,21 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return transform.position;
 
         var sr = diamond.GetComponent<SpriteRenderer>();
-        float tipDist = (sr != null && sr.sprite != null)
-            ? sr.sprite.bounds.extents.y
-            : diamondTipOffset;
+        bool useRight = tentacle.tipIndex >= 2;
+        float tipDist;
+        Vector2 dir;
+        if (useRight)
+        {
+            tipDist = (sr != null && sr.sprite != null) ? sr.sprite.bounds.extents.x : DiamondTipOffset;
+            dir = diamond.right;
+        }
+        else
+        {
+            tipDist = (sr != null && sr.sprite != null) ? sr.sprite.bounds.extents.y : DiamondTipOffset;
+            dir = diamond.up;
+        }
 
-        float pole = (tentacle.tipIndex < 2) ? 1f : -1f;
-        return (Vector2)diamond.position + (Vector2)diamond.up * (tipDist * pole);
+        return (Vector2)diamond.position + dir * tipDist;
     }
 
     private void UpdateTentacleLine(Tentacle tentacle)
@@ -751,16 +764,31 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         EvaluateVineSpline(tentacle, lineRoot);
 
-        int renderCount = tentacle.state == TentacleState.Growing
-            ? Mathf.Max(2, Mathf.RoundToInt(tentacle.growProgress * (vineSplinePoints - 1)) + 1)
-            : vineSplinePoints;
-
-        tentacle.line.positionCount = renderCount;
         tentacle.line.widthMultiplier = tentacleWidth * tentacle.alphaScale;
 
-        tentacle.line.SetPosition(0, lineRoot);
-        for (int i = 1; i < renderCount; i++)
-            tentacle.line.SetPosition(i, tentacle.splineBuf[i]);
+        if (tentacle.state == TentacleState.Growing)
+        {
+            // Continuous tip: interpolate within the current spline segment so the
+            // growing front moves every frame rather than snapping one sample at a time.
+            float fullT   = tentacle.growProgress * (SplinePoints - 1);
+            int   baseIdx = Mathf.Min(Mathf.FloorToInt(fullT), SplinePoints - 2);
+            float frac    = fullT - baseIdx;
+
+            int renderCount = Mathf.Max(2, baseIdx + 2);
+            tentacle.line.positionCount = renderCount;
+            tentacle.line.SetPosition(0, lineRoot);
+            for (int i = 1; i < renderCount - 1; i++)
+                tentacle.line.SetPosition(i, tentacle.splineBuf[i]);
+            tentacle.line.SetPosition(renderCount - 1,
+                Vector2.Lerp(tentacle.splineBuf[baseIdx], tentacle.splineBuf[baseIdx + 1], frac));
+        }
+        else
+        {
+            tentacle.line.positionCount = SplinePoints;
+            tentacle.line.SetPosition(0, lineRoot);
+            for (int i = 1; i < SplinePoints; i++)
+                tentacle.line.SetPosition(i, tentacle.splineBuf[i]);
+        }
 
         float dustCharge01 = 1f;
         if (tentacle.state == TentacleState.Draining || tentacle.state == TentacleState.Dissolving)
@@ -828,8 +856,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             },
             new[]
             {
-                new GradientAlphaKey(0.55f * alpha, 0f),
-                new GradientAlphaKey(0.08f * alpha, 1f),
+                new GradientAlphaKey(growingRootAlpha * alpha, 0f),
+                new GradientAlphaKey(growingTipAlpha  * alpha, 1f),
             }
         );
     }
@@ -860,10 +888,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             },
             new[]
             {
-                new GradientAlphaKey(0.35f * alpha, 0f),
-                new GradientAlphaKey(0.2f * alpha, p0),
+                new GradientAlphaKey(drainingBaseAlpha * alpha, 0f),
+                new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p0),
                 new GradientAlphaKey(1.0f * alpha, p1),
-                new GradientAlphaKey(0.2f * alpha, p2),
+                new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p2),
                 new GradientAlphaKey(tipAlpha, 0.92f),
                 new GradientAlphaKey(0f, 1f),
             }
@@ -917,7 +945,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         branch.line = CreateTentacleLine(tentacle.role);
 
         Vector2 branchRoot = GetLineRoot(branch);
-        for (int i = 0; i < vineSplinePoints; i++)
+        for (int i = 0; i < SplinePoints; i++)
             branch.splineBuf[i] = branchRoot;
 
         branch.tipPos = branchRoot;
@@ -975,9 +1003,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void AllocateTentacleBuffers(Tentacle tentacle)
     {
-        tentacle.baseControlPts = new Vector2[vineCtrlPointCount];
-        tentacle.ctrlBuf = new Vector2[Mathf.Max(vineCtrlPointCount + 2, 16)];
-        tentacle.splineBuf = new Vector2[vineSplinePoints];
+        tentacle.baseControlPts = new Vector2[FallbackCtrlPoints];
+        tentacle.ctrlBuf = new Vector2[Mathf.Max(FallbackCtrlPoints + 2, 16)];
+        tentacle.splineBuf = new Vector2[SplinePoints];
         tentacle.gradient = new Gradient();
         tentacle.alphaScale = 1f;
         tentacle.navWorldPts = null;
