@@ -255,11 +255,11 @@ private int     _cachedHash  = 0;
                 },
                 new []
                 {
-                    new GradientAlphaKey(0f, 0f),
+                    new GradientAlphaKey(.1f, 0f),
                     new GradientAlphaKey(Mathf.Clamp01(c.a * 0.9f), 0.12f),
                     new GradientAlphaKey(Mathf.Clamp01(c.a), 0.5f),
                     new GradientAlphaKey(Mathf.Clamp01(c.a * 0.7f), 0.88f),
-                    new GradientAlphaKey(0f, 1f)
+                    new GradientAlphaKey(.1f, 1f)
                 }
             );
             _lr.colorGradient = g;

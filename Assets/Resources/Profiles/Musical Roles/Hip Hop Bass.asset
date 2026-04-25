@@ -20,8 +20,8 @@ MonoBehaviour:
   maxEnergyUnits: 1
   carveResistance01: 1
   drainResistance01: 0.25
-  dustHardness01: 0.5
-  mineNodeSpeed: 0.5
+  dustHardness01: 1
+  mineNodeSpeed: 0.1
   mineNodeAgility: 0.5
   midiPreset: 1
   ripeDuration: 8

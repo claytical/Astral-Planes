@@ -17,8 +17,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [SerializeField, Min(0.01f)] private float diamondAngleSmoothTime = 0.06f;
 
     [Header("Dim (Disarmed) Look")]
-    [SerializeField, Range(0f, 1f)] private float dimAlpha = 0.06f;
-    [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.55f;
     [SerializeField] private bool dimUsesFixedTint = true;
     [SerializeField] private Color rejectFlashColor = new Color(0.9f, 0.25f, 0.05f, 0.55f);
     [SerializeField, Min(0.02f)] private float rejectFlashSeconds = 0.12f;
@@ -146,8 +145,8 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             return;
 
         Color startGray = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
-        Color tint = Color.Lerp(startGray, roleColor, charge01);
-        tint.a = charge01 > 0.001f ? charge01 : dimShardTint.a;
+        Color tint = Color.Lerp(startGray, roleColor, charge01 * charge01);
+        tint.a = Mathf.Lerp(dimShardTint.a, 1f, charge01);
 
         float sep = isReady ? 0f : Mathf.Lerp(dualMaxSeparationDeg, 0f, charge01);
 
@@ -214,7 +213,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             c.r *= dimRgbMul;
             c.g *= dimRgbMul;
             c.b *= dimRgbMul;
-            c.a = dimAlpha;
+            c.a = dimShardTint.a;
         }
         else
         {
@@ -222,7 +221,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             c.r *= dimRgbMul;
             c.g *= dimRgbMul;
             c.b *= dimRgbMul;
-            c.a = dimAlpha;
+            c.a = dimShardTint.a;
         }
 
         SetShardTint(c);
@@ -318,7 +317,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         dimColor.r *= dimRgbMul;
         dimColor.g *= dimRgbMul;
         dimColor.b *= dimRgbMul;
-        dimColor.a = dimAlpha;
+        dimColor.a = dimShardTint.a;
 
         Color brightColor = roleColor;
         brightColor.a = 0.85f;
@@ -335,6 +334,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         {
             var sr = _shardSpriteRenderers[i];
             if (!sr) continue;
+            if (sr == _diamondASprite || sr == _diamondBSprite) continue;
             sr.color = c;
         }
     }

@@ -112,6 +112,7 @@ public class PhaseStar : MonoBehaviour
     const float MaxImpactStrength = 40f;
     [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
     private bool _awaitingCollectableClear;
+    private bool _hasReceivedEnergy;   // set true on first drain delivery; drives gray→role color lerp
 
     // True while the star is parked off-screen during a collectable burst.
     // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
@@ -434,6 +435,7 @@ public class PhaseStar : MonoBehaviour
 
         visuals?.HideAll();
         DisableColliders();
+        _hasReceivedEnergy = false;
 
         // Tentacles + navigator active during Dormant — they drain dust to build charge.
         dust?.SetTentaclesActive(true);
@@ -539,11 +541,22 @@ public class PhaseStar : MonoBehaviour
     }
 
 
+    private bool _dustDeliveryWired;
+
     private void EnsureSubcomponents()
     {
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         if (!motion) motion = GetComponentInChildren<PhaseStarMotion2D>(true);
-        if (!dust) dust = GetComponentInChildren<PhaseStarDustAffect>(true);
+        if (!dust)
+        {
+            dust = GetComponentInChildren<PhaseStarDustAffect>(true);
+            _dustDeliveryWired = false;
+        }
+        if (!_dustDeliveryWired && dust != null)
+        {
+            dust.onDelivery += (_, __) => _hasReceivedEnergy = true;
+            _dustDeliveryWired = true;
+        }
         if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
     }
 
@@ -769,18 +782,26 @@ public class PhaseStar : MonoBehaviour
             readyRotSpeedMul);
     }
 
-    // Charge-driven visibility during Dormant charging phase.
+    // Visibility progression during Dormant charging phase:
+    //   1. No tentacles → invisible
+    //   2. Tentacles growing, no energy received yet → dim gray
+    //   3. Energy received → lerp gray→role color as charge builds
     if (_state == PhaseStarState.Dormant && !_burstOffScreen)
     {
-        if (_displayedCharge01 < 0.01f)
+        bool hasTentacles = dust?.HasActiveTentacles ?? false;
+        if (!hasTentacles && !_hasReceivedEnergy)
         {
             visuals?.ToggleShardRenderers(false);
+        }
+        else if (!_hasReceivedEnergy)
+        {
+            visuals?.ShowDim(Color.gray);
         }
         else
         {
             visuals?.ToggleShardRenderers(true);
-            if (_previewRole != MusicalRole.None)
-                visuals?.LerpBodyColor(_previewColor, _displayedCharge01);
+            Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
+            visuals?.LerpBodyColor(roleColor, _displayedCharge01);
         }
     }
     // Continuously lerp body color between dim and role color using charge level.
@@ -1223,6 +1244,15 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         if (!_isArmed)
         {
+            // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
+            // CIF-triggered hide is safe to reset. Restore motion before arming.
+            if (_burstOffScreen)
+            {
+                _burstOffScreen = false;
+                motion?.Enable(true);
+                motion?.SetFrozen(false);
+            }
+
             DBG("[PS:LB] -> re-arm");
             if (_state == PhaseStarState.WaitingForPoke)
                 ArmNext();

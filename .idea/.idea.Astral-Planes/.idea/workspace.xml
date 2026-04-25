@@ -6,9 +6,22 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Collection/Tether Effect.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Collection/Tether Effect.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Floor Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Floor Bass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Hip Hop Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Hip Hop Bass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Light Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Light Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Palm Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Palm Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rob Otto.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rob Otto.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Steel Jazz.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Steel Jazz.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Still Sky.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Still Sky.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.BridgeOrchestration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarDustAffect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarDustAffect.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarVisuals2D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarVisuals2D.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/GameFlowManager.BridgeVisuals.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/GameFlowManager.BridgeVisuals.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -281,7 +294,7 @@
       <workItem from="1775494988585" duration="43553000" />
       <workItem from="1775763634604" duration="84183000" />
       <workItem from="1776273287249" duration="2090000" />
-      <workItem from="1776399855633" duration="76765000" />
+      <workItem from="1776399855633" duration="93522000" />
     </task>
     <servers />
   </component>

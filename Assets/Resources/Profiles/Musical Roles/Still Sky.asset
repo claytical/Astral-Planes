@@ -21,8 +21,8 @@ MonoBehaviour:
   carveResistance01: 0.75
   drainResistance01: 0.25
   dustHardness01: 0.5
-  mineNodeSpeed: 0.5
-  mineNodeAgility: 0.5
+  mineNodeSpeed: 0.15
+  mineNodeAgility: 0.25
   midiPreset: 3
   ripeDuration: 8
   regrowthDelay: -1
