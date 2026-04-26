@@ -15403,7 +15403,7 @@ MonoBehaviour:
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
-  ascendLoopCount: 8
+  ascendLoopCount: 16
   ascensionLoopsPerExtraBin: 2
   rootShiftNotesByChord: 1
   spawnedCollectables: []
@@ -15950,7 +15950,7 @@ MonoBehaviour:
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
-  ascendLoopCount: 1
+  ascendLoopCount: 8
   ascensionLoopsPerExtraBin: 2
   rootShiftNotesByChord: 1
   spawnedCollectables: []
@@ -16078,7 +16078,7 @@ MonoBehaviour:
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
-  ascendLoopCount: 1
+  ascendLoopCount: 12
   ascensionLoopsPerExtraBin: 2
   rootShiftNotesByChord: 1
   spawnedCollectables: []
@@ -18671,7 +18671,7 @@ MonoBehaviour:
   authoredRootMidi: 0
   loopMultiplier: 1
   maxLoopMultiplier: 4
-  ascendLoopCount: 1
+  ascendLoopCount: 4
   ascensionLoopsPerExtraBin: 2
   rootShiftNotesByChord: 1
   spawnedCollectables: []

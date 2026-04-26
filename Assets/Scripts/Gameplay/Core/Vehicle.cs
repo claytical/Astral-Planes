@@ -1239,13 +1239,12 @@ public class Vehicle : MonoBehaviour
             return;
         }
 
-        // While boosting, maintain the full pocket and optionally remove dust.
-
+        // While boosting, maintain the full pocket and actively clear any dust inside it.
         gen.SetVehicleKeepClear(
             ownerId,
             centerCell,
             Mathf.Max(0, vehicleKeepClearRadiusCells),
-            forceRemoveExisting: false,
+            forceRemoveExisting: true,
             forceRemoveFadeSeconds: 0.20f
         );
     }

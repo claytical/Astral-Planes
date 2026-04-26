@@ -16,13 +16,12 @@ public class Collectable : MonoBehaviour
     public int intendedBin = -1;
 // ---- Spawn Arrival Intro ----
     [Header("Spawn Arrival")]
-    [SerializeField] private float spawnArrivalSeconds = 2.5f;
+    [SerializeField] private float spawnArrivalSeconds = 5.0f;
     [SerializeField] private AnimationCurve spawnArrivalEase = null;
     [SerializeField] private float spawnArrivalConeAngleDeg = 25f;
-    [SerializeField] private float spawnArrivalNoiseStrength = 0.5f;
-    [SerializeField] private float spawnArrivalNoiseFrequency = 0.5f;
+    [SerializeField] private float spawnArrivalNoiseStrength = 3.2f;
+    [SerializeField] private float spawnArrivalNoiseFrequency = 1.2f;
     private Coroutine _spawnArrivalRoutine;
-    private bool _spawnArrivalInProgress;
 // ---- Dust pocket (collectable visibility) ----
     [Header("Dust Pocket (Visibility)")]
     [SerializeField] private bool keepDustPocketOpen = true;
@@ -321,85 +320,102 @@ private IEnumerator SpawnArrivalRoutine(
     NoteSet noteSet,
     List<int> steps)
 {
-    _spawnArrivalInProgress = true;
-
     transform.position = originWorld;
     if (_rb == null) TryGetComponent(out _rb);
 
+    // Use kinematic during drift instead of simulated=false.
+    // Kinematic keeps the body in the physics world (collisions/triggers still fire)
+    // and tracks position exactly — so there is no re-insertion event at the end that
+    // can trigger Box2D depenetration and teleport the body.
+    RigidbodyType2D originalBodyType = RigidbodyType2D.Dynamic;
     if (_rb != null)
     {
+        originalBodyType = _rb.bodyType;
         _rb.linearVelocity = Vector2.zero;
         _rb.angularVelocity = 0f;
-        _rb.simulated = false;
+        _rb.bodyType = RigidbodyType2D.Kinematic;
+        _rb.position = (Vector2)(Vector3)originWorld;
     }
 
-    if (TryGetComponent(out Collider2D col))
-        col.enabled = false;
-
-    // Scale arrival duration by distance so nearby notes drift gently
-    // and distant notes don't zip across the screen.
+    // Scale arrival duration by distance — slower overall drift.
     float dist = Vector3.Distance(originWorld, targetWorld);
     float baseDur = Mathf.Max(0.01f, spawnArrivalSeconds);
-    float dur = Mathf.Lerp(baseDur * 0.75f, baseDur * 1.5f, Mathf.Clamp01(dist / 8f));
-    dur = Mathf.Max(1.0f, dur); // never shorter than 1 second
+    float dur = Mathf.Lerp(baseDur * 0.8f, baseDur * 1.4f, Mathf.Clamp01(dist / 8f));
+    dur = Mathf.Max(3.0f, dur);
     float t = 0f;
 
-    Vector3 start = originWorld;
-    Vector3 end = targetWorld;
+    Vector2 end2 = (Vector2)(Vector3)targetWorld;
 
-    // Bezier control point: offset mid-point sideways by cone angle (mirrors Cosmic Radiation 25° cone)
-    Vector3 baseDir = (end - start).normalized;
-    float coneAngle = UnityEngine.Random.Range(-spawnArrivalConeAngleDeg, spawnArrivalConeAngleDeg);
-    Vector3 perpDir = new Vector3(-baseDir.y, baseDir.x, 0f);
-    float sideOffset = Mathf.Tan(coneAngle * Mathf.Deg2Rad) * dist * 0.5f;
-    Vector3 controlPoint = Vector3.Lerp(start, end, 0.5f) + perpDir * sideOffset;
-
-    // Per-instance noise seeds so simultaneous collectables don't wiggle in sync
+    // Per-instance noise seeds so simultaneous collectables don't wiggle in sync.
     float noiseSeedX = UnityEngine.Random.value * 100f;
     float noiseSeedY = UnityEngine.Random.value * 100f;
 
+    // Velocity-based Perlin drift — two octaves for the first 70% of the duration.
+    // The final 30% is a convergence zone: noise fades to zero and the attractor ramps up
+    // so the path spirals smoothly into end2, eliminating the need for a hard position snap.
+    Vector2 pos = (Vector2)(Vector3)originWorld;
+    Vector2 vel = Vector2.zero;
+    const float attractPower = 1.2f;
+
     while (t < dur)
     {
-        t += Time.deltaTime;
-        float u = Mathf.Clamp01(t / dur);
+        float dt = Time.deltaTime;
+        t += dt;
 
-        if (spawnArrivalEase != null && spawnArrivalEase.length > 0)
-            u = spawnArrivalEase.Evaluate(u);
+        float u = t / dur;
+        // convergeU: 0 during free drift, ramps 0→1 over the last 30% of duration.
+        float convergeU = Mathf.Clamp01((u - 0.70f) / 0.30f);
+        float noiseScale = 1f - convergeU;
+        float velLerpRate = Mathf.Lerp(4f, 10f, convergeU);
+
+        // Octave A — broad slow swirl.
+        float ntA = t * spawnArrivalNoiseFrequency;
+        float vxA = (Mathf.PerlinNoise(noiseSeedX + ntA, 0.3f) - 0.5f) * 2f;
+        float vyA = (Mathf.PerlinNoise(0.7f, noiseSeedY + ntA) - 0.5f) * 2f;
+
+        // Octave B — faster tight curls (2.4× frequency, 0.4× amplitude).
+        float ntB = t * spawnArrivalNoiseFrequency * 2.4f;
+        float vxB = (Mathf.PerlinNoise(noiseSeedX + 50f + ntB, 0.1f) - 0.5f) * 2f * 0.4f;
+        float vyB = (Mathf.PerlinNoise(0.1f, noiseSeedY + 50f + ntB) - 0.5f) * 2f * 0.4f;
+
+        Vector2 noiseVel = new Vector2(vxA + vxB, vyA + vyB) * spawnArrivalNoiseStrength * noiseScale;
+
+        // Attractor: constant magnitude during free phase; distance-proportional spring during convergence.
+        // At convergeU=1 with 3 units remaining → ~18 units/s pull, guaranteed arrival.
+        Vector2 toTarget = end2 - pos;
+        float toTargetDist = toTarget.magnitude;
+        Vector2 attractVel;
+        if (toTargetDist > 0.001f)
+        {
+            float scale = Mathf.Lerp(attractPower, Mathf.Max(toTargetDist * 6f, attractPower), convergeU * convergeU);
+            attractVel = (toTarget / toTargetDist) * scale;
+        }
         else
-            u = Mathf.SmoothStep(0f, 1f, u);
+        {
+            attractVel = Vector2.zero;
+        }
 
-        // Quadratic bezier along cone arc
-        float inv = 1f - u;
-        Vector3 bezierPos = inv * inv * start + 2f * inv * u * controlPoint + u * u * end;
+        vel = Vector2.Lerp(vel, noiseVel + attractVel, dt * velLerpRate);
+        pos += vel * dt;
 
-        // Perlin noise displacement (mirrors Cosmic Radiation noise: strength=1, freq=0.5, position_amount=1)
-        float noiseTime = t * spawnArrivalNoiseFrequency;
-        float nx = (Mathf.PerlinNoise(noiseSeedX + noiseTime, 0f) - 0.5f) * 2f;
-        float ny = (Mathf.PerlinNoise(0f, noiseSeedY + noiseTime) - 0.5f) * 2f;
-        float noiseFade = 1f - u * u; // fade to zero near target so collectable arrives exactly
-        Vector3 noiseDisp = new Vector3(nx, ny, 0f) * spawnArrivalNoiseStrength * noiseFade;
-
-        transform.position = bezierPos + noiseDisp;
-
+        transform.position = new Vector3(pos.x, pos.y, originWorld.z);
+        if (_rb != null) _rb.position = pos;
         yield return null;
     }
 
-    transform.position = end;
+    // Drift converged — pos is at or very near end2; no hard snap needed.
+    transform.position = new Vector3(pos.x, pos.y, originWorld.z);
+    if (_rb != null) _rb.position = pos;
 
     if (_rb != null)
     {
         _rb.linearVelocity = Vector2.zero;
         _rb.angularVelocity = 0f;
-        _rb.simulated = true;
+        _rb.bodyType = originalBodyType;
     }
 
-    if (TryGetComponent(out Collider2D finalCol))
-        finalCol.enabled = true;
-
-    _spawnArrivalInProgress = false;
     _spawnArrivalRoutine = null;
 
-    // IMPORTANT: only now do we start dust pocket, movement, occupancy, etc.
     Initialize(note, duration, track, noteSet, steps);
 }
     public void OnManualReleaseDiscarded()
@@ -1355,7 +1371,6 @@ private IEnumerator SpawnArrivalRoutine(
 }
     private void OnTriggerEnter2D(Collider2D coll)
     {
-        if (_spawnArrivalInProgress) return;
         var vehicle = coll.GetComponent<Vehicle>();
         if (vehicle == null || _handled) return;
 
@@ -1404,6 +1419,16 @@ private IEnumerator SpawnArrivalRoutine(
 
         // Now we can safely latch idempotency + switch to carry behavior.
         _handled = true;
+
+        // Stop the drift coroutine if it's still running (mid-drift collection).
+        if (_spawnArrivalRoutine != null)
+        {
+            StopCoroutine(_spawnArrivalRoutine);
+            _spawnArrivalRoutine = null;
+            // Restore dynamic body type if collection happened before drift completed.
+            if (_rb != null && _rb.bodyType == RigidbodyType2D.Kinematic)
+                _rb.bodyType = RigidbodyType2D.Dynamic;
+        }
 
         // We are now "collected": stop dust pocket & claims and enter carry mode immediately.
         StopDustPocketAndReleaseClaims();

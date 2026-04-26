@@ -4960,13 +4960,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  diamond: {fileID: 5193296100496959142, guid: e6b4e136a0c964d99bd7db5f767521d6, type: 3}
-  activeDiamond: {fileID: 5193296100496959142, guid: e6b4e136a0c964d99bd7db5f767521d6,
+  diamond: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
+    type: 3}
+  activeDiamond: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
   diamondAngleSmoothTime: 0.06
-  dimAlpha: 0.063
   dimRgbMul: 0.08
-  dimUsesFixedTint: 1
+  dimUsesFixedTint: 0
   rejectFlashColor: {r: 0.9, g: 0.25, b: 0.05, a: 0.55}
   rejectFlashSeconds: 0.12
   particles: {fileID: 382306593780773728}
@@ -4990,14 +4990,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
   drainRatePerSec: 0.8
-  minContactTime: 1
+  minContactTime: 0.01
   colorTransitionTime: 0.5
   tentacleGrowSpeed: 2
   tentacleRetractSpeed: 12
   tentacleFlowSpeed: 5.1
-  tentacleWidth: 0.075
+  tentacleWidth: 0.035
   dissolveDuration: 1.1
-  tentacleMaterial: {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
+  tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   growingRootAlpha: 0.65
   growingTipAlpha: 0.4
   drainingBaseAlpha: 0.751

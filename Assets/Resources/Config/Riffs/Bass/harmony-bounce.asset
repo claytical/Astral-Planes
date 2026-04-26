@@ -29,4 +29,4 @@ MonoBehaviour:
     restProb: 0.1
     durJitter: 1
   mineNodeTintBudget: 20
-  ascendLoops: 12
+  ascendLoops: 16

@@ -61,7 +61,7 @@ MonoBehaviour:
   fleeRadiusWorld: 5
   fleeBlendWeight: 0.25
   driftSpeedMultiplier: 0.1
-  fleeTowardBoundaryWeight: 0.45
+  fleeTowardBoundaryWeight: 0.303
   driveCarvingMotionFromNoteSet: 1
   expireAfterLoops: 3
 --- !u!114 &2404411601338668691
@@ -81,7 +81,7 @@ MonoBehaviour:
   carveMaze: 1
   exhaustEnergyFraction: 0.4
   edgeHugForce: 2
-  escapePushForce: 12
+  escapePushForce: 5
   huntBfsBudget: 600
   huntDirWeight: 0.55
   arrivalRadiusCells: 1
@@ -180,7 +180,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 100
   m_MaskInteraction: 2
-  m_Sprite: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
+  m_Sprite: {fileID: 1211849485947851915, guid: cb35d248eb2024670b99d050f204beda,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -256,7 +256,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.3, y: 0.59}
+    oldSize: {x: 0.4, y: 0.78}
     newSize: {x: 1.28, y: 1.15}
     adaptiveTilingThreshold: 0.5
     drawMode: 0

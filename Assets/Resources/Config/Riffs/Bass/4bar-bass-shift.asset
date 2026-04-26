@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 4bar-bass-shift
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: 4bar-bass
-  role: 0
+  roleProfile: {fileID: 0}
   riff: {fileID: 11400000, guid: fb0f2935acb574b4693c50ccf9b077e4, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
@@ -21,20 +21,12 @@ MonoBehaviour:
   rhythms: []
   chordFunctions: []
   chordsPerRegion: 2
-  loopsToAscend: 1
   behaviors: []
   maxBehaviorsStack: 2
   variation:
     extensionBias: 0.35
-    passingToneProb: 0.2
-    neighborOrnProb: 0.15
-    minMidi: 36
-    maxMidi: 84
-    leapProb: 0.15
     octaveMoveProb: 0.1
     restProb: 0.1
-    humanizeMs: 0.02
     durJitter: 1
-    mutatePitch: 0.08
-    mutateVelocity: 0.12
-    mutateDuration: 0.1
+  mineNodeTintBudget: 20
+  ascendLoops: 16
