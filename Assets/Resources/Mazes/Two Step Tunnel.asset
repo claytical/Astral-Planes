@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61c29f65464264bd8aaca35b6879dc9a, type: 3}
+  m_Name: Two Step Tunnel
+  m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
+  patternType: 6
+  regrowDelay: 4
+  clearBoxCount: 4
+  clearBoxWidth: 5
+  clearBoxHeight: 5
+  caFillChance: 0.3
+  caIterations: 3
+  ringSpacing: 6
+  ringThickness: 1
+  ringJitter: 0.35
+  strokes: 10
+  strokeMaxLen: 18
+  strokeJitter: 0.35
+  strokeDilate: 0.3
+  laneStep: 12
+  tunnelCorridorStep: 2
+  tunnelCorridorWidth: 3
+  borderExitCount: 3

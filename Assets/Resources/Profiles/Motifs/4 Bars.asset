@@ -23,6 +23,8 @@ MonoBehaviour:
   bpm: 162
   stepsPerLoop: 64
   nodesPerStar: 4
+  starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  mazePattern: {fileID: 11400000, guid: e33ec23797f8442308d50f9624f2d657, type: 2}
   chordProgression: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7, type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 7f3f298110bd74ed1a3157b6631846e7, type: 2}

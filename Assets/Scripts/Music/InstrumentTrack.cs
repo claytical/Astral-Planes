@@ -53,6 +53,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     void IExpansionHost.ResetStepCursors()
     {
         _lastLocalStep = -1;
+        _lastBarIndex  = -1;
     }
 
     void IExpansionHost.SetBinAllocated(int bin, bool v) => SetBinAllocated(bin, v);
@@ -140,6 +141,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private readonly List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)>();    List<GameObject> _spawnedNotes = new();
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
+    private int _lastBarIndex  = -1;
     private int _nextBurstId = 0;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
     private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
@@ -510,7 +512,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     void Awake()
     {
         if (!midiVoice) midiVoice = GetComponent<MidiVoice>();
-        if (!loopPattern) loopPattern = GetComponent<LoopPattern>();
+        if (!loopPattern) loopPattern = GetComponent<LoopPattern>() ?? gameObject.AddComponent<LoopPattern>();
         _expansionCtrl = new TrackExpansionController(this);
         _expansionCtrl?.Bind(drumTrack);
         var awakeProf = MusicalRoleProfileLibrary.GetProfile(assignedRole);
@@ -594,6 +596,15 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             playheadBin = 0;
         }
 
+
+// Reset step cursor on bar change within the leader loop.
+// boundarySerial handles full-loop resets; this closes the gap where
+// targetCurLocal == _lastLocalStep at a bin transition (< guard misses ==).
+        if (barIndex != _lastBarIndex)
+        {
+            _lastLocalStep = -1;
+            _lastBarIndex  = barIndex;
+        }
 
 // Normalize playheadBin into [0, leaderBins-1].
 // ----- CLOCK (single authority: DSP) -----
@@ -1041,6 +1052,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _pendingCollapse = false;
         UnhookCollapseBoundary();
         _lastLocalStep = -1;
+        _lastBarIndex  = -1;
     }
 
     /// <summary>
@@ -2542,10 +2554,12 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         Vector3 spawnPos = drumTrack.GridToWorldPosition(chosenCell);
 
         bool cellHasDust = dustGen != null && dustGen.HasDustAt(chosenCell);
-        if (cellHasDust && dustGen != null)
+        // Always jail the landing cell — drift can take up to ~7 s (spawnArrivalSeconds * 1.4).
+        // Without this, dust that grows into an initially-empty cell causes physics depenetration
+        // the moment _rb.simulated = true, which teleports the collectable.
+        if (dustGen != null)
         {
-            // How long the center stays empty while "jailed"
-            const float jailHoldSeconds = 4.0f; // tune (or serialize)
+            const float jailHoldSeconds = 10f;
             dustGen.CreateJailCenterForCollectable(chosenCell, jailHoldSeconds, ownerId: burstId);
         }
 

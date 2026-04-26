@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 4bar-lead-2
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: 4bar-lead-1
-  roleProfile: {fileID: 11400000, guid: b074910f739d0459f81d5e08e65047ab, type: 2}
+  roleProfile: {fileID: 11400000, guid: 88ba87390b412400b88142811cf0e3ba, type: 2}
   riff: {fileID: 11400000, guid: fb621e31b10c44df8ad73c2e93c3fdb7, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
@@ -21,7 +21,6 @@ MonoBehaviour:
   rhythms: []
   chordFunctions: []
   chordsPerRegion: 2
-  loopsToAscend: 1
   behaviors: []
   maxBehaviorsStack: 2
   variation:
@@ -29,3 +28,5 @@ MonoBehaviour:
     octaveMoveProb: 0.1
     restProb: 0.1
     durJitter: 1
+  mineNodeTintBudget: 20
+  ascendLoops: 0

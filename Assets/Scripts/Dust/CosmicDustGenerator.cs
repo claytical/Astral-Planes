@@ -379,13 +379,12 @@ public class CosmicDustGenerator : MonoBehaviour
             if (vehicleNoSpawnRadiusCells <= 0) return false;
             if (vehicleCells == null || vehicleCells.Count == 0) return false;
 
-            int rSq = vehicleNoSpawnRadiusCells * vehicleNoSpawnRadiusCells;
             for (int i = 0; i < vehicleCells.Count; i++)
             {
                 var vc = vehicleCells[i];
-                int dx = gp.x - vc.x;
-                int dy = gp.y - vc.y;
-                if (dx * dx + dy * dy <= rSq) return true;
+                int dx = Mathf.Abs(gp.x - vc.x);
+                int dy = Mathf.Abs(gp.y - vc.y);
+                if (dx <= vehicleNoSpawnRadiusCells && dy <= vehicleNoSpawnRadiusCells) return true;
             }
             return false;
         }
@@ -446,6 +445,9 @@ public class CosmicDustGenerator : MonoBehaviour
                 {
                     Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
                 }            
+                // Vehicle pocket is a hard exclusion — no imprint, no spawn, no visual update.
+                if (NearAnyVehicle(gp)) continue;
+
                 // Always write persistent imprint (so regrow picks it up later)
                 _imprints[gp] = new DustImprint
                 {
@@ -470,7 +472,6 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (IsKeepClearCell(gp)) continue;
                 if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
                 if (IsDustSpawnBlocked(gp)) continue;
-                if (NearAnyVehicle(gp)) continue;
 
     // 3) Spawn/regrow if empty
                 if (_voidGrowCoroutines.ContainsKey(gp))

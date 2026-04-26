@@ -329,44 +329,7 @@ public class PhaseStar : MonoBehaviour
         EnterDormantWaitState();
         LogState("EnterInMaze+Dormant");
     }
-
-    public void EnterFromOffScreen(Vector2 targetWorldPos)
-    {
-        EnsureSubcomponents();
-        StopManagedCoroutine(ref _entryApproachCo);
-        StopManagedCoroutine(ref _waitForDustCo);
-
-        _entryInProgress = true;
-        _state = PhaseStarState.Dormant;
-
-        // Hide visuals and disable colliders until arrival.
-        visuals?.HideAll();
-        DisableColliders();
-
-        // Ensure tentacles and armed state are off during entry and Dormant phase.
-        dust?.SetTentaclesActive(false);
-        cravingNavigator?.SetActive(false);
-        _isArmed = false;
-        _disarmReason = DisarmReason.None;
-        _burstOffScreen = false;
-        _awaitingCollectableClear = false;
-        _ejectableTimer = 0f;
-        _starCharge.Clear();
-        _displayedCharge01 = 0f;
-
-        Vector2 offPos = PickOffScreenSpawnPoint();
-        transform.position = (Vector3)offPos + Vector3.forward * transform.position.z;
-
-        if (motion != null)
-        {
-            motion.Enable(true);
-            motion.SetSpeedMultiplier(1f);
-            motion.SetOverrideTarget(targetWorldPos);
-        }
-
-        _entryApproachCo = StartCoroutine(Co_EntryApproach(targetWorldPos));
-    }
-
+    
     private Vector2 PickOffScreenSpawnPoint()
     {
         var cam = Camera.main;
@@ -433,7 +396,11 @@ public class PhaseStar : MonoBehaviour
         _isArmed = false;
         _disarmReason = DisarmReason.None;
 
-        visuals?.HideAll();
+        visuals?.HideSafetyBubble();
+        visuals?.ToggleShardRenderers(true);
+        if (visuals != null) visuals.transform.localScale = Vector3.zero;
+        if (_previewVisual != null) _previewVisual.localScale = Vector3.zero;
+        if (_previewVisualB != null) _previewVisualB.localScale = Vector3.zero;
         DisableColliders();
         _hasReceivedEnergy = false;
 
@@ -630,6 +597,12 @@ public class PhaseStar : MonoBehaviour
 
         }
 
+        // Stop any coroutine still running from a previous phase before reinitializing.
+        StopManagedCoroutine(ref _waitForDustCo);
+
+        // Reset attunement so the star can re-attune to the new phase's roles.
+        _attunedRole = MusicalRole.None;
+
         // Clear charge state for this new star.
         _starCharge.Clear();
         _displayedCharge01 = 0f;
@@ -654,10 +627,11 @@ public class PhaseStar : MonoBehaviour
         if (_entryInProgress)
         {
             LogState("Initialized+AwaitingEntry");
-        } 
-        else {
-         ArmNext();
-         LogState("Initialized+Armed");
+        }
+        else
+        {
+            EnterDormantWaitState();
+            LogState("Initialized+DormantWait");
         }
     }
     private void OnAttuned_SetRole(MusicalRole role)
@@ -782,22 +756,25 @@ public class PhaseStar : MonoBehaviour
             readyRotSpeedMul);
     }
 
-    // Visibility progression during Dormant charging phase:
-    //   1. No tentacles → invisible
-    //   2. Tentacles growing, no energy received yet → dim gray
-    //   3. Energy received → lerp gray→role color as charge builds
-    if (_state == PhaseStarState.Dormant && !_burstOffScreen)
+    // Scale 0→1 as charge builds toward the ejection threshold.
+    // _previewVisual and _previewVisualB are children of PhaseStar (not of visuals),
+    // so they must be scaled explicitly — visuals.transform.localScale doesn't reach them.
+    // This block runs after UpdateDualDiamonds (which resets diamond localScale to 1),
+    // so these assignments win for the Dormant phase.
+    if ((_state == PhaseStarState.Dormant ||
+         (_state == PhaseStarState.WaitingForPoke && _displayedCharge01 < readyDisplayThreshold))
+        && !_burstOffScreen)
     {
-        bool hasTentacles = dust?.HasActiveTentacles ?? false;
-        if (!hasTentacles && !_hasReceivedEnergy)
-        {
-            visuals?.ToggleShardRenderers(false);
-        }
-        else if (!_hasReceivedEnergy)
-        {
-            visuals?.ShowDim(Color.gray);
-        }
-        else
+        // Sqrt curve: front-loads visual growth so small charge values produce
+        // a perceptible scale instead of staying near-invisible until threshold.
+        // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
+        float visualScale01 = Mathf.Sqrt(_displayedCharge01);
+        Vector3 chargeScale = Vector3.one * visualScale01;
+        if (visuals != null) visuals.transform.localScale = chargeScale;
+        if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
+        if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
+
+        if (visualScale01 > 0.001f && _disarmReason != DisarmReason.SiblingActive)
         {
             visuals?.ToggleShardRenderers(true);
             Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
@@ -970,6 +947,8 @@ public class PhaseStar : MonoBehaviour
         motion?.SetOverrideTarget(null);
         motion?.SetSpeedMultiplier(1f);
 
+        if (visuals != null && _displayedCharge01 >= readyDisplayThreshold)
+            visuals.transform.localScale = Vector3.one;
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
     }
@@ -977,7 +956,6 @@ public class PhaseStar : MonoBehaviour
     {
         Disarm(DisarmReason.SiblingActive);
         motion?.SetFrozen(true);
-        visuals?.ShowDim(Color.gray);
     }
 
     public void Resume()
@@ -1142,7 +1120,7 @@ public class PhaseStar : MonoBehaviour
         bool ep = AnyExpansionPendingGlobal();
 
         Debug.Log(
-            "$[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
+            $"[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
             $"awaitClr={_awaitingCollectableClear} " +
             $"activeNode={(_activeNode ? _activeNode.name : null)} ejectInFlight={_ejectionInFlight} CIF={cif} EP={ep}");
 
