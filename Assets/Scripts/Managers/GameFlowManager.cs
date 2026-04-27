@@ -27,7 +27,7 @@ public partial class GameFlowManager : MonoBehaviour
 {
     [Header("Bridge gating")]
     [Tooltip("If true, bridge/cinematic is pending and should gate spawns and re-arm.")]
-    public bool BridgePending = false;
+    public bool BridgePending => SessionState?.BridgePending ?? false;
     
     [Header("Coral (New Spiral)")]
     [SerializeField] private MotifCoralVisualizer motifCoralVisualizer;
@@ -72,7 +72,7 @@ public partial class GameFlowManager : MonoBehaviour
     public Transform PlayerStatsGrid => playerStatsGrid;
     private bool _setupInFlight, _setupDone;
     private readonly List<MotifSnapshot> _motifSnapshots = new();
-    private float _motifStartTime = 0f; // stamped when each motif begins, used for coral branch height
+    private float _motifStartTime = 0f;
     private GameState currentState = GameState.Begin;
     private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
@@ -91,7 +91,14 @@ public partial class GameFlowManager : MonoBehaviour
     [Tooltip("Seconds to fade in the next motif after the new phase begins.")]
     [SerializeField] private float phaseBridgeFadeInSeconds  = 0.6f;
     private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
-    public bool GhostCycleInProgress { get; private set; }
+    public bool GhostCycleInProgress
+    {
+        get => SessionState?.GhostCycleInProgress ?? false;
+        private set => SessionState?.SetGhostCycleInProgress(value);
+    }
+    public SessionStateCoordinator SessionState { get; private set; }
+    public BridgeCoordinator BridgeFlow { get; private set; }
+    public SceneFlowCoordinator SceneFlow { get; private set; }
     
     public void RegisterMotifCoralVisualizer(MotifCoralVisualizer vis)
     {
@@ -111,8 +118,8 @@ public partial class GameFlowManager : MonoBehaviour
 
     public GameState CurrentState
     {
-        get => currentState;
-        set => currentState = value;
+        get => SessionState?.CurrentState ?? GameState.Begin;
+        set => SessionState?.SetCurrentState(value);
     }
     
 
@@ -154,59 +161,17 @@ public partial class GameFlowManager : MonoBehaviour
     
     public void QuitToSelection()
     {
-        Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={demoMode})");
-
-        // 1) Destroy all LocalPlayer instances so input & state are fully reset.
-        if (localPlayers != null && localPlayers.Count > 0)
-        {
-            foreach (var lp in localPlayers)
-            {
-                if (lp == null) continue;
-
-                var go = lp.gameObject;
-                Debug.Log($"[GFM] Destroying LocalPlayer GameObject '{go.name}'");
-                Destroy(go);
-            }
-            localPlayers.Clear();
-        }
-
-        // 2) Clear any per-run collections.
-        vehicles?.Clear();
-        _activeTracks?.Clear();
-
-        // 3) Reset run-specific flags / state so next run starts clean.
-        hasGameOverStarted   = false;
-        GhostCycleInProgress = false;
-        _setupDone           = false;
-        _setupInFlight       = false;
-        currentState         = GameState.Begin;
-
-        // 4) Drop scene-local references so the next GeneratedTrack must re-register.
-        phaseTransitionManager = null;
-        activeDrumTrack        = null;
-        controller             = null;
-        dustGenerator          = null;
-        spawnGrid              = null;
-        playerStatsGrid        = null;
-
-        // 5) Load Main (Intro/Selection) scene.
-        StartCoroutine(TransitionToScene("Main"));
+        StartCoroutine(SceneFlow.QuitToSelection());
     }
 
     public void RegisterPlayerStatsGrid(Transform grid)
     {
-        if (!grid) return;
-        playerStatsGrid = grid;
-        Debug.Log($"[GFM] Registered PlayerStatsGrid from scene '{grid.gameObject.scene.name}'.");
+        SceneFlow.RegisterPlayerStatsGrid(grid);
     }
 
     public void UnregisterPlayerStatsGrid(Transform grid)
     {
-        if (playerStatsGrid == grid)
-        {
-            playerStatsGrid = null;
-            Debug.Log("[GFM] PlayerStatsGrid unregistered (scene unload?).");
-        }
+        SceneFlow.UnregisterPlayerStatsGrid(grid);
     }
     private IEnumerator HandleTrackSceneSetupAsync()
 {
@@ -468,24 +433,11 @@ public partial class GameFlowManager : MonoBehaviour
     
     private IEnumerator TransitionToScene(string sceneName)
     {
-        // Synchronous scene swap
-        SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
-
-        // Let the new scene's Awake/Start run
-        yield return null;
-
-
-        if (sceneHandlers != null && sceneHandlers.TryGetValue(sceneName, out var handler))
-        {
-            // Now ALWAYS call the handler, including for GeneratedTrack
-            handler?.Invoke();
-        }
-  
+        yield return StartCoroutine(SceneFlow.TransitionToScene(sceneName));
     }
     public void BeginGeneratedTrackSetup()
     {
-        if (_setupDone || _setupInFlight) return;
-        StartCoroutine(HandleTrackSceneSetupAsync());
+        SceneFlow.BeginGeneratedTrackSetup();
     }
     private void BindSceneVoicesToTimingAuthority()
     {
@@ -518,11 +470,6 @@ public partial class GameFlowManager : MonoBehaviour
             // SoloVoice already subscribes; this just prevents an unset reference case.
             // (If drumTrack is [SerializeField], you can add a setter later if needed.)
         }
-    }
-    private static Color QuantizeToColor32(Color c)
-    {
-        Color32 cc = (Color32)c;
-        return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
     }
     private void ResetPhaseBinStateAndGrid()
 {
@@ -697,30 +644,16 @@ public partial class GameFlowManager : MonoBehaviour
     }
     public void RegisterTracksBundle(TracksBundleAnchor a)
     {
-        if (!a) return;
-
-        phaseTransitionManager = a.phaseTransitionManager;
-        activeDrumTrack        = a.drumTrack;
-        controller             = a.controller;
-        dustGenerator          = a.dustGenerator;
-        spawnGrid              = a.spawnGrid;          // <- now reliably assigned
-        Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
-        BindSceneVoicesToTimingAuthority();
+        SceneFlow.RegisterTracksBundle(a);
     }
     public void UnregisterTracksBundle(TracksBundleAnchor a)
     {
-        if (!a) return;
-        // Clear refs if the same bundle unloads
-        if (phaseTransitionManager == a.phaseTransitionManager) phaseTransitionManager = null;
-        if (activeDrumTrack        == a.drumTrack)              activeDrumTrack        = null;
-        if (controller             == a.controller)             controller             = null;
-        if (dustGenerator          == a.dustGenerator)          dustGenerator          = null;
-        if (spawnGrid              == a.spawnGrid)              spawnGrid              = null;
+        SceneFlow.UnregisterTracksBundle(a);
     }
     
     // Destroys any lingering note tether GameObjects (including inactive) so they never persist across phases.
     // We key off name and component type to be resilient to prefab/script renames.
-    private void CleanupAllNoteTethers()
+    public void CleanupAllNoteTethers()
     {
         // Resources.FindObjectsOfTypeAll includes inactive objects; required because bridge may disable/hide UI.
         var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
@@ -776,6 +709,36 @@ public partial class GameFlowManager : MonoBehaviour
 
         if (killed > 0)
             Debug.Log($"[BRIDGE] CleanupAllNoteTethers destroyed={killed}");
+    }
+
+    // Coordinator facade helpers
+    public IReadOnlyList<Vehicle> GetVehicles() => vehicles;
+    public void ClearVehicles() => vehicles?.Clear();
+    public void ClearActiveTracks() => _activeTracks?.Clear();
+    public void SetPlayerStatsGrid(Transform grid) => playerStatsGrid = grid;
+    public void ClearPlayerStatsGrid() => playerStatsGrid = null;
+    public float GetMotifBridgeHoldSeconds() => motifBridgeHoldSeconds;
+    public MotifRingGlyphApplicator GetMotifRingGlyphApplicator() => motifRingGlyphApplicator;
+    public float GetVehiclePhaseInDelaySeconds() => vehiclePhaseInDelaySeconds;
+    public static Color QuantizeToColor32(Color c)
+    {
+        Color32 cc = (Color32)c;
+        return new Color(cc.r / 255f, cc.g / 255f, cc.b / 255f, cc.a / 255f);
+    }
+    public void PlayVehiclePhaseInFx()
+    {
+        if (vehiclePhaseInFxPrefab == null) return;
+        var activeVehicles = vehicles != null && vehicles.Count > 0
+            ? vehicles
+            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+
+        foreach (var v in activeVehicles)
+        {
+            if (v == null || !v.isActiveAndEnabled) continue;
+            var fx = Instantiate(vehiclePhaseInFxPrefab, v.transform.position, Quaternion.identity);
+            fx.Play();
+            Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
+        }
     }
 
 }
