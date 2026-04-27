@@ -667,7 +667,8 @@ public class CosmicDustGenerator : MonoBehaviour
         PromoteHiddenRole(gp);
         return true;
     }
-    public bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
+
+    private bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
 {
     if (drums == null) return;
@@ -1886,35 +1887,7 @@ private void BuildMazeRoleImprints(
             }
         }
     }
-
-    public void ResetDustToNoneInPlace(CosmicDust dust)
-    {
-        if (dust == null) return;
-
-        Vector2Int cell;
-        bool have = _goToCell.TryGetValue(dust.gameObject, out cell);
-        if (!have && drums != null)
-        {
-            cell = drums.WorldToGridPosition(dust.transform.position);
-            have = IsInBounds(cell);
-        }
-        if (!have) return;
-
-        _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-
-        _imprints[cell] = new DustImprint
-        {
-            role = MusicalRole.None,
-            color = _mazeTint,
-            hardness01 = defaultMazeHardness01,
-            healDelay = 0f
-        };
-
-        dust.clearing.hardness01 = defaultMazeHardness01;
-        dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, 1f);
-        dust.SyncParticleColor();
-        SetDustCollision(dust, true);
-    }
+    
     public void CreateJailCenterForCollectable(
         Vector2Int gpCenter,
         float holdSeconds,
@@ -1971,15 +1944,7 @@ private void BuildMazeRoleImprints(
         if (_cellState == null || _cellState[gp.x, gp.y] != DustCellState.Solid) yield break;
         ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.5f, scheduleRegrow: false);
     }
-
-    public float SampleDensity01(Vector3 worldPos)
-    {
-        if (drums == null) return 0f;
-
-        Vector2Int cell = drums.WorldToGridPosition(worldPos);
-        return HasDustAt(cell) ? 1f : 0f;
-    }
-
+    
     private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (_regrowthSuppressed)
@@ -2089,12 +2054,7 @@ private void BuildMazeRoleImprints(
             }
         }
     }
-    public void ClearStarKeepClear()
-    {
-        _exclusions.ClearStarPocket(_tmpReleased);
-        for (int i = 0; i < _tmpReleased.Count; i++)
-            RequestRegrowCellAt(_tmpReleased[i], delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
-    }
+
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {
         if (drums == null)
@@ -2253,25 +2213,7 @@ private void BuildMazeRoleImprints(
         // after the gray-start change where all initial cells have role=None.
         return _allSolidCount;
     }
-
-    /// <summary>Returns the number of solid cells currently tinted to <paramref name="role"/>.</summary>
-    public int GetSolidCountForRole(MusicalRole role)
-    {
-        return _solidCountByRole.TryGetValue(role, out int c) ? c : 0;
-    }
-
-    /// <summary>Returns total solid cell count (all roles including None).</summary>
-    public int GetTotalSolidCount() => _allSolidCount;
-
-    /// <summary>
-    /// When a cell is eroded, immediately queue a frontier empty cell to regrow,
-    /// preserving overall maze coverage. The eroded cell will be suppressed in
-    /// CommitRegrowCell once the compensation cell is committed, so dust "shifts"
-    /// rather than appearing and disappearing.
-    /// </summary>
-
-
-
+    
     /// <summary>
     /// Returns the role held by the plurality of solid imprinted neighbors within 1 cell.
     /// Ties broken by global density (least-dense wins). Returns None when no imprinted
@@ -2359,16 +2301,7 @@ private void BuildMazeRoleImprints(
         // nudge visuals to match the new profile so we don't leave any tiles at prefab/default.
         RetintExisting(seconds: 0.20f);
     }
-
-    private void BeginStaggeredMazeRegrowth(List<(Vector2Int, Vector3)> cellsToGrow)
-    { 
-        if (_runtimeVoidOnlyDustCreation) 
-            return;
-        if (_spawnRoutine != null)
-            StopCoroutine(_spawnRoutine); 
-        float fit = Mathf.Clamp(drums.GetLoopLengthInSeconds()*0.25f, 0.08f, drums.GetLoopLengthInSeconds()*0.5f);
-        _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToGrow, fit));
-    }
+    
     public void RetintExisting(float seconds = 0.35f) {
         if (!isActiveAndEnabled) return;
         // If this generator is active but its GameObject is not in hierarchy (parent disabled), also bail.
@@ -2453,54 +2386,6 @@ private void BuildMazeRoleImprints(
     /// Removes dust topology immediately (opens corridor) but fades visuals and pools afterward.
     /// Boost carving should use this, NOT DespawnDustAt.
     /// </summary>
-    public void CarveDustAt(Vector2Int gridPos, float fadeSeconds)
-    {
-        // IMPORTANT: "Permanent clear" was originally used to keep an authored tunnel open.
-        // In the refactor, we still want *pockets* and dynamic clearing. If a cell is marked
-        // permanent-clear but somehow still contains Solid dust (e.g., legacy init path),
-        // we treat that as stale state: remove the flag and allow carving.
-        if (_permanentClearCells.Contains(gridPos))
-        {
-            if (TryGetCellState(gridPos, out var st0) && st0 == DustCellState.Solid)
-            {
-                _permanentClearCells.Remove(gridPos);
-            }
-            else
-            {
-                return;
-            }
-        }
-        if (!TryGetCellState(gridPos, out var st) || st != DustCellState.Solid) return;
-        if (!TryGetCellGo(gridPos, out var go) || go == null) return;
-
-        // Reveal hidden Voronoi role on first vehicle carve (Option D).
-        PromoteHiddenRole(gridPos);
-
-        // Logical authority: the moment we carve, the cell stops being solid and must be removed
-        // from legacy maps so queries cannot treat it as terrain.
-        SetCellState(gridPos, DustCellState.Clearing);
-
-        // Stop contributing collisions/topology immediately.
-        if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){ 
-            SetDustCollision(dust, false); 
-        }
-        // Visual: allow dust to fade out; when the fade completes the tile will call
-        // back into OnDustVisualFadedOut(), which finalizes the Empty state.
-        if (go.TryGetComponent<CosmicDust>(out var d) && d != null)
-        {
-            // Optional: immediate "impact" read.
-            //d.PulseCharge(1f, fadeSeconds: Mathf.Max(0.01f, fadeSeconds), stickyUntilDestroyed: true);
-            d.DissipateAndHideVisualOnly(Mathf.Max(0.01f, dustTimings.fadeOutSeconds));
-        }
-        else
-        {
-            FadeAndHideCellGO(go);
-            SetCellState(gridPos, DustCellState.Empty);
-        }
-
-        // Schedule regrow (held off by keep-clear, claims, vehicle veto, collectables)
-        RequestRegrowCellAt(gridPos, refreshIfPending: true);
-    }
     public void SetReservedVehicleCells(IReadOnlyList<Vector2Int> cells)
     {
         _reservedVehicleCells ??= new List<Vector2Int>(64);
@@ -2868,108 +2753,7 @@ private void BuildMazeRoleImprints(
             new(-1, 0), new(0, -1), new(1, -1)
         };
     }
-
-    public int CarveTemporaryCellFromMineNode(
-        Vector3 centerWorld,
-        float regrowDelaySeconds,
-        MusicalRole removedRoleOverride,
-        int resolveRadiusCells,
-        float appetiteMul = 1f) {
-        if (drums == null) return 0;
-
-        EnsureImprints();
-
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-
-        Vector2Int c = drums.WorldToGridPosition(centerWorld);
-
-        // Footprint is cell-based, so 0 = 1 cell, 1 = 3x3, etc.
-        int rCells = Mathf.Max(0, resolveRadiusCells);
-
-        // Budget is "how many *present* dust cells we may remove this tick".
-        // We still refresh regrow timers across the footprint.
-        int removed = 0;
-        int budget  = Mathf.RoundToInt(mineNodeErodePerTick * Mathf.Clamp(appetiteMul, 0.4f, 2f));
-        
-        for (int gx = c.x - rCells; gx <= c.x + rCells; gx++)
-        {
-            for (int gy = c.y - rCells; gy <= c.y + rCells; gy++)
-            {
-                if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
-
-                Vector2Int gp = new Vector2Int(gx, gy);
-
-                // Never touch permanent-clear or keep-clear cells.
-                if (_permanentClearCells.Contains(gp)) continue;
-                if (IsKeepClearCell(gp)) continue;
-
-                MusicalRole removedRole = removedRoleOverride;
-
-                if (removedRole == MusicalRole.None &&
-                    TryGetDustAt(gp, out var existingDust) &&
-                    existingDust != null)
-                {
-                    removedRole = existingDust.Role;
-                }
-
-                if (removedRole != MusicalRole.None)
-                    _regrowExcludeRoleByCell[gp] = removedRole;
-                // Reveal the Voronoi role for this cell so CommitRegrowCell uses Priority 1
-                // (real-role imprint) instead of neighbor/least-dense. RestoreVoronoiImprint
-                // also clears any prior MineNode paint so the Voronoi role is always applied.
-                if (!RestoreVoronoiImprint(gp))
-                    _imprints?.Remove(gp);
-                // Clear if present, respecting budget.
-                if (HasDustAt(gp))
-                {
-                    if (removed < budget)
-                    {
-                        ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.20f, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds);
-                        removed++;
-                    }
-                }
-
-                // Always refresh regrow timer (even if already empty).
-                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
-            }
-        }
-
-        return removed;
-    }
-    /// <summary>
-    /// Removes the role imprint for a cell so its next regrowth is assigned
-    /// the least-dense role rather than its original Voronoi role.
-    /// Called by PhaseStarDustAffect when the star fully drains a cell.
-    /// </summary>
-    public void ClearImprintAt(Vector2Int cell)
-    {
-        _imprints?.Remove(cell);
-    }
-
-    /// <summary>
-    /// Promotes all hidden Voronoi cells assigned to <paramref name="role"/> into the
-    /// active imprint layer, then triggers a fade-and-regrow on any solid gray cell so
-    /// it re-emerges with the role color through the standard visual pipeline.
-    /// Cells are invisible (HasDustAt == false) during the fade, so the navigator
-    /// cannot target them until they fully regrow — preventing tentacles from latching
-    /// onto gray dust. Regrow delays are staggered to avoid a mass simultaneous pop-in.
-    /// </summary>
-    public void RevealHiddenRoleVisuals(MusicalRole role)
-    {
-        if (role == MusicalRole.None || _hiddenImprints == null) return;
-
-        foreach (var kvp in _hiddenImprints)
-        {
-            if (kvp.Value != role) continue;
-            // Promote hidden → active imprint so CommitRegrowCell uses the correct role
-            // when a vehicle-carved cell regrows. HasAnyDustWithRole() and GetColoredDustCells()
-            // both gate on dust.Role (component), so cells stay gray and untargetable until
-            // the vehicle actually carves them and they regrow colored.
-            PromoteHiddenRole(kvp.Key);
-        }
-    }
-
+    
     /// <summary>
     /// Returns true if any solid dust cell's component Role is non-None.
     /// Consistent with GetColoredDustCells so the star arms only when actual colored
@@ -2999,30 +2783,6 @@ private void BuildMazeRoleImprints(
             if (dust != null && dust.Role == role) return true;
         }
         return false;
-    }
-
-    /// <summary>
-    /// Tints a solid dust cell with the given MusicalRole color without carving it.
-    /// Called by MineNode as it moves through corridors.
-    /// </summary>
-    public void TintDustCellWithRole(Vector2Int cell, MusicalRole role)
-    {
-        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
-        var profile = MusicalRoleProfileLibrary.GetProfile(role);
-        if (profile == null) return;
-
-        Color color = profile.GetBaseColor();
-        _imprints[cell] = new DustImprint
-        {
-            role       = role,
-            color      = color,
-            hardness01 = profile.GetDustHardness01()
-        };
-        if (TryGetDustAt(cell, out var dust))
-        {
-            dust.ApplyRoleAndCharge(role, color, dust.Charge01);
-            dust.SyncParticleColor(); // ApplyRoleAndCharge only updates the sprite; sync particles too
-        }
     }
 
     // Paints existing dust with a role at reduced energy (MineNode exhaust trail).

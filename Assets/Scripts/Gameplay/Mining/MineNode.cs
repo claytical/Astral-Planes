@@ -67,7 +67,6 @@ public class MineNode : MonoBehaviour
     private InstrumentTrack _track;
     private MusicalRole _role;
     private float _speed    = 0.5f;
-    private float _agility  = 0.5f;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
     private Vector2 _carveDir = Vector2.right;
@@ -100,7 +99,6 @@ public class MineNode : MonoBehaviour
         if (prof != null)
         {
             _speed   = prof.mineNodeSpeed;
-            _agility = prof.mineNodeAgility;
         }
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetTint(_lockedColor, multiply: true);
@@ -483,16 +481,7 @@ public class MineNode : MonoBehaviour
         }
         return accum.sqrMagnitude > 0.0001f ? accum.normalized : Vector2.zero;
     }
-
-    private void ApplyLocalDustAffinity()
-    {
-        if (sameRoleDustAffinityStrength <= 0f) return;
-        Vector2 affinityDir = ComputeLocalSameRoleAffinityDir(Mathf.Max(1, sameRoleDustAffinityRadiusCells));
-        if (affinityDir.sqrMagnitude <= 0.0001f) return;
-        float authoredWeight = 1f - sameRoleDustAffinityStrength;
-        _carveDir = (authoredWeight * _carveDir + sameRoleDustAffinityStrength * affinityDir).normalized;
-    }
-
+    
     private void CacheAuthoredStepsFromNoteSet()
     {
         _stepsPerLoop = 16;

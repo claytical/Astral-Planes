@@ -8,10 +8,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     // =====================================================================
     // Core star gameplay levers (PhaseStar.cs)
     // =====================================================================
-    [Header("Core Star Gameplay (PhaseStar.cs)")]
-    [Min(1)]
-    [Tooltip("How many MineNodes this PhaseStar will eject before it transitions to bridge/completion.")]
-    public int nodesPerStar = 3;
 
     [Tooltip("If enabled, the PhaseStar requests a keep-clear pocket in the dust so players always have maneuvering space near it.")]
     public bool starKeepsDustClear = true;
@@ -63,10 +59,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Range(0f, 1f)]
     [Tooltip("Tendency to arc around avoidance vectors (0 = straight avoidance, 1 = strong tangential orbit).")]
     public float orbitBias = 0f;
-
-    [Range(0f, 0.2f)]
-    [Tooltip("Chance per second to teleport a small amount (Wildcard spice). 0 disables.")]
-    public float teleportChancePerSec = 0f;
 
     [Header("Craving Navigation (PhaseStarCravingNavigator)")]
     [Tooltip("Seconds between BFS replans. Lower = more responsive direction changes; higher = cheaper. " +

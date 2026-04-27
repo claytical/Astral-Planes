@@ -19,8 +19,6 @@ public class Vehicle : MonoBehaviour
     [Tooltip("Child SpriteRenderer clone of the vehicle art. Normally hidden. Scales up as placement becomes available.")]
     [SerializeField] private SpriteRenderer soulSprite;
 
-    private Color _soulDefaultColor = Color.white;
-
     [Header("Gravity Void Detection")]
     [SerializeField] private LayerMask gravityVoidMask; // set in inspector OR leave 0 and use tag fallback in VehicleConfig
 
@@ -150,7 +148,6 @@ public class Vehicle : MonoBehaviour
 
             if (soulSprite != null)
             {
-                _soulDefaultColor = soulSprite.color;
                 soulSprite.transform.localScale = Vector3.one * profile.soulMinScale;
 
                 var c = soulSprite.color;

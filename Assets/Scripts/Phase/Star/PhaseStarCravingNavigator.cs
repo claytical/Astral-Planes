@@ -132,18 +132,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     }
 
     public Vector2 GetDensitySteerDir() => (_huntingEnabled && _hasTarget) ? _targetDir : Vector2.zero;
-
-    public bool HasTarget => _hasTarget;
-
-    public Vector2Int GetTargetCell() => _targetCell;
-
-    public Vector2 GetTargetWorldPos()
-    {
-        if (!_hasTarget) return Vector2.zero;
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
-        return drum != null ? drum.GridToWorldPosition(_targetCell) : Vector2.zero;
-    }
-
+    
     public Vector2 GetDominantSnifferDir()
     {
         if (_huntingEnabled && (_hasLockOnCell || _hasTarget))

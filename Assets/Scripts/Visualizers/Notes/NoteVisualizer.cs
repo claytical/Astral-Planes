@@ -1641,8 +1641,6 @@ public class NoteVisualizer : MonoBehaviour
         if (stalePlaceholder || duplicateForKey)
             toDestroy.Add(child.gameObject);
 
-        Debug.Log($"[ORPHAN] considering {tag.step} ph={tag.isPlaceholder} bid={tag.burstId} " +
-                  $"hasKey={hasKey} same={sameObject} stalePH={stalePlaceholder} dup={duplicateForKey} (active={activeBurstId})");
     }
 
     if (debugNotOwned.Count > 0)

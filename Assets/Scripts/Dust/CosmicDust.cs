@@ -509,7 +509,7 @@ private Coroutine _jiggleRoutine;
 
     // Deprecated shim — converts a 0-1 charge fraction to integer units and delegates to ChipEnergy.
     // Does NOT call the generator on depletion — callers are responsible for post-depletion cleanup.
-    public float DrainCharge(float amount)
+    private float DrainCharge(float amount)
     {
         if (amount <= 0f) return 0f;
         int chipAmount = Mathf.RoundToInt(amount * _maxEnergyUnits);
@@ -1441,8 +1441,6 @@ private Coroutine _jiggleRoutine;
             emission.rateOverTime = _baseEmissionCurve;
         else
             emission.rateOverTime = _baseEmission;
-
-        Debug.Log($"[REGROWTH] Reset Visual To Base");
     }
     public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f, float clearanceWorld = 0f)
     {

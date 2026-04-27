@@ -457,18 +457,4 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _rechooseTimer = Random.Range(1.2f, 2.4f);
     }
 
-    public void ClampToScreenTop(float topInset)
-    {
-        if (_cam == null) _cam = Camera.main;
-        if (_cam == null || _rb == null) return;
-
-        float topY = ((Vector2)_cam.ViewportToWorldPoint(new Vector3(0.5f, 1f, 0f))).y;
-        var pos = _rb.position;
-        if (pos.y > topY - topInset)
-        {
-            pos.y = topY - topInset;
-            _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, 0f);
-            _rb.position = pos;
-        }
-    }
 }

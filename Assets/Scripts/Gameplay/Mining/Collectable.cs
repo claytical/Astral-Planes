@@ -1511,15 +1511,6 @@ private IEnumerator SpawnArrivalRoutine(
     double reportedBasePos = (reportedBase * baseStepDurDbg) % loopLenDbg;
     double reportedLeaderPos = (reportedLeader * leaderStepDurDbg) % loopLenDbg;
 
-    Debug.Log(
-        $"[COLLECT_TRACE] name={name} dspNow={dspNowDbg:F6} loopLen={loopLenDbg:F6} " +
-        $"transportStart={(transportStartDbg):F6} loopStart={loopStartDbg:F6} tPos={tPosDbg:F6} " +
-        $"baseSteps={baseStepsDbg} leaderSteps={leaderStepsDbg} mul={mulDbg} " +
-        $"playheadBase={playheadBaseStepDbg} playheadLeader={playheadLeaderStepDbg} " +
-        $"reportedBase={reportedBase} reportedLeader={reportedLeader} " +
-        $"repBasePos={reportedBasePos:F6} repLeaderPos={reportedLeaderPos:F6} " +
-        $"intendedStep={intendedStep} matchedStep={matchedStep}"
-    );
     float velocity127 = ComputeHitVelocity127(vehicle);
 
     // Confirm should happen at collision point (immediate), not at deposit.
