@@ -31,8 +31,7 @@ public static class MusicalRoleProfileLibrary
         {
             return profile;
         }
-
-        Debug.LogWarning($"No profile found for role: {role}");
+;
         return null;
     }
 }

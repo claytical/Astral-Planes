@@ -152,18 +152,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         foreach (var tentacle in _tentacles)
             ResetTentacleState(tentacle, starPos, destroyVisual: false);
     }
-
-    public bool IsAnyTentacleDraining
-    {
-        get
-        {
-            foreach (var tentacle in _tentacles)
-                if (tentacle.state == TentacleState.Draining)
-                    return true;
-            return false;
-        }
-    }
-
+    
     public bool HasActiveTentacles
     {
         get

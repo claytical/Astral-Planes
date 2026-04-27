@@ -3,8 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using Random = UnityEngine.Random;
-[System.Serializable]
+[Serializable]
 public class PhaseRecord
 {
     public string PhaseId;            // stable authored ID from PhaseLibrary
@@ -29,8 +28,6 @@ public class GardenRecord
     public int PlaythroughCountFor(string phaseId) =>
         CompletedPhases.Count(r => r.PhaseId == phaseId);
 }
-
-
 public enum PhaseStarState
 {
     Dormant        = -1,    // on-screen but inert, waiting for colored dust
@@ -122,8 +119,6 @@ public class PhaseStar : MonoBehaviour
     private Coroutine _waitForDustCo;
 
     [SerializeField] private bool _tracePhaseStar = true;
-    private float _loopDuration; // seconds (time authority)
-
 
     [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f); // fill/edge tint (alpha handled by visuals)
     [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
@@ -233,24 +228,7 @@ public class PhaseStar : MonoBehaviour
     void Start()
     {
         EnsurePreviewRing();
-        if (!_buildingPreview)
-        {
-            RefreshLoopDuration();
-        }
     }
-    /// <summary>The role the star is currently accumulating charge for. Navigator uses this to target the right dust.</summary>
-    public MusicalRole GetPreviewRole() => _previewRole;
-
-    /// <summary>The primary (CW) diamond's Transform. Used by PhaseStarDustAffect to anchor
-    /// the tentacle root to the diamond tip so it whips with the rotation.</summary>
-    public Transform PrimaryDiamondTransform => _previewVisual;
-
-    /// <summary>The secondary (CCW) diamond's Transform. Used by PhaseStarDustAffect for
-    /// tentacle tips assigned to Diamond B (tipIndex 1 and 3).</summary>
-    public Transform SecondaryDiamondTransform => _previewVisualB;
-
-    // energyUnitsDelivered: raw energy units (or Charge01-fraction via legacy shim — both work).
-    // No upper cap — _starCharge is now unbounded cumulative units.
     public void AddCharge(MusicalRole role, float energyUnitsDelivered)
     {
         if (role == MusicalRole.None) return;
@@ -275,15 +253,6 @@ public class PhaseStar : MonoBehaviour
         return 1f - GetChargeNormalized01(role);
     }
 
-    /// <summary>True when the star already has enough charge to eject a MineNode of this role.</summary>
-    public bool IsRoleReady(MusicalRole role)
-    {
-        if (role == MusicalRole.None) return false;
-        _starCharge.TryGetValue(role, out float c);
-        var rp = MusicalRoleProfileLibrary.GetProfile(role);
-        float threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1);
-        return c >= threshold;
-    }
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
     {
         if (!s_bubbleActive) return false;
@@ -330,54 +299,6 @@ public class PhaseStar : MonoBehaviour
         LogState("EnterInMaze+Dormant");
     }
     
-    private Vector2 PickOffScreenSpawnPoint()
-    {
-        var cam = Camera.main;
-        if (cam == null) return Vector2.zero;
-
-        float margin = Mathf.Max(0.5f, entryOffscreenMargin);
-        const float z = 0f;
-
-        Vector2 min = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
-        Vector2 max = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-
-        // Always descend from the top edge.
-        return new Vector2(Random.Range(min.x + 1f, max.x - 1f), max.y + margin);
-    }
-
-    private IEnumerator Co_EntryApproach(Vector2 targetWorldPos)
-    {
-        visuals?.ShowDim(Color.gray);
-
-        float arriveThresholdSq = entryArriveThreshold * entryArriveThreshold;
-        float failSafeUntil = Time.time + 8f;
-
-        while (Time.time < failSafeUntil)
-        {
-            Vector2 delta = targetWorldPos - (Vector2)transform.position;
-            if (delta.sqrMagnitude <= arriveThresholdSq)
-                break;
-            yield return null;
-        }
-
-        if (entryFadeInSeconds > 0f)
-            yield return new WaitForSeconds(entryFadeInSeconds);
-
-        motion?.SetSpeedMultiplier(entryDriftSpeedMul);
-        motion?.SetOverrideTarget(ComputeDormantRestPosition());
-
-        if (entryDriftSeconds > 0f)
-            yield return new WaitForSeconds(entryDriftSeconds);
-
-        motion?.ClampToScreenTop(entrySettleInset);
-
-        _entryInProgress = false;
-        _entryApproachCo = null;
-
-        EnterDormantWaitState();
-        LogState("EntryComplete+Dormant");
-    }
-
     private Vector2 ComputeDormantRestPosition()
     {
         var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
@@ -476,7 +397,8 @@ public class PhaseStar : MonoBehaviour
         float threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1);
         return Mathf.Clamp01(c / Mathf.Max(0.001f, threshold));
     }
-    public bool GetDominantRoleRaw(out MusicalRole role, out float rawCharge, out float threshold)
+
+    private bool GetDominantRoleRaw(out MusicalRole role, out float rawCharge, out float threshold)
     {
         role = MusicalRole.None;
         rawCharge = 0f;
@@ -501,7 +423,7 @@ public class PhaseStar : MonoBehaviour
         return true;
     }
 
-    public bool HasDominantRoleEjectable()
+    private bool HasDominantRoleEjectable()
     {
         return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
                rawCharge >= threshold;
@@ -533,13 +455,7 @@ public class PhaseStar : MonoBehaviour
         StopManagedCoroutine(ref _waitForDustCo);
         StopManagedCoroutine(ref _burstOffScreenWaitCo);
     }
-
-    private void EnterDormantMotionPose()
-    {
-        motion?.SetOverrideTarget(ComputeDormantRestPosition());
-        motion?.SetSpeedMultiplier(0.35f);
-    }
-
+    
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
     {
         var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
@@ -847,43 +763,7 @@ public class PhaseStar : MonoBehaviour
             case VisualMode.Hidden: visuals.HideAll(); break;
         }
     }
-
-    public void NotifyCollectableBurstCleared(bool hadNotes = true)
-    {
-        if (_state == PhaseStarState.BridgeInProgress)
-        {
-            _awaitingCollectableClear = false;
-            _awaitingCollectableClearSinceLoop = -1;
-            _awaitingCollectableClearSinceDsp = -1.0;
-            return;
-        }
-
-        Debug.Log(
-            $"[PS:BURST_CLEARED] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
-            $"awaitClr(before)={_awaitingCollectableClear} CIF={AnyCollectablesInFlightGlobal()} hadNotes={hadNotes}"
-        );
-
-        _awaitingCollectableClear = false;
-        _awaitingCollectableClearSinceLoop = -1;
-        _awaitingCollectableClearSinceDsp = -1.0;
-
-        if (AnyCollectablesInFlightGlobal() || AnyExpansionPendingGlobal())
-        {
-            Debug.LogWarning($"[PS:BURST_CLEARED] IGNORE (still busy) star={name}");
-            return;
-        }
-
-        if (!hadNotes)
-        {
-            Debug.Log($"[PS:BURST_CLEARED] hadNotes=false — rolling back.");
-            OnBurstRolledBack?.Invoke(this);
-            OnBurstNotesReleased();
-            return;
-        }
-
-        OnBurstNotesReleased();
-    }
-
+    
     private bool AnyCollectablesInFlightGlobal()
     {
         var gfm = GameFlowManager.Instance;
@@ -1002,32 +882,7 @@ public class PhaseStar : MonoBehaviour
         DisableColliders();
         Debug.Log($"[PhaseStar] Burst in flight — hidden in place at {transform.position}");
     }
-
-    // Called when all burst notes have been committed to the loop (or discarded).
-    // Relocates the star to a dust-free cell and re-enters the Dormant charging phase.
-    private void OnBurstNotesReleased()
-    {
-        _burstOffScreen = false;
-        StopManagedCoroutine(ref _burstOffScreenWaitCo);
-
-        // Zero charge so the star must drain again before the next ejection.
-        _starCharge.Clear();
-        _displayedCharge01 = 0f;
-
-        bool hasDust = HasColoredDustAvailable();
-        Debug.Log($"[PhaseStar] Burst notes released — charges reset, hasDust={hasDust}");
-
-        if (hasDust)
-        {
-            RelocateToAvailableCell();
-            EnterDormantWaitState();
-        }
-        else
-        {
-            _burstOffScreenWaitCo = StartCoroutine(Co_WaitForDustThenReenterDormant());
-        }
-    }
-
+    
     private void RelocateToAvailableCell()
     {
         var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
@@ -1037,21 +892,7 @@ public class PhaseStar : MonoBehaviour
         Vector2 worldPos = drum.GridToWorldPosition(cell);
         transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
     }
-
-    // Polls until colored dust exists, then relocates and re-enters Dormant in the maze.
-    private IEnumerator Co_WaitForDustThenReenterDormant()
-    {
-        while (true)
-        {
-            yield return new WaitForSeconds(0.5f);
-            var gen = GameFlowManager.Instance?.dustGenerator;
-            if (gen != null && gen.HasAnyDustWithRole()) break;
-        }
-        _burstOffScreenWaitCo = null;
-        RelocateToAvailableCell();
-        EnterDormantWaitState();
-    }
-
+    
     private void Disarm(DisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
@@ -1083,26 +924,6 @@ public class PhaseStar : MonoBehaviour
         }
 
         OnDisarmed?.Invoke(this);
-    }
-    private void RefreshLoopDuration()
-    {
-        // Prefer the DrumTrack that actually spawned this star.
-        // Fall back to the globally active drum track if needed.
-        var drums = _drum;
-        if (!drums)
-            drums = GameFlowManager.Instance?.activeDrumTrack;
-
-        if (drums)
-        {
-            // Use the EFFECTIVE loop length (extended loop, not just clip length)
-            _loopDuration = Mathf.Max(0.001f, drums.GetLoopLengthInSeconds());
-        }
-        else
-        {
-            // Defensive default so preview math never divides by zero
-            _loopDuration = 2f;
-        }
-        // _omega / harmonic spin ladder is retired; shard facing is now sniffer-driven.
     }
 
     private bool CanAdvancePhaseNow()
@@ -1278,7 +1099,6 @@ public class PhaseStar : MonoBehaviour
     {
         _drum = drum;
         if (_drum == null) return;
-        RefreshLoopDuration();
         EnsurePreviewRing();
     }
     

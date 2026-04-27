@@ -100,9 +100,6 @@ public class LoopPattern : MonoBehaviour
             float vel127 = Mathf.Clamp(n.velocity, 60f, 127f) * Mathf.Clamp01(gain);
 
             outNotes.Add((n.note, n.duration, vel127));
-
-            Debug.Log($"[LP/GET] {track.name} bin={bin} step={localStep} note={n.note} durTicks={n.duration} " +
-                      $"storedVel={n.velocity:F2} outVel127={vel127:F2} gain={gain:F2}");
         }
     }
 

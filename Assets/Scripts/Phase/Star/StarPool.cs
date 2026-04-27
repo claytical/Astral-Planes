@@ -173,9 +173,7 @@ public sealed class StarPool : MonoBehaviour
     {
         return _activeMotif?.GetActiveRoles();
     }
-
-    public bool HasAnyActiveStars() => _activeStars.Count > 0 || _pausedStars.Count > 0;
-
+    
     // ── Phase plan ────────────────────────────────────────────────────────────
 
     private void BuildPhasePlan()

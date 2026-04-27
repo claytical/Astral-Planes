@@ -396,17 +396,4 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
                 _shardSpriteRenderers[i].enabled = on;
         }
     }
-
-    public float[] GetPetalAngles(int count, float rotationOffsetDeg = 0f)
-    {
-        if (count <= 0) return Array.Empty<float>();
-
-        float[] angles = new float[count];
-        float step = 360f / count;
-
-        for (int i = 0; i < count; i++)
-            angles[i] = rotationOffsetDeg + (step * i);
-
-        return angles;
-    }
 }

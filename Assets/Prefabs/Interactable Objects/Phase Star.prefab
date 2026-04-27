@@ -4997,15 +4997,19 @@ MonoBehaviour:
   tentacleFlowSpeed: 5.1
   tentacleWidth: 0.035
   dissolveDuration: 1.1
+  maxLinesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   growingRootAlpha: 0.65
   growingTipAlpha: 0.4
   drainingBaseAlpha: 0.751
-  vineNavSway: 0.05
-  vineBreathePeriod: 1.6
-  vineCtrlRebuildInterval: 0.15
-  branchSpawnAtProgress: 0.4
-  maxBranchDepth: 3
+  sag: 0.5
+  noiseAmp: 0.15
+  noiseSpeed: 1.5
+  shimmerEnabled: 1
+  shimmerRatePerUnit: 5
+  shimmerLifetime: 0.35
+  shimmerSize: 0.04
+  shimmerAlpha: 0.45
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
