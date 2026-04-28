@@ -649,12 +649,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             _lastCommittedBoundarySerial = boundarySerial;
             _lastCommittedBar = barIndex; // debug / inspector only
 
-            // Commit any authored changes atomically at the boundary
-            if (_loopCacheDirtyPending)
-            {
-                RebuildLoopCache_FORCE();
-                _loopCacheDirtyPending = false;
-            }
+            // Always rebuild at boundary: picks up any loopMultiplier/binSize change
+            // that ArmCohortsOnLoopBoundary may have applied since the last mid-loop rebuild.
+            RebuildLoopCache_FORCE();
+            _loopCacheDirtyPending = false;
 
             // Reset step cursor so step 0 is eligible in the new bar/bin window
             _lastLocalStep = -1;

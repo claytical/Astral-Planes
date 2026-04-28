@@ -96,8 +96,6 @@ public sealed class BridgeCoordinator
             if (!track) continue;
             var notes = track.GetPersistentLoopNotes();
             if (notes == null || notes.Count == 0) continue;
-
-            Color c = _gameFlow.QuantizeToColor32(track.trackColor);
             int binSize = Mathf.Max(1, track.BinSize());
 
             foreach (var n in notes.OrderBy(n => n.stepIndex))
@@ -110,7 +108,7 @@ public sealed class BridgeCoordinator
                     step: n.stepIndex,
                     note: n.note,
                     velocity: n.velocity,
-                    trackColor: c,
+                    trackColor: track.trackColor,
                     binIndex: binIndex,
                     isMatched: true,
                     commitTime01: commitTime01));
@@ -121,7 +119,7 @@ public sealed class BridgeCoordinator
             {
                 snapshot.TrackBins.Add(new MotifSnapshot.TrackBinData
                 {
-                    TrackColor = c,
+                    TrackColor = track.trackColor,
                     Role = track.assignedRole,
                     BinIndex = b,
                     IsFilled = track.IsBinFilled(b),

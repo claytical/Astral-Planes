@@ -742,7 +742,7 @@ public class InstrumentTrackController : MonoBehaviour
             }
         }
 
-        int barIndex = Mathf.FloorToInt((float)(delta / clipLen));
+        int barIndex = (int)System.Math.Floor(delta / (double)clipLen);
 
         // IMPORTANT: use committed/audible bins, not visual bins.
         int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());

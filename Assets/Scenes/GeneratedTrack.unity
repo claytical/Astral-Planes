@@ -15395,8 +15395,8 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 0
-  lowestAllowedNote: 48
-  highestAllowedNote: 64
+  lowestAllowedNote: 27
+  highestAllowedNote: 67
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
