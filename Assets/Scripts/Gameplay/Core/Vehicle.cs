@@ -1187,7 +1187,7 @@ public class Vehicle : MonoBehaviour
             boosting = true;
 
             if (audioManager != null && thrustClip != null)
-                audioManager.PlayLoopingSound(thrustClip, .5f);
+                audioManager.PlayLoopingSound(thrustClip, .1f);
             Fly();
         }
         _burnRateMultiplier = Mathf.Max(0.2f, triggerValue);

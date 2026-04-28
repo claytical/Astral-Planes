@@ -64,6 +64,10 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         public int delayLoopsRemaining;
         // Cached tag so we can clear isAscending on arrival without GetComponent each step.
         public MarkerTag tag;
+        // track.GetNoteCommitTime(step) captured when ascension began for this marker.
+        // If the note is re-committed after this time, RemovePersistentNoteAtStep is skipped
+        // so a freshly collected note at the same step isn't erased by an older burst's ascent.
+        public float commitTimeAtStart;
     }
 
     private struct AscendTask
@@ -267,9 +271,15 @@ public sealed class NoteAscensionDirector : MonoBehaviour
                     LineCharge01 = Mathf.Min(1f, LineCharge01 + 0.25f);
 
                     // Remove the note from the persistent loop so it stops playing.
+                    // Guard: if the note was re-committed after this ascension started
+                    // (e.g. a new collection landed at the same step in the same frame),
+                    // skip removal so the fresh note continues to play.
                     if (ms.tag != null && ms.tag.track != null)
                     {
-                        ms.tag.track.RemovePersistentNoteAtStep(ms.tag.step);
+                        float currentCommit = ms.tag.track.GetNoteCommitTime(ms.tag.step);
+                        bool noteRefreshed = currentCommit > ms.commitTimeAtStart;
+                        if (!noteRefreshed)
+                            ms.tag.track.RemovePersistentNoteAtStep(ms.tag.step);
                         var ctrl = ms.tag.track.controller;
                         if (ctrl != null)
                         {
@@ -403,13 +413,19 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             var tag = go.GetComponent<MarkerTag>();
             if (tag != null) tag.isAscending = true;
 
+            int markerStep = tag != null ? tag.step : -1;
+            float commitTime = (tag?.track != null && markerStep >= 0)
+                ? tag.track.GetNoteCommitTime(markerStep)
+                : -1f;
+
             newMarkers.Add(new MarkerState
             {
                 go = go,
                 stepY = stepY,
                 loopsRemaining = loops,
                 delayLoopsRemaining = 0,
-                tag = tag
+                tag = tag,
+                commitTimeAtStart = commitTime,
             });
         }
 
@@ -428,6 +444,11 @@ public sealed class NoteAscensionDirector : MonoBehaviour
                 float remainingY = targetY - ms.go.transform.position.y;
                 ms.stepY = remainingY / loops;
                 ms.loopsRemaining = loops;
+                // Refresh commit-time snapshot since the ascension countdown is being reset.
+                int mStep = ms.tag != null ? ms.tag.step : -1;
+                ms.commitTimeAtStart = (ms.tag?.track != null && mStep >= 0)
+                    ? ms.tag.track.GetNoteCommitTime(mStep)
+                    : -1f;
                 merged.Add(ms);
             }
             merged.AddRange(newMarkers);

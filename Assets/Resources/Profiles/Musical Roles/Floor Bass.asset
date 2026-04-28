@@ -23,6 +23,6 @@ MonoBehaviour:
   dustHardness01: 1
   mineNodeSpeed: 0.15
   mineNodeAgility: 0.5
-  midiPreset: 0
+  midiPreset: 11
   ripeDuration: 8
   regrowthDelay: -1
