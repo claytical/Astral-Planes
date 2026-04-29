@@ -129,7 +129,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public int ascendLoopCount = 4;
     [SerializeField]
     private int ascensionLoopsPerExtraBin = 2;
-    private NoteSet[] _binNoteSets;
+    private readonly TrackLoopState _loopState = new();
+    private readonly TrackBurstState _burstState = new();
+    private readonly TrackExpansionState _expansionState = new();
     [Header("Harmony")]
     [Tooltip("If enabled, notes are treated as authored relative to chord index 0 (the 'I' chord), then root-shifted by the current chord before quantization. This makes progressions like I–IV–V change the bass/lead pitch even when the authored notes are static.")]
     public bool rootShiftNotesByChord = true;
@@ -138,35 +140,35 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private bool _currentBurstArmed = false;
     private NoteSet _currentNoteSet;
     private Boundaries _boundaries;
-    private readonly List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)>();    List<GameObject> _spawnedNotes = new();
+
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
     private int _lastBarIndex  = -1;
     private int _nextBurstId = 0;
-    private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
-    private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
-    private readonly Dictionary<int,int> _burstTotalSpawned = new(); // burstId -> total spawned
-    private readonly Dictionary<int,int> _burstCollected    = new(); // burstId -> collected count
+
+
+
+
     private bool _pendingCollapse;
     private int  _collapseTargetMultiplier = 1;
     private bool _hookedBoundaryForCollapse;
     private bool _ascendQueued;
-    private readonly Dictionary<int, HashSet<int>> _burstSteps = new(); // burstId -> steps for that burst
+
     private int? _pendingLoopMultiplier;   // supports expand or collapse
     public int currentBurstId;
-    [SerializeField] private List<bool> _binFilled = new();
+
     // Wall-clock time (Time.time) at which each bin was marked filled.
     // -1 means not yet filled. Sized and reset in parallel with _binFilled.
     private float[] _binCompletionTime;
     private bool _waitingForDrumReady;
-    [SerializeField] private int _maxBins = 4;                // keep in sync with your loop multiplier
-    [SerializeField] private List<int> _binFillOrder = null;  // 0 = unfilled; 1,2,3,... = ordinal it was filled
-    [SerializeField] private List<int> _binChordIndex = null; // -1 = unassigned; else index into ChordProgressionProfile.chordSequence
-    [SerializeField] private int _nextFillOrdinal = 1;
-    private readonly Dictionary<int, int> _burstLeaderBinsBeforeWrite = new(); // burstId -> leaderBins
-    private readonly Dictionary<int, int> _burstWroteBin             = new(); // burstId -> targetBin (cursor bin)
-    private readonly Dictionary<int, int> _burstTargetBin            = new(); // burstId -> allocated bin (for rollback on 0-note discard)
-    private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
+
+
+
+
+
+
+
+
 
     // ---- Composition Mode: step-sequenced burst spawning ----
     private struct PendingCompositionLaunch
@@ -185,8 +187,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private bool _compositionStepListenerActive;
     [SerializeField] private ParticleSystem compositionSpawnEffectPrefab;
     private ParticleSystem _compositionSpawnEffect;
-    [SerializeField] private bool[] binAllocated;
-    [SerializeField] private int _binCursor = 0;    // counts bins allocated on this track, including silent skips
+
+
     [Header("Components")]
     [SerializeField] private MidiVoice midiVoice;
     [SerializeField] private LoopPattern loopPattern;
@@ -257,10 +259,29 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private List<LoopNotePublic> _loopNotes = new();
     
     private readonly List<int> _scratchSteps = new List<int>(1);
-    private void SetBinCursor(int v) => _binCursor = Mathf.Max(0, v);
+    private List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes => _loopState.PersistentLoopNotes;
+    private Dictionary<int, float> _noteCommitTimes => _loopState.NoteCommitTimes;
+    private Dictionary<int,int> _burstRemaining => _burstState.Remaining;
+    private Dictionary<int,int> _burstTotalSpawned => _burstState.TotalSpawned;
+    private Dictionary<int,int> _burstCollected => _burstState.Collected;
+    private Dictionary<int, HashSet<int>> _burstSteps => _burstState.BurstSteps;
+    private List<bool> _binFilled => _expansionState.BinFilled;
+    private bool[] binAllocated { get => _expansionState.BinAllocated; set => _expansionState.BinAllocated = value; }
+    private int _binCursor { get => _expansionState.BinCursor; set => _expansionState.BinCursor = value; }
+    private List<int> _binFillOrder { get => _expansionState.BinFillOrder; set => _expansionState.BinFillOrder = value; }
+    private List<int> _binChordIndex { get => _expansionState.BinChordIndex; set => _expansionState.BinChordIndex = value; }
+    private int _nextFillOrdinal { get => _expansionState.NextFillOrdinal; set => _expansionState.NextFillOrdinal = value; }
+    private Dictionary<int, int> _burstLeaderBinsBeforeWrite => _burstState.LeaderBinsBeforeWrite;
+    private Dictionary<int, int> _burstWroteBin => _burstState.WroteBin;
+    private Dictionary<int, int> _burstTargetBin => _burstState.TargetBin;
+    private Dictionary<Collectable, Action> _destroyHandlers => _burstState.DestroyHandlers;
+    [SerializeField] private int _maxBins = 4;
+    List<GameObject> _spawnedNotes = new();
+
+    private void SetBinCursor(int v) => _expansionState.SetBinCursor(v);
     public  int  GetBinCursor()              => Mathf.Max(0, _binCursor);
-    public  void AdvanceBinCursor(int by=1)  => _binCursor = Mathf.Max(0, _binCursor + Mathf.Max(1,by));
-    private void ResetBinCursor()            => _binCursor = 0;
+    public  void AdvanceBinCursor(int by=1)  => _expansionState.AdvanceBinCursor(by);
+    private void ResetBinCursor()            => _expansionState.ResetBinCursor();
     public event Action<InstrumentTrack,int,int> OnAscensionCohortCompleted; // (track, start, end)
     public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
 
@@ -307,23 +328,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// Called by PhaseTransitionManager during motif setup.
     /// </summary>
     public void SetNoteSetForBin(int binIndex, NoteSet noteSet){
-        if (_binNoteSets == null || _binNoteSets.Length != maxLoopMultiplier)
-            _binNoteSets = new NoteSet[maxLoopMultiplier];
-
-        if (binIndex >= 0 && binIndex < _binNoteSets.Length)
-            _binNoteSets[binIndex] = noteSet;
+        _loopState.SetNoteSetForBin(binIndex, noteSet, maxLoopMultiplier);
     }
 
     /// <summary>
     /// Returns the pre-generated NoteSet for binIndex, falling back to _currentNoteSet.
     /// </summary>
     public NoteSet GetNoteSetForBin(int binIndex){
-        if (_binNoteSets != null && binIndex >= 0 && binIndex < _binNoteSets.Length)
-        {
-            var ns = _binNoteSets[binIndex];
-            if (ns != null) return ns;
-        }
-        return _currentNoteSet;
+        return _loopState.GetNoteSetForBin(binIndex, _currentNoteSet);
     }
     
     /// <summary>
@@ -2005,7 +2017,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// </summary>
     public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
     {
-        _binNoteSets = null;
+        _loopState.ClearAll();
         Debug.LogWarning(
             $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
             $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
@@ -2153,8 +2165,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         int qNote = skipChordQuantize ? note : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
         Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
-        persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
-        _noteCommitTimes[stepIndex] = Time.time;
+        _loopState.RecordCommittedNote(stepIndex, qNote, durationTicks, force, authoredRootMidi, Time.time);
 
         _loopCacheDirtyPending = true;
         GameObject noteMarker = null;
