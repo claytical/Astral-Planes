@@ -1468,7 +1468,8 @@ public class NoteVisualizer : MonoBehaviour
             burstId,
             seconds,
             GetMarkersForTrackAndBurst,
-            ResolveAscendLoopsForTrack(track)
+            ResolveAscendLoopsForTrack(track),
+            GetCommittedStepForMarker
         );
     }
 
@@ -1541,6 +1542,21 @@ public class NoteVisualizer : MonoBehaviour
         }
     }
     
+    /// Returns the loop step this marker is committed at — the noteMarkers dictionary
+    /// key, which is authoritative even when tag.step has drifted (e.g. after a
+    /// reverse-order manual release places a note into a different placeholder slot).
+    private int GetCommittedStepForMarker(InstrumentTrack track, GameObject go)
+    {
+        if (noteMarkers == null || go == null) return -1;
+        foreach (var kv in noteMarkers)
+        {
+            if (kv.Key.Item1 != track) continue;
+            if (kv.Value != null && kv.Value.gameObject == go)
+                return kv.Key.Item2;
+        }
+        return -1;
+    }
+
     private List<GameObject> GetNoteMarkers(InstrumentTrack track)
     {
         var result = new List<GameObject>();
