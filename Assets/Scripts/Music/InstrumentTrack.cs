@@ -1469,9 +1469,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // --- E) Loop-based fuse for ascension (note markers rising) ---
             int binCount = BinSize();
 
-            int effectiveLoops =
-                ascendLoopCount +
-                Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+            int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
 
             float seconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
 
@@ -1768,7 +1766,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (drumTrack != null)
                 {
                     int binCount = BinSize();
-                    int effectiveLoops = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+                    int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
                     float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
                     int capturedBurstId = burstId;
                     EnqueueNextFrame(() =>
@@ -1829,7 +1827,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (drumTrack != null)
         {
             int binCount = BinSize();
-            int effectiveLoops = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+            int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
             float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
             int capturedBurstId = burstId;
             int capturedDiscardedStep = authoredAbsStep;
@@ -1907,6 +1905,21 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// <summary>
     /// Returns this track's authored root, transposed into the same register as referenceMidi and clamped to allowed range.
     /// </summary>
+    /// <summary>
+    /// Ascension loops rounded up to the nearest multiple of the committed leader bin count.
+    /// This guarantees every track's note plays at least once at each of its bin positions
+    /// before being removed, regardless of how long the leader loop is relative to this track.
+    ///
+    /// Without this, a 1-bin track in a 2-bin leader ascends for 1 bar boundary and is removed
+    /// at playheadBin=1 — the track's step=0 is never audible during the ascension window.
+    /// </summary>
+    private int ComputeEffectiveAscendLoops(int binCount)
+    {
+        int ascendByConfig = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
+        int leaderBins = (controller != null) ? Mathf.Max(1, controller.GetCommittedLeaderBins()) : 1;
+        return Mathf.Max(1, Mathf.CeilToInt((float)ascendByConfig / leaderBins)) * leaderBins;
+    }
+
     private int GetAuthoredRootMidiInRegister(int referenceMidi)
     {
         int root = authoredRootMidi;

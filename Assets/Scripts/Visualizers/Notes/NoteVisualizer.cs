@@ -1186,6 +1186,17 @@ public class NoteVisualizer : MonoBehaviour
         }
         if (isLoop)
         {
+            // Density-injection guard: the step is in the loop from a *previous* burst's
+            // committed note, but this marker is a placeholder for the *current* burst.
+            // Preserve placeholder status so Vehicle can still target it for release.
+            // Clearing it here causes every queued note to be silently discarded and
+            // then TriggerBurstAscend removes the previous burst's note from the loop.
+            if (tag.isPlaceholder && tag.burstId == currentBurstId)
+            {
+                noteMarkers[(track, tag.step)] = tag.transform;
+                continue;
+            }
+
             // Keep burstId so the ascension director can find this marker by burst.
             // (DestroyOrphanRowMarkers only destroys isPlaceholder=true markers, so
             // keeping burstId >= 0 here does not cause premature cleanup.)

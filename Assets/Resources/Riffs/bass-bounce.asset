@@ -14,15 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
   riff:
     id: bass-bounce
-    authoredRootMidi: 48
+    authoredRootMidi: 60
     loopSteps: 16
     events:
     - step: 0
-      midiNote: 48
+      midiNote: 60
       durSteps: 16
       velocity01: 0.78740156
-    - step: 8
-      midiNote: 48
+    - step: 4
+      midiNote: 62
+      durSteps: 16
+      velocity01: 0.78740156
+    - step: 12
+      midiNote: 65
       durSteps: 16
       velocity01: 0.78740156
     overlapPolicy: 1
