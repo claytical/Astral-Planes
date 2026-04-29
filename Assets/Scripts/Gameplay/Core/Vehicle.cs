@@ -1536,13 +1536,10 @@ public class Vehicle : MonoBehaviour
     {
         Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} PASS=False commitSkipped=True");
 
-        // Outside the timing window — treat as an intentional discard so the player
-        // can skip notes they don't want to place.
-        _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
-        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+        // Keep the note queued so the same pending note can still be released on a
+        // later valid input action. This preserves cadence and avoids accidentally
+        // dropping notes during bin transitions.
         viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
-        CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
 
