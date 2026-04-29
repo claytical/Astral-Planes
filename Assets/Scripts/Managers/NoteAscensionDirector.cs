@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -287,7 +288,13 @@ public sealed class NoteAscensionDirector : MonoBehaviour
                         float currentCommit = ms.tag.track.GetNoteCommitTime(removeStep);
                         bool noteRefreshed = currentCommit > ms.commitTimeAtStart;
                         if (!noteRefreshed)
-                            ms.tag.track.RemovePersistentNoteAtStep(removeStep);
+                        {
+                            // Defer by 1 frame so InstrumentTrack.Update() can play the note
+                            // at the current bar boundary before it is removed, regardless of
+                            // script execution order (DrumTrack fires OnLoopBoundary before
+                            // InstrumentTrack runs, which otherwise silences step=0 permanently).
+                            StartCoroutine(RemovePersistentNoteNextFrame(ms.tag.track, removeStep, ms.commitTimeAtStart));
+                        }
                         var ctrl = ms.tag.track.controller;
                         if (ctrl != null)
                         {
@@ -318,6 +325,15 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         if (affectedControllers != null)
             foreach (var ctrl in affectedControllers)
                 TryCollapseIfHighestBinEmpty(ctrl);
+    }
+
+    private IEnumerator RemovePersistentNoteNextFrame(InstrumentTrack track, int step, float commitTimeAtStart)
+    {
+        yield return null;
+        if (track == null) yield break;
+        float currentCommit = track.GetNoteCommitTime(step);
+        if (currentCommit <= commitTimeAtStart)
+            track.RemovePersistentNoteAtStep(step);
     }
 
     private void TryCollapseIfHighestBinEmpty(InstrumentTrackController ctrl)
