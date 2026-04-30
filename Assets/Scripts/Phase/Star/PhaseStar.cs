@@ -832,11 +832,12 @@ public class PhaseStar : MonoBehaviour
     public void Resume()
     {
         if (_isDisposing) return;
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
         _disarmReason = DisarmReason.None;
         if (_burstOffScreen)
         {
-            _burstOffScreen = false;
-            motion?.Enable(true);
+            if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+                motion?.Enable(true);
             EnterDormantWaitState();
             return;
         }
@@ -1007,22 +1008,24 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         // 2) Global gate checks
         // ------------------------------------------------------------
-        if (AnyCollectablesInFlightGlobal())
+        bool anyCollectables = AnyCollectablesInFlightGlobal();
+        bool anyExpansion = AnyExpansionPendingGlobal();
+        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(anyCollectables, anyExpansion, _displayedCharge01 >= readyDisplayThreshold) ?? false;
+
+        if (shouldDisarmForGate)
         {
-            Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
-            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+            if (anyCollectables)
+                Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
+            else
+                Debug.Log($"[PS:LB] Any Expanding Global True");
+
+            Disarm(anyCollectables ? DisarmReason.CollectablesInFlight : DisarmReason.ExpansionPending, _lockedTint);
             return;
         }
 
-        if (AnyExpansionPendingGlobal())
+        if (anyExpansion && _displayedCharge01 >= readyDisplayThreshold)
         {
-            if (_displayedCharge01 >= readyDisplayThreshold)
-            {
-                Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
-                return;
-            }
-            Debug.Log($"[PS:LB] Any Expanding Global True");
-            Disarm(DisarmReason.ExpansionPending, _lockedTint);
+            Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
             return;
         }
 
@@ -1033,13 +1036,16 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         if (!_isArmed)
         {
+            _burstCoordinator ??= new PhaseStarBurstCoordinator();
             // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
             // CIF-triggered hide is safe to reset. Restore motion before arming.
             if (_burstOffScreen)
             {
-                _burstOffScreen = false;
-                motion?.Enable(true);
-                motion?.SetFrozen(false);
+                if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+                {
+                    motion?.Enable(true);
+                    motion?.SetFrozen(false);
+                }
             }
 
             DBG("[PS:LB] -> re-arm");
