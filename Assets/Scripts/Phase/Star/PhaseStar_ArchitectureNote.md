@@ -1,6 +1,7 @@
 # PhaseStar Ownership Boundaries (Post-refactor)
 
 - `PhaseStar` is orchestration-first: lifecycle sequencing, cross-component wiring, and top-level gameplay transitions.
+- `PhaseStar` is also the single authority for safety-bubble runtime state and static query mirrors (`SetSafetyBubbleState`).
 - `PhaseStarStateController` owns gate policy decisions for arming/disarming eligibility (single decision path for global gate checks).
 - `PhaseStarBurstCoordinator` owns burst-hidden transitions (enter + exit), reducing direct `_burstOffScreen` mutation spread.
 - `PhaseStarMotion2D` owns movement integration and screen containment.
