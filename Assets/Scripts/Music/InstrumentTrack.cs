@@ -1188,9 +1188,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     // First: transpose by the chord-root delta (this is the part you *expect* to hear)
         int shifted = midiNote + rootDelta;
-
-        // Clamp to this track's playable range
-        shifted = Mathf.Clamp(shifted, lowestAllowedNote, highestAllowedNote);
+        shifted = ShiftByOctavesIntoTrackRange(shifted);
 
         // Second: snap to nearest chord tone (optional but keeps your original intent)
         // Build allowed chord tones across this track’s playable range
@@ -1222,8 +1220,32 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             }
         }
 
-        return best;
+        return ShiftByOctavesIntoTrackRange(best);
 }
+
+    /// <summary>
+    /// Moves a MIDI note by octaves to fit this track's playable range.
+    /// If the range is narrower than one octave and no exact octave fit exists,
+    /// falls back to clamping.
+    /// </summary>
+    private int ShiftByOctavesIntoTrackRange(int midiNote)
+    {
+        int low = Mathf.Min(lowestAllowedNote, highestAllowedNote);
+        int high = Mathf.Max(lowestAllowedNote, highestAllowedNote);
+        if (high <= low) return low;
+
+        int shifted = midiNote;
+
+        while (shifted < low && shifted + 12 <= high)
+            shifted += 12;
+        while (shifted > high && shifted - 12 >= low)
+            shifted -= 12;
+
+        if (shifted < low || shifted > high)
+            shifted = Mathf.Clamp(shifted, low, high);
+
+        return shifted;
+    }
     public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
     {
         ascensionCohort ??= new AscensionCohort();
@@ -2164,7 +2186,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
     {
-        int qNote = skipChordQuantize ? note : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
+        int qNote = skipChordQuantize ? ShiftByOctavesIntoTrackRange(note) : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
         Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
         _noteCommitTimes[stepIndex] = Time.time;
