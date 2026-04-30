@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Kite-steering movement for SuperNode: flees nearest Vehicle, stays within DrumTrack play-area bounds.
@@ -17,7 +18,8 @@ public class SuperNodeKiteSteering : MonoBehaviour
     [SerializeField] private float maxSpeed = 6.0f;
 
     [Tooltip("Magnitude acceleration (units/sec^2).")]
-    [SerializeField] private float accel = 18.0f;
+    [FormerlySerializedAs("accel")]
+    [SerializeField] private float accelerationUnitsPerSecondSq = 18.0f;
 
     [Tooltip("Turn rate cap (deg/sec). Higher = slipperier.")]
     [SerializeField] private float turnRateDegPerSec = 540f;
@@ -79,7 +81,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
         }
 
         ResolveDrumTrack();
-        RefreshVehicles(force: true);
+        RefreshVehicles();
     }
 
     private void OnEnable()
@@ -101,7 +103,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
         _vehicleRefreshTimer -= Time.fixedDeltaTime;
         if (_vehicleRefreshTimer <= 0f)
         {
-            RefreshVehicles(force: false);
+            RefreshVehicles();
             _vehicleRefreshTimer = vehicleRefreshInterval;
         }
 
@@ -158,7 +160,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
         Vector2 toCenter = center - pos;
         Vector2 centerDir = toCenter.sqrMagnitude > 0.0001f ? toCenter.normalized : Vector2.zero;
 
-        float edgeFactor01 = EdgeFactor01(pos, bounds, edgeSoftnessWorld);
+        float edgeFactor01 = SuperNodeSteeringMath.EdgeFactor01(pos, bounds, edgeSoftnessWorld);
         Vector2 boundsBias = centerDir * edgeFactor01;
 
         // Combine desired heading.
@@ -181,7 +183,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
 
         // Turn-rate-limited steering.
         Vector2 vel = rb.linearVelocity;
-        Vector2 newVel = SteerTowards(vel, desiredVel, turnRateDegPerSec, accel, Time.fixedDeltaTime);
+        Vector2 newVel = SuperNodeSteeringMath.SteerTowards(vel, desiredVel, turnRateDegPerSec, accelerationUnitsPerSecondSq, Time.fixedDeltaTime);
 
         // Damping.
         newVel = Vector2.Lerp(newVel, Vector2.zero, linearDamping * Time.fixedDeltaTime);
@@ -189,7 +191,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
         rb.linearVelocity = newVel;
 
         // Hard clamp to play area (prevents corner-traps / out-of-bounds).
-        ClampToBounds(rb, bounds);
+        SuperNodeSteeringMath.ClampToBounds(rb, bounds);
 
         // Lifetime end: let SuperNode handle destruction semantics if desired.
         if (_age >= lifetimeSeconds)
@@ -235,60 +237,11 @@ public class SuperNodeKiteSteering : MonoBehaviour
         return bounds.width > 0.01f && bounds.height > 0.01f;
     }
 
-    private void RefreshVehicles(bool force)
+    private void RefreshVehicles()
     {
         // In newer Unity you can use FindObjectsByType. This is simple + robust for now.
         // If you already keep a live vehicle list in GameFlowManager, swap to that.
         _vehicles = FindObjectsOfType<Vehicle>(includeInactive: false);
     }
 
-    private static Vector2 SteerTowards(Vector2 currentVel, Vector2 desiredVel, float turnRateDegPerSec, float accel, float dt)
-    {
-        float curSpeed = currentVel.magnitude;
-        float desSpeed = desiredVel.magnitude;
-
-        // Match magnitude toward desired.
-        float speed = Mathf.MoveTowards(curSpeed, desSpeed, accel * dt);
-
-        // Rotate direction toward desired.
-        Vector2 curDir = curSpeed > 0.001f ? currentVel / curSpeed : (desSpeed > 0.001f ? desiredVel / desSpeed : Vector2.right);
-        Vector2 desDir = desSpeed > 0.001f ? desiredVel / desSpeed : curDir;
-
-        float maxRadians = turnRateDegPerSec * Mathf.Deg2Rad * dt;
-        Vector2 newDir = Vector3.RotateTowards(curDir, desDir, maxRadians, 0f);
-
-        return newDir * speed;
-    }
-
-    private static float EdgeFactor01(Vector2 pos, Rect bounds, float softnessWorld)
-    {
-        // Distance to nearest edge.
-        float dx = Mathf.Min(pos.x - bounds.xMin, bounds.xMax - pos.x);
-        float dy = Mathf.Min(pos.y - bounds.yMin, bounds.yMax - pos.y);
-        float d = Mathf.Min(dx, dy);
-
-        // When d >= softness => 0, when d == 0 => 1
-        return Mathf.Clamp01(1f - (d / Mathf.Max(0.0001f, softnessWorld)));
-    }
-
-    private static void ClampToBounds(Rigidbody2D rb, Rect bounds)
-    {
-        Vector2 p = rb.position;
-        bool clamped = false;
-
-        float x = p.x;
-        float y = p.y;
-
-        if (x < bounds.xMin) { x = bounds.xMin; clamped = true; }
-        else if (x > bounds.xMax) { x = bounds.xMax; clamped = true; }
-
-        if (y < bounds.yMin) { y = bounds.yMin; clamped = true; }
-        else if (y > bounds.yMax) { y = bounds.yMax; clamped = true; }
-
-        if (clamped)
-        {
-            rb.position = new Vector2(x, y);
-            rb.linearVelocity *= 0.65f; // soften edge impact
-        }
-    }
 }
