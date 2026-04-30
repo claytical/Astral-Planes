@@ -1642,11 +1642,10 @@ public class PhaseStar : MonoBehaviour
         // +0.5f gives the bubble a little breathing room relative to discrete cells
         _bubbleRadiusWorld = (SafetyBubbleRadiusCells + 0.5f) * cell;
 
-        _bubbleActive = true;
-
         // Use provided center (e.g. MineNode capture position for gravity void),
         // falling back to star position for non-void calls.
-        _bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
+        Vector2 bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
+        SetSafetyBubbleState(true, bubbleCenterWorld, _bubbleRadiusWorld);
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint, _bubbleCenterWorld);
@@ -1660,10 +1659,21 @@ public class PhaseStar : MonoBehaviour
         if (!_bubbleActive) return; // already off — no log spam
 
         Debug.Log($"[BUBBLE] DeactivateSafetyBubble star={name} frame={Time.frameCount}");
-        _bubbleActive = false;
+        SetSafetyBubbleState(false, Vector2.zero, 0f);
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.HideSafetyBubble();
+    }
+
+    private void SetSafetyBubbleState(bool active, Vector2 centerWorld, float radiusWorld)
+    {
+        _bubbleActive = active;
+        _bubbleCenterWorld = centerWorld;
+        _bubbleRadiusWorld = radiusWorld;
+
+        s_bubbleActive = active;
+        s_bubbleCenter = centerWorld;
+        s_bubbleRadiusWorld = radiusWorld;
     }
 }
     

@@ -8,6 +8,7 @@
 | PhaseStar.cs | `_previewInitialized`, `_previewVisual`, `_previewVisualB` | Live | High | Used by preview ring build/update scale paths. |
 | PhaseStar.cs | `_awaitingCollectableClearSinceLoop`, `_awaitingCollectableClearSinceDsp` | Live | High | Used in loop-boundary timeout recovery. |
 | PhaseStar.cs | `_burstOffScreen` | Live | High | Burst hide/recovery gate across state transitions. |
+| PhaseStar.cs | `_bubbleActive`, `_bubbleCenterWorld`, `_bubbleRadiusWorld`, `s_bubble*` mirrors | Live | High | Owned by `SetSafetyBubbleState` for local + static bubble queries. |
 | PhaseStar.cs | `bubbleTint`, `bubbleShardInnerTint` | Inspector-only | Medium | Visual tuning inputs for bubble render path. |
 | PhaseStar.cs | `_cachedIsSuperNode` | Live | Medium | Cached selection for node type decision. |
 | PhaseStarMotion2D.cs | `bounds`, `avoidance`, `steering`, `navBlend` and nested fields | Live | High | Read in FixedUpdate steering/containment logic. |
