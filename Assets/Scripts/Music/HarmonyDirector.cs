@@ -205,12 +205,14 @@ public class HarmonyDirector : MonoBehaviour
         if (seq == null || seq.Count == 0) return;
 
         var chord = seq[chordIndex % seq.Count];
-        Debug.Log($"[CHORD][HD] RetuneAll → chord[{chordIndex}]={chord.rootNote}");
+        Debug.Log($"[CHORD][HD] RetuneAll (per-bin) baselineChord[{chordIndex}]={chord.rootNote}");
         foreach (var tr in GameFlowManager.Instance.controller.tracks)
         {
-            Debug.Log($"Applying chord {chord.rootNote}");
-            Debug.Log($"[CHORD][HD] Retuned track={tr.name} role={tr.assignedRole}");
-            tr.RetuneLoopToChord(chord); // <-- new helper on InstrumentTrack (below)
+            Debug.Log($"Applying progression retune on track={tr.name} role={tr.assignedRole}");
+            Debug.Log($"[CHORD][HD] Retuned track={tr.name} role={tr.assignedRole} mode=RetuneLoopToCurrentProgression");
+            // IMPORTANT: Retune to per-bin chord assignments, not a single global chord.
+            // Using RetuneLoopToChord(...) here flattens bin harmony (e.g., I-II -> I-I).
+            tr.RetuneLoopToCurrentProgression();
         }
     }
     private void ResetLoopFlags()
