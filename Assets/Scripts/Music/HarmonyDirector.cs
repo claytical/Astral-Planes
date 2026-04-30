@@ -231,27 +231,30 @@ public class HarmonyDirector : MonoBehaviour
         }
 
         // === Phase/Chord COMMIT path (system-driven) ===
+        Debug.Log($"[CHORD][HD][Boundary] forceCommit={_forceCommitNextBoundary} pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
         if (_forceCommitNextBoundary || _hasPendingProfileSwap)
         {
-            // Swap to pending profile if any
+            bool appliedProfileSwap = false;
+
+            // Swap to pending profile if any.
+            // IMPORTANT: only a real profile swap should reset all tracks to chord 0.
             if (_hasPendingProfileSwap && _pendingProfile != null)
             {
                 profile = _pendingProfile;
                 _pendingProfile = null;
                 _hasPendingProfileSwap = false;
+                appliedProfileSwap = true;
             }
 
-            // Snap every track’s personal sequence back to I (index 0), retune per-bin
-            if (profile.chordSequence != null && profile.chordSequence.Count > 0)
+            if (appliedProfileSwap && profile.chordSequence != null && profile.chordSequence.Count > 0)
             {
+                // New profile committed: reset personal sequences and retune per-bin.
                 foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
                     if (tr == null) continue;
                     _trackSeq[tr] = new List<int> { 0 };
                     _trackPos[tr] = 0;
 
-                    // If a loop exists, retune it so the whole band lands together,
-                    // respecting each bin's chord assignment in the new progression.
                     if (tr.GetPersistentLoopNotes().Count > 0)
                         tr.RetuneLoopToCurrentProgression();
                 }

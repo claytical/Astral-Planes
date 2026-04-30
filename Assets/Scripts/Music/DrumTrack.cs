@@ -851,7 +851,10 @@ public class DrumTrack : MonoBehaviour
             foreach (var track in _ctrl.tracks)
             {
                 if (track == null) continue;
-                int bin = completedLoops % Mathf.Max(1, track.loopMultiplier);
+                // On a boundary callback, completedLoops has already been incremented
+                // to the *new* loop. For "what just played" checks, use the previous loop
+                // index so we do not accidentally sample bin 0 at wrap (e.g., I-II -> I-I).
+                int bin = (Mathf.Max(0, completedLoops - 1)) % Mathf.Max(1, track.loopMultiplier);
                 if (track.HasAnyNoteInBin(bin)) { allEmpty = false; break; }
             }
             if (allEmpty) intensity01 = 0f;
