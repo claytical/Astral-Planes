@@ -301,7 +301,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private readonly List<Action> _nextFrameQueue = new();
     private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
     public int BinSize() => drumTrack != null ? drumTrack.totalSteps : 16;
-    private int BinIndexForStep(int step) => Mathf.Clamp(step / BinSize(), 0, Mathf.Max(0, maxLoopMultiplier - 1));
+    public int BinIndexForStep(int step) => Mathf.Clamp(step / BinSize(), 0, Mathf.Max(0, maxLoopMultiplier - 1));
     /// <summary>
     /// Store the pre-generated NoteSet for a specific bin.
     /// Called by PhaseTransitionManager during motif setup.
