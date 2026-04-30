@@ -231,6 +231,7 @@ public class HarmonyDirector : MonoBehaviour
         }
 
         // === Phase/Chord COMMIT path (system-driven) ===
+        Debug.Log($"[CHORD][HD][Boundary] forceCommit={_forceCommitNextBoundary} pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
         if (_forceCommitNextBoundary || _hasPendingProfileSwap)
         {
             bool appliedProfileSwap = false;
