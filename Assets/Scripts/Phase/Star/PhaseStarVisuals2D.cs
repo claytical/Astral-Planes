@@ -51,7 +51,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     private float _diamondBAngleVelocity;
     private bool _diamondAnglesInitialized;
 
-    public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
+    public void Initialize()
     {
         ResolveBubbleReferences();
         CacheShardRenderers();

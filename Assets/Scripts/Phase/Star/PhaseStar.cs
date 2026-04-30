@@ -48,21 +48,6 @@ public class PhaseStar : MonoBehaviour
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
-    [Header("Off-Screen Entry")]
-    [Tooltip("World units outside the screen edge where the star spawns.")]
-    [SerializeField] private float entryOffscreenMargin = 2f;
-    [Tooltip("How close to the screen interior edge (world units) before the star is " +
-             "considered 'arrived' and transitions into its dormant on-screen wait.")]
-    [SerializeField] private float entryArriveThreshold = 1.5f;
-    [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
-    [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
-    [Tooltip("Seconds to drift at reduced speed after crossing the screen boundary, before stopping.")]
-    [SerializeField, Min(0f)] private float entryDriftSeconds = 2.0f;
-    [Tooltip("Speed fraction (0-1) during the post-entry drift settle.")]
-    [SerializeField, Range(0f, 1f)] private float entryDriftSpeedMul = 0.4f;
-    [Tooltip("Minimum world-unit inset from the top screen edge after drift settles. " +
-             "Must be > diamond half-height so no shard clips the viewport.")]
-    [SerializeField, Min(0.5f)] private float entrySettleInset = 2.5f;
     [Tooltip("Accumulator rotation speed multiplier when charge is ready (diamonds merged → faster spin).")]
     [SerializeField, Min(1f)] private float readyRotSpeedMul = 2.5f;
     [Header("Charge Readiness")]
@@ -519,9 +504,9 @@ public class PhaseStar : MonoBehaviour
         _displayedCharge01 = 0f;
 
         EnsureSubcomponents();
-        if (visuals) visuals.Initialize(behaviorProfile, this);
+        if (visuals) visuals.Initialize();
         if (motion) motion.Initialize(behaviorProfile, this);
-        if (cravingNavigator) cravingNavigator.Initialize(this, motion, behaviorProfile);
+        if (cravingNavigator) cravingNavigator.Initialize(this, behaviorProfile);
         if (motion && cravingNavigator) motion.SetCravingNavigator(cravingNavigator);
 
         if (dust)
