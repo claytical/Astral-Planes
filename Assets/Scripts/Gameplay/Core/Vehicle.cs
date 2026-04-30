@@ -446,7 +446,6 @@ public class Vehicle : MonoBehaviour
         bool compositionMode = p.track.controller != null &&
                                p.track.controller.noteCommitMode == NoteCommitMode.Composition;
         // Composition mode: use the note the player physically collected.
-        // Performance mode: look up the authored note for whatever step the player released on.
         int chosenMidi = compositionMode
             ? p.collectedMidi
             : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
@@ -1534,6 +1533,25 @@ public class Vehicle : MonoBehaviour
     bool inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
                          backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
     bool pass = inAheadWindow || inGraceWindow;
+
+    if (!pass && viz != null &&
+        viz.TryGetNearestUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int nearestAbsStep, out double nearestFwd))
+    {
+        double nearestBack = effectiveTotal - nearestFwd;
+        bool nearestPass = nearestFwd <= vehicleConfig.manualReleaseArmAheadSteps ||
+                           (vehicleConfig.manualReleaseGracePeriodSteps > 0f && nearestBack <= vehicleConfig.manualReleaseGracePeriodSteps);
+        if (nearestPass)
+        {
+            targetAbsStep = nearestAbsStep;
+            fwdToTarget = nearestFwd;
+            backFromTarget = nearestBack;
+            inAheadWindow = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
+            inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
+                            backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
+            pass = true;
+            Debug.Log($"[RELEASE_RETARGET] oldTarget rejected, newTarget={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} PASS=True");
+        }
+    }
     Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
 
     if (!pass)
@@ -1550,7 +1568,9 @@ public class Vehicle : MonoBehaviour
     // Window passed — now consume the note.
     _pendingNotes.Dequeue();
 
-    if (pass && vehicleConfig.manualReleaseUseArmLock)
+    bool lateGracePass = inGraceWindow && !inAheadWindow;
+
+    if (pass && vehicleConfig.manualReleaseUseArmLock && !lateGracePass)
     {
         // stepDur must use the full leader loop length (all bins × clip length), because
         // totalSteps from TryGetRawPlayheadAbsStep is also leader-scoped.

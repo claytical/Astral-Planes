@@ -309,6 +309,58 @@ public class NoteVisualizer : MonoBehaviour
     return true;
 }
 
+    public bool TryGetNearestUnlitStepExcluding(
+    InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
+    HashSet<int> excludedSteps, out int targetAbsStep, out double forwardSteps)
+{
+    targetAbsStep = -1;
+    forwardSteps = double.MaxValue;
+    if (track == null) return false;
+    if (noteMarkers == null || noteMarkers.Count == 0) return false;
+
+    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
+    double from = rawAbsStep % totalAbsSteps;
+    if (from < 0) from += totalAbsSteps;
+
+    int bestStep = -1;
+    double bestDistance = double.MaxValue;
+    double bestForward = double.MaxValue;
+
+    foreach (var kv in noteMarkers)
+    {
+        if (kv.Key.Item1 != track) continue;
+        int step = kv.Key.Item2;
+        if (step < 0) continue;
+
+        int effectiveTotal = track != null
+            ? Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()))
+            : totalAbsSteps;
+        if (step >= effectiveTotal) continue;
+        if (excludedSteps != null && excludedSteps.Contains(step)) continue;
+
+        var tr = kv.Value;
+        if (!tr) continue;
+        var tag = tr.GetComponent<MarkerTag>();
+        if (tag == null || !tag.isPlaceholder) continue;
+
+        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
+        double back = (from - step + totalAbsSteps) % totalAbsSteps;
+        double dist = Math.Min(fwd, back);
+
+        if (dist < bestDistance || (Math.Abs(dist - bestDistance) < 0.0001 && fwd < bestForward))
+        {
+            bestDistance = dist;
+            bestForward = fwd;
+            bestStep = step;
+        }
+    }
+
+    if (bestStep < 0) return false;
+    targetAbsStep = bestStep;
+    forwardSteps = bestForward;
+    return true;
+}
+
     public void ClearManualReleaseCue(Transform vehicle)
     {
         if (vehicle == null) return;

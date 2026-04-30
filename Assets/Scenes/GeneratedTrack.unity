@@ -17278,7 +17278,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d477bd438cd9324ca89a2934c7d01ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteCommitMode: 1
+  noteCommitMode: 0
   tracks:
   - {fileID: 342701841}
   - {fileID: 1690824280}
