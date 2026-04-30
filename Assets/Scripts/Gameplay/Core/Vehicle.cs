@@ -450,6 +450,14 @@ public class Vehicle : MonoBehaviour
             ? p.collectedMidi
             : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
+        int resolvedDurationTicks = p.durationTicks;
+        int binSize = Mathf.Max(1, p.track.BinSize());
+        int targetBin = p.track.BinIndexForStep(targetAbsStep);
+        int localStep = ((targetAbsStep % binSize) + binSize) % binSize;
+        var noteSetForBin = p.track.GetNoteSetForBin(targetBin);
+        if (noteSetForBin != null && noteSetForBin.TryGetTemplateTimingAtStep(localStep, out int authoredDurationTicks, out _))
+            resolvedDurationTicks = authoredDurationTicks;
+
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = p.velocity127;
         if (occupied)
@@ -469,7 +477,7 @@ public class Vehicle : MonoBehaviour
         p.track.CommitManualReleasedNote(
             stepAbs: targetAbsStep,
             midiNote: chosenMidi,
-            durationTicks: p.durationTicks,
+            durationTicks: resolvedDurationTicks,
             velocity127: commitVel,
             authoredRootMidi: p.authoredRootMidi,
             burstId: p.burstId,
@@ -479,7 +487,7 @@ public class Vehicle : MonoBehaviour
 
         // Play the note immediately — the playhead is at this step right now.
         // Without this, the note only sounds the next time the loop passes this step.
-        p.track.PlayOneShotMidi(chosenMidi, commitVel, p.durationTicks);
+        p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);
 
         // Visual feedback: pulse the marker and emit the track-color particle burst.
         if (viz != null)
@@ -490,7 +498,7 @@ public class Vehicle : MonoBehaviour
 
         // Occupied-step reward accent.
         if (occupied && vehicleConfig.occupiedStepOctaveAccent)
-            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
+            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, resolvedDurationTicks);
     }
     // ---- Note Trail Management ----
     private void RecordPositionHistory()
