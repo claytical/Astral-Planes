@@ -719,6 +719,15 @@ public class Vehicle : MonoBehaviour
 
         // Pending notes: trail behind vehicle.
         int slot = armedSlot;
+        bool hasPendingRaw = false;
+        double rawAbsPending = 0;
+        int totalPending = 0;
+        if (_pendingNotes.Count > 0)
+        {
+            var head = _pendingNotes.Peek();
+            if (head.track != null && head.track.controller != null)
+                hasPendingRaw = head.track.controller.TryGetRawPlayheadAbsStep(out rawAbsPending, out _, out totalPending);
+        }
         foreach (var p in _pendingNotes)
         {
             if (p.collectable == null) { slot++; continue; }
@@ -726,10 +735,36 @@ public class Vehicle : MonoBehaviour
             float dist = bunchDist;
             p.collectable.SetTrailTarget(SampleTrailPosition(dist));
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
-            if (slot == 0 && _armedReleases.Count == 0)
-                p.collectable.tether?.SetTimingState(pulse01, inTimingWindow, atExactStep);
-            else
-                p.collectable.tether?.SetTimingState(0f, false, false);
+
+            // Drive each tether from its own assigned step so one note doesn't incorrectly
+            // "borrow" another note's timing window.
+            bool noteInWindow = false;
+            bool noteExact = false;
+            float notePulse = 0f;
+            if (_armedReleases.Count == 0 && hasPendingRaw && totalPending > 0 &&
+                p.track != null && p.track.drumTrack != null)
+            {
+                int targetAbs = p.collectable.tether != null && p.collectable.tether.boundStep >= 0
+                    ? p.collectable.tether.boundStep
+                    : p.authoredAbsStep;
+
+                if (targetAbs >= 0)
+                {
+                    int total = Mathf.Max(1, totalPending);
+                    double fwdSteps = (targetAbs - rawAbsPending + total) % total;
+                    int pBinSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
+                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
+                    double pLoopLen = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
+                    double pStepDur = pLoopLen / total;
+                    double fwdDsp = fwdSteps * pStepDur;
+                    const float ringWindowLead = 1.5f;
+                    double windowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
+                    notePulse = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, windowDsp)));
+                    noteInWindow = fwdDsp <= windowDsp;
+                    noteExact = fwdSteps <= 0.025;
+                }
+            }
+            p.collectable.tether?.SetTimingState(notePulse, noteInWindow, noteExact);
             slot++;
         }
     }
