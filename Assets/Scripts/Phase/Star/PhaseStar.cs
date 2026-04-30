@@ -48,21 +48,6 @@ public class PhaseStar : MonoBehaviour
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
-    [Header("Off-Screen Entry")]
-    [Tooltip("World units outside the screen edge where the star spawns.")]
-    [SerializeField] private float entryOffscreenMargin = 2f;
-    [Tooltip("How close to the screen interior edge (world units) before the star is " +
-             "considered 'arrived' and transitions into its dormant on-screen wait.")]
-    [SerializeField] private float entryArriveThreshold = 1.5f;
-    [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
-    [SerializeField, Min(0f)] private float entryFadeInSeconds = 0.6f;
-    [Tooltip("Seconds to drift at reduced speed after crossing the screen boundary, before stopping.")]
-    [SerializeField, Min(0f)] private float entryDriftSeconds = 2.0f;
-    [Tooltip("Speed fraction (0-1) during the post-entry drift settle.")]
-    [SerializeField, Range(0f, 1f)] private float entryDriftSpeedMul = 0.4f;
-    [Tooltip("Minimum world-unit inset from the top screen edge after drift settles. " +
-             "Must be > diamond half-height so no shard clips the viewport.")]
-    [SerializeField, Min(0.5f)] private float entrySettleInset = 2.5f;
     [Tooltip("Accumulator rotation speed multiplier when charge is ready (diamonds merged → faster spin).")]
     [SerializeField, Min(1f)] private float readyRotSpeedMul = 2.5f;
     [Header("Charge Readiness")]
@@ -519,9 +504,9 @@ public class PhaseStar : MonoBehaviour
         _displayedCharge01 = 0f;
 
         EnsureSubcomponents();
-        if (visuals) visuals.Initialize(behaviorProfile, this);
+        if (visuals) visuals.Initialize();
         if (motion) motion.Initialize(behaviorProfile, this);
-        if (cravingNavigator) cravingNavigator.Initialize(this, motion, behaviorProfile);
+        if (cravingNavigator) cravingNavigator.Initialize(this, behaviorProfile);
         if (motion && cravingNavigator) motion.SetCravingNavigator(cravingNavigator);
 
         if (dust)
@@ -832,11 +817,12 @@ public class PhaseStar : MonoBehaviour
     public void Resume()
     {
         if (_isDisposing) return;
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
         _disarmReason = DisarmReason.None;
         if (_burstOffScreen)
         {
-            _burstOffScreen = false;
-            motion?.Enable(true);
+            if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+                motion?.Enable(true);
             EnterDormantWaitState();
             return;
         }
@@ -1007,22 +993,24 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         // 2) Global gate checks
         // ------------------------------------------------------------
-        if (AnyCollectablesInFlightGlobal())
+        bool anyCollectables = AnyCollectablesInFlightGlobal();
+        bool anyExpansion = AnyExpansionPendingGlobal();
+        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(anyCollectables, anyExpansion, _displayedCharge01 >= readyDisplayThreshold) ?? false;
+
+        if (shouldDisarmForGate)
         {
-            Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
-            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+            if (anyCollectables)
+                Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
+            else
+                Debug.Log($"[PS:LB] Any Expanding Global True");
+
+            Disarm(anyCollectables ? DisarmReason.CollectablesInFlight : DisarmReason.ExpansionPending, _lockedTint);
             return;
         }
 
-        if (AnyExpansionPendingGlobal())
+        if (anyExpansion && _displayedCharge01 >= readyDisplayThreshold)
         {
-            if (_displayedCharge01 >= readyDisplayThreshold)
-            {
-                Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
-                return;
-            }
-            Debug.Log($"[PS:LB] Any Expanding Global True");
-            Disarm(DisarmReason.ExpansionPending, _lockedTint);
+            Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
             return;
         }
 
@@ -1033,13 +1021,16 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         if (!_isArmed)
         {
+            _burstCoordinator ??= new PhaseStarBurstCoordinator();
             // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
             // CIF-triggered hide is safe to reset. Restore motion before arming.
             if (_burstOffScreen)
             {
-                _burstOffScreen = false;
-                motion?.Enable(true);
-                motion?.SetFrozen(false);
+                if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+                {
+                    motion?.Enable(true);
+                    motion?.SetFrozen(false);
+                }
             }
 
             DBG("[PS:LB] -> re-arm");
@@ -1651,11 +1642,10 @@ public class PhaseStar : MonoBehaviour
         // +0.5f gives the bubble a little breathing room relative to discrete cells
         _bubbleRadiusWorld = (SafetyBubbleRadiusCells + 0.5f) * cell;
 
-        _bubbleActive = true;
-
         // Use provided center (e.g. MineNode capture position for gravity void),
         // falling back to star position for non-void calls.
-        _bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
+        Vector2 bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
+        SetSafetyBubbleState(true, bubbleCenterWorld, _bubbleRadiusWorld);
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint, _bubbleCenterWorld);
@@ -1669,10 +1659,21 @@ public class PhaseStar : MonoBehaviour
         if (!_bubbleActive) return; // already off — no log spam
 
         Debug.Log($"[BUBBLE] DeactivateSafetyBubble star={name} frame={Time.frameCount}");
-        _bubbleActive = false;
+        SetSafetyBubbleState(false, Vector2.zero, 0f);
 
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
         visuals?.HideSafetyBubble();
+    }
+
+    private void SetSafetyBubbleState(bool active, Vector2 centerWorld, float radiusWorld)
+    {
+        _bubbleActive = active;
+        _bubbleCenterWorld = centerWorld;
+        _bubbleRadiusWorld = radiusWorld;
+
+        s_bubbleActive = active;
+        s_bubbleCenter = centerWorld;
+        s_bubbleRadiusWorld = radiusWorld;
     }
 }
     
