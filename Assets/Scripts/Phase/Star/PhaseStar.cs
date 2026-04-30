@@ -133,6 +133,9 @@ public class PhaseStar : MonoBehaviour
     private static Vector2 s_bubbleCenter;
     private static float s_bubbleRadiusWorld;
     private readonly Dictionary<MusicalRole, float> _starCharge = new();
+    private IPhaseStarChargeModel _chargeModel;
+    private IPhaseStarStateController _stateController;
+    private IPhaseStarBurstCoordinator _burstCoordinator;
 
     [Header("Shard Visuals (Charge-Alpha)")]
     [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
@@ -227,22 +230,15 @@ public class PhaseStar : MonoBehaviour
     // -------------------- Lifecycle --------------------
     void Start()
     {
+        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
+        _stateController ??= new PhaseStarStateController();
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
         EnsurePreviewRing();
     }
     public void AddCharge(MusicalRole role, float energyUnitsDelivered)
     {
-        if (role == MusicalRole.None) return;
-        if (_attunedRole != MusicalRole.None && role != _attunedRole) return;
-        float add = Mathf.Max(0f, energyUnitsDelivered) * (behaviorProfile != null ? behaviorProfile.dustToStarChargeMul : 1f);
-        if (add <= 0f) return;
-
-        // [BALANCE-C] Diminishing returns: charge above fieldAvg * 1.5 accrues at half rate.
-        float fieldAvg = (_starCharge.Count > 0) ? GetTotalCharge() / _starCharge.Count : 0f;
-        _starCharge.TryGetValue(role, out float cur);
-        if (cur > fieldAvg * 1.5f)
-            add *= 0.5f;
-
-        _starCharge[role] = cur + add;  // Unbounded — no Mathf.Min(1f) cap.
+        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
+        _chargeModel.AddCharge(role, energyUnitsDelivered, behaviorProfile != null ? behaviorProfile.dustToStarChargeMul : 1f, _attunedRole);
     }
     /// <summary>
     /// Returns 0..1 hunger for a specific role: 1 = starving (zero charge), 0 = fully charged.
@@ -250,7 +246,8 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public float GetRoleHunger(MusicalRole role)
     {
-        return 1f - GetChargeNormalized01(role);
+        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
+        return _chargeModel.GetRoleHunger(role);
     }
 
     public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
@@ -382,10 +379,8 @@ public class PhaseStar : MonoBehaviour
 
     private float GetTotalCharge()
     {
-        float total = 0f;
-        foreach (var kv in _starCharge)
-            total += kv.Value;
-        return total;
+        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
+        return _chargeModel.GetTotalCharge();
     }
 
     // Returns 0-1: how close a role's charge is to its ready threshold.
@@ -796,12 +791,8 @@ public class PhaseStar : MonoBehaviour
     
     private void ArmNext()
     {
-        if (_state != PhaseStarState.WaitingForPoke) return;
-        if (_entryInProgress) return;
-        if (_waitForDustCo != null) return;
-        if (_activeNode != null || _activeSuperNode != null) return;
-        if (_awaitingCollectableClear) return;
-        if (_burstOffScreen) return;
+        _stateController ??= new PhaseStarStateController();
+        if (!_stateController.CanArm(_state, _entryInProgress, _waitForDustCo != null, _activeNode != null || _activeSuperNode != null, _awaitingCollectableClear, _burstOffScreen)) return;
 
         if (AnyCollectablesInFlightGlobal())
         {
@@ -867,12 +858,11 @@ public class PhaseStar : MonoBehaviour
     // Guarded — safe to call repeatedly; only executes on the first call per burst.
     private void HideInPlaceForBurst()
     {
-        if (_burstOffScreen) return;
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
+        if (!_burstCoordinator.TryEnterBurstHidden(ref _burstOffScreen)) return;
 
         StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
-
-        _burstOffScreen = true;
 
         // Stay at current world position — do NOT teleport off-screen.
         motion?.Enable(false);

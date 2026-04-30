@@ -112,6 +112,9 @@ public class MotifCoralVisualizer : MonoBehaviour
     // Runtime noise textures — generated once in Awake, shared across all segments
     private Texture2D _outlineNoiseTex;
     private Texture2D _fillNoiseTex;
+    private IMotifCoralGeometryBuilder _geometryBuilder;
+    private IMotifCoralAnimationController _animationController;
+    private IMotifCoralVisualResources _visualResources;
 
     [Header("Scale")]
     [Tooltip("Master world-space scale for all geometry. Set this to match your scene's unit size instead of scaling the GameObject transform. " +
@@ -264,6 +267,9 @@ public class MotifCoralVisualizer : MonoBehaviour
 
         _outlineNoiseTex = GenerateOrganicNoise(noiseTexSize, darkenEdges: true);
         _fillNoiseTex    = GenerateOrganicNoise(noiseTexSize, darkenEdges: false);
+        _visualResources = new MotifCoralVisualResources(_outlineNoiseTex, _fillNoiseTex);
+        _geometryBuilder ??= new MotifCoralGeometryBuilder();
+        _animationController ??= new MotifCoralAnimationController();
 
         var mr = GetComponent<MeshRenderer>();
         if (mr) mr.enabled = false;
@@ -862,7 +868,7 @@ private void PlayBudSignal(GameObject budGo, bool isMatched)
 
         var fillMesh = new Mesh { name = segName + "_Fill" };
         fillMF.sharedMesh = fillMesh;
-        var fillData = BuildTube(fillMesh, spine, baseRadius * 0.55f, col, vertexAlpha: fillAlpha * vertexAlpha);
+        var fillData = _geometryBuilder.BuildTube(fillMesh, spine, baseRadius * 0.55f, tubeSides, tapePower, minTipRadius, worldScale, col, fillAlpha * vertexAlpha);
 
         // Hide initially for animation
         outlineMesh.SetTriangles(Array.Empty<int>(), 0, true);
@@ -886,90 +892,8 @@ private void PlayBudSignal(GameObject budGo, bool isMatched)
     private (int[] fullTris, int segCount) BuildTube(Mesh mesh, Vector3[] spine,
                                                        float baseRadius, Color col, float vertexAlpha)
     {
-        int rings    = spine.Length;
-        int segCount = rings - 1;
-        int sides    = Mathf.Max(3, tubeSides);
-
-        int vCount   = rings * sides;
-        int idxCount = segCount * sides * 6;
-
-        var verts = new Vector3[vCount];
-        var norms = new Vector3[vCount];
-        var uvs   = new Vector2[vCount];
-        var cols  = new Color[vCount];
-        var tris  = new int[idxCount];
-
-        // Parallel-transport frame
-        Vector3 prevNorm = Vector3.up;
-        if ((spine[1] - spine[0]).normalized is Vector3 initTan
-            && Mathf.Abs(Vector3.Dot(initTan, prevNorm)) > 0.95f)
-            prevNorm = Vector3.right;
-
-        for (int r = 0; r < rings; r++)
-        {
-            Vector3 tangent = r < rings - 1
-                ? (spine[r + 1] - spine[r])
-                : (spine[r] - spine[r - 1]);
-            if (tangent.sqrMagnitude < 1e-6f) tangent = prevNorm;
-            tangent.Normalize();
-
-            Vector3 normal = prevNorm - Vector3.Dot(prevNorm, tangent) * tangent;
-            if (normal.sqrMagnitude < 1e-6f)
-            {
-                normal = Vector3.Cross(tangent, Vector3.right);
-                if (normal.sqrMagnitude < 1e-6f) normal = Vector3.Cross(tangent, Vector3.up);
-            }
-            normal.Normalize();
-            Vector3 binormal = Vector3.Cross(tangent, normal).normalized;
-            prevNorm = normal;
-
-            float t      = rings <= 1 ? 0f : (float)r / (rings - 1);
-            float taper  = Mathf.Pow(1f - t, tapePower);
-            float radius = Mathf.Max(S(minTipRadius), baseRadius * taper);
-
-            for (int s = 0; s < sides; s++)
-            {
-                float angle = (float)s / sides * Mathf.PI * 2f;
-                float cos   = Mathf.Cos(angle);
-                float sin   = Mathf.Sin(angle);
-
-                Vector3 offset = (normal * cos + binormal * sin) * radius;
-                int vi = r * sides + s;
-                verts[vi] = spine[r] + offset;
-                norms[vi] = offset.normalized;
-                uvs[vi]   = new Vector2((float)s / sides, t);
-
-                Color c = col;
-                c.a = vertexAlpha * (1f - t * 0.35f); // subtle fade toward tip
-                cols[vi] = c;
-            }
-        }
-
-        // Triangles
-        int ti = 0;
-        for (int r = 0; r < segCount; r++)
-        {
-            for (int s = 0; s < sides; s++)
-            {
-                int sNext = (s + 1) % sides;
-                int a = r * sides + s;
-                int b = r * sides + sNext;
-                int c = (r + 1) * sides + s;
-                int d = (r + 1) * sides + sNext;
-
-                tris[ti++] = a; tris[ti++] = c; tris[ti++] = b;
-                tris[ti++] = b; tris[ti++] = c; tris[ti++] = d;
-            }
-        }
-
-        mesh.SetVertices(verts);
-        mesh.SetNormals(norms);
-        mesh.SetUVs(0, uvs);
-        mesh.SetColors(cols);
-        mesh.SetTriangles(tris, 0, true);
-        mesh.RecalculateBounds();
-
-        return (tris, segCount);
+        _geometryBuilder ??= new MotifCoralGeometryBuilder();
+        return _geometryBuilder.BuildTube(mesh, spine, baseRadius, tubeSides, tapePower, minTipRadius, worldScale, col, vertexAlpha);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
