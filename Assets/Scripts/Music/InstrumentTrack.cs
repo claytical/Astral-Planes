@@ -1186,8 +1186,25 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         ? chord.rootNote - authoredRootMidi
         : chord.rootNote - baseChord.rootNote;
 
-    // First: transpose by the chord-root delta (this is the part you *expect* to hear)
-        int shifted = midiNote + rootDelta;
+    bool noteAlreadyInTargetChord = false;
+    if (chord.intervals != null && chord.intervals.Count > 0)
+    {
+        int notePc = ((midiNote % 12) + 12) % 12;
+        int chordRootPc = ((chord.rootNote % 12) + 12) % 12;
+        for (int i = 0; i < chord.intervals.Count; i++)
+        {
+            int ivPc = ((chord.intervals[i] % 12) + 12) % 12;
+            if (notePc == ((chordRootPc + ivPc) % 12))
+            {
+                noteAlreadyInTargetChord = true;
+                break;
+            }
+        }
+    }
+
+    // If note already fits this chord, preserve it and only octave-fit into track range.
+    // Otherwise apply root-delta transposition for bin/chord movement.
+        int shifted = noteAlreadyInTargetChord ? midiNote : (midiNote + rootDelta);
         shifted = ShiftByOctavesIntoTrackRange(shifted);
 
         // Second: snap to nearest chord tone (optional but keeps your original intent)
