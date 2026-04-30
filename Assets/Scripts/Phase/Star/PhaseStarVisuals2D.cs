@@ -174,7 +174,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         ToggleShardRenderers(true);
         ApplyParticleAlpha(.4f);
 
-        if (particles) particles.Play();
+        EnsureParticlesVisible(playIfStopped: true);
     }
 
     public void ShowDim(Color tint)
@@ -202,8 +202,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         SetShardTint(c);
         ApplyParticleAlpha(0.05f);
 
-        if (particles && particles.isPlaying)
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        EnsureParticlesVisible(playIfStopped: true);
     }
 
     public void FlashReject()
@@ -308,6 +307,20 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
+
+    private void EnsureParticlesVisible(bool playIfStopped)
+    {
+        if (!particles) return;
+
+        if (!particles.gameObject.activeSelf)
+            particles.gameObject.SetActive(true);
+
+        var renderer = particles.GetComponent<ParticleSystemRenderer>();
+        if (renderer) renderer.enabled = true;
+
+        if (playIfStopped && !particles.isPlaying)
+            particles.Play();
+    }
     public void ToggleShardRenderers(bool on)
     {
         if (_shardSpriteRenderers == null || _shardSpriteRenderers.Length == 0 || _shardSpriteRenderers[0] == null)
