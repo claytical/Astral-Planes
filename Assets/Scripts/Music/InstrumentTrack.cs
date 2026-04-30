@@ -772,6 +772,16 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int trackBin = playheadBin;
         float gain = 1f;
 
+        if (localStep == 0)
+        {
+            int chordIdx = Harmony_GetChordIndexForBin(trackBin);
+            var hd = GameFlowManager.Instance?.harmony;
+            if (hd != null && hd.TryGetChordAt(chordIdx, out var c))
+                Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot={c.rootNote}");
+            else
+                Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot=<na>");
+        }
+
         // Ask LoopPattern for notes at this bin/step (velocity returned already gain-scaled per your API).
         loopPattern.GetNotesAt(this, trackBin, localStep, gain, _tmpStepNotes);
 
@@ -2180,6 +2190,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                     modified.Add((step, note, dur, vel));
                     continue;
                 }
+            }
+
+            if (step % BinSize() == 0)
+            {
+                Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
             }
 
             var allowed = new List<int>();
