@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.Rendering;
-
 [RequireComponent(typeof(Rigidbody2D))]
 public class MineNodeCharacterVis : MonoBehaviour
 {
@@ -27,11 +25,9 @@ public class MineNodeCharacterVis : MonoBehaviour
 
 
     // state
-    private bool _lockTint;
     float thinkTimer;
     float facedAngle;  // current facing
     float wobblePhase;
-    float wobbleHz;
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
