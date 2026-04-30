@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | PhaseStar.cs | `behaviorProfile`, `shardReadyThreshold` | Live | High | Read in runtime charge/ejection logic. |
 | PhaseStar.cs | `superNodePrefab`, `soloVoice` | Live | High | Used by super-node spawn path. |
-| PhaseStar.cs | `entry*` serialized fields | Live | Medium | Referenced by entry routines in this class. |
+| PhaseStar.cs | `entryOffscreenMargin`, `entryArriveThreshold`, `entryFadeInSeconds`, `entryDriftSeconds`, `entryDriftSpeedMul`, `entrySettleInset` | Dead candidate (confirmed) | High | No runtime reads in code; removed in this pass. |
 | PhaseStar.cs | `_previewInitialized`, `_previewVisual`, `_previewVisualB` | Live | High | Used by preview ring build/update scale paths. |
 | PhaseStar.cs | `_awaitingCollectableClearSinceLoop`, `_awaitingCollectableClearSinceDsp` | Live | High | Used in loop-boundary timeout recovery. |
 | PhaseStar.cs | `_burstOffScreen` | Live | High | Burst hide/recovery gate across state transitions. |
@@ -18,4 +18,4 @@
 
 ## Notes
 - Prefab/scene override verification is still required before deleting any serialized member marked Inspector-only.
-- This pass focuses on consolidating gating ownership and burst-state authority; dead-field removals are deferred until override checks are complete.
+- This pass consolidates gating ownership/burst authority and removes confirmed dead fields that had no runtime reads.

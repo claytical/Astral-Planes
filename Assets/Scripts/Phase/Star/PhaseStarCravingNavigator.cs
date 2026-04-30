@@ -34,7 +34,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     public void Initialize(
         PhaseStar star,
-        PhaseStarMotion2D motionComponent,
         PhaseStarBehaviorProfile profile)
     {
         if (profile != null)
