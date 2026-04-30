@@ -1529,34 +1529,28 @@ public class Vehicle : MonoBehaviour
     int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
     double fwdToTarget = (targetAbsStep - rawAbs + effectiveTotal) % effectiveTotal;
 
-    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} effectiveTotal={effectiveTotal} PASS={fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps}");
+    bool inAheadWindow = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
+    double backFromTarget = effectiveTotal - fwdToTarget;
+    bool inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
+                         backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
+    bool pass = inAheadWindow || inGraceWindow;
+    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
 
-    if (fwdToTarget > vehicleConfig.manualReleaseArmAheadSteps)
+    if (!pass)
     {
-        // Check if the playhead just passed the target within the grace period.
-        double backFromTarget = effectiveTotal - fwdToTarget;
-        if (vehicleConfig.manualReleaseGracePeriodSteps > 0f && backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps)
-        {
-            // Late but within grace — consume and commit retroactively to targetAbsStep.
-            _pendingNotes.Dequeue();
-            CommitManualReleaseAtStep(p, targetAbsStep);
-            return true;
-        }
+        Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} PASS=False commitSkipped=True");
 
-        // Outside the timing window — treat as an intentional discard so the player
-        // can skip notes they don't want to place.
-        _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
-        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+        // Keep the note queued so the same pending note can still be released on a
+        // later valid input action. This preserves cadence and avoids accidentally
+        // dropping notes during bin transitions.
         viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
-        CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
 
     // Window passed — now consume the note.
     _pendingNotes.Dequeue();
 
-    if (vehicleConfig.manualReleaseUseArmLock)
+    if (pass && vehicleConfig.manualReleaseUseArmLock)
     {
         // stepDur must use the full leader loop length (all bins × clip length), because
         // totalSteps from TryGetRawPlayheadAbsStep is also leader-scoped.
@@ -1578,8 +1572,15 @@ public class Vehicle : MonoBehaviour
         return true;
     }
 
-    CommitManualReleaseAtStep(p, targetAbsStep);
-    viz?.BlastManualReleaseCue(transform);
-    return true;
+    if (pass)
+    {
+        CommitManualReleaseAtStep(p, targetAbsStep);
+        viz?.BlastManualReleaseCue(transform);
+        return true;
+    }
+
+    // Defensive guard: all non-pass paths should have returned above.
+    Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} PASS=False commitSkipped=True");
+    return false;
 }
 }
