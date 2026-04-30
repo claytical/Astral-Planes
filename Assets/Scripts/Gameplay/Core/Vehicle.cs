@@ -1529,8 +1529,12 @@ public class Vehicle : MonoBehaviour
     int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
     double fwdToTarget = (targetAbsStep - rawAbs + effectiveTotal) % effectiveTotal;
 
-    bool pass = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
-    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
+    bool inAheadWindow = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
+    double backFromTarget = effectiveTotal - fwdToTarget;
+    bool inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
+                         backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
+    bool pass = inAheadWindow || inGraceWindow;
+    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
 
     if (!pass)
     {
