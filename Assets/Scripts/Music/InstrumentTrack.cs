@@ -1019,7 +1019,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 Harmony_OnBinEmptied(b);
             }
 
-            _totalSteps = (drumTrack != null ? drumTrack.totalSteps : 16) * loopMultiplier;
+            // Use this track's bin size rather than DrumTrack.totalSteps.
+            // DrumTrack.totalSteps can represent a different timing grid (e.g. 16),
+            // while InstrumentTrack bins may be authored at a smaller width (e.g. 8).
+            // If we multiply by DrumTrack.totalSteps during collapse, notes in trimmed
+            // bins can remain inside _totalSteps and survive pruning, causing
+            // stale harmony/marker artifacts at the right edge after loop contraction.
+            _totalSteps = BinSize() * loopMultiplier;
 
             // Remove any loop notes that are now outside the audible window
             persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
