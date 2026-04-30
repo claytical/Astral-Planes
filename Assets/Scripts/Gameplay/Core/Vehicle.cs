@@ -1589,7 +1589,9 @@ public class Vehicle : MonoBehaviour
     // Window passed — now consume the note.
     _pendingNotes.Dequeue();
 
-    if (pass && vehicleConfig.manualReleaseUseArmLock)
+    bool lateGracePass = inGraceWindow && !inAheadWindow;
+
+    if (pass && vehicleConfig.manualReleaseUseArmLock && !lateGracePass)
     {
         // stepDur must use the full leader loop length (all bins × clip length), because
         // totalSteps from TryGetRawPlayheadAbsStep is also leader-scoped.
