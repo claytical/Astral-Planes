@@ -343,25 +343,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return authoredRootMidi;
     }
 
-    public int GetAuthoredDurationAtAbsStep(int absStep, int fallbackDurationTicks)
-    {
-        int binSz = BinSize();
-        if (binSz <= 0) return Mathf.Max(1, fallbackDurationTicks);
-        int binIndex = absStep / binSz;
-        int localStep = absStep % binSz;
-        var noteSet = GetNoteSetForBin(binIndex);
-        if (noteSet != null && noteSet.persistentTemplate != null)
-        {
-            for (int i = 0; i < noteSet.persistentTemplate.Count; i++)
-            {
-                var e = noteSet.persistentTemplate[i];
-                if (e.step == localStep)
-                    return Mathf.Max(1, e.duration);
-            }
-        }
-        return Mathf.Max(1, fallbackDurationTicks);
-    }
-
     /// <summary>
     /// Instantly overwrites the entire track with perfect authored notes for every bin,
     /// following each bin's chord progression. Called by SuperNode on collision.
