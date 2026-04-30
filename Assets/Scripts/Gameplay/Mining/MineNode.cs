@@ -18,11 +18,6 @@ public class MineNode : MonoBehaviour
     [Tooltip("Minimum carved path length before pruning runs.")]
     [Min(2)] public int pruneMinPathCount = 8;
 
-    [Header("Flee Behaviour (Legacy — superseded by State Machine)")]
-    [Tooltip("Kept for reference. Proximity flee is replaced by strike-triggered fleeing.")]
-    [SerializeField] private float fleeRadiusWorld = 8f;
-    [SerializeField, Range(0f, 1f)] private float fleeBlendWeight = 0.65f;
-
     [Header("State Machine")]
     [SerializeField] private float driftSpeedMultiplier = 0.35f;
 
