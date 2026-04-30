@@ -26,12 +26,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     public ParticleSystem particles;
 
-    [Header("Bubble (Safe Space)")]
-    [SerializeField] private Transform bubbleRoot;
-    [SerializeField] private SpriteRenderer bubbleSprite;
-    [SerializeField] private ParticleSystem bubbleEdgeParticles;
-    [SerializeField, Range(0f, 1f)] private float bubbleFillAlpha = 0.14f;
-    [SerializeField, Range(0f, 1f)] private float bubbleEdgeAlpha = 0.65f;
 
     [Header("Dual Diamond")]
     [Tooltip("Max angular separation between the two counter-rotating diamonds at zero charge.")]
@@ -53,9 +47,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     public void Initialize()
     {
-        ResolveBubbleReferences();
         CacheShardRenderers();
-        HideSafetyBubble();
     }
 
     public void BindDualDiamondRenderers(Transform diamondA, Transform diamondB)
@@ -73,22 +65,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         _diamondBAngleVelocity = 0f;
     }
 
-    private void ResolveBubbleReferences()
-    {
-        if (!bubbleRoot)
-        {
-            var t = transform.Find("Bubble Root");
-            if (t) bubbleRoot = t;
-        }
-
-        if (bubbleRoot)
-        {
-            if (!bubbleSprite) bubbleSprite = bubbleRoot.GetComponentInChildren<SpriteRenderer>(true);
-            if (!bubbleEdgeParticles) bubbleEdgeParticles = bubbleRoot.GetComponentInChildren<ParticleSystem>(true);
-        }
-    }
-
-
     private void CacheShardRenderers()
     {
         var srs = GetComponentsInChildren<SpriteRenderer>(true);
@@ -98,7 +74,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         {
             var sr = srs[i];
             if (!sr) continue;
-            if (bubbleSprite && sr == bubbleSprite) continue;
             if (sr.gameObject.name == "Scout Visual") continue;
             list.Add(sr);
         }
@@ -249,66 +224,14 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     public void HideAll()
     {
         ToggleShardRenderers(false);
-        HideSafetyBubble();
 
         if (particles && particles.isPlaying)
             particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
-    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default)
-    {
-        if (!bubbleRoot) return;
-        bubbleRoot.gameObject.SetActive(true);
-
-        if (worldCenter != default)
-            bubbleRoot.position = new Vector3(worldCenter.x, worldCenter.y, bubbleRoot.position.z);
-        else
-            bubbleRoot.localPosition = Vector3.zero;
-
-        if (bubbleSprite)
-        {
-            float diameter = Mathf.Max(0.01f, radiusWorld * 2f);
-            bubbleSprite.transform.localScale = new Vector3(diameter, diameter, 1f);
-
-            var c = bubbleTint;
-            c.a = bubbleFillAlpha;
-            bubbleSprite.color = c;
-        }
-
-        if (bubbleEdgeParticles)
-        {
-            bubbleEdgeParticles.transform.localScale = Vector3.one;
-
-            var shape = bubbleEdgeParticles.shape;
-            shape.shapeType = ParticleSystemShapeType.Circle;
-            shape.radius = radiusWorld;
-            shape.radiusThickness = 0f;
-
-            var main = bubbleEdgeParticles.main;
-            main.simulationSpace = ParticleSystemSimulationSpace.Local;
-
-            var ec = bubbleTint;
-            ec.a = bubbleEdgeAlpha;
-            main.startColor = new ParticleSystem.MinMaxGradient(ec);
-
-            if (!bubbleEdgeParticles.isPlaying) bubbleEdgeParticles.Play();
-        }
-    }
-
-    public void HideSafetyBubble()
-    {
-        if (!bubbleRoot) return;
-        bubbleRoot.gameObject.SetActive(false);
-
-        if (bubbleEdgeParticles && bubbleEdgeParticles.isPlaying)
-            bubbleEdgeParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-    }
-
-    public void UpdateBubblePosition(Vector2 worldPos)
-    {
-        if (!bubbleRoot || !bubbleRoot.gameObject.activeSelf) return;
-        bubbleRoot.position = new Vector3(worldPos.x, worldPos.y, bubbleRoot.position.z);
-    }
+    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default) { }
+    public void HideSafetyBubble() { }
+    public void UpdateBubblePosition(Vector2 worldPos) { }
 
     // Called every frame from PhaseStar.Update() to continuously lerp body color.
     public void LerpBodyColor(Color roleColor, float t)

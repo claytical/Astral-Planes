@@ -53,9 +53,6 @@ public class PhaseStar : MonoBehaviour
     [Header("Charge Readiness")]
     private bool _cachedIsSuperNode = false;
     
-    private bool SafetyBubbleEnabled => !behaviorProfile || behaviorProfile.enableSafetyBubble;
-    private int SafetyBubbleRadiusCells => behaviorProfile ? Mathf.Max(0, behaviorProfile.safetyBubbleRadiusCells) : 4;
-
     private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
 
     private float CollectableClearTimeoutSeconds =>
@@ -105,18 +102,6 @@ public class PhaseStar : MonoBehaviour
 
     [SerializeField] private bool _tracePhaseStar = true;
 
-    [SerializeField] private Color bubbleTint = new Color(1f, 1f, 1f, 1f); // fill/edge tint (alpha handled by visuals)
-    [SerializeField] private Color bubbleShardInnerTint = new Color(0.05f, 0.05f, 0.05f, 0.9f);
-
-    private bool _bubbleActive;
-    private float _bubbleRadiusWorld;
-    // World-space center of the active bubble; set at activation and held fixed (gravity void uses MineNode capture position).
-    private Vector2 _bubbleCenterWorld;
-
-// Static “global query” (simple + reliable for Vehicle)
-    private static bool s_bubbleActive;
-    private static Vector2 s_bubbleCenter;
-    private static float s_bubbleRadiusWorld;
     private readonly Dictionary<MusicalRole, float> _starCharge = new();
     private IPhaseStarChargeModel _chargeModel;
     private IPhaseStarStateController _stateController;
@@ -235,16 +220,9 @@ public class PhaseStar : MonoBehaviour
         return _chargeModel.GetRoleHunger(role);
     }
 
-    public static bool IsPointInsideSafetyBubble(Vector2 worldPos)
-    {
-        if (!s_bubbleActive) return false;
-        return (worldPos - s_bubbleCenter).sqrMagnitude <= (s_bubbleRadiusWorld * s_bubbleRadiusWorld);
-    }
+    public static bool IsPointInsideSafetyBubble(Vector2 worldPos) => false;
 
-    public bool IsPointInsideMyBubble(Vector2 worldPos)
-    {
-        return _bubbleActive && (worldPos - _bubbleCenterWorld).sqrMagnitude <= _bubbleRadiusWorld * _bubbleRadiusWorld;
-    }
+    public bool IsPointInsideMyBubble(Vector2 worldPos) => false;
 
     public void EnterInMaze(Vector2 worldPos)
     {
@@ -552,11 +530,6 @@ public class PhaseStar : MonoBehaviour
 
     void Update()
 {
-    if (_bubbleActive)
-    {
-        visuals?.UpdateBubblePosition(_bubbleCenterWorld);
-    }
-
     float dt = Time.deltaTime;
 
     _accumulatorRotAngle += accumulatorRotSpeed * dt;
@@ -1218,12 +1191,10 @@ public class PhaseStar : MonoBehaviour
     }
     public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
     {
-        Debug.Log($"[BUBBLE] SetGravityVoidSafetyBubbleActive active={active} star={name} frame={Time.frameCount}");
-        if (active) ActivateSafetyBubble(center);
-        else DeactivateSafetyBubble();
+        // Safety bubble visuals/gameplay removed.
     }
 
-    public int GetSafetyBubbleRadiusCells() => SafetyBubbleRadiusCells;
+    public int GetSafetyBubbleRadiusCells() => 0;
 
     private void OnCollisionEnter2D(Collision2D coll)
     {
@@ -1631,50 +1602,8 @@ public class PhaseStar : MonoBehaviour
             $"role={targetRole} attunedRole={_attunedRole} charge={GetTotalCharge():0.00}");
     }
 
-    private void ActivateSafetyBubble(Vector3 center = default)
-    {
-        if (!SafetyBubbleEnabled) return;
-        Debug.Log($"[BUBBLE] ActivateSafetyBubble star={name} frame={Time.frameCount}");
-
-        var drumsForBubble = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
-        float cell = drumsForBubble != null ? drumsForBubble.GetCellWorldSize() : 1f;
-
-        // +0.5f gives the bubble a little breathing room relative to discrete cells
-        _bubbleRadiusWorld = (SafetyBubbleRadiusCells + 0.5f) * cell;
-
-        // Use provided center (e.g. MineNode capture position for gravity void),
-        // falling back to star position for non-void calls.
-        Vector2 bubbleCenterWorld = (center != default) ? (Vector2)center : (Vector2)transform.position;
-        SetSafetyBubbleState(true, bubbleCenterWorld, _bubbleRadiusWorld);
-
-        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        visuals?.ShowSafetyBubble(_bubbleRadiusWorld, bubbleTint, bubbleShardInnerTint, _bubbleCenterWorld);
-
-        // IMPORTANT:
-        // Safety bubble is now a gravity-void refuge zone only.
-        // It does NOT freeze PhaseStar motion or root physics.
-    }
-    private void DeactivateSafetyBubble()
-    {
-        if (!_bubbleActive) return; // already off — no log spam
-
-        Debug.Log($"[BUBBLE] DeactivateSafetyBubble star={name} frame={Time.frameCount}");
-        SetSafetyBubbleState(false, Vector2.zero, 0f);
-
-        if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);
-        visuals?.HideSafetyBubble();
-    }
-
-    private void SetSafetyBubbleState(bool active, Vector2 centerWorld, float radiusWorld)
-    {
-        _bubbleActive = active;
-        _bubbleCenterWorld = centerWorld;
-        _bubbleRadiusWorld = radiusWorld;
-
-        s_bubbleActive = active;
-        s_bubbleCenter = centerWorld;
-        s_bubbleRadiusWorld = radiusWorld;
-    }
+    private void ActivateSafetyBubble(Vector3 center = default) { }
+    private void DeactivateSafetyBubble() { }
 }
     
 

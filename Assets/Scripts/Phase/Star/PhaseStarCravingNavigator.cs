@@ -11,9 +11,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     [Header("Sniffer (per-role diamond facing)")]
     [SerializeField] private float snifferIntervalSeconds = 0.25f;
 
-    [Header("Hunger-Weighted Targeting")]
-    [SerializeField, Range(0f, 1f)] private float hungerFloorWeight = 0.15f;
-
     private PhaseStar _star;
     private bool _active;
     private MusicalRole _attunedRole = MusicalRole.None;
@@ -192,19 +189,16 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             var cell = _coloredCellsScratch[i];
             var dust = GetDust(gen, cell);
             if (dust == null || dust.Role == MusicalRole.None) continue;
+            if (_attunedRole != MusicalRole.None && dust.Role != _attunedRole) continue;
             if (dust.currentEnergyUnits <= 0) continue;
-
-            float hunger = _star != null ? _star.GetRoleHunger(dust.Role) : 1f;
-            float score = Mathf.Lerp(hungerFloorWeight, 1f, hunger);
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
             float dist = (cellWorld - starWorld).magnitude;
-            float effDist = dist / Mathf.Max(0.001f, score);
 
-            if (effDist < bestEffDist)
+            if (dist < bestEffDist)
             {
                 bestCell = cell;
-                bestEffDist = effDist;
+                bestEffDist = dist;
                 found = true;
             }
         }

@@ -19,6 +19,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         public float radius = 3.0f;
         public float exponent = 2.0f;
         public float strength = 1.0f;
+        [Range(0f, 2f)] public float huntWeight = 1.0f;
     }
 
 
@@ -226,7 +227,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         Vector2 desiredDir = huntDir;
 
         if (avoid.sqrMagnitude > 0.0001f)
-            desiredDir = (huntDir + avoid * avoidance.strength * 0.4f).normalized;
+            desiredDir = (huntDir + avoid * avoidance.strength * avoidance.huntWeight).normalized;
 
         Vector2 edgeRepulsion = ComputeEdgeRepulsion(currentPos);
         if (edgeRepulsion.sqrMagnitude > 0.0001f)
