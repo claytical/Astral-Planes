@@ -476,6 +476,11 @@ public class Vehicle : MonoBehaviour
         if (occupied)
             commitVel = Mathf.Clamp(commitVel * vehicleConfig.occupiedStepVelocityMultiplier, 1f, 127f);
 
+        int commitAuthoredRootMidi = p.authoredRootMidi;
+        if (commitAuthoredRootMidi == int.MinValue || commitAuthoredRootMidi < 0)
+            commitAuthoredRootMidi = chosenMidi;
+        commitAuthoredRootMidi = Mathf.Clamp(commitAuthoredRootMidi, p.track.lowestAllowedNote, p.track.highestAllowedNote);
+
         // Mark as collected and remove from spawnedCollectables BEFORE committing the note.
         // This ensures that when CommitManualReleasedNote fires OnCollectableBurstCleared,
         // AnyCollectablesInFlightGlobal() returns false and PhaseStar re-arms immediately
@@ -492,7 +497,7 @@ public class Vehicle : MonoBehaviour
             midiNote: chosenMidi,
             durationTicks: p.durationTicks,
             velocity127: commitVel,
-            authoredRootMidi: p.authoredRootMidi,
+            authoredRootMidi: commitAuthoredRootMidi,
             burstId: p.burstId,
             lightMarkerNow: true,
             skipChordQuantize: compositionMode
