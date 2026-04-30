@@ -229,6 +229,9 @@ private int     _cachedHash  = 0;
     [SerializeField] private float releaseWidthMax = 3.5f;
 
     private float _releaseProgress01 = 0f;
+    private Gradient _dimGradient;
+    private Gradient _windowGradient;
+    private Gradient _exactGradient;
 
     // t01=0: window is open, normal width. t01=1: window closing, thick urgent width.
     // Called each frame during manual-release carry by Vehicle.TickNoteTrail.
@@ -237,6 +240,27 @@ private int     _cachedHash  = 0;
         _releaseProgress01 = Mathf.Clamp01(t01);
         if (_lr != null)
             _lr.widthMultiplier = baseWidth * Mathf.Lerp(releaseWidthMin, releaseWidthMax, _releaseProgress01);
+    }
+
+    public void SetTimingState(float windowLerp01, bool inWindow, bool atExactStep)
+    {
+        if (_lr == null) return;
+        BuildTimingGradients();
+
+        if (!inWindow)
+        {
+            _lr.colorGradient = _dimGradient;
+            return;
+        }
+
+        if (atExactStep)
+        {
+            _lr.colorGradient = _exactGradient;
+            return;
+        }
+
+        // In timing window but not exact: blend from dim toward the existing white+role gradient.
+        _lr.colorGradient = LerpGradient(_dimGradient, _windowGradient, Mathf.Clamp01(windowLerp01));
     }
 
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
@@ -264,6 +288,9 @@ private int     _cachedHash  = 0;
             );
             _lr.colorGradient = g;
             _lr.widthMultiplier = baseWidth * widthMul;
+            _dimGradient = null;
+            _windowGradient = null;
+            _exactGradient = null;
         }
 
         EnsureShimmer();
@@ -276,6 +303,72 @@ private int     _cachedHash  = 0;
                 Color.white
             );
         }
+    }
+
+    private void BuildTimingGradients()
+    {
+        if (_dimGradient != null && _windowGradient != null && _exactGradient != null) return;
+
+        Color role = baseColor;
+        Color dimRole = new Color(role.r * 0.2f, role.g * 0.2f, role.b * 0.2f, Mathf.Clamp01(role.a * 0.35f));
+
+        _dimGradient = new Gradient();
+        _dimGradient.SetKeys(
+            new[] {
+                new GradientColorKey(dimRole, 0f),
+                new GradientColorKey(new Color(1f,1f,1f,0.7f), 0.5f),
+                new GradientColorKey(dimRole, 1f)
+            },
+            new[] {
+                new GradientAlphaKey(0.06f, 0f),
+                new GradientAlphaKey(0.14f, 0.4f),
+                new GradientAlphaKey(0.08f, 1f)
+            });
+
+        _windowGradient = new Gradient();
+        _windowGradient.SetKeys(
+            new[] {
+                new GradientColorKey(role * 0.6f, 0f),
+                new GradientColorKey(Color.white, 0.5f),
+                new GradientColorKey(role, 1f)
+            },
+            new[] {
+                new GradientAlphaKey(.1f, 0f),
+                new GradientAlphaKey(Mathf.Clamp01(role.a * 0.9f), 0.12f),
+                new GradientAlphaKey(Mathf.Clamp01(role.a), 0.5f),
+                new GradientAlphaKey(Mathf.Clamp01(role.a * 0.7f), 0.88f),
+                new GradientAlphaKey(.1f, 1f)
+            });
+
+        _exactGradient = new Gradient();
+        _exactGradient.SetKeys(
+            new[] {
+                new GradientColorKey(role, 0f),
+                new GradientColorKey(role, 1f)
+            },
+            new[] {
+                new GradientAlphaKey(Mathf.Clamp01(role.a * 0.95f), 0f),
+                new GradientAlphaKey(Mathf.Clamp01(role.a), 1f)
+            });
+    }
+
+    private static Gradient LerpGradient(Gradient a, Gradient b, float t)
+    {
+        var g = new Gradient();
+        Color ac0 = a.Evaluate(0f); Color ac1 = a.Evaluate(0.5f); Color ac2 = a.Evaluate(1f);
+        Color bc0 = b.Evaluate(0f); Color bc1 = b.Evaluate(0.5f); Color bc2 = b.Evaluate(1f);
+        g.SetKeys(
+            new[] {
+                new GradientColorKey(Color.Lerp(ac0, bc0, t), 0f),
+                new GradientColorKey(Color.Lerp(ac1, bc1, t), 0.5f),
+                new GradientColorKey(Color.Lerp(ac2, bc2, t), 1f)
+            },
+            new[] {
+                new GradientAlphaKey(Mathf.Lerp(ac0.a, bc0.a, t), 0f),
+                new GradientAlphaKey(Mathf.Lerp(ac1.a, bc1.a, t), 0.5f),
+                new GradientAlphaKey(Mathf.Lerp(ac2.a, bc2.a, t), 1f)
+            });
+        return g;
     }
 
     private void EnsureShimmer()
