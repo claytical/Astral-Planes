@@ -217,6 +217,20 @@ using Random = UnityEngine.Random;
     _notes.Sort();
 }
 
+
+    public bool TryGetTemplateTimingAtStep(int step, out int durationTicks, out float velocity)
+    {
+        if (_templateByStep.TryGetValue(step, out var tpl))
+        {
+            durationTicks = tpl.dur;
+            velocity = tpl.vel;
+            return true;
+        }
+
+        durationTicks = 0;
+        velocity = 0f;
+        return false;
+    }
     private int GetRootNote()
     {
         return Mathf.Clamp(rootMidi, assignedInstrumentTrack.lowestAllowedNote, assignedInstrumentTrack.highestAllowedNote);
