@@ -623,7 +623,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int drumSteps = Mathf.Max(1, drumTrack.totalSteps);
         int binSize   = Mathf.Max(1, BinSize());
 
-        double start = drumTrack.startDspTime; // stable transport origin for bin/bar indexing
+        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         if (start <= 0.0) return;
 
         if (dspNow < start)
@@ -634,7 +634,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         double barStart = start + (double)barIndex * clipLen;
 
-        double transportStart = drumTrack.startDspTime;
+        double transportStart = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         double localStart     = drumTrack.startDspTime;
 
 
@@ -3009,7 +3009,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         double dspNow = AudioSettings.dspTime;
 
         // OnLoopBoundary is based on leaderStartDspTime + EffectiveLoopLengthSec.
-        double start = drumTrack.startDspTime; // stable transport origin for bin/bar indexing
+        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
         if (start <= 0.0) return 0f;
 
         float loopLen = drumTrack.GetLoopLengthInSeconds(); // this is EffectiveLoopLengthSec
