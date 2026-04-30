@@ -29,6 +29,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [SerializeField] private float sag        = 0.5f;
     [SerializeField] private float noiseAmp   = 0.15f;
     [SerializeField] private float noiseSpeed = 1.5f;
+    [SerializeField] private float weaveAmplitude = 0.1f;
+    [SerializeField, Min(0.01f)] private float weaveWavelength = 1.8f;
+    [SerializeField] private float weaveSpeed = 1.1f;
 
     [Header("Shimmer")]
     [SerializeField] private bool  shimmerEnabled     = true;
@@ -71,6 +74,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public float alphaScale = 1f;
         public float drainFlashTimer;
         public bool notifiedDrainLock;
+        public int lineIndexInRole;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -117,6 +121,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 {
                     role       = roles[i],
                     tipIndex   = slotIndex % 4,
+                    lineIndexInRole = j,
                     flowOffset = UnityEngine.Random.value,
                     tipPos     = transform.position
                 };
@@ -474,6 +479,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         Vector2 cS = (Vector2)dS - dir * c2Dist + bend * 0.35f;
 
         float time = Time.time * noiseSpeed + tentacle.flowOffset * 10f;
+        float weaveAmpPx = weaveAmplitude * 80f;
+        float weaveCycles = dist / Mathf.Max(0.01f, weaveWavelength * 100f);
+        float weavePhase = tentacle.lineIndexInRole * Mathf.PI * 0.8f;
+        float weaveTime = Time.time * weaveSpeed;
 
         for (int i = 0; i < SplinePoints; i++)
         {
@@ -494,6 +503,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 wobTaper = 1f - Mathf.InverseLerp(wobOffAt, 1f, u);
 
             pS += n * wob * (noiseAmp * 35f) * wobTaper;
+
+            float weave = Mathf.Sin((u * Mathf.PI * 2f * weaveCycles) + weaveTime + weavePhase);
+            float weaveTaper = Mathf.Sin(u * Mathf.PI); // zero at root/tip
+            pS += n * (weave * weaveAmpPx * weaveTaper);
+
             pS.x = Mathf.Clamp(pS.x, margin, Screen.width  - margin);
             pS.y = Mathf.Clamp(pS.y, margin, Screen.height - margin);
 
