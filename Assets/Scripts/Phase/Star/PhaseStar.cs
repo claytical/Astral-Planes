@@ -1050,6 +1050,17 @@ public class PhaseStar : MonoBehaviour
         }
         else
         {
+            // If thresholds changed (e.g. motif/phase swap) while this star stayed armed,
+            // we can end up armed-but-not-ejectable with tentacles off, which deadlocks poke flow.
+            // Drop back into dormant so charge collection can resume.
+            if (!HasDominantRoleEjectable())
+            {
+                DBG("[PS:LB] armed but dominant role not ejectable -> returning to dormant");
+                Disarm(DisarmReason.None, _lockedTint);
+                EnterDormantWaitState();
+                return;
+            }
+
             DBG("[PS:LB] -> No need to arm");
         }
     }
