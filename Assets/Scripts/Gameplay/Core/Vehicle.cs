@@ -464,6 +464,13 @@ public class Vehicle : MonoBehaviour
                 : p.authoredRootMidi;
         }
 
+        // Safety: prevent invalid MIDI values from muting the instrument voice.
+        if (chosenMidi == int.MinValue || chosenMidi < 0)
+        {
+            chosenMidi = (p.collectedMidi >= 0) ? p.collectedMidi : p.track.authoredRootMidi;
+        }
+        chosenMidi = Mathf.Clamp(chosenMidi, p.track.lowestAllowedNote, p.track.highestAllowedNote);
+
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = p.velocity127;
         if (occupied)
