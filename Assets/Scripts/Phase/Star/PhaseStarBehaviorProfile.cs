@@ -69,5 +69,23 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Optional prefab used for ejection VFX/markers.")]
     public GameObject ejectionPrefab;
 
+    [Header("Entry / Arrival (PhaseStar)")]
+    [Tooltip("World units outside the screen edge where the star spawns.")]
+    public float entryOffscreenMargin = 2f;
+    [Tooltip("How close to the screen interior edge (world units) before arrival is considered complete.")]
+    public float entryArriveThreshold = 1.5f;
+    [Tooltip("Seconds to fade visuals in once inside the screen boundary.")]
+    [Min(0f)] public float entryFadeInSeconds = 0.6f;
+    [Tooltip("Seconds to drift at reduced speed after crossing the screen boundary, before stopping.")]
+    [Min(0f)] public float entryDriftSeconds = 2.0f;
+    [Tooltip("Speed fraction (0-1) during the post-entry drift settle.")]
+    [Range(0f, 1f)] public float entryDriftSpeedMul = 0.4f;
+    [Tooltip("Minimum world-unit inset from the top screen edge after drift settles.")]
+    [Min(0.5f)] public float entrySettleInset = 2.5f;
+
+    [Header("Charge Readiness (PhaseStar)")]
+    [Range(0f, 1f)] public float shardReadyThreshold = 0.5f;
+    [Tooltip("Accumulator rotation speed multiplier when charge is ready.")]
+    [Min(1f)] public float readyRotSpeedMul = 2.5f;
 
 }
