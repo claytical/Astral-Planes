@@ -4992,11 +4992,11 @@ MonoBehaviour:
   drainRatePerSec: 0.8
   minContactTime: 0.01
   colorTransitionTime: 0.5
-  tentacleGrowSpeed: 2
-  tentacleRetractSpeed: 12
-  tentacleFlowSpeed: 5.1
-  tentacleWidth: 0.035
-  dissolveDuration: 1.1
+  tentacleGrowSpeed: 0.5
+  tentacleRetractSpeed: 2
+  tentacleFlowSpeed: 1
+  tentacleWidth: 0.05
+  dissolveDuration: 2.1
   maxLinesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   growingRootAlpha: 0.65
