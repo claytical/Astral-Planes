@@ -710,11 +710,11 @@ public class InstrumentTrackController : MonoBehaviour
         // return the cached result instead of recalculating.
         // Also invalidate if leaderStartDspTime advanced mid-frame (loop boundary fired after some
         // InstrumentTracks already ran Update), which would cause stale barIndex + fresh start mismatch.
-        double leaderDspNow = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
+        double leaderDspNow = drum.startDspTime; // stable transport origin; leaderStart can jump on watchdog/re-arm
         if (_hasLastTransport && dspNow == _lastTransportDsp && leaderDspNow == _lastTransportLeaderDsp)
             return _lastTransport;
 
-        double start = leaderDspNow;
+        double start = drum.startDspTime;
         if (start <= 0.0) return default;
 
         float clipLen = drum.GetClipLengthInSeconds();
