@@ -596,6 +596,8 @@ public class Vehicle : MonoBehaviour
         // ------------------------------------------------------------------
         float pulse01 = 0f;
         bool isAuthoritative = true;
+        bool inTimingWindow = false;
+        bool atExactStep = false;
 
         if (_armedReleases.Count > 0)
         {
@@ -615,6 +617,8 @@ public class Vehicle : MonoBehaviour
                 double fwdDsp     = fwdSteps * stepDur;
 
                 pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, a.gapDurationDsp)));
+                inTimingWindow = fwdDsp <= Math.Max(0.001, a.gapDurationDsp);
+                atExactStep = fwdSteps <= 0.025;
 
                 if (a.note.track.IsExpansionPending)
                     pulse01 = Mathf.Min(pulse01, 0.3f);
@@ -657,6 +661,8 @@ public class Vehicle : MonoBehaviour
                     const float ringWindowLead = 1.5f;
                     double windowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
                     pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
+                    inTimingWindow = fwdDsp <= windowDsp;
+                    atExactStep = fwdSteps <= 0.025;
 
                     int nextLocal = ((nextStep % pBinSize) + pBinSize) % pBinSize;
                     bool pMatchesAuthored = (p.authoredAbsStep >= 0) && (nextStep == p.authoredAbsStep);
@@ -674,6 +680,7 @@ public class Vehicle : MonoBehaviour
         UpdateVehiclePlacementResonance(pulse01, cueTrack, isAuthoritative);
         // Armed notes: fly orb toward its target marker.
         int armedSlot = 0;
+        float bunchDist = vehicleConfig.trailFirstSlotOffset;
         foreach (var ar in _armedReleases)
         {
             if (ar.note.collectable == null) { armedSlot++; continue; }
@@ -692,14 +699,21 @@ public class Vehicle : MonoBehaviour
                 ar.note.collectable.SetTrailTarget(markerWorld);
             else
             {
-                float dist = vehicleConfig.trailFirstSlotOffset + armedSlot * vehicleConfig.trailSlotSpacing;
+                float dist = bunchDist;
                 ar.note.collectable.SetTrailTarget(SampleTrailPosition(dist));
             }
 
             ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
             // Drive tether thickness: t01=0 = open window, t01=1 = release now.
             if (armedSlot == 0)
+            {
                 ar.note.collectable.tether?.SetReleaseProgress(pulse01);
+                ar.note.collectable.tether?.SetTimingState(pulse01, inTimingWindow, atExactStep);
+            }
+            else
+            {
+                ar.note.collectable.tether?.SetTimingState(0f, false, false);
+            }
             armedSlot++;
         }
 
@@ -709,9 +723,13 @@ public class Vehicle : MonoBehaviour
         {
             if (p.collectable == null) { slot++; continue; }
 
-            float dist = vehicleConfig.trailFirstSlotOffset + slot * vehicleConfig.trailSlotSpacing;
+            float dist = bunchDist;
             p.collectable.SetTrailTarget(SampleTrailPosition(dist));
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
+            if (slot == 0 && _armedReleases.Count == 0)
+                p.collectable.tether?.SetTimingState(pulse01, inTimingWindow, atExactStep);
+            else
+                p.collectable.tether?.SetTimingState(0f, false, false);
             slot++;
         }
     }
