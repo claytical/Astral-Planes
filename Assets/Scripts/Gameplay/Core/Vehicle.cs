@@ -744,9 +744,40 @@ public class Vehicle : MonoBehaviour
             if (_armedReleases.Count == 0 && hasPendingRaw && totalPending > 0 &&
                 p.track != null && p.track.drumTrack != null)
             {
-                int targetAbs = p.collectable.tether != null && p.collectable.tether.boundStep >= 0
-                    ? p.collectable.tether.boundStep
-                    : p.authoredAbsStep;
+                int targetAbs = -1;
+
+                // Re-resolve each pending note's target against the current unlit steps.
+                // This prevents orphaned authored steps (already filled) from remaining
+                // highlighted after another carried note is placed.
+                if (viz != null)
+                {
+                    var pendingSpokenFor = new HashSet<int>();
+                    foreach (var ar in _armedReleases)
+                        pendingSpokenFor.Add(ar.targetAbsStep);
+
+                    foreach (var other in _pendingNotes)
+                    {
+                        if (ReferenceEquals(other.collectable, p.collectable))
+                            break;
+
+                        var otherTether = other.collectable != null ? other.collectable.tether : null;
+                        if (otherTether != null && otherTether.boundStep >= 0)
+                            pendingSpokenFor.Add(otherTether.boundStep);
+                    }
+
+                    if (viz.TryGetNextUnlitStepExcluding(p.track, rawAbsPending, totalPending, pendingSpokenFor, out int nextUnlitTarget))
+                    {
+                        targetAbs = nextUnlitTarget;
+                        p.collectable.tether?.BindByStep(p.track, targetAbs, viz);
+                    }
+                }
+
+                if (targetAbs < 0)
+                {
+                    targetAbs = p.collectable.tether != null && p.collectable.tether.boundStep >= 0
+                        ? p.collectable.tether.boundStep
+                        : p.authoredAbsStep;
+                }
 
                 if (targetAbs >= 0)
                 {
