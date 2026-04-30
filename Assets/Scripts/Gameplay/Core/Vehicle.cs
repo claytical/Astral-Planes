@@ -446,38 +446,14 @@ public class Vehicle : MonoBehaviour
         bool compositionMode = p.track.controller != null &&
                                p.track.controller.noteCommitMode == NoteCommitMode.Composition;
         // Composition mode: use the note the player physically collected.
-        // Performance mode: always use the authored note at the committed step so
-        // completed loops preserve the target phrase's tone and interval movement.
-        int chosenMidi;
-        if (compositionMode)
-        {
-            chosenMidi = p.collectedMidi;
-        }
-        else
-        {
-            chosenMidi = p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
-        }
-
-        // Safety: prevent invalid MIDI values from muting the instrument voice.
-        if (chosenMidi == int.MinValue || chosenMidi < 0)
-        {
-            chosenMidi = (p.collectedMidi >= 0) ? p.collectedMidi : p.track.authoredRootMidi;
-        }
-        chosenMidi = Mathf.Clamp(chosenMidi, p.track.lowestAllowedNote, p.track.highestAllowedNote);
-
-        int chosenDurationTicks = compositionMode
-            ? Mathf.Max(1, p.durationTicks)
-            : p.track.GetAuthoredDurationAtAbsStep(targetAbsStep, p.durationTicks);
+        int chosenMidi = compositionMode
+            ? p.collectedMidi
+            : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = p.velocity127;
         if (occupied)
             commitVel = Mathf.Clamp(commitVel * vehicleConfig.occupiedStepVelocityMultiplier, 1f, 127f);
-
-        int commitAuthoredRootMidi = p.authoredRootMidi;
-        if (commitAuthoredRootMidi == int.MinValue || commitAuthoredRootMidi < 0)
-            commitAuthoredRootMidi = chosenMidi;
-        commitAuthoredRootMidi = Mathf.Clamp(commitAuthoredRootMidi, p.track.lowestAllowedNote, p.track.highestAllowedNote);
 
         // Mark as collected and remove from spawnedCollectables BEFORE committing the note.
         // This ensures that when CommitManualReleasedNote fires OnCollectableBurstCleared,
@@ -493,9 +469,9 @@ public class Vehicle : MonoBehaviour
         p.track.CommitManualReleasedNote(
             stepAbs: targetAbsStep,
             midiNote: chosenMidi,
-            durationTicks: chosenDurationTicks,
+            durationTicks: p.durationTicks,
             velocity127: commitVel,
-            authoredRootMidi: commitAuthoredRootMidi,
+            authoredRootMidi: p.authoredRootMidi,
             burstId: p.burstId,
             lightMarkerNow: true,
             skipChordQuantize: compositionMode
@@ -503,7 +479,7 @@ public class Vehicle : MonoBehaviour
 
         // Play the note immediately — the playhead is at this step right now.
         // Without this, the note only sounds the next time the loop passes this step.
-        p.track.PlayOneShotMidi(chosenMidi, commitVel, chosenDurationTicks);
+        p.track.PlayOneShotMidi(chosenMidi, commitVel, p.durationTicks);
 
         // Visual feedback: pulse the marker and emit the track-color particle burst.
         if (viz != null)
@@ -514,7 +490,7 @@ public class Vehicle : MonoBehaviour
 
         // Occupied-step reward accent.
         if (occupied && vehicleConfig.occupiedStepOctaveAccent)
-            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, chosenDurationTicks);
+            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, p.durationTicks);
     }
     // ---- Note Trail Management ----
     private void RecordPositionHistory()
