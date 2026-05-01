@@ -1088,163 +1088,34 @@ public class CosmicDustGenerator : MonoBehaviour
         if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
 
         Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
-        Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
         Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
-        Func<Vector3, bool> includeWorld = world => true;
-
-        // Grid veto for BFS-based patterns (ring chokepoints).
-        // IMPORTANT: allow the BFS seed (starCell) even though it's reserved —
-        // it will be filtered out from emitted growth by the final pass below.
-        Func<Vector2Int, bool> includeCellForBfs = cell =>
+        var context = new MazeTopologyService.Context
         {
-            if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
-            if (cell == starCell) return true;
-            if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
-            if (reservedCells != null && reservedCells.Contains(cell)) return false;
-            if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
-            if (IsKeepClearCell(cell)) return false;
-            return true;
+            Width = w,
+            Height = h,
+            StarCell = starCell,
+            GetHexDirectionsByRow = getDirsByRow,
+            IsCellAvailable = isCellAvailable,
+            IsBlocked = cell =>
+            {
+                if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return true;
+                if (cell == starCell) return true;
+                if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return true;
+                if (reservedCells != null && reservedCells.Contains(cell)) return true;
+                if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return true;
+                if (IsKeepClearCell(cell)) return true;
+                return false;
+            },
+            NormalizeCell = toroidal ? WrapCell : null
         };
 
-        var patternType = config != null ? config.patternType : MazePatternType.FullFill;
-
-        // IMPORTANT: Patterns return the *cells to place dust*.
-        // A final reserved/permanent/keep-clear filter is applied afterward as defense-in-depth.
-        List<(Vector2Int cell, Vector3 world)> growth = null;
-
-        switch (patternType)
+        var solidCells = _mazeTopologyService.BuildSolidCells(config, context);
+        var growth = new List<(Vector2Int cell, Vector3 world)>(solidCells.Count);
+        foreach (var gp in solidCells)
         {
-            case MazePatternType.ClearBoxes:
-            {
-                growth = CosmicDustMazePatterns.BuildClearBoxes(
-                    width: w,
-                    height: h,
-                    count: config.clearBoxes.clearBoxCount,
-                    boxW: config.clearBoxes.clearBoxWidth,
-                    boxH: config.clearBoxes.clearBoxHeight,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.CellularAutomata:
-            {
-                growth = CosmicDustMazePatterns.BuildCA(
-                    width: w,
-                    height: h,
-                    fillChance: config.cellularAutomata.fillChance,
-                    iterations: config.cellularAutomata.iterations,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.RingChokepoints:
-            {
-                growth = CosmicDustMazePatterns.BuildRingChokepoints(
-                    center: starCell,
-                    width: w,
-                    height: h,
-                    ringSpacing: config.ring.spacing,
-                    ringThickness: config.ring.thickness,
-                    jitter: config.ring.jitter,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeCellForBfs: includeCellForBfs,
-                    includeWorld: includeWorld,
-                    normalizeCell: toroidal ? WrapCell : (Func<Vector2Int, Vector2Int>)null);
-                break;
-            }
-
-            case MazePatternType.DrunkenStrokes:
-            {
-                growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
-                    width: w,
-                    height: h,
-                    strokes: config.drunkenStrokes.strokes,
-                    maxLen: config.drunkenStrokes.maxLen,
-                    stepJitter: config.drunkenStrokes.jitter,
-                    dilate: config.drunkenStrokes.dilate,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.DiagonalLanes:
-            {
-                growth = CosmicDustMazePatterns.BuildPopDots(
-                    width: w,
-                    height: h,
-                    step: config.diagonalLanes.step,
-                    phaseOffset: Random.Range(0, config.diagonalLanes.step),
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.Tunnels:
-            {
-                growth = CosmicDustMazePatterns.BuildPacManTunnels(
-                    width: w,
-                    height: h,
-                    corridorStep: config.tunnels.corridorStep,
-                    corridorWidth: config.tunnels.corridorWidth,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.FullFill:
-            default:
-            {
-                var rect = new List<(Vector2Int, Vector3)>(w * h);
-                for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                {
-                    if (!drums.IsSpawnCellAvailable(x, y)) continue;
-                    var gp = new Vector2Int(x, y);
-                    if (reservedCells != null && reservedCells.Contains(gp)) continue;
-                    if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-                    if (IsKeepClearCell(gp)) continue;
-                    var world = drums.GridToWorldPosition(gp);
-                    if (!IsWorldPositionInsideScreen(world)) continue;
-                    rect.Add((gp, world));
-                }
-                growth = rect;
-                break;
-            }
-        }
-
-        if (growth == null)
-            growth = new List<(Vector2Int, Vector3)>();
-
-        // Porous border: union border-wall cells into growth before the final filter.
-        if (config != null && config.porousBorder.exitCount >= 0)
-        {
-            var borderCells = CosmicDustMazePatterns.BuildPorousBorderCells(
-                width: w,
-                height: h,
-                exitCount: config.porousBorder.exitCount,
-                isCellAvailable: isCellAvailable);
-
-            var growthSet = new HashSet<Vector2Int>(growth.Count);
-            for (int i = 0; i < growth.Count; i++)
-                growthSet.Add(growth[i].cell);
-
-            foreach (var cell in borderCells)
-            {
-                if (growthSet.Contains(cell)) continue;
-                growth.Add((cell, gridToWorld(cell)));
-                growthSet.Add(cell);
-            }
+            var world = drums.GridToWorldPosition(gp);
+            if (!IsWorldPositionInsideScreen(world)) continue;
+            growth.Add((gp, world));
         }
 
         // Final filter: enforce reserved/permanent/keep-clear even if a pattern emitted them.
