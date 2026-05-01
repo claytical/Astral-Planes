@@ -664,15 +664,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 // ----- PLAYBACK (catch-up deterministically) -----
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
 //        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
-        int leaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
-// This prevents “bin disappears” if transport emits -1 or leaderBins at wrap.
-        playheadBin = WrapIndex(playheadBin, leaderBins);
-
-        // IMPORTANT: playback must be driven by the leader transport bin, not this track's local
-        // bin wrap. Using barIndex % trackBins causes short tracks (e.g. 1 bin) to retrigger
-        // multiple times within a longer leader loop. Keep leader-space bin here; gating inside
-        // PlayLoopedNotesInBin() will silence bins this track doesn't own.
-        int playbackBin = playheadBin;
+        int committedLeaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
+        int activeLeaderBins    = Mathf.Max(1, controller.GetMaxLoopMultiplier());
+        int leaderBins          = Mathf.Max(committedLeaderBins, activeLeaderBins);
+// Use runtime leader-space bin so chord progression doesn't flatten while committed bins catch up.
+        int playbackBin = WrapIndex(barIndex, leaderBins);
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
