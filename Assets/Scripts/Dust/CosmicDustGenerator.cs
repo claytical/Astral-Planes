@@ -1082,6 +1082,7 @@ public class CosmicDustGenerator : MonoBehaviour
         Vector2Int starCell,
         HashSet<Vector2Int> reservedCells)
     {
+        config?.Validate();
         if (drums == null) return new List<(Vector2Int, Vector3)>();
 
         int w = drums.GetSpawnGridWidth();
@@ -1120,9 +1121,9 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildClearBoxes(
                     width: w,
                     height: h,
-                    count: config.clearBoxCount,
-                    boxW: config.clearBoxWidth,
-                    boxH: config.clearBoxHeight,
+                    count: config.clearBoxes.clearBoxCount,
+                    boxW: config.clearBoxes.clearBoxWidth,
+                    boxH: config.clearBoxes.clearBoxHeight,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
@@ -1134,8 +1135,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildCA(
                     width: w,
                     height: h,
-                    fillChance: Mathf.Clamp01(config.caFillChance),
-                    iterations: config.caIterations,
+                    fillChance: config.cellularAutomata.fillChance,
+                    iterations: config.cellularAutomata.iterations,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1149,9 +1150,9 @@ public class CosmicDustGenerator : MonoBehaviour
                     center: starCell,
                     width: w,
                     height: h,
-                    ringSpacing: config.ringSpacing,
-                    ringThickness: config.ringThickness,
-                    jitter: config.ringJitter,
+                    ringSpacing: config.ring.spacing,
+                    ringThickness: config.ring.thickness,
+                    jitter: config.ring.jitter,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1166,10 +1167,10 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
                     width: w,
                     height: h,
-                    strokes: config.strokes,
-                    maxLen: config.strokeMaxLen,
-                    stepJitter: config.strokeJitter,
-                    dilate: config.strokeDilate,
+                    strokes: config.drunkenStrokes.strokes,
+                    maxLen: config.drunkenStrokes.maxLen,
+                    stepJitter: config.drunkenStrokes.jitter,
+                    dilate: config.drunkenStrokes.dilate,
                     getHexDirectionsByRow: getDirsByRow,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
@@ -1182,8 +1183,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildPopDots(
                     width: w,
                     height: h,
-                    step: config.laneStep,
-                    phaseOffset: Random.Range(0, config.laneStep),
+                    step: config.diagonalLanes.step,
+                    phaseOffset: Random.Range(0, config.diagonalLanes.step),
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
@@ -1195,8 +1196,8 @@ public class CosmicDustGenerator : MonoBehaviour
                 growth = CosmicDustMazePatterns.BuildPacManTunnels(
                     width: w,
                     height: h,
-                    corridorStep: config.tunnelCorridorStep,
-                    corridorWidth: config.tunnelCorridorWidth,
+                    corridorStep: config.tunnels.corridorStep,
+                    corridorWidth: config.tunnels.corridorWidth,
                     gridToWorld: gridToWorld,
                     isCellAvailable: isCellAvailable,
                     includeWorld: includeWorld);
@@ -1228,12 +1229,12 @@ public class CosmicDustGenerator : MonoBehaviour
             growth = new List<(Vector2Int, Vector3)>();
 
         // Porous border: union border-wall cells into growth before the final filter.
-        if (config != null && config.borderExitCount >= 0)
+        if (config != null && config.porousBorder.exitCount >= 0)
         {
             var borderCells = CosmicDustMazePatterns.BuildPorousBorderCells(
                 width: w,
                 height: h,
-                exitCount: config.borderExitCount,
+                exitCount: config.porousBorder.exitCount,
                 isCellAvailable: isCellAvailable);
 
             var growthSet = new HashSet<Vector2Int>(growth.Count);
@@ -1924,7 +1925,7 @@ private void BuildMazeRoleImprints(
             return;
 
         // Compute delay from the active motif's maze config, or fall back to a safe default.
-        float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.regrowDelay : 8f);
+        float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.dustTiming.regrowDelay : 8f);
        
         EnsureRegrowController();
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);

@@ -1,14 +1,136 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum MazePatternType
 {
-    FullFill,         // fill entire available grid
-    ClearBoxes,       // fill grid, punch N rectangular clear zones
-    CellularAutomata, // organic blobs
-    RingChokepoints,  // concentric ring walls with gaps
-    DrunkenStrokes,   // glitchy scribble lines
-    DiagonalLanes,    // repeating diagonal open lanes
-    Tunnels           // pac-man corridor grid
+    FullFill,
+    ClearBoxes,
+    CellularAutomata,
+    RingChokepoints,
+    DrunkenStrokes,
+    DiagonalLanes,
+    Tunnels
+}
+
+[System.Serializable]
+public sealed class DustTimingParams
+{
+    [FormerlySerializedAs("regrowDelay")]
+    [Tooltip("Base seconds before a cleared cell regrows dust.")]
+    public float regrowDelay = 8f;
+}
+
+[System.Serializable]
+public sealed class ClearBoxesParams
+{
+    [FormerlySerializedAs("clearBoxCount")]
+    [Min(1)] public int clearBoxCount = 4;
+    [FormerlySerializedAs("clearBoxWidth")]
+    [Min(1)] public int clearBoxWidth = 5;
+    [FormerlySerializedAs("clearBoxHeight")]
+    [Min(1)] public int clearBoxHeight = 5;
+
+    public void Validate()
+    {
+        clearBoxCount = Mathf.Max(1, clearBoxCount);
+        clearBoxWidth = Mathf.Max(1, clearBoxWidth);
+        clearBoxHeight = Mathf.Max(1, clearBoxHeight);
+    }
+}
+
+[System.Serializable]
+public sealed class CellularAutomataParams
+{
+    [FormerlySerializedAs("caFillChance")]
+    [Range(0f, 1f)] public float fillChance = 0.30f;
+    [FormerlySerializedAs("caIterations")]
+    [Range(1, 10)] public int iterations = 3;
+
+    public void Validate()
+    {
+        fillChance = Mathf.Clamp01(fillChance);
+        iterations = Mathf.Clamp(iterations, 1, 10);
+    }
+}
+
+[System.Serializable]
+public sealed class RingParams
+{
+    [FormerlySerializedAs("ringSpacing")]
+    [Min(1)] public int spacing = 6;
+    [FormerlySerializedAs("ringThickness")]
+    [Min(1)] public int thickness = 1;
+    [FormerlySerializedAs("ringJitter")]
+    [Range(0f, 1f)] public float jitter = 0.35f;
+
+    public void Validate()
+    {
+        spacing = Mathf.Max(1, spacing);
+        thickness = Mathf.Max(1, thickness);
+        jitter = Mathf.Clamp01(jitter);
+    }
+}
+
+[System.Serializable]
+public sealed class DrunkenStrokesParams
+{
+    [FormerlySerializedAs("strokes")]
+    [Min(1)] public int strokes = 10;
+    [FormerlySerializedAs("strokeMaxLen")]
+    [Min(1)] public int maxLen = 18;
+    [FormerlySerializedAs("strokeJitter")]
+    [Range(0f, 1f)] public float jitter = 0.35f;
+    [FormerlySerializedAs("strokeDilate")]
+    [Range(0f, 1f)] public float dilate = 0.30f;
+
+    public void Validate()
+    {
+        strokes = Mathf.Max(1, strokes);
+        maxLen = Mathf.Max(1, maxLen);
+        jitter = Mathf.Clamp01(jitter);
+        dilate = Mathf.Clamp01(dilate);
+    }
+}
+
+[System.Serializable]
+public sealed class DiagonalLanesParams
+{
+    [FormerlySerializedAs("laneStep")]
+    [Min(2)] public int step = 12;
+
+    public void Validate()
+    {
+        step = Mathf.Max(2, step);
+    }
+}
+
+[System.Serializable]
+public sealed class TunnelsParams
+{
+    [FormerlySerializedAs("tunnelCorridorStep")]
+    [Min(1)] public int corridorStep = 1;
+    [FormerlySerializedAs("tunnelCorridorWidth")]
+    [Min(1)] public int corridorWidth = 3;
+
+    public void Validate()
+    {
+        corridorStep = Mathf.Max(1, corridorStep);
+        corridorWidth = Mathf.Max(1, corridorWidth);
+        if (corridorWidth > corridorStep)
+            corridorStep = corridorWidth;
+    }
+}
+
+[System.Serializable]
+public sealed class PorousBorderParams
+{
+    [FormerlySerializedAs("borderExitCount")]
+    [Min(0)] public int exitCount = 3;
+
+    public void Validate()
+    {
+        exitCount = Mathf.Max(0, exitCount);
+    }
 }
 
 [CreateAssetMenu(menuName = "Astral Planes/Maze/Maze Pattern Config")]
@@ -17,52 +139,63 @@ public class MazePatternConfig : ScriptableObject
     public MazePatternType patternType = MazePatternType.FullFill;
 
     [Header("Dust Timing")]
-    [Tooltip("Base seconds before a cleared cell regrows dust.")]
-    public float regrowDelay = 8f;
+    public DustTimingParams dustTiming = new();
 
     [Header("Clear Boxes")]
-    [Tooltip("Number of rectangular clear zones punched into an otherwise full grid.")]
-    [Min(1)] public int clearBoxCount  = 4;
-    [Tooltip("Width of each clear zone in grid cells.")]
-    [Min(1)] public int clearBoxWidth  = 5;
-    [Tooltip("Height of each clear zone in grid cells.")]
-    [Min(1)] public int clearBoxHeight = 5;
+    public ClearBoxesParams clearBoxes = new();
 
     [Header("Cellular Automata")]
-    [Tooltip("Initial fill probability before CA smoothing (0 = empty, 1 = full).")]
-    [Range(0f, 1f)] public float caFillChance = 0.30f;
-    [Tooltip("Number of CA smoothing passes.")]
-    [Range(1, 10)]  public int   caIterations  = 3;
+    public CellularAutomataParams cellularAutomata = new();
 
     [Header("Ring Chokepoints")]
-    [Tooltip("Grid cells between successive ring walls.")]
-    [Min(1)]        public int   ringSpacing   = 6;
-    [Tooltip("Thickness of each ring wall in cells.")]
-    [Min(1)]        public int   ringThickness = 1;
-    [Tooltip("Per-cell radial noise applied to ring placement (0 = perfect circles).")]
-    [Range(0f, 1f)] public float ringJitter    = 0.35f;
+    public RingParams ring = new();
 
     [Header("Drunken Strokes")]
-    [Tooltip("Number of scribble strokes drawn.")]
-    [Min(1)]        public int   strokes      = 10;
-    [Tooltip("Maximum cells per stroke.")]
-    [Min(1)]        public int   strokeMaxLen = 18;
-    [Tooltip("Chance per step to deviate from current heading.")]
-    [Range(0f, 1f)] public float strokeJitter = 0.35f;
-    [Tooltip("Fraction of neighboring cells also filled per step (thickens strokes).")]
-    [Range(0f, 1f)] public float strokeDilate = 0.30f;
+    public DrunkenStrokesParams drunkenStrokes = new();
 
     [Header("Diagonal Lanes")]
-    [Tooltip("Cell stride between lane walls. Larger = wider open lanes.")]
-    [Min(2)] public int laneStep = 12;
+    public DiagonalLanesParams diagonalLanes = new();
 
     [Header("Tunnels")]
-    [Tooltip("Cell stride of the corridor grid (wall thickness = corridorStep - corridorWidth).")]
-    [Min(1)] public int tunnelCorridorStep  = 1;
-    [Tooltip("Width of each open corridor in cells.")]
-    [Min(1)] public int tunnelCorridorWidth = 3;
+    public TunnelsParams tunnels = new();
 
     [Header("Porous Border")]
-    [Tooltip("Number of evenly-distributed gap openings in the 3-edge border ring (left, right, top). 0 = solid border.")]
-    [Min(0)] public int borderExitCount = 3;
+    public PorousBorderParams porousBorder = new();
+
+    public object GetActivePatternParams()
+    {
+        return patternType switch
+        {
+            MazePatternType.ClearBoxes => clearBoxes,
+            MazePatternType.CellularAutomata => cellularAutomata,
+            MazePatternType.RingChokepoints => ring,
+            MazePatternType.DrunkenStrokes => drunkenStrokes,
+            MazePatternType.DiagonalLanes => diagonalLanes,
+            MazePatternType.Tunnels => tunnels,
+            _ => null,
+        };
+    }
+
+    public void Validate()
+    {
+        dustTiming ??= new DustTimingParams();
+        clearBoxes ??= new ClearBoxesParams();
+        cellularAutomata ??= new CellularAutomataParams();
+        ring ??= new RingParams();
+        drunkenStrokes ??= new DrunkenStrokesParams();
+        diagonalLanes ??= new DiagonalLanesParams();
+        tunnels ??= new TunnelsParams();
+        porousBorder ??= new PorousBorderParams();
+
+        dustTiming.regrowDelay = Mathf.Max(0f, dustTiming.regrowDelay);
+        clearBoxes.Validate();
+        cellularAutomata.Validate();
+        ring.Validate();
+        drunkenStrokes.Validate();
+        diagonalLanes.Validate();
+        tunnels.Validate();
+        porousBorder.Validate();
+    }
+
+    private void OnValidate() => Validate();
 }
