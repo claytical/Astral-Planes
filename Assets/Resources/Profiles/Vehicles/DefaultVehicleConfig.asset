@@ -16,14 +16,14 @@ MonoBehaviour:
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
   manualReleaseUseArmLock: 1
-  manualReleaseArmAheadSteps: 6
+  manualReleaseArmAheadSteps: 2
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 0.5
   plowTickSeconds: 0.06
   plowFadeSeconds: 0.15
   inputTimeout: 0.15
   enableRecovery: 1
-  viewportOobMargin: 0.15
+  viewportOobMargin: 0.1
   minSecondsBetweenRecoveries: 0.75
   respawnSearchRadiusCells: 8
   stuckSpeedThreshold: 0.35
@@ -42,7 +42,7 @@ MonoBehaviour:
   spawnRestPocketRadiusCells: 1
   spawnRestPocketFadeSeconds: 0.05
   spawnRestPocketDelaySeconds: 0
-  trailSlotSpacing: 0.55
-  trailFirstSlotOffset: 0.7
+  trailSlotSpacing: 0.1
+  trailFirstSlotOffset: 0.3
   trailHistoryCapacity: 48
   trailReleasePulseSteps: 4
