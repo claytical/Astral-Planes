@@ -3,6 +3,15 @@ using UnityEngine;
 
 public partial class CosmicDust
 {
+    private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
+    private Vector3 _dustSpriteBaseLocalPos;
+    private Vector3 _noseVisualOffsetLocal = Vector3.zero;
+    private Vector2 _noseCompressDirWorld = Vector2.up;
+    private float _noseCompressTarget01 = 0f;
+    private float _noseCompressCurrent01 = 0f;
+    private float _lastNoseContactTime = -999f;
+    private float _noseVisibleUntil = -999f;
+
     [Serializable]
     public struct NoseCompressionSettings
     {
