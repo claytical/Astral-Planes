@@ -139,14 +139,40 @@ public class CosmicDust : MonoBehaviour {
 // ------------------------------------------------------------
 // Vehicle nose compression (visual only)
 // ------------------------------------------------------------
-    [Header("Vehicle Nose Compression")]
-    [SerializeField] private bool enableVehicleCompression = true;
-    [SerializeField, Range(0f, 0.75f)] private float noseCompressAmount = 0.22f;
-    [SerializeField, Range(0f, 0.5f)] private float noseBulgeAmount = 0.10f;
-    [SerializeField] private float noseCompressMaxOffsetWorld = 0.16f;
-    [SerializeField] private float noseProbeWorld = 0.55f;
-    [SerializeField] private float noseCompressSpeedForFull = 10f;
-    [SerializeField] private float noseCompressBoostBonus = 0.20f;
+    [Serializable]
+    public struct NoseCompressionSettings
+    {
+        [Header("Vehicle Nose Compression")]
+        public bool enabled;
+        [Range(0f, 0.75f)] public float compressAmount;
+        [Range(0f, 0.5f)] public float bulgeAmount;
+        [Tooltip("Maximum world-space visual offset while compressed.")]
+        [Min(0f)] public float maxOffsetWorld;
+        [Tooltip("Distance from vehicle center used to sample nose contact.")]
+        [Min(0f)] public float probeWorld;
+        [Tooltip("Vehicle speed (world units/sec) that yields full compression target.")]
+        [Min(0.01f)] public float speedForFull;
+        [Range(0f, 1f)] public float boostBonus;
+        [Min(0f)] public float contactGraceSeconds;
+        [Min(0f)] public float minimumVisibleSeconds;
+        [Tooltip("Lower = slower, more cushioned. Higher = snappier.")]
+        [Min(0.01f)] public float attackSharpness;
+        [Min(0.01f)] public float releaseSharpness;
+    }
+    [SerializeField] private NoseCompressionSettings noseCompression = new NoseCompressionSettings
+    {
+        enabled = true,
+        compressAmount = 0.22f,
+        bulgeAmount = 0.10f,
+        maxOffsetWorld = 0.16f,
+        probeWorld = 0.55f,
+        speedForFull = 10f,
+        boostBonus = 0.20f,
+        contactGraceSeconds = 0.075f,
+        minimumVisibleSeconds = 0.050f,
+        attackSharpness = 10f,
+        releaseSharpness = 16f
+    };
     private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
     private Vector3 _dustSpriteBaseLocalPos;
     private Vector3 _noseVisualOffsetLocal = Vector3.zero;
@@ -155,12 +181,6 @@ public class CosmicDust : MonoBehaviour {
     private float _noseCompressCurrent01 = 0f;
     private float _lastNoseContactTime = -999f;
     private float _noseVisibleUntil = -999f;    // Some prefab variants ended up with colliders on children (or multiple colliders).
-    [SerializeField] private float noseContactGraceSeconds = 0.075f;
-    [SerializeField] private float noseMinimumVisibleSeconds = 0.050f;
-
-// Lower = slower, more cushioned. Higher = snappier.
-    [SerializeField] private float noseCompressAttackSharpness = 10f;
-    [SerializeField] private float noseCompressReleaseSharpness = 16f;
     // Carve/disable must be authoritative, so we cache all colliders in the hierarchy.
     private Collider2D[] _cachedColliders;
     private BoxCollider2D _box;
@@ -291,7 +311,7 @@ private Coroutine _jiggleRoutine;
     }
     private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
     {
-        if (!enableVehicleCompression || vehicle == null || visual.sprite == null)
+        if (!noseCompression.enabled || vehicle == null || visual.sprite == null)
             return;
         if (_isDespawned)
             return;
@@ -299,7 +319,7 @@ private Coroutine _jiggleRoutine;
             return;
         Vector2 dustCenter = visual.sprite.bounds.center;
 
-        Vector2 noseWorld = (Vector2)vehicle.transform.position + (Vector2)vehicle.transform.up * noseProbeWorld;
+        Vector2 noseWorld = (Vector2)vehicle.transform.position + (Vector2)vehicle.transform.up * noseCompression.probeWorld;
 
         Vector2 dir = Vector2.zero;
 
@@ -322,9 +342,9 @@ private Coroutine _jiggleRoutine;
 
         float speed01 = 0f;
         if (vehicle.rb != null)
-            speed01 = Mathf.Clamp01(vehicle.rb.linearVelocity.magnitude / Mathf.Max(0.01f, noseCompressSpeedForFull));
+            speed01 = Mathf.Clamp01(vehicle.rb.linearVelocity.magnitude / Mathf.Max(0.01f, noseCompression.speedForFull));
 
-        float boostBonus = vehicle.boosting ? noseCompressBoostBonus : 0f;
+        float boostBonus = vehicle.boosting ? noseCompression.boostBonus : 0f;
 
         // Let very small glancing touches still read visually.
         float floor = 0.18f;
@@ -334,7 +354,7 @@ private Coroutine _jiggleRoutine;
         _lastNoseContactTime = Time.time;
 
         // Prevent micro-taps from appearing as a single-frame flash.
-        _noseVisibleUntil = Mathf.Max(_noseVisibleUntil, Time.time + noseMinimumVisibleSeconds);
+        _noseVisibleUntil = Mathf.Max(_noseVisibleUntil, Time.time + noseCompression.minimumVisibleSeconds);
     }
     private void SetBaseSpriteScale(Vector3 scale)
     {
@@ -346,20 +366,20 @@ private Coroutine _jiggleRoutine;
 
     private void TickVehicleCompression()
 {
-    if (!enableVehicleCompression || visual.sprite == null)
+    if (!noseCompression.enabled || visual.sprite == null)
         return;
 
     Transform srt = visual.sprite.transform;
     float now = Time.time;
 
-    bool recentlyTouched = (now - _lastNoseContactTime) <= noseContactGraceSeconds;
+    bool recentlyTouched = (now - _lastNoseContactTime) <= noseCompression.contactGraceSeconds;
     bool stillVisible = now <= _noseVisibleUntil;
 
     float desired01 = (recentlyTouched || stillVisible) ? _noseCompressTarget01 : 0f;
 
     float sharpness = (desired01 > _noseCompressCurrent01)
-        ? noseCompressAttackSharpness
-        : noseCompressReleaseSharpness;
+        ? noseCompression.attackSharpness
+        : noseCompression.releaseSharpness;
 
     float lerp = 1f - Mathf.Exp(-sharpness * Time.deltaTime);
     _noseCompressCurrent01 = Mathf.Lerp(_noseCompressCurrent01, desired01, lerp);
@@ -393,8 +413,8 @@ private Coroutine _jiggleRoutine;
 
     Vector2 perpLocal2 = new Vector2(-dirLocal2.y, dirLocal2.x);
 
-    float squash = noseCompressAmount * _noseCompressCurrent01;
-    float bulge  = noseBulgeAmount * _noseCompressCurrent01;
+    float squash = noseCompression.compressAmount * _noseCompressCurrent01;
+    float bulge  = noseCompression.bulgeAmount * _noseCompressCurrent01;
 
     Vector2 basisX = Vector2.right;
     Vector2 basisY = Vector2.up;
@@ -411,7 +431,7 @@ private Coroutine _jiggleRoutine;
 
     Vector3 deformationScale = new Vector3(Mathf.Max(0.1f, sx), Mathf.Max(0.1f, sy), 1f);
 
-    Vector3 worldOffset = (Vector3)(_noseCompressDirWorld.normalized * (noseCompressMaxOffsetWorld * _noseCompressCurrent01));
+    Vector3 worldOffset = (Vector3)(_noseCompressDirWorld.normalized * (noseCompression.maxOffsetWorld * _noseCompressCurrent01));
     _noseVisualOffsetLocal = transform.InverseTransformVector(worldOffset);
 
     // Apply deformation relative to current gameplay-owned scale.
