@@ -485,12 +485,13 @@ public class NoteVisualizer : MonoBehaviour
             if (_releasePulseT > 0f)
             {
                 float pulse01 = Mathf.Clamp01(_releasePulseT / Mathf.Max(0.0001f, releasePulseSeconds));
-                emitParams.startColor = Color.Lerp(Color.white, GetReleasePulseColor(_lastReleasePulseRole), pulse01);
+                emitParams.startColor = Color.Lerp(Color.white, GetReleasePulseColor(_lastReleasePulseRole), .5f);
             }
             else
             {
                 emitParams.startColor = Color.white; // or omit if you want the system default
             }
+
 
             playheadParticles.Emit(emitParams, 1);
         }
@@ -774,7 +775,7 @@ public class NoteVisualizer : MonoBehaviour
 
     ProcessFirstPlayConfirmFx();
     UpdateFirstPlayConfirmTasks();
-    DisableBuiltInEmissionForTrail();
+    //DisableBuiltInEmissionForTrail();
     UpdatePlayheadParticleTrailWorld();
 
 // Leader time in [0, fullVisualLoopDuration)
