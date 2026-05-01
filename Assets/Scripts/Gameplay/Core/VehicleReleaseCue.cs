@@ -1,18 +1,15 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// Vehicle-local release cue: a filled circle that grows behind the vehicle,
-/// colored with the pending note's track color, plus a ring of beat dots that
-/// count down remaining steps to the armed target.
+/// colored with the pending note's track color, plus a step bar that
+/// counts down remaining steps to the armed target.
 ///
 /// Setup — add this component to the vehicle GameObject (or a child).
 /// Assign the <see cref="releaseCue"/> field on Vehicle to this component.
 ///
 /// The growing circle is a SpriteRenderer drawn BEHIND the vehicle (lower
 /// sorting order), so white-outline vehicles remain visible on top of it.
-/// Each beat dot is a small SpriteRenderer quad spawned at runtime from a
-/// configurable sprite (or Unity's built-in circle if left null).
 /// </summary>
 [DisallowMultipleComponent]
 public class VehicleReleaseCue : MonoBehaviour
@@ -64,28 +61,6 @@ public class VehicleReleaseCue : MonoBehaviour
     private SpriteRenderer _stepBar;
     private float _stepBarFullWidth = 1f;
 
-    [Header("Beat Dots")]
-    [Tooltip("Sprite for each beat dot. Leave null for a plain quad.")]
-    [SerializeField] private Sprite dotSprite;
-
-    [Tooltip("World-space radius at which dots are placed.")]
-    [SerializeField] private float dotOrbitRadius = 0.75f;
-
-    [Tooltip("World-space scale of each dot.")]
-    [SerializeField] private float dotSize = 0.10f;
-
-    [Tooltip("Sorting layer name shared with the vehicle sprite.")]
-    [SerializeField] private string dotSortingLayer = "Default";
-
-    [Tooltip("Sorting order for dots (drawn on top of circle, ideally on top of vehicle too).")]
-    [SerializeField] private int dotSortingOrder = 2;
-
-    [Tooltip("Color for a beat that has NOT yet passed (remaining).")]
-    [SerializeField] private Color dotColorActive = new Color(1f, 1f, 1f, 0.90f);
-
-    [Tooltip("Color for a beat that HAS already passed (spent).")]
-    [SerializeField] private Color dotColorSpent  = new Color(1f, 1f, 1f, 0.15f);
-
     // ------------------------------------------------------------------
     // Runtime state
     // ------------------------------------------------------------------
@@ -93,9 +68,6 @@ public class VehicleReleaseCue : MonoBehaviour
     private float           _currentPulse;   // 0→1, smoothed
     private float           _targetPulse;
     private Color           _trackColor = Color.white;
-
-    private readonly List<SpriteRenderer> _dots = new List<SpriteRenderer>();
-    private int _lastTotalBeats = -1;
 
     // ------------------------------------------------------------------
     // Unity
@@ -124,39 +96,16 @@ public class VehicleReleaseCue : MonoBehaviour
             UpdateCircle(_currentPulse);
     }
 
-    private void OnDestroy()
-    {
-        ClearDots();
-    }
-
     // ------------------------------------------------------------------
     // Public API — called by Vehicle
     // ------------------------------------------------------------------
 
-
-
     /// <summary>
-    /// Update the beat-dot countdown display.
+    /// Update the step countdown display.
     /// Called on every musical step tick while a note is armed.
     /// </summary>
     public void SetBeatsRemaining(int remaining, int total)
     {
-        if (total != _lastTotalBeats)
-        {
-            RebuildDots(total);
-            _stepBarFullWidth = stepBarWidth;
-        }
-
-        for (int i = 0; i < _dots.Count; i++)
-        {
-            if (_dots[i] == null) continue;
-            // Dots are laid out clockwise from 12 o'clock.
-            // Active dots are the rightmost `remaining` ones.
-            bool isActive = i >= (_dots.Count - remaining);
-            _dots[i].color = isActive ? dotColorActive : dotColorSpent;
-            _dots[i].gameObject.SetActive(true);
-        }
-
         // Shrink step bar proportionally to beats remaining.
         if (_stepBar != null && total > 0)
         {
@@ -201,48 +150,6 @@ public class VehicleReleaseCue : MonoBehaviour
         _circle.color = new Color(_trackColor.r, _trackColor.g, _trackColor.b, alpha);
     }
 
-    // ------------------------------------------------------------------
-    // Beat dots (SpriteRenderers)
-    // ------------------------------------------------------------------
-    private void RebuildDots(int count)
-    {
-        ClearDots();
-        _lastTotalBeats = count;
-
-        for (int i = 0; i < count; i++)
-        {
-            var go = new GameObject($"ReleaseDot_{i}");
-            go.transform.SetParent(transform, false);
-
-            float angle = (i / (float)count) * Mathf.PI * 2f - Mathf.PI * 0.5f; // 12 o'clock first
-            go.transform.localPosition = new Vector3(
-                Mathf.Cos(angle) * dotOrbitRadius,
-                Mathf.Sin(angle) * dotOrbitRadius,
-                0f);
-
-            go.transform.localScale = Vector3.one * dotSize;
-
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite           = dotSprite;
-            sr.color            = dotColorSpent;
-            sr.sortingLayerName = dotSortingLayer;
-            sr.sortingOrder     = dotSortingOrder;
-
-            _dots.Add(sr);
-        }
-    }
-
-    private void ClearDots()
-    {
-        foreach (var sr in _dots)
-        {
-            if (sr != null)
-                Destroy(sr.gameObject);
-        }
-        _dots.Clear();
-        _lastTotalBeats = -1;
-    }
-
     private void BuildStepBar()
     {
         var go = new GameObject("StepBar");
@@ -271,7 +178,5 @@ public class VehicleReleaseCue : MonoBehaviour
         if (_stepBar != null)
             _stepBar.enabled = visible;
 
-        foreach (var sr in _dots)
-            if (sr != null) sr.gameObject.SetActive(visible);
     }
 }
