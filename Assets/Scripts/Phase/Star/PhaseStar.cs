@@ -173,6 +173,8 @@ public class PhaseStar : MonoBehaviour
 
     private float _displayedCharge01;
 
+    private bool _dormantSeedVisualPrimed;
+
     private bool _ejectionInFlight;
     private int _spawnTicket;
     private float _ejectableTimer;
@@ -291,6 +293,7 @@ public class PhaseStar : MonoBehaviour
         if (_previewVisual != null) _previewVisual.localScale = seed;
         if (_previewVisualB != null) _previewVisualB.localScale = seed;
         visuals?.ShowDim(ResolvePreviewColorByReadiness());
+        _dormantSeedVisualPrimed = true;
 
         DisableColliders();
         _hasReceivedEnergy = false;
@@ -314,6 +317,7 @@ public class PhaseStar : MonoBehaviour
 
         StopManagedCoroutine(ref _waitForDustCo);
         _state = PhaseStarState.WaitingForPoke;
+        _dormantSeedVisualPrimed = false;
 
         // Star earned free movement — unfreeze and retract tentacles.
         motion?.SetFrozen(false);
@@ -568,6 +572,8 @@ public class PhaseStar : MonoBehaviour
         rotB = -_accumulatorRotAngle;
     }
 
+    EnsureDormantSeedVisuals();
+
     // Passive decay first.
     float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
     if (_starCharge.Count > 0 && passiveDecay > 0f)
@@ -699,6 +705,24 @@ public class PhaseStar : MonoBehaviour
         EnterDormantWaitState();
     }
 }
+    private void EnsureDormantSeedVisuals()
+    {
+        if (visuals == null) return;
+        if (_state != PhaseStarState.Dormant) return;
+        if (_burstOffScreen) return;
+        if (_disarmReason == DisarmReason.SiblingActive) return;
+
+        if (!_dormantSeedVisualPrimed)
+        {
+            visuals.ShowDim(ResolvePreviewColorByReadiness());
+            _dormantSeedVisualPrimed = true;
+        }
+
+        float minScale = Mathf.Max(0f, dormantSeedScale);
+        if (visuals.transform.localScale.x < minScale)
+            visuals.transform.localScale = Vector3.one * minScale;
+    }
+
     private void SafeUnsubscribeAll()
     {
         // Unhook both places we subscribe OnLoopBoundary:
