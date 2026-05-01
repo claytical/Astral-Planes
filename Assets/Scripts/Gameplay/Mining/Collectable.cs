@@ -13,6 +13,10 @@ public class Collectable : MonoBehaviour
 
     [Tooltip("Burst identifier used by spawn/accounting systems.")]
     public int burstId;
+
+    [Tooltip("Authoritative burst bin assigned at spawn; used to resolve absolute sequencer step on deposit.")]
+    public int intendedBin = -1;
+
     [Header("Spawn Intent")]
     public bool isTrappedInDust = false;
     // ---- Dust collision tuning ----
