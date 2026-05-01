@@ -55,6 +55,10 @@ public partial class CosmicDust : MonoBehaviour {
     public float Charge01 => (float)_currentEnergyUnits / Mathf.Max(1, _maxEnergyUnits);
     public MusicalRole Role { get; private set; } = MusicalRole.None;
 
+    public event Action<float> OnChargeChanged;
+    public event Action<MusicalRole> OnRoleChanged;
+    public event Action<bool> OnCollisionStateChanged;
+
 // Authoritative/resting tint of this dust cell.
 // This is what retinting, charge drain, role assignment, etc. should modify.
     public Color CurrentTint => _currentTint;
@@ -142,6 +146,7 @@ public partial class CosmicDust : MonoBehaviour {
     private Coroutine  _fadeRoutine, _growInRoutine;
     private DrumTrack _drumTrack;
     private CosmicDustGenerator gen;
+    private CosmicDustVisualController _visualController;
     private float _growInOverride = -1f;
 
 // Canonical/rest tint.
@@ -164,6 +169,7 @@ private int _tintPulseToken = 0;
 private bool _tintPulseActive = false;
 private Coroutine _jiggleRoutine;
     void Awake() {
+        _visualController = GetComponent<CosmicDustVisualController>();
         if (!_cachedInitialScale)
         {
             
@@ -249,6 +255,7 @@ private Coroutine _jiggleRoutine;
                 _currentEnergyUnits = 1;
         }
         ApplyDisplayedTint(_currentTint);
+        OnChargeChanged?.Invoke(Charge01);
     }
     public void InitializeVisuals(DustVisualTimings settings)
     {
@@ -302,6 +309,7 @@ private Coroutine _jiggleRoutine;
     public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge, int maxUnits = -1)
     {
         Role = r;
+        OnRoleChanged?.Invoke(Role);
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;
         SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
@@ -344,6 +352,7 @@ private Coroutine _jiggleRoutine;
 
         _currentTint = drained;
         ApplyDisplayedTint(_currentTint);
+        OnChargeChanged?.Invoke(Charge01);
 
         if (_currentEnergyUnits <= 0)
             SetTerrainColliderEnabled(false);
@@ -363,6 +372,7 @@ private Coroutine _jiggleRoutine;
         return (float)actual / Mathf.Max(1, _maxEnergyUnits);
     }
     
+    [Obsolete("Compatibility wrapper. Prefer visual-controller driven spawn presentation.")]
     public void Begin()
     {
         if (!gameObject.activeInHierarchy)
@@ -461,6 +471,7 @@ private Coroutine _jiggleRoutine;
         if (restoreToBase)
             RestoreDisplayToBaseTint();
     }
+    [Obsolete("Compatibility wrapper. Prefer state/event-driven tint updates via CosmicDustVisualController.")]
     public void SetTint(Color tint)
     {
         SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
@@ -531,7 +542,10 @@ private Coroutine _jiggleRoutine;
             RebuildColliderForCurrentScale();
             SyncColliderRadiusToSprite();
         }
+
+        OnCollisionStateChanged?.Invoke(enabled);
     }
+    [Obsolete("Compatibility wrapper. Prefer visual-controller driven clear presentation.")]
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
     {
         if (_isDespawned) return;
