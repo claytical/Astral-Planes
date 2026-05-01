@@ -15,13 +15,6 @@ public sealed class MazeTopologyService
         public Func<Vector2Int, Vector2Int> NormalizeCell;
     }
 
-    /// <summary>
-    /// Builds the final set of solid grid cells for a maze pattern.
-    /// Contract: callers must provide a fully-authoritative <see cref="Context.IsBlocked"/> predicate
-    /// that encodes all exclusion rules (for example star, reserved, permanent-clear, and keep-clear).
-    /// This service treats <see cref="Context.IsBlocked"/> as the single ownership point for filtering
-    /// and guarantees returned cells satisfy <c>!IsBlocked(cell)</c>.
-    /// </summary>
     public HashSet<Vector2Int> BuildSolidCells(
         MazePatternConfig config,
         Context context)
