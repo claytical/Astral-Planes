@@ -1254,109 +1254,64 @@ private Coroutine _jiggleRoutine;
         var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
         if (vehicle == null) return;
         DriveVehicleCompression(vehicle, collision);
-        float drainRes = Mathf.Clamp01(clearing.drainResistance01);
         float dt = Time.fixedDeltaTime;
 
         if (vehicle.boosting)
         {
-            // ---------------------------------------------------------------
-            // BOOST PATH: vehicle bleaches this cell's charge.
-            //
-            // The vehicle invests its own energy to sap dust charge so the
-            // PhaseStar gains little or nothing from cells already worked.
-            //
-            // Drain rate is inversely scaled by drainResistance01:
-            //   drainRes=0 -> drains at full rate  (resistMul = 1.0)
-            //   drainRes=1 -> drains at 1/3 rate   (resistMul = 0.33)
-            //
-            // Vehicle energy cost mirrors resistance in the other direction --
-            // high-resistance dust costs proportionally more boost to neutralize.
-            // ---------------------------------------------------------------
-            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-            float resistMul   = Mathf.Lerp(1.0f, 0.33f, drainRes);
-            float chargeDrain = drainPerSec * resistMul * dt;
-
-            float taken = DrainCharge(chargeDrain); // lowers alpha visually
-
-            // High-resistance dust fights back -- pay more boost energy to bleach it.
-            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, drainRes);
-            vehicle.DrainEnergy(drainPerSec * hardnessCost * dt);
-
-            // Flash charge color so the player sees the cell losing its color.
-            if (taken > 0.001f)
-                TriggerChargeTintPulse();
-
-            // If the boost fully drained this cell, clear it from the generator.
-            if (_currentEnergyUnits <= 0 && gen != null && _drumTrack != null)
-            {
-                var gp = _drumTrack.WorldToGridPosition(transform.position);
-                gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
-                    fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
-            }
+            HandleBoostCollision(vehicle, dt);
         }
         else
         {
-            // ---------------------------------------------------------------
-            // NON-BOOST PATH: dust is a wall. No clearing, no energy drain.
-            // Musical pluck still fires so pressing against dust sounds alive.
-            // _nonBoostClearSeconds tracks contact duration for pluck intensity
-            // only — it never triggers a break.
-            // ---------------------------------------------------------------
-            _nonBoostClearSeconds += dt;
-
-            // No vehicle.DrainEnergy — non-boost contact is free.
-            // No clearing — severity is purely cosmetic for pluck bloom.
-
-            float denom = Mathf.Max(0.05f, dustPluckSwellSeconds);
-            float severity = Mathf.Clamp01(_nonBoostClearSeconds / denom);
-
-            if (_currentPluckVehicle != vehicle)
-            {
-                _currentPluckVehicle = vehicle;
-                _nextDustPluckTime = Time.time;
-                TriggerDenyTintPulse(1);
-                TriggerJiggle();
-            }
-
-            if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
-            {
-
-                float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
-
-                // Slow emergence, then bloom.
-                float bloom01 = hold01 * hold01;
-
-                int durTicks = Mathf.RoundToInt(Mathf.Lerp(
-                    dustPluckMinDurationTicks,
-                    dustPluckMaxDurationTicks,
-                    bloom01
-                ));
-
-                float vel127 = Mathf.Lerp(
-                    dustPluckMinVelocity127,
-                    dustPluckMaxVelocity127,
-                    bloom01
-                );
-
-                // Starts sparse, gets denser as the dust "sings."
-                float cooldown = Mathf.Lerp(
-                    dustPluckMaxCooldownSeconds,
-                    dustPluckMinCooldownSeconds,
-                    bloom01
-                );
-
-                var controller = GameFlowManager.Instance?.controller;
-                if (controller != null)
-                {
-                    // Phrase index into the chord also grows with hold.
-                    controller.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
-                }
-
-                // Space future triggers so notes swell rather than machine-gun.
-                _nextDustPluckTime = Time.time + cooldown;
-            }
+            HandleNonBoostCollision(vehicle, dt);
         }
 
+    }
+
+    private void HandleBoostCollision(Vehicle vehicle, float dt)
+    {
+        float drainRes = Mathf.Clamp01(clearing.drainResistance01);
+        float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
+        float chargeDrain = drainPerSec * Mathf.Lerp(1.0f, 0.33f, drainRes) * dt;
+        float taken = DrainCharge(chargeDrain);
+
+        vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(0.1f, 1.0f, drainRes) * dt);
+        if (taken > 0.001f) TriggerChargeTintPulse();
+        if (_currentEnergyUnits > 0) return;
+
+        var gp = _drumTrack.WorldToGridPosition(transform.position);
+        gen.ClearCell(
+            gp,
+            CosmicDustGenerator.DustClearMode.FadeAndHide,
+            fadeSeconds: _timings.fadeOutSeconds,
+            scheduleRegrow: true,
+            runPreExplode: true);
+    }
+
+    private void HandleNonBoostCollision(Vehicle vehicle, float dt)
+    {
+        _nonBoostClearSeconds += dt;
+        if (_currentPluckVehicle != vehicle)
+        {
+            _currentPluckVehicle = vehicle;
+            _nextDustPluckTime = Time.time;
+            TriggerDenyTintPulse(1);
+            TriggerJiggle();
+        }
+
+        if (Role == MusicalRole.None || Time.time < _nextDustPluckTime) return;
+        PlayNonBoostDustPluck();
+    }
+
+    private void PlayNonBoostDustPluck()
+    {
+        float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
+        float bloom01 = hold01 * hold01;
+        int durTicks = Mathf.RoundToInt(Mathf.Lerp(dustPluckMinDurationTicks, dustPluckMaxDurationTicks, bloom01));
+        float vel127 = Mathf.Lerp(dustPluckMinVelocity127, dustPluckMaxVelocity127, bloom01);
+        float cooldown = Mathf.Lerp(dustPluckMaxCooldownSeconds, dustPluckMinCooldownSeconds, bloom01);
+
+        GameFlowManager.Instance?.controller?.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
+        _nextDustPluckTime = Time.time + cooldown;
     }
 
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
