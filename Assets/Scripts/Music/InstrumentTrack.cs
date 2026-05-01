@@ -668,10 +668,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 // This prevents “bin disappears” if transport emits -1 or leaderBins at wrap.
         playheadBin = WrapIndex(playheadBin, leaderBins);
 
-        // Track playback should follow this track's own loop span, even if committed leader bins
-        // are temporarily stale around boundary/re-arm transitions.
-        int trackBins = Mathf.Max(1, loopMultiplier);
-        int playbackBin = WrapIndex(barIndex, trackBins);
+        // IMPORTANT: playback must be driven by the leader transport bin, not this track's local
+        // bin wrap. Using barIndex % trackBins causes short tracks (e.g. 1 bin) to retrigger
+        // multiple times within a longer leader loop. Keep leader-space bin here; gating inside
+        // PlayLoopedNotesInBin() will silence bins this track doesn't own.
+        int playbackBin = playheadBin;
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
