@@ -1132,6 +1132,138 @@ public class CosmicDustGenerator : MonoBehaviour
         return filtered;
     }
 
+    private static List<(Vector2Int cell, MusicalRole role)> SelectRoleSeeds(
+        IReadOnlyList<Vector2Int> occupied,
+        Vector2Int starCell,
+        IReadOnlyList<MusicalRole> roles,
+        int? deterministicSeed = null)
+    {
+        var seeds = new List<(Vector2Int cell, MusicalRole role)>();
+        if (occupied == null || occupied.Count == 0 || roles == null || roles.Count == 0)
+            return seeds;
+
+        int seedCount = Mathf.Min(roles.Count, occupied.Count);
+        var seedCells = new Vector2Int[seedCount];
+        var seedRoles = new MusicalRole[seedCount];
+
+        int firstSeedIdx = 0;
+        float bestStarDist = float.MinValue;
+        for (int i = 0; i < occupied.Count; i++)
+        {
+            float d = (occupied[i] - starCell).sqrMagnitude;
+            if (d > bestStarDist)
+            {
+                bestStarDist = d;
+                firstSeedIdx = i;
+            }
+        }
+
+        seedCells[0] = occupied[firstSeedIdx];
+        seedRoles[0] = roles[0];
+
+        var rng = deterministicSeed.HasValue ? new System.Random(deterministicSeed.Value) : null;
+        var chosen = new HashSet<Vector2Int> { seedCells[0] };
+
+        for (int s = 1; s < seedCount; s++)
+        {
+            int bestIdx = -1;
+            float bestMinDist = float.MinValue;
+            var tieCandidates = new List<int>();
+
+            for (int i = 0; i < occupied.Count; i++)
+            {
+                Vector2Int candidate = occupied[i];
+                if (chosen.Contains(candidate)) continue;
+
+                float minDistToChosen = float.MaxValue;
+                for (int c = 0; c < s; c++)
+                {
+                    float d = (candidate - seedCells[c]).sqrMagnitude;
+                    if (d < minDistToChosen)
+                        minDistToChosen = d;
+                }
+
+                if (minDistToChosen > bestMinDist)
+                {
+                    bestMinDist = minDistToChosen;
+                    tieCandidates.Clear();
+                    tieCandidates.Add(i);
+                    bestIdx = i;
+                }
+                else if (Mathf.Approximately(minDistToChosen, bestMinDist))
+                {
+                    tieCandidates.Add(i);
+                }
+            }
+
+            if (bestIdx < 0)
+                break;
+
+            if (rng != null && tieCandidates.Count > 1)
+                bestIdx = tieCandidates[rng.Next(tieCandidates.Count)];
+
+            seedCells[s] = occupied[bestIdx];
+            seedRoles[s] = roles[s];
+            chosen.Add(seedCells[s]);
+        }
+
+        for (int i = 0; i < chosen.Count; i++)
+            seeds.Add((seedCells[i], seedRoles[i]));
+
+        return seeds;
+    }
+
+    private static Dictionary<Vector2Int, MusicalRole> AssignRolesVoronoi(
+        IReadOnlyList<Vector2Int> occupied,
+        IReadOnlyList<(Vector2Int cell, MusicalRole role)> seeds)
+    {
+        var assignments = new Dictionary<Vector2Int, MusicalRole>();
+        if (occupied == null || occupied.Count == 0 || seeds == null || seeds.Count == 0)
+            return assignments;
+
+        for (int i = 0; i < occupied.Count; i++)
+        {
+            Vector2Int gp = occupied[i];
+            float best = float.MaxValue;
+            int bestSeed = 0;
+
+            for (int s = 0; s < seeds.Count; s++)
+            {
+                float d = (gp - seeds[s].cell).sqrMagnitude;
+                if (d < best)
+                {
+                    best = d;
+                    bestSeed = s;
+                }
+            }
+
+            assignments[gp] = seeds[bestSeed].role;
+        }
+
+        return assignments;
+    }
+
+    private static void BuildDustImprintsFromRoles(
+        IEnumerable<Vector2Int> cells,
+        Dictionary<Vector2Int, DustImprint> imprints,
+        Color mazeTint,
+        float defaultHardness01)
+    {
+        foreach (var gp in cells)
+        {
+            imprints[gp] = new DustImprint
+            {
+                role = MusicalRole.None,
+                color = mazeTint,
+                hardness01 = defaultHardness01,
+                carveResistance01 = 0f,
+                drainResistance01 = 0f,
+                maxEnergyUnits = 1,
+                healDelay = 0f
+            };
+        }
+    }
+
     /// <summary>
     /// Assigns a MusicalRole to every cell in the growth list via Voronoi (or a future
     /// archetype-specific layout), then writes a DustImprint for each cell so that
@@ -1139,14 +1271,14 @@ public class CosmicDustGenerator : MonoBehaviour
     /// </summary>
 private void BuildMazeRoleImprints(
     Vector2Int starCell,
-    List<(Vector2Int cell, Vector3 world)> cells)
+    List<(Vector2Int cell, Vector3 world)> cells,
+    int? deterministicSeed = null)
 {
     if (cells == null || cells.Count == 0) return;
     if (drums == null) return;
 
     _imprints ??= new Dictionary<Vector2Int, DustImprint>(cells.Count * 2);
 
-    // Resolve active roles from motif; fall back to all 4 roles.
     IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
         ? _activeRoles
         : new List<MusicalRole>
@@ -1158,152 +1290,23 @@ private void BuildMazeRoleImprints(
         };
 
     var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);
-    if (rolesList.Count == 0)
-        return;
+    if (rolesList.Count == 0) return;
 
-    // All dust starts gray (MusicalRole.None); hidden Voronoi roles are revealed later.
-    foreach (var (gp, _) in cells)
-    {
-        _imprints[gp] = new DustImprint
-        {
-            role               = MusicalRole.None,
-            color              = _mazeTint,
-            hardness01         = defaultMazeHardness01,
-            carveResistance01  = 0f,
-            drainResistance01  = 0f,
-            maxEnergyUnits     = 1,
-            healDelay          = 0f
-        };
-    }
-
-    _hiddenImprints.Clear();
-
-    // Use only the ACTUAL occupied maze cells as the Voronoi domain.
     var occupied = new List<Vector2Int>(cells.Count);
-    for (int i = 0; i < cells.Count; i++)
-        occupied.Add(cells[i].cell);
+    for (int i = 0; i < cells.Count; i++) occupied.Add(cells[i].cell);
 
-    // Single-role motif: trivial assignment.
-    if (rolesList.Count == 1)
-    {
-        MusicalRole onlyRole = rolesList[0];
-        for (int i = 0; i < occupied.Count; i++)
-            _hiddenImprints[occupied[i]] = onlyRole;
+    BuildDustImprintsFromRoles(occupied, _imprints, _mazeTint, defaultMazeHardness01);
+    _hiddenImprints = AssignRolesVoronoi(occupied, SelectRoleSeeds(occupied, starCell, rolesList, deterministicSeed));
 
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
-        return;
-    }
-
-    // ------------------------------------------------------------
-    // Seed selection over occupied cells only
-    // ------------------------------------------------------------
-    //
-    // Strategy:
-    // 1) Seed 0 (dominant role) = occupied cell farthest from the star.
-    //    This preserves the idea that the first motif role has the strongest territory,
-    //    but only within the actual maze footprint.
-    // 2) Remaining seeds use farthest-point sampling over occupied cells so roles
-    //    spread across the real pattern instead of empty grid space.
-    //
-    // This fixes patterns like blobs, strokes, tunnels, and rings where the occupied
-    // region is only a subset of the full spawn grid.
-    // ------------------------------------------------------------
-
-    int seedCount = Mathf.Min(rolesList.Count, occupied.Count);
-    var seedCells = new Vector2Int[seedCount];
-    var seedRoles = new MusicalRole[seedCount];
-
-    // Seed 0: farthest occupied cell from the star.
-    int firstSeedIdx = 0;
-    float bestStarDist = float.MinValue;
-    for (int i = 0; i < occupied.Count; i++)
-    {
-        float d = (occupied[i] - starCell).sqrMagnitude;
-        if (d > bestStarDist)
-        {
-            bestStarDist = d;
-            firstSeedIdx = i;
-        }
-    }
-
-    seedCells[0] = occupied[firstSeedIdx];
-    seedRoles[0] = rolesList[0];
-
-    // Remaining seeds: farthest-point sampling from already chosen seeds.
-    var chosen = new HashSet<Vector2Int> { seedCells[0] };
-
-    for (int s = 1; s < seedCount; s++)
-    {
-        int bestIdx = -1;
-        float bestMinDist = float.MinValue;
-
-        for (int i = 0; i < occupied.Count; i++)
-        {
-            Vector2Int candidate = occupied[i];
-            if (chosen.Contains(candidate)) continue;
-
-            float minDistToChosen = float.MaxValue;
-            for (int c = 0; c < s; c++)
-            {
-                float d = (candidate - seedCells[c]).sqrMagnitude;
-                if (d < minDistToChosen)
-                    minDistToChosen = d;
-            }
-
-            if (minDistToChosen > bestMinDist)
-            {
-                bestMinDist = minDistToChosen;
-                bestIdx = i;
-            }
-        }
-
-        if (bestIdx < 0)
-            break;
-
-        seedCells[s] = occupied[bestIdx];
-        seedRoles[s] = rolesList[s];
-        chosen.Add(seedCells[s]);
-    }
-
-    // If there are more roles than distinct available seed positions, assign only the seeds
-    // we could actually place. This is defensive and should be rare.
-    int actualSeedCount = chosen.Count;
-
-    // Assign each occupied cell to the nearest chosen seed.
-    for (int i = 0; i < occupied.Count; i++)
-    {
-        Vector2Int gp = occupied[i];
-
-        float best = float.MaxValue;
-        int bestSeed = 0;
-
-        for (int s = 0; s < actualSeedCount; s++)
-        {
-            float d = (gp - seedCells[s]).sqrMagnitude;
-            if (d < best)
-            {
-                best = d;
-                bestSeed = s;
-            }
-        }
-
-        _hiddenImprints[gp] = seedRoles[bestSeed];
-    }
-
-    // Helpful distribution log for validation.
     var counts = new Dictionary<MusicalRole, int>();
-    for (int i = 0; i < actualSeedCount; i++)
-        counts[seedRoles[i]] = 0;
-
     foreach (var kv in _hiddenImprints)
     {
-        if (!counts.ContainsKey(kv.Value))
-            counts[kv.Value] = 0;
+        if (!counts.ContainsKey(kv.Value)) counts[kv.Value] = 0;
         counts[kv.Value]++;
     }
 
     string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-    Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
+    Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={counts.Count}, distribution=({summary}), deterministicSeed={(deterministicSeed.HasValue ? deterministicSeed.Value.ToString() : "none")}");
 }
     public void ResetMazeGenerationFlag()
     {
