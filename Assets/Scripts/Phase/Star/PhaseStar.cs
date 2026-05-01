@@ -168,6 +168,8 @@ public class PhaseStar : MonoBehaviour
 
     [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
     [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
+    [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
+    [SerializeField, Range(0f, 0.5f)] private float dormantSeedScale = 0.08f;
 
     private float _displayedCharge01;
 
@@ -282,9 +284,14 @@ public class PhaseStar : MonoBehaviour
 
         visuals?.HideSafetyBubble();
         visuals?.ToggleShardRenderers(true);
-        if (visuals != null) visuals.transform.localScale = Vector3.zero;
-        if (_previewVisual != null) _previewVisual.localScale = Vector3.zero;
-        if (_previewVisualB != null) _previewVisualB.localScale = Vector3.zero;
+
+        float seedScale = Mathf.Max(0f, dormantSeedScale);
+        Vector3 seed = Vector3.one * seedScale;
+        if (visuals != null) visuals.transform.localScale = seed;
+        if (_previewVisual != null) _previewVisual.localScale = seed;
+        if (_previewVisualB != null) _previewVisualB.localScale = seed;
+        visuals?.ShowDim(ResolvePreviewColorByReadiness());
+
         DisableColliders();
         _hasReceivedEnergy = false;
 
@@ -640,7 +647,7 @@ public class PhaseStar : MonoBehaviour
         // Sqrt curve: front-loads visual growth so small charge values produce
         // a perceptible scale instead of staying near-invisible until threshold.
         // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
-        float visualScale01 = Mathf.Sqrt(_displayedCharge01);
+        float visualScale01 = Mathf.Max(dormantSeedScale, Mathf.Sqrt(_displayedCharge01));
         bool tentaclesDrawing = dust != null && dust.HasActiveTentacles;
         if (tentaclesDrawing)
             visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
