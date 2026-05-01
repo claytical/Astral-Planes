@@ -131,16 +131,14 @@ public class CosmicDustGenerator : MonoBehaviour
         { MusicalRole.Groove,  0 },
     };
     // Counts ALL solid cells regardless of role (including MusicalRole.None).
-    // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses this instead.
-    private int _gridState.AllSolidCount = 0;
+    // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses _gridState.AllSolidCount.
     // Density conservation: target solid count set at maze init; -1 = inactive.
     private int _targetSolidCount = -1;
     // Pattern oracle: wall cells intended by the current archetype. Null when no maze is active.
     private HashSet<Vector2Int> _mazePatternCells;
     // Cells currently transitioning in (Regrowing state). Added to Solid count
     // for committed-count checks so original cells are suppressed before
-    // compensation cells finish growing in.
-    private int _gridState.RegrowingCount = 0;
+    // compensation cells finish growing in. Stored in _gridState.RegrowingCount.
     public float TileDiameterWorld
     {
         get => tileDiameterWorld;
