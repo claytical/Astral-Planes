@@ -58,7 +58,7 @@ public partial class CosmicDust
 
         var gp = _drumTrack.WorldToGridPosition(transform.position);
         gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
-            fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
+            fadeSeconds: _timings.clearFadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
     }
 
     private void HandleNonBoostCollision(Vehicle vehicle, float dt)

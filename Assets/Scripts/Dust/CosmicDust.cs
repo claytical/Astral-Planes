@@ -19,19 +19,32 @@ public partial class CosmicDust : MonoBehaviour {
     [System.Serializable]
     public struct DustVisualTimings
     {
-        [Min(0.01f)] public float spriteScaleInSeconds;   // Circle scale 0->1
-        [Min(0.01f)] public float spriteScaleOutSeconds;  // Circle scale 1->0
-        [Min(0.01f)] public float particleGrowInSeconds;  // particle alpha ramp
-        [Min(0.01f)] public float fadeOutSeconds;         // tint/alpha fade out (if used)
+        [Min(0.01f)] public float regrowSpriteScaleInSeconds; // regrow sprite scale 0->1
+        [Min(0.01f)] public float clearSpriteScaleOutSeconds; // clear sprite scale 1->0
+        [Min(0.01f)] public float regrowParticleGrowInSeconds; // particle emission/alpha ramp on regrow
+        [Min(0.01f)] public float clearFadeOutSeconds; // clear tint/alpha fade out (if used)
+
+        public static DustVisualTimings Default => new DustVisualTimings
+        {
+            regrowSpriteScaleInSeconds = 0.20f,
+            clearSpriteScaleOutSeconds = 0.20f,
+            regrowParticleGrowInSeconds = 1.00f,
+            clearFadeOutSeconds = 0.20f
+        };
+
+        public DustVisualTimings Sanitized()
+        {
+            var sanitized = this;
+            sanitized.regrowSpriteScaleInSeconds = Mathf.Max(0.01f, sanitized.regrowSpriteScaleInSeconds);
+            sanitized.clearSpriteScaleOutSeconds = Mathf.Max(0.01f, sanitized.clearSpriteScaleOutSeconds);
+            sanitized.regrowParticleGrowInSeconds = Mathf.Max(0.01f, sanitized.regrowParticleGrowInSeconds);
+            sanitized.clearFadeOutSeconds = Mathf.Max(0.01f, sanitized.clearFadeOutSeconds);
+            return sanitized;
+        }
     }
 
-    [SerializeField] private DustVisualTimings _timings = new DustVisualTimings
-    {
-        spriteScaleInSeconds = 0.20f,
-        spriteScaleOutSeconds = 0.20f,
-        particleGrowInSeconds = 1.00f,
-        fadeOutSeconds = 0.20f
-    };
+    private DustVisualTimings _timings;
+    private bool _visualTimingsInitialized;
     private float _nextDustPluckTime = -999f;
     private Vehicle _currentPluckVehicle = null;
     // Energy unit backing fields. Charge01 is derived — do NOT write to it directly.
@@ -237,14 +250,10 @@ private Coroutine _jiggleRoutine;
         }
         ApplyDisplayedTint(_currentTint);
     }
-    public void SetVisualTimings(DustVisualTimings t)
+    public void InitializeVisuals(DustVisualTimings settings)
     {
-        // Defensive clamps so bad inspector values can’t break everything.
-        t.spriteScaleInSeconds  = Mathf.Max(0.01f, t.spriteScaleInSeconds);
-        t.spriteScaleOutSeconds = Mathf.Max(0.01f, t.spriteScaleOutSeconds);
-        t.particleGrowInSeconds = Mathf.Max(0.01f, t.particleGrowInSeconds);
-        t.fadeOutSeconds        = Mathf.Max(0.01f, t.fadeOutSeconds);
-        _timings = t;
+        _timings = settings.Sanitized();
+        _visualTimingsInitialized = true;
     }
     private IEnumerator ScaleSpriteRoutine(float from, float to, float seconds)
     {
@@ -369,7 +378,10 @@ private Coroutine _jiggleRoutine;
         CaptureBaseVisual();
 
         // Use override if provided (void growth wants bin-remaining time)
-        float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.spriteScaleInSeconds;
+        if (!_visualTimingsInitialized)
+            throw new InvalidOperationException($"CosmicDust '{name}' must be initialized with InitializeVisuals before Begin.");
+
+        float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.regrowSpriteScaleInSeconds;
         growSeconds = Mathf.Max(0.01f, growSeconds);
 
         // Sprite scale-in over growSeconds — target is footprintMul (>1 = overlap, <1 = gap)
@@ -528,7 +540,7 @@ private Coroutine _jiggleRoutine;
         // No collision while carved/empty.
         SetTerrainColliderEnabled(false);
 
-        float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.spriteScaleOutSeconds;
+        float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.clearSpriteScaleOutSeconds;
 
         // Sprite scales down (solid disappears).
         AnimateSpriteScale(1f, 0f, d);
@@ -1064,7 +1076,7 @@ private Coroutine _jiggleRoutine;
         if (to > from && _growInOverride > 0f)
             return Mathf.Max(0.01f, _growInOverride);
 
-        return (to >= from) ? _timings.spriteScaleInSeconds : _timings.spriteScaleOutSeconds;
+        return (to >= from) ? _timings.regrowSpriteScaleInSeconds : _timings.clearSpriteScaleOutSeconds;
     }
 // ------------- SCALE -------------
     private void AnimateSpriteScale(float from, float to, float seconds = -1f)

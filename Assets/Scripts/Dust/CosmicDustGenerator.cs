@@ -34,13 +34,11 @@ public class CosmicDustGenerator : MonoBehaviour
         public int   maxEnergyUnits;
         public MusicalRole role;
     }
-    [SerializeField] private CosmicDust.DustVisualTimings dustTimings = new CosmicDust.DustVisualTimings
-    {
-        spriteScaleInSeconds = 0.20f,
-        spriteScaleOutSeconds = 0.20f,
-        particleGrowInSeconds = 1.00f,
-        fadeOutSeconds = 0.20f
-    };
+    [Header("Dust Visual Timings")]
+    [SerializeField] private DustVisualTimingSettings dustVisualTimingSettings;
+    private CosmicDust.DustVisualTimings DustTimings => dustVisualTimingSettings != null
+        ? dustVisualTimingSettings.Timings
+        : CosmicDust.DustVisualTimings.Default;
     
     // --- Extracted controllers (refactor targets) ---
     private CosmicDustExclusionMap _exclusions = new CosmicDustExclusionMap();
@@ -212,9 +210,9 @@ public class CosmicDustGenerator : MonoBehaviour
              }
              else {
                 if (runPreExplode)
-                    StartCoroutine(DeferredDissipateAfterPreExplode(dust, dustTimings.spriteScaleOutSeconds));
+                    StartCoroutine(DeferredDissipateAfterPreExplode(dust, DustTimings.clearSpriteScaleOutSeconds));
                 else
-                    dust.DissipateAndHideVisualOnly(dustTimings.spriteScaleOutSeconds);
+                    dust.DissipateAndHideVisualOnly(DustTimings.clearSpriteScaleOutSeconds);
                 // OnDustVisualFadedOut will finalize Empty + hide visuals
              }
          }
@@ -502,7 +500,7 @@ public class CosmicDustGenerator : MonoBehaviour
             var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
             if (!IsInBounds(gp)) continue;
             if (TryGetCellState(gp, out var st) && st == DustCellState.Solid)
-                ClearCell(gp, DustClearMode.FadeAndHide, dustTimings.spriteScaleOutSeconds, scheduleRegrow: true);
+                ClearCell(gp, DustClearMode.FadeAndHide, DustTimings.clearSpriteScaleOutSeconds, scheduleRegrow: true);
         }
     }
 
@@ -546,7 +544,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (go.TryGetComponent(out dust) && dust != null)
         {
             dust.PrepareForReuse();
-            dust.SetVisualTimings(dustTimings);
+            dust.InitializeVisuals(DustTimings);
 
             // void uses remaining-bin time
             dust.SetGrowInDuration(growInSeconds);
@@ -953,8 +951,8 @@ public class CosmicDustGenerator : MonoBehaviour
         if (go.TryGetComponent<CosmicDust>(out dust) && dust != null)
         {
             dust.PrepareForReuse();
-            dust.SetVisualTimings(dustTimings);
-            dust.SetGrowInDuration(dustTimings.particleGrowInSeconds);
+            dust.InitializeVisuals(DustTimings);
+            dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
             // --- Role resolution ---
             // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
