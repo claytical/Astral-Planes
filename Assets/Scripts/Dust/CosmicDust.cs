@@ -58,6 +58,9 @@ public partial class CosmicDust : MonoBehaviour {
     public event Action<float> OnChargeChanged;
     public event Action<MusicalRole> OnRoleChanged;
     public event Action<bool> OnCollisionStateChanged;
+    public event Action<Color> OnTintStateChanged;
+    public event Action OnSpawnVisualRequested;
+    public event Action<float> OnClearVisualRequested;
 
 // Authoritative/resting tint of this dust cell.
 // This is what retinting, charge drain, role assignment, etc. should modify.
@@ -317,11 +320,9 @@ private Coroutine _jiggleRoutine;
         // Alpha comes from the caller (roleProfile.baseAlpha via GetBaseColor()).
         // Do NOT floor it here — cells that aren't Solid yet must stay dim.
         // The generator enforces a visible-alpha floor when solidifying.
-        SetTint(roleColorRgb);
-        if (GetComponent<Explode>() != null)
-        {
-            GetComponent<Explode>().SetTint(roleColorRgb);
-        }
+        SetBaseTint(roleColorRgb, applyImmediatelyIfNoPulse: false);
+        OnTintStateChanged?.Invoke(_currentTint);
+        OnChargeChanged?.Invoke(Charge01);
     }
 
     // Sets current energy units, clamped [0, max]. Updates tint alpha accordingly.
@@ -330,7 +331,8 @@ private Coroutine _jiggleRoutine;
         _currentEnergyUnits = Mathf.Clamp(units, 0, _maxEnergyUnits);
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
         _currentTint.a = visibleAlpha;
-        ApplyDisplayedTint(_currentTint);
+        OnTintStateChanged?.Invoke(_currentTint);
+        OnChargeChanged?.Invoke(Charge01);
     }
 
     // Decrements energy units by amount. Drives visual drain. Returns actual units removed.
@@ -351,7 +353,7 @@ private Coroutine _jiggleRoutine;
         drained.a = Mathf.Lerp(0.05f, _currentTint.a, Charge01);
 
         _currentTint = drained;
-        ApplyDisplayedTint(_currentTint);
+        OnTintStateChanged?.Invoke(_currentTint);
         OnChargeChanged?.Invoke(Charge01);
 
         if (_currentEnergyUnits <= 0)
@@ -381,34 +383,7 @@ private Coroutine _jiggleRoutine;
             return;
         }
 
-        SetVisualsEnabled(true);
-        SetColorVariance();
-
-        ApplyParticleFootprint();
-        CaptureBaseVisual();
-
-        // Use override if provided (void growth wants bin-remaining time)
-        if (!_visualTimingsInitialized)
-            throw new InvalidOperationException($"CosmicDust '{name}' must be initialized with InitializeVisuals before Begin.");
-
-        float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.regrowSpriteScaleInSeconds;
-        growSeconds = Mathf.Max(0.01f, growSeconds);
-
-        // Sprite scale-in over growSeconds — target is footprintMul (>1 = overlap, <1 = gap)
-        ResetSpriteScaleTo(0f);
-        AnimateSpriteScale(0f, _spriteScaleTarget, growSeconds);
-
-        // Particles emission ramp over growSeconds too (keeps "radiating" coherent)
-        EnsureParticlesPlaying();
-        SetEmissionMultiplier(1f, seconds: growSeconds);
-
-        if (useWorkShaderParams)
-            ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
-        else
-            SetDustColorAllParticles(_currentTint);
-
-        // Consume override so normal spawns aren't affected later
-        _growInOverride = -1f;
+        OnSpawnVisualRequested?.Invoke();
     }
     /// <summary>
     /// Syncs both the sprite renderer AND the particle system to _currentTint.
@@ -416,6 +391,7 @@ private Coroutine _jiggleRoutine;
     /// e.g. after MineNode tinting. ApplyRoleAndCharge alone only updates the sprite;
     /// particles keep their birth color until explicitly refreshed.
     /// </summary>
+    [Obsolete("Compatibility wrapper. Prefer state/event-driven updates via CosmicDustVisualController.")]
     public void SyncParticleColor()
     {
         if (useWorkShaderParams)
@@ -475,6 +451,7 @@ private Coroutine _jiggleRoutine;
     public void SetTint(Color tint)
     {
         SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
+        OnTintStateChanged?.Invoke(_currentTint);
 
         // Particles: leave authored color/gradient/material alone.
         // (If you later want particle tinting, do it as an explicit opt-in path.)
@@ -551,20 +528,21 @@ private Coroutine _jiggleRoutine;
         if (_isDespawned) return;
         _isDespawned = true;
 
-        // No collision while carved/empty.
-        SetTerrainColliderEnabled(false);
-
         float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.clearSpriteScaleOutSeconds;
-
-        // Sprite scales down (solid disappears).
-        AnimateSpriteScale(1f, 0f, d);
-
-        // Particles stay visible, but stop emitting smoothly.
-        SetEmissionMultiplier(0f, seconds: d);
+        OnClearVisualRequested?.Invoke(d);
 
         // Notify generator after the carve-out read, so it can finalize state bookkeeping.
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
         _fadeRoutine = StartCoroutine(NotifyGeneratorAfter(d));
+    }
+    internal float ResolveGrowDurationSeconds()
+    {
+        if (!_visualTimingsInitialized)
+            throw new InvalidOperationException($"CosmicDust '{name}' must be initialized with InitializeVisuals before Begin.");
+        float growSeconds = (_growInOverride > 0f) ? _growInOverride : _timings.regrowSpriteScaleInSeconds;
+        growSeconds = Mathf.Max(0.01f, growSeconds);
+        _growInOverride = -1f;
+        return growSeconds;
     }
     private IEnumerator NotifyGeneratorAfter(float seconds)
     {
@@ -572,6 +550,34 @@ private Coroutine _jiggleRoutine;
 
         if (gen != null) gen.OnDustVisualFadedOut(this);
         _fadeRoutine = null;
+    }
+    internal void ApplyTintVisual(Color tint)
+    {
+        ApplyDisplayedTint(tint);
+        if (useWorkShaderParams)
+            ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: _workSigned01);
+        else
+            SetDustColorAllParticles(tint);
+        var explode = GetComponent<Explode>();
+        if (explode != null) explode.SetTint(tint);
+    }
+    internal void RunSpawnVisuals(float growSeconds)
+    {
+        SetVisualsEnabled(true);
+        SetColorVariance();
+        ApplyParticleFootprint();
+        CaptureBaseVisual();
+        ResetSpriteScaleTo(0f);
+        AnimateSpriteScale(0f, _spriteScaleTarget, growSeconds);
+        EnsureParticlesPlaying();
+        SetEmissionMultiplier(1f, seconds: growSeconds);
+        ApplyTintVisual(_currentTint);
+    }
+    internal void RunClearVisuals(float fadeSeconds)
+    {
+        SetTerrainColliderEnabled(false);
+        AnimateSpriteScale(1f, 0f, fadeSeconds);
+        SetEmissionMultiplier(0f, seconds: fadeSeconds);
     }
     // Called by the generator when a Clearing -> Empty transition is finalized.
     // Keeps particles alive (no Stop/Clear), but ensures the cell is visually "carved".
