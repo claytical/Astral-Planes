@@ -26,6 +26,10 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     public ParticleSystem particles;
 
+    [Header("Particle Debug")]
+    [SerializeField] private bool traceParticleState;
+    [SerializeField, Min(0f)] private float particleAlphaDriftTolerance = 0.02f;
+    private float _expectedParticleAlpha = -1f;
 
     [Header("Dual Diamond")]
     [Tooltip("Max angular separation between the two counter-rotating diamonds at zero charge.")]
@@ -290,10 +294,14 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             );
             col.color = new ParticleSystem.MinMaxGradient(grad);
         }
+
+        TraceParticleState("SetTintWithParticles");
     }
 
     private void ApplyParticleAlpha(float a)
     {
+        _expectedParticleAlpha = a;
+
         var pss = GetComponentsInChildren<ParticleSystem>(true);
         foreach (var ps in pss)
         {
@@ -303,8 +311,42 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             c.a = a;
             main.startColor = new ParticleSystem.MinMaxGradient(c);
         }
+
+        TraceParticleState($"ApplyParticleAlpha({a:0.###})");
     }
 
+    private void LateUpdate()
+    {
+        if (!traceParticleState || _expectedParticleAlpha < 0f) return;
+
+        var pss = GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < pss.Length; i++)
+        {
+            var ps = pss[i];
+            if (!ps) continue;
+
+            float actualAlpha = ps.main.startColor.color.a;
+            if (Mathf.Abs(actualAlpha - _expectedParticleAlpha) > particleAlphaDriftTolerance)
+            {
+                Debug.LogWarning($"[PhaseStarVisuals2D] Particle alpha drift on '{ps.name}'. Expected {_expectedParticleAlpha:0.###}, actual {actualAlpha:0.###}. Another system may be overwriting startColor.", ps);
+            }
+        }
+    }
+
+    private void TraceParticleState(string reason)
+    {
+        if (!traceParticleState) return;
+
+        var pss = GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < pss.Length; i++)
+        {
+            var ps = pss[i];
+            if (!ps) continue;
+            var main = ps.main;
+            Color c = main.startColor.color;
+            Debug.Log($"[PhaseStarVisuals2D] {reason} :: '{ps.name}' activeSelf={ps.gameObject.activeSelf} playing={ps.isPlaying} rendererEnabled={ps.GetComponent<ParticleSystemRenderer>()?.enabled} startRGBA=({c.r:0.###},{c.g:0.###},{c.b:0.###},{c.a:0.###})", ps);
+        }
+    }
 
     private void EnsureParticlesVisible(bool playIfStopped)
     {
@@ -318,6 +360,8 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
         if (playIfStopped && !particles.isPlaying)
             particles.Play();
+
+        TraceParticleState($"EnsureParticlesVisible(playIfStopped={playIfStopped})");
     }
     public void ToggleShardRenderers(bool on)
     {
