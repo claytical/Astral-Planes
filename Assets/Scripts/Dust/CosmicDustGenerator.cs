@@ -1075,6 +1075,13 @@ public class CosmicDustGenerator : MonoBehaviour
         _regrow?.EnqueueStepRegrow(gp);
     }
     
+    /// <summary>
+    /// Builds maze growth candidates from config and projects them to world coordinates.
+    /// Contract: blocked/reserved/permanent/keep-clear ownership lives in
+    /// <see cref="MazeTopologyService.BuildSolidCells"/> via <see cref="MazeTopologyService.Context.IsBlocked"/>.
+    /// This method must pass complete exclusion predicates into the service and should not apply a
+    /// second blocked-cell filter after the service returns.
+    /// </summary>
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
         MazePatternConfig config,
         Vector2Int starCell,
@@ -1117,19 +1124,7 @@ public class CosmicDustGenerator : MonoBehaviour
             if (!IsWorldPositionInsideScreen(world)) continue;
             growth.Add((gp, world));
         }
-
-        // Final filter: enforce reserved/permanent/keep-clear even if a pattern emitted them.
-        var filtered = new List<(Vector2Int, Vector3)>(growth.Count);
-        for (int i = 0; i < growth.Count; i++)
-        {
-            var gp = growth[i].cell;
-            if (reservedCells != null && reservedCells.Contains(gp)) continue;
-            if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-            if (IsKeepClearCell(gp)) continue;
-            filtered.Add((growth[i].cell, growth[i].world));
-        }
-
-        return filtered;
+        return growth;
     }
 
     private static List<(Vector2Int cell, MusicalRole role)> SelectRoleSeeds(
