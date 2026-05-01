@@ -166,7 +166,14 @@ public class PhaseStar : MonoBehaviour
              "Keeps locomotion and collision locked until the diamonds are visually at full opacity.")]
     [SerializeField, Range(0.8f, 1f)] private float readyDisplayThreshold = 0.99f;
 
+    [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
+    [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
+    [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
+    [SerializeField, Range(0f, 0.5f)] private float dormantSeedScale = 0.08f;
+
     private float _displayedCharge01;
+
+    private bool _dormantSeedVisualPrimed;
 
     private bool _ejectionInFlight;
     private int _spawnTicket;
@@ -279,9 +286,15 @@ public class PhaseStar : MonoBehaviour
 
         visuals?.HideSafetyBubble();
         visuals?.ToggleShardRenderers(true);
-        if (visuals != null) visuals.transform.localScale = Vector3.zero;
-        if (_previewVisual != null) _previewVisual.localScale = Vector3.zero;
-        if (_previewVisualB != null) _previewVisualB.localScale = Vector3.zero;
+
+        float seedScale = Mathf.Max(0f, dormantSeedScale);
+        Vector3 seed = Vector3.one * seedScale;
+        if (visuals != null) visuals.transform.localScale = seed;
+        if (_previewVisual != null) _previewVisual.localScale = seed;
+        if (_previewVisualB != null) _previewVisualB.localScale = seed;
+        visuals?.ShowDim(ResolvePreviewColorByReadiness());
+        _dormantSeedVisualPrimed = true;
+
         DisableColliders();
         _hasReceivedEnergy = false;
 
@@ -304,6 +317,7 @@ public class PhaseStar : MonoBehaviour
 
         StopManagedCoroutine(ref _waitForDustCo);
         _state = PhaseStarState.WaitingForPoke;
+        _dormantSeedVisualPrimed = false;
 
         // Star earned free movement — unfreeze and retract tentacles.
         motion?.SetFrozen(false);
@@ -558,6 +572,8 @@ public class PhaseStar : MonoBehaviour
         rotB = -_accumulatorRotAngle;
     }
 
+    EnsureDormantSeedVisuals();
+
     // Passive decay first.
     float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
     if (_starCharge.Count > 0 && passiveDecay > 0f)
@@ -637,7 +653,11 @@ public class PhaseStar : MonoBehaviour
         // Sqrt curve: front-loads visual growth so small charge values produce
         // a perceptible scale instead of staying near-invisible until threshold.
         // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
-        float visualScale01 = Mathf.Sqrt(_displayedCharge01);
+        float visualScale01 = Mathf.Max(dormantSeedScale, Mathf.Sqrt(_displayedCharge01));
+        bool tentaclesDrawing = dust != null && dust.HasActiveTentacles;
+        if (tentaclesDrawing)
+            visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
+
         Vector3 chargeScale = Vector3.one * visualScale01;
         if (visuals != null) visuals.transform.localScale = chargeScale;
         if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
@@ -685,6 +705,24 @@ public class PhaseStar : MonoBehaviour
         EnterDormantWaitState();
     }
 }
+    private void EnsureDormantSeedVisuals()
+    {
+        if (visuals == null) return;
+        if (_state != PhaseStarState.Dormant) return;
+        if (_burstOffScreen) return;
+        if (_disarmReason == DisarmReason.SiblingActive) return;
+
+        if (!_dormantSeedVisualPrimed)
+        {
+            visuals.ShowDim(ResolvePreviewColorByReadiness());
+            _dormantSeedVisualPrimed = true;
+        }
+
+        float minScale = Mathf.Max(0f, dormantSeedScale);
+        if (visuals.transform.localScale.x < minScale)
+            visuals.transform.localScale = Vector3.one * minScale;
+    }
+
     private void SafeUnsubscribeAll()
     {
         // Unhook both places we subscribe OnLoopBoundary:
