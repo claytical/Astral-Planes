@@ -665,8 +665,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
 //        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
         int leaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
-// This prevents “bin disappears” if transport emits -1 or leaderBins at wrap.
+// Normalize both transport-facing bin signals.
+        // `playheadBin` can transiently report out-of-range around wraps.
+        // `barIndex` is still the stable progression cursor for which bin's harmony should sound.
         playheadBin = WrapIndex(playheadBin, leaderBins);
+        int progressionBin = WrapIndex(barIndex, leaderBins);
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
@@ -680,7 +683,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         for (int s = startStep; s <= targetCurLocal; s++)
         {
             int local = ((s % binSize) + binSize) % binSize;
-            PlayLoopedNotesInBin(playheadBin, local, leaderBins);
+            // Use progressionBin so multi-bin tracks (e.g., Bass I→II) advance harmonically,
+            // while PlayLoopedNotesInBin's Case A keeps smaller tracks silent out-of-range.
+            PlayLoopedNotesInBin(progressionBin, local, leaderBins);
         }
 
         _lastLocalStep = targetCurLocal;
