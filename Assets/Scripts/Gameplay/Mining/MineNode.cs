@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Random = System.Random;
 
 public enum MineNodeState { Drifting, Fleeing }
 
@@ -11,9 +10,6 @@ public class MineNode : MonoBehaviour
     public SpriteRenderer outlineSprite;
     public int maxStrength = 100;
 
-    [Header("Dust Affinity")]
-    [SerializeField, Range(0f, 1f)] private float sameRoleDustAffinityStrength = 0.25f;
-    [SerializeField, Min(1)] private int sameRoleDustAffinityRadiusCells = 2;
     public bool pruneCarvedPathOnLoopBoundary = true;
     [Tooltip("Minimum carved path length before pruning runs.")]
     [Min(2)] public int pruneMinPathCount = 8;
@@ -40,9 +36,6 @@ public class MineNode : MonoBehaviour
     public DrumTrack DrumTrack => _drumTrack;
 
     private Vector2Int _spawnCell;
-    private bool _hasSpawnCell;
-    private HashSet<int> _turnStepSet;
-    private NoteSet _cachedTurnSetSource;
     private float _nextEscapeAllowedTime = 0f;
     private Vector2 _lastPosForStall;
     private float _nextStallSampleTime = 0f;
@@ -55,7 +48,6 @@ public class MineNode : MonoBehaviour
     private int _loopsSinceSpawn;
     private Collider2D _col;
     private Rigidbody2D _rb;
-    private float _lastNote01 = 0.5f;
     private DrumTrack _drumTrack;
     private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
     private NoteSet _noteSet;
@@ -133,7 +125,7 @@ public class MineNode : MonoBehaviour
             _loopsSinceSpawn++;
 
         if (!pruneCarvedPathOnLoopBoundary) return;
-        if (_carvedPath == null || _carvedPath.Count < pruneMinPathCount) return;
+        if (_carvedPath.Count < pruneMinPathCount) return;
         int before = _carvedPath.Count;
         var compact = new List<Vector2Int>(before);
         Vector2Int? last = null;
@@ -256,7 +248,6 @@ public class MineNode : MonoBehaviour
         int stepNow     = _drumTrack.currentStep;
         int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         float speed01   = Mathf.InverseLerp(_track.lowestAllowedNote, _track.highestAllowedNote, currentNote);
-        _lastNote01 = speed01;
 
         float speedMin = Mathf.Lerp(0.5f,  2.5f, _speed);
         float speedMax = Mathf.Lerp(3f,   14f,  _speed);
@@ -452,31 +443,6 @@ public class MineNode : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------
-    // Dust affinity (kept for potential future use)
-    // ---------------------------------------------------------------
-
-    private Vector2 ComputeLocalSameRoleAffinityDir(int radiusCells)
-    {
-        if (_drumTrack == null) return Vector2.zero;
-        Vector2Int center = _drumTrack.CellOf(_rb.position);
-        Vector2 accum = Vector2.zero;
-        for (int dx = -radiusCells; dx <= radiusCells; dx++)
-        for (int dy = -radiusCells; dy <= radiusCells; dy++)
-        {
-            if (dx == 0 && dy == 0) continue;
-            Vector2Int gp = new Vector2Int(center.x + dx, center.y + dy);
-            if (!_drumTrack.TryGetDustAt(gp, out var dust) || dust == null) continue;
-            if (dust.Role != _role) continue;
-            Vector2 world = _drumTrack.GridToWorldPosition(gp);
-            Vector2 to    = world - _rb.position;
-            float dist    = to.magnitude;
-            if (dist <= 0.0001f) continue;
-            accum += to.normalized * (1f / (1f + dist));
-        }
-        return accum.sqrMagnitude > 0.0001f ? accum.normalized : Vector2.zero;
-    }
-    
     private void CacheAuthoredStepsFromNoteSet()
     {
         _stepsPerLoop = 16;

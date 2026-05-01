@@ -8,7 +8,6 @@ public class MineNodeCharacterVis : MonoBehaviour
 
     [Header("Thinking (at intersections / planning)")]
     [SerializeField] float frenzySpinDegPerSec = 480f;   // fast spin while “deciding”
-    [SerializeField] float thinkDampen = 7f;             // how quickly spin eases if planning stalls
 
     [Header("Swimming (on-rails wobble)")]
     [SerializeField] float faceTurnDegPerSec = 420f;     // snap-to-heading when it picks a path
@@ -21,33 +20,29 @@ public class MineNodeCharacterVis : MonoBehaviour
     [SerializeField] Transform spritePivotOuter;         // rotate these; defaults to SR transform
     [SerializeField] Transform spritePivotInner;         // optional
 
-    Rigidbody2D rb;
-
+    private Rigidbody2D _rb;
 
     // state
-    float thinkTimer;
     float facedAngle;  // current facing
     float wobblePhase;
-    void Awake()
+    private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
+        _rb = GetComponent<Rigidbody2D>();
         if (!outerSprite) outerSprite = GetComponentInChildren<SpriteRenderer>(true);
         if (!spritePivotOuter && outerSprite) spritePivotOuter = outerSprite.transform;
         if (innerSprite && !spritePivotInner) spritePivotInner = innerSprite.transform;
     }
-    void FixedUpdate()
+    private void FixedUpdate()
     {
-        var v = rb ? rb.linearVelocity : Vector2.zero;
+        var v = _rb != null ? _rb.linearVelocity : Vector2.zero;
         float speed = v.magnitude;
  
         // Decide if we’re THINKING (spin) or SWIMMING (wobble)
-        bool thinking = (speed < minSpeedForSwim || thinkTimer > 0f);
+        bool thinking = speed < minSpeedForSwim;
 
         if (thinking)
         {
-            // Countdown frenzy burst; if it runs long, damp the spin
-            if (thinkTimer > 0f) thinkTimer -= Time.fixedDeltaTime;
-            float spin = frenzySpinDegPerSec * Time.fixedDeltaTime * (1f / (1f + thinkDampen * Mathf.Max(0f, -thinkTimer)));
+            float spin = frenzySpinDegPerSec * Time.fixedDeltaTime;
             facedAngle = Mathf.Repeat(facedAngle + spin, 360f);
             ApplyRotation(facedAngle, wobbleOffsetDeg: 0f);
             return;
@@ -64,7 +59,7 @@ public class MineNodeCharacterVis : MonoBehaviour
 
         ApplyRotation(facedAngle, wob);
     }
-    void ApplyRotation(float baseDeg, float wobbleOffsetDeg)
+    private void ApplyRotation(float baseDeg, float wobbleOffsetDeg)
     {
         if (spritePivotOuter)
             spritePivotOuter.localRotation = Quaternion.Euler(0,0, baseDeg + wobbleOffsetDeg);
