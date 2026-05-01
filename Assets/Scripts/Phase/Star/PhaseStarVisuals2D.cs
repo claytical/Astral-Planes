@@ -204,6 +204,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
 
         SetShardTint(c);
+        SetTintWithParticles(c);
         ApplyParticleAlpha(0.35f);
 
         EnsureParticlesVisible(playIfStopped: true);
