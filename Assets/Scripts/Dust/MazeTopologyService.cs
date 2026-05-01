@@ -40,7 +40,7 @@ public sealed class MazeTopologyService
             includeWorld: _ => true,
             normalizeCell: normalizeCell);
 
-        foreach (var item in growth) solid.Add(item.cell);
+        foreach (var item in growth) solid.Add(item.Item1);
         return solid;
     }
 }
