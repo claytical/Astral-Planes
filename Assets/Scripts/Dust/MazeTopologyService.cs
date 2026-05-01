@@ -13,6 +13,7 @@ public sealed class MazeTopologyService
         Func<int, List<Vector2Int>> getHexDirections,
         Func<Vector2Int, bool> isBlocked)
     {
+        config?.Validate();
         var solid = new HashSet<Vector2Int>();
         var pattern = config != null ? config.patternType : MazePatternType.FullFill;
         if (pattern == MazePatternType.FullFill)
@@ -30,9 +31,9 @@ public sealed class MazeTopologyService
             center: starCell,
             width: width,
             height: height,
-            ringSpacing: config.ringSpacing,
-            ringThickness: config.ringThickness,
-            jitter: config.ringJitter,
+            ringSpacing: config.ring.spacing,
+            ringThickness: config.ring.thickness,
+            jitter: config.ring.jitter,
             getHexDirectionsByRow: getHexDirections,
             gridToWorld: _ => Vector3.zero,
             isCellAvailable: (x, y) => !isBlocked(new Vector2Int(x, y)),
