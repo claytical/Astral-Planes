@@ -671,22 +671,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 // Normalize transport bin to the effective leader span.
         playheadBin = WrapIndex(playheadBin, leaderBins);
 
-        // Derive the active leader bin directly from DSP time to avoid transport-frame
-        // drift where playheadBin and barIndex can disagree near boundaries.
-        int transportBin = playheadBin;
-        {
-            int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
-            double stepDur = clipLen / Mathf.Max(1, binSize);
-            if (stepDur > 0.0 && start > 0.0)
-            {
-                double elapsed = dspNow - start;
-                if (elapsed < 0.0) elapsed = 0.0;
-                int leaderStep = (int)System.Math.Floor(elapsed / stepDur);
-                leaderStep = WrapIndex(leaderStep, leaderSteps);
-                transportBin = WrapIndex(leaderStep / Mathf.Max(1, binSize), leaderBins);
-            }
-        }
-
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
         // (float precision edge at bar boundary), reset the cursor so no steps are skipped.
@@ -699,8 +683,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         for (int s = startStep; s <= targetCurLocal; s++)
         {
             int local = ((s % binSize) + binSize) % binSize;
-            // Drive from DSP-derived transport bin for stable harmony + silence behavior.
-            PlayLoopedNotesInBin(transportBin, local, leaderBins);
+            PlayLoopedNotesInBin(playheadBin, local, leaderBins);
         }
 
         _lastLocalStep = targetCurLocal;
@@ -783,8 +766,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // - DrumTrack defines the global playheadBin (0..leaderBins-1)
         // - This track only has content for bins 0..(loopMultiplier-1)
         // - If playheadBin exceeds that, remain silent until the loop wraps.
-        int trackBins = Mathf.Max(1, loopMultiplier);
-        if (playheadBin < 0 || playheadBin >= trackBins)
+        int audibleBins = Mathf.Clamp(HighestFilledBinIndex() + 1, 1, Mathf.Max(1, loopMultiplier));
+        if (playheadBin < 0 || playheadBin >= audibleBins)
         {
             return;
         }
