@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class CosmicDust : MonoBehaviour {
+public partial class CosmicDust : MonoBehaviour {
     [Serializable]
     public struct DustVisualSettings {
         [Header("Sizing (prefab baseline)")]
@@ -49,18 +49,6 @@ public class CosmicDust : MonoBehaviour {
 // Currently displayed tint on the sprite.
 // Temporary pulses modify this, but must not overwrite _currentTint.
     private Color _displayTint = Color.white;
-    [Header("Dust Musical Swell")]
-    [SerializeField] private float dustPluckSwellSeconds = 1.4f;
-
-    [SerializeField] private int dustPluckMinDurationTicks = 360;
-    [SerializeField] private int dustPluckMaxDurationTicks = 1440;
-
-    [SerializeField] private float dustPluckMinVelocity127 = 40f;
-    [SerializeField] private float dustPluckMaxVelocity127 = 70f;
-
-    [SerializeField] private float dustPluckMinCooldownSeconds = 0.8f;
-    [SerializeField] private float dustPluckMaxCooldownSeconds = 2f;
-
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
@@ -121,31 +109,6 @@ public class CosmicDust : MonoBehaviour {
     private bool _baseEmissionCurveCaptured;
 
     [SerializeField] public Collider2D terrainCollider;
-// ------------------------------------------------------------
-// Vehicle nose compression (visual only)
-// ------------------------------------------------------------
-    [Header("Vehicle Nose Compression")]
-    [SerializeField] private bool enableVehicleCompression = true;
-    [SerializeField, Range(0f, 0.75f)] private float noseCompressAmount = 0.22f;
-    [SerializeField, Range(0f, 0.5f)] private float noseBulgeAmount = 0.10f;
-    [SerializeField] private float noseCompressMaxOffsetWorld = 0.16f;
-    [SerializeField] private float noseProbeWorld = 0.55f;
-    [SerializeField] private float noseCompressSpeedForFull = 10f;
-    [SerializeField] private float noseCompressBoostBonus = 0.20f;
-    private Vector3 _dustSpriteBaseVisualScale = Vector3.one;
-    private Vector3 _dustSpriteBaseLocalPos;
-    private Vector3 _noseVisualOffsetLocal = Vector3.zero;
-    private Vector2 _noseCompressDirWorld = Vector2.up;
-    private float _noseCompressTarget01 = 0f;
-    private float _noseCompressCurrent01 = 0f;
-    private float _lastNoseContactTime = -999f;
-    private float _noseVisibleUntil = -999f;    // Some prefab variants ended up with colliders on children (or multiple colliders).
-    [SerializeField] private float noseContactGraceSeconds = 0.075f;
-    [SerializeField] private float noseMinimumVisibleSeconds = 0.050f;
-
-// Lower = slower, more cushioned. Higher = snappier.
-    [SerializeField] private float noseCompressAttackSharpness = 10f;
-    [SerializeField] private float noseCompressReleaseSharpness = 16f;
     // Carve/disable must be authoritative, so we cache all colliders in the hierarchy.
     private Collider2D[] _cachedColliders;
     private BoxCollider2D _box;
@@ -179,7 +142,8 @@ public class CosmicDust : MonoBehaviour {
     private Coroutine _emissionMulRoutine;
 
 [Header("Deny Feedback")]
-[SerializeField] private float denyPulseDefaultSeconds = 0.25f;
+[SerializeField, Tooltip("Fallback deny pulse duration when no explicit pulse length is provided.")]
+private float denyPulseDefaultSeconds = 0.25f;
 
 // Single managed tint pulse lane (charge + deny both use this).
 private Coroutine _tintPulseRoutine;
@@ -273,135 +237,6 @@ private Coroutine _jiggleRoutine;
         }
         ApplyDisplayedTint(_currentTint);
     }
-    private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
-    {
-        if (!enableVehicleCompression || vehicle == null || visual.sprite == null)
-            return;
-        if (_isDespawned)
-            return;
-        if (_dustSpriteBaseVisualScale.sqrMagnitude <= 0.000001f)
-            return;
-        Vector2 dustCenter = visual.sprite.bounds.center;
-
-        Vector2 noseWorld = (Vector2)vehicle.transform.position + (Vector2)vehicle.transform.up * noseProbeWorld;
-
-        Vector2 dir = Vector2.zero;
-
-        // Prefer a direction from dust center toward the inferred nose point.
-        Vector2 toNose = noseWorld - dustCenter;
-        if (toNose.sqrMagnitude > 0.0001f)
-        {
-            dir = toNose.normalized;
-        }
-        else if (collision != null && collision.contactCount > 0)
-        {
-            Vector2 contact = collision.GetContact(0).point;
-            Vector2 toContact = contact - dustCenter;
-            if (toContact.sqrMagnitude > 0.0001f)
-                dir = toContact.normalized;
-        }
-
-        if (dir.sqrMagnitude > 0.0001f)
-            _noseCompressDirWorld = dir;
-
-        float speed01 = 0f;
-        if (vehicle.rb != null)
-            speed01 = Mathf.Clamp01(vehicle.rb.linearVelocity.magnitude / Mathf.Max(0.01f, noseCompressSpeedForFull));
-
-        float boostBonus = vehicle.boosting ? noseCompressBoostBonus : 0f;
-
-        // Let very small glancing touches still read visually.
-        float floor = 0.18f;
-        _noseCompressTarget01 = Mathf.Clamp01(Mathf.Max(floor, speed01 + boostBonus));
-
-        // Contact gets refreshed every stay tick.
-        _lastNoseContactTime = Time.time;
-
-        // Prevent micro-taps from appearing as a single-frame flash.
-        _noseVisibleUntil = Mathf.Max(_noseVisibleUntil, Time.time + noseMinimumVisibleSeconds);
-    }
-    private void SetBaseSpriteScale(Vector3 scale)
-    {
-        _dustSpriteBaseVisualScale = scale;
-
-        if (visual.sprite != null)
-            visual.sprite.transform.localScale = scale;
-    }
-
-    private void TickVehicleCompression()
-{
-    if (!enableVehicleCompression || visual.sprite == null)
-        return;
-
-    Transform srt = visual.sprite.transform;
-    float now = Time.time;
-
-    bool recentlyTouched = (now - _lastNoseContactTime) <= noseContactGraceSeconds;
-    bool stillVisible = now <= _noseVisibleUntil;
-
-    float desired01 = (recentlyTouched || stillVisible) ? _noseCompressTarget01 : 0f;
-
-    float sharpness = (desired01 > _noseCompressCurrent01)
-        ? noseCompressAttackSharpness
-        : noseCompressReleaseSharpness;
-
-    float lerp = 1f - Mathf.Exp(-sharpness * Time.deltaTime);
-    _noseCompressCurrent01 = Mathf.Lerp(_noseCompressCurrent01, desired01, lerp);
-
-    if (desired01 <= 0.0001f && _noseCompressCurrent01 <= 0.001f)
-        _noseCompressCurrent01 = 0f;
-
-    // IMPORTANT:
-    // Restore to lifecycle-owned base scale/position, not hardcoded visible scale.
-    if (_noseCompressCurrent01 <= 0.0001f)
-    {
-        _noseVisualOffsetLocal = Vector3.zero;
-        srt.localScale = _dustSpriteBaseVisualScale;
-        srt.localPosition = _dustSpriteBaseLocalPos;
-        return;
-    }
-
-    // If the dust is currently visually absent, do not reintroduce it via compression.
-    float baseMag = _dustSpriteBaseVisualScale.sqrMagnitude;
-    if (baseMag <= 0.000001f)
-    {
-        srt.localScale = _dustSpriteBaseVisualScale;
-        srt.localPosition = _dustSpriteBaseLocalPos;
-        return;
-    }
-
-    Vector2 dirLocal2 = transform.InverseTransformDirection(_noseCompressDirWorld.normalized);
-    if (dirLocal2.sqrMagnitude < 0.0001f)
-        dirLocal2 = Vector2.up;
-    dirLocal2.Normalize();
-
-    Vector2 perpLocal2 = new Vector2(-dirLocal2.y, dirLocal2.x);
-
-    float squash = noseCompressAmount * _noseCompressCurrent01;
-    float bulge  = noseBulgeAmount * _noseCompressCurrent01;
-
-    Vector2 basisX = Vector2.right;
-    Vector2 basisY = Vector2.up;
-
-    float sx =
-        1f
-        - squash * Mathf.Abs(Vector2.Dot(dirLocal2, basisX))
-        + bulge  * Mathf.Abs(Vector2.Dot(perpLocal2, basisX));
-
-    float sy =
-        1f
-        - squash * Mathf.Abs(Vector2.Dot(dirLocal2, basisY))
-        + bulge  * Mathf.Abs(Vector2.Dot(perpLocal2, basisY));
-
-    Vector3 deformationScale = new Vector3(Mathf.Max(0.1f, sx), Mathf.Max(0.1f, sy), 1f);
-
-    Vector3 worldOffset = (Vector3)(_noseCompressDirWorld.normalized * (noseCompressMaxOffsetWorld * _noseCompressCurrent01));
-    _noseVisualOffsetLocal = transform.InverseTransformVector(worldOffset);
-
-    // Apply deformation relative to current gameplay-owned scale.
-    srt.localScale = Vector3.Scale(_dustSpriteBaseVisualScale, deformationScale);
-    srt.localPosition = _dustSpriteBaseLocalPos + _noseVisualOffsetLocal;
-}
     public void SetVisualTimings(DustVisualTimings t)
     {
         // Defensive clamps so bad inspector values can’t break everything.
@@ -1246,119 +1081,6 @@ private Coroutine _jiggleRoutine;
         if (visual.sprite == null) return;
         SetBaseSpriteScale(Vector3.one * s);
     }
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        if (_isDespawned || _isBreaking) return;
-        if (gen == null || _drumTrack == null) return;
-
-        var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
-        if (vehicle == null) return;
-        DriveVehicleCompression(vehicle, collision);
-        float drainRes = Mathf.Clamp01(clearing.drainResistance01);
-        float dt = Time.fixedDeltaTime;
-
-        if (vehicle.boosting)
-        {
-            // ---------------------------------------------------------------
-            // BOOST PATH: vehicle bleaches this cell's charge.
-            //
-            // The vehicle invests its own energy to sap dust charge so the
-            // PhaseStar gains little or nothing from cells already worked.
-            //
-            // Drain rate is inversely scaled by drainResistance01:
-            //   drainRes=0 -> drains at full rate  (resistMul = 1.0)
-            //   drainRes=1 -> drains at 1/3 rate   (resistMul = 0.33)
-            //
-            // Vehicle energy cost mirrors resistance in the other direction --
-            // high-resistance dust costs proportionally more boost to neutralize.
-            // ---------------------------------------------------------------
-            float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-            float resistMul   = Mathf.Lerp(1.0f, 0.33f, drainRes);
-            float chargeDrain = drainPerSec * resistMul * dt;
-
-            float taken = DrainCharge(chargeDrain); // lowers alpha visually
-
-            // High-resistance dust fights back -- pay more boost energy to bleach it.
-            float hardnessCost = Mathf.Lerp(0.1f, 1.0f, drainRes);
-            vehicle.DrainEnergy(drainPerSec * hardnessCost * dt);
-
-            // Flash charge color so the player sees the cell losing its color.
-            if (taken > 0.001f)
-                TriggerChargeTintPulse();
-
-            // If the boost fully drained this cell, clear it from the generator.
-            if (_currentEnergyUnits <= 0 && gen != null && _drumTrack != null)
-            {
-                var gp = _drumTrack.WorldToGridPosition(transform.position);
-                gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
-                    fadeSeconds: _timings.fadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
-            }
-        }
-        else
-        {
-            // ---------------------------------------------------------------
-            // NON-BOOST PATH: dust is a wall. No clearing, no energy drain.
-            // Musical pluck still fires so pressing against dust sounds alive.
-            // _nonBoostClearSeconds tracks contact duration for pluck intensity
-            // only — it never triggers a break.
-            // ---------------------------------------------------------------
-            _nonBoostClearSeconds += dt;
-
-            // No vehicle.DrainEnergy — non-boost contact is free.
-            // No clearing — severity is purely cosmetic for pluck bloom.
-
-            float denom = Mathf.Max(0.05f, dustPluckSwellSeconds);
-            float severity = Mathf.Clamp01(_nonBoostClearSeconds / denom);
-
-            if (_currentPluckVehicle != vehicle)
-            {
-                _currentPluckVehicle = vehicle;
-                _nextDustPluckTime = Time.time;
-                TriggerDenyTintPulse(1);
-                TriggerJiggle();
-            }
-
-            if (Role != MusicalRole.None && Time.time >= _nextDustPluckTime)
-            {
-
-                float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
-
-                // Slow emergence, then bloom.
-                float bloom01 = hold01 * hold01;
-
-                int durTicks = Mathf.RoundToInt(Mathf.Lerp(
-                    dustPluckMinDurationTicks,
-                    dustPluckMaxDurationTicks,
-                    bloom01
-                ));
-
-                float vel127 = Mathf.Lerp(
-                    dustPluckMinVelocity127,
-                    dustPluckMaxVelocity127,
-                    bloom01
-                );
-
-                // Starts sparse, gets denser as the dust "sings."
-                float cooldown = Mathf.Lerp(
-                    dustPluckMaxCooldownSeconds,
-                    dustPluckMinCooldownSeconds,
-                    bloom01
-                );
-
-                var controller = GameFlowManager.Instance?.controller;
-                if (controller != null)
-                {
-                    // Phrase index into the chord also grows with hold.
-                    controller.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
-                }
-
-                // Space future triggers so notes swell rather than machine-gun.
-                _nextDustPluckTime = Time.time + cooldown;
-            }
-        }
-
-    }
-
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {
         // Shader is retired; interpret workSigned01 as:
@@ -1403,19 +1125,6 @@ private Coroutine _jiggleRoutine;
         _chargeColor = chargeColor;
         _denyColor = denyColor;
         _hasFeedbackColors = true;
-    }
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
-        if (vehicle == null) return;
-        _nonBoostClearSeconds = 0f;
-        ResetVisualToBase();
-
-        if (_currentPluckVehicle == vehicle)
-        {
-            _currentPluckVehicle = null;
-            _nextDustPluckTime = -999f;
-        }
     }
     private void OnDisable()
     {
