@@ -560,6 +560,32 @@ public partial class Vehicle : MonoBehaviour
             if (head.track != null && head.track.controller != null)
                 hasPendingRaw = head.track.controller.TryGetRawPlayheadAbsStep(out rawAbsPending, out _, out totalPending);
         }
+        Dictionary<Collectable, int> visualRankByCollectable = null;
+        if (hasPendingRaw && totalPending > 0)
+        {
+            int total = Mathf.Max(1, totalPending);
+            visualRankByCollectable = new Dictionary<Collectable, int>();
+            var ranked = new List<(Collectable collectable, double forward)>();
+
+            foreach (var pending in _pendingNotes)
+            {
+                if (pending.collectable == null) continue;
+
+                int authored = pending.authoredAbsStep;
+                if (pending.collectable.tether != null && pending.collectable.tether.boundStep >= 0)
+                    authored = pending.collectable.tether.boundStep;
+
+                if (authored < 0) continue;
+
+                double fwd = (authored - rawAbsPending + total) % total;
+                ranked.Add((pending.collectable, fwd));
+            }
+
+            ranked.Sort((a, b) => a.forward.CompareTo(b.forward));
+            for (int i = 0; i < ranked.Count; i++)
+                visualRankByCollectable[ranked[i].collectable] = i;
+        }
+
         foreach (var p in _pendingNotes)
         {
             if (p.collectable == null) { slot++; continue; }
@@ -587,12 +613,23 @@ public partial class Vehicle : MonoBehaviour
                     foreach (var ar in _armedReleases)
                         pendingSpokenFor.Add(ar.targetAbsStep);
 
+                    int myVisualRank = int.MaxValue;
+                    if (visualRankByCollectable != null)
+                        visualRankByCollectable.TryGetValue(p.collectable, out myVisualRank);
+
                     foreach (var other in _pendingNotes)
                     {
-                        if (ReferenceEquals(other.collectable, p.collectable))
-                            break;
+                        if (other.collectable == null || ReferenceEquals(other.collectable, p.collectable))
+                            continue;
 
-                        var otherTether = other.collectable != null ? other.collectable.tether : null;
+                        int otherRank = int.MaxValue;
+                        if (visualRankByCollectable != null)
+                            visualRankByCollectable.TryGetValue(other.collectable, out otherRank);
+
+                        if (otherRank >= myVisualRank)
+                            continue;
+
+                        var otherTether = other.collectable.tether;
                         if (otherTether != null && otherTether.boundStep >= 0)
                             pendingSpokenFor.Add(otherTether.boundStep);
                     }
