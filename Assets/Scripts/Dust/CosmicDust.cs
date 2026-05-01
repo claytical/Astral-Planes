@@ -1126,19 +1126,6 @@ private Coroutine _jiggleRoutine;
         _denyColor = denyColor;
         _hasFeedbackColors = true;
     }
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        var vehicle = collision.collider != null ? collision.collider.GetComponent<Vehicle>() : null;
-        if (vehicle == null) return;
-        _nonBoostClearSeconds = 0f;
-        ResetVisualToBase();
-
-        if (_currentPluckVehicle == vehicle)
-        {
-            _currentPluckVehicle = null;
-            _nextDustPluckTime = -999f;
-        }
-    }
     private void OnDisable()
     {
         CancelTintPulse(restoreToBase: true);
