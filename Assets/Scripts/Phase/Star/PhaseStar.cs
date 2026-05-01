@@ -166,6 +166,9 @@ public class PhaseStar : MonoBehaviour
              "Keeps locomotion and collision locked until the diamonds are visually at full opacity.")]
     [SerializeField, Range(0.8f, 1f)] private float readyDisplayThreshold = 0.99f;
 
+    [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
+    [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
+
     private float _displayedCharge01;
 
     private bool _ejectionInFlight;
@@ -638,6 +641,10 @@ public class PhaseStar : MonoBehaviour
         // a perceptible scale instead of staying near-invisible until threshold.
         // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
         float visualScale01 = Mathf.Sqrt(_displayedCharge01);
+        bool tentaclesDrawing = dust != null && dust.HasActiveTentacles;
+        if (tentaclesDrawing)
+            visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
+
         Vector3 chargeScale = Vector3.one * visualScale01;
         if (visuals != null) visuals.transform.localScale = chargeScale;
         if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
