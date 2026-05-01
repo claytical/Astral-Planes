@@ -49,17 +49,32 @@ public class CosmicDust : MonoBehaviour {
 // Currently displayed tint on the sprite.
 // Temporary pulses modify this, but must not overwrite _currentTint.
     private Color _displayTint = Color.white;
-    [Header("Dust Musical Swell")]
-    [SerializeField] private float dustPluckSwellSeconds = 1.4f;
-
-    [SerializeField] private int dustPluckMinDurationTicks = 360;
-    [SerializeField] private int dustPluckMaxDurationTicks = 1440;
-
-    [SerializeField] private float dustPluckMinVelocity127 = 40f;
-    [SerializeField] private float dustPluckMaxVelocity127 = 70f;
-
-    [SerializeField] private float dustPluckMinCooldownSeconds = 0.8f;
-    [SerializeField] private float dustPluckMaxCooldownSeconds = 2f;
+    [Serializable]
+    public struct DustPluckSettings
+    {
+        [Header("Dust Musical Swell")]
+        [Tooltip("How long contact needs to build before plucks reach full intensity.")]
+        [Range(0.1f, 4f)] public float swellSeconds;
+        [Tooltip("Short/long pluck lengths used at low/high contact intensity.")]
+        [Min(1)] public int minDurationTicks;
+        [Min(1)] public int maxDurationTicks;
+        [Tooltip("Soft/loud pluck velocities used at low/high contact intensity.")]
+        [Range(1f, 127f)] public float minVelocity127;
+        [Range(1f, 127f)] public float maxVelocity127;
+        [Tooltip("Time between plucks. Max applies at first contact, min after sustained pressure.")]
+        [Min(0.01f)] public float minCooldownSeconds;
+        [Min(0.01f)] public float maxCooldownSeconds;
+    }
+    [SerializeField] private DustPluckSettings pluck = new DustPluckSettings
+    {
+        swellSeconds = 1.4f,
+        minDurationTicks = 360,
+        maxDurationTicks = 1440,
+        minVelocity127 = 40f,
+        maxVelocity127 = 70f,
+        minCooldownSeconds = 0.8f,
+        maxCooldownSeconds = 2f
+    };
 
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
@@ -179,7 +194,8 @@ public class CosmicDust : MonoBehaviour {
     private Coroutine _emissionMulRoutine;
 
 [Header("Deny Feedback")]
-[SerializeField] private float denyPulseDefaultSeconds = 0.25f;
+[SerializeField, Tooltip("Fallback deny pulse duration when no explicit pulse length is provided.")]
+private float denyPulseDefaultSeconds = 0.25f;
 
 // Single managed tint pulse lane (charge + deny both use this).
 private Coroutine _tintPulseRoutine;
@@ -1304,11 +1320,11 @@ private Coroutine _jiggleRoutine;
 
     private void PlayNonBoostDustPluck()
     {
-        float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, dustPluckSwellSeconds));
+        float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, pluck.swellSeconds));
         float bloom01 = hold01 * hold01;
-        int durTicks = Mathf.RoundToInt(Mathf.Lerp(dustPluckMinDurationTicks, dustPluckMaxDurationTicks, bloom01));
-        float vel127 = Mathf.Lerp(dustPluckMinVelocity127, dustPluckMaxVelocity127, bloom01);
-        float cooldown = Mathf.Lerp(dustPluckMaxCooldownSeconds, dustPluckMinCooldownSeconds, bloom01);
+        int durTicks = Mathf.RoundToInt(Mathf.Lerp(pluck.minDurationTicks, pluck.maxDurationTicks, bloom01));
+        float vel127 = Mathf.Lerp(pluck.minVelocity127, pluck.maxVelocity127, bloom01);
+        float cooldown = Mathf.Lerp(pluck.maxCooldownSeconds, pluck.minCooldownSeconds, bloom01);
 
         GameFlowManager.Instance?.controller?.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
         _nextDustPluckTime = Time.time + cooldown;
