@@ -172,7 +172,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         SetTintWithParticles(c);
         ToggleShardRenderers(true);
-        ApplyParticleAlpha(.4f);
+        ApplyParticleAlpha(0.85f);
 
         EnsureParticlesVisible(playIfStopped: true);
     }
@@ -200,7 +200,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
 
         SetShardTint(c);
-        ApplyParticleAlpha(0.05f);
+        ApplyParticleAlpha(0.35f);
 
         EnsureParticlesVisible(playIfStopped: true);
     }
@@ -263,7 +263,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     private void SetTintWithParticles(Color c)
     {
-        c.a = .2f;
+        c.a = 1f;
 
         var pss = GetComponentsInChildren<ParticleSystem>(true);
         for (int i = 0; i < pss.Length; i++)
@@ -272,9 +272,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
             if (!ps) continue;
 
             var main = ps.main;
-            var keepA = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : c.a;
             var start = c;
-            start.a = keepA;
             main.startColor = new ParticleSystem.MinMaxGradient(start);
 
             var col = ps.colorOverLifetime;
