@@ -668,8 +668,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Never allow the transport span used for bin selection to be smaller than this track's own bins,
         // or multi-bin tracks can get squashed into bin 0 (I-I instead of I-II).
         int leaderBins = Mathf.Max(1, Mathf.Max(controller.GetCommittedLeaderBins(), Mathf.Max(1, loopMultiplier)));
-// Normalize transport bin to the effective leader span.
+// Normalize transport/progression bins to the effective leader span.
         playheadBin = WrapIndex(playheadBin, leaderBins);
+        int progressionBin = WrapIndex(barIndex, leaderBins);
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
@@ -683,8 +684,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         for (int s = startStep; s <= targetCurLocal; s++)
         {
             int local = ((s % binSize) + binSize) % binSize;
-            // Drive playback from transport bin; PlayLoopedNotesInBin handles out-of-range silence.
-            PlayLoopedNotesInBin(playheadBin, local, leaderBins);
+            // Use progression bin for deterministic harmonic traversal at boundaries.
+            PlayLoopedNotesInBin(progressionBin, local, leaderBins);
         }
 
         _lastLocalStep = targetCurLocal;
@@ -769,6 +770,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // - If playheadBin exceeds that, remain silent until the loop wraps.
         int trackBins = Mathf.Max(1, loopMultiplier);
         if (playheadBin < 0 || playheadBin >= trackBins)
+        {
+            return;
+        }
+        if (!IsBinFilled(playheadBin))
         {
             return;
         }
