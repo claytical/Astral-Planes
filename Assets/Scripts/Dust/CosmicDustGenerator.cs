@@ -59,18 +59,7 @@ public class CosmicDustGenerator : MonoBehaviour
     // ------------------------------------------------------------------
     // Authoritative grid (no pooling). The grid is the traffic cop.
     // ------------------------------------------------------------------
-    private enum DustCellState
-    {
-        Empty = 0,
-        PendingRegrow = 1,
-        Regrowing = 2,
-        Clearing = 3,
-        Solid = 4,
-    }
-    private GameObject[,] _cellGo;
-    private CosmicDust[,] _cellDust;
-    private DustCellState[,] _cellState;
-    private int _cellW = -1, _cellH = -1;
+    private readonly DustGridState _gridState = new();
     private Dictionary<GameObject, Vector2Int> _goToCell = new Dictionary<GameObject, Vector2Int>(1024);
 
     [Header("Regrow Step Gate")]
@@ -79,11 +68,10 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Seconds to wait after a cell becomes visible again before enabling its collider.")]
     [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
 
-    private readonly Queue<List<Vector2Int>> _pendingCorridorRegrowth = new Queue<List<Vector2Int>>();
     private Dictionary<Vector2Int, bool> _fillMap = new();
-    private Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new();
-    private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
     private MazePatternConfig _activeMazePattern;
+    private readonly DustRegrowthScheduler _regrowthScheduler = new();
+    private readonly MazeTopologyService _mazeTopologyService = new();
     [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
     [Header("Topology")]
     [Tooltip("When enabled, the dust grid wraps toroidally — cells at one edge connect to the opposite edge.")]
@@ -143,16 +131,14 @@ public class CosmicDustGenerator : MonoBehaviour
         { MusicalRole.Groove,  0 },
     };
     // Counts ALL solid cells regardless of role (including MusicalRole.None).
-    // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses this instead.
-    private int _allSolidCount = 0;
+    // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses _gridState.AllSolidCount.
     // Density conservation: target solid count set at maze init; -1 = inactive.
     private int _targetSolidCount = -1;
     // Pattern oracle: wall cells intended by the current archetype. Null when no maze is active.
     private HashSet<Vector2Int> _mazePatternCells;
     // Cells currently transitioning in (Regrowing state). Added to Solid count
     // for committed-count checks so original cells are suppressed before
-    // compensation cells finish growing in.
-    private int _regrowingCount = 0;
+    // compensation cells finish growing in. Stored in _gridState.RegrowingCount.
     public float TileDiameterWorld
     {
         get => tileDiameterWorld;
@@ -275,50 +261,50 @@ public class CosmicDustGenerator : MonoBehaviour
         }
 
         // Stop any legacy per-cell regrowth coroutines if they still exist.
-        if (_regrowthCoroutines != null)
+        if (_regrowthScheduler.RegrowthCoroutines != null)
         {
-            foreach (var kv in _regrowthCoroutines)
+            foreach (var kv in _regrowthScheduler.RegrowthCoroutines)
             {
                 if (kv.Value != null)
                     StopCoroutine(kv.Value);
             }
-            _regrowthCoroutines.Clear();
+            _regrowthScheduler.RegrowthCoroutines.Clear();
         }
 
         // Stop any void-grow coroutines that might still be animating dust in.
-        if (_voidGrowCoroutines != null)
+        if (_regrowthScheduler.VoidGrowCoroutines != null)
         {
-            foreach (var kv in _voidGrowCoroutines)
+            foreach (var kv in _regrowthScheduler.VoidGrowCoroutines)
             {
                 if (kv.Value != null)
                     StopCoroutine(kv.Value);
             }
-            _voidGrowCoroutines.Clear();
+            _regrowthScheduler.VoidGrowCoroutines.Clear();
         }
 
         // Dismiss transient cells from the outgoing motif using the same dissipation visual as
         // vehicle carving — no abrupt pop/cut.
         EnsureCellGrid();
-        if (_cellState != null && _cellGo != null)
+        if (_gridState.CellState != null && _gridState.CellGo != null)
         {
-            for (int x = 0; x < _cellW; x++)
+            for (int x = 0; x < _gridState.Width; x++)
             {
-                for (int y = 0; y < _cellH; y++)
+                for (int y = 0; y < _gridState.Height; y++)
                 {
-                    var st = _cellState[x, y];
+                    var st = _gridState.CellState[x, y];
                     if (st == DustCellState.PendingRegrow)
                     {
                         // Not yet visible — instant hide is fine.
-                        _cellState[x, y] = DustCellState.Empty;
-                        var go = _cellGo[x, y];
+                        _gridState.CellState[x, y] = DustCellState.Empty;
+                        var go = _gridState.CellGo[x, y];
                         if (hideTransientDust && go != null)
                             HideCellGO(go);
                     }
                     else if (st == DustCellState.Regrowing)
                     {
                         // Was growing in — fade out instead of cutting off.
-                        _cellState[x, y] = DustCellState.Clearing;
-                        var go = _cellGo[x, y];
+                        _gridState.CellState[x, y] = DustCellState.Clearing;
+                        var go = _gridState.CellGo[x, y];
                         if (hideTransientDust && go != null)
                             FadeAndHideCellGO(go);
                     }
@@ -474,11 +460,11 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (IsDustSpawnBlocked(gp)) continue;
 
     // 3) Spawn/regrow if empty
-                if (_voidGrowCoroutines.ContainsKey(gp))
+                if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp))
                     continue;
 
                 _voidGrowCells.Add(gp);
-                _voidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
+                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
             }
         }
 
@@ -506,7 +492,7 @@ public class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     public void ClearBubbleZone(Vector2Int centerGP, int radiusCells)
     {
-        if (radiusCells <= 0 || _cellState == null) return;
+        if (radiusCells <= 0 || _gridState.CellState == null) return;
         EnsureCellGrid();
         int rSq = radiusCells * radiusCells;
         for (int dy = -radiusCells; dy <= radiusCells; dy++)
@@ -528,7 +514,7 @@ public class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
     {
-        if (!IsInBounds(gp)) { _voidGrowCoroutines.Remove(gp); yield break; }
+        if (!IsInBounds(gp)) { _regrowthScheduler.VoidGrowCoroutines.Remove(gp); yield break; }
 
         bool veto0_perm        = _permanentClearCells.Contains(gp);
         bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
@@ -540,7 +526,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (veto0_perm || veto0_spawnBlocked || veto0_claim)
         {
 //            Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
-            _voidGrowCoroutines.Remove(gp);
+            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -548,7 +534,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (go == null)
         {
 //            Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
-            _voidGrowCoroutines.Remove(gp);
+            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -584,7 +570,7 @@ public class CosmicDustGenerator : MonoBehaviour
         {
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _voidGrowCoroutines.Remove(gp);
+            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -598,7 +584,7 @@ public class CosmicDustGenerator : MonoBehaviour
             Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _voidGrowCoroutines.Remove(gp);
+            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -608,7 +594,7 @@ public class CosmicDustGenerator : MonoBehaviour
             Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
             SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
             if (dust != null) SetDustCollision(dust, false);
-            _voidGrowCoroutines.Remove(gp);
+            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -617,7 +603,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (dust != null) SetDustCollision(dust, true);
 
 //        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
-        _voidGrowCoroutines.Remove(gp);
+        _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
     }
     private void SetDustCollision(CosmicDust dust, bool _enabled)
         {
@@ -775,6 +761,7 @@ public class CosmicDustGenerator : MonoBehaviour
         EnsureImprints();
         TryEnsureRefs();
         EnsureCellGrid();
+        _regrowthScheduler.Initialize(regrowCellsPerStep, regrowColliderEnableDelaySeconds);
         EnsureRegrowController();
         // Init extracted systems (no pooling/legacy queues required).
         if (_tintDiffusionSystem == null)
@@ -881,7 +868,7 @@ public class CosmicDustGenerator : MonoBehaviour
         if (!_cellGridReady)
         {
             EnsureCellGrid();
-            _cellGridReady = (_cellGo != null); // or a stronger condition
+            _cellGridReady = (_gridState.CellGo != null); // or a stronger condition
             if (!_cellGridReady) return;
         }
 
@@ -1620,18 +1607,10 @@ private void BuildMazeRoleImprints(
     }
 
     if (w <= 0 || h <= 0) return;
-    if (_cellGo != null && _cellW == w && _cellH == h) return;
+    if (_gridState.CellGo != null && _gridState.Width == w && _gridState.Height == h) return;
 
-    _cellW = w; _cellH = h;
-    _cellGo = new GameObject[w, h];
-    _cellDust = new CosmicDust[w, h];
-    _cellState = new DustCellState[w, h];
+    _gridState.Allocate(w, h);
     _goToCell.Clear();
-
-    // Explicitly initialize state to Empty (avoid enum-default pitfalls)
-    for (int x = 0; x < w; x++)
-    for (int y = 0; y < h; y++)
-        _cellState[x, y] = DustCellState.Empty;
 
     var root = (activeDustRoot != null) ? activeDustRoot : transform;
     var existing = root.GetComponentsInChildren<CosmicDust>(true);
@@ -1645,14 +1624,14 @@ private void BuildMazeRoleImprints(
         Vector2Int gp = drums.WorldToGridPosition(go.transform.position);
         if ((uint)gp.x >= (uint)w || (uint)gp.y >= (uint)h) continue;
 
-        if (_cellGo[gp.x, gp.y] != null && _cellGo[gp.x, gp.y] != go)
+        if (_gridState.CellGo[gp.x, gp.y] != null && _gridState.CellGo[gp.x, gp.y] != go)
         {
             FadeAndHideCellGO(go);
             continue;
         }
 
-        _cellGo[gp.x, gp.y] = go;
-        _cellDust[gp.x, gp.y] = d;
+        _gridState.CellGo[gp.x, gp.y] = go;
+        _gridState.CellDust[gp.x, gp.y] = d;
         _goToCell[go] = gp;
 
         go.transform.position = drums.GridToWorldPosition(gp);
@@ -1664,7 +1643,7 @@ private void BuildMazeRoleImprints(
             !d.terrainCollider.isTrigger &&
             go.activeInHierarchy;
 
-        _cellState[gp.x, gp.y] = blocks ? DustCellState.Solid : DustCellState.Empty;
+        _gridState.CellState[gp.x, gp.y] = blocks ? DustCellState.Solid : DustCellState.Empty;
     }
 }
 
@@ -1672,51 +1651,21 @@ private void BuildMazeRoleImprints(
     {
         EnsureCellGrid();
         go = null;
-        if (_cellGo == null) return false;
+        if (_gridState.CellGo == null) return false;
         if (toroidal) gp = WrapCell(gp);
-        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
-        go = _cellGo[gp.x, gp.y];
+        if ((uint)gp.x >= (uint)_gridState.Width || (uint)gp.y >= (uint)_gridState.Height) return false;
+        go = _gridState.CellGo[gp.x, gp.y];
         return go != null;
     }
     private bool TryGetCellState(Vector2Int gp, out DustCellState st)
     {
         EnsureCellGrid();
-        st = DustCellState.Empty;
-        if (_cellState == null) return false;
-        if (toroidal) gp = WrapCell(gp);
-        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return false;
-        st = _cellState[gp.x, gp.y];
-        return true;
+        return _gridState.TryGetCellState(gp, toroidal, WrapCell, out st);
     }
     private void SetCellState(Vector2Int gp, DustCellState st)
     {
         EnsureCellGrid();
-        if (_cellState == null) return;
-        if (toroidal) gp = WrapCell(gp);
-        if ((uint)gp.x >= (uint)_cellW || (uint)gp.y >= (uint)_cellH) return;
-
-        // Track role density when a cell enters or leaves Solid state.
-        DustCellState prev = _cellState[gp.x, gp.y];
-        _cellState[gp.x, gp.y] = st;
-
-        if (prev != st)
-        {
-            if (st == DustCellState.Solid)
-            {
-                _allSolidCount++;
-                TrackRoleDensityChange(gp, becomesSolid: true);
-            }
-            else if (prev == DustCellState.Solid)
-            {
-                _allSolidCount = Mathf.Max(0, _allSolidCount - 1);
-                TrackRoleDensityChange(gp, becomesSolid: false);
-            }
-
-            if (prev == DustCellState.Regrowing && st != DustCellState.Regrowing)
-                _regrowingCount = Mathf.Max(0, _regrowingCount - 1);
-            else if (prev != DustCellState.Regrowing && st == DustCellState.Regrowing)
-                _regrowingCount++;
-        }
+        _gridState.SetCellState(gp, st, toroidal, WrapCell, (cell, becomesSolid) => TrackRoleDensityChange(cell, becomesSolid));
     }
     /// <summary>
     /// Called by CosmicDust when its fade-out completes. Finalizes the
@@ -1755,7 +1704,7 @@ private void BuildMazeRoleImprints(
         if (root != null && !root.gameObject.activeSelf)
             root.gameObject.SetActive(true);
 
-        var existing = _cellGo[gp.x, gp.y];
+        var existing = _gridState.CellGo[gp.x, gp.y];
         if (existing != null)
         {
             if (!existing.activeSelf)
@@ -1781,8 +1730,8 @@ private void BuildMazeRoleImprints(
             SetDustCollision(dust, false);
         }
 
-        _cellGo[gp.x, gp.y] = go;
-        _cellDust[gp.x, gp.y] = dust;
+        _gridState.CellGo[gp.x, gp.y] = go;
+        _gridState.CellDust[gp.x, gp.y] = dust;
         _goToCell[go] = gp;
         SetCellState(gp, DustCellState.Empty);
 
@@ -1800,12 +1749,12 @@ private void BuildMazeRoleImprints(
     public void GetColoredDustCells(List<Vector2Int> results)
     {
         results.Clear();
-        if (_cellState == null || _cellDust == null) return;
-        for (int y = 0; y < _cellH; y++)
-        for (int x = 0; x < _cellW; x++)
+        if (_gridState.CellState == null || _gridState.CellDust == null) return;
+        for (int y = 0; y < _gridState.Height; y++)
+        for (int x = 0; x < _gridState.Width; x++)
         {
-            if (_cellState[x, y] != DustCellState.Solid) continue;
-            var dust = _cellDust[x, y];
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var dust = _gridState.CellDust[x, y];
             if (dust != null && dust.Role != MusicalRole.None)
                 results.Add(new Vector2Int(x, y));
         }
@@ -1823,7 +1772,7 @@ private void BuildMazeRoleImprints(
 
         _playerCarvedCells.Add(cell);
 
-        var cellGo = _cellGo?[cell.x, cell.y];
+        var cellGo = _gridState.CellGo?[cell.x, cell.y];
 
         bool isVoidCell = _voidGrowCells.Remove(cell);
         if (isVoidCell)
@@ -1853,7 +1802,7 @@ private void BuildMazeRoleImprints(
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
-        var cellGo = _cellGo?[cell.x, cell.y];
+        var cellGo = _gridState.CellGo?[cell.x, cell.y];
         if (cellGo == null) return;
         if (!cellGo.TryGetComponent<CosmicDust>(out var dust) || dust == null) return;
 
@@ -1925,13 +1874,13 @@ private void BuildMazeRoleImprints(
     /// </summary>
     public void BeginSlowFadeAllDust(float durationSeconds)
     {
-        if (_cellState == null || _cellGo == null || _cellW <= 0 || _cellH <= 0) return;
+        if (_gridState.CellState == null || _gridState.CellGo == null || _gridState.Width <= 0 || _gridState.Height <= 0) return;
 
-        for (int x = 0; x < _cellW; x++)
-        for (int y = 0; y < _cellH; y++)
+        for (int x = 0; x < _gridState.Width; x++)
+        for (int y = 0; y < _gridState.Height; y++)
         {
-            if (_cellState[x, y] != DustCellState.Solid) continue;
-            var go = _cellGo[x, y];
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var go = _gridState.CellGo[x, y];
             if (go == null) continue;
             float delay = Random.Range(0f, durationSeconds * 0.75f);
             StartCoroutine(DelayedFadeCell(new Vector2Int(x, y), delay));
@@ -1941,7 +1890,7 @@ private void BuildMazeRoleImprints(
     private IEnumerator DelayedFadeCell(Vector2Int gp, float delay)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
-        if (_cellState == null || _cellState[gp.x, gp.y] != DustCellState.Solid) yield break;
+        if (_gridState.CellState == null || _gridState.CellState[gp.x, gp.y] != DustCellState.Solid) yield break;
         ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.5f, scheduleRegrow: false);
     }
     
@@ -1951,10 +1900,10 @@ private void BuildMazeRoleImprints(
             return;
         if (!IsInBounds(gridPos)) { 
 
-            if (_regrowthCoroutines != null && _regrowthCoroutines.TryGetValue(gridPos, out var pending))
+            if (_regrowthScheduler.RegrowthCoroutines != null && _regrowthScheduler.RegrowthCoroutines.TryGetValue(gridPos, out var pending))
             { 
                 if (pending != null) StopCoroutine(pending);
-                _regrowthCoroutines.Remove(gridPos);
+                _regrowthScheduler.RegrowthCoroutines.Remove(gridPos);
 
             } 
             return;
@@ -1996,10 +1945,10 @@ private void BuildMazeRoleImprints(
     /// </summary>
     public Vector2Int WrapCell(Vector2Int gp)
     {
-        if (!toroidal || _cellW <= 0 || _cellH <= 0) return gp;
+        if (!toroidal || _gridState.Width <= 0 || _gridState.Height <= 0) return gp;
         return new Vector2Int(
-            ((gp.x % _cellW) + _cellW) % _cellW,
-            ((gp.y % _cellH) + _cellH) % _cellH);
+            ((gp.x % _gridState.Width) + _gridState.Width) % _gridState.Width,
+            ((gp.y % _gridState.Height) + _gridState.Height) % _gridState.Height);
     }
     
     public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting)
@@ -2208,10 +2157,10 @@ private void BuildMazeRoleImprints(
     }
     private int TotalSolidCount()
     {
-        // _allSolidCount tracks ALL solid cells including MusicalRole.None.
+        // _gridState.AllSolidCount tracks ALL solid cells including MusicalRole.None.
         // _solidCountByRole only tracks non-None roles, so it can't be used here
         // after the gray-start change where all initial cells have role=None.
-        return _allSolidCount;
+        return _gridState.AllSolidCount;
     }
     
     /// <summary>
@@ -2308,17 +2257,17 @@ private void BuildMazeRoleImprints(
         if (!gameObject.activeInHierarchy) return;
 
         // Primary: iterate the authoritative grid.
-        if (_cellGridReady && _cellGo != null)
+        if (_cellGridReady && _gridState.CellGo != null)
         {
-            for (int x = 0; x < _cellW; x++)
+            for (int x = 0; x < _gridState.Width; x++)
             {
-                for (int y = 0; y < _cellH; y++)
+                for (int y = 0; y < _gridState.Height; y++)
                 {
-                    var go = _cellGo[x, y];
+                    var go = _gridState.CellGo[x, y];
                     if (!go) continue;
                     if (!go.activeInHierarchy) continue;
 
-                    var d = _cellDust != null ? _cellDust[x, y] : go.GetComponent<CosmicDust>();
+                    var d = _gridState.CellDust != null ? _gridState.CellDust[x, y] : go.GetComponent<CosmicDust>();
                     if (d == null) continue;
                     if (!d.isActiveAndEnabled) continue;
 
@@ -2358,9 +2307,9 @@ private void BuildMazeRoleImprints(
     {
         try
         {
-            for (int x = 0; x < _cellW; x++)
+            for (int x = 0; x < _gridState.Width; x++)
             {
-                for (int y = 0; y < _cellH; y++)
+                for (int y = 0; y < _gridState.Height; y++)
                 {
                     var gp = new Vector2Int(x, y);
                     if (TryGetCellGo(gp, out var go) && go != null)
@@ -2377,9 +2326,9 @@ private void BuildMazeRoleImprints(
         _voidGrowCells.Clear();
         _ripenessByCell.Clear();
         _playerCarvedCells.Clear();
-        _allSolidCount    = 0;
+        _gridState.AllSolidCount    = 0;
         _targetSolidCount = -1;
-        _regrowingCount   = 0;
+        _gridState.RegrowingCount   = 0;
         _mazePatternCells = null;
     }
     /// <summary>
@@ -2712,9 +2661,9 @@ private void BuildMazeRoleImprints(
         // Register in the authoritative grid.
         if (IsInBounds(gridPos))
         {
-            _cellGo[gridPos.x, gridPos.y] = hex;
+            _gridState.CellGo[gridPos.x, gridPos.y] = hex;
             var d = hex != null ? hex.GetComponent<CosmicDust>() : null;
-            _cellDust[gridPos.x, gridPos.y] = d;
+            _gridState.CellDust[gridPos.x, gridPos.y] = d;
             if (hex != null) _goToCell[hex] = gridPos;
             SetCellState(gridPos, DustCellState.Solid);
         }
@@ -2761,12 +2710,12 @@ private void BuildMazeRoleImprints(
     /// </summary>
     public bool HasAnyDustWithRole()
     {
-        if (_cellState == null || _cellDust == null) return false;
-        for (int y = 0; y < _cellH; y++)
-        for (int x = 0; x < _cellW; x++)
+        if (_gridState.CellState == null || _gridState.CellDust == null) return false;
+        for (int y = 0; y < _gridState.Height; y++)
+        for (int x = 0; x < _gridState.Width; x++)
         {
-            if (_cellState[x, y] != DustCellState.Solid) continue;
-            var dust = _cellDust[x, y];
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var dust = _gridState.CellDust[x, y];
             if (dust != null && dust.Role != MusicalRole.None) return true;
         }
         return false;
@@ -2774,12 +2723,12 @@ private void BuildMazeRoleImprints(
 
     public bool HasAnyDustWithRole(MusicalRole role)
     {
-        if (role == MusicalRole.None || _cellState == null || _cellDust == null) return false;
-        for (int y = 0; y < _cellH; y++)
-        for (int x = 0; x < _cellW; x++)
+        if (role == MusicalRole.None || _gridState.CellState == null || _gridState.CellDust == null) return false;
+        for (int y = 0; y < _gridState.Height; y++)
+        for (int x = 0; x < _gridState.Width; x++)
         {
-            if (_cellState[x, y] != DustCellState.Solid) continue;
-            var dust = _cellDust[x, y];
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var dust = _gridState.CellDust[x, y];
             if (dust != null && dust.Role == role) return true;
         }
         return false;
@@ -2821,13 +2770,13 @@ private void BuildMazeRoleImprints(
     [ContextMenu("Debug: Find Phantom Colliders")]
     public void DebugFindPhantomColliders()
     {
-        if (_cellState == null || _cellGo == null) return;
+        if (_gridState.CellState == null || _gridState.CellGo == null) return;
         int phantoms = 0;
-        for (int x = 0; x < _cellW; x++)
-        for (int y = 0; y < _cellH; y++)
+        for (int x = 0; x < _gridState.Width; x++)
+        for (int y = 0; y < _gridState.Height; y++)
         {
-            var st = _cellState[x, y];
-            var go = _cellGo[x, y];
+            var st = _gridState.CellState[x, y];
+            var go = _gridState.CellGo[x, y];
             if (go == null) continue;
         
             if (st != DustCellState.Solid)
