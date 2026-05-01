@@ -773,7 +773,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         {
             return;
         }
-        if (!IsBinFilled(playheadBin))
+        // Filled flags can be ahead/behind during cross-track expansion bookkeeping.
+        // Audio authority should be actual committed notes in this bin.
+        if (!HasAnyNoteInBin(playheadBin))
         {
             return;
         }
