@@ -4,16 +4,20 @@ using System.Collections.Generic;
 using UnityEngine;
 public class Collectable : MonoBehaviour
 {
+    [Header("Core References")]
+    [Tooltip("Track that spawned this collectable and receives collection callbacks.")]
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
+
+    [Tooltip("Primary sprite used for glow, tint, and release feedback.")]
     public SpriteRenderer energySprite;
+
+    [Tooltip("Burst identifier used by spawn/accounting systems.")]
     public int burstId;
     [Header("Spawn Intent")]
     public bool isTrappedInDust = false;
     // ---- Dust collision tuning ----
     public float dustCollisionEnterImpulse = 0.85f;
     public float dustCollisionStayForce = 2.25f;
-    private bool _hasDesiredGridTarget; 
-    public int intendedBin = -1;
 // ---- Spawn Arrival Intro ----
     [Header("Spawn Arrival")]
     [SerializeField] private float spawnArrivalSeconds = 5.0f;
@@ -66,18 +70,25 @@ public class Collectable : MonoBehaviour
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
     private bool isInitialized = false;
-// Carry-as-child (school run) tuning
-    [SerializeField] private Vector3 carryLocalOffset = new Vector3(0f, 0.65f, 0f);
-    [SerializeField] private float carryLocalOffsetJitter = 0.05f; // optional tiny wobble
+
+    [Header("Carry (Parented)")]
+    [SerializeField] private CarrySettings carrySettings = new CarrySettings();
+
+    [Serializable]
+    public class CarrySettings
+    {
+        [Tooltip("Local hover offset while parented to the collector.")]
+        public Vector3 localOffset = new Vector3(0f, 0.65f, 0f);
+
+        [Tooltip("Small randomized wobble applied to the carry offset.")]
+        [Range(0f, 0.2f)]
+        public float localOffsetJitter = 0.05f;
+    }
     private Transform _carryParent;
     // Idempotency flags
     private bool _handled;            // prevents double processing on trigger
     private bool _destroyNotified;    // prevents double OnDestroyed
 
-    // Optional availability tension (currently only used if you enable it)
-    private double _availableUntilDsp;
-    [SerializeField] [Range(0.6f, 1.4f)]
-    private float availabilityFactor = 1.0f;
     [SerializeField] private float pulseSpeed = 1.6f;
     [SerializeField] private float minAlpha = 0.25f;
     [SerializeField] private float maxAlpha = 0.65f;
@@ -274,6 +285,8 @@ public class Collectable : MonoBehaviour
         Debug.Log($"[Collectable] AttachTetherAtPickup track={assignedInstrumentTrack.name} " +
                   $"step={resolvedStep} marker={(ribbonMarker ? ribbonMarker.name : "(null)")}");
     }
+    [Header("Sequencer Link")]
+    [Tooltip("Candidate step anchors this collectable may resolve to when attaching to the track ribbon.")]
     public List<int> sharedTargetSteps = new List<int>();
     // --- Movement (grid-aware, dust-adjacent) ---
     [Header("Movement")]
@@ -912,11 +925,11 @@ private IEnumerator SpawnArrivalRoutine(
 
         transform.SetParent(_carryParent, worldPositionStays: true);
 
-        Vector3 jitter = (carryLocalOffsetJitter > 0f)
-            ? (Vector3)(UnityEngine.Random.insideUnitCircle * carryLocalOffsetJitter)
+        Vector3 jitter = (carrySettings.localOffsetJitter > 0f)
+            ? (Vector3)(UnityEngine.Random.insideUnitCircle * carrySettings.localOffsetJitter)
             : Vector3.zero;
 
-        transform.localPosition = carryLocalOffset + jitter;
+        transform.localPosition = carrySettings.localOffset + jitter;
         transform.localRotation = Quaternion.identity;
     }
 
@@ -1302,11 +1315,11 @@ private IEnumerator SpawnArrivalRoutine(
 
             transform.SetParent(_carryParent, worldPositionStays: true);
 
-            Vector3 jitter = (carryLocalOffsetJitter > 0f)
-                ? (Vector3)(UnityEngine.Random.insideUnitCircle * carryLocalOffsetJitter)
+            Vector3 jitter = (carrySettings.localOffsetJitter > 0f)
+                ? (Vector3)(UnityEngine.Random.insideUnitCircle * carrySettings.localOffsetJitter)
                 : Vector3.zero;
 
-            transform.localPosition = carryLocalOffset + jitter;
+            transform.localPosition = carrySettings.localOffset + jitter;
             transform.localRotation = Quaternion.identity;
         }
 
