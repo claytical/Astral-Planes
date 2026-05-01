@@ -204,7 +204,11 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
 
         SetShardTint(c);
-        SetTintWithParticles(c);
+
+        Color particleTint = tint;
+        if (particleTint.maxColorComponent <= 0.001f)
+            particleTint = c;
+        SetTintWithParticles(particleTint);
         ApplyParticleAlpha(0.35f);
 
         EnsureParticlesVisible(playIfStopped: true);
