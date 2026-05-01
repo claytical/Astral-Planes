@@ -2414,6 +2414,7 @@ private void BuildMazeRoleImprints(
                         dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
 
                         dust.PrepareForReuse();
+                        dust.InitializeVisuals(DustTimings);
                         dust.SetGrowInDuration(hexGrowInSeconds);
 
                         // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
