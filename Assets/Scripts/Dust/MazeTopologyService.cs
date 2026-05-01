@@ -53,7 +53,7 @@ public sealed class MazeTopologyService
                 context.GetHexDirectionsByRow,
                 _ => Vector3.zero,
                 context.IsCellAvailable,
-                gp => !context.IsBlocked(gp),
+                gp => gp == context.StarCell || !context.IsBlocked(gp),
                 _ => true,
                 context.NormalizeCell),
             MazePatternType.DrunkenStrokes => CosmicDustMazePatterns.BuildDrunkenStrokes(
