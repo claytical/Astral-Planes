@@ -383,7 +383,15 @@ private Coroutine _jiggleRoutine;
             return;
         }
 
-        OnSpawnVisualRequested?.Invoke();
+        if (OnSpawnVisualRequested != null)
+        {
+            OnSpawnVisualRequested.Invoke();
+            return;
+        }
+
+        // Backstop for lifecycle ordering: if Begin is called before the visual controller
+        // subscribes (or if no controller is present), still run the spawn visuals.
+        RunSpawnVisuals(ResolveGrowDurationSeconds());
     }
     /// <summary>
     /// Syncs both the sprite renderer AND the particle system to _currentTint.
@@ -529,7 +537,10 @@ private Coroutine _jiggleRoutine;
         _isDespawned = true;
 
         float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.clearSpriteScaleOutSeconds;
-        OnClearVisualRequested?.Invoke(d);
+        if (OnClearVisualRequested != null)
+            OnClearVisualRequested.Invoke(d);
+        else
+            RunClearVisuals(d);
 
         // Notify generator after the carve-out read, so it can finalize state bookkeeping.
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
