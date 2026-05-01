@@ -228,8 +228,13 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         ToggleShardRenderers(false);
 
-        if (particles && particles.isPlaying)
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var pss = GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < pss.Length; i++)
+        {
+            var ps = pss[i];
+            if (!ps || !ps.isPlaying) continue;
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
     }
 
     public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default) { }
@@ -350,16 +355,26 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     private void EnsureParticlesVisible(bool playIfStopped)
     {
-        if (!particles) return;
+        var pss = GetComponentsInChildren<ParticleSystem>(true);
+        if (pss == null || pss.Length == 0) return;
 
-        if (!particles.gameObject.activeSelf)
-            particles.gameObject.SetActive(true);
+        if (!particles)
+            particles = pss[0];
 
-        var renderer = particles.GetComponent<ParticleSystemRenderer>();
-        if (renderer) renderer.enabled = true;
+        for (int i = 0; i < pss.Length; i++)
+        {
+            var ps = pss[i];
+            if (!ps) continue;
 
-        if (playIfStopped && !particles.isPlaying)
-            particles.Play();
+            if (!ps.gameObject.activeSelf)
+                ps.gameObject.SetActive(true);
+
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            if (renderer) renderer.enabled = true;
+
+            if (playIfStopped && !ps.isPlaying)
+                ps.Play();
+        }
 
         TraceParticleState($"EnsureParticlesVisible(playIfStopped={playIfStopped})");
     }
