@@ -664,12 +664,12 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 // ----- PLAYBACK (catch-up deterministically) -----
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
 //        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
-        int leaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
-// Normalize both transport-facing bin signals.
-        // `playheadBin` can transiently report out-of-range around wraps.
-        // `barIndex` is still the stable progression cursor for which bin's harmony should sound.
+        // Committed leader bins can lag briefly during re-arm/collapse transitions.
+        // Never allow the transport span used for bin selection to be smaller than this track's own bins,
+        // or multi-bin tracks can get squashed into bin 0 (I-I instead of I-II).
+        int leaderBins = Mathf.Max(1, Mathf.Max(controller.GetCommittedLeaderBins(), Mathf.Max(1, loopMultiplier)));
+// Normalize transport bin to the effective leader span.
         playheadBin = WrapIndex(playheadBin, leaderBins);
-        int progressionBin = WrapIndex(barIndex, leaderBins);
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
@@ -683,9 +683,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         for (int s = startStep; s <= targetCurLocal; s++)
         {
             int local = ((s % binSize) + binSize) % binSize;
-            // Use progressionBin so multi-bin tracks (e.g., Bass I→II) advance harmonically,
-            // while PlayLoopedNotesInBin's Case A keeps smaller tracks silent out-of-range.
-            PlayLoopedNotesInBin(progressionBin, local, leaderBins);
+            // Drive playback from transport bin; PlayLoopedNotesInBin handles out-of-range silence.
+            PlayLoopedNotesInBin(playheadBin, local, leaderBins);
         }
 
         _lastLocalStep = targetCurLocal;
