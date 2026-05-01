@@ -1088,163 +1088,34 @@ public class CosmicDustGenerator : MonoBehaviour
         if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
 
         Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
-        Func<Vector2Int, Vector3> gridToWorld = cell => drums.GridToWorldPosition(cell);
         Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
-        Func<Vector3, bool> includeWorld = world => true;
-
-        // Grid veto for BFS-based patterns (ring chokepoints).
-        // IMPORTANT: allow the BFS seed (starCell) even though it's reserved —
-        // it will be filtered out from emitted growth by the final pass below.
-        Func<Vector2Int, bool> includeCellForBfs = cell =>
+        var context = new MazeTopologyService.Context
         {
-            if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return false;
-            if (cell == starCell) return true;
-            if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return false;
-            if (reservedCells != null && reservedCells.Contains(cell)) return false;
-            if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return false;
-            if (IsKeepClearCell(cell)) return false;
-            return true;
+            Width = w,
+            Height = h,
+            StarCell = starCell,
+            GetHexDirectionsByRow = getDirsByRow,
+            IsCellAvailable = isCellAvailable,
+            IsBlocked = cell =>
+            {
+                if ((uint)cell.x >= (uint)w || (uint)cell.y >= (uint)h) return true;
+                if (cell == starCell) return true;
+                if (!drums.IsSpawnCellAvailable(cell.x, cell.y)) return true;
+                if (reservedCells != null && reservedCells.Contains(cell)) return true;
+                if (_permanentClearCells != null && _permanentClearCells.Contains(cell)) return true;
+                if (IsKeepClearCell(cell)) return true;
+                return false;
+            },
+            NormalizeCell = toroidal ? WrapCell : null
         };
 
-        var patternType = config != null ? config.patternType : MazePatternType.FullFill;
-
-        // IMPORTANT: Patterns return the *cells to place dust*.
-        // A final reserved/permanent/keep-clear filter is applied afterward as defense-in-depth.
-        List<(Vector2Int cell, Vector3 world)> growth = null;
-
-        switch (patternType)
+        var solidCells = _mazeTopologyService.BuildSolidCells(config, context);
+        var growth = new List<(Vector2Int cell, Vector3 world)>(solidCells.Count);
+        foreach (var gp in solidCells)
         {
-            case MazePatternType.ClearBoxes:
-            {
-                growth = CosmicDustMazePatterns.BuildClearBoxes(
-                    width: w,
-                    height: h,
-                    count: config.clearBoxes.clearBoxCount,
-                    boxW: config.clearBoxes.clearBoxWidth,
-                    boxH: config.clearBoxes.clearBoxHeight,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.CellularAutomata:
-            {
-                growth = CosmicDustMazePatterns.BuildCA(
-                    width: w,
-                    height: h,
-                    fillChance: config.cellularAutomata.fillChance,
-                    iterations: config.cellularAutomata.iterations,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.RingChokepoints:
-            {
-                growth = CosmicDustMazePatterns.BuildRingChokepoints(
-                    center: starCell,
-                    width: w,
-                    height: h,
-                    ringSpacing: config.ring.spacing,
-                    ringThickness: config.ring.thickness,
-                    jitter: config.ring.jitter,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeCellForBfs: includeCellForBfs,
-                    includeWorld: includeWorld,
-                    normalizeCell: toroidal ? WrapCell : (Func<Vector2Int, Vector2Int>)null);
-                break;
-            }
-
-            case MazePatternType.DrunkenStrokes:
-            {
-                growth = CosmicDustMazePatterns.BuildDrunkenStrokes(
-                    width: w,
-                    height: h,
-                    strokes: config.drunkenStrokes.strokes,
-                    maxLen: config.drunkenStrokes.maxLen,
-                    stepJitter: config.drunkenStrokes.jitter,
-                    dilate: config.drunkenStrokes.dilate,
-                    getHexDirectionsByRow: getDirsByRow,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.DiagonalLanes:
-            {
-                growth = CosmicDustMazePatterns.BuildPopDots(
-                    width: w,
-                    height: h,
-                    step: config.diagonalLanes.step,
-                    phaseOffset: Random.Range(0, config.diagonalLanes.step),
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.Tunnels:
-            {
-                growth = CosmicDustMazePatterns.BuildPacManTunnels(
-                    width: w,
-                    height: h,
-                    corridorStep: config.tunnels.corridorStep,
-                    corridorWidth: config.tunnels.corridorWidth,
-                    gridToWorld: gridToWorld,
-                    isCellAvailable: isCellAvailable,
-                    includeWorld: includeWorld);
-                break;
-            }
-
-            case MazePatternType.FullFill:
-            default:
-            {
-                var rect = new List<(Vector2Int, Vector3)>(w * h);
-                for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                {
-                    if (!drums.IsSpawnCellAvailable(x, y)) continue;
-                    var gp = new Vector2Int(x, y);
-                    if (reservedCells != null && reservedCells.Contains(gp)) continue;
-                    if (_permanentClearCells != null && _permanentClearCells.Contains(gp)) continue;
-                    if (IsKeepClearCell(gp)) continue;
-                    var world = drums.GridToWorldPosition(gp);
-                    if (!IsWorldPositionInsideScreen(world)) continue;
-                    rect.Add((gp, world));
-                }
-                growth = rect;
-                break;
-            }
-        }
-
-        if (growth == null)
-            growth = new List<(Vector2Int, Vector3)>();
-
-        // Porous border: union border-wall cells into growth before the final filter.
-        if (config != null && config.porousBorder.exitCount >= 0)
-        {
-            var borderCells = CosmicDustMazePatterns.BuildPorousBorderCells(
-                width: w,
-                height: h,
-                exitCount: config.porousBorder.exitCount,
-                isCellAvailable: isCellAvailable);
-
-            var growthSet = new HashSet<Vector2Int>(growth.Count);
-            for (int i = 0; i < growth.Count; i++)
-                growthSet.Add(growth[i].cell);
-
-            foreach (var cell in borderCells)
-            {
-                if (growthSet.Contains(cell)) continue;
-                growth.Add((cell, gridToWorld(cell)));
-                growthSet.Add(cell);
-            }
+            var world = drums.GridToWorldPosition(gp);
+            if (!IsWorldPositionInsideScreen(world)) continue;
+            growth.Add((gp, world));
         }
 
         // Final filter: enforce reserved/permanent/keep-clear even if a pattern emitted them.
@@ -1307,10 +1178,7 @@ private void BuildMazeRoleImprints(
 
     _hiddenImprints.Clear();
 
-    // Use only the ACTUAL occupied maze cells as the Voronoi domain.
-    var occupied = new List<Vector2Int>(cells.Count);
-    for (int i = 0; i < cells.Count; i++)
-        occupied.Add(cells[i].cell);
+    var occupied = BuildOccupiedCells(cells);
 
     // Single-role motif: trivial assignment.
     if (rolesList.Count == 1)
@@ -1338,11 +1206,45 @@ private void BuildMazeRoleImprints(
     // region is only a subset of the full spawn grid.
     // ------------------------------------------------------------
 
+    var (seedCells, seedRoles, actualSeedCount) = SelectRoleSeeds(occupied, rolesList, starCell);
+
+    // Assign each occupied cell to the nearest chosen seed.
+    AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedRoles, actualSeedCount);
+
+    // Helpful distribution log for validation.
+    var counts = new Dictionary<MusicalRole, int>();
+    for (int i = 0; i < actualSeedCount; i++)
+        counts[seedRoles[i]] = 0;
+
+    foreach (var kv in _hiddenImprints)
+    {
+        if (!counts.ContainsKey(kv.Value))
+            counts[kv.Value] = 0;
+        counts[kv.Value]++;
+    }
+
+    string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
+    Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
+}
+
+private static List<Vector2Int> BuildOccupiedCells(List<(Vector2Int cell, Vector3 world)> cells)
+{
+    var occupied = new List<Vector2Int>(cells.Count);
+    for (int i = 0; i < cells.Count; i++)
+        occupied.Add(cells[i].cell);
+    return occupied;
+}
+
+private static (Vector2Int[] seedCells, MusicalRole[] seedRoles, int actualSeedCount) SelectRoleSeeds(
+    List<Vector2Int> occupied,
+    List<MusicalRole> rolesList,
+    Vector2Int starCell)
+{
     int seedCount = Mathf.Min(rolesList.Count, occupied.Count);
     var seedCells = new Vector2Int[seedCount];
     var seedRoles = new MusicalRole[seedCount];
+    if (seedCount <= 0) return (seedCells, seedRoles, 0);
 
-    // Seed 0: farthest occupied cell from the star.
     int firstSeedIdx = 0;
     float bestStarDist = float.MinValue;
     for (int i = 0; i < occupied.Count; i++)
@@ -1358,7 +1260,6 @@ private void BuildMazeRoleImprints(
     seedCells[0] = occupied[firstSeedIdx];
     seedRoles[0] = rolesList[0];
 
-    // Remaining seeds: farthest-point sampling from already chosen seeds.
     var chosen = new HashSet<Vector2Int> { seedCells[0] };
 
     for (int s = 1; s < seedCount; s++)
@@ -1394,11 +1295,15 @@ private void BuildMazeRoleImprints(
         chosen.Add(seedCells[s]);
     }
 
-    // If there are more roles than distinct available seed positions, assign only the seeds
-    // we could actually place. This is defensive and should be rare.
-    int actualSeedCount = chosen.Count;
+    return (seedCells, seedRoles, chosen.Count);
+}
 
-    // Assign each occupied cell to the nearest chosen seed.
+private void AssignHiddenImprintsByNearestSeed(
+    List<Vector2Int> occupied,
+    Vector2Int[] seedCells,
+    MusicalRole[] seedRoles,
+    int actualSeedCount)
+{
     for (int i = 0; i < occupied.Count; i++)
     {
         Vector2Int gp = occupied[i];
@@ -1418,21 +1323,6 @@ private void BuildMazeRoleImprints(
 
         _hiddenImprints[gp] = seedRoles[bestSeed];
     }
-
-    // Helpful distribution log for validation.
-    var counts = new Dictionary<MusicalRole, int>();
-    for (int i = 0; i < actualSeedCount; i++)
-        counts[seedRoles[i]] = 0;
-
-    foreach (var kv in _hiddenImprints)
-    {
-        if (!counts.ContainsKey(kv.Value))
-            counts[kv.Value] = 0;
-        counts[kv.Value]++;
-    }
-
-    string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-    Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
 }
     public void ResetMazeGenerationFlag()
     {
