@@ -54,6 +54,13 @@ public class MineNodeDustInteractor : MonoBehaviour
         new( 1, 0), new(-1, 0), new( 0, 1), new( 0,-1)
     };
 
+    private static readonly Vector2Int[] kNeighbours8 =
+    {
+        new(-1,-1), new(0,-1), new(1,-1),
+        new(-1, 0),            new(1, 0),
+        new(-1, 1), new(0, 1), new(1, 1),
+    };
+
     // ---------------------------------------------------------------
     // Existing carve state
     // ---------------------------------------------------------------
@@ -120,14 +127,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 
             // Push back toward the nearest open (non-dust) neighboring cell so the node
             // can't remain embedded in a wall — this is the complement of the edge-hug force.
-            Vector2 escapeDir = Vector2.zero;
-            for (int dx = -1; dx <= 1; dx++)
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                if (dx == 0 && dy == 0) continue;
-                if (!_drumTrack.HasDustAt(cell + new Vector2Int(dx, dy)))
-                    escapeDir += new Vector2(dx, dy);
-            }
+            Vector2 escapeDir = SumNeighborDirections(cell, requireDust: false);
             if (escapeDir.sqrMagnitude > 0.0001f)
             {
                 _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
@@ -188,13 +188,9 @@ public class MineNodeDustInteractor : MonoBehaviour
         MusicalRole role = _node.GetImprintRole();
 
         // Paint any adjacent dust with our role at reduced energy (exhaust trail)
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
+        for (int i = 0; i < kNeighbours8.Length; i++)
         {
-            if (dx == 0 && dy == 0) continue;
-
-            var neighbor = cell + new Vector2Int(dx, dy);
-
+            var neighbor = cell + kNeighbours8[i];
             if (!_drumTrack.HasDustAt(neighbor)) continue;
             if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
 
@@ -206,20 +202,8 @@ public class MineNodeDustInteractor : MonoBehaviour
         // and edge-hug would directly cancel it by pushing back toward the wall.
         if (!inDust)
         {
-            Vector2 edgeDir           = Vector2.zero;
-            int     dustNeighborCount = 0;
-            for (int dx = -1; dx <= 1; dx++)
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                if (dx == 0 && dy == 0) continue;
-                var neighbor = cell + new Vector2Int(dx, dy);
-                if (_drumTrack.HasDustAt(neighbor))
-                {
-                    edgeDir += new Vector2(dx, dy);
-                    dustNeighborCount++;
-                }
-            }
-            if (dustNeighborCount > 0)
+            Vector2 edgeDir = SumNeighborDirections(cell, requireDust: true);
+            if (edgeDir.sqrMagnitude > 0.0001f)
                 _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
     }
@@ -336,6 +320,20 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (!gen.TryGetCellGo(gp, out var go) || go == null) return false;
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return false;
         return dust.Role == _node.GetImprintRole();
+    }
+
+
+    private Vector2 SumNeighborDirections(Vector2Int center, bool requireDust)
+    {
+        Vector2 dir = Vector2.zero;
+        for (int i = 0; i < kNeighbours8.Length; i++)
+        {
+            var offset = kNeighbours8[i];
+            bool hasDust = _drumTrack.HasDustAt(center + offset);
+            if (hasDust == requireDust)
+                dir += new Vector2(offset.x, offset.y);
+        }
+        return dir;
     }
 
     public void SetLevelAuthority(DrumTrack drumTrack)
