@@ -44,22 +44,6 @@ public class Boundaries : MonoBehaviour
                 new Vector2(screenHalfWidth * 2f, topBoundary.size.y);
         }
 
-        if (leftBoundary != null)
-        {
-            leftBoundary.transform.position =
-                new Vector3(-screenHalfWidth - (leftBoundary.size.x * 0.5f), 0f, 0f);
-            leftBoundary.size =
-                new Vector2(leftBoundary.size.x, screenHalfHeight * 2f);
-        }
-
-        if (rightBoundary != null)
-        {
-            rightBoundary.transform.position =
-                new Vector3(screenHalfWidth + (rightBoundary.size.x * 0.5f), 0f, 0f);
-            rightBoundary.size =
-                new Vector2(rightBoundary.size.x, screenHalfHeight * 2f);
-        }
-
         if (bottomBoundary != null)
         {
             bottomBoundary.transform.position =
@@ -67,6 +51,8 @@ public class Boundaries : MonoBehaviour
             bottomBoundary.size =
                 new Vector2(screenHalfWidth * 2f, bottomBoundary.size.y);
         }
+
+        LayoutSideBoundaries(screenHalfWidth, screenHalfHeight);
 
         Debug.Log($"[BOUNDARIES] Boundaries constructed");
 
@@ -126,5 +112,38 @@ public class Boundaries : MonoBehaviour
             new Vector3(0f, centerY, 0f);
         bottomBoundary.size =
             new Vector2(screenHalfWidth * 2f, thickness);
+
+        LayoutSideBoundaries(screenHalfWidth, screenHalfHeight);
+    }
+
+    private void LayoutSideBoundaries(float screenHalfWidth, float screenHalfHeight)
+    {
+        float topY = screenHalfHeight;
+        float bottomY = -screenHalfHeight;
+
+        if (topBoundary != null)
+            topY = topBoundary.transform.position.y - (topBoundary.size.y * 0.5f);
+
+        if (bottomBoundary != null)
+            bottomY = bottomBoundary.transform.position.y + (bottomBoundary.size.y * 0.5f);
+
+        float sideHeight = Mathf.Max(0.1f, topY - bottomY);
+        float sideCenterY = (topY + bottomY) * 0.5f;
+
+        if (leftBoundary != null)
+        {
+            leftBoundary.transform.position =
+                new Vector3(-screenHalfWidth - (leftBoundary.size.x * 0.5f), sideCenterY, 0f);
+            leftBoundary.size =
+                new Vector2(leftBoundary.size.x, sideHeight);
+        }
+
+        if (rightBoundary != null)
+        {
+            rightBoundary.transform.position =
+                new Vector3(screenHalfWidth + (rightBoundary.size.x * 0.5f), sideCenterY, 0f);
+            rightBoundary.size =
+                new Vector2(rightBoundary.size.x, sideHeight);
+        }
     }
 }
