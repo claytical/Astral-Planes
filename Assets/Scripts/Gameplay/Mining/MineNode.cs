@@ -346,10 +346,26 @@ public class MineNode : MonoBehaviour
         Vector2 correction = legalWorld - hitPos;
         float leakDistanceCells = correction.magnitude;
         if (leakDistanceCells <= boundaryLeakToleranceCells) return;
+
         float maxCorr = Mathf.Max(0f, maxCorrectionPerTick);
         if (maxCorr <= 0f) return;
-        correction = Vector2.ClampMagnitude(correction, maxCorr);
-        _rb.position += correction;
+
+        Vector2 depenDir = correction.normalized;
+        float depenMagnitude = Mathf.Min(maxCorr, leakDistanceCells);
+
+        // Push out over time instead of snapping position.
+        // This keeps containment deterministic while preserving smooth motion.
+        float depenSpeed = depenMagnitude / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        Vector2 desiredDepenVelocity = depenDir * depenSpeed;
+
+        // Remove any velocity component that continues into the blocked region.
+        float inwardSpeed = Vector2.Dot(_rb.linearVelocity, -depenDir);
+        if (inwardSpeed > 0f)
+            _rb.linearVelocity += depenDir * inwardSpeed;
+
+        Vector2 depenDeltaV = desiredDepenVelocity - Vector2.Project(_rb.linearVelocity, depenDir);
+        Vector2 depenForce = depenDeltaV * _rb.mass / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        _rb.AddForce(depenForce, ForceMode2D.Force);
     }
 
     private Vector2Int FindNearestLegalCell(Vector2Int fromCell, int radius)
