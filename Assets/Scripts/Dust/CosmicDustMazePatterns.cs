@@ -552,6 +552,7 @@ public static class CosmicDustMazePatterns
 
         exitCount = Mathf.Max(0, exitCount);
         var gapCells = new HashSet<Vector2Int>();
+        const int minGapLength = 2;
 
         if (exitCount > 0)
         {
@@ -562,7 +563,29 @@ public static class CosmicDustMazePatterns
                 int segEnd   = Mathf.RoundToInt((seg + 1) * (n / (float)exitCount));
                 segEnd = Mathf.Min(segEnd, n);
                 if (segEnd <= segStart) segEnd = Mathf.Min(segStart + 1, n);
-                gapCells.Add(perimeter[Random.Range(segStart, segEnd)]);
+
+                int firstIndex = Random.Range(segStart, segEnd);
+                gapCells.Add(perimeter[firstIndex]);
+
+                if (n < minGapLength) continue;
+
+                int secondIndex;
+                if (firstIndex + 1 < segEnd)
+                {
+                    secondIndex = firstIndex + 1;
+                }
+                else if (firstIndex - 1 >= segStart)
+                {
+                    secondIndex = firstIndex - 1;
+                }
+                else
+                {
+                    // Extremely short segment (length 1): spill to adjacent perimeter cell
+                    // so each porous opening is still visibly at least two cells long.
+                    secondIndex = (firstIndex + 1) % n;
+                }
+
+                gapCells.Add(perimeter[secondIndex]);
             }
         }
 
