@@ -138,7 +138,12 @@ public class MineNodeDustInteractor : MonoBehaviour
             }
         }
 
-        if (!carveMaze) return;
+        if (!carveMaze)
+        {
+            _prevPos = _rb.position;
+            _hasPrevPos = true;
+            return;
+        }
 
         // ---------------------------------------------------------------
         // None-hunter: retarget tick (no budget gate — runs indefinitely)
