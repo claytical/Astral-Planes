@@ -106,6 +106,28 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (_hasPrevPos)
             EnforceSweptContainment(_prevPos, _rb.position);
 
+
+        if (_drumTrack.TryGetPlayAreaWorld(out var area))
+        {
+            const float kBoundaryInset = 0.05f;
+            Vector2 clamped = new Vector2(
+                Mathf.Clamp(_rb.position.x, area.left + kBoundaryInset, area.right - kBoundaryInset),
+                Mathf.Clamp(_rb.position.y, area.bottom + kBoundaryInset, area.top - kBoundaryInset));
+            if ((clamped - _rb.position).sqrMagnitude > 0.000001f)
+            {
+                Vector2 correction = clamped - _rb.position;
+                _rb.position = clamped;
+
+                if (correction.sqrMagnitude > 0.000001f)
+                {
+                    Vector2 outward = correction.normalized;
+                    float outwardSpeed = Vector2.Dot(_rb.linearVelocity, -outward);
+                    if (outwardSpeed > 0f)
+                        _rb.linearVelocity += outward * outwardSpeed;
+                }
+            }
+        }
+
         Vector2    worldPos = _rb.position;
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
         bool       inDust   = _drumTrack.HasDustAt(cell);
