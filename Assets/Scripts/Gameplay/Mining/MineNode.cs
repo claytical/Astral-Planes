@@ -40,6 +40,10 @@ public class MineNode : MonoBehaviour
     [SerializeField, Min(0f)] private float separationAccel = 30f;
     [Tooltip("Penetration dead zone in world units; below this no separation force is applied.")]
     [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
+    [Tooltip("How quickly inward wall velocity is damped (normalized to 50 Hz).")]
+    [SerializeField, Min(0f)] private float inwardVelocityDamping = 0.65f;
+    [Tooltip("Maximum inward speed removed per physics tick when damping wall penetration.")]
+    [SerializeField, Min(0f)] private float maxVelocityCorrectionPerTick = 2.5f;
 
     [Header("Expiry")]
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
@@ -337,14 +341,12 @@ public class MineNode : MonoBehaviour
         if (tangent.sqrMagnitude > 0.0001f)
         {
             tangent.Normalize();
-            float tangentSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
-            _rb.linearVelocity = tangent * tangentSpeed;
+            Vector2 wallNormal = new Vector2(-tangent.y, tangent.x);
+            if (Vector2.Dot(_rb.linearVelocity, wallNormal) > 0f)
+                wallNormal = -wallNormal;
+            ApplyInwardVelocityDamping(wallNormal);
             if (_carveDir.sqrMagnitude > 0.001f)
                 _carveDir = Vector2.Lerp(_carveDir, tangent * Mathf.Sign(Vector2.Dot(_carveDir, tangent)), 0.6f).normalized;
-        }
-        else
-        {
-            _rb.linearVelocity = Vector2.zero;
         }
 
         Vector2Int legal = FindNearestLegalCell(blockedCell, 4);
@@ -369,7 +371,7 @@ public class MineNode : MonoBehaviour
 
         float inwardSpeed = Vector2.Dot(_rb.linearVelocity, -depenDir);
         if (inwardSpeed > 0f)
-            _rb.linearVelocity += depenDir * inwardSpeed;
+            ApplyInwardVelocityDamping(depenDir);
 
         float velocityAlongDepen = Vector2.Dot(_rb.linearVelocity, depenDir);
         Vector2 currentDepenVelocity = depenDir * velocityAlongDepen;
@@ -377,6 +379,24 @@ public class MineNode : MonoBehaviour
         float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
         Vector2 accelDeltaV = Vector2.ClampMagnitude(depenDeltaV, maxDeltaSpeed);
         _rb.AddForce((accelDeltaV / dt) * _rb.mass, ForceMode2D.Force);
+    }
+
+    private void ApplyInwardVelocityDamping(Vector2 wallNormal)
+    {
+        if (wallNormal.sqrMagnitude <= 0.0001f) return;
+        wallNormal.Normalize();
+
+        Vector2 velocity = _rb.linearVelocity;
+        float inwardSpeed = -Vector2.Dot(velocity, wallNormal);
+        if (inwardSpeed <= 0f) return;
+
+        float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        float normalizedTick = dt / 0.02f;
+        float dampingFraction = 1f - Mathf.Exp(-Mathf.Max(0f, inwardVelocityDamping) * normalizedTick);
+        float maxRemoval = Mathf.Max(0f, maxVelocityCorrectionPerTick) * normalizedTick;
+        float removeSpeed = Mathf.Min(inwardSpeed, Mathf.Min(inwardSpeed * dampingFraction, maxRemoval));
+
+        _rb.linearVelocity = velocity + wallNormal * removeSpeed;
     }
 
     private Vector2Int FindNearestLegalCell(Vector2Int fromCell, int radius)

@@ -30,6 +30,10 @@ public class MineNodeDustInteractor : MonoBehaviour
     [SerializeField, Min(0f)] private float separationAccel = 30f;
     [Tooltip("Penetration dead zone in world units; below this no separation is applied.")]
     [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
+    [Tooltip("How quickly inward wall velocity is damped (normalized to 50 Hz).")]
+    [SerializeField, Min(0f)] private float inwardVelocityDamping = 0.65f;
+    [Tooltip("Maximum inward speed removed per physics tick when damping wall penetration.")]
+    [SerializeField, Min(0f)] private float maxVelocityCorrectionPerTick = 2.5f;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -140,7 +144,7 @@ public class MineNodeDustInteractor : MonoBehaviour
                 Vector2 wallNormal  = escapeDir.normalized;
                 float   intoWallVel = Vector2.Dot(_rb.linearVelocity, wallNormal);
                 if (intoWallVel < 0f)
-                    _rb.linearVelocity -= wallNormal * intoWallVel;
+                    ApplyInwardVelocityDamping(wallNormal);
             }
         }
 
@@ -227,16 +231,20 @@ public class MineNodeDustInteractor : MonoBehaviour
             if (!_drumTrack.HasDustAt(sampleCell)) continue;
 
             Vector2 tangent = new Vector2(-delta.y, delta.x);
+            Vector2 wallNormal = Vector2.zero;
             if (tangent.sqrMagnitude > 0.0001f)
             {
                 tangent.Normalize();
-                float tangentialSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
-                _rb.linearVelocity = tangent * tangentialSpeed;
+                wallNormal = new Vector2(-tangent.y, tangent.x);
+                if (Vector2.Dot(_rb.linearVelocity, wallNormal) > 0f)
+                    wallNormal = -wallNormal;
             }
             else
             {
-                _rb.linearVelocity = Vector2.zero;
+                wallNormal = delta.sqrMagnitude > 0.0001f ? -delta.normalized : Vector2.zero;
             }
+            if (wallNormal.sqrMagnitude > 0.0001f)
+                ApplyInwardVelocityDamping(wallNormal);
 
             Vector2Int legal = FindNearestOpenCell(sampleCell, 4);
             Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
@@ -416,5 +424,23 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         if (_rb == null || _drumTrack == null) return false;
         return _drumTrack.HasDustAt(_drumTrack.CellOf(_rb.position));
+    }
+
+    private void ApplyInwardVelocityDamping(Vector2 wallNormal)
+    {
+        if (wallNormal.sqrMagnitude <= 0.0001f) return;
+        wallNormal.Normalize();
+
+        Vector2 velocity = _rb.linearVelocity;
+        float inwardSpeed = -Vector2.Dot(velocity, wallNormal);
+        if (inwardSpeed <= 0f) return;
+
+        float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        float normalizedTick = dt / 0.02f;
+        float dampingFraction = 1f - Mathf.Exp(-Mathf.Max(0f, inwardVelocityDamping) * normalizedTick);
+        float maxRemoval = Mathf.Max(0f, maxVelocityCorrectionPerTick) * normalizedTick;
+        float removeSpeed = Mathf.Min(inwardSpeed, Mathf.Min(inwardSpeed * dampingFraction, maxRemoval));
+
+        _rb.linearVelocity = velocity + wallNormal * removeSpeed;
     }
 }
