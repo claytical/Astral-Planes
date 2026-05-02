@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum MineNodeState { Drifting, Fleeing }
+public enum MineNodeBehaviorIntent { Thinking, Committing, Escaping }
 
 public class MineNode : MonoBehaviour
 {
@@ -39,11 +40,13 @@ public class MineNode : MonoBehaviour
     [SerializeField, Min(0)] private int expireAfterLoops = 3;
 
     public event System.Action<MineNode> OnResolved;
+    public event System.Action<MineNodeBehaviorIntent> OnBehaviorIntentChanged;
 
     public bool WasCaptured { get; private set; }
     public bool WasEscaped  { get; private set; }
     public MineNodeState State { get; private set; } = MineNodeState.Drifting;
     public DrumTrack DrumTrack => _drumTrack;
+    public MineNodeLocomotionProfile ActiveLocomotionProfile => _activeLocomotionProfile;
 
     private Vector2Int _spawnCell;
     private float _nextEscapeAllowedTime = 0f;
@@ -77,6 +80,7 @@ public class MineNode : MonoBehaviour
     private MineNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
     private float _nextDirectionDecisionAt;
     private float _pathCommitUntil;
+    private MineNodeBehaviorIntent _behaviorIntent = MineNodeBehaviorIntent.Thinking;
 
     // Motion tunables (previously local consts in FixedUpdate)
     private const float kStallSpeed        = 0.20f;
@@ -109,6 +113,7 @@ public class MineNode : MonoBehaviour
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
         _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
         _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
+        SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         if (_drumTrack != null)
         {
@@ -196,6 +201,7 @@ public class MineNode : MonoBehaviour
     {
         if (_depletedHandled || _resolvedFired) return;
         WasEscaped = true;
+        SetBehaviorIntent(MineNodeBehaviorIntent.Escaping);
         Debug.Log($"[MineNode] {name} — escaped through boundary.");
         FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy());
@@ -418,7 +424,14 @@ public class MineNode : MonoBehaviour
     private void RunCorridorLookahead(Vector2Int myCell)
     {
         if (Time.time < _nextDirectionDecisionAt || Time.time < _pathCommitUntil)
+        {
+            if (_behaviorIntent != MineNodeBehaviorIntent.Committing)
+                SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
             return;
+        }
+
+        if (_behaviorIntent != MineNodeBehaviorIntent.Thinking)
+            SetBehaviorIntent(MineNodeBehaviorIntent.Thinking);
 
         _rescanTimer -= Time.fixedDeltaTime;
 
@@ -487,6 +500,7 @@ public class MineNode : MonoBehaviour
             _carveDir = Rotate(bestDir.normalized, jitter).normalized;
             _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
             _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
+            SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
         }
     }
 
@@ -653,6 +667,14 @@ public class MineNode : MonoBehaviour
         int note    = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         _track.PlayNote127(note, 200, 0.5f);
         if (GetComponent<Explode>() != null) GetComponent<Explode>().PreExplode();
+    }
+
+
+    private void SetBehaviorIntent(MineNodeBehaviorIntent intent)
+    {
+        if (_behaviorIntent == intent) return;
+        _behaviorIntent = intent;
+        OnBehaviorIntentChanged?.Invoke(intent);
     }
 
     private IEnumerator CleanupAndDestroy()
