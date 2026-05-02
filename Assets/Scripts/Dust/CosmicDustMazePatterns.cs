@@ -519,7 +519,7 @@ public static class CosmicDustMazePatterns
 
     /// <summary>
     /// Builds the set of border cells that should be filled as dust walls.
-    /// Covers the 3 non-bottom edges: top row, right column, left column (y=1..h-2).
+    /// Covers the top row and full side columns, including bottom corners.
     /// <paramref name="exitCount"/> evenly-spaced gaps are punched out using segment-based
     /// distribution so exits are spread across the perimeter rather than clustered.
     /// </summary>
@@ -540,12 +540,12 @@ public static class CosmicDustMazePatterns
 
         // Right column: descending, skipping top-right corner already added
         if (height >= 2)
-            for (int y = height - 2; y >= 1; y--)
+            for (int y = height - 2; y >= 0; y--)
                 perimeter.Add(new Vector2Int(width - 1, y));
 
         // Left column: descending, skipping top-left corner already added
         if (height >= 2)
-            for (int y = height - 2; y >= 1; y--)
+            for (int y = height - 2; y >= 0; y--)
                 perimeter.Add(new Vector2Int(0, y));
 
         if (perimeter.Count == 0) return result;
