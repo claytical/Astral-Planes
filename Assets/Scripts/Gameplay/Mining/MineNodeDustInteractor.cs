@@ -253,16 +253,16 @@ public class MineNodeDustInteractor : MonoBehaviour
             float deadZone = Mathf.Max(0f, separationDeadZone);
             if (correctionMag <= deadZone) return;
 
-            Vector2 wallNormal = correctionMag > 0.0001f ? correction / correctionMag : Vector2.zero;
-            float normalCorrection = Vector2.Dot(correction, wallNormal);
+            Vector2 correctionNormal = correctionMag > 0.0001f ? correction / correctionMag : Vector2.zero;
+            float normalCorrection = Vector2.Dot(correction, correctionNormal);
             if (normalCorrection <= deadZone) return;
 
             float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
             float desiredDistance = Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), normalCorrection - deadZone);
             float targetSpeed = Mathf.Min(Mathf.Max(0f, maxSeparationSpeed), desiredDistance / dt);
-            Vector2 targetVelocity = wallNormal * targetSpeed;
-            float currentNormalSpeed = Vector2.Dot(_rb.linearVelocity, wallNormal);
-            Vector2 currentNormalVelocity = wallNormal * currentNormalSpeed;
+            Vector2 targetVelocity = correctionNormal * targetSpeed;
+            float currentNormalSpeed = Vector2.Dot(_rb.linearVelocity, correctionNormal);
+            Vector2 currentNormalVelocity = correctionNormal * currentNormalSpeed;
             Vector2 deltaVelocity = targetVelocity - currentNormalVelocity;
             float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
             Vector2 accelDelta = Vector2.ClampMagnitude(deltaVelocity, maxDeltaSpeed);
