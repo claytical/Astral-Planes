@@ -16468,7 +16468,7 @@ MonoBehaviour:
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
-  _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.6509804}
+  _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.2901961}
   toroidal: 0
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12

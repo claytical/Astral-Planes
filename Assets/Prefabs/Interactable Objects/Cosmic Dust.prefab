@@ -49,26 +49,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f6882bf26df24f008ea696115f23e45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _timings:
-    spriteScaleInSeconds: 0.2
-    spriteScaleOutSeconds: 0.2
-    particleGrowInSeconds: 1
-    fadeOutSeconds: 0.2
-  dustPluckSwellSeconds: 1.4
-  dustPluckMinDurationTicks: 360
-  dustPluckMaxDurationTicks: 1440
-  dustPluckMinVelocity127: 40
-  dustPluckMaxVelocity127: 70
-  dustPluckMinCooldownSeconds: 0.8
-  dustPluckMaxCooldownSeconds: 2
-  _chargeColor: {r: 1, g: 1, b: 1, a: 1}
+  pluck:
+    swellSeconds: 1.4
+    minDurationTicks: 360
+    maxDurationTicks: 1440
+    minVelocity127: 40
+    maxVelocity127: 70
+    minCooldownSeconds: 0.8
+    maxCooldownSeconds: 2
+  noseCompression:
+    enabled: 1
+    compressAmount: 0.22
+    bulgeAmount: 0.1
+    maxOffsetWorld: 0.16
+    probeWorld: 0.55
+    speedForFull: 10
+    boostBonus: 0.2
+    contactGraceSeconds: 0.075
+    minimumVisibleSeconds: 0.05
+    attackSharpness: 10
+    releaseSharpness: 16
+  _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
   regrowAlphaCapped: 0
   colliderDisabledAlpha: 0.08
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
-    particleFootprintMul: 0.68
+    particleFootprintMul: 0.5
     sprite: {fileID: 8999714297043290424}
   interaction:
     energyDrainPerSecond: 0
@@ -78,17 +86,6 @@ MonoBehaviour:
     drainResistance01: 0
   useWorkShaderParams: 1
   terrainCollider: {fileID: 0}
-  enableVehicleCompression: 1
-  noseCompressAmount: 0.22
-  noseBulgeAmount: 0.1
-  noseCompressMaxOffsetWorld: 0.16
-  noseProbeWorld: 0.55
-  noseCompressSpeedForFull: 10
-  noseCompressBoostBonus: 0.2
-  noseContactGraceSeconds: 0.075
-  noseMinimumVisibleSeconds: 0.05
-  noseCompressAttackSharpness: 10
-  noseCompressReleaseSharpness: 16
   _baseEmission: 10
   denyPulseDefaultSeconds: 0.25
 --- !u!114 &8747843313378906591
@@ -382,7 +379,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 0.011764706}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.5019608}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -446,7 +443,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.42
+      scalar: 0.2
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -831,7 +828,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 1, y: 1, z: 1}
+    m_Scale: {x: 0.5, y: 0.5, z: 0.5}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
@@ -1029,7 +1026,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 760
+      scalar: 260
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -5035,7 +5032,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6293350662635880757}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -5076,9 +5073,9 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 6485846461334653488, guid: 43dc102d976b24668a4c8bf47427b57d,
+  m_Sprite: {fileID: 7476157650917278790, guid: c414f77bbc0ce4375b2a81edf31f558d,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.49803922}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.23921569}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

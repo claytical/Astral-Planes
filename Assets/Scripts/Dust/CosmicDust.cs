@@ -73,7 +73,7 @@ public partial class CosmicDust : MonoBehaviour {
     [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
-    private const float kRegrowAlphaCap = 0.35f;
+    private const float kRegrowAlphaCap = 0.25f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
     private const float kSolidAlphaFloor = .55f;
     [Serializable]
@@ -200,6 +200,7 @@ private Coroutine _jiggleRoutine;
             {
                 _currentTint = visual.sprite.color;
                 _displayTint = _currentTint;
+                _displayTint.a = kRegrowAlphaCap;
                 _dustSpriteBaseLocalPos = visual.sprite.transform.localPosition;
             }
             
@@ -517,7 +518,14 @@ private Coroutine _jiggleRoutine;
         if (visual.sprite != null)
         {
             Color c = _displayTint;
-            c.a = enabled ? _currentTint.a : colliderDisabledAlpha;
+            if (enabled)
+            {
+                c.a = kRegrowAlphaCap;
+            }
+            else
+            {
+                c.a = colliderDisabledAlpha;
+            }
             ApplyDisplayedTint(c);
         }
 
