@@ -5,8 +5,8 @@ using System.Collections.Generic;
 public class MineNodeDustInteractor : MonoBehaviour
 {
     [Header("Multipliers while in dust (node-specific)")]
-    [Tooltip("Clamp max speed while inside dust (multiplies your locomotion maxSpeed).")]
-    public float speedCapMul = 0.9f;
+    [Tooltip("Environment feedback scalar consumed by MineNode locomotion while in dust.")]
+    [Range(0f, 1f)] public float dustDragScalar = 0.85f;
 
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
     public float extraBrake = 0.25f;
@@ -71,9 +71,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     private Rigidbody2D _rb;
     private DrumTrack   _drumTrack;
     private MineNode    _node;
-    private float _desiredSpeed     = 0f;
-    private float _desiredSpeedFloor = 0.25f;
-
     private bool _prevInDust;
 
     // ---------------------------------------------------------------
@@ -115,13 +112,6 @@ public class MineNodeDustInteractor : MonoBehaviour
         // ---------------------------------------------------------------
         if (inDust)
         {
-            float desired = Mathf.Max(_desiredSpeed, _desiredSpeedFloor);
-            float cap     = desired * Mathf.Max(0.05f, speedCapMul);
-            float speed   = _rb.linearVelocity.magnitude;
-
-            if (speed > cap && speed > 0.0001f)
-                _rb.linearVelocity = _rb.linearVelocity.normalized * cap;
-
             if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
                 _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
 
@@ -341,8 +331,9 @@ public class MineNodeDustInteractor : MonoBehaviour
         _drumTrack = drumTrack;
     }
 
-    public void SetDesiredSpeed(float desiredSpeed)
+    public bool IsInDustAtCurrentCell()
     {
-        _desiredSpeed = Mathf.Max(0f, desiredSpeed);
+        if (_rb == null || _drumTrack == null) return false;
+        return _drumTrack.HasDustAt(_drumTrack.CellOf(_rb.position));
     }
 }
