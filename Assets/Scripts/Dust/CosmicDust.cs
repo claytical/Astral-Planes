@@ -73,7 +73,7 @@ public partial class CosmicDust : MonoBehaviour {
     [SerializeField] private Color _denyColor = Color.magenta;
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
-    private const float kRegrowAlphaCap = 0.25f;
+    private const float kRegrowAlphaCap = 0.20f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
     private const float kSolidAlphaFloor = .55f;
     [Serializable]
