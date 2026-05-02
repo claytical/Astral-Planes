@@ -22,6 +22,8 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
     [SerializeField] private float escapePushForce = 12f;
+    [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
+    [SerializeField] private float maxCorrectionPerTick = 0.5f;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -72,6 +74,8 @@ public class MineNodeDustInteractor : MonoBehaviour
     private DrumTrack   _drumTrack;
     private MineNode    _node;
     private bool _prevInDust;
+    private Vector2 _prevPos;
+    private bool _hasPrevPos;
 
     // ---------------------------------------------------------------
     // Public API
@@ -98,6 +102,9 @@ public class MineNodeDustInteractor : MonoBehaviour
     void FixedUpdate()
     {
         if (_rb == null || _drumTrack == null) return;
+
+        if (_hasPrevPos)
+            EnforceSweptContainment(_prevPos, _rb.position);
 
         Vector2    worldPos = _rb.position;
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
@@ -196,6 +203,56 @@ public class MineNodeDustInteractor : MonoBehaviour
             if (edgeDir.sqrMagnitude > 0.0001f)
                 _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
+
+        _prevPos = _rb.position;
+        _hasPrevPos = true;
+    }
+
+    private void EnforceSweptContainment(Vector2 fromPos, Vector2 toPos)
+    {
+        Vector2 delta = toPos - fromPos;
+        float maxAxis = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y));
+        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 4f), 1, 64);
+        for (int i = 1; i <= steps; i++)
+        {
+            float t = (float)i / steps;
+            Vector2 sample = Vector2.Lerp(fromPos, toPos, t);
+            Vector2Int sampleCell = _drumTrack.CellOf(sample);
+            if (!_drumTrack.HasDustAt(sampleCell)) continue;
+
+            Vector2 tangent = new Vector2(-delta.y, delta.x);
+            if (tangent.sqrMagnitude > 0.0001f)
+            {
+                tangent.Normalize();
+                float tangentialSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
+                _rb.linearVelocity = tangent * tangentialSpeed;
+            }
+            else
+            {
+                _rb.linearVelocity = Vector2.zero;
+            }
+
+            Vector2Int legal = FindNearestOpenCell(sampleCell, 4);
+            Vector2 correction = _drumTrack.GridToWorldPosition(legal) - sample;
+            _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            return;
+        }
+    }
+
+    private Vector2Int FindNearestOpenCell(Vector2Int fromCell, int radius)
+    {
+        if (!_drumTrack.HasDustAt(fromCell)) return fromCell;
+        Vector2Int best = fromCell;
+        float bestDist = float.MaxValue;
+        for (int y = -radius; y <= radius; y++)
+        for (int x = -radius; x <= radius; x++)
+        {
+            var c = fromCell + new Vector2Int(x, y);
+            if (_drumTrack.HasDustAt(c)) continue;
+            float d = x * x + y * y;
+            if (d < bestDist) { bestDist = d; best = c; }
+        }
+        return best;
     }
 
     // ---------------------------------------------------------------

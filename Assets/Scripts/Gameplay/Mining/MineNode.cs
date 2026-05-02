@@ -26,6 +26,12 @@ public class MineNode : MonoBehaviour
     [Header("NoteSet-Driven Motion")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
 
+    [Header("Grid Containment")]
+    [Tooltip("Tolerance in grid cells before forcing containment correction (helps reduce jitter at high speed).")]
+    [SerializeField, Min(0f)] private float boundaryLeakToleranceCells = 0.35f;
+    [Tooltip("Maximum world-space correction applied per FixedUpdate when depenetrating from dust boundary.")]
+    [SerializeField, Min(0f)] private float maxCorrectionPerTick = 0.5f;
+
     [Header("Expiry")]
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
     [SerializeField, Min(0)] private int expireAfterLoops = 3;
@@ -64,6 +70,8 @@ public class MineNode : MonoBehaviour
     private Camera _cam;
     private float _currentDesiredSpeed;
     private bool _hasBeenStruck;
+    private Vector2 _prevPhysicsPos;
+    private bool _hasPrevPhysicsPos;
 
     // Motion tunables (previously local consts in FixedUpdate)
     private const float kStallSpeed        = 0.20f;
@@ -203,10 +211,15 @@ public class MineNode : MonoBehaviour
             case MineNodeState.Drifting: FixedUpdateDrifting(); break;
             case MineNodeState.Fleeing:  FixedUpdateFleeing();  break;
         }
+
+        _prevPhysicsPos = _rb.position;
+        _hasPrevPhysicsPos = true;
     }
 
     private void FixedUpdateDrifting()
     {
+        if (_hasPrevPhysicsPos) EnforceGridContainment(_prevPhysicsPos, _rb.position);
+
         Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
         RunCorridorLookahead(myCell);
 
@@ -218,21 +231,7 @@ public class MineNode : MonoBehaviour
 
     private void FixedUpdateFleeing()
     {
-        // Off-screen escape — fallback for when BoundaryWrap trigger is missed at high velocity.
-        if (_cam == null) _cam = Camera.main;
-        if (_cam != null)
-        {
-            const float kEscapeMargin = 2f;
-            float halfW = _cam.orthographicSize * _cam.aspect;
-            float halfH = _cam.orthographicSize;
-            Vector2 pos = _rb.position;
-            if (pos.x < -halfW - kEscapeMargin || pos.x > halfW + kEscapeMargin ||
-                pos.y < -halfH - kEscapeMargin || pos.y > halfH + kEscapeMargin)
-            {
-                HandleEscape();
-                return;
-            }
-        }
+        if (_hasPrevPhysicsPos) EnforceGridContainment(_prevPhysicsPos, _rb.position);
 
         Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
         RunCorridorLookahead(myCell);
@@ -268,6 +267,88 @@ public class MineNode : MonoBehaviour
 
         RunStallEscape(myCell);
         RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
+
+        // Off-screen escape — fallback for when deterministic containment and boundary trigger are missed.
+        if (_cam == null) _cam = Camera.main;
+        if (_cam != null)
+        {
+            const float kEscapeMargin = 2f;
+            float halfW = _cam.orthographicSize * _cam.aspect;
+            float halfH = _cam.orthographicSize;
+            Vector2 pos = _rb.position;
+            if (pos.x < -halfW - kEscapeMargin || pos.x > halfW + kEscapeMargin ||
+                pos.y < -halfH - kEscapeMargin || pos.y > halfH + kEscapeMargin)
+            {
+                HandleEscape();
+                return;
+            }
+        }
+    }
+
+    private void EnforceGridContainment(Vector2 fromPos, Vector2 toPos)
+    {
+        Vector2 delta = toPos - fromPos;
+        float maxAxis = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y));
+        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 4f), 1, 64);
+
+        Vector2Int blockedCell = default;
+        bool hitBlocked = false;
+        Vector2 hitPos = toPos;
+        for (int i = 1; i <= steps; i++)
+        {
+            float t = (float)i / steps;
+            Vector2 sample = Vector2.Lerp(fromPos, toPos, t);
+            var sampleCell = _drumTrack.WorldToGridPosition(sample);
+            if (_drumTrack.HasDustAt(sampleCell))
+            {
+                hitBlocked = true;
+                blockedCell = sampleCell;
+                hitPos = sample;
+                break;
+            }
+        }
+
+        if (!hitBlocked) return;
+
+        Vector2 tangent = new Vector2(-delta.y, delta.x);
+        if (tangent.sqrMagnitude > 0.0001f)
+        {
+            tangent.Normalize();
+            float tangentSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
+            _rb.linearVelocity = tangent * tangentSpeed;
+            if (_carveDir.sqrMagnitude > 0.001f)
+                _carveDir = Vector2.Lerp(_carveDir, tangent * Mathf.Sign(Vector2.Dot(_carveDir, tangent)), 0.6f).normalized;
+        }
+        else
+        {
+            _rb.linearVelocity = Vector2.zero;
+        }
+
+        Vector2Int legal = FindNearestLegalCell(blockedCell, 4);
+        Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
+        Vector2 correction = legalWorld - hitPos;
+        float leakDistanceCells = correction.magnitude;
+        if (leakDistanceCells <= boundaryLeakToleranceCells) return;
+        float maxCorr = Mathf.Max(0f, maxCorrectionPerTick);
+        if (maxCorr <= 0f) return;
+        correction = Vector2.ClampMagnitude(correction, maxCorr);
+        _rb.position += correction;
+    }
+
+    private Vector2Int FindNearestLegalCell(Vector2Int fromCell, int radius)
+    {
+        if (!_drumTrack.HasDustAt(fromCell)) return fromCell;
+        Vector2Int best = fromCell;
+        float bestDist = float.MaxValue;
+        for (int y = -radius; y <= radius; y++)
+        for (int x = -radius; x <= radius; x++)
+        {
+            var c = fromCell + new Vector2Int(x, y);
+            if (_drumTrack.HasDustAt(c)) continue;
+            float d = x * x + y * y;
+            if (d < bestDist) { bestDist = d; best = c; }
+        }
+        return best;
     }
 
     // ---------------------------------------------------------------
