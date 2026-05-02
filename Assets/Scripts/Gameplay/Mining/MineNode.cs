@@ -21,6 +21,7 @@ public class MineNode : MonoBehaviour
     [SerializeField] private MineNodeLocomotionProfile defaultLocomotionProfile;
     [SerializeField] private MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
     [SerializeField] private string locomotionVariantOverride;
+    [SerializeField] private MineNodeMotionConfig sharedMotionConfig;
 
     [Header("Flee Boundary Targeting")]
     [Tooltip("How strongly fleeing node steers toward the nearest horizontal screen edge.")]
@@ -82,14 +83,14 @@ public class MineNode : MonoBehaviour
     private float _pathCommitUntil;
     private MineNodeBehaviorIntent _behaviorIntent = MineNodeBehaviorIntent.Thinking;
 
-    // Motion tunables (previously local consts in FixedUpdate)
-    private const float kStallSpeed        = 0.20f;
-    private const float kStuckDot          = 0.10f;
-    private const float kEscapeJitterDeg   = 25f;
-    private const float kMinSpeedFloor     = 0.25f;
-    private const float kStallSamplePeriod = 0.40f;
-    private const float kStallDistanceEps  = 0.12f;
-    private const float kEscapeCooldown    = 0.30f;
+
+    private float StallSpeed => sharedMotionConfig != null ? sharedMotionConfig.stallSpeed : 0.20f;
+    private float StuckDot => sharedMotionConfig != null ? sharedMotionConfig.stuckDot : 0.10f;
+    private float EscapeJitterDeg => sharedMotionConfig != null ? sharedMotionConfig.escapeJitterDeg : 25f;
+    private float MinSpeedFloor => sharedMotionConfig != null ? sharedMotionConfig.minSpeedFloor : 0.25f;
+    private float StallSamplePeriod => sharedMotionConfig != null ? sharedMotionConfig.stallSamplePeriod : 0.40f;
+    private float StallDistanceEps => sharedMotionConfig != null ? sharedMotionConfig.stallDistanceEps : 0.12f;
+    private float EscapeCooldown => sharedMotionConfig != null ? sharedMotionConfig.escapeCooldown : 0.30f;
 
     public MusicalRole GetImprintRole() => _role;
 
@@ -376,14 +377,14 @@ public class MineNode : MonoBehaviour
         var profile = _activeLocomotionProfile;
         if (profile == null)
         {
-            float fallback = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, _speed) * speedScale, kMinSpeedFloor);
+            float fallback = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, _speed) * speedScale, MinSpeedFloor);
             Vector2 fallbackForce = (_carveDir * fallback - _rb.linearVelocity) * Mathf.Lerp(3f, 20f, _speed) * _rb.mass;
             _rb.AddForce(fallbackForce, ForceMode2D.Force);
             _currentDesiredSpeed = fallback;
             return;
         }
 
-        float targetSpeed = Mathf.Max(profile.EvaluateTargetSpeed(speedIntensity01) * speedScale, kMinSpeedFloor);
+        float targetSpeed = Mathf.Max(profile.EvaluateTargetSpeed(speedIntensity01) * speedScale, MinSpeedFloor);
         if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
         if (_dustInteractor != null && _dustInteractor.IsInDustAtCurrentCell())
         {
@@ -508,7 +509,7 @@ public class MineNode : MonoBehaviour
     {
         float vMag  = _rb.linearVelocity.magnitude;
         float align = (vMag > 0.0001f) ? Vector2.Dot(_rb.linearVelocity.normalized, _carveDir) : 0f;
-        bool pressedNow = (vMag < kStallSpeed) || (align < kStuckDot);
+        bool pressedNow = (vMag < StallSpeed) || (align < StuckDot);
 
         bool confirmedStall = false;
         if (Time.time >= _nextStallSampleTime)
@@ -517,18 +518,18 @@ public class MineNode : MonoBehaviour
             float   moved = (pos - _lastPosForStall).magnitude;
             if (_nextStallSampleTime > 0f)
             {
-                if (moved < kStallDistanceEps && pressedNow) _stallHits++;
+                if (moved < StallDistanceEps && pressedNow) _stallHits++;
                 else _stallHits = Mathf.Max(0, _stallHits - 1);
                 confirmedStall = (_stallHits >= 1);
             }
             _lastPosForStall     = pos;
-            _nextStallSampleTime = Time.time + kStallSamplePeriod;
+            _nextStallSampleTime = Time.time + StallSamplePeriod;
         }
 
         if (!confirmedStall || Time.time < _nextEscapeAllowedTime) return;
 
         float recoveryScale = Mathf.Lerp(1.25f, 0.4f, _decisionArchetype.stallRecoveryAggressiveness);
-        _nextEscapeAllowedTime = Time.time + (kEscapeCooldown * recoveryScale);
+        _nextEscapeAllowedTime = Time.time + (EscapeCooldown * recoveryScale);
         _stallHits = 0;
 
         Vector2 fwd   = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
@@ -555,7 +556,7 @@ public class MineNode : MonoBehaviour
             _carveDir = Rotate(fwd, UnityEngine.Random.Range(150f, 210f)).normalized;
         }
 
-        float jitter = Mathf.Lerp(kEscapeJitterDeg * 0.5f, kEscapeJitterDeg * 1.5f, _decisionArchetype.stallRecoveryAggressiveness);
+        float jitter = Mathf.Lerp(EscapeJitterDeg * 0.5f, EscapeJitterDeg * 1.5f, _decisionArchetype.stallRecoveryAggressiveness);
         _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(-jitter, jitter)).normalized;
         _rb.linearVelocity *= 0.5f;
     }
@@ -635,6 +636,33 @@ public class MineNode : MonoBehaviour
         float c = Mathf.Cos(r);
         float s = Mathf.Sin(r);
         return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
+    }
+
+    [ContextMenu("Debug/Log Effective Motion Snapshot")]
+    public void LogEffectiveMotionSnapshot()
+    {
+        float targetSpeed = _currentDesiredSpeed;
+        float realizedSpeed = _rb != null ? _rb.linearVelocity.magnitude : 0f;
+        float dragModifier = 1f;
+        float brakeModifier = _activeLocomotionProfile != null ? _activeLocomotionProfile.braking : Mathf.Lerp(3f, 20f, _speed);
+
+        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        if (_dustInteractor != null && _activeLocomotionProfile != null && _dustInteractor.IsInDustAtCurrentCell())
+            dragModifier = Mathf.Lerp(1f, Mathf.Clamp01(_dustInteractor.dustDragScalar), Mathf.Clamp01(_activeLocomotionProfile.dustPenalty));
+
+        Vector2 correction = Vector2.zero;
+        if (_rb != null && _drumTrack != null)
+        {
+            Vector2Int currentCell = _drumTrack.WorldToGridPosition(_rb.position);
+            Vector2Int legal = FindNearestLegalCell(currentCell, 4);
+            correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+        }
+
+        string roleName = _role.ToString();
+        string archetypeName = string.IsNullOrEmpty(_decisionArchetype.id) ? "Unknown" : _decisionArchetype.id;
+        string locomotionName = _activeLocomotionProfile != null ? _activeLocomotionProfile.archetype.ToString() : "Fallback";
+
+        Debug.Log($"[MineNode Snapshot] {name} role={roleName} archetype={archetypeName}/{locomotionName} targetSpeed={targetSpeed:F3} realizedSpeed={realizedSpeed:F3} dragMod={dragModifier:F3} brake={brakeModifier:F3} containmentCorrection=({correction.x:F3},{correction.y:F3})");
     }
 
     // ---------------------------------------------------------------
