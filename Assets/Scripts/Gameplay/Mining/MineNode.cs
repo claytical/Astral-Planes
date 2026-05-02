@@ -371,7 +371,9 @@ public class MineNode : MonoBehaviour
         if (inwardSpeed > 0f)
             _rb.linearVelocity += depenDir * inwardSpeed;
 
-        Vector2 depenDeltaV = desiredDepenVelocity - Vector2.Project(_rb.linearVelocity, depenDir);
+        float velocityAlongDepen = Vector2.Dot(_rb.linearVelocity, depenDir);
+        Vector2 currentDepenVelocity = depenDir * velocityAlongDepen;
+        Vector2 depenDeltaV = desiredDepenVelocity - currentDepenVelocity;
         Vector2 depenForce = depenDeltaV * _rb.mass / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
         _rb.AddForce(depenForce, ForceMode2D.Force);
     }
