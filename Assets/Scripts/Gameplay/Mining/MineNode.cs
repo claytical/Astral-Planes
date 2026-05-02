@@ -18,6 +18,8 @@ public class MineNode : MonoBehaviour
     [SerializeField] private float driftSpeedMultiplier = 0.35f;
     [SerializeField] private MineNodeLocomotionProfile[] locomotionArchetypeProfiles = new MineNodeLocomotionProfile[4];
     [SerializeField] private MineNodeLocomotionProfile defaultLocomotionProfile;
+    [SerializeField] private MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
+    [SerializeField] private string locomotionVariantOverride;
 
     [Header("Flee Boundary Targeting")]
     [Tooltip("How strongly fleeing node steers toward the nearest horizontal screen edge.")]
@@ -72,6 +74,9 @@ public class MineNode : MonoBehaviour
     private bool _hasBeenStruck;
     private Vector2 _prevPhysicsPos;
     private bool _hasPrevPhysicsPos;
+    private MineNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
+    private float _nextDirectionDecisionAt;
+    private float _pathCommitUntil;
 
     // Motion tunables (previously local consts in FixedUpdate)
     private const float kStallSpeed        = 0.20f;
@@ -96,11 +101,14 @@ public class MineNode : MonoBehaviour
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);
         if (prof != null) _speed = prof.mineNodeSpeed;
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
+        ResolveDecisionArchetype(prof);
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetTint(_lockedColor, multiply: true);
 
         float a = UnityEngine.Random.Range(0f, 360f);
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
+        _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
+        _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
         _lastProcessedStep = -1;
         if (_drumTrack != null)
         {
@@ -261,7 +269,10 @@ public class MineNode : MonoBehaviour
                     if (_drumTrack.HasDustAt(probe)) { edgeBlocked = true; break; }
                 }
                 if (!edgeBlocked)
-                    _carveDir = Vector2.Lerp(_carveDir, toEdge, fleeTowardBoundaryWeight).normalized;
+                {
+                    float edgeBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
+                    _carveDir = Vector2.Lerp(_carveDir, toEdge, edgeBias).normalized;
+                }
             }
         }
 
@@ -406,6 +417,9 @@ public class MineNode : MonoBehaviour
 
     private void RunCorridorLookahead(Vector2Int myCell)
     {
+        if (Time.time < _nextDirectionDecisionAt || Time.time < _pathCommitUntil)
+            return;
+
         _rescanTimer -= Time.fixedDeltaTime;
 
         bool wallAhead = false;
@@ -464,10 +478,15 @@ public class MineNode : MonoBehaviour
                         break;
                     }
                 }
+                float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
+                score += riskBias * Mathf.Clamp01(score / 3f);
                 if (Vector2.Dot(dir, _carveDir) < -0.5f) score *= 0.1f;
                 if (score > bestScore) { bestScore = score; bestDir = dir; }
             }
-            _carveDir = bestDir.normalized;
+            float jitter = UnityEngine.Random.Range(-_decisionArchetype.turnJitter, _decisionArchetype.turnJitter);
+            _carveDir = Rotate(bestDir.normalized, jitter).normalized;
+            _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
+            _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
         }
     }
 
@@ -494,7 +513,8 @@ public class MineNode : MonoBehaviour
 
         if (!confirmedStall || Time.time < _nextEscapeAllowedTime) return;
 
-        _nextEscapeAllowedTime = Time.time + kEscapeCooldown;
+        float recoveryScale = Mathf.Lerp(1.25f, 0.4f, _decisionArchetype.stallRecoveryAggressiveness);
+        _nextEscapeAllowedTime = Time.time + (kEscapeCooldown * recoveryScale);
         _stallHits = 0;
 
         Vector2 fwd   = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
@@ -521,8 +541,30 @@ public class MineNode : MonoBehaviour
             _carveDir = Rotate(fwd, UnityEngine.Random.Range(150f, 210f)).normalized;
         }
 
-        _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(-kEscapeJitterDeg, kEscapeJitterDeg)).normalized;
+        float jitter = Mathf.Lerp(kEscapeJitterDeg * 0.5f, kEscapeJitterDeg * 1.5f, _decisionArchetype.stallRecoveryAggressiveness);
+        _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(-jitter, jitter)).normalized;
         _rb.linearVelocity *= 0.5f;
+    }
+
+    private void ResolveDecisionArchetype(MusicalRoleProfile roleProfile)
+    {
+        _decisionArchetype = default;
+        if (decisionArchetypeLibrary == null)
+        {
+            _decisionArchetype.id = "Steady";
+            _decisionArchetype.reactionDelayWindow = new Vector2(0.1f, 0.25f);
+            _decisionArchetype.pathCommitmentDuration = 0.75f;
+            _decisionArchetype.turnJitter = 8f;
+            _decisionArchetype.fleeBias = 0.6f;
+            _decisionArchetype.stallRecoveryAggressiveness = 0.6f;
+            _decisionArchetype.dustRiskTolerance = 0.5f;
+            return;
+        }
+
+        string variantId = string.IsNullOrWhiteSpace(locomotionVariantOverride) ? null : locomotionVariantOverride;
+        string archetypeId = roleProfile != null ? roleProfile.ResolveMineNodeArchetypeId(variantId) : "Steady";
+        if (!decisionArchetypeLibrary.TryGet(archetypeId, out _decisionArchetype))
+            decisionArchetypeLibrary.TryGet("Steady", out _decisionArchetype);
     }
 
     private void RunBoundaryClamp(bool clampX, bool clampY)
