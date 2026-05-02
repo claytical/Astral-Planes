@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd57d10d8663941f796c44bfafab7547, type: 3}
+  m_Name: MineNodeDecisionArchetypes
+  m_EditorClassIdentifier: Assembly-CSharp::MineNodeDecisionArchetypeLibrary
+  archetypes:
+  - id: Skittish
+    reactionDelayWindow: {x: 0.02, y: 0.15}
+    pathCommitmentDuration: 0.3
+    turnJitter: 18
+    fleeBias: 0.9
+    stallRecoveryAggressiveness: 0.95
+    dustRiskTolerance: 0.25
+  - id: Steady
+    reactionDelayWindow: {x: 0.12, y: 0.25}
+    pathCommitmentDuration: 0.85
+    turnJitter: 6
+    fleeBias: 0.55
+    stallRecoveryAggressiveness: 0.6
+    dustRiskTolerance: 0.5
+  - id: Aggressive
+    reactionDelayWindow: {x: 0.05, y: 0.16}
+    pathCommitmentDuration: 0.7
+    turnJitter: 10
+    fleeBias: 0.7
+    stallRecoveryAggressiveness: 0.85
+    dustRiskTolerance: 0.85
+  - id: Darting
+    reactionDelayWindow: {x: 0.03, y: 0.12}
+    pathCommitmentDuration: 0.22
+    turnJitter: 22
+    fleeBias: 0.8
+    stallRecoveryAggressiveness: 0.9
+    dustRiskTolerance: 0.35

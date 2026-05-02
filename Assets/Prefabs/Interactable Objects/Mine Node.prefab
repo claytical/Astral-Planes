@@ -54,15 +54,24 @@ MonoBehaviour:
   coreSprite: {fileID: 2442014530722922072}
   outlineSprite: {fileID: 2442014530722922072}
   maxStrength: 100
-  sameRoleDustAffinityStrength: 0.25
-  sameRoleDustAffinityRadiusCells: 2
   pruneCarvedPathOnLoopBoundary: 0
   pruneMinPathCount: 8
-  fleeRadiusWorld: 5
-  fleeBlendWeight: 0.25
   driftSpeedMultiplier: 0.1
+  locomotionArchetypeProfiles:
+  - {fileID: 11400000, guid: c99ad54cb59b548cfa292341d8d99588, type: 2}
+  - {fileID: 11400000, guid: 306442b78dceb4c74aff488e6bca3530, type: 2}
+  - {fileID: 11400000, guid: 8b992e9dff416477a8e276422fde2205, type: 2}
+  - {fileID: 11400000, guid: 8950ad273df764f059e5b24320b6f961, type: 2}
+  defaultLocomotionProfile: {fileID: 11400000, guid: 306442b78dceb4c74aff488e6bca3530,
+    type: 2}
+  decisionArchetypeLibrary: {fileID: 11400000, guid: 9149d5657d68241218e5bc77924e4708,
+    type: 2}
+  locomotionVariantOverride: 
+  sharedMotionConfig: {fileID: 0}
   fleeTowardBoundaryWeight: 0.303
   driveCarvingMotionFromNoteSet: 1
+  boundaryLeakToleranceCells: 0.35
+  maxCorrectionPerTick: 0.5
   expireAfterLoops: 3
 --- !u!114 &2404411601338668691
 MonoBehaviour:
@@ -76,12 +85,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speedCapMul: 100
+  dustDragScalar: 0.85
   extraBrake: 0
   carveMaze: 1
   exhaustEnergyFraction: 0.4
   edgeHugForce: 2
   escapePushForce: 5
+  maxCorrectionPerTick: 0.5
   huntBfsBudget: 600
   huntDirWeight: 0.55
   arrivalRadiusCells: 1
@@ -100,13 +110,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   outerSprite: {fileID: 2442014530722922072}
   innerSprite: {fileID: 2442014530722922072}
-  frenzySpinDegPerSec: 240
-  thinkDampen: 7
-  faceTurnDegPerSec: 420
-  wobbleDeg: 12
+  defaultThinkingSpinDegPerSec: 480
+  defaultFaceTurnDegPerSec: 420
+  defaultWobbleDeg: 12
   wobbleHzRange: {x: 2.5, y: 4.5}
   innerCounterFactor: -0.4
-  minSpeedForSwim: 0.02
+  escapeSpinBoost: 1.2
+  defaultThinkToSwimSpeed: 0.12
+  defaultSwimToThinkSpeed: 0.06
+  archetypeVisualProfiles: []
   spritePivotOuter: {fileID: 0}
   spritePivotInner: {fileID: 0}
 --- !u!114 &8668376557347016044
