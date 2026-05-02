@@ -34,6 +34,12 @@ public class MineNode : MonoBehaviour
     [SerializeField, Min(0f)] private float boundaryLeakToleranceCells = 0.35f;
     [Tooltip("Maximum world-space correction applied per FixedUpdate when depenetrating from dust boundary.")]
     [SerializeField, Min(0f)] private float maxCorrectionPerTick = 0.5f;
+    [Tooltip("Maximum speed used when separating out of blocked dust cells.")]
+    [SerializeField, Min(0f)] private float maxSeparationSpeed = 4f;
+    [Tooltip("Acceleration used to converge toward separation speed.")]
+    [SerializeField, Min(0f)] private float separationAccel = 30f;
+    [Tooltip("Penetration dead zone in world units; below this no separation force is applied.")]
+    [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
 
     [Header("Expiry")]
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
@@ -349,24 +355,18 @@ public class MineNode : MonoBehaviour
         }
 
         Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
-        Vector2 correction = legalWorld - _rb.position;
+        Vector2 correction = legalWorld - hitPos;
         float leakDistanceCells = correction.magnitude;
         if (leakDistanceCells <= boundaryLeakToleranceCells) return;
+        float deadZone = Mathf.Max(boundaryLeakToleranceCells, separationDeadZone);
+        if (leakDistanceCells <= deadZone) return;
 
-        float maxCorr = Mathf.Max(0f, maxCorrectionPerTick);
-        if (maxCorr <= 0f) return;
+        Vector2 depenDir = correction / leakDistanceCells;
+        float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        float desiredDistance = Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), leakDistanceCells - deadZone);
+        float targetSpeed = Mathf.Min(Mathf.Max(0f, maxSeparationSpeed), desiredDistance / dt);
+        Vector2 desiredDepenVelocity = depenDir * targetSpeed;
 
-        Vector2 depenDir = correction.normalized;
-        float depenMagnitude = Mathf.Min(maxCorr, leakDistanceCells);
-
-        // Push out over time instead of snapping position.
-        // This keeps containment deterministic while preserving smooth motion.
-        float depenSpeed = depenMagnitude / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-        float maxDepenSpeed = Mathf.Max(_currentDesiredSpeed, 0.75f);
-        depenSpeed = Mathf.Min(depenSpeed, maxDepenSpeed);
-        Vector2 desiredDepenVelocity = depenDir * depenSpeed;
-
-        // Remove any velocity component that continues into the blocked region.
         float inwardSpeed = Vector2.Dot(_rb.linearVelocity, -depenDir);
         if (inwardSpeed > 0f)
             _rb.linearVelocity += depenDir * inwardSpeed;
@@ -374,8 +374,9 @@ public class MineNode : MonoBehaviour
         float velocityAlongDepen = Vector2.Dot(_rb.linearVelocity, depenDir);
         Vector2 currentDepenVelocity = depenDir * velocityAlongDepen;
         Vector2 depenDeltaV = desiredDepenVelocity - currentDepenVelocity;
-        Vector2 depenForce = depenDeltaV * _rb.mass / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-        _rb.AddForce(depenForce, ForceMode2D.Force);
+        float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
+        Vector2 accelDeltaV = Vector2.ClampMagnitude(depenDeltaV, maxDeltaSpeed);
+        _rb.AddForce((accelDeltaV / dt) * _rb.mass, ForceMode2D.Force);
     }
 
     private Vector2Int FindNearestLegalCell(Vector2Int fromCell, int radius)

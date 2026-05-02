@@ -24,6 +24,12 @@ public class MineNodeDustInteractor : MonoBehaviour
     [SerializeField] private float escapePushForce = 12f;
     [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
     [SerializeField] private float maxCorrectionPerTick = 0.5f;
+    [Tooltip("Maximum speed used when separating out of blocked dust cells.")]
+    [SerializeField, Min(0f)] private float maxSeparationSpeed = 4f;
+    [Tooltip("Acceleration used to converge toward the separation velocity.")]
+    [SerializeField, Min(0f)] private float separationAccel = 30f;
+    [Tooltip("Penetration dead zone in world units; below this no separation is applied.")]
+    [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -233,8 +239,26 @@ public class MineNodeDustInteractor : MonoBehaviour
             }
 
             Vector2Int legal = FindNearestOpenCell(sampleCell, 4);
-            Vector2 correction = _drumTrack.GridToWorldPosition(legal) - sample;
-            _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
+            Vector2 correction = legalWorld - sample;
+            float correctionMag = correction.magnitude;
+            float deadZone = Mathf.Max(0f, separationDeadZone);
+            if (correctionMag <= deadZone) return;
+
+            Vector2 wallNormal = correctionMag > 0.0001f ? correction / correctionMag : Vector2.zero;
+            float normalCorrection = Vector2.Dot(correction, wallNormal);
+            if (normalCorrection <= deadZone) return;
+
+            float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+            float desiredDistance = Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), normalCorrection - deadZone);
+            float targetSpeed = Mathf.Min(Mathf.Max(0f, maxSeparationSpeed), desiredDistance / dt);
+            Vector2 targetVelocity = wallNormal * targetSpeed;
+            float currentNormalSpeed = Vector2.Dot(_rb.linearVelocity, wallNormal);
+            Vector2 currentNormalVelocity = wallNormal * currentNormalSpeed;
+            Vector2 deltaVelocity = targetVelocity - currentNormalVelocity;
+            float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
+            Vector2 accelDelta = Vector2.ClampMagnitude(deltaVelocity, maxDeltaSpeed);
+            _rb.AddForce((accelDelta / dt) * _rb.mass, ForceMode2D.Force);
             return;
         }
     }
