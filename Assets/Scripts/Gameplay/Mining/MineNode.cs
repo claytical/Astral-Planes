@@ -16,6 +16,8 @@ public class MineNode : MonoBehaviour
 
     [Header("State Machine")]
     [SerializeField] private float driftSpeedMultiplier = 0.35f;
+    [SerializeField] private MineNodeLocomotionProfile[] locomotionArchetypeProfiles = new MineNodeLocomotionProfile[4];
+    [SerializeField] private MineNodeLocomotionProfile defaultLocomotionProfile;
 
     [Header("Flee Boundary Targeting")]
     [Tooltip("How strongly fleeing node steers toward the nearest horizontal screen edge.")]
@@ -54,6 +56,7 @@ public class MineNode : MonoBehaviour
     private InstrumentTrack _track;
     private MusicalRole _role;
     private float _speed    = 0.5f;
+    private MineNodeLocomotionProfile _activeLocomotionProfile;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
     private Vector2 _carveDir = Vector2.right;
@@ -83,10 +86,8 @@ public class MineNode : MonoBehaviour
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);
-        if (prof != null)
-        {
-            _speed   = prof.mineNodeSpeed;
-        }
+        if (prof != null) _speed = prof.mineNodeSpeed;
+        _activeLocomotionProfile = ResolveLocomotionProfile(prof);
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetTint(_lockedColor, multiply: true);
 
@@ -209,16 +210,7 @@ public class MineNode : MonoBehaviour
         Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
         RunCorridorLookahead(myCell);
 
-        float targetSpeed = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, _speed) * driftSpeedMultiplier, kMinSpeedFloor);
-        _currentDesiredSpeed = targetSpeed;
-
-        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
-        _dustInteractor?.SetDesiredSpeed(targetSpeed);
-
-        float steer    = Mathf.Lerp(3f,  20f, _speed);
-        float maxSteer = Mathf.Lerp(15f, 80f, _speed);
-        Vector2 force  = Vector2.ClampMagnitude((_carveDir * targetSpeed - _rb.linearVelocity) * steer * _rb.mass, maxSteer);
-        _rb.AddForce(force, ForceMode2D.Force);
+        ApplyLocomotion(0f, driftSpeedMultiplier);
 
         RunStallEscape(myCell);
         RunBoundaryClamp(true, true);
@@ -249,15 +241,7 @@ public class MineNode : MonoBehaviour
         int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         float speed01   = Mathf.InverseLerp(_track.lowestAllowedNote, _track.highestAllowedNote, currentNote);
 
-        float speedMin = Mathf.Lerp(0.5f,  2.5f, _speed);
-        float speedMax = Mathf.Lerp(3f,   14f,  _speed);
-        float steer    = Mathf.Lerp(3f,   20f,  _speed);
-        float maxSteer = Mathf.Lerp(15f,  80f,  _speed);
-        float targetSpeed = Mathf.Max(Mathf.Lerp(speedMin, speedMax, speed01), kMinSpeedFloor);
-        _currentDesiredSpeed = targetSpeed;
-
-        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
-        _dustInteractor?.SetDesiredSpeed(targetSpeed);
+        ApplyLocomotion(speed01, 1f);
 
         // Steer toward nearest horizontal screen edge
         if (_cam == null) _cam = Camera.main;
@@ -282,9 +266,6 @@ public class MineNode : MonoBehaviour
             }
         }
 
-        Vector2 force = Vector2.ClampMagnitude((_carveDir * targetSpeed - _rb.linearVelocity) * steer * _rb.mass, maxSteer);
-        _rb.AddForce(force, ForceMode2D.Force);
-
         RunStallEscape(myCell);
         RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
     }
@@ -292,6 +273,55 @@ public class MineNode : MonoBehaviour
     // ---------------------------------------------------------------
     // Shared motion helpers
     // ---------------------------------------------------------------
+    private void ApplyLocomotion(float speedIntensity01, float speedScale)
+    {
+        var profile = _activeLocomotionProfile;
+        if (profile == null)
+        {
+            float fallback = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, _speed) * speedScale, kMinSpeedFloor);
+            Vector2 fallbackForce = (_carveDir * fallback - _rb.linearVelocity) * Mathf.Lerp(3f, 20f, _speed) * _rb.mass;
+            _rb.AddForce(fallbackForce, ForceMode2D.Force);
+            _currentDesiredSpeed = fallback;
+            return;
+        }
+
+        float targetSpeed = Mathf.Max(profile.EvaluateTargetSpeed(speedIntensity01) * speedScale, kMinSpeedFloor);
+        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        if (_dustInteractor != null && _dustInteractor.IsInDustAtCurrentCell())
+        {
+            float drag = Mathf.Clamp01(_dustInteractor.dustDragScalar);
+            float penalty = Mathf.Clamp01(profile.dustPenalty);
+            targetSpeed *= Mathf.Lerp(1f, drag, penalty);
+        }
+
+        _currentDesiredSpeed = targetSpeed;
+
+        Vector2 desiredVelocity = _carveDir * targetSpeed;
+        float turnBlend = 1f - Mathf.Clamp01(profile.hesitation);
+        if (_rb.linearVelocity.sqrMagnitude > 0.001f)
+            desiredVelocity = Vector2.Lerp(_rb.linearVelocity, desiredVelocity, Mathf.Clamp01(profile.turnRate * turnBlend * Time.fixedDeltaTime));
+        Vector2 delta = desiredVelocity - _rb.linearVelocity;
+        Vector2 accelForce = Vector2.ClampMagnitude(delta * profile.acceleration * _rb.mass, profile.maxSpeed * _rb.mass);
+        _rb.AddForce(accelForce, ForceMode2D.Force);
+
+        if (_rb.linearVelocity.magnitude > targetSpeed)
+            _rb.AddForce(-_rb.linearVelocity * profile.braking, ForceMode2D.Force);
+    }
+
+    private MineNodeLocomotionProfile ResolveLocomotionProfile(MusicalRoleProfile roleProfile)
+    {
+        if (roleProfile != null && roleProfile.mineNodeLocomotionProfile != null)
+            return roleProfile.mineNodeLocomotionProfile;
+
+        int count = locomotionArchetypeProfiles != null ? locomotionArchetypeProfiles.Length : 0;
+        if (count > 0)
+        {
+            int idx = Mathf.Clamp(Mathf.RoundToInt(_speed * (count - 1)), 0, count - 1);
+            if (locomotionArchetypeProfiles[idx] != null)
+                return locomotionArchetypeProfiles[idx];
+        }
+        return defaultLocomotionProfile;
+    }
 
     private void RunCorridorLookahead(Vector2Int myCell)
     {
