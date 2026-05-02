@@ -68,7 +68,7 @@ MonoBehaviour:
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
-    particleFootprintMul: 0.775
+    particleFootprintMul: 0.68
     sprite: {fileID: 8999714297043290424}
   interaction:
     energyDrainPerSecond: 0
@@ -446,7 +446,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.5
+      scalar: 0.42
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -1029,7 +1029,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1000
+      scalar: 760
       minScalar: 10
       maxCurve:
         serializedVersion: 2
