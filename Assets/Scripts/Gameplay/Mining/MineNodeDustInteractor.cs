@@ -20,8 +20,14 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [SerializeField] private float edgeHugForce = 2f;
 
-    [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
-    [SerializeField] private float escapePushForce = 12f;
+    [Tooltip("Target escape speed along the computed open-space direction while embedded in dust.")]
+    [SerializeField, Min(0f)] private float escapeTargetSpeed = 4f;
+    [Tooltip("Maximum acceleration used when steering toward the escape target speed.")]
+    [SerializeField, Min(0f)] private float escapeAccel = 28f;
+    [Tooltip("Seconds for dust escape push to ramp from 0 to full strength while staying in contact.")]
+    [SerializeField, Min(0f)] private float escapeRampSeconds = 0.12f;
+    [Tooltip("Max total force this component can apply in one FixedUpdate (dust braking + steering + containment).")]
+    [SerializeField, Min(0f)] private float maxTotalDustResponseForce = 40f;
     [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
     [SerializeField] private float maxCorrectionPerTick = 0.5f;
     [Tooltip("Maximum speed used when separating out of blocked dust cells.")]
@@ -86,6 +92,9 @@ public class MineNodeDustInteractor : MonoBehaviour
     private bool _prevInDust;
     private Vector2 _prevPos;
     private bool _hasPrevPos;
+    private float _escapeRampTimer;
+    private float _escapePersistTimer;
+    private float _dustResponseForceBudget;
 
     // ---------------------------------------------------------------
     // Public API
@@ -112,6 +121,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     void FixedUpdate()
     {
         if (_rb == null || _drumTrack == null) return;
+        _dustResponseForceBudget = Mathf.Max(0f, maxTotalDustResponseForce);
 
         if (_hasPrevPos)
             EnforceSweptContainment(_prevPos, _rb.position);
@@ -130,22 +140,45 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (inDust)
         {
             if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
-                _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
+                ApplyDustResponseForce(-_rb.linearVelocity * extraBrake);
 
             // Push back toward the nearest open (non-dust) neighboring cell so the node
             // can't remain embedded in a wall — this is the complement of the edge-hug force.
             Vector2 escapeDir = SumNeighborDirections(cell, requireDust: false);
+            float occupancy01 = ComputeDustOccupancy01(cell);
             if (escapeDir.sqrMagnitude > 0.0001f)
             {
-                _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
+                float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+                Vector2 escapeNormal = escapeDir.normalized;
+                _escapePersistTimer += dt;
+                _escapeRampTimer = Mathf.Min(Mathf.Max(escapeRampSeconds, 0.0001f), _escapeRampTimer + dt);
+                float ramp01 = Mathf.Clamp01(_escapeRampTimer / Mathf.Max(escapeRampSeconds, 0.0001f));
+                float persist01 = Mathf.Clamp01(_escapePersistTimer / 0.08f);
+                float severity01 = Mathf.Clamp01(Mathf.Max(occupancy01, persist01));
+                float response01 = ramp01 * severity01;
+
+                Vector2 desiredVelocity = escapeNormal * (Mathf.Max(0f, escapeTargetSpeed) * response01);
+                Vector2 velocityError = desiredVelocity - _rb.linearVelocity;
+                Vector2 desiredAccel = Vector2.ClampMagnitude(velocityError / dt, Mathf.Max(0f, escapeAccel));
+                ApplyDustResponseForce(desiredAccel * _rb.mass);
 
                 // Hard wall: cancel any velocity component pushing deeper into the dust wall.
                 // This prevents driving forces from overpowering the escape push and tunneling through.
-                Vector2 wallNormal  = escapeDir.normalized;
-                float   intoWallVel = Vector2.Dot(_rb.linearVelocity, wallNormal);
+                float intoWallVel = Vector2.Dot(_rb.linearVelocity, escapeNormal);
                 if (intoWallVel < 0f)
-                    ApplyInwardVelocityDamping(wallNormal);
+                    ApplyInwardVelocityDamping(escapeNormal);
             }
+            else
+            {
+                // Hysteresis/cooldown to avoid rapid force toggles at boundary transitions.
+                _escapePersistTimer = Mathf.Max(0f, _escapePersistTimer - Time.fixedDeltaTime * 0.5f);
+                _escapeRampTimer = Mathf.Max(0f, _escapeRampTimer - Time.fixedDeltaTime * 0.5f);
+            }
+        }
+        else
+        {
+            _escapePersistTimer = Mathf.Max(0f, _escapePersistTimer - Time.fixedDeltaTime * 3f);
+            _escapeRampTimer = Mathf.Max(0f, _escapeRampTimer - Time.fixedDeltaTime * 3f);
         }
 
         if (!carveMaze) return;
@@ -211,7 +244,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         {
             Vector2 edgeDir = SumNeighborDirections(cell, requireDust: true);
             if (edgeDir.sqrMagnitude > 0.0001f)
-                _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
+                ApplyDustResponseForce(edgeDir.normalized * edgeHugForce);
         }
 
         _prevPos = _rb.position;
@@ -266,7 +299,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             Vector2 deltaVelocity = targetVelocity - currentNormalVelocity;
             float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
             Vector2 accelDelta = Vector2.ClampMagnitude(deltaVelocity, maxDeltaSpeed);
-            _rb.AddForce((accelDelta / dt) * _rb.mass, ForceMode2D.Force);
+            ApplyDustResponseForce((accelDelta / dt) * _rb.mass);
             return;
         }
     }
@@ -413,6 +446,27 @@ public class MineNodeDustInteractor : MonoBehaviour
                 dir += new Vector2(offset.x, offset.y);
         }
         return dir;
+    }
+
+    private float ComputeDustOccupancy01(Vector2Int center)
+    {
+        int dustCount = 0;
+        for (int i = 0; i < kNeighbours8.Length; i++)
+        {
+            if (_drumTrack.HasDustAt(center + kNeighbours8[i]))
+                dustCount++;
+        }
+        return dustCount / (float)kNeighbours8.Length;
+    }
+
+    private void ApplyDustResponseForce(Vector2 force)
+    {
+        float mag = force.magnitude;
+        if (mag <= 0.0001f || _dustResponseForceBudget <= 0f) return;
+
+        float appliedMag = Mathf.Min(mag, _dustResponseForceBudget);
+        _rb.AddForce(force * (appliedMag / mag), ForceMode2D.Force);
+        _dustResponseForceBudget -= appliedMag;
     }
 
     public void SetLevelAuthority(DrumTrack drumTrack)
