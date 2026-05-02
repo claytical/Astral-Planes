@@ -16462,11 +16462,7 @@ MonoBehaviour:
   activeDustRoot: {fileID: 823134540}
   cellClearanceWorld: 0
   defaultMazeHardness01: 0.232
-  dustTimings:
-    spriteScaleInSeconds: 1
-    spriteScaleOutSeconds: 1
-    particleGrowInSeconds: 1
-    fadeOutSeconds: 0.1
+  dustVisualTimingSettings: {fileID: 0}
   mineNodeErodePerTick: 10
   dustFootprintMul: 1
   tileDiameterWorld: 1
@@ -17241,7 +17237,7 @@ MonoBehaviour:
   currentStep: 0
   referenceWidthPx: 1920
   referenceColumns: 40
-  uiBottomPaddingPx: 250
+  uiBottomPaddingPx: 140
   autoSizeSpawnGridToScreen: 1
   _starPool: {fileID: 0}
   tanksPerLoopAtFullIntensity: 0.35

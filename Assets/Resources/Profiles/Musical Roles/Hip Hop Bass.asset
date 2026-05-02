@@ -17,12 +17,12 @@ MonoBehaviour:
     baseColor: {r: 0.6073599, g: 0, b: 1, a: 1}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
   baseAlpha: 1
-  maxEnergyUnits: 8
-  carveResistance01: 1
+  maxEnergyUnits: 5
+  carveResistance01: 0.7
   drainResistance01: 0.25
   dustHardness01: 1
-  mineNodeSpeed: 0.1
-  mineNodeAgility: 0.5
+  mineNodeSpeed: 0.35
+  mineNodeAgility: 0.3
   midiPreset: 1
-  ripeDuration: 8
-  regrowthDelay: -1
+  ripeDuration: 512
+  regrowthDelay: 1
