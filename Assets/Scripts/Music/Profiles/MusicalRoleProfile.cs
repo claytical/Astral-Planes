@@ -45,9 +45,12 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Legacy single-axis hardness. Superseded by carveResistance01 + drainResistance01. Kept for migration.")]
     public float dustHardness01 = 0.50f;
 
-    [Header("MineNode Balance")]
-    [Range(0f, 1f)] public float mineNodeSpeed    = 0.5f;  // 0 = sluggish, 1 = fast
-    [Range(0f, 1f)] public float mineNodeAgility  = 0.5f;  // 0 = gentle curves, 1 = sharp turns
+    [Header("MineNode Locomotion")]
+    [Tooltip("Legacy selector used to choose a locomotion archetype/variant when no explicit profile is assigned.")]
+    [Range(0f, 1f)] public float mineNodeSpeed = 0.5f;
+
+    [Tooltip("Direct locomotion profile override for this role.")]
+    public MineNodeLocomotionProfile mineNodeLocomotionProfile;
 
     [Header("Presets")] public int midiPreset;
 
