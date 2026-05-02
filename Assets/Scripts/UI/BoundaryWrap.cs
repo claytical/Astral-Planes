@@ -45,8 +45,27 @@ public class BoundaryWrap : MonoBehaviour
     [Tooltip("Tiny inward bias while the ship is still pressing outward but not yet committed.")]
     public float inwardBiasSpeed = 1.25f;
 
+    [Header("Mine Boundary Bounce")]
+    [Range(0.05f, 0.95f)]
+    [Tooltip("Velocity retained along the boundary normal when MineNodes rebound.")]
+    public float mineReboundRestitution = 0.65f;
+
+    [Tooltip("Cooldown between MineNode bounces to avoid rapid frame-to-frame flip-flopping.")]
+    public float mineBounceCooldown = 0.08f;
+
+    [Tooltip("Small inward offset applied after MineNode reflection only when still intersecting.")]
+    public float mineInwardOffset = 0.08f;
+
+    [Tooltip("Penetration depth threshold before falling back to hard positional clamp.")]
+    public float mineExtremePenetration = 0.45f;
+
+    [Header("Mine Bounce Debug")]
+    public bool debugMineBoundary;
+    public bool debugMineBoundaryLog;
+
     private const float WrapCooldown = 0.3f;
     private static readonly Dictionary<Rigidbody2D, float> _lastWrapTime = new();
+    private static readonly Dictionary<Rigidbody2D, float> _lastMineBounceTime = new();
 
     private BoxCollider2D _self;
 
@@ -74,20 +93,20 @@ public class BoundaryWrap : MonoBehaviour
     {
         bool isHorizontal = side == BoundarySide.Left || side == BoundarySide.Right;
 
-        // Top/Bottom: always hard bounce
-        if (!isHorizontal) { BounceRigidbody(rb); return; }
+        // Top/Bottom: always bounce inward
+        if (!isHorizontal) { BounceRigidbody(rb, true); return; }
 
         // If there is a dust cell at the boundary position, deny exit regardless of state —
         // the node hit a solid border cell and must find a gap opening to escape.
         var dt = mine.DrumTrack;
         if (IsMineExitBlockedByDust(dt, rb.position))
         {
-            BounceRigidbody(rb);
+            BounceRigidbody(rb, true);
             return;
         }
 
         // Left/Right + Drifting: bounce to keep it in play
-        if (mine.State == MineNodeState.Drifting) { BounceRigidbody(rb); return; }
+        if (mine.State == MineNodeState.Drifting) { BounceRigidbody(rb, true); return; }
 
         // Left/Right + Fleeing + no dust at this position (gap): let it escape
         mine.HandleEscape();
@@ -273,9 +292,18 @@ public class BoundaryWrap : MonoBehaviour
         vehicle.ClearTrailForWrap();
     }
 
-    private void BounceRigidbody(Rigidbody2D rb)
+    private void BounceRigidbody(Rigidbody2D rb, bool preferSoftForMine = false)
     {
         if (_self == null) return;
+
+        var mine = rb.GetComponent<MineNode>();
+        bool isMineSoftCandidate = preferSoftForMine && mine != null;
+
+        if (isMineSoftCandidate && TrySoftMineRebound(rb))
+        {
+            mine.ReflectCarveDir(reflectX: axis == WrapAxis.Horizontal);
+            return;
+        }
 
         Vector2 pos = rb.position;
         Vector2 vel = rb.linearVelocity;
@@ -306,8 +334,84 @@ public class BoundaryWrap : MonoBehaviour
         rb.position = pos;
         rb.linearVelocity = vel;
 
-        var mine = rb.GetComponent<MineNode>();
         if (mine != null)
+        {
             mine.ReflectCarveDir(reflectX: axis == WrapAxis.Horizontal);
+            if (debugMineBoundaryLog)
+                Debug.Log($"[BoundaryWrap] Mine hard clamp fallback on {side} for {mine.name} at t={Time.time:F3}.", this);
+        }
+    }
+
+    private bool TrySoftMineRebound(Rigidbody2D rb)
+    {
+        float now = Time.time;
+        if (_lastMineBounceTime.TryGetValue(rb, out float lastBounce) && now - lastBounce < mineBounceCooldown)
+            return false;
+
+        Vector2 normal = GetBoundaryInwardNormal();
+        Vector2 preVel = rb.linearVelocity;
+        float normalSpeed = Vector2.Dot(preVel, normal);
+
+        // Only rebound if continuing outward through boundary.
+        if (normalSpeed >= 0f)
+            return false;
+
+        Vector2 postVel = preVel - (1f + mineReboundRestitution) * normalSpeed * normal;
+
+        float penetration = GetMinePenetrationDepth(rb.position);
+        bool requiresHardClamp = penetration >= mineExtremePenetration;
+
+        if (requiresHardClamp)
+            return false;
+
+        rb.linearVelocity = postVel;
+
+        // Minimal inward correction only if still intersecting after reflection.
+        if (penetration > 0f)
+            rb.position += normal * mineInwardOffset;
+
+        _lastMineBounceTime[rb] = now;
+
+        if (debugMineBoundaryLog)
+            Debug.Log($"[BoundaryWrap] Mine soft rebound {rb.name} side={side} pre={preVel} post={postVel} n={normal} pen={penetration:F3}", this);
+
+        return true;
+    }
+
+    private float GetMinePenetrationDepth(Vector2 pos)
+    {
+        return side switch
+        {
+            BoundarySide.Left => Mathf.Max(0f, _self.bounds.max.x - pos.x),
+            BoundarySide.Right => Mathf.Max(0f, pos.x - _self.bounds.min.x),
+            BoundarySide.Bottom => Mathf.Max(0f, _self.bounds.max.y - pos.y),
+            BoundarySide.Top => Mathf.Max(0f, pos.y - _self.bounds.min.y),
+            _ => 0f,
+        };
+    }
+
+    private Vector2 GetBoundaryInwardNormal()
+    {
+        return side switch
+        {
+            BoundarySide.Left => Vector2.right,
+            BoundarySide.Right => Vector2.left,
+            BoundarySide.Bottom => Vector2.up,
+            BoundarySide.Top => Vector2.down,
+            _ => Vector2.zero,
+        };
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!debugMineBoundary) return;
+        if (_self == null) _self = GetComponent<BoxCollider2D>();
+        if (_self == null) return;
+
+        Vector3 center = _self.bounds.center;
+        Vector3 n = GetBoundaryInwardNormal();
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawLine(center, center + n * 0.9f);
+        Gizmos.DrawSphere(center + n * 0.9f, 0.06f);
     }
 }
