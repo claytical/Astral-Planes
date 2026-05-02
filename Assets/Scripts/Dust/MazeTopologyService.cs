@@ -91,6 +91,10 @@ public sealed class MazeTopologyService
 
         if (config != null && config.porousBorder.exitCount >= 0)
         {
+            var perimeterCells = BuildPorousBorderPerimeter(width, height);
+            foreach (var cell in perimeterCells)
+                solid.Remove(cell);
+
             var borderCells = CosmicDustMazePatterns.BuildPorousBorderCells(
                 width,
                 height,
@@ -103,6 +107,25 @@ public sealed class MazeTopologyService
             }
         }
         return solid;
+    }
+
+    private static List<Vector2Int> BuildPorousBorderPerimeter(int width, int height)
+    {
+        var perimeter = new List<Vector2Int>(width + 2 * Mathf.Max(0, height - 2));
+        if (width <= 0 || height <= 0) return perimeter;
+
+        for (int x = 0; x < width; x++)
+            perimeter.Add(new Vector2Int(x, height - 1));
+
+        if (height >= 2)
+            for (int y = height - 2; y >= 0; y--)
+                perimeter.Add(new Vector2Int(width - 1, y));
+
+        if (height >= 2)
+            for (int y = height - 2; y >= 0; y--)
+                perimeter.Add(new Vector2Int(0, y));
+
+        return perimeter;
     }
 
     private static List<(Vector2Int cell, Vector3 world)> BuildFullFill(int width, int height, Func<Vector2Int, bool> isBlocked)
