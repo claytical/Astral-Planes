@@ -19,6 +19,13 @@ public struct DustColorSet
 [CreateAssetMenu(menuName = "Astral Planes/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
 public class MusicalRoleProfile : ScriptableObject
 {
+    [System.Serializable]
+    public struct MineNodeArchetypeVariant
+    {
+        public string variantId;
+        public string archetypeId;
+    }
+
     public MusicalRole role;
 
     [Header("Visuals & Styling")]
@@ -52,6 +59,13 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Direct locomotion profile override for this role.")]
     public MineNodeLocomotionProfile mineNodeLocomotionProfile;
 
+    [Header("MineNode Decision Archetype")]
+    [Tooltip("Default decision archetype id (e.g. Steady, Aggressive, Skittish, Darting).")]
+    public string defaultMineNodeArchetypeId = "Steady";
+
+    [Tooltip("Optional role-specific variant overrides (e.g. Lead_A, Lead_B).")]
+    public MineNodeArchetypeVariant[] mineNodeArchetypeVariants;
+
     [Header("Presets")] public int midiPreset;
 
     [Header("Ripeness / Decay")]
@@ -78,4 +92,20 @@ public class MusicalRoleProfile : ScriptableObject
     public float GetDustHardness01()    => Mathf.Clamp01(dustHardness01);
     public float GetCarveResistance01() => Mathf.Clamp01(carveResistance01);
     public float GetDrainResistance01() => Mathf.Clamp01(drainResistance01);
+
+    public string ResolveMineNodeArchetypeId(string variantId)
+    {
+        if (!string.IsNullOrWhiteSpace(variantId) && mineNodeArchetypeVariants != null)
+        {
+            for (int i = 0; i < mineNodeArchetypeVariants.Length; i++)
+            {
+                var candidate = mineNodeArchetypeVariants[i];
+                if (string.Equals(candidate.variantId, variantId, System.StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(candidate.archetypeId))
+                    return candidate.archetypeId;
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(defaultMineNodeArchetypeId) ? "Steady" : defaultMineNodeArchetypeId;
+    }
 }
