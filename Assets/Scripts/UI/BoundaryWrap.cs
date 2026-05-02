@@ -80,7 +80,7 @@ public class BoundaryWrap : MonoBehaviour
         // If there is a dust cell at the boundary position, deny exit regardless of state —
         // the node hit a solid border cell and must find a gap opening to escape.
         var dt = mine.DrumTrack;
-        if (dt != null && dt.HasDustAt(dt.CellOf(rb.position)))
+        if (IsMineExitBlockedByDust(dt, rb.position))
         {
             BounceRigidbody(rb);
             return;
@@ -91,6 +91,31 @@ public class BoundaryWrap : MonoBehaviour
 
         // Left/Right + Fleeing + no dust at this position (gap): let it escape
         mine.HandleEscape();
+    }
+
+    private bool IsMineExitBlockedByDust(DrumTrack dt, Vector2 worldPos)
+    {
+        if (dt == null) return false;
+
+        // Sample slightly inward and outward from the current position.
+        // Using only rb.position can miss a blocking boundary cell because the trigger
+        // can fire while the rigidbody center is still in a neighboring open cell.
+        Vector2 outward = side switch
+        {
+            BoundarySide.Left => Vector2.left,
+            BoundarySide.Right => Vector2.right,
+            BoundarySide.Top => Vector2.up,
+            BoundarySide.Bottom => Vector2.down,
+            _ => Vector2.zero,
+        };
+
+        const float sampleOffset = 0.35f;
+        Vector2 inwardSample = worldPos - outward * sampleOffset;
+        Vector2 outwardSample = worldPos + outward * sampleOffset;
+
+        return dt.HasDustAt(dt.CellOf(worldPos))
+            || dt.HasDustAt(dt.CellOf(inwardSample))
+            || dt.HasDustAt(dt.CellOf(outwardSample));
     }
 
     private void OnTriggerStay2D(Collider2D other)
