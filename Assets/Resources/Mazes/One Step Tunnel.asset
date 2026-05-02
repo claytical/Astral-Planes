@@ -13,19 +13,28 @@ MonoBehaviour:
   m_Name: One Step Tunnel
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
   patternType: 6
-  regrowDelay: 4
-  clearBoxCount: 4
-  clearBoxWidth: 5
-  clearBoxHeight: 5
-  caFillChance: 0.3
-  caIterations: 3
-  ringSpacing: 6
-  ringThickness: 1
-  ringJitter: 0.35
-  strokes: 10
-  strokeMaxLen: 18
-  strokeJitter: 0.35
-  strokeDilate: 0.3
-  laneStep: 12
-  tunnelCorridorStep: 1
-  tunnelCorridorWidth: 3
+  dustTiming:
+    regrowDelay: 1
+  clearBoxes:
+    clearBoxCount: 4
+    clearBoxWidth: 5
+    clearBoxHeight: 5
+  cellularAutomata:
+    fillChance: 0.3
+    iterations: 3
+  ring:
+    spacing: 6
+    thickness: 1
+    jitter: 0.35
+  drunkenStrokes:
+    strokes: 10
+    maxLen: 18
+    jitter: 0.35
+    dilate: 0.3
+  diagonalLanes:
+    step: 12
+  tunnels:
+    corridorStep: 3
+    corridorWidth: 3
+  porousBorder:
+    exitCount: 3
