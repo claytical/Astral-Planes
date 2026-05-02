@@ -342,8 +342,14 @@ public class MineNode : MonoBehaviour
         }
 
         Vector2Int legal = FindNearestLegalCell(blockedCell, 4);
+        if (_drumTrack.HasDustAt(legal))
+        {
+            _rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
-        Vector2 correction = legalWorld - hitPos;
+        Vector2 correction = legalWorld - _rb.position;
         float leakDistanceCells = correction.magnitude;
         if (leakDistanceCells <= boundaryLeakToleranceCells) return;
 
@@ -356,6 +362,8 @@ public class MineNode : MonoBehaviour
         // Push out over time instead of snapping position.
         // This keeps containment deterministic while preserving smooth motion.
         float depenSpeed = depenMagnitude / Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        float maxDepenSpeed = Mathf.Max(_currentDesiredSpeed, 0.75f);
+        depenSpeed = Mathf.Min(depenSpeed, maxDepenSpeed);
         Vector2 desiredDepenVelocity = depenDir * depenSpeed;
 
         // Remove any velocity component that continues into the blocked region.
