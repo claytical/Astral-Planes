@@ -243,9 +243,11 @@ public class MineNodeDustInteractor : MonoBehaviour
         Vector2Int toCell = _drumTrack.CellOf(toPos);
         if (IsDiagonalCutBlocked(fromCell, toCell))
         {
-            Vector2Int legal = FindNearestOpenCell(fromCell, 2);
-            Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
-            _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            if (TryFindNearestOpenCell(fromCell, 2, out var legal))
+            {
+                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            }
             _rb.linearVelocity = Vector2.zero;
             return;
         }
@@ -261,9 +263,11 @@ public class MineNodeDustInteractor : MonoBehaviour
 
             if (IsDiagonalCutBlocked(prevCell, sampleCell))
             {
-                Vector2Int legalDiag = FindNearestOpenCell(prevCell, 2);
-                Vector2 diagCorrection = _drumTrack.GridToWorldPosition(legalDiag) - _rb.position;
-                _rb.position += Vector2.ClampMagnitude(diagCorrection, Mathf.Max(0f, maxCorrectionPerTick));
+                if (TryFindNearestOpenCell(prevCell, 2, out var legalDiag))
+                {
+                    Vector2 diagCorrection = _drumTrack.GridToWorldPosition(legalDiag) - _rb.position;
+                    _rb.position += Vector2.ClampMagnitude(diagCorrection, Mathf.Max(0f, maxCorrectionPerTick));
+                }
                 _rb.linearVelocity = Vector2.zero;
                 return;
             }
@@ -283,9 +287,12 @@ public class MineNodeDustInteractor : MonoBehaviour
                 _rb.linearVelocity = Vector2.zero;
             }
 
-            Vector2Int legal = FindNearestOpenCell(sampleCell, 4);
-            Vector2 correction = _drumTrack.GridToWorldPosition(legal) - sample;
-            _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            if (TryFindNearestOpenCell(sampleCell, 4, out var legal))
+            {
+                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            }
+            _rb.linearVelocity = Vector2.zero;
             return;
         }
     }
@@ -304,20 +311,31 @@ public class MineNodeDustInteractor : MonoBehaviour
         return _drumTrack.HasDustAt(sideX) || _drumTrack.HasDustAt(sideY);
     }
 
-    private Vector2Int FindNearestOpenCell(Vector2Int fromCell, int radius)
+    private bool TryFindNearestOpenCell(Vector2Int fromCell, int radius, out Vector2Int best)
     {
-        if (!_drumTrack.HasDustAt(fromCell)) return fromCell;
-        Vector2Int best = fromCell;
+        if (!_drumTrack.HasDustAt(fromCell))
+        {
+            best = fromCell;
+            return true;
+        }
+
+        best = fromCell;
         float bestDist = float.MaxValue;
+        bool found = false;
         for (int y = -radius; y <= radius; y++)
         for (int x = -radius; x <= radius; x++)
         {
-            var c = fromCell + new Vector2Int(x, y);
+            var c = _drumTrack.WrapGridCell(fromCell + new Vector2Int(x, y));
             if (_drumTrack.HasDustAt(c)) continue;
             float d = x * x + y * y;
-            if (d < bestDist) { bestDist = d; best = c; }
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = c;
+                found = true;
+            }
         }
-        return best;
+        return found;
     }
 
     // ---------------------------------------------------------------
