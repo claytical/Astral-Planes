@@ -239,48 +239,36 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         Vector2 delta = toPos - fromPos;
 
-        // Prevent corner-cutting through diagonal gaps when adjacent orthogonal cells are blocked.
-        // Example: moving NE from (x,y) to (x+1,y+1) should not pass if E or N cell is dust.
         Vector2Int fromCell = _drumTrack.CellOf(fromPos);
         Vector2Int toCell = _drumTrack.CellOf(toPos);
-        int stepX = toCell.x - fromCell.x;
-        int stepY = toCell.y - fromCell.y;
-        if (stepX != 0 && stepY != 0)
+        if (IsDiagonalCutBlocked(fromCell, toCell))
         {
-            stepX = stepX > 0 ? 1 : -1;
-            stepY = stepY > 0 ? 1 : -1;
-            Vector2Int sideX = fromCell + new Vector2Int(stepX, 0);
-            Vector2Int sideY = fromCell + new Vector2Int(0, stepY);
-            bool sideXBlocked = _drumTrack.HasDustAt(sideX);
-            bool sideYBlocked = _drumTrack.HasDustAt(sideY);
-            if (sideXBlocked || sideYBlocked)
-            {
-                Vector2 tangent = new Vector2(-delta.y, delta.x);
-                if (tangent.sqrMagnitude > 0.0001f)
-                {
-                    tangent.Normalize();
-                    float tangentialSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
-                    _rb.linearVelocity = tangent * tangentialSpeed;
-                }
-                else
-                {
-                    _rb.linearVelocity = Vector2.zero;
-                }
-
-                Vector2Int legal = FindNearestOpenCell(fromCell, 2);
-                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
-                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
-                return;
-            }
+            Vector2Int legal = FindNearestOpenCell(fromCell, 2);
+            Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+            _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            _rb.linearVelocity = Vector2.zero;
+            return;
         }
 
         float maxAxis = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y));
-        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 4f), 1, 64);
+        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 6f), 1, 96);
+        Vector2Int prevCell = fromCell;
         for (int i = 1; i <= steps; i++)
         {
             float t = (float)i / steps;
             Vector2 sample = Vector2.Lerp(fromPos, toPos, t);
             Vector2Int sampleCell = _drumTrack.CellOf(sample);
+
+            if (IsDiagonalCutBlocked(prevCell, sampleCell))
+            {
+                Vector2Int legalDiag = FindNearestOpenCell(prevCell, 2);
+                Vector2 diagCorrection = _drumTrack.GridToWorldPosition(legalDiag) - _rb.position;
+                _rb.position += Vector2.ClampMagnitude(diagCorrection, Mathf.Max(0f, maxCorrectionPerTick));
+                _rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
+            prevCell = sampleCell;
             if (!_drumTrack.HasDustAt(sampleCell)) continue;
 
             Vector2 tangent = new Vector2(-delta.y, delta.x);
@@ -300,6 +288,20 @@ public class MineNodeDustInteractor : MonoBehaviour
             _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
             return;
         }
+    }
+
+    private bool IsDiagonalCutBlocked(Vector2Int fromCell, Vector2Int toCell)
+    {
+        int stepX = toCell.x - fromCell.x;
+        int stepY = toCell.y - fromCell.y;
+        if (stepX == 0 || stepY == 0) return false;
+
+        stepX = stepX > 0 ? 1 : -1;
+        stepY = stepY > 0 ? 1 : -1;
+
+        Vector2Int sideX = _drumTrack.WrapGridCell(fromCell + new Vector2Int(stepX, 0));
+        Vector2Int sideY = _drumTrack.WrapGridCell(fromCell + new Vector2Int(0, stepY));
+        return _drumTrack.HasDustAt(sideX) || _drumTrack.HasDustAt(sideY);
     }
 
     private Vector2Int FindNearestOpenCell(Vector2Int fromCell, int radius)
