@@ -123,7 +123,25 @@ public partial class Vehicle : MonoBehaviour
         if (activeTrail != null)
         {
             var tr = activeTrail.GetComponent<TrailRenderer>();
-            if (tr != null) tr.Clear();
+            if (tr != null)
+            {
+                tr.Clear();
+                StartCoroutine(ReenableTrailAfterWrap(tr));
+            }
+        }
+    }
+
+    private IEnumerator ReenableTrailAfterWrap(TrailRenderer tr)
+    {
+        if (tr == null) yield break;
+
+        tr.emitting = false;
+        yield return null; // wait one frame after teleport so no cross-screen segment is rebuilt
+
+        if (tr != null)
+        {
+            tr.Clear();
+            tr.emitting = boosting;
         }
     }
 
