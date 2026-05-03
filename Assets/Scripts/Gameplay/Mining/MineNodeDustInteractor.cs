@@ -20,26 +20,10 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [SerializeField] private float edgeHugForce = 2f;
 
-    [Tooltip("Target escape speed along the computed open-space direction while embedded in dust.")]
-    [SerializeField, Min(0f)] private float escapeTargetSpeed = 4f;
-    [Tooltip("Maximum acceleration used when steering toward the escape target speed.")]
-    [SerializeField, Min(0f)] private float escapeAccel = 28f;
-    [Tooltip("Seconds for dust escape push to ramp from 0 to full strength while staying in contact.")]
-    [SerializeField, Min(0f)] private float escapeRampSeconds = 0.12f;
-    [Tooltip("Max total force this component can apply in one FixedUpdate (dust braking + steering + containment).")]
-    [SerializeField, Min(0f)] private float maxTotalDustResponseForce = 40f;
+    [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
+    [SerializeField] private float escapePushForce = 12f;
     [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
     [SerializeField] private float maxCorrectionPerTick = 0.5f;
-    [Tooltip("Maximum speed used when separating out of blocked dust cells.")]
-    [SerializeField, Min(0f)] private float maxSeparationSpeed = 4f;
-    [Tooltip("Acceleration used to converge toward the separation velocity.")]
-    [SerializeField, Min(0f)] private float separationAccel = 30f;
-    [Tooltip("Penetration dead zone in world units; below this no separation is applied.")]
-    [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
-    [Tooltip("How quickly inward wall velocity is damped (normalized to 50 Hz).")]
-    [SerializeField, Min(0f)] private float inwardVelocityDamping = 0.65f;
-    [Tooltip("Maximum inward speed removed per physics tick when damping wall penetration.")]
-    [SerializeField, Min(0f)] private float maxVelocityCorrectionPerTick = 2.5f;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -92,9 +76,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     private bool _prevInDust;
     private Vector2 _prevPos;
     private bool _hasPrevPos;
-    private float _escapeRampTimer;
-    private float _escapePersistTimer;
-    private float _dustResponseForceBudget;
 
     // ---------------------------------------------------------------
     // Public API
@@ -121,10 +102,31 @@ public class MineNodeDustInteractor : MonoBehaviour
     void FixedUpdate()
     {
         if (_rb == null || _drumTrack == null) return;
-        _dustResponseForceBudget = Mathf.Max(0f, maxTotalDustResponseForce);
 
         if (_hasPrevPos)
             EnforceSweptContainment(_prevPos, _rb.position);
+
+
+        if (_drumTrack.TryGetPlayAreaWorld(out var area))
+        {
+            const float kBoundaryInset = 0.05f;
+            Vector2 clamped = new Vector2(
+                Mathf.Clamp(_rb.position.x, area.left + kBoundaryInset, area.right - kBoundaryInset),
+                Mathf.Clamp(_rb.position.y, area.bottom + kBoundaryInset, area.top - kBoundaryInset));
+            if ((clamped - _rb.position).sqrMagnitude > 0.000001f)
+            {
+                Vector2 correction = clamped - _rb.position;
+                _rb.position = clamped;
+
+                if (correction.sqrMagnitude > 0.000001f)
+                {
+                    Vector2 outward = correction.normalized;
+                    float outwardSpeed = Vector2.Dot(_rb.linearVelocity, -outward);
+                    if (outwardSpeed > 0f)
+                        _rb.linearVelocity += outward * outwardSpeed;
+                }
+            }
+        }
 
         Vector2    worldPos = _rb.position;
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
@@ -140,48 +142,30 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (inDust)
         {
             if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
-                ApplyDustResponseForce(-_rb.linearVelocity * extraBrake);
+                _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
 
             // Push back toward the nearest open (non-dust) neighboring cell so the node
             // can't remain embedded in a wall — this is the complement of the edge-hug force.
             Vector2 escapeDir = SumNeighborDirections(cell, requireDust: false);
-            float occupancy01 = ComputeDustOccupancy01(cell);
             if (escapeDir.sqrMagnitude > 0.0001f)
             {
-                float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-                Vector2 escapeNormal = escapeDir.normalized;
-                _escapePersistTimer += dt;
-                _escapeRampTimer = Mathf.Min(Mathf.Max(escapeRampSeconds, 0.0001f), _escapeRampTimer + dt);
-                float ramp01 = Mathf.Clamp01(_escapeRampTimer / Mathf.Max(escapeRampSeconds, 0.0001f));
-                float persist01 = Mathf.Clamp01(_escapePersistTimer / 0.08f);
-                float severity01 = Mathf.Clamp01(Mathf.Max(occupancy01, persist01));
-                float response01 = ramp01 * severity01;
-
-                Vector2 desiredVelocity = escapeNormal * (Mathf.Max(0f, escapeTargetSpeed) * response01);
-                Vector2 velocityError = desiredVelocity - _rb.linearVelocity;
-                Vector2 desiredAccel = Vector2.ClampMagnitude(velocityError / dt, Mathf.Max(0f, escapeAccel));
-                ApplyDustResponseForce(desiredAccel * _rb.mass);
+                _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
 
                 // Hard wall: cancel any velocity component pushing deeper into the dust wall.
                 // This prevents driving forces from overpowering the escape push and tunneling through.
-                float intoWallVel = Vector2.Dot(_rb.linearVelocity, escapeNormal);
+                Vector2 wallNormal  = escapeDir.normalized;
+                float   intoWallVel = Vector2.Dot(_rb.linearVelocity, wallNormal);
                 if (intoWallVel < 0f)
-                    ApplyInwardVelocityDamping(escapeNormal);
+                    _rb.linearVelocity -= wallNormal * intoWallVel;
             }
-            else
-            {
-                // Hysteresis/cooldown to avoid rapid force toggles at boundary transitions.
-                _escapePersistTimer = Mathf.Max(0f, _escapePersistTimer - Time.fixedDeltaTime * 0.5f);
-                _escapeRampTimer = Mathf.Max(0f, _escapeRampTimer - Time.fixedDeltaTime * 0.5f);
-            }
-        }
-        else
-        {
-            _escapePersistTimer = Mathf.Max(0f, _escapePersistTimer - Time.fixedDeltaTime * 3f);
-            _escapeRampTimer = Mathf.Max(0f, _escapeRampTimer - Time.fixedDeltaTime * 3f);
         }
 
-        if (!carveMaze) return;
+        if (!carveMaze)
+        {
+            _prevPos = _rb.position;
+            _hasPrevPos = true;
+            return;
+        }
 
         // ---------------------------------------------------------------
         // None-hunter: retarget tick (no budget gate — runs indefinitely)
@@ -244,7 +228,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         {
             Vector2 edgeDir = SumNeighborDirections(cell, requireDust: true);
             if (edgeDir.sqrMagnitude > 0.0001f)
-                ApplyDustResponseForce(edgeDir.normalized * edgeHugForce);
+                _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
         }
 
         _prevPos = _rb.position;
@@ -254,70 +238,104 @@ public class MineNodeDustInteractor : MonoBehaviour
     private void EnforceSweptContainment(Vector2 fromPos, Vector2 toPos)
     {
         Vector2 delta = toPos - fromPos;
+
+        Vector2Int fromCell = _drumTrack.CellOf(fromPos);
+        Vector2Int toCell = _drumTrack.CellOf(toPos);
+        if (IsDiagonalCutBlocked(fromCell, toCell))
+        {
+            if (TryFindNearestOpenCell(fromCell, 2, out var legal))
+            {
+                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            }
+            _rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         float maxAxis = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y));
-        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 4f), 1, 64);
+        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 6f), 1, 96);
+        Vector2Int prevCell = fromCell;
         for (int i = 1; i <= steps; i++)
         {
             float t = (float)i / steps;
             Vector2 sample = Vector2.Lerp(fromPos, toPos, t);
             Vector2Int sampleCell = _drumTrack.CellOf(sample);
+
+            if (IsDiagonalCutBlocked(prevCell, sampleCell))
+            {
+                if (TryFindNearestOpenCell(prevCell, 2, out var legalDiag))
+                {
+                    Vector2 diagCorrection = _drumTrack.GridToWorldPosition(legalDiag) - _rb.position;
+                    _rb.position += Vector2.ClampMagnitude(diagCorrection, Mathf.Max(0f, maxCorrectionPerTick));
+                }
+                _rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
+            prevCell = sampleCell;
             if (!_drumTrack.HasDustAt(sampleCell)) continue;
 
             Vector2 tangent = new Vector2(-delta.y, delta.x);
-            Vector2 wallNormal = Vector2.zero;
             if (tangent.sqrMagnitude > 0.0001f)
             {
                 tangent.Normalize();
-                wallNormal = new Vector2(-tangent.y, tangent.x);
-                if (Vector2.Dot(_rb.linearVelocity, wallNormal) > 0f)
-                    wallNormal = -wallNormal;
+                float tangentialSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
+                _rb.linearVelocity = tangent * tangentialSpeed;
             }
             else
             {
-                wallNormal = delta.sqrMagnitude > 0.0001f ? -delta.normalized : Vector2.zero;
+                _rb.linearVelocity = Vector2.zero;
             }
-            if (wallNormal.sqrMagnitude > 0.0001f)
-                ApplyInwardVelocityDamping(wallNormal);
 
-            Vector2Int legal = FindNearestOpenCell(sampleCell, 4);
-            Vector2 legalWorld = _drumTrack.GridToWorldPosition(legal);
-            Vector2 correction = legalWorld - sample;
-            float correctionMag = correction.magnitude;
-            float deadZone = Mathf.Max(0f, separationDeadZone);
-            if (correctionMag <= deadZone) return;
-
-            Vector2 correctionNormal = correctionMag > 0.0001f ? correction / correctionMag : Vector2.zero;
-            float normalCorrection = Vector2.Dot(correction, correctionNormal);
-            if (normalCorrection <= deadZone) return;
-
-            float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-            float desiredDistance = Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), normalCorrection - deadZone);
-            float targetSpeed = Mathf.Min(Mathf.Max(0f, maxSeparationSpeed), desiredDistance / dt);
-            Vector2 targetVelocity = correctionNormal * targetSpeed;
-            float currentNormalSpeed = Vector2.Dot(_rb.linearVelocity, correctionNormal);
-            Vector2 currentNormalVelocity = correctionNormal * currentNormalSpeed;
-            Vector2 deltaVelocity = targetVelocity - currentNormalVelocity;
-            float maxDeltaSpeed = Mathf.Max(0f, separationAccel) * dt;
-            Vector2 accelDelta = Vector2.ClampMagnitude(deltaVelocity, maxDeltaSpeed);
-            ApplyDustResponseForce((accelDelta / dt) * _rb.mass);
+            if (TryFindNearestOpenCell(sampleCell, 4, out var legal))
+            {
+                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
+                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+            }
+            _rb.linearVelocity = Vector2.zero;
             return;
         }
     }
 
-    private Vector2Int FindNearestOpenCell(Vector2Int fromCell, int radius)
+    private bool IsDiagonalCutBlocked(Vector2Int fromCell, Vector2Int toCell)
     {
-        if (!_drumTrack.HasDustAt(fromCell)) return fromCell;
-        Vector2Int best = fromCell;
+        int stepX = toCell.x - fromCell.x;
+        int stepY = toCell.y - fromCell.y;
+        if (stepX == 0 || stepY == 0) return false;
+
+        stepX = stepX > 0 ? 1 : -1;
+        stepY = stepY > 0 ? 1 : -1;
+
+        Vector2Int sideX = _drumTrack.WrapGridCell(fromCell + new Vector2Int(stepX, 0));
+        Vector2Int sideY = _drumTrack.WrapGridCell(fromCell + new Vector2Int(0, stepY));
+        return _drumTrack.HasDustAt(sideX) || _drumTrack.HasDustAt(sideY);
+    }
+
+    private bool TryFindNearestOpenCell(Vector2Int fromCell, int radius, out Vector2Int best)
+    {
+        if (!_drumTrack.HasDustAt(fromCell))
+        {
+            best = fromCell;
+            return true;
+        }
+
+        best = fromCell;
         float bestDist = float.MaxValue;
+        bool found = false;
         for (int y = -radius; y <= radius; y++)
         for (int x = -radius; x <= radius; x++)
         {
-            var c = fromCell + new Vector2Int(x, y);
+            var c = _drumTrack.WrapGridCell(fromCell + new Vector2Int(x, y));
             if (_drumTrack.HasDustAt(c)) continue;
             float d = x * x + y * y;
-            if (d < bestDist) { bestDist = d; best = c; }
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = c;
+                found = true;
+            }
         }
-        return best;
+        return found;
     }
 
     // ---------------------------------------------------------------
@@ -448,27 +466,6 @@ public class MineNodeDustInteractor : MonoBehaviour
         return dir;
     }
 
-    private float ComputeDustOccupancy01(Vector2Int center)
-    {
-        int dustCount = 0;
-        for (int i = 0; i < kNeighbours8.Length; i++)
-        {
-            if (_drumTrack.HasDustAt(center + kNeighbours8[i]))
-                dustCount++;
-        }
-        return dustCount / (float)kNeighbours8.Length;
-    }
-
-    private void ApplyDustResponseForce(Vector2 force)
-    {
-        float mag = force.magnitude;
-        if (mag <= 0.0001f || _dustResponseForceBudget <= 0f) return;
-
-        float appliedMag = Mathf.Min(mag, _dustResponseForceBudget);
-        _rb.AddForce(force * (appliedMag / mag), ForceMode2D.Force);
-        _dustResponseForceBudget -= appliedMag;
-    }
-
     public void SetLevelAuthority(DrumTrack drumTrack)
     {
         _drumTrack = drumTrack;
@@ -478,23 +475,5 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         if (_rb == null || _drumTrack == null) return false;
         return _drumTrack.HasDustAt(_drumTrack.CellOf(_rb.position));
-    }
-
-    private void ApplyInwardVelocityDamping(Vector2 wallNormal)
-    {
-        if (wallNormal.sqrMagnitude <= 0.0001f) return;
-        wallNormal.Normalize();
-
-        Vector2 velocity = _rb.linearVelocity;
-        float inwardSpeed = -Vector2.Dot(velocity, wallNormal);
-        if (inwardSpeed <= 0f) return;
-
-        float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-        float normalizedTick = dt / 0.02f;
-        float dampingFraction = 1f - Mathf.Exp(-Mathf.Max(0f, inwardVelocityDamping) * normalizedTick);
-        float maxRemoval = Mathf.Max(0f, maxVelocityCorrectionPerTick) * normalizedTick;
-        float removeSpeed = Mathf.Min(inwardSpeed, Mathf.Min(inwardSpeed * dampingFraction, maxRemoval));
-
-        _rb.linearVelocity = velocity + wallNormal * removeSpeed;
     }
 }
