@@ -119,29 +119,47 @@ public partial class Vehicle : MonoBehaviour
         _posHistoryAccum = 0f;
         _posHistoryLast  = transform.position;
 
-        // Clear the rendered trail geometry.
-        if (activeTrail != null)
+        if (activeTrail == null) return;
+
+        ClearActiveTrailVisuals();
+        StartCoroutine(ReenableTrailVisualsAfterWrap());
+    }
+
+    private void ClearActiveTrailVisuals()
+    {
+        if (activeTrail == null) return;
+
+        foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true))
         {
-            var tr = activeTrail.GetComponent<TrailRenderer>();
-            if (tr != null)
-            {
-                tr.Clear();
-                StartCoroutine(ReenableTrailAfterWrap(tr));
-            }
+            tr.emitting = false;
+            tr.Clear();
+        }
+
+        foreach (var ps in activeTrail.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
     }
 
-    private IEnumerator ReenableTrailAfterWrap(TrailRenderer tr)
+    private IEnumerator ReenableTrailVisualsAfterWrap()
     {
-        if (tr == null) yield break;
+        // Wait until render step after teleport so no cross-screen segment is rebuilt.
+        yield return new WaitForEndOfFrame();
 
-        tr.emitting = false;
-        yield return null; // wait one frame after teleport so no cross-screen segment is rebuilt
+        if (activeTrail == null) yield break;
 
-        if (tr != null)
+        foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true))
         {
             tr.Clear();
             tr.emitting = boosting;
+        }
+
+        if (boosting)
+        {
+            foreach (var ps in activeTrail.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                ps.Play(true);
+            }
         }
     }
 
@@ -1092,7 +1110,8 @@ public partial class Vehicle : MonoBehaviour
 
             if (activeTrail != null)
             {
-                activeTrail.GetComponent<TrailRenderer>().emitting = true; // Enable the trail's emission
+                foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true)) tr.emitting = true;
+                foreach (var ps in activeTrail.GetComponentsInChildren<ParticleSystem>(true)) ps.Play(true);
             }
         }
     public void SetBoostFree(bool free)
@@ -1124,7 +1143,9 @@ public partial class Vehicle : MonoBehaviour
         // Disable the trail's emission when boosting stops
         if (activeTrail != null)
         {
-            activeTrail.GetComponent<TrailRenderer>().emitting = false;
+            foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true)) tr.emitting = false;
+            foreach (var ps in activeTrail.GetComponentsInChildren<ParticleSystem>(true))
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
     }
     public float GetCumulativeSpentTanks() {
