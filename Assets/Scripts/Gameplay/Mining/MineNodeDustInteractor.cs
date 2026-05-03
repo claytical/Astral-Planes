@@ -24,6 +24,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     [SerializeField] private float escapePushForce = 12f;
     [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
     [SerializeField] private float maxCorrectionPerTick = 0.5f;
+    [SerializeField] private bool debugSweepContainment = false;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -237,105 +238,22 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     private void EnforceSweptContainment(Vector2 fromPos, Vector2 toPos)
     {
-        Vector2 delta = toPos - fromPos;
+        var hit = GridSweepContainmentUtility.FindFirstBlockedCrossing(_drumTrack, fromPos, toPos);
+        if (!hit.hit) return;
 
-        Vector2Int fromCell = _drumTrack.CellOf(fromPos);
-        Vector2Int toCell = _drumTrack.CellOf(toPos);
-        if (IsDiagonalCutBlocked(fromCell, toCell))
-        {
-            if (TryFindNearestOpenCell(fromCell, 2, out var legal))
-            {
-                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
-                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
-            }
-            _rb.linearVelocity = Vector2.zero;
-            return;
-        }
+        Vector2 n = hit.normal.sqrMagnitude > 0.0001f ? hit.normal.normalized : Vector2.zero;
+        float inset = Mathf.Max(0.0005f, Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), 0.02f));
+        Vector2 target = hit.impactPoint - n * inset;
+        Vector2 correction = target - _rb.position;
+        Vector2 clampedCorrection = Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
+        _rb.position += clampedCorrection;
 
-        float maxAxis = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y));
-        int steps = Mathf.Clamp(Mathf.CeilToInt(maxAxis * 6f), 1, 96);
-        Vector2Int prevCell = fromCell;
-        for (int i = 1; i <= steps; i++)
-        {
-            float t = (float)i / steps;
-            Vector2 sample = Vector2.Lerp(fromPos, toPos, t);
-            Vector2Int sampleCell = _drumTrack.CellOf(sample);
+        float inward = Vector2.Dot(_rb.linearVelocity, -n);
+        if (inward > 0f)
+            _rb.linearVelocity += n * inward;
 
-            if (IsDiagonalCutBlocked(prevCell, sampleCell))
-            {
-                if (TryFindNearestOpenCell(prevCell, 2, out var legalDiag))
-                {
-                    Vector2 diagCorrection = _drumTrack.GridToWorldPosition(legalDiag) - _rb.position;
-                    _rb.position += Vector2.ClampMagnitude(diagCorrection, Mathf.Max(0f, maxCorrectionPerTick));
-                }
-                _rb.linearVelocity = Vector2.zero;
-                return;
-            }
-
-            prevCell = sampleCell;
-            if (!_drumTrack.HasDustAt(sampleCell)) continue;
-
-            Vector2 tangent = new Vector2(-delta.y, delta.x);
-            if (tangent.sqrMagnitude > 0.0001f)
-            {
-                tangent.Normalize();
-                float tangentialSpeed = Vector2.Dot(_rb.linearVelocity, tangent);
-                _rb.linearVelocity = tangent * tangentialSpeed;
-            }
-            else
-            {
-                _rb.linearVelocity = Vector2.zero;
-            }
-
-            if (TryFindNearestOpenCell(sampleCell, 4, out var legal))
-            {
-                Vector2 correction = _drumTrack.GridToWorldPosition(legal) - _rb.position;
-                _rb.position += Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
-            }
-            _rb.linearVelocity = Vector2.zero;
-            return;
-        }
-    }
-
-    private bool IsDiagonalCutBlocked(Vector2Int fromCell, Vector2Int toCell)
-    {
-        int stepX = toCell.x - fromCell.x;
-        int stepY = toCell.y - fromCell.y;
-        if (stepX == 0 || stepY == 0) return false;
-
-        stepX = stepX > 0 ? 1 : -1;
-        stepY = stepY > 0 ? 1 : -1;
-
-        Vector2Int sideX = _drumTrack.WrapGridCell(fromCell + new Vector2Int(stepX, 0));
-        Vector2Int sideY = _drumTrack.WrapGridCell(fromCell + new Vector2Int(0, stepY));
-        return _drumTrack.HasDustAt(sideX) || _drumTrack.HasDustAt(sideY);
-    }
-
-    private bool TryFindNearestOpenCell(Vector2Int fromCell, int radius, out Vector2Int best)
-    {
-        if (!_drumTrack.HasDustAt(fromCell))
-        {
-            best = fromCell;
-            return true;
-        }
-
-        best = fromCell;
-        float bestDist = float.MaxValue;
-        bool found = false;
-        for (int y = -radius; y <= radius; y++)
-        for (int x = -radius; x <= radius; x++)
-        {
-            var c = _drumTrack.WrapGridCell(fromCell + new Vector2Int(x, y));
-            if (_drumTrack.HasDustAt(c)) continue;
-            float d = x * x + y * y;
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = c;
-                found = true;
-            }
-        }
-        return found;
+        if (debugSweepContainment)
+            Debug.Log($"[MineNodeDustInteractor] blockedCell={hit.blockedCell} normal={n} correctionDist={clampedCorrection.magnitude:F4}");
     }
 
     // ---------------------------------------------------------------
