@@ -46,6 +46,12 @@ public class MineNode : MonoBehaviour
     [SerializeField, Min(0f)] private float maxVelocityCorrectionPerTick = 2.5f;
     [SerializeField] private bool debugSweepContainment = false;
 
+    [Header("Containment Ownership Debug")]
+    [SerializeField] private bool assertSingleHardCorrectionPerTick = true;
+    private int _hardCorrectionsThisTick;
+
+    public bool didContainmentThisTick { get; private set; }
+
     [Header("Expiry")]
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
     [SerializeField, Min(0)] private int expireAfterLoops = 3;
@@ -231,6 +237,9 @@ public class MineNode : MonoBehaviour
             _track == null)
             return;
 
+        didContainmentThisTick = false;
+        _hardCorrectionsThisTick = 0;
+
         switch (State)
         {
             case MineNodeState.Drifting: FixedUpdateDrifting(); break;
@@ -334,6 +343,8 @@ public class MineNode : MonoBehaviour
         Vector2 correction = target - _rb.position;
         Vector2 clampedCorrection = Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
         _rb.position += clampedCorrection;
+        didContainmentThisTick = true;
+        _hardCorrectionsThisTick++;
 
         float inwardSpeed = Vector2.Dot(_rb.linearVelocity, -wallNormal);
         if (inwardSpeed > 0f)
@@ -606,6 +617,10 @@ public class MineNode : MonoBehaviour
         {
             _rb.position = pos;
             _rb.linearVelocity = _carveDir * _rb.linearVelocity.magnitude;
+            didContainmentThisTick = true;
+            _hardCorrectionsThisTick++;
+            if (assertSingleHardCorrectionPerTick && _hardCorrectionsThisTick > 1)
+                Debug.LogAssertion($"[MineNode] Multiple hard corrections in one tick on {name}: {_hardCorrectionsThisTick}", this);
         }
     }
 
