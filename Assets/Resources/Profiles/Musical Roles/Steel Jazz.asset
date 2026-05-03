@@ -22,7 +22,10 @@ MonoBehaviour:
   drainResistance01: 1
   dustHardness01: 0.248
   mineNodeSpeed: 0.3
-  mineNodeAgility: 0.5
+  mineNodeLocomotionProfile: {fileID: 11400000, guid: 729b36cbed0cf40df8012d4b5b1866b2,
+    type: 2}
+  defaultMineNodeArchetypeId: Steady
+  mineNodeArchetypeVariants: []
   midiPreset: 8
   ripeDuration: 128
   regrowthDelay: -1
