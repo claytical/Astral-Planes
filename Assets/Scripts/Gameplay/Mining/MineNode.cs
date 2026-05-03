@@ -214,7 +214,7 @@ public class MineNode : MonoBehaviour
         SetBehaviorIntent(MineNodeBehaviorIntent.Escaping);
         Debug.Log($"[MineNode] {name} — escaped through boundary.");
         FireResolvedOnce();
-        StartCoroutine(CleanupAndDestroy());
+        StartCoroutine(CleanupAndDestroy(waitForFullEscape: true));
     }
 
     // ---------------------------------------------------------------
@@ -724,9 +724,12 @@ public class MineNode : MonoBehaviour
         OnBehaviorIntentChanged?.Invoke(intent);
     }
 
-    private IEnumerator CleanupAndDestroy()
+    private IEnumerator CleanupAndDestroy(bool waitForFullEscape = false)
     {
-        yield return null;
+        if (waitForFullEscape)
+            yield return StartCoroutine(WaitUntilFullyOutsidePlayArea());
+        else
+            yield return null;
         var dt = _drumTrack;
         if (dt != null)
         {
@@ -735,6 +738,39 @@ public class MineNode : MonoBehaviour
             dt.UnregisterMineNode(this);
         }
         Destroy(gameObject);
+    }
+
+
+    private IEnumerator WaitUntilFullyOutsidePlayArea()
+    {
+        if (_rb == null)
+        {
+            yield return null;
+            yield break;
+        }
+
+        float timeoutAt = Time.time + 2f;
+        while (Time.time < timeoutAt)
+        {
+            if (IsFullyOutsidePlayArea(_rb.position))
+                yield break;
+
+            yield return new WaitForFixedUpdate();
+        }
+    }
+
+    private bool IsFullyOutsidePlayArea(Vector2 worldPos)
+    {
+        if (_drumTrack == null || !_drumTrack.TryGetPlayAreaWorld(out var area))
+            return true;
+
+        float radius = 0f;
+        if (_col != null)
+            radius = Mathf.Max(_col.bounds.extents.x, _col.bounds.extents.y);
+
+        bool outsideX = worldPos.x < area.left - radius || worldPos.x > area.right + radius;
+        bool outsideY = worldPos.y < area.bottom - radius || worldPos.y > area.top + radius;
+        return outsideX || outsideY;
     }
 
     private void TriggerExplosion()
