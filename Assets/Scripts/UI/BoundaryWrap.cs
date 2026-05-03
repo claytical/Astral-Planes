@@ -91,10 +91,13 @@ public class BoundaryWrap : MonoBehaviour
 
     private void HandleMineNodeBoundary(MineNode mine, Rigidbody2D rb)
     {
-        bool isHorizontal = side == BoundarySide.Left || side == BoundarySide.Right;
+        bool isLeftOrRight = side == BoundarySide.Left || side == BoundarySide.Right;
 
-        // Top/Bottom: always bounce inward
-        if (!isHorizontal) { BounceRigidbody(rb, true); return; }
+        // MineNode escape policy:
+        // - Allowed escape sides: LEFT and RIGHT only (when a dust gap is present and node is Fleeing).
+        // - TOP remains bounce-only by design.
+        // - BOTTOM remains bounce-only (never an escape side).
+        if (!isLeftOrRight) { BounceRigidbody(rb, true); return; }
 
         // If there is a dust cell at the boundary position, deny exit regardless of state —
         // the node hit a solid border cell and must find a gap opening to escape.

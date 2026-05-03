@@ -296,7 +296,9 @@ public class MineNode : MonoBehaviour
         RunStallEscape(myCell);
         RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
 
-        // Off-screen escape — fallback for when deterministic containment and boundary trigger are missed.
+        // Off-screen escape fallback:
+        // Allowed escape sides are LEFT, RIGHT, and TOP only.
+        // Bottom off-screen does NOT count as an escape and must never call HandleEscape().
         if (_cam == null) _cam = Camera.main;
         if (_cam != null)
         {
@@ -304,13 +306,21 @@ public class MineNode : MonoBehaviour
             float halfW = _cam.orthographicSize * _cam.aspect;
             float halfH = _cam.orthographicSize;
             Vector2 pos = _rb.position;
-            if (pos.x < -halfW - kEscapeMargin || pos.x > halfW + kEscapeMargin ||
-                pos.y < -halfH - kEscapeMargin || pos.y > halfH + kEscapeMargin)
+            if (CanEscapeFromWorldPos(pos, halfW, halfH, kEscapeMargin))
             {
                 HandleEscape();
                 return;
             }
         }
+    }
+
+    private static bool CanEscapeFromWorldPos(Vector2 pos, float halfW, float halfH, float margin)
+    {
+        // Keep this rule in sync with boundary-trigger behavior:
+        // escape permitted from left/right/top only; never from bottom.
+        return pos.x < -halfW - margin
+            || pos.x > halfW + margin
+            || pos.y > halfH + margin;
     }
 
     private void EnforceGridContainment(Vector2 fromPos, Vector2 toPos)
