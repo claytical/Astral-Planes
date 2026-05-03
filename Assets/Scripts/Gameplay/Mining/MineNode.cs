@@ -260,7 +260,8 @@ public class MineNode : MonoBehaviour
         ApplyLocomotion(0f, driftSpeedMultiplier);
 
         RunStallEscape(myCell);
-        RunBoundaryClamp(true, true);
+        if (!ShouldSkipBoundaryClampThisTick())
+            RunBoundaryClamp(true, true);
     }
 
     private void FixedUpdateFleeing()
@@ -303,7 +304,8 @@ public class MineNode : MonoBehaviour
         }
 
         RunStallEscape(myCell);
-        RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
+        if (!ShouldSkipBoundaryClampThisTick())
+            RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
 
         // Off-screen escape fallback:
         // Allowed escape sides are LEFT, RIGHT, and TOP only.
@@ -358,6 +360,13 @@ public class MineNode : MonoBehaviour
 
         if (debugSweepContainment)
             Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} correctionDist={clampedCorrection.magnitude:F4}");
+    }
+
+    private bool ShouldSkipBoundaryClampThisTick()
+    {
+        // When swept dust containment already performed a hard correction this tick,
+        // skip the subsequent play-area hard clamp to preserve single-correction ownership.
+        return didContainmentThisTick;
     }
 
     private void ApplyInwardVelocityDamping(Vector2 wallNormal)
