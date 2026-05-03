@@ -22,9 +22,6 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
     [SerializeField] private float escapePushForce = 12f;
-    [Tooltip("World-space cap for depenetration correction during swept boundary containment.")]
-    [SerializeField] private float maxCorrectionPerTick = 0.5f;
-    [SerializeField] private bool debugSweepContainment = false;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
@@ -103,31 +100,6 @@ public class MineNodeDustInteractor : MonoBehaviour
     void FixedUpdate()
     {
         if (_rb == null || _drumTrack == null) return;
-
-        if (_hasPrevPos)
-            EnforceSweptContainment(_prevPos, _rb.position);
-
-
-        if (_drumTrack.TryGetPlayAreaWorld(out var area))
-        {
-            const float kBoundaryInset = 0.05f;
-            Vector2 clamped = new Vector2(
-                Mathf.Clamp(_rb.position.x, area.left + kBoundaryInset, area.right - kBoundaryInset),
-                Mathf.Clamp(_rb.position.y, area.bottom + kBoundaryInset, area.top - kBoundaryInset));
-            if ((clamped - _rb.position).sqrMagnitude > 0.000001f)
-            {
-                Vector2 correction = clamped - _rb.position;
-                _rb.position = clamped;
-
-                if (correction.sqrMagnitude > 0.000001f)
-                {
-                    Vector2 outward = correction.normalized;
-                    float outwardSpeed = Vector2.Dot(_rb.linearVelocity, -outward);
-                    if (outwardSpeed > 0f)
-                        _rb.linearVelocity += outward * outwardSpeed;
-                }
-            }
-        }
 
         Vector2    worldPos = _rb.position;
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
@@ -234,26 +206,6 @@ public class MineNodeDustInteractor : MonoBehaviour
 
         _prevPos = _rb.position;
         _hasPrevPos = true;
-    }
-
-    private void EnforceSweptContainment(Vector2 fromPos, Vector2 toPos)
-    {
-        var hit = GridSweepContainmentUtility.FindFirstBlockedCrossing(_drumTrack, fromPos, toPos);
-        if (!hit.hit) return;
-
-        Vector2 n = hit.normal.sqrMagnitude > 0.0001f ? hit.normal.normalized : Vector2.zero;
-        float inset = Mathf.Max(0.0005f, Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), 0.02f));
-        Vector2 target = hit.impactPoint - n * inset;
-        Vector2 correction = target - _rb.position;
-        Vector2 clampedCorrection = Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
-        _rb.position += clampedCorrection;
-
-        float inward = Vector2.Dot(_rb.linearVelocity, -n);
-        if (inward > 0f)
-            _rb.linearVelocity += n * inward;
-
-        if (debugSweepContainment)
-            Debug.Log($"[MineNodeDustInteractor] blockedCell={hit.blockedCell} normal={n} correctionDist={clampedCorrection.magnitude:F4}");
     }
 
     // ---------------------------------------------------------------
