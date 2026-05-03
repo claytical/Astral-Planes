@@ -761,16 +761,30 @@ public class MineNode : MonoBehaviour
 
     private bool IsFullyOutsidePlayArea(Vector2 worldPos)
     {
-        if (_drumTrack == null || !_drumTrack.TryGetPlayAreaWorld(out var area))
-            return true;
-
         float radius = 0f;
         if (_col != null)
             radius = Mathf.Max(_col.bounds.extents.x, _col.bounds.extents.y);
 
-        bool outsideX = worldPos.x < area.left - radius || worldPos.x > area.right + radius;
-        bool outsideY = worldPos.y < area.bottom - radius || worldPos.y > area.top + radius;
-        return outsideX || outsideY;
+        // Use the visible camera frame first so escape cleanup waits until the node is fully off-screen,
+        // not merely outside DrumTrack's playable sub-rect.
+        if (_cam == null) _cam = Camera.main;
+        if (_cam != null)
+        {
+            float halfH = _cam.orthographicSize;
+            float halfW = halfH * _cam.aspect;
+            Vector2 camPos = _cam.transform.position;
+
+            bool outsideX = worldPos.x < camPos.x - halfW - radius || worldPos.x > camPos.x + halfW + radius;
+            bool outsideY = worldPos.y < camPos.y - halfH - radius || worldPos.y > camPos.y + halfH + radius;
+            return outsideX || outsideY;
+        }
+
+        if (_drumTrack == null || !_drumTrack.TryGetPlayAreaWorld(out var area))
+            return true;
+
+        bool outsidePlayAreaX = worldPos.x < area.left - radius || worldPos.x > area.right + radius;
+        bool outsidePlayAreaY = worldPos.y < area.bottom - radius || worldPos.y > area.top + radius;
+        return outsidePlayAreaX || outsidePlayAreaY;
     }
 
     private void TriggerExplosion()
