@@ -21,6 +21,13 @@ public class SuperNode : MonoBehaviour
     [SerializeField] private float collisionAudioVelocity = 0.85f;
     [SerializeField] private int collisionAudioTicks = 30;
 
+    [Header("Role shard visuals")]
+    [SerializeField] private Transform roleShardRoot;
+    [SerializeField] private SpriteRenderer templateDiamondRenderer;
+    [SerializeField] private float roleShardRadius = 0.3f;
+    [SerializeField] private float roleShardScale = 0.85f;
+    [SerializeField] private float roleShardRotationDegPerSec = 65f;
+
     public Action OnResolved;
 
     private float _spawnTime;
@@ -31,12 +38,15 @@ public class SuperNode : MonoBehaviour
     private readonly Dictionary<MusicalRole, InstrumentTrack> _trackByRole = new();
     private readonly HashSet<MusicalRole> _activeRoles = new();
     private readonly HashSet<MusicalRole> _armedRoles = new();
+    private readonly List<SpriteRenderer> _roleShardRenderers = new();
 
     private void Awake()
     {
         _spawnTime = Time.time;
         if (!soloVoice) soloVoice = FindAnyObjectByType<SoloVoice>();
         if (!dustWaveDriver) dustWaveDriver = FindAnyObjectByType<SuperNodeCosmicDustWaveDriver>();
+        if (templateDiamondRenderer == null) templateDiamondRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        if (roleShardRoot == null) roleShardRoot = transform;
         ResolveDrumTrackIfNeeded();
     }
 
@@ -71,7 +81,22 @@ public class SuperNode : MonoBehaviour
         if (_activeRoles.Count == 0)
             BuildRoleMapFromController();
 
+        RebuildRoleShardVisuals();
+
         TrySubscribeToBoundary();
+    }
+
+    private void Update()
+    {
+        if (_roleShardRenderers.Count <= 0) return;
+        float delta = roleShardRotationDegPerSec * Time.deltaTime;
+        for (int i = 0; i < _roleShardRenderers.Count; i++)
+        {
+            var sr = _roleShardRenderers[i];
+            if (!sr) continue;
+            float sign = (i % 2 == 0) ? 1f : -1f;
+            sr.transform.Rotate(0f, 0f, delta * sign, Space.Self);
+        }
     }
 
     private void OnDisable()
@@ -103,6 +128,74 @@ public class SuperNode : MonoBehaviour
             _trackByRole[t.assignedRole] = t;
             _activeRoles.Add(t.assignedRole);
         }
+
+        if (_activeRoles.Count == 0)
+        {
+            var motifRoles = ResolveRolesFromCurrentMotif();
+            for (int i = 0; i < motifRoles.Count; i++)
+                _activeRoles.Add(motifRoles[i]);
+        }
+    }
+
+    private List<MusicalRole> ResolveRolesFromCurrentMotif()
+    {
+        var roles = new List<MusicalRole>();
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif == null) return roles;
+        return motif.GetActiveRoles();
+    }
+
+    private void RebuildRoleShardVisuals()
+    {
+        if (templateDiamondRenderer == null || roleShardRoot == null) return;
+
+        for (int i = 0; i < _roleShardRenderers.Count; i++)
+            if (_roleShardRenderers[i] != null) Destroy(_roleShardRenderers[i].gameObject);
+        _roleShardRenderers.Clear();
+
+        var orderedRoles = _activeRoles.Count > 0 ? _activeRoles.ToList() : ResolveRolesFromCurrentMotif();
+        if (orderedRoles.Count == 0) return;
+
+        templateDiamondRenderer.enabled = false;
+        int count = orderedRoles.Count;
+        for (int i = 0; i < count; i++)
+        {
+            var role = orderedRoles[i];
+            var go = new GameObject($"SuperNodeRoleShard_{role}");
+            go.transform.SetParent(roleShardRoot, false);
+
+            float ang = (i / (float)count) * Mathf.PI * 2f;
+            go.transform.localPosition = new Vector3(Mathf.Cos(ang), Mathf.Sin(ang), 0f) * roleShardRadius;
+            go.transform.localScale = Vector3.one * roleShardScale;
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = templateDiamondRenderer.sprite;
+            sr.sortingLayerID = templateDiamondRenderer.sortingLayerID;
+            sr.sortingOrder = templateDiamondRenderer.sortingOrder;
+            sr.sharedMaterial = templateDiamondRenderer.sharedMaterial;
+            sr.color = ResolveRoleColor(role);
+            _roleShardRenderers.Add(sr);
+        }
+    }
+
+    private Color ResolveRoleColor(MusicalRole role)
+    {
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (roleProfile != null)
+        {
+            var c = roleProfile.dustColors.baseColor;
+            c.a = 1f;
+            return c;
+        }
+
+        if (_trackByRole.TryGetValue(role, out var track) && track != null)
+        {
+            var c = track.trackColor;
+            c.a = 1f;
+            return c;
+        }
+
+        return Color.white;
     }
 
     private void TrySubscribeToBoundary()
