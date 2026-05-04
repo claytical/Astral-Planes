@@ -17,16 +17,17 @@ using System.Collections.Generic;
     [HideInInspector] public int gridHeight = 12;
     public GridCell[,] GridCells;
     public float cellSize = 1f; // Adjust to match the world space size
+    private GameFlowManager _gfm;
     private DrumTrack _drums;
-    
+
     private void Awake()
     {
         if (_drums == null)
         {
             // Prefer the active drum track from the GameFlowManager
-            var gfm = GameFlowManager.Instance;
-            if (gfm != null && gfm.activeDrumTrack != null)
-                _drums = gfm.activeDrumTrack;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            if (_gfm != null && _gfm.activeDrumTrack != null)
+                _drums = _gfm.activeDrumTrack;
             else
                 _drums = FindObjectOfType<DrumTrack>();
         }

@@ -19,13 +19,20 @@ MonoBehaviour:
   arcadeBoostAccel: 80
   arcadeLinearDamping: 0.25
   arcadeAngularDamping: 0.5
-  requireBoostForThrust: 0
   coastBrakeForce: 1.8
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  carveRadiusMul: 1.1
-  carvePowerMul: 3
   mass: 1
   capacity: 100
-  burnEfficiency: 0.95
+  burnRate: 0.25
+  plowHalfWidthCells: 1
+  plowDepthCells: 2
+  plowMinSpeed: 2
+  plowChipAmount: 1
+  vehicleKeepClearRadiusCells: 1
+  soulMinScale: 0.3
+  soulMaxScale: 1.2
+  soulScaleLerpSpeed: 14
+  soulAlphaMin: 0
+  soulAlphaMax: 0.85

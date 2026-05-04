@@ -84,6 +84,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     public Action<MusicalRole, float> onDelivery;
     public event Action<MusicalRole> OnAttuned;
 
+    private GameFlowManager _gfm;
     private PhaseStarBehaviorProfile _profile;
     private PhaseStar _star;
     private PhaseStarCravingNavigator _navigator;
@@ -204,7 +205,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (best == null) return;
 
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
         Vector2 starPos  = transform.position;
@@ -240,9 +242,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void TickTentacle(Tentacle tentacle, float dt)
     {
-        var gfm    = GameFlowManager.Instance;
-        var gen    = gfm?.dustGenerator;
-        var drum   = gfm?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen    = _gfm?.dustGenerator;
+        var drum   = _gfm?.activeDrumTrack;
         Vector2 starPos = transform.position;
 
         switch (tentacle.state)
@@ -560,7 +562,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             float dustCharge01 = 1f;
             if (tentacle.state == TentacleState.Draining || tentacle.state == TentacleState.Dissolving)
             {
-                var gen = GameFlowManager.Instance?.dustGenerator;
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                var gen = _gfm?.dustGenerator;
                 if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var dustRef) && dustRef != null)
                     dustCharge01 = dustRef.Charge01;
             }
@@ -804,9 +807,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (_profile == null || !_profile.starKeepsDustClear)
             return;
 
-        var gfm  = GameFlowManager.Instance;
-        var gen  = gfm?.dustGenerator;
-        var drum = gfm?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen  = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
         Vector2Int center = drum.WorldToGridPosition(transform.position);
@@ -905,7 +908,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private bool IsTargetValid(Vector2Int cell, MusicalRole role, out string reason)
     {
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null || !gen.HasDustAt(cell))
         {
             reason = "HasDustAt false";

@@ -7,6 +7,7 @@ using Random = UnityEngine.Random;
 
 public class CosmicDustGenerator : MonoBehaviour
 {
+    private GameFlowManager _gfm;
     private CosmicDustRegrowthController _regrow;
     private bool _isBootstrappingMaze = false;
     public GameObject dustPrefab;
@@ -830,16 +831,16 @@ public class CosmicDustGenerator : MonoBehaviour
     {
         if (drums != null && phaseTransitionManager != null) return;
 
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null) return;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        if (_gfm == null) return;
 
-        if (drums == null) drums = gfm.activeDrumTrack;
-        if (phaseTransitionManager == null) phaseTransitionManager = gfm.phaseTransitionManager;
+        if (drums == null) drums = _gfm.activeDrumTrack;
+        if (phaseTransitionManager == null) phaseTransitionManager = _gfm.phaseTransitionManager;
     }
     public void ManualStart()
     {
-        var gfm = GameFlowManager.Instance;
-        drums = gfm.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        drums = _gfm.activeDrumTrack;
         TryEnsureRefs();
         EnsureRegrowController();
         if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();

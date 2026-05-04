@@ -69,6 +69,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     private float _carveTimer;
     private int   _dustCellsCarved = 0;
     private Rigidbody2D _rb;
+    private GameFlowManager _gfm;
     private DrumTrack   _drumTrack;
     private MineNode    _node;
     private bool _prevInDust;
@@ -179,7 +180,8 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (_carveTimer < carveIntervalSeconds) return;
         _carveTimer = 0f;
 
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null || _node == null) return;
 
         MusicalRole role = _node.GetImprintRole();
@@ -216,7 +218,8 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         if (_node == null || _drumTrack == null) return;
 
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null) return;
         if (!gen.TryGetCellGo(cell, out var go) || go == null) return;
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return;
@@ -298,7 +301,8 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     private void PaintTargetCell()
     {
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null || _node == null) return;
 
         MusicalRole role = _node.GetImprintRole();
@@ -315,7 +319,8 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     private bool IsAlreadyNodeRole(Vector2Int gp)
     {
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null || _node == null) return false;
         if (!gen.TryGetCellGo(gp, out var go) || go == null) return false;
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return false;

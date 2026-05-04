@@ -84,7 +84,8 @@ public partial class CosmicDust
         float vel127 = Mathf.Lerp(pluck.minVelocity127, pluck.maxVelocity127, bloom01);
         float cooldown = Mathf.Lerp(pluck.maxCooldownSeconds, pluck.minCooldownSeconds, bloom01);
 
-        GameFlowManager.Instance?.controller?.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        _gfm?.controller?.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
         _nextDustPluckTime = Time.time + cooldown;
     }
 

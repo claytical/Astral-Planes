@@ -84,6 +84,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     [SerializeField] private SteeringTuning steering = new();
     [SerializeField] private NavigatorBlendTuning navBlend = new();
 
+    private GameFlowManager _gfm;
     private Rigidbody2D _rb;
     private PhaseStarBehaviorProfile _profile;
     private bool _enabled;
@@ -134,13 +135,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         VehiclePositionsProvider ??= () =>
         {
-            var gfm = GameFlowManager.Instance;
-            if (gfm == null || gfm.localPlayers == null) return Array.Empty<Vector2>();
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            if (_gfm == null || _gfm.localPlayers == null) return Array.Empty<Vector2>();
 
-            var list = new List<Vector2>(gfm.localPlayers.Count);
-            for (int i = 0; i < gfm.localPlayers.Count; i++)
+            var list = new List<Vector2>(_gfm.localPlayers.Count);
+            for (int i = 0; i < _gfm.localPlayers.Count; i++)
             {
-                var lp = gfm.localPlayers[i];
+                var lp = _gfm.localPlayers[i];
                 if (lp == null) continue;
                 var v = lp.plane;
                 if (v == null) continue;

@@ -95,7 +95,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.58, y: 0.86}
+  m_Size: {x: 0.5, y: 0.77}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -325,8 +325,8 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.64, y: 0.98}
-    newSize: {x: 0.58, y: 0.86}
+    oldSize: {x: 0.5, y: 0.77}
+    newSize: {x: 0.5, y: 0.77}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
@@ -402,13 +402,11 @@ MonoBehaviour:
   circleSortingOrder: -1
   circleLerpSpeed: 10
   circleSprite: {fileID: 0}
-  dotSprite: {fileID: 0}
-  dotOrbitRadius: 0.75
-  dotSize: 0.1
-  dotSortingLayer: Default
-  dotSortingOrder: 2
-  dotColorActive: {r: 1, g: 1, b: 1, a: 0.9}
-  dotColorSpent: {r: 1, g: 1, b: 1, a: 0.15}
+  stepBarSprite: {fileID: 0}
+  stepBarWidth: 0.8
+  stepBarHeight: 0.07
+  stepBarYOffset: -0.55
+  stepBarSortingOrder: 3
 --- !u!1 &7076781707541423879
 GameObject:
   m_ObjectHideFlags: 0
@@ -496,7 +494,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.62, y: 1.16}
+  m_Size: {x: 0.5, y: 0.77}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1

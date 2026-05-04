@@ -13,6 +13,7 @@ public class SuperNode : MonoBehaviour
 
     public System.Action OnResolved;
 
+    private GameFlowManager _gfm;
     private float _spawnTime;
     private bool _sawFirstBoundary;
     private bool _triggered;
@@ -27,9 +28,9 @@ public class SuperNode : MonoBehaviour
         // Late bind if not inspector-wired
         if (drumTrack == null)
         {
-            var gfm = GameFlowManager.Instance;
-            if (gfm != null && gfm.activeDrumTrack != null)
-                drumTrack = gfm.activeDrumTrack;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            if (_gfm != null && _gfm.activeDrumTrack != null)
+                drumTrack = _gfm.activeDrumTrack;
             else
                 drumTrack = FindAnyObjectByType<DrumTrack>();
         }
@@ -61,9 +62,9 @@ public class SuperNode : MonoBehaviour
     {
         if (drumTrack == null)
         {
-            var gfm = GameFlowManager.Instance;
-            if (gfm != null && gfm.activeDrumTrack != null)
-                drumTrack = gfm.activeDrumTrack;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            if (_gfm != null && _gfm.activeDrumTrack != null)
+                drumTrack = _gfm.activeDrumTrack;
         }
 
         if (drumTrack != null)
@@ -126,8 +127,8 @@ public class SuperNode : MonoBehaviour
     }
     private IEnumerable<InstrumentTrack> ResolveTracks()
     {
-        var gfm = GameFlowManager.Instance;
-        var ctrl = gfm != null ? gfm.controller : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var ctrl = _gfm != null ? _gfm.controller : null;
         return (ctrl != null) ? ctrl.tracks : null;
     }
 }

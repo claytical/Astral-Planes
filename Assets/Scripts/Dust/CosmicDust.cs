@@ -167,6 +167,7 @@ public partial class CosmicDust : MonoBehaviour {
 private float denyPulseDefaultSeconds = 0.25f;
 
 // Single managed tint pulse lane (charge + deny both use this).
+private GameFlowManager _gfm;
 private Coroutine _tintPulseRoutine;
 private int _tintPulseToken = 0;
 private bool _tintPulseActive = false;

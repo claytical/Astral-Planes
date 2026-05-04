@@ -19,6 +19,7 @@ public sealed class StarPool : MonoBehaviour
     [SerializeField, Min(0f)] private float starExitDuration = 0.4f;
 
     // ── Runtime refs (set by Initialize) ─────────────────────────────────────
+    private GameFlowManager _gfm;
     private DrumTrack _drum;
     private MotifProfile _activeMotif;
     private PhaseStarBehaviorProfile _behaviorProfile;
@@ -101,7 +102,8 @@ public sealed class StarPool : MonoBehaviour
         _activeMotif = motif;
         _behaviorProfile = profile;
         _tracks = tracks?.Where(t => t != null).ToArray() ?? System.Array.Empty<InstrumentTrack>();
-        _dustGen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        _dustGen = _gfm?.dustGenerator;
 
         BuildPhasePlan();
         SubscribeToTracks();
@@ -187,7 +189,7 @@ public sealed class StarPool : MonoBehaviour
 
     private void Tick()
     {
-        if (_dustGen == null) _dustGen = GameFlowManager.Instance?.dustGenerator;
+        if (_dustGen == null) { if (_gfm == null) _gfm = GameFlowManager.Instance; _dustGen = _gfm?.dustGenerator; }
         if (_dustGen == null || _drum == null) return;
         if (_mineNodePending || AnyCollectablesInFlight()) return;
         if (_remainingEjectionsTotal <= 0) return;
@@ -256,7 +258,8 @@ public sealed class StarPool : MonoBehaviour
         }
 
         // Apply dust profile.
-        var dustGen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = _gfm?.dustGenerator;
         if (dustGen && _behaviorProfile) dustGen.ApplyProfile(_behaviorProfile);
 
         // Wire events before Initialize so subscriptions are in place.
@@ -478,7 +481,8 @@ public sealed class StarPool : MonoBehaviour
         if (_pausedStars.Any(s => s != null)) { Debug.Log($"[StarPool] CheckBridgeGate: pausedStars still live — blocked"); return; }
         if (AnyCollectablesInFlight()) { Debug.Log($"[StarPool] CheckBridgeGate: CIF — blocked"); return; }
 
-        var gfm = GameFlowManager.Instance;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gfm = _gfm;
         if (gfm == null) return;
 
         // If no nodes were captured this motif and all track loops are still empty,

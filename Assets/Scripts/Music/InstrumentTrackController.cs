@@ -107,9 +107,11 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private AudioClip commitStingerHarmony;
     [SerializeField] private AudioClip commitStingerGroove;
     [SerializeField] private AudioClip commitStingerDrums;
-    
+    private GameFlowManager gfm;
+
     private float GetSecondsRemainingInCurrentBin() {
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return 0f; 
         
         double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime; 
@@ -272,8 +274,8 @@ public class InstrumentTrackController : MonoBehaviour
 
         // Safety bubble: activate at the MineNode capture position while the void is expanding.
         {
-            var gfm = GameFlowManager.Instance;
-            var pool = gfm?.activeDrumTrack?._starPool;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var pool = _gfm?.activeDrumTrack?._starPool;
             if (pool != null)
             {
                 Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at pos={_gravityVoidCenterWorld}");
@@ -321,7 +323,8 @@ public class InstrumentTrackController : MonoBehaviour
         }
         // Safety bubble: deactivate when the void resolves.
         {
-            var pool = GameFlowManager.Instance?.activeDrumTrack?._starPool;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var pool = _gfm?.activeDrumTrack?._starPool;
             pool?.SetGravityVoidSafetyBubbleActive(false);
         }
         DespawnGravityVoid();
@@ -332,12 +335,12 @@ public class InstrumentTrackController : MonoBehaviour
     
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
-        var gfm = GameFlowManager.Instance;
-        var dustGen = gfm?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = _gfm?.dustGenerator;
         if (dustGen == null) yield break;
 
         // Get motif-active roles (falls back to all 4 if no motif).
-        var pool = gfm?.activeDrumTrack?._starPool;
+        var pool = _gfm?.activeDrumTrack?._starPool;
         IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
         if (activeRoles == null || activeRoles.Count == 0)
             activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
@@ -438,7 +441,8 @@ public class InstrumentTrackController : MonoBehaviour
             if (track == null)
                 return;
 
-            var harmony = GameFlowManager.Instance?.harmony;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var harmony = _gfm?.harmony;
             if (harmony == null)
                 return;
 
@@ -675,7 +679,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     void Start()
     {
-        if (!GameFlowManager.Instance.ReadyToPlay()) return;
+        _gfm = GameFlowManager.Instance;
+        if (_gfm == null || !_gfm.ReadyToPlay()) return;
         noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
         ResetAllCursorsAndGuards(clearLoops:false);
         EnsurePickupSfxSource();
@@ -689,7 +694,7 @@ public class InstrumentTrackController : MonoBehaviour
                 t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
             }
         // Subscribe to the drum’s loop boundary so we (re)arm each loop
-        var drum = GameFlowManager.Instance.activeDrumTrack;
+        var drum = _gfm.activeDrumTrack;
         TrySubscribeChordEvents(); 
         if (drum != null)
             drum.OnLoopBoundary += ArmCohortsOnLoopBoundary;
@@ -701,7 +706,8 @@ public class InstrumentTrackController : MonoBehaviour
     /// </summary>
     public TransportFrame GetTransportFrame()
     {
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return default;
 
         double dspNow = AudioSettings.dspTime;
@@ -772,7 +778,8 @@ public class InstrumentTrackController : MonoBehaviour
         floorAbsStep = 0;
         totalAbsSteps = 0;
 
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return false;
 
         // NOTE: Manual release timing must be evaluated on the *leader* loop timeline.
@@ -818,7 +825,8 @@ public class InstrumentTrackController : MonoBehaviour
     /// </summary>
     public void ResyncLeaderBinsNow()
     {
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
         int bins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
@@ -832,7 +840,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public int GetCommittedLeaderBins()
     {
-        var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null) return 1;
         return Mathf.Max(1, drum.GetCommittedBinCount());
     }
@@ -856,7 +865,8 @@ public class InstrumentTrackController : MonoBehaviour
     private void OnDestroy()
     {
         // tidy subscriptions
-        var drum = GameFlowManager.Instance ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm ? _gfm.activeDrumTrack : null;
         if (drum != null) drum.OnLoopBoundary -= ArmCohortsOnLoopBoundary;
         foreach (var t in tracks)
             if (t != null)
@@ -868,7 +878,8 @@ public class InstrumentTrackController : MonoBehaviour
         var src = tracks;
         if (src == null || src.Length == 0)
         {
-            var ctrl = GameFlowManager.Instance ? GameFlowManager.Instance.controller : null;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var ctrl = _gfm ? _gfm.controller : null;
             if (ctrl != null && ctrl.tracks != null && ctrl.tracks.Length > 0)
                 src = ctrl.tracks;
         }
@@ -910,8 +921,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public float GetEffectiveLoopLengthInSeconds()
     {
-        var gfm  = GameFlowManager.Instance;
-        var drum = gfm != null ? gfm.activeDrumTrack : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm != null ? _gfm.activeDrumTrack : null;
         if (drum == null)
             return 0f;
 
@@ -931,7 +942,8 @@ public class InstrumentTrackController : MonoBehaviour
     }
     private void ArmCohortsOnLoopBoundary()
     {
-        var drum = GameFlowManager.Instance.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
 
         // Keep the drum's binning logic and the UI timebase aligned to the *committed* leader bins.
         // This is the primary place we re-sync, because it is guaranteed to run on loop boundaries.
@@ -1136,7 +1148,8 @@ public class InstrumentTrackController : MonoBehaviour
     /// </summary>
     public void BeginNewMotif(string reason = "BeginNewMotif") {
         Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
-        GameFlowManager.Instance?.activeDrumTrack.ResetBeatSequencingState("InstrumentTrackController/BeginNewMotif");
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        _gfm?.activeDrumTrack.ResetBeatSequencingState("InstrumentTrackController/BeginNewMotif");
         // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.
         ForceDestroyAllCollectablesInFlight(reason);
 
@@ -1174,14 +1187,15 @@ public class InstrumentTrackController : MonoBehaviour
     private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
     {
 
-        var h = GameFlowManager.Instance ? GameFlowManager.Instance.harmony : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var h = _gfm ? _gfm.harmony : null;
         if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }
 
         // This is your “tick”: the armed cohort finished ascending on 'track'
         // 1) Optionally: small flourish / feedback hook could go here
-        
+
         // 2) Ask HarmonyDirector to advance one chord and retune everyone
-        GameFlowManager.Instance?.harmony?.AdvanceChordAndRetuneAll(1);
+        _gfm?.harmony?.AdvanceChordAndRetuneAll(1);
     }
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
     {
