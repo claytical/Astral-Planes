@@ -105,6 +105,7 @@ MonoBehaviour:
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -669,9 +670,9 @@ MonoBehaviour:
   southImage: {fileID: 5802559630031275860}
   arrowsImage: {fileID: 7465947410740371477}
   startImage: {fileID: 6592055603358532050}
-  driftText: Drift
+  driftText: Fly
   boostText: Boost
-  releaseText: Release
+  releaseText: Commit
   baseTint: {r: 1, g: 1, b: 1, a: 0.55}
   highlightTint: {r: 0, g: 1, b: 0.9721277, a: 1}
   tintLerpSpeed: 12
@@ -679,7 +680,7 @@ MonoBehaviour:
   pulseSpeed: 3
   scaleReturnSpeed: 16
   tutorialSequence: 010000000200000003000000
-  pressAnySequence: 03000000040000000500000006000000
+  pressAnySequence: 0400000006000000
   instructionGroup: {fileID: 1640874604516882173}
   labelFadeInSeconds: 0.12
   labelFadeOutSeconds: 0.12

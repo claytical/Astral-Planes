@@ -375,20 +375,15 @@ public class NoteVisualizer : MonoBehaviour
         ClearManualReleaseCue(vehicle);
     }
 
-    public void BlastManualReleaseCueFailure(Transform vehicle, InstrumentTrack track, int absStep)
+    public void BlastManualReleaseCueFailure(Transform vehicle, Vector3 blastPos, Color roleColor)
     {
-        // Prefer the placeholder marker's world position; fall back to vehicle.
-        Vector3 blastPos = vehicle != null ? vehicle.position : Vector3.zero;
-        if (track != null && noteMarkers.TryGetValue((track, absStep), out var markerTr) && markerTr != null)
-            blastPos = markerTr.position;
-
         ClearManualReleaseCue(vehicle);
 
         if (failureExplosionPrefab != null)
         {
             var ps = Instantiate(failureExplosionPrefab, blastPos, Quaternion.identity);
             var main = ps.main;
-            main.startColor = failureColor;
+            main.startColor = roleColor * 0.45f;
             ps.Play();
             Destroy(ps.gameObject, main.duration + main.startLifetime.constantMax);
         }
@@ -791,7 +786,8 @@ public class NoteVisualizer : MonoBehaviour
     bool shimmer = false;
     float maxVelocity = 0f;
 
-    var controller = GameFlowManager.Instance != null ? GameFlowManager.Instance.controller : null;
+    if (_gfm == null) _gfm = GameFlowManager.Instance;
+    var controller = _gfm?.controller;
     if (controller != null && controller.tracks != null)
     {
         foreach (var track in controller.tracks)
@@ -1540,7 +1536,8 @@ public class NoteVisualizer : MonoBehaviour
     private int ResolveAscendLoopsForTrack(InstrumentTrack track)
     {
         if (track == null) return -1;
-        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var motif = _gfm?.phaseTransitionManager?.currentMotif;
         if (motif?.roleNoteConfigs == null) return -1;
         foreach (var cfg in motif.roleNoteConfigs)
             if (cfg != null && cfg.ascendLoops > 0 && cfg.role == track.assignedRole)

@@ -156,7 +156,7 @@ public partial class Vehicle : MonoBehaviour
                 soulSprite.enabled = false;
             }
             audioManager = GetComponent<AudioManager>();
-            loopStartDSPTime = GameFlowManager.Instance.activeDrumTrack.startDspTime;
+            loopStartDSPTime = gfm.activeDrumTrack.startDspTime;
             ApplyShipProfile(profile);
             if (rb == null)
             {
@@ -198,7 +198,7 @@ public partial class Vehicle : MonoBehaviour
             SyncEnergyUI();
 
             // Hook step events for the release-cue beat countdown.
-            var drum = GameFlowManager.Instance?.activeDrumTrack;
+            var drum = gfm?.activeDrumTrack;
             if (drum != null) drum.OnStepChanged += OnStepTickForReleaseCue;
 
             // --- Spawn rest pocket ---
@@ -300,7 +300,8 @@ public partial class Vehicle : MonoBehaviour
         // Fuel burn only while boosting
         if (boosting && energyLevel > 0f && !_boostCostFree)
         {
-            float burn = _burnRateMultiplier * profile.burnRate * dt;
+            Debug.Log($"[ENERGY] {energyLevel} : {_burnRateMultiplier} * {profile.burnRate}");
+            float burn = _burnRateMultiplier * profile.burnRate;
             ConsumeEnergy(burn);
         }
 
@@ -411,7 +412,7 @@ public partial class Vehicle : MonoBehaviour
     }
     private void TickNoteTrail()
     {
-        var gfm = GameFlowManager.Instance;
+        if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = gfm != null ? gfm.noteViz : null;
 
         if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
@@ -961,7 +962,7 @@ public partial class Vehicle : MonoBehaviour
     return (dust == null);
 }
 
-    public void CollectEnergy(int amount)
+    public void CollectEnergy(float amount)
     {
         energyLevel += amount;
         if (energyLevel > capacity)
@@ -1203,10 +1204,10 @@ public partial class Vehicle : MonoBehaviour
     private void OnDestroy()
     {
         // Unhook step-tick before the object is gone.
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (gfm == null) gfm = GameFlowManager.Instance;
+        var drum = gfm?.activeDrumTrack;
         if (drum != null) drum.OnStepChanged -= OnStepTickForReleaseCue;
 
-        var gfm = GameFlowManager.Instance;
         var gen = (gfm != null) ? gfm.dustGenerator : null;
         if (gen == null) return;
 
@@ -1215,6 +1216,7 @@ public partial class Vehicle : MonoBehaviour
     private void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
+            Debug.Log($"[ENERGY] energy level: {energyLevel} / draining {amount}");
             energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
             _cumulativeEnergySpent += Mathf.Max(0f, amount);
             if (energyLevel <= 0)
@@ -1226,7 +1228,7 @@ public partial class Vehicle : MonoBehaviour
                     {
                         explode.Permanent();
                     }
-                    GameFlowManager.Instance.CheckAllPlayersOutOfEnergy();
+                    gfm?.CheckAllPlayersOutOfEnergy();
 //                }
 
             }
@@ -1296,7 +1298,7 @@ public partial class Vehicle : MonoBehaviour
         float cellSize = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 forward = vel.normalized;
         Vector2 perp    = new Vector2(-forward.y, forward.x);
-        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        var motif = gfm?.phaseTransitionManager?.currentMotif;
         float fade = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
         int halfW = Mathf.Max(0, profile.plowHalfWidthCells);
         int depth = Mathf.Max(0, profile.plowDepthCells);
@@ -1385,7 +1387,7 @@ public partial class Vehicle : MonoBehaviour
 {
     if (_pendingNotes.Count <= 0) return false;
 
-    var gfm = GameFlowManager.Instance;
+    if (gfm == null) gfm = GameFlowManager.Instance;
     var viz = (gfm != null) ? gfm.noteViz : null;
 
     // Peek first — only dequeue once we know the window passes.
@@ -1404,7 +1406,9 @@ public partial class Vehicle : MonoBehaviour
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
+        CollectEnergy(p.collectable.amount * .25f);
+//sacrifice note to gain small amount of energy instead of specific failure
+        //        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
         return false;
     }
 
@@ -1423,7 +1427,9 @@ public partial class Vehicle : MonoBehaviour
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
+        CollectEnergy(p.collectable.amount * .25f);
+
+        //        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
         CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
@@ -1459,12 +1465,13 @@ public partial class Vehicle : MonoBehaviour
 
     if (!pass)
     {
-        Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} PASS=False commitSkipped=True");
-
-        // Keep the note queued so the same pending note can still be released on a
-        // later valid input action. This preserves cadence and avoids accidentally
-        // dropping notes during bin transitions.
-        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
+        Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
+        _pendingNotes.Dequeue();
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+        Vector3 blastPos = p.collectable != null ? p.collectable.transform.position : transform.position;
+        viz?.BlastManualReleaseCueFailure(transform, blastPos, p.track.trackColor);
+        if (p.collectable != null) CollectEnergy(p.collectable.amount * .25f);
         return false;
     }
 

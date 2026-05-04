@@ -57,6 +57,7 @@ public class SuperNodeKiteSteering : MonoBehaviour
     [Header("Vehicle Cache")]
     [SerializeField] private float vehicleRefreshInterval = 0.25f;
 
+    private GameFlowManager _gfm;
     private float _age;
     private float _vehicleRefreshTimer;
     private Vehicle[] _vehicles;
@@ -213,10 +214,10 @@ public class SuperNodeKiteSteering : MonoBehaviour
         }
 
         // Fallback to active drum track.
-        var gfm = GameFlowManager.Instance;
-        if (gfm != null && gfm.activeDrumTrack != null)
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        if (_gfm != null && _gfm.activeDrumTrack != null)
         {
-            drumTrack = gfm.activeDrumTrack;
+            drumTrack = _gfm.activeDrumTrack;
             return;
         }
 

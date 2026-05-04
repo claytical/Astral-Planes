@@ -11,6 +11,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     [Header("Sniffer (per-role diamond facing)")]
     [SerializeField] private float snifferIntervalSeconds = 0.25f;
 
+    private GameFlowManager _gfm;
     private PhaseStar _star;
     private bool _active;
     private MusicalRole _attunedRole = MusicalRole.None;
@@ -75,9 +76,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         cell = default;
         if (_attunedRole != MusicalRole.None && role != _attunedRole) return false;
 
-        var gfm = GameFlowManager.Instance;
-        var gen = gfm?.dustGenerator;
-        var drum = gfm?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
         if (gen == null || drum == null) return false;
 
         gen.GetColoredDustCells(_coloredCellsScratch);
@@ -165,9 +166,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     {
         if (_hasLockOnCell) return;
 
-        var gfm = GameFlowManager.Instance;
-        var gen = gfm?.dustGenerator;
-        var drum = gfm?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
         gen.GetColoredDustCells(_coloredCellsScratch);
@@ -217,9 +218,9 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private void SnifferTick()
     {
-        var gfm = GameFlowManager.Instance;
-        var gen = gfm?.dustGenerator;
-        var drum = gfm?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
         if (gen == null || drum == null) return;
 
         gen.GetColoredDustCells(_coloredCellsScratch);
@@ -279,7 +280,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             return;
         }
 
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         if (drum == null)
         {
             _targetDir = Vector2.zero;
@@ -328,7 +330,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private bool IsTargetValid(Vector2Int cell)
     {
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         if (gen == null) return false;
 
         var dust = GetDust(gen, cell);
@@ -353,7 +356,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             Gizmos.color = Color.yellow;
             Gizmos.DrawRay(transform.position, _targetDir * 2f);
 
-            var drum = GameFlowManager.Instance?.activeDrumTrack;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var drum = _gfm?.activeDrumTrack;
             if (drum != null)
             {
                 Vector2 tw = drum.GridToWorldPosition(_targetCell);

@@ -6,7 +6,7 @@ public partial class Vehicle
 {
     private void TickManualReleaseCue()
     {
-        var gfm = GameFlowManager.Instance;
+        if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = (gfm != null) ? gfm.noteViz : null;
         if (viz == null) return;
 
@@ -91,7 +91,7 @@ public partial class Vehicle
 
     private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep)
     {
-        var gfm = GameFlowManager.Instance;
+        if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = (gfm != null) ? gfm.noteViz : null;
 
         if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
@@ -168,7 +168,8 @@ public partial class Vehicle
                 p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
             {
                 var spokenFor = new HashSet<int>();
-                var viz = GameFlowManager.Instance?.noteViz;
+                if (gfm == null) gfm = GameFlowManager.Instance;
+                var viz = gfm?.noteViz;
                 if (viz != null && viz.TryGetNextUnlitStepExcluding(
                         p.track, rawAbsP, totalP, spokenFor, out int nextStep))
                 {

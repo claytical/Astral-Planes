@@ -134,6 +134,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     [Tooltip("If enabled, notes are treated as authored relative to chord index 0 (the 'I' chord), then root-shifted by the current chord before quantization. This makes progressions like I–IV–V change the bass/lead pitch even when the authored notes are static.")]
     public bool rootShiftNotesByChord = true;
     public List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
+    private GameFlowManager _gfm;
     private int _currentBurstRemaining = 0;
     private bool _currentBurstArmed = false;
     private NoteSet _currentNoteSet;
@@ -777,7 +778,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (localStep == 0)
         {
             int chordIdx = Harmony_GetChordIndexForBin(trackBin);
-            var hd = GameFlowManager.Instance?.harmony;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var hd = _gfm?.harmony;
             if (hd != null && hd.TryGetChordAt(chordIdx, out var c))
                 Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot={c.rootNote}");
             else
@@ -1155,7 +1157,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
     public int Harmony_GetChordIndexForBin(int binIndex)
     {
-        var hd = GameFlowManager.Instance?.harmony;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var hd = _gfm?.harmony;
         if (hd == null) return -1;
 
         int progLen = Mathf.Max(1, hd.ProgressionLength);
@@ -1193,7 +1196,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Fallback: try HarmonyDirector (works when chordRegion is absent)
         int chordIdx = Harmony_GetChordIndexForBin(bin);
         if (chordIdx < 0) return midiNote;
-        var hd = GameFlowManager.Instance?.harmony;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var hd = _gfm?.harmony;
         if (hd == null) return midiNote;
         if (!hd.TryGetChordAt(chordIdx, out chord)) return midiNote;
         if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
@@ -1500,7 +1504,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 controller.noteVisualizer.TriggerPlayheadReleasePulse(assignedRole);
             }
 
-            var hd = GameFlowManager.Instance?.harmony;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var hd = _gfm?.harmony;
             int progLen = hd != null ? hd.ProgressionLength : 0;
             Harmony_OnBinFilled(filledBin, progLen);
             // --- C) Clean up per-burst tracking ---
@@ -1721,7 +1726,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi); // fallback
         if (rootShiftNotesByChord && authoredAbs >= 0)
         {
-            var hd = GameFlowManager.Instance?.harmony;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var hd = _gfm?.harmony;
             if (hd != null)
             {
                 int authoredBin = BinIndexForStep(authoredAbs);
@@ -2186,7 +2192,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             else
             {
                 int chordIdx = Harmony_GetChordIndexForBin(bin);
-                var hd = GameFlowManager.Instance?.harmony;
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                var hd = _gfm?.harmony;
                 if (chordIdx < 0 || hd == null || !hd.TryGetChordAt(chordIdx, out chord))
                 {
                     modified.Add((step, note, dur, vel));
@@ -2525,7 +2532,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return;
     }
 
-    var dustGen = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+    if (_gfm == null) _gfm = GameFlowManager.Instance;
+    var dustGen = _gfm?.dustGenerator;
 
     // redundant but keep (matches your structure)
     if (gridW <= 0)
@@ -2821,7 +2829,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         float spawnJitterRadius,
         int burstId)
     {
-        var dustGen   = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen   = _gfm?.dustGenerator;
         var nv        = controller?.noteVisualizer;
         int gridW     = drumTrack != null ? drumTrack.GetSpawnGridWidth()  : 0;
         int gridH     = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;

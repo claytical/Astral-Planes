@@ -66,7 +66,7 @@ public class Collectable : MonoBehaviour
     [Tooltip("Minimum lead time so travel doesn't start 'late' due to frame jitter.")]
     [SerializeField] private float carryMinLeadSeconds = 0.02f;
     private Coroutine _dustPocketRoutine;
-    private int amount = 1;
+    public int amount = 5;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
@@ -88,6 +88,7 @@ public class Collectable : MonoBehaviour
         [Range(0f, 0.2f)]
         public float localOffsetJitter = 0.05f;
     }
+    private GameFlowManager _gfm;
     private Transform _carryParent;
     // Idempotency flags
     private bool _handled;            // prevents double processing on trigger
@@ -210,7 +211,8 @@ public class Collectable : MonoBehaviour
     /// </summary>
     public void AttachTetherAtPickup()
     {
-        var viz = GameFlowManager.Instance ? GameFlowManager.Instance.noteViz : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var viz = _gfm ? _gfm.noteViz : null;
         if (!assignedInstrumentTrack || !viz) return;
 
         // Resolve tether prefab
@@ -504,8 +506,8 @@ private IEnumerator SpawnArrivalRoutine(
         if (!useLoopBoundaryIdea) return;
         if (_inCarry) return;
 
-        var gfm = GameFlowManager.Instance;
-        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = (_gfm != null) ? _gfm.dustGenerator : null;
         var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
         if (dustGen == null || dt == null) return;
 
@@ -638,8 +640,8 @@ private IEnumerator SpawnArrivalRoutine(
     
     private void ReleaseDustPocket()
     {
-        var gfm = GameFlowManager.Instance;
-        var dustGen = gfm != null ? gfm.dustGenerator : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = _gfm != null ? _gfm.dustGenerator : null;
         var drumTrack = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
         if (dustGen == null || drumTrack == null) return;
 
@@ -746,8 +748,8 @@ private IEnumerator SpawnArrivalRoutine(
         yield return new WaitForFixedUpdate();
         if (_rb == null) continue;
         if (_inCarry) continue;
-        var gfm = GameFlowManager.Instance;
-        var dustGen = (gfm != null) ? gfm.dustGenerator : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = (_gfm != null) ? _gfm.dustGenerator : null;
         var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
 
         Vector2 cur = _rb.position;
@@ -871,7 +873,8 @@ private IEnumerator SpawnArrivalRoutine(
             // Re-carve the cell at arrival time. The jail created at enqueue may have expired
             // (long step delay + travel), or the cell may have had no dust at enqueue but
             // regrew before we arrived. The Occupancy claim above will veto any regrowth.
-            var dustGen = GameFlowManager.Instance?.dustGenerator;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var dustGen = _gfm?.dustGenerator;
             if (dustGen != null)
                 dustGen.CreateJailCenterForCollectable(_currentCell, holdSeconds: 0f, ownerId: GetInstanceID());
         }

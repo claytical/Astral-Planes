@@ -72,6 +72,7 @@ public class PhaseStar : MonoBehaviour
     [SerializeField] private PhaseStarDustAffect dust;
     [SerializeField] private PhaseStarCravingNavigator cravingNavigator;
 
+    private GameFlowManager _gfm;
     private DrumTrack _drum;
     private bool _subscribedLoopBoundary;
     private Color _lockedTint;
@@ -268,7 +269,8 @@ public class PhaseStar : MonoBehaviour
     
     private Vector2 ComputeDormantRestPosition()
     {
-        var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _drum != null ? _drum : _gfm?.activeDrumTrack;
         if (drum == null) return transform.position;
         int gw = drum.GetSpawnGridWidth();
         int gh = drum.GetSpawnGridHeight();
@@ -355,7 +357,8 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasColoredDustAvailable()
     {
-        var gen = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
         return gen != null && gen.HasAnyDustWithRole();
     }
 
@@ -695,7 +698,8 @@ public class PhaseStar : MonoBehaviour
         GetTotalCharge() < 0.01f &&
         !(dust?.HasActiveTentacles ?? false))
     {
-        var genCheck = GameFlowManager.Instance?.dustGenerator;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var genCheck = _gfm?.dustGenerator;
         if (genCheck != null && !genCheck.HasAnyDustWithRole())
         {
             Disarm(DisarmReason.None);
@@ -750,8 +754,8 @@ public class PhaseStar : MonoBehaviour
 
     bool AnyExpansionPendingGlobal()
     {
-        var gfm = GameFlowManager.Instance;
-        var tc = gfm != null ? gfm.controller : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var tc = _gfm != null ? _gfm.controller : null;
         return (tc != null && tc.AnyExpansionPending());
     }
 
@@ -769,13 +773,13 @@ public class PhaseStar : MonoBehaviour
     
     private bool AnyCollectablesInFlightGlobal()
     {
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        if (_gfm == null || _gfm.controller == null || _gfm.controller.tracks == null)
             return false;
 
         bool any = false;
 
-        foreach (var t in gfm.controller.tracks)
+        foreach (var t in _gfm.controller.tracks)
         {
             if (t == null) continue;
 
@@ -884,7 +888,8 @@ public class PhaseStar : MonoBehaviour
     
     private void RelocateToAvailableCell()
     {
-        var drum = _drum != null ? _drum : GameFlowManager.Instance?.activeDrumTrack;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _drum != null ? _drum : _gfm?.activeDrumTrack;
         if (drum == null) return;
         Vector2Int cell = drum.GetRandomAvailableCell();
         if (cell.x < 0) return;
@@ -959,9 +964,8 @@ public class PhaseStar : MonoBehaviour
                 return;
             }
 
-            var drums = _drum != null
-                ? _drum
-                : (GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null);
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var drums = _drum != null ? _drum : _gfm?.activeDrumTrack;
 
             bool timedOut = false;
 
@@ -1098,7 +1102,8 @@ public class PhaseStar : MonoBehaviour
 
     private void OnDisable()
     {
-        var drum = GameFlowManager.Instance != null ? GameFlowManager.Instance.activeDrumTrack : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
     }
@@ -1141,8 +1146,8 @@ public class PhaseStar : MonoBehaviour
         // generate one in the same way HarmonyDirector does.
         if (planned == null)
         {
-            var gfm = GameFlowManager.Instance;
-            var factory = gfm != null ? gfm.phaseTransitionManager.noteSetFactory : null;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var factory = _gfm != null ? _gfm.phaseTransitionManager.noteSetFactory : null;
             if (factory != null)
                 planned = factory.Generate(track, _assignedMotif);
         }
@@ -1226,7 +1231,8 @@ public class PhaseStar : MonoBehaviour
 }
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
-        var controller = GameFlowManager.Instance?.controller;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var controller = _gfm?.controller;
         if (controller == null || controller.tracks == null) return null;
 
         foreach (var t in controller.tracks)
@@ -1390,9 +1396,10 @@ public class PhaseStar : MonoBehaviour
             if (_state == PhaseStarState.BridgeInProgress) return;
 
             _awaitingCollectableClear = true;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
-                : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
+                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
             HideInPlaceForBurst();
             Disarm(DisarmReason.NodeResolving, spawnTint);
@@ -1500,9 +1507,10 @@ public class PhaseStar : MonoBehaviour
 
             if (_state == PhaseStarState.BridgeInProgress) return;
             _awaitingCollectableClear = true;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
-                : (GameFlowManager.Instance?.activeDrumTrack?.completedLoops ?? -1);
+                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
             HideInPlaceForBurst();
             Disarm(DisarmReason.NodeResolving, spawnTint);
@@ -1605,7 +1613,8 @@ public class PhaseStar : MonoBehaviour
             rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
         }
         int entropy = CurrentEntropyForSelection();
-        var noteSet = GameFlowManager.Instance != null ? GameFlowManager.Instance.GenerateNotes(track, entropy) : null;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
  Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
