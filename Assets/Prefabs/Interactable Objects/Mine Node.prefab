@@ -70,6 +70,13 @@ MonoBehaviour:
   driveCarvingMotionFromNoteSet: 1
   boundaryLeakToleranceCells: 0.35
   maxCorrectionPerTick: 0.5
+  maxSeparationSpeed: 1
+  separationAccel: 30
+  separationDeadZone: 0.02
+  inwardVelocityDamping: 0.65
+  maxVelocityCorrectionPerTick: 2.5
+  debugSweepContainment: 0
+  assertSingleHardCorrectionPerTick: 1
   expireAfterLoops: 3
 --- !u!114 &2404411601338668691
 MonoBehaviour:
@@ -89,7 +96,6 @@ MonoBehaviour:
   exhaustEnergyFraction: 0.4
   edgeHugForce: 2
   escapePushForce: 5
-  maxCorrectionPerTick: 0.5
   huntBfsBudget: 600
   huntDirWeight: 0.55
   arrivalRadiusCells: 1

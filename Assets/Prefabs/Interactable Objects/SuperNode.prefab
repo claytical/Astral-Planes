@@ -4758,7 +4758,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &6944589486205489484
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -4804,6 +4804,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -4835,7 +4836,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &8730078499695705973
 GameObject:
   m_ObjectHideFlags: 0
@@ -4848,7 +4848,6 @@ GameObject:
   - component: {fileID: 7563855331298833572}
   - component: {fileID: 2233781314832999817}
   - component: {fileID: 817086377908567222}
-  - component: {fileID: 6986225742988950710}
   - component: {fileID: 8747427807092537186}
   - component: {fileID: 5035915469394830760}
   - component: {fileID: 235213639117587724}
@@ -4877,6 +4876,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &7563855331298833572
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -4922,9 +4922,10 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
-  m_Color: {r: 0.89777994, g: 0, b: 1, a: 0.45490196}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.45490196}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -4932,7 +4933,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!114 &2233781314832999817
 MonoBehaviour:
@@ -4948,9 +4948,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SuperNode
   soloVoice: {fileID: 0}
   drumTrack: {fileID: 0}
+  dustWaveDriver: {fileID: 0}
   spawnCollisionGraceSeconds: 0.15
   minImpactSpeed: 2
   despawnOnNextBoundary: 1
+  playSafeCollisionAudio: 1
+  collisionAudioVelocity: 0.85
+  collisionAudioTicks: 30
+  roleShardRoot: {fileID: 4264311372790930814}
+  templateDiamondRenderer: {fileID: 7563855331298833572}
+  roleShardRadius: 0.3
+  roleShardScale: 0.85
+  roleShardRotationDegPerSec: 65
 --- !u!114 &817086377908567222
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4967,7 +4976,7 @@ MonoBehaviour:
   superNode: {fileID: 2233781314832999817}
   drumTrack: {fileID: 0}
   maxSpeed: 6
-  accel: 18
+  accelerationUnitsPerSecondSq: 18
   turnRateDegPerSec: 540
   linearDamping: 2.5
   pursuerPredictSeconds: 0.25
@@ -4982,19 +4991,6 @@ MonoBehaviour:
   slowNearExpirySeconds: 0.5
   expirySlowMultiplier: 0.75
   vehicleRefreshInterval: 0.25
---- !u!114 &6986225742988950710
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8730078499695705973}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d02794592e58424fbc138445b37aa41, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
-  colorCycleSpeed: 1
 --- !u!60 &8747427807092537186
 PolygonCollider2D:
   m_ObjectHideFlags: 0
