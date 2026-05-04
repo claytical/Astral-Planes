@@ -41,6 +41,8 @@ public partial class Vehicle : MonoBehaviour
     public PlayerStatsTracking playerStats;
     
     private GameObject activeTrail; // Reference to the currently active trail instance 
+    private readonly List<TrailRenderer> _wrapTrailRenderers = new List<TrailRenderer>(8);
+    private readonly List<float> _wrapTrailTimes = new List<float>(8);
     public Rigidbody2D rb;
     private AudioManager audioManager;
     private SpriteRenderer baseSprite;
@@ -121,8 +123,22 @@ public partial class Vehicle : MonoBehaviour
 
         if (activeTrail == null) return;
 
+        CacheWrapTrailStates();
         ClearActiveTrailVisuals();
         StartCoroutine(ReenableTrailVisualsAfterWrap());
+    }
+
+    private void CacheWrapTrailStates()
+    {
+        _wrapTrailRenderers.Clear();
+        _wrapTrailTimes.Clear();
+
+        if (activeTrail == null) return;
+        foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true))
+        {
+            _wrapTrailRenderers.Add(tr);
+            _wrapTrailTimes.Add(tr.time);
+        }
     }
 
     private void ClearActiveTrailVisuals()
@@ -132,6 +148,7 @@ public partial class Vehicle : MonoBehaviour
         foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true))
         {
             tr.emitting = false;
+            tr.time = 0f; // instantly expire any lingering segment from pre-wrap position
             tr.Clear();
         }
 
@@ -148,11 +165,16 @@ public partial class Vehicle : MonoBehaviour
 
         if (activeTrail == null) yield break;
 
-        foreach (var tr in activeTrail.GetComponentsInChildren<TrailRenderer>(true))
+        for (int i = 0; i < _wrapTrailRenderers.Count; i++)
         {
+            var tr = _wrapTrailRenderers[i];
+            if (tr == null) continue;
+            tr.time = i < _wrapTrailTimes.Count ? _wrapTrailTimes[i] : tr.time;
             tr.Clear();
             tr.emitting = boosting;
         }
+        _wrapTrailRenderers.Clear();
+        _wrapTrailTimes.Clear();
 
         if (boosting)
         {
