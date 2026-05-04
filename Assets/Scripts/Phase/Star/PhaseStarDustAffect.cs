@@ -19,6 +19,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [SerializeField] private float dissolveDuration = 0.8f;
     [SerializeField, Min(1)] private int maxLinesPerRole = 3;
     [SerializeField] private Material tentacleMaterial;
+    [SerializeField, Min(1)] private int invalidTargetRetryFrames = 3;
+    [SerializeField, Min(0f)] private float invalidTargetRetryMs = 120f;
 
     [Header("Line Visual")]
     [SerializeField, Range(0f, 1f)] private float growingRootAlpha  = 0.65f;
@@ -75,6 +77,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public float drainFlashTimer;
         public bool notifiedDrainLock;
         public int lineIndexInRole;
+        public int invalidTargetFrames;
+        public float invalidTargetMs;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -248,7 +252,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (gen == null || drum == null || _navigator == null) break;
                 if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole) break;
 
-                if (_navigator.TryGetTargetForRole(tentacle.role, out var cell) && IsTargetValid(cell, tentacle.role))
+                if (_navigator.TryGetTargetForRole(tentacle.role, out var cell) && IsTargetValid(cell, tentacle.role, out _))
                     BeginGrowingTentacle(tentacle, cell, drum, starPos);
 
                 break;
@@ -259,20 +263,20 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (drum != null)
                     tentacle.targetWorldPos = drum.GridToWorldPosition(tentacle.targetCell);
 
-                if (!IsTargetValid(tentacle.targetCell, tentacle.role))
+                if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
-                    if (_navigator != null && drum != null &&
-                        _navigator.TryGetTargetForRole(tentacle.role, out var newCell) &&
-                        newCell != tentacle.targetCell &&
-                        IsTargetValid(newCell, tentacle.role))
+                    if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var newCell) &&
+                        newCell != tentacle.targetCell && IsTargetValid(newCell, tentacle.role, out _))
                     {
                         tentacle.targetCell      = newCell;
                         tentacle.targetWorldPos  = drum.GridToWorldPosition(newCell);
+                        ResetInvalidTargetRetry(tentacle);
+                        LogTentacleTransition(tentacle, TentacleState.Growing, "retargeted");
                     }
                     else
                     {
                         ReleaseDrainLock(tentacle);
-                        tentacle.state = TentacleState.Retracting;
+                        TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
                         break;
                     }
                 }
@@ -283,7 +287,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (tentacle.growProgress >= 1f)
                 {
                     tentacle.tipPos      = tentacle.targetWorldPos;
-                    tentacle.state       = TentacleState.Draining;
+                    TransitionTentacleState(tentacle, TentacleState.Draining, "reached target");
                     tentacle.contactTimer = 0f;
                     tentacle.drainTimer  = 0f;
 
@@ -299,10 +303,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             case TentacleState.Draining:
             {
-                if (!IsTargetValid(tentacle.targetCell, tentacle.role))
+                if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
                     ReleaseDrainLock(tentacle);
-                    tentacle.state = TentacleState.Retracting;
+                    TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
                     break;
                 }
 
@@ -334,7 +338,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 if (Vector2.Distance(tentacle.tipPos, starPos) < 0.05f)
                 {
-                    tentacle.state      = TentacleState.Idle;
+                    TransitionTentacleState(tentacle, TentacleState.Idle, "fully retracted");
                     tentacle.line.enabled = false;
                 }
 
@@ -353,7 +357,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 if (tentacle.dissolveTimer >= dissolveDuration)
                 {
-                    tentacle.state        = TentacleState.Idle;
+                    TransitionTentacleState(tentacle, TentacleState.Idle, "dissolve complete");
                     tentacle.alphaScale   = 1f;
                     tentacle.dissolveTimer = 0f;
                     tentacle.growProgress = 0f;
@@ -382,7 +386,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         for (int i = 0; i < SplinePoints; i++)
             tentacle.linePts[i] = root3;
 
-        tentacle.state        = TentacleState.Growing;
+        TransitionTentacleState(tentacle, TentacleState.Growing, "acquired target");
         tentacle.line.enabled = true;
         UpdateTentacleLine(tentacle, starPos, 0f);
     }
@@ -414,7 +418,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 fadeSeconds: 1.5f,
                 scheduleRegrow: false);
 
-            tentacle.state        = TentacleState.Dissolving;
+            TransitionTentacleState(tentacle, TentacleState.Dissolving, "energy 0");
             tentacle.dissolveTimer = 0f;
             tentacle.alphaScale   = 1f;
         }
@@ -820,7 +824,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private void ResetTentacleState(Tentacle tentacle, Vector2 starPos, bool destroyVisual)
     {
         ReleaseDrainLock(tentacle);
-        tentacle.state        = TentacleState.Idle;
+        TransitionTentacleState(tentacle, TentacleState.Idle, "reset");
         tentacle.tipPos       = starPos;
         tentacle.growProgress = 0f;
         tentacle.contactTimer = 0f;
@@ -865,11 +869,68 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             : Color.white;
     }
 
-    private bool IsTargetValid(Vector2Int cell, MusicalRole role)
+    private bool TryValidateOrHoldTarget(Tentacle tentacle, float dt, out string invalidReason)
+    {
+        if (IsTargetValid(tentacle.targetCell, tentacle.role, out invalidReason))
+        {
+            ResetInvalidTargetRetry(tentacle);
+            return true;
+        }
+
+        tentacle.invalidTargetFrames++;
+        tentacle.invalidTargetMs += dt * 1000f;
+        bool withinFrameGrace = tentacle.invalidTargetFrames < invalidTargetRetryFrames;
+        bool withinTimeGrace = tentacle.invalidTargetMs < invalidTargetRetryMs;
+        return withinFrameGrace || withinTimeGrace;
+    }
+
+    private void ResetInvalidTargetRetry(Tentacle tentacle)
+    {
+        tentacle.invalidTargetFrames = 0;
+        tentacle.invalidTargetMs = 0f;
+    }
+
+    private void TransitionTentacleState(Tentacle tentacle, TentacleState nextState, string reason)
+    {
+        if (tentacle.state == nextState) return;
+        tentacle.state = nextState;
+        ResetInvalidTargetRetry(tentacle);
+        LogTentacleTransition(tentacle, nextState, reason);
+    }
+
+    private void LogTentacleTransition(Tentacle tentacle, TentacleState state, string reason)
+    {
+        Debug.Log($"[PhaseStarDustAffect] tentacle.role={tentacle.role} state={state} targetCell={tentacle.targetCell} reason={reason}");
+    }
+
+    private bool IsTargetValid(Vector2Int cell, MusicalRole role, out string reason)
     {
         var gen = GameFlowManager.Instance?.dustGenerator;
-        if (gen == null || !gen.HasDustAt(cell)) return false;
-        if (!gen.TryGetDustAt(cell, out var dust) || dust == null) return false;
-        return dust.Role == role && dust.currentEnergyUnits > 0;
+        if (gen == null || !gen.HasDustAt(cell))
+        {
+            reason = "HasDustAt false";
+            return false;
+        }
+
+        if (!gen.TryGetDustAt(cell, out var dust) || dust == null)
+        {
+            reason = "missing dust";
+            return false;
+        }
+
+        if (dust.Role != role)
+        {
+            reason = "missing dust";
+            return false;
+        }
+
+        if (dust.currentEnergyUnits <= 0)
+        {
+            reason = "energy 0";
+            return false;
+        }
+
+        reason = "";
+        return true;
     }
 }
