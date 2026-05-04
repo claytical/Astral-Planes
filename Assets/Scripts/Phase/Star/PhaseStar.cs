@@ -333,7 +333,19 @@ public class PhaseStar : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(0.5f);
-            if (HasColoredDustAvailable() && HasDominantRoleEjectable())
+
+            bool hasDust = HasColoredDustAvailable();
+            bool hasDelivery = _hasReceivedEnergy;
+            bool hasEjectable = HasDominantRoleEjectable();
+
+            if (_tracePhaseStar)
+            {
+                Debug.Log($"[PhaseStar] Dormant wait precheck hasDust={hasDust} hasDelivery={hasDelivery} hasEjectable={hasEjectable}", this);
+            }
+
+            // Wake on stable acquisition preconditions only.
+            // Ejection readiness remains gated by poke/eject code paths.
+            if (hasDust && hasDelivery)
                 break;
         }
 
