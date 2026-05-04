@@ -24,9 +24,9 @@ public class SuperNode : MonoBehaviour
     [Header("Role shard visuals")]
     [SerializeField] private Transform roleShardRoot;
     [SerializeField] private SpriteRenderer templateDiamondRenderer;
-    [SerializeField] private float roleShardRadius = 0.3f;
     [SerializeField] private float roleShardScale = 0.85f;
     [SerializeField] private float roleShardRotationDegPerSec = 65f;
+    [SerializeField] private float highlightedScaleMultiplier = 1.25f;
 
     public Action OnResolved;
 
@@ -38,7 +38,10 @@ public class SuperNode : MonoBehaviour
     private readonly Dictionary<MusicalRole, InstrumentTrack> _trackByRole = new();
     private readonly HashSet<MusicalRole> _activeRoles = new();
     private readonly HashSet<MusicalRole> _armedRoles = new();
-    private readonly List<SpriteRenderer> _roleShardRenderers = new();
+    private readonly Dictionary<MusicalRole, SpriteRenderer> _roleShardByRole = new();
+    private readonly List<MusicalRole> _roleOrder = new();
+    private int _highlightedRoleIndex = 0;
+    private int _lastDerivedBin = -1;
 
     private void Awake()
     {
@@ -82,20 +85,20 @@ public class SuperNode : MonoBehaviour
             BuildRoleMapFromController();
 
         RebuildRoleShardVisuals();
+        SubscribeStepBoundaries(true);
 
         TrySubscribeToBoundary();
     }
 
     private void Update()
     {
-        if (_roleShardRenderers.Count <= 0) return;
+        if (_roleShardByRole.Count <= 0) return;
         float delta = roleShardRotationDegPerSec * Time.deltaTime;
-        for (int i = 0; i < _roleShardRenderers.Count; i++)
+        foreach (var kv in _roleShardByRole)
         {
-            var sr = _roleShardRenderers[i];
+            var sr = kv.Value;
             if (!sr) continue;
-            float sign = (i % 2 == 0) ? 1f : -1f;
-            sr.transform.Rotate(0f, 0f, delta * sign, Space.Self);
+            sr.transform.Rotate(0f, 0f, delta, Space.Self);
         }
     }
 
@@ -103,6 +106,7 @@ public class SuperNode : MonoBehaviour
     {
         if (drumTrack != null)
             drumTrack.OnLoopBoundary -= OnLoopBoundary;
+        SubscribeStepBoundaries(false);
     }
 
     private void ResolveDrumTrackIfNeeded()
@@ -149,33 +153,37 @@ public class SuperNode : MonoBehaviour
     {
         if (templateDiamondRenderer == null || roleShardRoot == null) return;
 
-        for (int i = 0; i < _roleShardRenderers.Count; i++)
-            if (_roleShardRenderers[i] != null) Destroy(_roleShardRenderers[i].gameObject);
-        _roleShardRenderers.Clear();
+        foreach (var kv in _roleShardByRole)
+            if (kv.Value != null) Destroy(kv.Value.gameObject);
+        _roleShardByRole.Clear();
+        _roleOrder.Clear();
 
         var orderedRoles = _activeRoles.Count > 0 ? _activeRoles.ToList() : ResolveRolesFromCurrentMotif();
+        orderedRoles = orderedRoles.Where(r => r != MusicalRole.None).Distinct().ToList();
         if (orderedRoles.Count == 0) return;
+        _roleOrder.AddRange(orderedRoles);
+        _highlightedRoleIndex = 0;
 
         templateDiamondRenderer.enabled = false;
-        int count = orderedRoles.Count;
-        for (int i = 0; i < count; i++)
+        int baseOrder = templateDiamondRenderer.sortingOrder;
+        for (int i = 0; i < _roleOrder.Count; i++)
         {
-            var role = orderedRoles[i];
+            var role = _roleOrder[i];
             var go = new GameObject($"SuperNodeRoleShard_{role}");
             go.transform.SetParent(roleShardRoot, false);
-
-            float ang = (i / (float)count) * Mathf.PI * 2f;
-            go.transform.localPosition = new Vector3(Mathf.Cos(ang), Mathf.Sin(ang), 0f) * roleShardRadius;
+            go.transform.localPosition = Vector3.zero;
             go.transform.localScale = Vector3.one * roleShardScale;
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = templateDiamondRenderer.sprite;
             sr.sortingLayerID = templateDiamondRenderer.sortingLayerID;
-            sr.sortingOrder = templateDiamondRenderer.sortingOrder;
+            sr.sortingOrder = baseOrder + i;
             sr.sharedMaterial = templateDiamondRenderer.sharedMaterial;
             sr.color = ResolveRoleColor(role);
-            _roleShardRenderers.Add(sr);
+            _roleShardByRole[role] = sr;
         }
+
+        UpdateShardHighlightVisuals();
     }
 
     private Color ResolveRoleColor(MusicalRole role)
@@ -233,17 +241,64 @@ public class SuperNode : MonoBehaviour
     private bool TryArmNextRole(out MusicalRole role)
     {
         role = MusicalRole.None;
-        if (_activeRoles.Count == 0) return false;
+        if (_roleOrder.Count == 0) return false;
 
-        foreach (var r in _activeRoles)
+        role = _roleOrder[Mathf.Clamp(_highlightedRoleIndex, 0, _roleOrder.Count - 1)];
+        if (_armedRoles.Contains(role)) return false;
+
+        _armedRoles.Add(role);
+        EjectRoleShard(role);
+        AdvanceHighlightedRole();
+        return true;
+    }
+
+    private void EjectRoleShard(MusicalRole role)
+    {
+        if (_roleShardByRole.TryGetValue(role, out var sr) && sr != null)
+            Destroy(sr.gameObject);
+        _roleShardByRole.Remove(role);
+        _roleOrder.Remove(role);
+        if (_roleOrder.Count == 0) _highlightedRoleIndex = 0;
+        else _highlightedRoleIndex %= _roleOrder.Count;
+        UpdateShardHighlightVisuals();
+    }
+
+    private void AdvanceHighlightedRole()
+    {
+        if (_roleOrder.Count == 0) return;
+        _highlightedRoleIndex = (_highlightedRoleIndex + 1) % _roleOrder.Count;
+        UpdateShardHighlightVisuals();
+    }
+
+    private void UpdateShardHighlightVisuals()
+    {
+        for (int i = 0; i < _roleOrder.Count; i++)
         {
-            if (_armedRoles.Contains(r)) continue;
-            _armedRoles.Add(r);
-            role = r;
-            return true;
+            var role = _roleOrder[i];
+            if (!_roleShardByRole.TryGetValue(role, out var sr) || sr == null) continue;
+            bool highlighted = (i == _highlightedRoleIndex);
+            sr.transform.localScale = Vector3.one * roleShardScale * (highlighted ? highlightedScaleMultiplier : 1f);
         }
+    }
 
-        return false;
+    private void SubscribeStepBoundaries(bool subscribe)
+    {
+        if (drumTrack == null) return;
+        if (subscribe) drumTrack.OnStepChanged += OnStepChanged;
+        else drumTrack.OnStepChanged -= OnStepChanged;
+    }
+
+    private void OnStepChanged(int stepIndex, int leaderSteps)
+    {
+        if (_roleOrder.Count <= 1 || leaderSteps <= 0) return;
+        int bins = Mathf.Max(1, _roleOrder.Count);
+        int stepsPerBin = Mathf.Max(1, leaderSteps / bins);
+        int bin = stepIndex / stepsPerBin;
+        if (bin != _lastDerivedBin)
+        {
+            _lastDerivedBin = bin;
+            AdvanceHighlightedRole();
+        }
     }
 
     private void PlaySafeCollisionFeedback(MusicalRole armedRole)
