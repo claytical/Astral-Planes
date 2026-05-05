@@ -665,6 +665,8 @@ public partial class Vehicle : MonoBehaviour
                     noteExact = fwdSteps <= 0.025;
                 }
             }
+            float pendingReleaseProgress = _armedReleases.Count > 0 ? 0f : notePulse;
+            p.collectable.tether?.SetReleaseProgress(pendingReleaseProgress);
             p.collectable.tether?.SetTimingState(notePulse, noteInWindow, noteExact);
             slot++;
         }
