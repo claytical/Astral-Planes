@@ -3,14 +3,15 @@ using UnityEngine;
 // =========================================================================
 //  BinRingController
 //
-//  MonoBehaviour that spawns a single ring at the overlay whenever a bin
-//  is completed during gameplay. Rings persist until the next drum loop
-//  boundary, then fade out. At bridge time (BridgeCoordinator), gameplay
-//  rings are cleared instantly before the full-motif record is shown.
+//  On each bin completion: clears any existing gameplay rings and re-spawns
+//  one ring for every bin completed so far across all tracks. This means
+//  completing bin 2 shows rings for bin 1 AND bin 2 together.
 //
-//  Setup: place in scene, add to GameFlowManager inspector slot or let
-//  it self-register. GameFlowManager calls Setup() after the drum track
-//  starts (step 3 of HandleTrackSceneSetupAsync).
+//  At the loop boundary all gameplay rings fade out. The next bin
+//  completion will re-show the full cumulative set again.
+//
+//  At bridge time, ClearGameplayRings() removes them instantly before the
+//  full-motif record is shown via AnimateApply.
 // =========================================================================
 public class BinRingController : MonoBehaviour
 {
@@ -23,15 +24,12 @@ public class BinRingController : MonoBehaviour
         GameFlowManager.Instance.RegisterBinRingController(this);
     }
 
-    /// <summary>
-    /// Called by GameFlowManager after the drum track and instrument tracks are ready.
-    /// </summary>
     public void Setup(DrumTrack drumTrack, InstrumentTrack[] tracks)
     {
         Teardown();
 
-        _drumTrack     = drumTrack;
-        _tracks        = tracks;
+        _drumTrack      = drumTrack;
+        _tracks         = tracks;
         _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
 
         if (_drumTrack != null)
@@ -51,7 +49,6 @@ public class BinRingController : MonoBehaviour
             _drumTrack.OnLoopBoundary -= OnLoopBoundary;
             _drumTrack = null;
         }
-
         if (_tracks != null)
         {
             foreach (var t in _tracks)
@@ -66,26 +63,34 @@ public class BinRingController : MonoBehaviour
     {
         if (_ringApplicator == null)
             _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
-        if (_ringApplicator == null) return;
+        if (_ringApplicator == null || _tracks == null) return;
 
         int totalSteps = (_drumTrack != null && _drumTrack.totalSteps > 0)
-            ? _drumTrack.totalSteps
-            : 16;
+            ? _drumTrack.totalSteps : 16;
 
-        _ringApplicator.SpawnBinRing(
-            track.assignedRole,
-            binIndex,
-            track.trackColor,
-            track.GetBinNoteEntries(binIndex),
-            totalSteps);
+        // Clear any rings currently visible (including a running fade) and
+        // re-spawn one ring per completed bin across all tracks.
+        _ringApplicator.ClearGameplayRings();
+
+        foreach (var t in _tracks)
+        {
+            if (t == null) continue;
+            int allocatedBins = Mathf.Max(1, t.loopMultiplier);
+            for (int b = 0; b < allocatedBins; b++)
+            {
+                if (!t.IsBinFilled(b)) continue;
+                _ringApplicator.SpawnBinRing(
+                    t.assignedRole, b, t.trackColor,
+                    t.GetBinNoteEntries(b), totalSteps);
+            }
+        }
     }
 
     private void OnLoopBoundary()
     {
         if (_ringApplicator == null) return;
-        var applicator = _ringApplicator;
-        var config     = applicator.config;
-        float duration = config != null ? config.fadeOutDuration : 0.5f;
-        StartCoroutine(applicator.FadeAndClearGameplayRings(duration));
+        float duration = _ringApplicator.config != null
+            ? _ringApplicator.config.fadeOutDuration : 0.5f;
+        StartCoroutine(_ringApplicator.FadeAndClearGameplayRings(duration));
     }
 }

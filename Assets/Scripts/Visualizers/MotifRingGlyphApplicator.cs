@@ -86,6 +86,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             config.ringDrawInDuration, go.transform, rotDeg,
             noteInfos: new List<NoteAnimInfo>(), noteViz: null,
             shouldStop: () => _gameplayFadingOut));
+        RefreshPlayAreaFit(_gameplayRings.Count);
     }
 
     /// <summary>Fade and destroy all gameplay rings over <paramref name="duration"/> seconds.</summary>
