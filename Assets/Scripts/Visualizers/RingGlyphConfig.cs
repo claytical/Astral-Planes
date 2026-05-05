@@ -4,16 +4,29 @@ using UnityEngine;
 public class RingGlyphConfig : ScriptableObject
 {
     [Header("Layout")]
-    [Tooltip("Radius of the innermost ring in local units (parent-relative).")]
+    [Tooltip("Inner edge radius of the innermost ring in local units (parent-relative).")]
     public float innerRadius = 0.08f;
 
+    [Tooltip("Radial thickness of each filled ring in local units.")]
+    public float ringThickness = 0.04f;
+
     [Tooltip("Gap between the outer edge of one ring and the inner edge of the next.")]
-    public float ringSpacing = 0.035f;
+    public float ringSpacing = 0.02f;
 
     [Range(0f, 0.4f)]
     [Tooltip("Fraction of the play area height reserved as padding on each side. " +
              "0.05 = 5% padding, so the outermost ring fills 90% of the play area height.")]
     public float fitPaddingFraction = 0.05f;
+
+    [Header("Filled Ring Appearance")]
+    [Tooltip("Material for filled annulus rings. Must support alpha blending. " +
+             "Assign a URP Unlit/Transparent or Sprites/Default material.")]
+    public Material ringMeshMaterial;
+
+    [Range(0f, 1f)]
+    [Tooltip("Base alpha applied to all filled rings. Low values allow rings to stack " +
+             "on top of each other without fully obscuring what is behind.")]
+    public float ringAlpha = 0.45f;
 
     [Header("Line")]
     [Tooltip("LineRenderer width in local units.")]

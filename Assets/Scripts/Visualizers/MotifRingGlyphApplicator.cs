@@ -1,314 +1,278 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 // =========================================================================
 //  MotifRingGlyphApplicator
 //
-//  Manages two ring layers:
+//  Each ring has two visual layers sharing one parent transform:
 //
-//  Gameplay rings (_gameplayRings): spawned one-at-a-time as bins are
-//  completed during play via SpawnBinRing(). Each ring fades at loop
-//  boundary via FadeAndClearGameplayRings() or is cleared instantly by
-//  ClearGameplayRings() before the bridge record is shown.
+//  Fill    — semi-transparent filled annulus (MeshRenderer) tinted by the
+//            musical role color; multiple rings stack like record tracks.
 //
-//  Record rings (_recordRings): built from the full motif snapshot at
-//  bridge time via AnimateApply(). These represent the completed motif
-//  and fade out at the end of the bridge via FadeOutAndClear().
+//  Contour — note-tug LineRenderer at the outer rim of the filled annulus,
+//            sitting in the space just above it. Note travel-dot animations
+//            fire from NoteVisualizer markers to the tug points during the
+//            record draw-in.
+//
+//  The parent GO is rotated by the contour animation coroutine, so fill and
+//  contour rotate together.
+//
+//  _gameplayRings — one ring per completed bin, spawned during play
+//  _recordRings   — full-motif snapshot, shown at bridge time
 // =========================================================================
 public class MotifRingGlyphApplicator : MonoBehaviour
 {
     [Header("Config")]
-    [Tooltip("ScriptableObject controlling ring layout, segment count, tug, and animation parameters.")]
     public RingGlyphConfig config;
 
-    [Tooltip("Material applied to all ring LineRenderers. Sprites/Default works for unlit rings.")]
+    [Tooltip("Material for contour LineRenderers (Sprites/Default works well).")]
     public Material lineMaterial;
 
-    private readonly List<LineRenderer> _recordRings   = new();
-    private readonly List<LineRenderer> _gameplayRings = new();
+    private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
-    private bool _recordFadingOut   = false;
-    private bool _gameplayFadingOut = false;
+    private struct RingEntry
+    {
+        public GameObject    Root;
+        public MeshRenderer  Fill;
+        public LineRenderer  Contour;
+        public Color         BaseColor;
+        public int[]         FullTris;       // saved before mesh triangles are cleared
+        public List<Vector2> ContourPoints;  // polyline passed to AnimateSingleRing
+    }
+
+    private readonly List<RingEntry> _gameplayRings = new();
+    private readonly List<RingEntry> _recordRings   = new();
+
+    private bool _recordFadingOut;
+    private bool _gameplayFadingOut;
 
     private struct NoteAnimInfo
     {
         public InstrumentTrack Track;
         public int             AbsStep;
-        public float           NoteAngle;    // radians [0, 2π)
-        public Vector3         TugLocalPos;  // in ring-local space
+        public float           NoteAngle;
+        public Vector3         TugLocalPos;
         public Color           DotColor;
     }
 
-    // ── Public API ───────────────────────────────────────────────────────────
+    // ── Lifecycle ────────────────────────────────────────────────────────────
 
-    void Start()
-    {
-        GameFlowManager.Instance.RegisterRingGlyphApplicator(this);
-    }
+    void Start() => GameFlowManager.Instance.RegisterRingGlyphApplicator(this);
+    void OnDestroy() => Clear();
 
     // ── Gameplay ring API ────────────────────────────────────────────────────
 
     /// <summary>
-    /// Spawn a single ring for a just-completed bin. Rings stack outward by the
-    /// order they are added. Animates with draw-in and continuous rotation.
+    /// Spawn one ring for a just-completed bin: a filled annulus with a
+    /// note-tug contour at its outer rim. No travel dots for gameplay rings.
     /// </summary>
     public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
                               List<MotifSnapshot.NoteEntry> notes, int totalSteps)
     {
         if (config == null) return;
 
-        int ringIndex = _gameplayRings.Count;
-        var poly = MotifRingGlyphGenerator.GenerateSingleRing(
-            role, binIndex, color, notes, totalSteps, ringIndex, config);
-        if (poly == null) return;
+        int   idx    = _gameplayRings.Count;
+        float innerR = RingInnerRadius(idx);
+        float outerR = innerR + config.ringThickness;
+        int   segs   = Mathf.Max(16, config.segments);
 
-        var go = new GameObject(poly.LayerName);
-        go.transform.SetParent(transform, worldPositionStays: false);
+        var entry = BuildRingEntry($"GameplayRing_Bin{binIndex}_{role}",
+            innerR, outerR, segs, color, role, binIndex, notes, totalSteps);
+        _gameplayRings.Add(entry);
 
-        var lr = go.AddComponent<LineRenderer>();
-        if (lineMaterial != null) lr.material = lineMaterial;
-        lr.useWorldSpace     = false;
-        lr.loop              = false;
-        lr.widthMultiplier   = poly.LineWidth;
-        lr.startColor        = poly.LineColor;
-        lr.endColor          = poly.LineColor;
-        lr.positionCount     = 0;
-        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows    = false;
-        _gameplayRings.Add(lr);
+        float rotDeg = Mathf.Clamp(config.rotSpeedBase, 0f, config.rotSpeedMax);
+        if (idx % 2 == 1) rotDeg = -rotDeg;
 
-        float rotDeg = Mathf.Clamp(config.rotSpeedBase * 1f, 0f, config.rotSpeedMax);
-        if (ringIndex % 2 == 1) rotDeg = -rotDeg;
+        StartCoroutine(AnimateMeshFill(
+            entry.Fill.GetComponent<MeshFilter>().sharedMesh,
+            entry.FullTris, segs, delay: 0f, config.ringDrawInDuration));
 
         StartCoroutine(AnimateSingleRing(
-            lr, poly.Points, delay: 0f,
-            config.ringDrawInDuration, go.transform, rotDeg,
-            noteInfos: new List<NoteAnimInfo>(), noteViz: null,
+            entry.Contour, entry.ContourPoints,
+            delay: 0f, config.ringDrawInDuration,
+            entry.Root.transform, rotDeg,
+            new List<NoteAnimInfo>(), noteViz: null,
             shouldStop: () => _gameplayFadingOut));
+
         RefreshPlayAreaFit(_gameplayRings.Count);
     }
 
-    /// <summary>Fade and destroy all gameplay rings over <paramref name="duration"/> seconds.</summary>
+    /// <summary>Fade and destroy all gameplay rings.</summary>
     public IEnumerator FadeAndClearGameplayRings(float duration)
     {
         _gameplayFadingOut = true;
+        var snapshot = _gameplayRings.ToArray();
+        var mpbs     = MakeMpbs(snapshot.Length);
 
-        var startColors = _gameplayRings.ConvertAll(lr => lr != null ? lr.startColor : Color.clear);
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float alpha = 1f - Mathf.Clamp01(elapsed / duration);
-            for (int i = 0; i < _gameplayRings.Count; i++)
-            {
-                if (_gameplayRings[i] == null) continue;
-                Color c = startColors[i];
-                c.a = alpha;
-                _gameplayRings[i].startColor = _gameplayRings[i].endColor = c;
-            }
+            ApplyAlpha(snapshot, 1f - Mathf.Clamp01(elapsed / duration), mpbs);
             yield return null;
         }
 
-        DestroyGameplayRings();
+        DestroyList(_gameplayRings);
         _gameplayFadingOut = false;
     }
 
-    /// <summary>Destroy all gameplay rings immediately with no fade.</summary>
+    /// <summary>Destroy all gameplay rings immediately.</summary>
     public void ClearGameplayRings()
     {
         _gameplayFadingOut = true;
-        DestroyGameplayRings();
+        DestroyList(_gameplayRings);
         _gameplayFadingOut = false;
     }
 
     // ── Record ring API ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Build record rings from the full motif snapshot with animated draw-in
-    /// and per-ring Z-axis rotation. Replaces any previously running record animation.
+    /// Build filled + contour record rings from the full motif snapshot with
+    /// staggered draw-in, note travel dots, and continuous rotation.
     /// </summary>
     public void AnimateApply(MotifSnapshot snapshot)
     {
         StopAllCoroutines();
         _recordFadingOut   = false;
         _gameplayFadingOut = false;
-        ClearRecordRings();
+        DestroyList(_recordRings);
 
         if (snapshot == null || config == null) return;
 
-        var polylines = MotifRingGlyphGenerator.Generate(snapshot, config);
-        if (polylines.Count == 0) return;
+        // Build ordered ring keys (ascending BinIndex, then MusicalRole)
+        var seen     = new HashSet<(int, MusicalRole)>();
+        var ringKeys = new List<(int binIndex, MusicalRole role, Color color, float fillDur)>();
 
-        // Build lookup: (binIndex, r, g, b) → FillDurationSeconds
         var fillDurs = new Dictionary<(int, float, float, float), float>();
         foreach (var bin in snapshot.TrackBins)
         {
             Color c = bin.TrackColor;
-            var key = (bin.BinIndex, c.r, c.g, c.b);
-            if (!fillDurs.TryGetValue(key, out float existing) || bin.FillDurationSeconds > existing)
-                fillDurs[key] = bin.FillDurationSeconds;
+            var   k = (bin.BinIndex, c.r, c.g, c.b);
+            if (!fillDurs.TryGetValue(k, out float ex) || bin.FillDurationSeconds > ex)
+                fillDurs[k] = bin.FillDurationSeconds;
         }
 
-        // Resolve NoteVisualizer and build color→track lookup for travel dots
-        var noteViz = GameFlowManager.Instance?.controller?.noteVisualizer;
-        var tracks  = GameFlowManager.Instance?.controller?.tracks;
+        foreach (var bin in snapshot.TrackBins
+                     .Where(b => b.IsFilled || b.CollectedSteps.Count > 0)
+                     .OrderBy(b => b.BinIndex).ThenBy(b => (int)b.Role))
+        {
+            var key = (bin.BinIndex, bin.Role);
+            if (!seen.Add(key)) continue;
+            Color c2 = bin.TrackColor;
+            fillDurs.TryGetValue((bin.BinIndex, c2.r, c2.g, c2.b), out float fd);
+            ringKeys.Add((bin.BinIndex, bin.Role, c2, fd));
+        }
+
+        if (ringKeys.Count == 0) return;
+
+        var noteViz       = GameFlowManager.Instance?.controller?.noteVisualizer;
+        var tracks        = GameFlowManager.Instance?.controller?.tracks;
         var trackByQColor = new Dictionary<Color, InstrumentTrack>();
         if (tracks != null)
             foreach (var tr in tracks)
                 if (tr != null) { Color32 q = tr.trackColor; trackByQColor[(Color)q] = tr; }
 
-        for (int i = 0; i < polylines.Count; i++)
+        int segs    = Mathf.Max(16, config.segments);
+        int binSize = Mathf.Max(1, snapshot.TotalSteps);
+
+        for (int i = 0; i < ringKeys.Count; i++)
         {
-            var poly = polylines[i];
+            var (binIndex, role, color, fillDur) = ringKeys[i];
+            float innerR = RingInnerRadius(i);
+            float outerR = innerR + config.ringThickness;
 
-            var go = new GameObject(poly.LayerName);
-            go.transform.SetParent(transform, worldPositionStays: false);
+            var ringNotes = snapshot.CollectedNotes
+                .Where(n => n.BinIndex == binIndex
+                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
+                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
+                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
+                .ToList();
 
-            var lr = go.AddComponent<LineRenderer>();
-            if (lineMaterial != null) lr.material = lineMaterial;
-            lr.useWorldSpace     = false;
-            lr.loop              = false;
-            lr.widthMultiplier   = poly.LineWidth;
-            lr.startColor        = poly.LineColor;
-            lr.endColor          = poly.LineColor;
-            lr.positionCount     = 0;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            lr.receiveShadows    = false;
-            _recordRings.Add(lr);
+            var entry = BuildRingEntry($"RecordRing_Bin{binIndex}_{role}",
+                innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps);
+            _recordRings.Add(entry);
 
-            Color lc = poly.LineColor;
-            fillDurs.TryGetValue((poly.BinIndex, lc.r, lc.g, lc.b), out float fillDur);
             float rotDeg = Mathf.Clamp(
-                config.rotSpeedBase * Mathf.Max(fillDur, 0.1f),
-                0f, config.rotSpeedMax);
+                config.rotSpeedBase * Mathf.Max(fillDur, 0.1f), 0f, config.rotSpeedMax);
             if (i % 2 == 1) rotDeg = -rotDeg;
 
-            int   binSize = Mathf.Max(1, snapshot.TotalSteps);
-            float tugR    = (config.innerRadius + i * (config.ringSpacing + config.lineWidth))
-                            * (1f - config.tugDepthFraction);
-
+            float tugR    = outerR * (1f - config.tugDepthFraction);
             var noteInfos = new List<NoteAnimInfo>();
-            foreach (var n in snapshot.CollectedNotes)
+            foreach (var n in ringNotes)
             {
-                if (n.BinIndex != poly.BinIndex) continue;
                 Color32 q = n.TrackColor;
-                if (!trackByQColor.TryGetValue((Color)q, out var track)) continue;
-
+                if (!trackByQColor.TryGetValue(q, out var track)) continue;
                 int   localStep = n.Step % binSize;
-                float angle     = (localStep / (float)binSize) * Mathf.PI * 2f;
-                float tx        = Mathf.Cos(angle) * tugR;
-                float ty        = Mathf.Sin(angle) * tugR;
-
+                float angle     = localStep / (float)binSize * Mathf.PI * 2f;
                 noteInfos.Add(new NoteAnimInfo
                 {
                     Track       = track,
                     AbsStep     = n.Step,
                     NoteAngle   = angle,
-                    TugLocalPos = new Vector3(tx, ty, 0f),
-                    DotColor    = poly.LineColor,
+                    TugLocalPos = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f),
+                    DotColor    = color,
                 });
             }
-
             noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
 
             float delay = i * config.ringStaggerDelay;
+            StartCoroutine(AnimateMeshFill(
+                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
+                entry.FullTris, segs, delay, config.ringDrawInDuration));
+
             StartCoroutine(AnimateSingleRing(
-                lr, poly.Points, delay,
-                config.ringDrawInDuration, go.transform, rotDeg, noteInfos, noteViz,
+                entry.Contour, entry.ContourPoints,
+                delay, config.ringDrawInDuration,
+                entry.Root.transform, rotDeg,
+                noteInfos, noteViz,
                 shouldStop: () => _recordFadingOut));
         }
+
+        RefreshPlayAreaFit(_recordRings.Count);
     }
 
-    /// <summary>
-    /// Fade all record rings to transparent over <paramref name="duration"/> seconds, then destroy.
-    /// </summary>
+    /// <summary>Fade all record rings to transparent, then destroy.</summary>
     public IEnumerator FadeOutAndClear(float duration)
     {
         _recordFadingOut = true;
+        var snapshot = _recordRings.ToArray();
+        var mpbs     = MakeMpbs(snapshot.Length);
 
-        var startColors = _recordRings.ConvertAll(lr => lr != null ? lr.startColor : Color.clear);
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float alpha = 1f - Mathf.Clamp01(elapsed / duration);
-            for (int i = 0; i < _recordRings.Count; i++)
-            {
-                if (_recordRings[i] == null) continue;
-                Color c = startColors[i];
-                c.a = alpha;
-                _recordRings[i].startColor = _recordRings[i].endColor = c;
-            }
+            ApplyAlpha(snapshot, 1f - Mathf.Clamp01(elapsed / duration), mpbs);
             yield return null;
         }
 
-        ClearRecordRings();
+        DestroyList(_recordRings);
         _recordFadingOut = false;
     }
 
-    /// <summary>Rebuild all record rings instantly with no animation.</summary>
-    public void Apply(MotifSnapshot snapshot)
-    {
-        StopAllCoroutines();
-        _recordFadingOut = false;
-        ClearRecordRings();
-
-        if (snapshot == null || config == null) return;
-
-        var polylines = MotifRingGlyphGenerator.Generate(snapshot, config);
-
-        foreach (var poly in polylines)
-        {
-            var go = new GameObject(poly.LayerName);
-            go.transform.SetParent(transform, worldPositionStays: false);
-
-            var lr = go.AddComponent<LineRenderer>();
-            if (lineMaterial != null) lr.material = lineMaterial;
-            lr.useWorldSpace     = false;
-            lr.loop              = false;
-            lr.widthMultiplier   = poly.LineWidth;
-            lr.startColor        = poly.LineColor;
-            lr.endColor          = poly.LineColor;
-            lr.positionCount     = poly.Points.Count;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            lr.receiveShadows    = false;
-
-            for (int i = 0; i < poly.Points.Count; i++)
-                lr.SetPosition(i, new Vector3(poly.Points[i].x, poly.Points[i].y, 0f));
-
-            _recordRings.Add(lr);
-        }
-    }
-
-    /// <summary>Destroy all rings (both layers) and clear all lists.</summary>
+    /// <summary>Destroy all rings (both layers).</summary>
     public void Clear()
     {
-        foreach (Transform child in transform)
-            Destroy(child.gameObject);
+        foreach (Transform child in transform) Destroy(child.gameObject);
         _recordRings.Clear();
         _gameplayRings.Clear();
     }
 
-    /// <summary>Center and scale the ring group to fit within a world-space rectangle.</summary>
     public void FitToPlayArea(float width, float height, float cx, float cy)
     {
+        float s = Mathf.Min(width, height);
         transform.position   = new Vector3(cx, cy, transform.position.z);
-        float scale          = Mathf.Min(width, height);
-        transform.localScale = new Vector3(scale, scale, 1f);
+        transform.localScale = new Vector3(s, s, 1f);
     }
-
-    private void OnDestroy() => Clear();
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Scale and center the ring group so the outermost ring's diameter equals the play area
-    /// height minus padding. <paramref name="ringCount"/> is the total number of rings currently
-    /// visible (used to compute the outermost ring's radius from config values).
-    /// </summary>
+    private float RingInnerRadius(int idx) =>
+        config.innerRadius + idx * (config.ringThickness + config.ringSpacing);
+
     private void RefreshPlayAreaFit(int ringCount)
     {
         if (config == null || ringCount == 0) return;
@@ -316,52 +280,184 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         if (gfm?.activeDrumTrack == null) return;
         if (!gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area)) return;
 
-        // Outermost ring radius in local config units
-        float outerRadius = config.innerRadius
-            + (ringCount - 1) * (config.ringSpacing + config.lineWidth);
+        float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
         if (outerRadius <= 0f) return;
 
-        // Target radius: half of (height - 2 × padding)
         float targetRadius = area.height * (0.5f - config.fitPaddingFraction);
         if (targetRadius <= 0f) return;
 
         float scale = targetRadius / outerRadius;
-        float cx    = (area.left + area.right)  * 0.5f;
-        float cy    = (area.bottom + area.top)  * 0.5f;
-        transform.position   = new Vector3(cx, cy, transform.position.z);
+        transform.position   = new Vector3(
+            (area.left + area.right) * 0.5f,
+            (area.bottom + area.top) * 0.5f,
+            transform.position.z);
         transform.localScale = new Vector3(scale, scale, 1f);
     }
 
-    private void ClearRecordRings()
+    private RingEntry BuildRingEntry(
+        string goName, float innerR, float outerR, int segs,
+        Color color, MusicalRole role, int binIndex,
+        List<MotifSnapshot.NoteEntry> notes, int totalSteps)
     {
-        foreach (var lr in _recordRings)
-            if (lr != null) Destroy(lr.gameObject);
-        _recordRings.Clear();
+        var root = new GameObject(goName);
+        root.transform.SetParent(transform, worldPositionStays: false);
+
+        // ── Fill ─────────────────────────────────────────────────────────────
+        var fillGo = new GameObject("Fill");
+        fillGo.transform.SetParent(root.transform, worldPositionStays: false);
+
+        var mesh     = BuildAnnulusMesh(innerR, outerR, segs);
+        var fullTris = mesh.triangles;          // save before clearing
+        mesh.SetTriangles(System.Array.Empty<int>(), 0);
+
+        var mf        = fillGo.AddComponent<MeshFilter>();
+        mf.sharedMesh = mesh;
+
+        var mr               = fillGo.AddComponent<MeshRenderer>();
+        mr.sharedMaterial    = config.ringMeshMaterial;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+
+        var mpb = new MaterialPropertyBlock();
+        SetFillColor(mr, new Color(color.r, color.g, color.b, config.ringAlpha), mpb);
+
+        // ── Contour ───────────────────────────────────────────────────────────
+        var contourGo = new GameObject("Contour");
+        contourGo.transform.SetParent(root.transform, worldPositionStays: false);
+
+        var poly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
+            role, binIndex, color, notes, totalSteps, outerR, config);
+        var pts = poly?.Points ?? new List<Vector2>();
+
+        var lr = contourGo.AddComponent<LineRenderer>();
+        if (lineMaterial != null) lr.material = lineMaterial;
+        lr.useWorldSpace     = false;
+        lr.loop              = false;
+        lr.widthMultiplier   = config.lineWidth;
+        lr.startColor        = color;
+        lr.endColor          = color;
+        lr.positionCount     = 0;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+
+        return new RingEntry
+        {
+            Root          = root,
+            Fill          = mr,
+            Contour       = lr,
+            BaseColor     = color,
+            FullTris      = fullTris,
+            ContourPoints = pts,
+        };
     }
 
-    private void DestroyGameplayRings()
+    private static MaterialPropertyBlock[] MakeMpbs(int count)
     {
-        foreach (var lr in _gameplayRings)
-            if (lr != null) Destroy(lr.gameObject);
-        _gameplayRings.Clear();
+        var arr = new MaterialPropertyBlock[count];
+        for (int i = 0; i < count; i++) arr[i] = new MaterialPropertyBlock();
+        return arr;
+    }
+
+    private void ApplyAlpha(RingEntry[] entries, float normalizedAlpha,
+                            MaterialPropertyBlock[] mpbs)
+    {
+        for (int i = 0; i < entries.Length; i++)
+        {
+            Color c = entries[i].BaseColor;
+            if (entries[i].Fill != null)
+                SetFillColor(entries[i].Fill,
+                    new Color(c.r, c.g, c.b, config.ringAlpha * normalizedAlpha), mpbs[i]);
+
+            if (entries[i].Contour != null)
+            {
+                var lc = new Color(c.r, c.g, c.b, normalizedAlpha);
+                entries[i].Contour.startColor = lc;
+                entries[i].Contour.endColor   = lc;
+            }
+        }
+    }
+
+    private static void SetFillColor(MeshRenderer mr, Color c, MaterialPropertyBlock mpb)
+    {
+        mpb.SetColor(BasePropId,  c);
+        mpb.SetColor(ColorPropId, c);
+        mr.SetPropertyBlock(mpb);
+    }
+
+    private static void DestroyList(List<RingEntry> list)
+    {
+        foreach (var e in list)
+            if (e.Root != null) Destroy(e.Root);
+        list.Clear();
+    }
+
+    // ── Mesh generation ──────────────────────────────────────────────────────
+
+    private static Mesh BuildAnnulusMesh(float innerR, float outerR, int segments)
+    {
+        int n     = segments;
+        var verts = new Vector3[n * 2];
+        var uvs   = new Vector2[n * 2];
+
+        for (int i = 0; i < n; i++)
+        {
+            float angle = i / (float)n * Mathf.PI * 2f;
+            float cos = Mathf.Cos(angle), sin = Mathf.Sin(angle);
+            verts[i]     = new Vector3(cos * outerR, sin * outerR, 0f);
+            verts[n + i] = new Vector3(cos * innerR, sin * innerR, 0f);
+            uvs[i]       = new Vector2(i / (float)n, 1f);
+            uvs[n + i]   = new Vector2(i / (float)n, 0f);
+        }
+
+        var tris = new int[n * 6];
+        for (int i = 0; i < n; i++)
+        {
+            int next = (i + 1) % n;
+            int t    = i * 6;
+            tris[t]     = i;        tris[t + 1] = next;     tris[t + 2] = n + i;
+            tris[t + 3] = next;     tris[t + 4] = n + next; tris[t + 5] = n + i;
+        }
+
+        var mesh = new Mesh();
+        mesh.vertices  = verts;
+        mesh.uv        = uvs;
+        mesh.triangles = tris;
+        mesh.RecalculateBounds();
+        return mesh;
     }
 
     // ── Animation ────────────────────────────────────────────────────────────
 
+    private static IEnumerator AnimateMeshFill(
+        Mesh mesh, int[] fullTris, int segments, float delay, float drawDuration)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+
+        float elapsed = 0f;
+        while (elapsed < drawDuration)
+        {
+            elapsed += Time.deltaTime;
+            int visible = Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Clamp01(elapsed / drawDuration) * segments) * 6,
+                0, fullTris.Length);
+            mesh.SetTriangles(fullTris, 0, visible, 0);
+            mesh.RecalculateBounds();
+            yield return null;
+        }
+
+        mesh.SetTriangles(fullTris, 0);
+        mesh.RecalculateBounds();
+    }
+
     private IEnumerator AnimateSingleRing(
-        LineRenderer lr,
-        List<Vector2> pts,
-        float delay,
-        float drawDuration,
-        Transform ringTransform,
-        float rotDegPerSec,
-        List<NoteAnimInfo> noteInfos,
-        NoteVisualizer noteViz,
+        LineRenderer lr, List<Vector2> pts,
+        float delay, float drawDuration,
+        Transform ringTransform, float rotDegPerSec,
+        List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         System.Func<bool> shouldStop)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
-        // Phase 1: Draw-in — grow positionCount from 2 → total over drawDuration
         int   total    = pts.Count;
         int   nextNote = 0;
         float elapsed  = 0f;
@@ -376,8 +472,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             while (nextNote < noteInfos.Count && drawnAngle >= noteInfos[nextNote].NoteAngle)
             {
                 var info = noteInfos[nextNote++];
-                if (noteViz != null && noteViz.noteMarkers != null &&
-                    info.Track != null &&
+                if (noteViz?.noteMarkers != null && info.Track != null &&
                     noteViz.noteMarkers.TryGetValue((info.Track, info.AbsStep), out var markerTr) &&
                     markerTr != null)
                 {
@@ -387,24 +482,20 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 }
             }
 
-            int count = Mathf.Clamp(
-                Mathf.RoundToInt(progress * total),
-                2, total);
+            int count = Mathf.Clamp(Mathf.RoundToInt(progress * total), 2, total);
             lr.positionCount = count;
             for (int i = 0; i < count; i++)
                 lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
             yield return null;
         }
 
-        // Ensure all points are set at full draw completion
         lr.positionCount = total;
         for (int i = 0; i < total; i++)
             lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
 
-        // Phase 2: Rotate until shouldStop() returns true
         while (!shouldStop())
         {
-            if (lr == null) yield break;
+            if (ringTransform == null) yield break;
             ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
@@ -419,7 +510,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
         var lr = go.AddComponent<LineRenderer>();
         if (lineMaterial != null) lr.material = lineMaterial;
-        lr.startColor        = lr.endColor = color;
+        lr.startColor = lr.endColor = color;
         lr.widthMultiplier   = config.lineWidth * 2f;
         lr.useWorldSpace     = false;
         lr.loop              = false;
@@ -427,21 +518,21 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         lr.receiveShadows    = false;
 
         const int segs = 8;
-        float r = config.noteDotRadius;
+        float dotR = config.noteDotRadius;
         lr.positionCount = segs + 1;
         for (int i = 0; i <= segs; i++)
         {
             float a = i / (float)segs * Mathf.PI * 2f;
-            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
+            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * dotR, Mathf.Sin(a) * dotR, 0f));
         }
 
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float   t   = Mathf.Clamp01(elapsed / duration);
-            Vector3 end = ringTransform.TransformPoint(tugLocalPos);
-            go.transform.position = Vector3.Lerp(startWorld, end, t);
+            go.transform.position = Vector3.Lerp(
+                startWorld, ringTransform.TransformPoint(tugLocalPos),
+                Mathf.Clamp01(elapsed / duration));
             yield return null;
         }
 
