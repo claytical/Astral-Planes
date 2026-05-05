@@ -99,6 +99,7 @@ public partial class Vehicle : MonoBehaviour
     }
 
     private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
+    private readonly HashSet<InstrumentTrack> _carriedTracksScratch = new HashSet<InstrumentTrack>();
 
     public void ClearPendingNotesForBridge()
     {
@@ -415,8 +416,11 @@ public partial class Vehicle : MonoBehaviour
         if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = gfm != null ? gfm.noteViz : null;
 
+        _carriedTracksScratch.Clear();
+
         if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
         {
+            if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
             UpdateVehiclePlacementResonance(0f, null);
             return;
         }
@@ -569,56 +573,60 @@ public partial class Vehicle : MonoBehaviour
             p.collectable.SetTrailTarget(SampleTrailPosition(dist));
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
 
-            // Drive each tether from its own assigned step so one note doesn't incorrectly
-            // "borrow" another note's timing window.
             bool noteInWindow = false;
             bool noteExact = false;
             float notePulse = 0f;
             if (_armedReleases.Count == 0 && hasPendingRaw && totalPending > 0 &&
                 p.track != null && p.track.drumTrack != null)
             {
-                int targetAbs = -1;
+                // Keep FIFO BindByStep so BuildManualReleaseSpokenFor exclusion stays correct.
+                if (viz != null && TryResolveManualReleaseTargetStep(p, rawAbsPending, totalPending, out int nextUnlitTarget, out _))
+                    p.collectable.tether?.BindByStep(p.track, nextUnlitTarget, viz);
 
-                // Re-resolve each pending note's target against the current unlit steps.
-                // This prevents orphaned authored steps (already filled) from remaining
-                // highlighted after another carried note is placed.
-                if (viz != null)
-                {
-                    if (TryResolveManualReleaseTargetStep(p, rawAbsPending, totalPending, out int nextUnlitTarget, out _))
-                    {
-                        targetAbs = nextUnlitTarget;
-                        p.collectable.tether?.BindByStep(p.track, targetAbs, viz);
-                    }
-                }
+                // Visual timing uses the authored step — that is where the tether's end
+                // transform was anchored at pickup. FIFO re-resolves the nearest unlit step
+                // each frame and swaps assignments as the playhead moves, so using targetAbs
+                // here would pulse the wrong step relative to the visible line.
+                int visualStep = p.authoredAbsStep >= 0 ? p.authoredAbsStep
+                    : (p.collectable.tether != null && p.collectable.tether.boundStep >= 0
+                        ? p.collectable.tether.boundStep : -1);
 
-                if (targetAbs < 0)
-                {
-                    targetAbs = p.collectable.tether != null && p.collectable.tether.boundStep >= 0
-                        ? p.collectable.tether.boundStep
-                        : p.authoredAbsStep;
-                }
-
-                if (targetAbs >= 0)
+                if (visualStep >= 0)
                 {
                     int total = Mathf.Max(1, totalPending);
-                    double fwdSteps = (targetAbs - rawAbsPending + total) % total;
+                    double fwdSteps = (visualStep - rawAbsPending + total) % total;
+                    double backSteps = total - fwdSteps;
                     int pBinSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
                     int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
                     double pLoopLen = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
                     double pStepDur = pLoopLen / total;
                     double fwdDsp = fwdSteps * pStepDur;
+                    double backDsp = backSteps * pStepDur;
                     const float ringWindowLead = 1.5f;
-                    double windowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
-                    notePulse = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, windowDsp)));
-                    noteInWindow = fwdDsp <= windowDsp;
+                    double armWindowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
+                    double graceDsp = vehicleConfig.manualReleaseGracePeriodSteps * pStepDur;
+
+                    bool inArmWindow = fwdDsp <= armWindowDsp;
+                    bool inGrace = graceDsp > 0 && backDsp <= graceDsp;
+                    noteInWindow = inArmWindow || inGrace;
                     noteExact = fwdSteps <= 0.025;
+
+                    if (inArmWindow)
+                        notePulse = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, armWindowDsp)));
+                    else if (inGrace)
+                        notePulse = 1f - Mathf.Clamp01((float)(backDsp / System.Math.Max(0.001, graceDsp)));
                 }
             }
-            float pendingReleaseProgress = _armedReleases.Count > 0 ? 0f : notePulse;
-            p.collectable.tether?.SetReleaseProgress(pendingReleaseProgress);
+            bool isHeadPending = slot == 0;
+            // Head note gets width urgency; all notes get per-step timing colour.
+            p.collectable.tether?.SetReleaseProgress(isHeadPending ? notePulse : 0f);
             p.collectable.tether?.SetTimingState(notePulse, noteInWindow, noteExact);
             slot++;
         }
+
+        foreach (var ar in _armedReleases) if (ar.note.track != null) _carriedTracksScratch.Add(ar.note.track);
+        foreach (var p in _pendingNotes)   if (p.track != null)       _carriedTracksScratch.Add(p.track);
+        if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
     }
     
     private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)

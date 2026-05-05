@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Lead NodeLocomotionProfile
   m_EditorClassIdentifier: Assembly-CSharp::MineNodeLocomotionProfile
   archetype: 2
-  baseSpeed: 1
+  baseSpeed: 3
   maxSpeed: 6
   acceleration: 10
-  braking: 2
+  braking: 3
   turnRate: 6
-  hesitation: 0.1
+  hesitation: 0.4
   dustPenalty: 0.2

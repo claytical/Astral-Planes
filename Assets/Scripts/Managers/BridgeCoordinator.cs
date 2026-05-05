@@ -49,6 +49,9 @@ public sealed class BridgeCoordinator
 
         _motifSnapshots.Add(motifSnap);
         ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
+
+        // Suppress any queued bin-completion ring so the record is the only thing shown.
+        _gameFlow.GetBinRingController()?.CancelPendingDraw();
         _gameFlow.GetMotifRingGlyphApplicator()?.ClearGameplayRings();
         _gameFlow.GetMotifRingGlyphApplicator()?.AnimateApply(motifSnap);
 
@@ -61,7 +64,7 @@ public sealed class BridgeCoordinator
         foreach (var v in _gameFlow.GetVehicles())
             v?.SetBoostFree(true);
 
-        yield return new WaitForSeconds(remainingInLoop * 2);
+        yield return new WaitForSeconds(effectiveLoopSec);
 
         foreach (var v in _gameFlow.GetVehicles())
             v?.SetBoostFree(false);

@@ -83,7 +83,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             innerR, outerR, segs, color, role, binIndex, notes, totalSteps);
         _gameplayRings.Add(entry);
 
-        float rotDeg = Mathf.Clamp(config.rotSpeedBase, 0f, config.rotSpeedMax);
+        float bpm    = GameFlowManager.Instance?.activeDrumTrack?.drumLoopBPM ?? 120f;
+        float rotDeg = Mathf.Clamp(config.rotSpeedBase * (bpm / 60f), 0f, config.rotSpeedMax);
         if (idx % 2 == 1) rotDeg = -rotDeg;
 
         StartCoroutine(AnimateMeshFill(
@@ -96,6 +97,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             entry.Root.transform, rotDeg,
             new List<NoteAnimInfo>(), noteViz: null,
             shouldStop: () => _gameplayFadingOut));
+
+        StartCoroutine(BounceToHoldScale(entry.Root.transform, config.ringDrawInDuration));
 
         RefreshPlayAreaFit(_gameplayRings.Count);
     }
@@ -117,6 +120,124 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
         DestroyList(_gameplayRings);
         _gameplayFadingOut = false;
+    }
+
+    /// <summary>
+    /// Waits for the bounce animation to complete, then starts <see cref="RollOffGameplayRings"/>.
+    /// </summary>
+    public IEnumerator RollOffGameplayRingsAfterBounce()
+    {
+        float delay = config != null
+            ? config.ringDrawInDuration + config.bouncePressDuration + config.bounceSettleDuration
+            : 0.82f;
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        yield return RollOffGameplayRings();
+    }
+
+    /// <summary>
+    /// Translate rings from center to off the left edge of the play area over
+    /// <c>config.rollOffDuration</c> seconds. Rings are already at ringHoldScale.
+    /// </summary>
+    public IEnumerator RollOffGameplayRings()
+    {
+        var snapshot = _gameplayRings.ToArray();
+        if (snapshot.Length == 0) yield break;
+
+        // Capture start world positions.
+        var startPositions = new Vector3[snapshot.Length];
+        for (int i = 0; i < snapshot.Length; i++)
+            startPositions[i] = snapshot[i].Root != null
+                ? snapshot[i].Root.transform.position : transform.position;
+
+        // Target X: ring's right edge lands at the play area's left edge.
+        // Rings are at ringHoldScale so their effective world radius shrinks accordingly.
+        float holdScale  = config != null ? config.ringHoldScale   : 0.25f;
+        float duration   = config != null ? config.rollOffDuration  : 1.5f;
+        float targetX    = startPositions[0].x - 20f; // safe fallback
+        var   gfm        = GameFlowManager.Instance;
+        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
+        {
+            float worldScale  = transform.lossyScale.x;
+            float outerRWorld = worldScale > 0f
+                ? worldScale * (RingInnerRadius(snapshot.Length - 1) + config.ringThickness)
+                : config.ringThickness;
+            targetX = area.left - outerRWorld * holdScale;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                if (snapshot[i].Root == null) continue;
+                var pos = snapshot[i].Root.transform.position;
+                pos.x = Mathf.Lerp(startPositions[i].x, targetX, t);
+                snapshot[i].Root.transform.position = pos;
+            }
+
+            yield return null;
+        }
+
+        DestroyList(_gameplayRings);
+    }
+
+    /// <summary>
+    /// After <paramref name="delay"/> seconds, press-and-bounce the ring to ringHoldScale:
+    /// fast compress to bouncePressScale, spring past ringHoldScale, settle.
+    /// </summary>
+    private IEnumerator BounceToHoldScale(Transform ringTransform, float delay)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (ringTransform == null || config == null) yield break;
+
+        float holdScale   = config.ringHoldScale;
+        float pressScale  = config.bouncePressScale;
+        float pressDur    = config.bouncePressDuration;
+        float settleDur   = config.bounceSettleDuration;
+        // Overshoot slightly past holdScale on the spring-back.
+        float overshoot   = holdScale + (holdScale - pressScale) * 0.4f;
+
+        // Phase 1: press down.
+        float elapsed = 0f;
+        while (elapsed < pressDur)
+        {
+            if (ringTransform == null) yield break;
+            elapsed += Time.deltaTime;
+            float s = Mathf.Lerp(1f, pressScale, Mathf.Clamp01(elapsed / pressDur));
+            ringTransform.localScale = new Vector3(s, s, 1f);
+            yield return null;
+        }
+
+        // Phase 2: spring back past holdScale (60% of settle time).
+        float springDur = settleDur * 0.6f;
+        elapsed = 0f;
+        while (elapsed < springDur)
+        {
+            if (ringTransform == null) yield break;
+            elapsed += Time.deltaTime;
+            float s = Mathf.Lerp(pressScale, overshoot, Mathf.Clamp01(elapsed / springDur));
+            ringTransform.localScale = new Vector3(s, s, 1f);
+            yield return null;
+        }
+
+        // Phase 3: dampen to holdScale (remaining 40%).
+        float dampDur  = settleDur * 0.4f;
+        float dampStart = ringTransform != null ? ringTransform.localScale.x : overshoot;
+        elapsed = 0f;
+        while (elapsed < dampDur)
+        {
+            if (ringTransform == null) yield break;
+            elapsed += Time.deltaTime;
+            float s = Mathf.Lerp(dampStart, holdScale, Mathf.Clamp01(elapsed / dampDur));
+            ringTransform.localScale = new Vector3(s, s, 1f);
+            yield return null;
+        }
+
+        if (ringTransform != null)
+            ringTransform.localScale = new Vector3(holdScale, holdScale, 1f);
     }
 
     /// <summary>Destroy all gameplay rings immediately.</summary>

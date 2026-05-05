@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Harmony NodeLocomotionProfile
   m_EditorClassIdentifier: Assembly-CSharp::MineNodeLocomotionProfile
   archetype: 1
-  baseSpeed: 1
-  maxSpeed: 6
-  acceleration: 10
+  baseSpeed: 1.5
+  maxSpeed: 3
+  acceleration: 15
   braking: 2
   turnRate: 6
   hesitation: 0.1

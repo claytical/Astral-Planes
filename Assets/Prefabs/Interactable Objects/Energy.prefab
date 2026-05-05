@@ -35,6 +35,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
 --- !u!212 &212503362928707232
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -80,6 +81,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.22745098}
@@ -90,7 +92,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!58 &3946104915065642209
 CircleCollider2D:
@@ -186,10 +187,10 @@ MonoBehaviour:
   assignedInstrumentTrack: {fileID: 0}
   energySprite: {fileID: 212503362928707232}
   burstId: 0
+  intendedBin: -1
   isTrappedInDust: 0
   dustCollisionEnterImpulse: 0.85
   dustCollisionStayForce: 2.25
-  intendedBin: -1
   spawnArrivalSeconds: 1
   spawnArrivalEase:
     serializedVersion: 2
@@ -197,6 +198,9 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  spawnArrivalConeAngleDeg: 25
+  spawnArrivalNoiseStrength: 3.2
+  spawnArrivalNoiseFrequency: 1.2
   keepDustPocketOpen: 1
   dustPocketRadiusWorld: 0.55
   dustPocketTickSeconds: 0.15
@@ -208,12 +212,13 @@ MonoBehaviour:
   imminentNoOrbitThreshold: 0.28
   dspEpsilon: 0.01
   carryMinLeadSeconds: 0.02
+  amount: 10
   ribbonMarker: {fileID: 0}
   tether: {fileID: 0}
   intendedStep: -1
-  carryLocalOffset: {x: 0, y: 0.65, z: 0}
-  carryLocalOffsetJitter: 0.05
-  availabilityFactor: 1
+  carrySettings:
+    localOffset: {x: 0, y: 0.65, z: 0}
+    localOffsetJitter: 0.05
   pulseSpeed: 1.6
   minAlpha: 0.25
   maxAlpha: 0.65
@@ -5183,7 +5188,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &7183225244735677516
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5229,6 +5234,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -5260,7 +5266,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &4064160350664904132
 GameObject:
   m_ObjectHideFlags: 0
@@ -5295,6 +5300,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &4873741449873789531
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5340,6 +5346,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 163
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 3674776665990660658, guid: 0ee7556dfa91243a6aec98c01610b987,
     type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
@@ -5350,7 +5357,6 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &6967156135766022681
 GameObject:
@@ -10111,7 +10117,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &4483759389138969780
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -10157,6 +10163,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 263648039
   m_SortingLayer: 1
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -10188,7 +10195,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!114 &6728145653037721023
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14960,7 +14966,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &7927407101416305195
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -15006,6 +15012,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -15037,7 +15044,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!114 &2760226129735340495
 MonoBehaviour:
   m_ObjectHideFlags: 0

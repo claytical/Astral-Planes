@@ -123,6 +123,8 @@ public partial class GameFlowManager : MonoBehaviour
         binRingController = ctrl;
     }
 
+    public BinRingController GetBinRingController() => binRingController;
+
     public void SetupBinRingController()
     {
         if (binRingController == null)

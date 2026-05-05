@@ -92,7 +92,7 @@ public partial class CosmicDust : MonoBehaviour {
         [Range(0f, 1f)] public float carveResistance01; // Vehicle plow resistance. 0=instant, 1=nearly indestructible.
         [Range(0f, 1f)] public float drainResistance01; // PhaseStar drain resistance. 0=drains fast, 1=very slow.
     }
-    [SerializeField] private DustVisualSettings visual = new DustVisualSettings
+    [SerializeField] public DustVisualSettings visual = new DustVisualSettings
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
         particleFootprintMul   = 0.85f
@@ -252,7 +252,7 @@ private Coroutine _jiggleRoutine;
     /// </summary>
     public void EnsureMinSolidAlpha(float minAlpha)
     {
-        if (_currentTint.a < minAlpha)
+        if (_currentTint.a <= minAlpha)
         {
             _currentTint.a = minAlpha;
             // Ensure at least 1 energy unit so the cell is solid.
@@ -535,6 +535,21 @@ private Coroutine _jiggleRoutine;
         {
             RebuildColliderForCurrentScale();
             SyncColliderRadiusToSprite();
+            // Invariant: active collider → visible sprite + particle renderers.
+            // HideVisualsInstant() can disable these; re-enable them so the cell is never
+            // an invisible wall with an active collider.
+            SetVisualsEnabled(true);
+            if (visual.particleSystem != null)
+            {
+                var systems = GetAllParticleSystems();
+                if (systems != null)
+                    for (int i = 0; i < systems.Length; i++)
+                    {
+                        if (systems[i] == null) continue;
+                        var pr = systems[i].GetComponent<ParticleSystemRenderer>();
+                        if (pr != null) pr.enabled = true;
+                    }
+            }
         }
 
         OnCollisionStateChanged?.Invoke(enabled);

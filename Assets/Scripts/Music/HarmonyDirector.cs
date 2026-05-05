@@ -32,12 +32,34 @@ public class HarmonyDirector : MonoBehaviour
     private enum ConflictPolicy { DeferPlayerToNextLoop, LetPlayerOvertake }
     [SerializeField] private ConflictPolicy conflictPolicy = ConflictPolicy.DeferPlayerToNextLoop;
     private bool _forceCommitNextBoundary;
+    private DrumTrack _subscribedDrumTrack;
 
-    void OnEnable()  { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary += OnLoopBoundary; }
-    void OnDisable() { if (GameFlowManager.Instance.activeDrumTrack != null) GameFlowManager.Instance.activeDrumTrack.OnLoopBoundary -= OnLoopBoundary; }
+    void OnEnable()
+    {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum != null)
+        {
+            drum.OnLoopBoundary -= OnLoopBoundary;
+            drum.OnLoopBoundary += OnLoopBoundary;
+            _subscribedDrumTrack = drum;
+        }
+    }
+    void OnDisable()
+    {
+        if (_subscribedDrumTrack != null)
+        {
+            _subscribedDrumTrack.OnLoopBoundary -= OnLoopBoundary;
+            _subscribedDrumTrack = null;
+        }
+    }
     public void Initialize(DrumTrack d, InstrumentTrackController t) {
-        // (your existing Initialize body)
-        // After you set tracks, initialize per-track sequences:
+        if (d != null)
+        {
+            d.OnLoopBoundary -= OnLoopBoundary;
+            d.OnLoopBoundary += OnLoopBoundary;
+            _subscribedDrumTrack = d;
+        }
+
         if (GameFlowManager.Instance.controller?.tracks != null)
         {
             _trackSeq.Clear();
@@ -45,7 +67,7 @@ public class HarmonyDirector : MonoBehaviour
             foreach (var tr in GameFlowManager.Instance.controller.tracks)
             {
                 if (tr == null) continue;
-                _trackSeq[tr] = new List<int> { 0 }; // start at I for every track
+                _trackSeq[tr] = new List<int> { 0 };
                 _trackPos[tr] = 0;
             }
         }
@@ -80,6 +102,7 @@ public class HarmonyDirector : MonoBehaviour
     if (ptm != null)
     {
         ptm.OnPhaseChanged += HandlePhaseChangedBridgeAware;
+        ptm.OnMotifChanged += HandleMotifChanged;
 
         // Optionally snap to the current motif's chord profile at startup.
         if (useMotifChordProfiles &&
@@ -96,7 +119,17 @@ public class HarmonyDirector : MonoBehaviour
 {
     var ptm = GameFlowManager.Instance?.phaseTransitionManager;
     if (ptm != null)
+    {
         ptm.OnPhaseChanged -= HandlePhaseChangedBridgeAware;
+        ptm.OnMotifChanged -= HandleMotifChanged;
+    }
+}
+    private void HandleMotifChanged(MotifProfile oldMotif, MotifProfile newMotif)
+{
+    if (!useMotifChordProfiles) return;
+    if (newMotif?.chordProgression == null) return;
+    if (newMotif.chordProgression == profile) return;
+    SetActiveProfile(newMotif.chordProgression, applyImmediately: false);
 }
     private void HandlePhaseChangedBridgeAware()
 {

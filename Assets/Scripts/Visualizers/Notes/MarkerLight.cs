@@ -24,6 +24,14 @@ public class MarkerLight : MonoBehaviour
         c.a = .3f;
         sr.color = c;
     }
+    public void SetAvailable(Color color)
+    {
+        if (sr == null) return;
+        Color c = color;
+        c.a = 0.75f;
+        sr.color = c;
+    }
+
     public void LightUp(Color trackColor)
     {
         if (sr == null) return;

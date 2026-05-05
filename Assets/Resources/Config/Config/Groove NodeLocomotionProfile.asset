@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Groove NodeLocomotionProfile
   m_EditorClassIdentifier: Assembly-CSharp::MineNodeLocomotionProfile
   archetype: 3
-  baseSpeed: 1
+  baseSpeed: 2
   maxSpeed: 6
   acceleration: 10
   braking: 2
-  turnRate: 6
+  turnRate: 3
   hesitation: 0.1
   dustPenalty: 0.2

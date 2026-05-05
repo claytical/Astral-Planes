@@ -191,6 +191,7 @@ public class PhaseTransitionManager : MonoBehaviour
         var drums = GameFlowManager.Instance?.activeDrumTrack;
         if (drums != null)
             drums.SetMotifBeatSequence(newMotif, armAtNextBoundary, who, restartTransport);
+//        GameFlowManager.Instance.harmony.SetActiveProfile(newMotif.chordProgression, applyImmediately: true);
 
         ConfigureTracksForCurrentPhaseAndMotif();
     }

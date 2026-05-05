@@ -253,6 +253,24 @@ public class NoteVisualizer : MonoBehaviour
         cue.transform.position = p;
     }
 }
+    public void UpdateCarryHighlights(HashSet<InstrumentTrack> carried)
+    {
+        if (noteMarkers == null) return;
+        foreach (var kv in noteMarkers)
+        {
+            if (kv.Value == null) continue;
+            var tag = kv.Value.GetComponent<MarkerTag>();
+            if (tag == null || !tag.isPlaceholder) continue;
+            var ml = kv.Value.GetComponent<MarkerLight>();
+            if (ml == null) continue;
+            var track = kv.Key.Item1;
+            if (carried != null && carried.Contains(track))
+                ml.SetAvailable(track.trackColor);
+            else
+                ml.SetGrey(track.trackColor);
+        }
+    }
+
     public bool TryGetNextUnlitStepExcluding(
     InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
     HashSet<int> excludedSteps, out int targetAbsStep)
