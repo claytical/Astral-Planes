@@ -101,9 +101,32 @@ public static class MotifRingGlyphGenerator
     }
 
     /// <summary>
-    /// Generate a single ring polyline for one completed bin.
-    /// <paramref name="ringIndex"/> controls the radius offset so stacked gameplay
-    /// rings don't overlap (pass <c>_gameplayRings.Count</c> before adding the new one).
+    /// Generate a single contour ring polyline at an explicit world radius.
+    /// Used when the ring radius is determined externally (e.g. the outer edge of a
+    /// filled annulus so the contour sits at the rim of the filled disc).
+    /// </summary>
+    public static GlyphPolyline GenerateSingleRingAtRadius(
+        MusicalRole role, int binIndex, Color color,
+        List<MotifSnapshot.NoteEntry> notes, int totalSteps,
+        float radius, RingGlyphConfig cfg)
+    {
+        if (cfg == null) return null;
+        int effectiveBinSize = Mathf.Max(1, totalSteps);
+        var pts = BuildRingPoints(notes ?? new List<MotifSnapshot.NoteEntry>(), radius, effectiveBinSize, cfg);
+        return new GlyphPolyline
+        {
+            LayerName = $"ContourRing_Bin{binIndex}_{role}",
+            Role      = role,
+            Points    = pts,
+            LineWidth = cfg.lineWidth,
+            LineColor = color,
+            SortOrder = 0,
+            BinIndex  = binIndex,
+        };
+    }
+
+    /// <summary>
+    /// Generate a single contour ring polyline using the ring-index radius formula.
     /// </summary>
     public static GlyphPolyline GenerateSingleRing(
         MusicalRole role, int binIndex, Color color,
@@ -111,19 +134,8 @@ public static class MotifRingGlyphGenerator
         int ringIndex, RingGlyphConfig cfg)
     {
         if (cfg == null) return null;
-        int effectiveBinSize = Mathf.Max(1, totalSteps);
-        float radius = cfg.innerRadius + ringIndex * (cfg.ringSpacing + cfg.lineWidth);
-        var pts = BuildRingPoints(notes ?? new List<MotifSnapshot.NoteEntry>(), radius, effectiveBinSize, cfg);
-        return new GlyphPolyline
-        {
-            LayerName = $"GameplayRing_Bin{binIndex}_{role}",
-            Role      = role,
-            Points    = pts,
-            LineWidth = cfg.lineWidth,
-            LineColor = color,
-            SortOrder = ringIndex,
-            BinIndex  = binIndex,
-        };
+        float radius = cfg.innerRadius + ringIndex * (cfg.ringThickness + cfg.ringSpacing) + cfg.ringThickness;
+        return GenerateSingleRingAtRadius(role, binIndex, color, notes, totalSteps, radius, cfg);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

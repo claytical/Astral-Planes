@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: RingGlyphConfig
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
+  ringThickness: 0.04
   ringSpacing: 0.5
   fitPaddingFraction: 0.05
+  ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  ringAlpha: 0.45
   lineWidth: 0.05
   segments: 64
   tugDepthFraction: 0.436
