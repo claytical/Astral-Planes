@@ -64,18 +64,21 @@ public class PlayerSelect : MonoBehaviour
 
         ShipMusicalProfile profile = vehicle.profile;
 
-        const float speedBoostSystemTopEnd = 20f;
+        const float maxCapacityForUI = 250f;
+        const float minBurnRateForUI = 0.25f;
+        const float maxBurnRateForUI = 1f;
+        const float speedTopEndForUI = 20f;
+        const float boostTopEndForUI = 280f;
 
         float capacity = profile != null ? profile.capacity : vehicle.capacity;
-        float burnRate = profile != null ? profile.burnRate : 0f;
+        float burnRate = profile != null ? profile.burnRate : minBurnRateForUI;
         float maxSpeed = profile != null ? profile.arcadeMaxSpeed : vehicle.arcadeMaxSpeed;
         float boostAccel = profile != null ? profile.arcadeBoostAccel : 0f;
 
-        float maxCapacity = _hangar != null ? _hangar.GetMaxCapacity() : 0f;
-        float capacityRatio = maxCapacity > 0f ? capacity / maxCapacity : 0f;
-        float fuelEfficiencyRatio = capacity > 0f ? burnRate / capacity : 0f;
-        float speedRatio = maxSpeed / speedBoostSystemTopEnd;
-        float boostRatio = boostAccel / speedBoostSystemTopEnd;
+        float capacityRatio = capacity / maxCapacityForUI;
+        float fuelEfficiencyRatio = Mathf.InverseLerp(minBurnRateForUI, maxBurnRateForUI, burnRate);
+        float speedRatio = maxSpeed / speedTopEndForUI;
+        float boostRatio = boostAccel / boostTopEndForUI;
 
         fuel.UpdateProfileComparisonUI(capacityRatio, fuelEfficiencyRatio, speedRatio, boostRatio);
     }
