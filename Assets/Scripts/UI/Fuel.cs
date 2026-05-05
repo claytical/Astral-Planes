@@ -7,8 +7,10 @@ public class Fuel : MonoBehaviour
     public Image fuelFill;
 
     [Header("Player Select Comparison Fills")]
+    public Image capacityFill;
     public Image efficiencyFill;
     public Image speedFill;
+    public Image boostFill;
 
     public void UpdateFuelUI(float energyRatio)
     {
@@ -18,8 +20,13 @@ public class Fuel : MonoBehaviour
         }
     }
 
-    public void UpdateProfileComparisonUI(float fuelEfficiencyRatio, float speedRatio)
+    public void UpdateProfileComparisonUI(float capacityRatio, float fuelEfficiencyRatio, float speedRatio, float boostRatio)
     {
+        if (capacityFill != null)
+        {
+            capacityFill.fillAmount = Mathf.Clamp01(capacityRatio);
+        }
+
         if (efficiencyFill != null)
         {
             efficiencyFill.fillAmount = Mathf.Clamp01(fuelEfficiencyRatio);
@@ -28,6 +35,11 @@ public class Fuel : MonoBehaviour
         if (speedFill != null)
         {
             speedFill.fillAmount = Mathf.Clamp01(speedRatio);
+        }
+
+        if (boostFill != null)
+        {
+            boostFill.fillAmount = Mathf.Clamp01(boostRatio);
         }
     }
 }
