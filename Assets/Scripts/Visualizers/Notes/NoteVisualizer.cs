@@ -262,8 +262,12 @@ public class NoteVisualizer : MonoBehaviour
     if (noteMarkers == null || noteMarkers.Count == 0) return false;
 
     totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    double from = rawAbsStep % totalAbsSteps;
-    if (from < 0) from += totalAbsSteps;
+    // NOTE: Keep a single authoritative modulus domain for this search.
+    // loopMultiplier can expand the playable leader timeline beyond the caller-provided totalAbsSteps,
+    // so we must normalize 'from' and all wrap math against the same effectiveTotal used for candidate validation.
+    int effectiveTotal = Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()));
+    double from = rawAbsStep % effectiveTotal;
+    if (from < 0) from += effectiveTotal;
 
     int bestStep = -1;
     double bestForward = double.MaxValue;
@@ -273,9 +277,6 @@ public class NoteVisualizer : MonoBehaviour
         if (kv.Key.Item1 != track) continue;
         int step = kv.Key.Item2;
         if (step < 0) continue;
-        int effectiveTotal = track != null
-            ? Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()))
-            : totalAbsSteps;
         if (step >= effectiveTotal)
         {
             continue;
@@ -296,7 +297,7 @@ public class NoteVisualizer : MonoBehaviour
         bool isPlaceholder = tag != null && tag.isPlaceholder;
         if (tag == null || !tag.isPlaceholder) continue;
 
-        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
+        double fwd = (step - from + effectiveTotal) % effectiveTotal;
         if (fwd < bestForward)
         {
             bestForward = fwd;
@@ -319,8 +320,11 @@ public class NoteVisualizer : MonoBehaviour
     if (noteMarkers == null || noteMarkers.Count == 0) return false;
 
     totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    double from = rawAbsStep % totalAbsSteps;
-    if (from < 0) from += totalAbsSteps;
+    // NOTE: Mirror next-step selection domain exactly so nearest-step callers observe identical wrapping behavior.
+    // This prevents mismatches where candidate filtering uses expanded leader length but distance math wraps by a smaller modulus.
+    int effectiveTotal = Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()));
+    double from = rawAbsStep % effectiveTotal;
+    if (from < 0) from += effectiveTotal;
 
     int bestStep = -1;
     double bestDistance = double.MaxValue;
@@ -332,9 +336,6 @@ public class NoteVisualizer : MonoBehaviour
         int step = kv.Key.Item2;
         if (step < 0) continue;
 
-        int effectiveTotal = track != null
-            ? Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()))
-            : totalAbsSteps;
         if (step >= effectiveTotal) continue;
         if (excludedSteps != null && excludedSteps.Contains(step)) continue;
 
@@ -343,8 +344,8 @@ public class NoteVisualizer : MonoBehaviour
         var tag = tr.GetComponent<MarkerTag>();
         if (tag == null || !tag.isPlaceholder) continue;
 
-        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
-        double back = (from - step + totalAbsSteps) % totalAbsSteps;
+        double fwd = (step - from + effectiveTotal) % effectiveTotal;
+        double back = (from - step + effectiveTotal) % effectiveTotal;
         double dist = Math.Min(fwd, back);
 
         if (dist < bestDistance || (Math.Abs(dist - bestDistance) < 0.0001 && fwd < bestForward))
