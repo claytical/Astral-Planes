@@ -57,17 +57,22 @@ public class PlayerSelect : MonoBehaviour
     }
     private void SetStats(Vehicle vehicle)
     {
-        float capacity = vehicle.capacity;
-        float maxCapacity = _hangar.GetMaxCapacity();
-        if (fuel != null && maxCapacity > 0)
+        if (fuel == null)
         {
-            float ratio = Mathf.Clamp01(capacity / maxCapacity);
-            fuel.UpdateFuelUI(ratio);
+            return;
         }
-        else
-        {
-            fuel?.UpdateFuelUI(1f); // fallback
-        }
+
+        ShipMusicalProfile profile = vehicle.profile;
+
+        float capacity = profile != null ? profile.capacity : vehicle.capacity;
+        float burnRate = profile != null ? profile.burnRate : 0f;
+        float accel = profile != null ? profile.arcadeAccel : vehicle.arcadeMaxSpeed;
+        float maxSpeed = profile != null ? profile.arcadeMaxSpeed : vehicle.arcadeMaxSpeed;
+
+        float fuelEfficiencyRatio = capacity > 0f ? burnRate / capacity : 0f;
+        float speedRatio = maxSpeed > 0f ? accel / maxSpeed : 0f;
+
+        fuel.UpdateProfileComparisonUI(fuelEfficiencyRatio, speedRatio);
     }
 
     private void ApplyVisuals()
