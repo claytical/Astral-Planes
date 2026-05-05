@@ -51,8 +51,9 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Seconds between the start of successive ring draw-ins.")]
     public float ringStaggerDelay = 0.08f;
 
-    [Tooltip("Base rotation speed in degrees/sec. Multiplied by FillDurationSeconds — " +
-             "a bin filled in 5s spins at 5× this value.")]
+    [Tooltip("Rotation base value. " +
+             "Gameplay rings: degrees/beat × bpm/60 = deg/sec (scales with active BPM). " +
+             "Record rings: degrees/sec × bin fill duration in seconds.")]
     public float rotSpeedBase = 20f;
 
     [Tooltip("Maximum rotation speed cap in degrees/sec.")]
@@ -66,4 +67,23 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Duration in seconds for each note-to-tug travel animation.")]
     public float noteTravelDuration = 0.35f;
+
+    [Header("Ring Hold / Bounce")]
+    [Tooltip("Scale rings hold at after the bounce and during the roll-off exit.")]
+    [Range(0.05f, 1f)]
+    public float ringHoldScale = 0.25f;
+
+    [Tooltip("How far the ring compresses during the press phase (fraction of full size). " +
+             "Lower = more dramatic press.")]
+    [Range(0.01f, 0.5f)]
+    public float bouncePressScale = 0.12f;
+
+    [Tooltip("Seconds for the initial press-down.")]
+    public float bouncePressDuration = 0.10f;
+
+    [Tooltip("Seconds for the spring-back and settle to ringHoldScale.")]
+    public float bounceSettleDuration = 0.22f;
+
+    [Tooltip("Seconds for the ring to slide from center to off the left edge at the second loop boundary.")]
+    public float rollOffDuration = 1.5f;
 }

@@ -17,7 +17,19 @@ MonoBehaviour:
     authoredRootMidi: 60
     loopSteps: 16
     events:
-    - step: 0
+    - step: 4
+      midiNote: 60
+      durSteps: 16
+      velocity01: 0.9448819
+    - step: 6
+      midiNote: 60
+      durSteps: 16
+      velocity01: 0.9448819
+    - step: 8
+      midiNote: 60
+      durSteps: 16
+      velocity01: 0.9448819
+    - step: 12
       midiNote: 60
       durSteps: 16
       velocity01: 0.9448819
