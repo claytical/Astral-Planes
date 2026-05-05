@@ -1,12 +1,16 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+[AddComponentMenu("UI/Vehicle Stat Bars (Fuel Legacy)")]
 public class Fuel : MonoBehaviour
 {
+    // Legacy name: this component now manages both runtime fuel and player-select stat bars.
+    // It can live on a single GameObject and drive Image refs anywhere in the canvas.
+
     [Header("Primary Fill")]
     public Image fuelFill;
 
-    [Header("Player Select Comparison Fills")]
+    [Header("Player Select Comparison Fills (same component, assign any 4 Images)")]
     public Image capacityFill;
     public Image efficiencyFill;
     public Image speedFill;
