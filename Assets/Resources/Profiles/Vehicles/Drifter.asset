@@ -24,7 +24,7 @@ MonoBehaviour:
   stopAngularSpeed: 5
   inputDeadzone: 0.2
   mass: 1.6
-  capacity: 200
+  capacity: 100
   burnRate: 0.25
   plowHalfWidthCells: 1
   plowDepthCells: 2
