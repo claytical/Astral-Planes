@@ -4,15 +4,56 @@ using UnityEngine;
 
 public partial class Vehicle
 {
+    private HashSet<int> BuildManualReleaseSpokenFor(PendingCollectedNote pending = default)
+    {
+        var spokenFor = new HashSet<int>();
+        foreach (var ar in _armedReleases)
+            spokenFor.Add(ar.targetAbsStep);
+
+        if (pending.collectable == null)
+            return spokenFor;
+
+        foreach (var other in _pendingNotes)
+        {
+            if (other.collectable == null || ReferenceEquals(other.collectable, pending.collectable))
+                break;
+
+            var otherTether = other.collectable.tether;
+            if (otherTether != null && otherTether.boundStep >= 0)
+                spokenFor.Add(otherTether.boundStep);
+        }
+
+        return spokenFor;
+    }
+
+    private bool TryResolveManualReleaseTargetStep(
+        PendingCollectedNote pending,
+        double rawAbs,
+        int totalAbsSteps,
+        out int targetAbsStep,
+        out HashSet<int> spokenFor)
+    {
+        targetAbsStep = -1;
+        spokenFor = BuildManualReleaseSpokenFor(pending);
+
+        if (pending.track == null || totalAbsSteps <= 0)
+            return false;
+
+        if (gfm == null) gfm = GameFlowManager.Instance;
+        var viz = gfm?.noteViz;
+        if (viz == null)
+            return false;
+
+        return viz.TryGetNextUnlitStepExcluding(pending.track, rawAbs, totalAbsSteps, spokenFor, out targetAbsStep);
+    }
+
     private void TickManualReleaseCue()
     {
         if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = (gfm != null) ? gfm.noteViz : null;
         if (viz == null) return;
 
-        var spokenFor = new HashSet<int>();
-        foreach (var ar in _armedReleases)
-            spokenFor.Add(ar.targetAbsStep);
+        var spokenFor = BuildManualReleaseSpokenFor();
 
         if (_armedReleases.Count > 0)
         {
@@ -83,7 +124,8 @@ public partial class Vehicle
             return;
         }
 
-        viz.UpdateManualReleaseCueExcluding(transform, queued.track, rawAbsQ, floorAbsQ, totalStepsQ, spokenFor);
+        var pendingSpokenFor = BuildManualReleaseSpokenFor(queued);
+        viz.UpdateManualReleaseCueExcluding(transform, queued.track, rawAbsQ, floorAbsQ, totalStepsQ, pendingSpokenFor);
 
         _lastRawAbsStep = rawAbsQ;
         _hasLastRawAbsStep = true;
@@ -165,22 +207,16 @@ public partial class Vehicle
             var p = _pendingNotes.Peek();
             drum = p.track?.drumTrack;
             if (p.track?.controller != null &&
-                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP))
+                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP) &&
+                TryResolveManualReleaseTargetStep(p, rawAbsP, totalP, out int resolvedTargetStep, out _))
             {
-                var spokenFor = new HashSet<int>();
-                if (gfm == null) gfm = GameFlowManager.Instance;
-                var viz = gfm?.noteViz;
-                if (viz != null && viz.TryGetNextUnlitStepExcluding(
-                        p.track, rawAbsP, totalP, spokenFor, out int nextStep))
-                {
-                    targetStep = nextStep;
-                    int pBinSize = Mathf.Max(1, drum != null ? drum.totalSteps : leaderSteps);
-                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)pBinSize));
-                    double pLoopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1f) * pLeaderBins;
-                    double pStepDur = pLoopLen / Mathf.Max(1, leaderSteps);
-                    double fwdSteps = (nextStep - rawAbsP + totalP) % totalP;
-                    gapDsp = Math.Max(0.001, fwdSteps * pStepDur);
-                }
+                targetStep = resolvedTargetStep;
+                int pBinSize = Mathf.Max(1, drum != null ? drum.totalSteps : leaderSteps);
+                int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)pBinSize));
+                double pLoopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1f) * pLeaderBins;
+                double pStepDur = pLoopLen / Mathf.Max(1, leaderSteps);
+                double fwdSteps = (targetStep - rawAbsP + totalP) % totalP;
+                gapDsp = Math.Max(0.001, fwdSteps * pStepDur);
             }
         }
 
