@@ -10,6 +10,7 @@ public class PhaseTransitionManager : MonoBehaviour
 
     // Phase index replaces MazeArchetype. Stub property kept for BridgeOrchestration compat.
     private int currentPhaseIndex  { get; set; } = -1;
+    public int CurrentPhaseIndex => currentPhaseIndex;
     public int previousPhaseIndex { get; private set; } = -1;
     public MazeArchetype currentPhase => MazeArchetype.Windows; // compat stub — remove when MazeArchetype is fully gone
 

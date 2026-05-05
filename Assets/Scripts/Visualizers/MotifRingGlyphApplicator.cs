@@ -5,15 +5,16 @@ using UnityEngine;
 // =========================================================================
 //  MotifRingGlyphApplicator
 //
-//  MonoBehaviour that owns the LineRenderers for the ring glyph system.
-//  Place on any persistent GO. Call AnimateApply(snapshot) to build rings
-//  with animated draw-in + per-ring Z rotation, FadeOutAndClear(dur) to
-//  fade them out, and Clear() to remove immediately.
+//  Manages two ring layers:
 //
-//  Usage:
-//    ringApplicator.AnimateApply(snapshot);
-//    ringApplicator.FitToPlayArea(areaWidth, areaHeight, cx, cy);
-//    StartCoroutine(ringApplicator.FadeOutAndClear(config.fadeOutDuration));
+//  Gameplay rings (_gameplayRings): spawned one-at-a-time as bins are
+//  completed during play via SpawnBinRing(). Each ring fades at loop
+//  boundary via FadeAndClearGameplayRings() or is cleared instantly by
+//  ClearGameplayRings() before the bridge record is shown.
+//
+//  Record rings (_recordRings): built from the full motif snapshot at
+//  bridge time via AnimateApply(). These represent the completed motif
+//  and fade out at the end of the bridge via FadeOutAndClear().
 // =========================================================================
 public class MotifRingGlyphApplicator : MonoBehaviour
 {
@@ -24,8 +25,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("Material applied to all ring LineRenderers. Sprites/Default works for unlit rings.")]
     public Material lineMaterial;
 
-    private readonly List<LineRenderer> _rings = new();
-    private bool _fadingOut;
+    private readonly List<LineRenderer> _recordRings   = new();
+    private readonly List<LineRenderer> _gameplayRings = new();
+
+    private bool _recordFadingOut   = false;
+    private bool _gameplayFadingOut = false;
 
     private struct NoteAnimInfo
     {
@@ -43,17 +47,93 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         GameFlowManager.Instance.RegisterRingGlyphApplicator(this);
     }
 
+    // ── Gameplay ring API ────────────────────────────────────────────────────
+
     /// <summary>
-    /// Build rings from the snapshot with animated draw-in and per-ring Z-axis rotation.
-    /// Each ring traces itself in over <c>config.ringDrawInDuration</c> seconds (staggered),
-    /// then rotates continuously at a speed derived from its bin's fill duration.
-    /// Stops and replaces any previously running animation.
+    /// Spawn a single ring for a just-completed bin. Rings stack outward by the
+    /// order they are added. Animates with draw-in and continuous rotation.
+    /// </summary>
+    public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
+                              List<MotifSnapshot.NoteEntry> notes, int totalSteps)
+    {
+        if (config == null) return;
+
+        int ringIndex = _gameplayRings.Count;
+        var poly = MotifRingGlyphGenerator.GenerateSingleRing(
+            role, binIndex, color, notes, totalSteps, ringIndex, config);
+        if (poly == null) return;
+
+        var go = new GameObject(poly.LayerName);
+        go.transform.SetParent(transform, worldPositionStays: false);
+
+        var lr = go.AddComponent<LineRenderer>();
+        if (lineMaterial != null) lr.material = lineMaterial;
+        lr.useWorldSpace     = false;
+        lr.loop              = false;
+        lr.widthMultiplier   = poly.LineWidth;
+        lr.startColor        = poly.LineColor;
+        lr.endColor          = poly.LineColor;
+        lr.positionCount     = 0;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+        _gameplayRings.Add(lr);
+
+        float rotDeg = Mathf.Clamp(config.rotSpeedBase * 1f, 0f, config.rotSpeedMax);
+        if (ringIndex % 2 == 1) rotDeg = -rotDeg;
+
+        StartCoroutine(AnimateSingleRing(
+            lr, poly.Points, delay: 0f,
+            config.ringDrawInDuration, go.transform, rotDeg,
+            noteInfos: new List<NoteAnimInfo>(), noteViz: null,
+            shouldStop: () => _gameplayFadingOut));
+    }
+
+    /// <summary>Fade and destroy all gameplay rings over <paramref name="duration"/> seconds.</summary>
+    public IEnumerator FadeAndClearGameplayRings(float duration)
+    {
+        _gameplayFadingOut = true;
+
+        var startColors = _gameplayRings.ConvertAll(lr => lr != null ? lr.startColor : Color.clear);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float alpha = 1f - Mathf.Clamp01(elapsed / duration);
+            for (int i = 0; i < _gameplayRings.Count; i++)
+            {
+                if (_gameplayRings[i] == null) continue;
+                Color c = startColors[i];
+                c.a = alpha;
+                _gameplayRings[i].startColor = _gameplayRings[i].endColor = c;
+            }
+            yield return null;
+        }
+
+        DestroyGameplayRings();
+        _gameplayFadingOut = false;
+    }
+
+    /// <summary>Destroy all gameplay rings immediately with no fade.</summary>
+    public void ClearGameplayRings()
+    {
+        _gameplayFadingOut = true;
+        DestroyGameplayRings();
+        _gameplayFadingOut = false;
+    }
+
+    // ── Record ring API ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Build record rings from the full motif snapshot with animated draw-in
+    /// and per-ring Z-axis rotation. Replaces any previously running record animation.
     /// </summary>
     public void AnimateApply(MotifSnapshot snapshot)
     {
         StopAllCoroutines();
-        _fadingOut = false;
-        Clear();
+        _recordFadingOut   = false;
+        _gameplayFadingOut = false;
+        ClearRecordRings();
 
         if (snapshot == null || config == null) return;
 
@@ -92,21 +172,18 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             lr.widthMultiplier   = poly.LineWidth;
             lr.startColor        = poly.LineColor;
             lr.endColor          = poly.LineColor;
-            lr.positionCount     = 0;   // starts empty; draw-in coroutine populates it
+            lr.positionCount     = 0;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lr.receiveShadows    = false;
-            _rings.Add(lr);
+            _recordRings.Add(lr);
 
-            // Rotation speed: scales with how long this bin took to fill
             Color lc = poly.LineColor;
             fillDurs.TryGetValue((poly.BinIndex, lc.r, lc.g, lc.b), out float fillDur);
             float rotDeg = Mathf.Clamp(
                 config.rotSpeedBase * Mathf.Max(fillDur, 0.1f),
                 0f, config.rotSpeedMax);
-            // Alternate clockwise / counterclockwise per ring for visual depth
             if (i % 2 == 1) rotDeg = -rotDeg;
 
-            // Build per-ring note infos for travel dot animation
             int   binSize = Mathf.Max(1, snapshot.TotalSteps);
             float tugR    = (config.innerRadius + i * (config.ringSpacing + config.lineWidth))
                             * (1f - config.tugDepthFraction);
@@ -133,53 +210,50 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 });
             }
 
-            // Sort by angle so dots fire in draw-in order
             noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
 
             float delay = i * config.ringStaggerDelay;
-            StartCoroutine(AnimateSingleRing(lr, poly.Points, delay,
-                config.ringDrawInDuration, go.transform, rotDeg, noteInfos, noteViz));
+            StartCoroutine(AnimateSingleRing(
+                lr, poly.Points, delay,
+                config.ringDrawInDuration, go.transform, rotDeg, noteInfos, noteViz,
+                shouldStop: () => _recordFadingOut));
         }
     }
 
     /// <summary>
-    /// Fade all rings from their current alpha to transparent over <paramref name="duration"/>
-    /// seconds, then destroy them. Safe to fire-and-forget with StartCoroutine.
+    /// Fade all record rings to transparent over <paramref name="duration"/> seconds, then destroy.
     /// </summary>
     public IEnumerator FadeOutAndClear(float duration)
     {
-        _fadingOut = true;   // signals rotation loops in AnimateSingleRing to exit
+        _recordFadingOut = true;
 
-        var startColors = _rings.ConvertAll(lr => lr != null ? lr.startColor : Color.clear);
+        var startColors = _recordRings.ConvertAll(lr => lr != null ? lr.startColor : Color.clear);
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float alpha = 1f - Mathf.Clamp01(elapsed / duration);
-            for (int i = 0; i < _rings.Count; i++)
+            for (int i = 0; i < _recordRings.Count; i++)
             {
-                if (_rings[i] == null) continue;
+                if (_recordRings[i] == null) continue;
                 Color c = startColors[i];
                 c.a = alpha;
-                _rings[i].startColor = _rings[i].endColor = c;
+                _recordRings[i].startColor = _recordRings[i].endColor = c;
             }
             yield return null;
         }
 
-        Clear();
-        _fadingOut = false;
+        ClearRecordRings();
+        _recordFadingOut = false;
     }
 
-    /// <summary>
-    /// Rebuild all ring LineRenderers from the supplied snapshot with no animation.
-    /// Destroys any previously built rings first.
-    /// </summary>
+    /// <summary>Rebuild all record rings instantly with no animation.</summary>
     public void Apply(MotifSnapshot snapshot)
     {
         StopAllCoroutines();
-        _fadingOut = false;
-        Clear();
+        _recordFadingOut = false;
+        ClearRecordRings();
 
         if (snapshot == null || config == null) return;
 
@@ -204,21 +278,20 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             for (int i = 0; i < poly.Points.Count; i++)
                 lr.SetPosition(i, new Vector3(poly.Points[i].x, poly.Points[i].y, 0f));
 
-            _rings.Add(lr);
+            _recordRings.Add(lr);
         }
     }
 
-    /// <summary>Destroy all ring child GameObjects and clear the renderer list.</summary>
+    /// <summary>Destroy all rings (both layers) and clear all lists.</summary>
     public void Clear()
     {
         foreach (Transform child in transform)
             Destroy(child.gameObject);
-        _rings.Clear();
+        _recordRings.Clear();
+        _gameplayRings.Clear();
     }
 
-    /// <summary>
-    /// Center and scale the ring group to fit within a world-space rectangle.
-    /// </summary>
+    /// <summary>Center and scale the ring group to fit within a world-space rectangle.</summary>
     public void FitToPlayArea(float width, float height, float cx, float cy)
     {
         transform.position   = new Vector3(cx, cy, transform.position.z);
@@ -227,6 +300,22 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     }
 
     private void OnDestroy() => Clear();
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private void ClearRecordRings()
+    {
+        foreach (var lr in _recordRings)
+            if (lr != null) Destroy(lr.gameObject);
+        _recordRings.Clear();
+    }
+
+    private void DestroyGameplayRings()
+    {
+        foreach (var lr in _gameplayRings)
+            if (lr != null) Destroy(lr.gameObject);
+        _gameplayRings.Clear();
+    }
 
     // ── Animation ────────────────────────────────────────────────────────────
 
@@ -238,7 +327,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         Transform ringTransform,
         float rotDegPerSec,
         List<NoteAnimInfo> noteInfos,
-        NoteVisualizer noteViz)
+        NoteVisualizer noteViz,
+        System.Func<bool> shouldStop)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
@@ -254,7 +344,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             float progress   = Mathf.Clamp01(elapsed / drawDuration);
             float drawnAngle = progress * Mathf.PI * 2f;
 
-            // Fire a travel dot for each note whose angle the trace has passed
             while (nextNote < noteInfos.Count && drawnAngle >= noteInfos[nextNote].NoteAngle)
             {
                 var info = noteInfos[nextNote++];
@@ -283,9 +372,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         for (int i = 0; i < total; i++)
             lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
 
-        // Phase 2: Rotate until FadeOutAndClear signals _fadingOut
-        while (!_fadingOut)
+        // Phase 2: Rotate until shouldStop() returns true
+        while (!shouldStop())
         {
+            if (lr == null) yield break;
             ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
@@ -307,7 +397,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows    = false;
 
-        // Small circle in dot's own local space
         const int segs = 8;
         float r = config.noteDotRadius;
         lr.positionCount = segs + 1;
@@ -322,7 +411,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float   t   = Mathf.Clamp01(elapsed / duration);
-            Vector3 end = ringTransform.TransformPoint(tugLocalPos); // live world pos, tracks ring rotation
+            Vector3 end = ringTransform.TransformPoint(tugLocalPos);
             go.transform.position = Vector3.Lerp(startWorld, end, t);
             yield return null;
         }

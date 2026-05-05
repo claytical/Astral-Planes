@@ -100,6 +100,32 @@ public static class MotifRingGlyphGenerator
         return result;
     }
 
+    /// <summary>
+    /// Generate a single ring polyline for one completed bin.
+    /// <paramref name="ringIndex"/> controls the radius offset so stacked gameplay
+    /// rings don't overlap (pass <c>_gameplayRings.Count</c> before adding the new one).
+    /// </summary>
+    public static GlyphPolyline GenerateSingleRing(
+        MusicalRole role, int binIndex, Color color,
+        List<MotifSnapshot.NoteEntry> notes, int totalSteps,
+        int ringIndex, RingGlyphConfig cfg)
+    {
+        if (cfg == null) return null;
+        int effectiveBinSize = Mathf.Max(1, totalSteps);
+        float radius = cfg.innerRadius + ringIndex * (cfg.ringSpacing + cfg.lineWidth);
+        var pts = BuildRingPoints(notes ?? new List<MotifSnapshot.NoteEntry>(), radius, effectiveBinSize, cfg);
+        return new GlyphPolyline
+        {
+            LayerName = $"GameplayRing_Bin{binIndex}_{role}",
+            Role      = role,
+            Points    = pts,
+            LineWidth = cfg.lineWidth,
+            LineColor = color,
+            SortOrder = ringIndex,
+            BinIndex  = binIndex,
+        };
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Ring point generation
     // ─────────────────────────────────────────────────────────────────────────
