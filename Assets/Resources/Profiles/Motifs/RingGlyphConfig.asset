@@ -14,14 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
   ringSpacing: 0.5
-  lineWidth: 0.012
+  fitPaddingFraction: 0.05
+  lineWidth: 0.05
   segments: 64
   tugDepthFraction: 0.436
   tugHalfWidthRad: 0.5
-  ringDrawInDuration: 0.5
+  ringDrawInDuration: 2
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 300
-  fadeOutDuration: 0.75
+  fadeOutDuration: 2
   noteDotRadius: 0.02
-  noteTravelDuration: 0.35
+  noteTravelDuration: 1
