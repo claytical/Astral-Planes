@@ -18,6 +18,7 @@ public class BinRingController : MonoBehaviour
     private DrumTrack _drumTrack;
     private InstrumentTrack[] _tracks;
     private MotifRingGlyphApplicator _ringApplicator;
+    private int _loopBoundariesToSkip;
 
     void Start()
     {
@@ -70,6 +71,8 @@ public class BinRingController : MonoBehaviour
 
         // Clear any rings currently visible (including a running fade) and
         // re-spawn one ring per completed bin across all tracks.
+        // Reset the skip counter so rings stay visible for one additional full loop.
+        _loopBoundariesToSkip = 1;
         _ringApplicator.ClearGameplayRings();
 
         foreach (var t in _tracks)
@@ -89,6 +92,7 @@ public class BinRingController : MonoBehaviour
     private void OnLoopBoundary()
     {
         if (_ringApplicator == null) return;
+        if (_loopBoundariesToSkip > 0) { _loopBoundariesToSkip--; return; }
         float duration = _ringApplicator.config != null
             ? _ringApplicator.config.fadeOutDuration : 0.5f;
         StartCoroutine(_ringApplicator.FadeAndClearGameplayRings(duration));

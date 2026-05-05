@@ -28,10 +28,10 @@ MonoBehaviour:
   capacity: 75
   burnRate: 0.4
   plowHalfWidthCells: 1
-  plowDepthCells: 2
+  plowDepthCells: 3
   plowMinSpeed: 2
-  plowChipAmount: 1
-  vehicleKeepClearRadiusCells: 0
+  plowChipAmount: 2
+  vehicleKeepClearRadiusCells: 1
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14

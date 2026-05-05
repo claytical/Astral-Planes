@@ -283,9 +283,7 @@ public sealed class StarPool : MonoBehaviour
 
     private void OnStarEjected(PhaseStar star, MusicalRole role)
     {
-        int before = _remainingEjectionsTotal;
-        _remainingEjectionsTotal = Mathf.Max(0, _remainingEjectionsTotal - 1);
-        Debug.Log($"[StarPool] OnStarEjected role={role} remainingTotal {before}→{_remainingEjectionsTotal}");
+        Debug.Log($"[StarPool] OnStarEjected role={role} remainingHarvests={_remainingEjectionsTotal}");
 
         _lastEjectingStar = star;
         _lastEjectedRole = role;
@@ -386,14 +384,12 @@ public sealed class StarPool : MonoBehaviour
 
         // Clear the gate immediately for:
         //   empty burst, SuperNode, expired (player ignored it), or escaped (node fled successfully).
-        // Expired refunds the slot; escaped does NOT — the ejection was consumed as a missed opportunity.
+        // These outcomes do not count as harvests — _remainingEjectionsTotal is unchanged and
+        // Tick() will spawn the next PhaseStar so the player can try again.
         if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired || wasEscaped))
         {
             if (wasExpired || wasEscaped)
-            {
-                _remainingEjectionsTotal++;
-                Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — ejection slot refunded (total now {_remainingEjectionsTotal})");
-            }
+                Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — no harvest, spawning next star (remainingHarvests={_remainingEjectionsTotal})");
 
             _mineNodeResolved = false;
             _mineNodePending = false;
@@ -420,10 +416,17 @@ public sealed class StarPool : MonoBehaviour
         if (isEjectedTrack && !_mineNodeResolved && !hadNotes)
             _ejectedBurstWasEmpty = true;
 
-        if (isMineBurst && !hadNotes)
+        if (isMineBurst)
         {
-            _remainingEjectionsTotal++;
-            Debug.Log($"[StarPool] Burst rolled back — re-added ejection slot (total now {_remainingEjectionsTotal})");
+            if (hadNotes)
+            {
+                _remainingEjectionsTotal = Mathf.Max(0, _remainingEjectionsTotal - 1);
+                Debug.Log($"[StarPool] Harvest complete — remainingHarvests={_remainingEjectionsTotal}");
+            }
+            else
+            {
+                Debug.Log($"[StarPool] Mine burst had no notes — not counted as harvest, spawning next star");
+            }
         }
 
         // Clear the mine-node gate immediately when the burst is placed,
