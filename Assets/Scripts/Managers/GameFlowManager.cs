@@ -7,6 +7,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
+using Object = UnityEngine.Object;
 
 public static class SessionGenome
 {
@@ -37,6 +38,7 @@ public partial class GameFlowManager : MonoBehaviour
 
     [Header("Ring Glyph (Motif Rings)")]
     [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
+    [SerializeField] private BinRingController binRingController;
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [SerializeField] private bool useSpiralCoralDuringBridge = true;
     [SerializeField] private Transform coralRoot; // scene object root
@@ -114,6 +116,18 @@ public partial class GameFlowManager : MonoBehaviour
     public void RegisterRingGlyphApplicator(MotifRingGlyphApplicator applicator)
     {
         motifRingGlyphApplicator = applicator;
+    }
+
+    public void RegisterBinRingController(BinRingController ctrl)
+    {
+        binRingController = ctrl;
+    }
+
+    public void SetupBinRingController()
+    {
+        if (binRingController == null)
+            binRingController = FindFirstObjectByType<BinRingController>(FindObjectsInactive.Include);
+        binRingController?.Setup(activeDrumTrack, controller?.tracks);
     }
 
     public GameState CurrentState

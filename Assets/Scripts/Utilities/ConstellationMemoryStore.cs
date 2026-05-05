@@ -18,6 +18,7 @@ public static class ConstellationMemoryStore
                 pattern = s.Pattern.ToString(),
                 color = s.Color,
                 timestamp = (long)s.Timestamp,
+                phaseIndex = s.PhaseIndex,
                 collectedNotes = s.CollectedNotes.Select(n => new SerializableNoteEntry
                 {
                     step         = n.Step,
@@ -38,6 +39,7 @@ public static class ConstellationMemoryStore
             Pattern = Enum.TryParse<MazeArchetype>(s.pattern, out var parsedPhase) ? parsedPhase : MazeArchetype.Windows,
             Color = s.color,
             Timestamp = s.timestamp,
+            PhaseIndex = s.phaseIndex,
             CollectedNotes = s.collectedNotes.Select(n => new MotifSnapshot.NoteEntry(
                 n.step, n.note, n.velocity, n.trackColor, commitTime01: n.commitTime01
             )).ToList()
@@ -102,10 +104,19 @@ public static class ConstellationMemoryStore
             Pattern = s.Pattern,
             Color = s.Color,
             Timestamp = s.Timestamp,
+            PhaseIndex = s.PhaseIndex,
             CollectedNotes = s.CollectedNotes
                 .Select(n => new MotifSnapshot.NoteEntry(n.Step, n.Note, n.Velocity, n.TrackColor, commitTime01: n.CommitTime01))
                 .ToList()
         }).ToList(); // Deep copy for safety
+    }
+
+    public static List<MotifSnapshot> GetSnapshotsByPhase(int phaseIndex)
+    {
+        var result = new List<MotifSnapshot>();
+        foreach (var s in cachedSnapshots)
+            if (s.PhaseIndex == phaseIndex) result.Add(s);
+        return result;
     }
 
     public static List<MotifSnapshot> RetrieveSnapshot()

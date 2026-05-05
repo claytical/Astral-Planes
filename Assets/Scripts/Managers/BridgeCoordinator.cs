@@ -49,6 +49,7 @@ public sealed class BridgeCoordinator
 
         _motifSnapshots.Add(motifSnap);
         ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
+        _gameFlow.GetMotifRingGlyphApplicator()?.ClearGameplayRings();
         _gameFlow.GetMotifRingGlyphApplicator()?.AnimateApply(motifSnap);
 
         if (_gameFlow.dustGenerator != null)
@@ -86,6 +87,7 @@ public sealed class BridgeCoordinator
         snapshot.MotifKeyRootMidi = (_gameFlow.phaseTransitionManager != null && _gameFlow.phaseTransitionManager.currentMotif != null)
             ? _gameFlow.phaseTransitionManager.currentMotif.keyRootMidi
             : 60;
+        snapshot.PhaseIndex = _gameFlow.phaseTransitionManager?.CurrentPhaseIndex ?? 0;
 
         if (retained == null || retained.Count == 0) return snapshot;
 

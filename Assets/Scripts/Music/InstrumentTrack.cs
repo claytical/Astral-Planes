@@ -264,6 +264,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private void ResetBinCursor()            => _binCursor = 0;
     public event Action<InstrumentTrack,int,int> OnAscensionCohortCompleted; // (track, start, end)
     public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
+    public event Action<InstrumentTrack, int> OnBinFilled; // (track, binIndex)
 
     private void OnDisable()
     {
@@ -405,6 +406,34 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     public bool IsExpansionPending => _expansionCtrl?.IsExpansionPending ?? false;
     public List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
+    }
+
+    /// <summary>
+    /// Returns NoteEntry objects for all persistent notes in the given bin.
+    /// Safe to call immediately after OnBinFilled fires.
+    /// </summary>
+    public List<MotifSnapshot.NoteEntry> GetBinNoteEntries(int binIndex)
+    {
+        var result = new List<MotifSnapshot.NoteEntry>();
+        var notes = GetPersistentLoopNotes();
+        if (notes == null || notes.Count == 0) return result;
+
+        int binSize = Mathf.Max(1, BinSize());
+        foreach (var n in notes)
+        {
+            if (n.stepIndex / binSize != binIndex) continue;
+            int localStep = n.stepIndex % binSize;
+            float commitTime01 = (binSize > 1) ? localStep / (float)(binSize - 1) : 0.5f;
+            result.Add(new MotifSnapshot.NoteEntry(
+                step: n.stepIndex,
+                note: n.note,
+                velocity: n.velocity,
+                trackColor: trackColor,
+                binIndex: binIndex,
+                isMatched: true,
+                commitTime01: commitTime01));
+        }
+        return result;
     }
 
     /// <summary>
@@ -943,6 +972,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
+
+        if (filled) OnBinFilled?.Invoke(this, bin);
     }
     private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);

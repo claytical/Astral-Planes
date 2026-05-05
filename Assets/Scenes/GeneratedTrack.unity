@@ -19843,6 +19843,7 @@ GameObject:
   - component: {fileID: 2009313290}
   - component: {fileID: 2009313294}
   - component: {fileID: 2009313291}
+  - component: {fileID: 2009313295}
   m_Layer: 0
   m_Name: Glyph Generator
   m_TagString: Untagged
@@ -20071,6 +20072,18 @@ MonoBehaviour:
     Velocity: 0.6
     TrackColor: {r: 1, g: 0.3, b: 0.4, a: 1}
   LivePreview: 0
+--- !u!114 &2009313295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009313289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 928fcb3b030a0458da21bf77631c0c9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BinRingController
 --- !u!1 &2067870200
 GameObject:
   m_ObjectHideFlags: 0

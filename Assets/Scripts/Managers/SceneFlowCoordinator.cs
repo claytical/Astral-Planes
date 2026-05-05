@@ -188,6 +188,7 @@ public sealed class SceneFlowCoordinator
         _gameFlow.harmony.Initialize(_gameFlow.activeDrumTrack, _gameFlow.controller);
         _gameFlow.activeDrumTrack.ManualStart();
         _gameFlow.dustGenerator.ManualStart();
+        _gameFlow.SetupBinRingController();
 
         foreach (var lp in _session.Players)
             lp?.Launch();

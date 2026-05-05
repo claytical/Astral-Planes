@@ -18,6 +18,7 @@ public class SerializablePhaseSnapshot
     public string pattern;
     public Color color;
     public long timestamp;
+    public int phaseIndex;
     public List<SerializableNoteEntry> collectedNotes;
 }
 
