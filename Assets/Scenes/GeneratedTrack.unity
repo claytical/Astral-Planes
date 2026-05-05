@@ -188,7 +188,7 @@ MonoBehaviour:
     type: 3}
   releaseCuePrefab: {fileID: 1316711709889716, guid: 8ebf85a8692064c7b81417bf7bbcc9e6,
     type: 3}
-  failureExplosionPrefab: {fileID: 2567590292593330887, guid: 7cfef40c3fd6cc44c87f04196a734800,
+  failureExplosionPrefab: {fileID: 6341629909758884825, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
     type: 3}
   failureColor: {r: 1, g: 0.12, b: 0.05, a: 1}
   releaseCueLookaheadSteps: 8
