@@ -10,6 +10,11 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Gap between the outer edge of one ring and the inner edge of the next.")]
     public float ringSpacing = 0.035f;
 
+    [Range(0f, 0.4f)]
+    [Tooltip("Fraction of the play area height reserved as padding on each side. " +
+             "0.05 = 5% padding, so the outermost ring fills 90% of the play area height.")]
+    public float fitPaddingFraction = 0.05f;
+
     [Header("Line")]
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;

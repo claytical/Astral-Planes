@@ -469,29 +469,6 @@ public class LocalPlayer : MonoBehaviour
         }
     }
 
-    public void OnNextColor(InputValue value)
-    {
-        if (!value.isPressed) return;
-        GetComponent<AudioSource>().PlayOneShot(clickFx);
-
-        if (_selection != null)
-        {
-            _selection.NextColor();
-            NotifySelectionNavigatedOnce();
-        }
-    }
-
-    public void OnPreviousColor(InputValue value)
-    {
-        if (!value.isPressed) return;
-        GetComponent<AudioSource>().PlayOneShot(clickFx);
-
-        if (_selection != null)
-        {
-            _selection.PreviousColor();
-            NotifySelectionNavigatedOnce();
-        }
-    }
 
     private void StartRumble(float lowFreq, float highFreq, float duration)
     {

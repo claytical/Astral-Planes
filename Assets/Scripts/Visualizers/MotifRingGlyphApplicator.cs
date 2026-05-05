@@ -303,6 +303,34 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Scale and center the ring group so the outermost ring's diameter equals the play area
+    /// height minus padding. <paramref name="ringCount"/> is the total number of rings currently
+    /// visible (used to compute the outermost ring's radius from config values).
+    /// </summary>
+    private void RefreshPlayAreaFit(int ringCount)
+    {
+        if (config == null || ringCount == 0) return;
+        var gfm = GameFlowManager.Instance;
+        if (gfm?.activeDrumTrack == null) return;
+        if (!gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area)) return;
+
+        // Outermost ring radius in local config units
+        float outerRadius = config.innerRadius
+            + (ringCount - 1) * (config.ringSpacing + config.lineWidth);
+        if (outerRadius <= 0f) return;
+
+        // Target radius: half of (height - 2 × padding)
+        float targetRadius = area.height * (0.5f - config.fitPaddingFraction);
+        if (targetRadius <= 0f) return;
+
+        float scale = targetRadius / outerRadius;
+        float cx    = (area.left + area.right)  * 0.5f;
+        float cy    = (area.bottom + area.top)  * 0.5f;
+        transform.position   = new Vector3(cx, cy, transform.position.z);
+        transform.localScale = new Vector3(scale, scale, 1f);
+    }
+
     private void ClearRecordRings()
     {
         foreach (var lr in _recordRings)

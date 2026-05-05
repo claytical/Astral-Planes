@@ -8,7 +8,6 @@ public class PlayerSelect : MonoBehaviour
 {
     public Image planeIcon;
     public Fuel fuel;
-    public Color[] planeColors;
     public GameObject controlsAndStats;
     public GameObject tutorialControls;
     public Image border;
@@ -70,21 +69,13 @@ public class PlayerSelect : MonoBehaviour
             fuel?.UpdateFuelUI(1f); // fallback
         }
     }
-    private void SetVehicleIconColor(Color color)
-    {
-        planeIcon.color = color;
-    }
+
     private void ApplyVisuals()
     {
         SpriteRenderer sr = _chosenPlane.GetComponent<SpriteRenderer>();
         if (sr != null)
         {
             planeIcon.sprite = sr.sprite;
-            planeIcon.color = planeColors[_selectedColor];
-        }
-        else
-        {
-            Debug.LogWarning("Selected plane has no SpriteRenderer.");
         }
     }
     public void Confirm()
@@ -93,16 +84,7 @@ public class PlayerSelect : MonoBehaviour
         planeIcon.transform.parent.gameObject.SetActive(false);
         border.enabled = false;
     }
-    public void NextColor()
-    {
-        _selectedColor = (_selectedColor + 1) % planeColors.Length;
-        SetVehicleIconColor(planeColors[_selectedColor]);
-    }
-    public void PreviousColor()
-    {
-        _selectedColor = (_selectedColor - 1 + planeColors.Length) % planeColors.Length;
-        SetVehicleIconColor(planeColors[_selectedColor]);
-    }
+
     public void NextVehicle()
     {
         if (_chosenPlane != null)
