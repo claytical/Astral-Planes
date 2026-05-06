@@ -412,7 +412,21 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasDominantRoleEjectable() =>
         GetDominantRoleRaw(out _, out float rawCharge, out float threshold) && rawCharge >= threshold;
-    private bool IsEjectionReady() => _zapProgressState == ZapProgressState.ReadyLatched && HasDominantRoleEjectable();
+    private bool IsEjectionReady()
+    {
+        if (!_plannedEjectionDescriptor.IsValid)
+        {
+            if (!_missingDescriptorWarned)
+            {
+                Debug.LogWarning($"[PhaseStar:Zap] planned ejection descriptor missing; readiness blocked. role={_requiredZapRole} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
+                _missingDescriptorWarned = true;
+            }
+            return false;
+        }
+
+        _missingDescriptorWarned = false;
+        return _zapProgressState == ZapProgressState.ReadyLatched && HasDominantRoleEjectable();
+    }
     private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
     {
         if (track == null) return null;
@@ -420,6 +434,27 @@ public class PhaseStar : MonoBehaviour
         int entropy = CurrentEntropyForSelection();
         return _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
     }
+    private struct PlannedEjectionDescriptor
+    {
+        public MusicalRole role;
+        public InstrumentTrack track;
+        public NoteSet noteSet;
+        public int requiredZapCount;
+
+        public bool IsValid => role != MusicalRole.None && track != null && noteSet != null && requiredZapCount > 0;
+    }
+
+    private PlannedEjectionDescriptor _plannedEjectionDescriptor;
+    private bool _missingDescriptorWarned;
+
+    private static bool PlannedDescriptorEquals(in PlannedEjectionDescriptor a, in PlannedEjectionDescriptor b)
+    {
+        return a.role == b.role &&
+               ReferenceEquals(a.track, b.track) &&
+               ReferenceEquals(a.noteSet, b.noteSet) &&
+               a.requiredZapCount == b.requiredZapCount;
+    }
+
     private bool TryRefreshRequiredZapCountForPlannedRole(
         MusicalRole role,
         InstrumentTrack track,
@@ -429,10 +464,18 @@ public class PhaseStar : MonoBehaviour
         _requiredZapRole = role;
         _requiredZapNoteSetAvailable = false;
 
+        PlannedEjectionDescriptor previousDescriptor = _plannedEjectionDescriptor;
+        PlannedEjectionDescriptor nextDescriptor = default;
+        nextDescriptor.role = role;
+        nextDescriptor.track = track;
+
         if (track == null)
         {
             requiredZapCount = int.MaxValue;
+            _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
+            if (_zapProgressState == ZapProgressState.Seeking)
+                zappedCount = 0;
             return false;
         }
 
@@ -440,19 +483,31 @@ public class PhaseStar : MonoBehaviour
         if (planned == null)
         {
             requiredZapCount = int.MaxValue;
+            _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
+            if (_zapProgressState == ZapProgressState.Seeking)
+                zappedCount = 0;
             return false;
         }
 
-        _requiredZapNoteSetAvailable = true;
         int noteCount = planned.GetStepList()?.Count ?? 0;
         if (noteCount <= 0)
             noteCount = planned.GetNoteList()?.Count ?? 0;
-        requiredZapCount = Mathf.Max(1, noteCount);
-        if (resetCurrentZapCount)
+
+        nextDescriptor.noteSet = planned;
+        nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
+
+        _requiredZapNoteSetAvailable = nextDescriptor.IsValid;
+        requiredZapCount = nextDescriptor.requiredZapCount;
+
+        bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
+        _plannedEjectionDescriptor = nextDescriptor;
+
+        if (resetCurrentZapCount || (_zapProgressState == ZapProgressState.Seeking && descriptorChanged))
             zappedCount = 0;
+
         TransitionZapState(resetCurrentZapCount ? ZapProgressState.Seeking : ZapProgressState.Zapping, role, $"refresh:{reason}");
-        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} reason={reason}");
+        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
         return true;
     }
     private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)
@@ -517,7 +572,12 @@ public class PhaseStar : MonoBehaviour
         _lastResolvedZapRole = role;
         _lastResolvedZapCell = targetCell;
 
-        bool readyNow = _requiredZapNoteSetAvailable && zappedCount >= requiredZapCount;
+        if (!_requiredZapNoteSetAvailable || !_plannedEjectionDescriptor.IsValid)
+        {
+            Debug.LogWarning($"[PhaseStar:ZapResolved] missing planned ejection descriptor; readiness blocked. role={role} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
+        }
+
+        bool readyNow = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
         if (readyNow)
             TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
 
@@ -684,6 +744,16 @@ public class PhaseStar : MonoBehaviour
             _cachedTrack = FindTrackByRole(dominantRole);
             TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
             visuals?.ResetDualDiamondVisualState();
+        }
+        else
+        {
+            InstrumentTrack latestTrack = FindTrackByRole(dominantRole);
+            bool trackChanged = !ReferenceEquals(latestTrack, _plannedEjectionDescriptor.track);
+            if (trackChanged)
+            {
+                _cachedTrack = latestTrack;
+                TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+            }
         }
 
         float dominantCharge01 = Mathf.Clamp01(dominantRawCharge / Mathf.Max(0.001f, dominantThreshold));
