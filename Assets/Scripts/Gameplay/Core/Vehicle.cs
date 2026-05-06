@@ -62,11 +62,14 @@ public partial class Vehicle : MonoBehaviour
         public PendingCollectedNote note;
         public int targetAbsStep;
         public int totalAbsSteps;
-        public double gapDurationDsp;  // wall-clock seconds from arm moment to target; stable across bin expansion
+        public double gapDurationDsp;   // wall-clock seconds from arm moment to target; stable across bin expansion
+        public float releaseVelocity;   // timing-based velocity captured at the moment the player armed the release
     }
 
     // Armed releases commit automatically as the playhead reaches the target.
     private readonly Queue<ArmedRelease> _armedReleases = new Queue<ArmedRelease>(8);
+    // Single Vehicle-owned tether — created on first collect, destroyed when all notes gone.
+    private NoteTether _vehicleTether;
     private double _lastRawAbsStep = 0.0;
     private bool _hasLastRawAbsStep = false;
 
@@ -105,6 +108,14 @@ public partial class Vehicle : MonoBehaviour
     {
         _pendingNotes.Clear();
         _armedReleases.Clear();
+        DestroyVehicleTether();
+    }
+
+    private void DestroyVehicleTether()
+    {
+        if (_vehicleTether == null) return;
+        Destroy(_vehicleTether.gameObject);
+        _vehicleTether = null;
     }
 
     /// <summary>
@@ -420,6 +431,7 @@ public partial class Vehicle : MonoBehaviour
 
         if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
         {
+            DestroyVehicleTether();
             if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
             UpdateVehiclePlacementResonance(0f, null);
             return;
@@ -515,6 +527,7 @@ public partial class Vehicle : MonoBehaviour
             cueTrack = _pendingNotes.Peek().track;
 
         UpdateVehiclePlacementResonance(pulse01, cueTrack, isAuthoritative);
+
         // Armed notes: fly orb toward its target marker.
         int armedSlot = 0;
         float bunchDist = vehicleConfig.trailFirstSlotOffset;
@@ -541,87 +554,45 @@ public partial class Vehicle : MonoBehaviour
             }
 
             ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
-            // Drive tether thickness: t01=0 = open window, t01=1 = release now.
-            if (armedSlot == 0)
-            {
-                ar.note.collectable.tether?.SetReleaseProgress(pulse01);
-                ar.note.collectable.tether?.SetTimingState(pulse01, inTimingWindow, atExactStep);
-            }
-            else
-            {
-                ar.note.collectable.tether?.SetTimingState(0f, false, false);
-            }
             armedSlot++;
         }
 
         // Pending notes: trail behind vehicle.
         int slot = armedSlot;
-        bool hasPendingRaw = false;
-        double rawAbsPending = 0;
-        int totalPending = 0;
-        if (_pendingNotes.Count > 0)
-        {
-            var head = _pendingNotes.Peek();
-            if (head.track != null && head.track.controller != null)
-                hasPendingRaw = head.track.controller.TryGetRawPlayheadAbsStep(out rawAbsPending, out _, out totalPending);
-        }
         foreach (var p in _pendingNotes)
         {
             if (p.collectable == null) { slot++; continue; }
 
-            float dist = bunchDist;
-            p.collectable.SetTrailTarget(SampleTrailPosition(dist));
+            p.collectable.SetTrailTarget(SampleTrailPosition(bunchDist));
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
-
-            bool noteInWindow = false;
-            bool noteExact = false;
-            float notePulse = 0f;
-            if (_armedReleases.Count == 0 && hasPendingRaw && totalPending > 0 &&
-                p.track != null && p.track.drumTrack != null)
-            {
-                // Keep FIFO BindByStep so BuildManualReleaseSpokenFor exclusion stays correct.
-                if (viz != null && TryResolveManualReleaseTargetStep(p, rawAbsPending, totalPending, out int nextUnlitTarget, out _))
-                    p.collectable.tether?.BindByStep(p.track, nextUnlitTarget, viz);
-
-                // Visual timing uses the authored step — that is where the tether's end
-                // transform was anchored at pickup. FIFO re-resolves the nearest unlit step
-                // each frame and swaps assignments as the playhead moves, so using targetAbs
-                // here would pulse the wrong step relative to the visible line.
-                int visualStep = p.authoredAbsStep >= 0 ? p.authoredAbsStep
-                    : (p.collectable.tether != null && p.collectable.tether.boundStep >= 0
-                        ? p.collectable.tether.boundStep : -1);
-
-                if (visualStep >= 0)
-                {
-                    int total = Mathf.Max(1, totalPending);
-                    double fwdSteps = (visualStep - rawAbsPending + total) % total;
-                    double backSteps = total - fwdSteps;
-                    int pBinSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
-                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
-                    double pLoopLen = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
-                    double pStepDur = pLoopLen / total;
-                    double fwdDsp = fwdSteps * pStepDur;
-                    double backDsp = backSteps * pStepDur;
-                    const float ringWindowLead = 1.5f;
-                    double armWindowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
-                    double graceDsp = vehicleConfig.manualReleaseGracePeriodSteps * pStepDur;
-
-                    bool inArmWindow = fwdDsp <= armWindowDsp;
-                    bool inGrace = graceDsp > 0 && backDsp <= graceDsp;
-                    noteInWindow = inArmWindow || inGrace;
-                    noteExact = fwdSteps <= 0.025;
-
-                    if (inArmWindow)
-                        notePulse = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, armWindowDsp)));
-                    else if (inGrace)
-                        notePulse = 1f - Mathf.Clamp01((float)(backDsp / System.Math.Max(0.001, graceDsp)));
-                }
-            }
-            bool isHeadPending = slot == 0;
-            // Head note gets width urgency; all notes get per-step timing colour.
-            p.collectable.tether?.SetReleaseProgress(isHeadPending ? notePulse : 0f);
-            p.collectable.tether?.SetTimingState(notePulse, noteInWindow, noteExact);
             slot++;
+        }
+
+        // Single Vehicle-owned tether: create, update, or destroy.
+        bool hasNotes = _pendingNotes.Count > 0 || _armedReleases.Count > 0;
+        if (!hasNotes)
+        {
+            DestroyVehicleTether();
+        }
+        else
+        {
+            if (_vehicleTether == null && viz != null && viz.noteTetherPrefab != null)
+            {
+                var go = Instantiate(viz.noteTetherPrefab);
+                _vehicleTether = go.GetComponent<NoteTether>() ?? go.AddComponent<NoteTether>();
+                Color col = Color.white;
+                if (_pendingNotes.Count > 0 && _pendingNotes.Peek().track != null)
+                    col = _pendingNotes.Peek().track.trackColor;
+                else if (_armedReleases.Count > 0 && _armedReleases.Peek().note.track != null)
+                    col = _armedReleases.Peek().note.track.trackColor;
+                _vehicleTether.SetEndpoints(null, null, col);
+            }
+
+            if (_vehicleTether != null)
+            {
+                _vehicleTether.SetStartWorldPos(SampleTrailPosition(vehicleConfig.trailFirstSlotOffset));
+                UpdateVehicleTether(viz);
+            }
         }
 
         foreach (var ar in _armedReleases) if (ar.note.track != null) _carriedTracksScratch.Add(ar.note.track);
@@ -629,6 +600,111 @@ public partial class Vehicle : MonoBehaviour
         if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
     }
     
+    private void UpdateVehicleTether(NoteVisualizer viz)
+    {
+        if (_vehicleTether == null) return;
+
+        // ── Armed-release state ─────────────────────────────────────────────────
+        if (_armedReleases.Count > 0)
+        {
+            var a = _armedReleases.Peek();
+            if (a.note.track?.controller == null) return;
+            if (!a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out _, out int total)) return;
+            total = Mathf.Max(1, total);
+            var drum = a.note.track.drumTrack;
+            int binSize = drum != null ? drum.totalSteps : total;
+            int leaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)binSize));
+            double loopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1.0) * leaderBins;
+            double stepDur = loopLen / total;
+            double fwdSteps = (a.targetAbsStep - rawAbs + total) % total;
+            double fwdDsp   = fwdSteps * stepDur;
+            float  pulse    = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, a.gapDurationDsp)));
+            bool   inWin    = fwdDsp <= System.Math.Max(0.001, a.gapDurationDsp);
+            bool   atExact  = fwdSteps <= 0.025;
+            _vehicleTether.BindByStep(a.note.track, a.targetAbsStep, viz);
+            _vehicleTether.SetReleaseProgress(pulse);
+            _vehicleTether.SetTimingState(pulse, inWin, atExact);
+            return;
+        }
+
+        // ── Pending-note state ──────────────────────────────────────────────────
+        if (_pendingNotes.Count == 0) return;
+        var p = _pendingNotes.Peek();
+        if (p.track?.controller == null || p.track.drumTrack == null) return;
+        if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP)) return;
+
+        int    tot         = Mathf.Max(1, totalP);
+        int    pBinSize    = Mathf.Max(1, p.track.drumTrack.totalSteps);
+        int    pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(tot / (float)pBinSize));
+        double pLoopLen    = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
+        double pStepDur    = pLoopLen / tot;
+        double tetherWin   = vehicleConfig.manualReleaseArmAheadSteps  * pStepDur;
+        double graceDsp    = vehicleConfig.manualReleaseGracePeriodSteps * pStepDur;
+        double playheadInLoop = rawAbsP % tot;
+
+        // Find the nearest forward unlit step. No FIFO exclusions — one tether shows one step at a time.
+        int  nextTarget = -1;
+        bool resolved   = viz != null &&
+            viz.TryGetNextUnlitStepExcluding(p.track, rawAbsP, tot, null, out nextTarget);
+
+        int   currentBound  = _vehicleTether.boundStep;
+        float notePulse     = 0f;
+        bool  noteInWindow  = false;
+
+        // Grace hold: stay on the just-passed step until its grace window expires.
+        bool inGraceForBound = false;
+        if (graceDsp > 0 && currentBound >= 0 && resolved && nextTarget != currentBound)
+        {
+            double fwdToBound    = (currentBound - rawAbsP + tot) % tot;
+            double backFromBound = tot - fwdToBound;
+            double backDspBound  = backFromBound * pStepDur;
+            // Suppress grace that crosses the loop boundary (from a previous iteration).
+            if (backDspBound <= graceDsp && backFromBound <= playheadInLoop + 0.001)
+            {
+                inGraceForBound = true;
+                noteInWindow    = true;
+                notePulse       = 1f - Mathf.Clamp01((float)(backDspBound / graceDsp));
+            }
+        }
+
+        if (!inGraceForBound && resolved)
+            _vehicleTether.BindByStep(p.track, nextTarget, viz);
+
+        if (!inGraceForBound)
+        {
+            int visualStep = _vehicleTether.boundStep >= 0 ? _vehicleTether.boundStep : p.authoredAbsStep;
+            if (visualStep >= 0)
+            {
+                double fwdSteps2 = (visualStep - rawAbsP + tot) % tot;
+                double backSteps = tot - fwdSteps2;
+                double fwdDsp2   = fwdSteps2 * pStepDur;
+                double backDsp   = backSteps  * pStepDur;
+                bool   inArmWin  = fwdDsp2 <= tetherWin;
+                // Suppress cross-boundary grace (step passed in a previous iteration).
+                bool   inGrace   = graceDsp > 0 && backDsp <= graceDsp && backSteps <= playheadInLoop + 0.001;
+                noteInWindow = inArmWin || inGrace;
+                bool atExact = fwdSteps2 <= 0.025;
+                notePulse = inArmWin
+                    ? 1f - Mathf.Clamp01((float)(fwdDsp2 / System.Math.Max(0.001, tetherWin)))
+                    : inGrace
+                        ? 1f - Mathf.Clamp01((float)(backDsp / System.Math.Max(0.001, graceDsp)))
+                        : 0f;
+                // Suppress the arm window for a step only reachable by crossing the loop boundary.
+                if (inArmWin && playheadInLoop + fwdSteps2 >= tot)
+                {
+                    noteInWindow = false;
+                    notePulse    = 0f;
+                }
+                _vehicleTether.SetReleaseProgress(notePulse);
+                _vehicleTether.SetTimingState(notePulse, noteInWindow, atExact);
+                return;
+            }
+        }
+
+        _vehicleTether.SetReleaseProgress(notePulse);
+        _vehicleTether.SetTimingState(notePulse, noteInWindow, false);
+    }
+
     private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)
     {
         if (!vehicleConfig.useVehiclePlacementResonance)
@@ -1439,6 +1515,14 @@ public partial class Vehicle : MonoBehaviour
 
     bool lateGracePass = inGraceWindow && !inAheadWindow;
 
+    // Timing-based velocity: 0 = earliest window open (~vel 40), 1 = exact step (vel 127).
+    float releaseWindowLerp = inAheadWindow
+        ? 1f - Mathf.Clamp01((float)(fwdToTarget / Mathf.Max(0.001f, vehicleConfig.manualReleaseArmAheadSteps)))
+        : inGraceWindow
+            ? 1f - Mathf.Clamp01((float)(backFromTarget / Mathf.Max(0.001f, vehicleConfig.manualReleaseGracePeriodSteps)))
+            : 0f;
+    float releaseVelocity = Mathf.Lerp(40f, 127f, releaseWindowLerp);
+
     if (pass && vehicleConfig.manualReleaseUseArmLock && !lateGracePass)
     {
         // stepDur must use the full leader loop length (all bins × clip length), because
@@ -1453,17 +1537,18 @@ public partial class Vehicle : MonoBehaviour
 
         _armedReleases.Enqueue(new ArmedRelease
         {
-            note           = p,
-            targetAbsStep  = targetAbsStep,
-            totalAbsSteps  = effectiveTotal,
-            gapDurationDsp = gapDsp
+            note            = p,
+            targetAbsStep   = targetAbsStep,
+            totalAbsSteps   = effectiveTotal,
+            gapDurationDsp  = gapDsp,
+            releaseVelocity = releaseVelocity
         });
         return true;
     }
 
     if (pass)
     {
-        CommitManualReleaseAtStep(p, targetAbsStep);
+        CommitManualReleaseAtStep(p, targetAbsStep, releaseVelocity);
         viz?.BlastManualReleaseCue(transform);
         return true;
     }

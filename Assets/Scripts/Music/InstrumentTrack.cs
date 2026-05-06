@@ -1593,8 +1593,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (markerGo != null)
         {
             collectable.ribbonMarker = markerGo.transform;
-            if (collectable.tether != null)
-                collectable.tether.SetEndpoints(collectable.transform, collectable.ribbonMarker, this.trackColor, 1f);
         }
         double loopLen = drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0.0;
         if (loopLen <= 0.0001) loopLen = drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0.0;

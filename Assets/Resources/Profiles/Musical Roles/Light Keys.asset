@@ -16,7 +16,7 @@ MonoBehaviour:
   dustColors:
     baseColor: {r: 0, g: 1, b: 0.21960784, a: 0.6509804}
     shadowColor: {r: 0, g: 0.5566038, b: 0.12223455, a: 1}
-  baseAlpha: 1
+  baseAlpha: 0.65
   maxEnergyUnits: 4
   carveResistance01: 0.55
   drainResistance01: 0.4

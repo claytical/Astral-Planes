@@ -46,6 +46,10 @@ public class NoteTether : MonoBehaviour
     [SerializeField] private float worldZOverride = float.NaN; // if set, force the tether's Z
     private Vector3 _lastEndWorld;
 
+    // Vehicle-tail start override — set each frame by Vehicle via SetStartWorldPos().
+    private Vector3 _startWorldOverride;
+    private bool    _hasStartOverride;
+
     // --- Arc-length cache (add these fields somewhere in the same class) ---
 private float[] _cumDist;   // cumulative distance at each point
 private float   _totalLen;  // total curve length
@@ -92,7 +96,8 @@ private int     _cachedHash  = 0;
     void Update()
 {
     // If either endpoint is missing, try to (re)acquire before destroying
-    if (!start || !end)
+    bool hasStart = _hasStartOverride || (start != null);
+    if (!hasStart || !end)
     {
         // Try to resolve 'end' from the visualizer’s marker table every few frames
         if (!end && boundVisualizer && boundTrack && boundStep >= 0)
@@ -139,8 +144,9 @@ private int     _cachedHash  = 0;
 
     if (_dripEmitter != null)
     {
-        Vector3 endW = ResolveEndWorldPosition();
-        Vector3 dir  = (endW - start.position).normalized;
+        Vector3 endW     = ResolveEndWorldPosition();
+        Vector3 startPos = _hasStartOverride ? _startWorldOverride : (start != null ? start.position : transform.position);
+        Vector3 dir      = (endW - startPos).normalized;
         _dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
     }
 
@@ -217,10 +223,28 @@ private int     _cachedHash  = 0;
         // ✅ Make sure we actually have a PS ready
         EnsureShimmer();
     }
+    public void SetStartWorldPos(Vector3 worldPos)
+    {
+        _startWorldOverride = worldPos;
+        _hasStartOverride   = true;
+    }
+
     public void BindByStep(InstrumentTrack track, int step, NoteVisualizer viz) {
-        boundTrack = track; 
-        boundStep  = step;
+        boundTrack      = track;
+        boundStep       = step;
         boundVisualizer = viz;
+        // Move the line endpoint to the new marker immediately so the tether
+        // draws to the correct step rather than the original pickup position.
+        if (viz != null && viz.noteMarkers != null &&
+            viz.noteMarkers.TryGetValue((track, step), out var marker) && marker != null)
+        {
+            end = marker;
+            _endpointNullTimer = 0f;
+        }
+        else
+        {
+            end = null; // Update() will poll for it
+        }
     }
     [Header("Release Progress")]
     [Tooltip("Width multiplier at t01=0 (plenty of time).")]
@@ -229,7 +253,7 @@ private int     _cachedHash  = 0;
     [SerializeField] private float releaseWidthMax = 3.5f;
 
     private float _releaseProgress01 = 0f;
-    private Gradient _dimGradient;
+    private Gradient _ghostGradient;   // near-invisible version used at window open (replaces dim)
     private Gradient _windowGradient;
     private Gradient _exactGradient;
 
@@ -245,22 +269,17 @@ private int     _cachedHash  = 0;
     public void SetTimingState(float windowLerp01, bool inWindow, bool atExactStep)
     {
         if (_lr == null) return;
-        BuildTimingGradients();
 
         if (!inWindow)
         {
-            _lr.colorGradient = _dimGradient;
+            _lr.enabled = false;
             return;
         }
 
-        if (atExactStep)
-        {
-            _lr.colorGradient = _exactGradient;
-            return;
-        }
-
-        // In timing window but not exact: blend from dim toward the existing white+role gradient.
-        _lr.colorGradient = LerpGradient(_dimGradient, _windowGradient, Mathf.Clamp01(windowLerp01));
+        BuildTimingGradients();
+        _lr.enabled = true;
+        // Fade from ghost (faint, window just opened) to exact (bright, perfect timing).
+        _lr.colorGradient = LerpGradient(_ghostGradient, _exactGradient, Mathf.Clamp01(windowLerp01));
     }
 
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
@@ -288,9 +307,9 @@ private int     _cachedHash  = 0;
             );
             _lr.colorGradient = g;
             _lr.widthMultiplier = baseWidth * widthMul;
-            _dimGradient = null;
+            _ghostGradient  = null;
             _windowGradient = null;
-            _exactGradient = null;
+            _exactGradient  = null;
         }
 
         EnsureShimmer();
@@ -307,22 +326,24 @@ private int     _cachedHash  = 0;
 
     private void BuildTimingGradients()
     {
-        if (_dimGradient != null && _windowGradient != null && _exactGradient != null) return;
+        if (_ghostGradient != null && _windowGradient != null && _exactGradient != null) return;
 
         Color role = baseColor;
-        Color dimRole = new Color(role.r * 0.2f, role.g * 0.2f, role.b * 0.2f, Mathf.Clamp01(role.a * 0.35f));
 
-        _dimGradient = new Gradient();
-        _dimGradient.SetKeys(
+        // Ghost: nearly invisible — shows the tether is just entering the window.
+        _ghostGradient = new Gradient();
+        _ghostGradient.SetKeys(
             new[] {
-                new GradientColorKey(dimRole, 0f),
-                new GradientColorKey(new Color(1f,1f,1f,0.7f), 0.5f),
-                new GradientColorKey(dimRole, 1f)
+                new GradientColorKey(role * 0.6f, 0f),
+                new GradientColorKey(Color.white, 0.5f),
+                new GradientColorKey(role, 1f)
             },
             new[] {
-                new GradientAlphaKey(0.06f, 0f),
-                new GradientAlphaKey(0.14f, 0.4f),
-                new GradientAlphaKey(0.08f, 1f)
+                new GradientAlphaKey(0.02f, 0f),
+                new GradientAlphaKey(0.04f, 0.12f),
+                new GradientAlphaKey(0.12f, 0.5f),
+                new GradientAlphaKey(0.06f, 0.88f),
+                new GradientAlphaKey(0.02f, 1f)
             });
 
         _windowGradient = new Gradient();
@@ -409,7 +430,7 @@ private int     _cachedHash  = 0;
     }
     private void EmitShimmer(float deltaTime)
     {
-        if (!shimmerEnabled || _shimmerPS == null) return;
+        if (!shimmerEnabled || _shimmerPS == null || (_lr != null && !_lr.enabled)) return;
         float particlesToEmit = _curveLength * shimmerRatePerUnit * Mathf.Max(0.0001f, deltaTime);
 
         int emits = Mathf.FloorToInt(particlesToEmit);
@@ -432,7 +453,7 @@ private int     _cachedHash  = 0;
     }
     private void RebuildCurve()
 {
-    Vector3 aW = start.position;
+    Vector3 aW = _hasStartOverride ? _startWorldOverride : (start != null ? start.position : transform.position);
     Vector3 dW = ResolveEndWorldPosition();
 
     var cam = worldCamera != null ? worldCamera : Camera.main;
