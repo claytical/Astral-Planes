@@ -85,6 +85,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     public Action<MusicalRole, float> onDelivery;
     public event Action<MusicalRole> OnAttuned;
+    public event Action OnAllTentaclesRetracted;
 
     private GameFlowManager _gfm;
     private PhaseStarBehaviorProfile _profile;
@@ -93,6 +94,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private MusicalRole _attunedRole = MusicalRole.None;
 
     private bool _tentaclesActive;
+    private bool _acquisitionEnabled = true;
     private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
@@ -153,10 +155,26 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     public void SetTentaclesActive(bool active)
     {
         _tentaclesActive = active;
+        _acquisitionEnabled = active;
         _navigator?.SetHuntingEnabled(active);
 
         if (!active)
             ResetTentacles();
+    }
+
+    public void BeginRetractionForActiveTentacles()
+    {
+        _acquisitionEnabled = false;
+        _navigator?.SetHuntingEnabled(false);
+
+        Vector2 starPos = transform.position;
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.state == TentacleState.Idle) continue;
+            BeginRetractingTentacle(tentacle, starPos, "phase-star-waiting-for-retract");
+        }
+
+        TryNotifyAllTentaclesRetracted();
     }
 
     public void ResetTentacles()
@@ -165,6 +183,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         foreach (var tentacle in _tentacles)
             ResetTentacleState(tentacle, starPos, destroyVisual: false);
+
+        TryNotifyAllTentaclesRetracted();
     }
     
     public bool HasActiveTentacles
@@ -257,6 +277,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         {
             case TentacleState.Idle:
             {
+                if (!_acquisitionEnabled) break;
                 if (gen == null || drum == null || _navigator == null) break;
                 if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole) break;
 
@@ -343,6 +364,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 {
                     TransitionTentacleState(tentacle, TentacleState.Idle, "fully retracted");
                     tentacle.line.enabled = false;
+                    TryNotifyAllTentaclesRetracted();
                 }
 
                 break;
@@ -1008,5 +1030,16 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             excluded.Add(zappedCell);
 
         return excluded;
+    }
+
+    private void TryNotifyAllTentaclesRetracted()
+    {
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.state != TentacleState.Idle)
+                return;
+        }
+
+        OnAllTentaclesRetracted?.Invoke();
     }
 }
