@@ -444,12 +444,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         _navigator?.NotifyCellZappedThisCycle(tentacle.targetCell);
         ReleaseReservation(tentacle, tentacle.targetCell);
         Vector2Int zappedCell = tentacle.targetCell;
+        _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
         if (TryZapAndConfirmClear(gen, zappedCell))
         {
             _navigator?.ClearLockOn(zappedCell);
             tentacle.notifiedDrainLock = false;
             tentacle.targetCell = default;
-            _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
         }
         return true;
     }
