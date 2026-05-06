@@ -171,6 +171,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 if (tentacle.state == TentacleState.Growing  ||
                     tentacle.state == TentacleState.Draining ||
+                    tentacle.state == TentacleState.Retracting ||
                     tentacle.state == TentacleState.Dissolving)
                     return true;
             }
@@ -418,7 +419,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         ReleaseReservation(tentacle, tentacle.targetCell);
         Vector2Int zappedCell = tentacle.targetCell;
         if (TryZapAndConfirmClear(gen, zappedCell))
+        {
+            _navigator?.ClearLockOn(zappedCell);
+            tentacle.notifiedDrainLock = false;
+            tentacle.targetCell = default;
             _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
+        }
         return true;
     }
 
@@ -974,6 +980,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return false;
 
         _reservedCells[cell] = tentacle;
+        _navigator?.ReserveCell(cell);
         return true;
     }
 
@@ -981,6 +988,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         if (_reservedCells.TryGetValue(cell, out var owner) && owner == tentacle)
             _reservedCells.Remove(cell);
+        _navigator?.ReleaseCellReservation(cell);
     }
 
     private HashSet<Vector2Int> BuildExcludedCells(Tentacle requester)

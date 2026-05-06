@@ -30,6 +30,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private Vector2 _nearestColoredDustDir = Vector2.zero;
     private readonly List<Vector2Int> _coloredCellsScratch = new(512);
     private readonly HashSet<Vector2Int> _zappedThisCycle = new();
+    private readonly HashSet<Vector2Int> _reservedCells = new();
 
     public void Initialize(
         PhaseStar star,
@@ -92,6 +93,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             var c = _coloredCellsScratch[i];
             if (excludedCells != null && excludedCells.Contains(c)) continue;
+            if (_reservedCells.Contains(c)) continue;
 
             if (!IsZapEligible(gen, c, role)) continue;
 
@@ -129,9 +131,12 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     public void NotifyCellZappedThisCycle(Vector2Int cell)
     {
         _zappedThisCycle.Add(cell);
+        _reservedCells.Remove(cell);
     }
 
     public bool WasCellZappedThisCycle(Vector2Int cell) => _zappedThisCycle.Contains(cell);
+    public void ReserveCell(Vector2Int cell) => _reservedCells.Add(cell);
+    public void ReleaseCellReservation(Vector2Int cell) => _reservedCells.Remove(cell);
 
     public Vector2 GetDensitySteerDir() => (_huntingEnabled && _hasTarget) ? _targetDir : Vector2.zero;
     
@@ -193,6 +198,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
         {
             var cell = _coloredCellsScratch[i];
+            if (_reservedCells.Contains(cell)) continue;
             var expectedRole = _attunedRole != MusicalRole.None ? _attunedRole : MusicalRole.None;
             if (!IsZapEligible(gen, cell, expectedRole)) continue;
 
@@ -355,6 +361,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         if (dust.currentEnergyUnits <= 0) return false;
         if (_hasLockOnCell && _lockOnCell != cell) return false;
         if (_zappedThisCycle.Contains(cell)) return false;
+        if (_reservedCells.Contains(cell)) return false;
         return true;
     }
 
