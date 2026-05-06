@@ -1415,6 +1415,12 @@ public partial class Vehicle : MonoBehaviour
         return true;
     }
 
+
+    public bool HasCapturedCollectablesPendingRelease()
+    {
+        return _pendingNotes.Count > 0 || _armedReleases.Count > 0;
+    }
+
     // Back-compat with earlier patches / external callers.
     public bool EnqueuePendingNote(PendingCollectedNote p) => EnqueuePendingCollectedNote(p);
     
