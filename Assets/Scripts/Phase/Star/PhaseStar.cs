@@ -321,6 +321,7 @@ public class PhaseStar : MonoBehaviour
         StopManagedCoroutine(ref _waitForDustCo);
         _pendingDormantActivation = true;
         TransitionZapState(ZapProgressState.WaitingForRetract, _requiredZapRole, "dormant-threshold-hit");
+        cravingNavigator?.SetActive(false);
         dust?.BeginRetractionForActiveTentacles();
     }
 
@@ -603,6 +604,7 @@ public class PhaseStar : MonoBehaviour
         if (readyNow)
         {
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
+            cravingNavigator?.SetActive(false);
             dust?.BeginRetractionForActiveTentacles();
 
             if (_state == PhaseStarState.Dormant && !_pendingDormantActivation)

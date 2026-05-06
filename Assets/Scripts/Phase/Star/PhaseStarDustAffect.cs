@@ -98,6 +98,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private bool _tentaclesActive;
     private bool _acquisitionEnabled = true;
     private bool _isRetractAllInProgress;
+    private bool _pendingDeactivateAfterRetract;
     private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
@@ -161,8 +162,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         _acquisitionEnabled = active;
         _navigator?.SetHuntingEnabled(active);
 
-        if (!active)
-            ResetTentacles();
+        if (active)
+        {
+            _pendingDeactivateAfterRetract = false;
+            return;
+        }
+
+        _pendingDeactivateAfterRetract = true;
+        BeginRetractAllTentacles();
     }
 
     public void BeginRetractionForActiveTentacles()
@@ -1070,6 +1077,15 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
 
         _isRetractAllInProgress = false;
+
+        if (_pendingDeactivateAfterRetract)
+        {
+            _pendingDeactivateAfterRetract = false;
+            Vector2 starPos = transform.position;
+            foreach (var tentacle in _tentacles)
+                ResetTentacleState(tentacle, starPos, destroyVisual: false);
+        }
+
         OnAllTentaclesRetracted?.Invoke();
     }
 }
