@@ -672,7 +672,7 @@ MonoBehaviour:
   startImage: {fileID: 6592055603358532050}
   driftText: Fly
   boostText: Boost
-  releaseText: Commit
+  releaseText: Release
   baseTint: {r: 1, g: 1, b: 1, a: 0.55}
   highlightTint: {r: 0, g: 1, b: 0.9721277, a: 1}
   tintLerpSpeed: 12
@@ -680,7 +680,7 @@ MonoBehaviour:
   pulseSpeed: 3
   scaleReturnSpeed: 16
   tutorialSequence: 010000000200000003000000
-  pressAnySequence: 0400000006000000
+  pressAnySequence: 04000000
   instructionGroup: {fileID: 1640874604516882173}
   labelFadeInSeconds: 0.12
   labelFadeOutSeconds: 0.12

@@ -235,6 +235,17 @@
                     "action": "Join",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "bcf7da95-c80f-4db8-895d-62df972d2984",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad",
+                    "action": "Join",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -508,6 +519,17 @@
                 },
                 {
                     "name": "",
+                    "id": "f5d33ed8-cbf0-482d-a906-07f8d8403607",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "226ff6af-6b3c-4d40-ac82-387a59536498",
                     "path": "<Gamepad>/rightTrigger",
                     "interactions": "",
@@ -697,9 +719,9 @@
                     "name": "",
                     "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
                     "path": "<Gamepad>/buttonEast",
-                    "interactions": "Hold",
+                    "interactions": "",
                     "processors": "",
-                    "groups": ";Switch",
+                    "groups": "",
                     "action": "ReleaseNote",
                     "isComposite": false,
                     "isPartOfComposite": false
