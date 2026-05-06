@@ -518,7 +518,14 @@ public class PhaseStar : MonoBehaviour
         if (resetCurrentZapCount || (_zapProgressState == ZapProgressState.Seeking && descriptorChanged))
             zappedCount = 0;
 
-        TransitionZapState(resetCurrentZapCount ? ZapProgressState.Seeking : ZapProgressState.Zapping, role, $"refresh:{reason}");
+        if (resetCurrentZapCount)
+        {
+            TransitionZapState(ZapProgressState.Seeking, role, $"refresh:{reason}");
+        }
+        else if (_zapProgressState == ZapProgressState.Seeking || _zapProgressState == ZapProgressState.Zapping)
+        {
+            TransitionZapState(ZapProgressState.Zapping, role, $"refresh:{reason}");
+        }
         Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
         return true;
     }
