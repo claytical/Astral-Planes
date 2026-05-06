@@ -168,6 +168,32 @@ public class CosmicDustGenerator : MonoBehaviour
 
     // Back-compat hooks (no-op now that composite rebuilds are removed).
 
+    public enum DustInteractionMode
+    {
+        Carve,
+        Zap
+    }
+
+    private readonly struct DustClearRequest
+    {
+        public readonly DustInteractionMode InteractionMode;
+        public readonly DustClearMode ClearMode;
+        public readonly float FadeSeconds;
+        public readonly bool ScheduleRegrow;
+        public readonly float RegrowDelaySeconds;
+        public readonly bool RunPreExplode;
+
+        public DustClearRequest(DustInteractionMode interactionMode, DustClearMode clearMode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds, bool runPreExplode)
+        {
+            InteractionMode = interactionMode;
+            ClearMode = clearMode;
+            FadeSeconds = fadeSeconds;
+            ScheduleRegrow = scheduleRegrow;
+            RegrowDelaySeconds = regrowDelaySeconds;
+            RunPreExplode = runPreExplode;
+        }
+    }
+
     public enum DustClearMode
     {
         FadeAndHide,
@@ -222,7 +248,7 @@ public class CosmicDustGenerator : MonoBehaviour
                 if (runPreExplode)
                     StartCoroutine(DeferredDissipateAfterPreExplode(dust, DustTimings.clearSpriteScaleOutSeconds));
                 else
-                    dust.DissipateAndHideVisualOnly(DustTimings.clearSpriteScaleOutSeconds);
+                    dust.DissipateAndHideVisualOnly(Mathf.Max(0.01f, fadeSeconds));
                 // OnDustVisualFadedOut will finalize Empty + hide visuals
              }
          }
@@ -1658,18 +1684,48 @@ private void AssignHiddenImprintsByNearestSeed(
                 results.Add(new Vector2Int(x, y));
         }
     }
-    public void ZapClearCell(Vector2Int cell)
+    // Carve mode (Vehicle/MineNode):
+    // - Role imprint changes are allowed before clearing (e.g. MineNode paint restore/promote).
+    // - Regrow is normally scheduled, except for permanent clear systems that explicitly disable it.
+    // - Void-grown exception applies: vehicle carve removes void-grow imprint so regrow can re-resolve role.
+    // - Visual fade duration is caller-provided (resistance/tuning aware).
+    public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, float regrowDelaySeconds = -1f, bool runPreExplode = true)
+    {
+        var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, regrowDelaySeconds, runPreExplode);
+        ClearCellByInteraction(cell, req);
+    }
+
+    // Zap mode (PhaseStar tentacles):
+    // - Role imprint is not mutated on clear; stars consume current state discretely.
+    // - Regrow uses zap tuning (delay can be explicit or role/default when -1).
+    // - Void-grown exception does NOT apply: zap can regrow void-grown cells when scheduling allows.
+    // - Visual fade duration comes from zapFadeSeconds tuning.
+    public void ZapCell(Vector2Int cell)
+    {
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, zapFadeSeconds, true, zapRegrowDelaySeconds, false);
+        ClearCellByInteraction(cell, req);
+    }
+
+    private void ClearCellByInteraction(Vector2Int cell, in DustClearRequest request)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         ClearCell(
             cell,
-            DustClearMode.FadeAndHide,
-            fadeSeconds: zapFadeSeconds,
-            scheduleRegrow: true,
-            regrowDelaySeconds: zapRegrowDelaySeconds,
-            runPreExplode: false);
+            request.ClearMode,
+            request.FadeSeconds,
+            request.ScheduleRegrow,
+            regrowDelaySeconds: request.RegrowDelaySeconds,
+            runPreExplode: request.RunPreExplode);
+    }
+
+    public void ZapClearCell(Vector2Int cell)
+    {
+        if (!IsInBounds(cell)) return;
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+
+        ZapCell(cell);
     }
 
     public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds)
@@ -1692,13 +1748,7 @@ private void AssignHiddenImprintsByNearestSeed(
             _imprints?.Remove(cell);
         var explode = cellGo.GetComponentInChildren<Explode>(true);
         Debug.Log($"[DUST-CLEAR] explode={(explode != null ? explode.name : "NULL")} cell={cell} go={cellGo.name}");
-        ClearCell(
-            cell,
-            DustClearMode.FadeAndHide,
-            fadeSeconds,
-            scheduleRegrow: true,
-            runPreExplode: true
-        );
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
 
         if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
         {
@@ -1739,7 +1789,7 @@ private void AssignHiddenImprintsByNearestSeed(
             bool wasVoidCell = _voidGrowCells.Remove(cell);
             if (wasVoidCell) _imprints?.Remove(cell);
 
-            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
+            CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
 
             if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
             {
