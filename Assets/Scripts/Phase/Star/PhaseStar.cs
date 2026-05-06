@@ -254,6 +254,7 @@ public class PhaseStar : MonoBehaviour
         _ejectableTimer = 0f;
         _starCharge.Clear();
         _displayedCharge01 = 0f;
+        _isEjectReadyLatched = false;
 
         if (motion != null)
         {
@@ -412,6 +413,7 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasDominantRoleEjectable()
     {
+        if (_isEjectReadyLatched) return true;
         return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
                rawCharge >= threshold;
     }
@@ -455,6 +457,7 @@ public class PhaseStar : MonoBehaviour
     private int _requiredEjectionZapCount = 1;
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _zapReadyLogged;
+    private bool _isEjectReadyLatched;
 
     private void EnsureSubcomponents()
     {
@@ -486,6 +489,8 @@ public class PhaseStar : MonoBehaviour
 
         _currentEjectionZapCount++;
         bool readyNow = IsZapReady();
+        if (readyNow)
+            _isEjectReadyLatched = true;
         Debug.Log($"[PhaseStar:Zap] role={role} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount} ready={readyNow}");
         if (readyNow && !_zapReadyLogged)
         {
@@ -560,6 +565,7 @@ public class PhaseStar : MonoBehaviour
         // Clear charge state for this new star.
         _starCharge.Clear();
         _displayedCharge01 = 0f;
+        _isEjectReadyLatched = false;
 
         EnsureSubcomponents();
         if (visuals) visuals.Initialize();
@@ -601,7 +607,7 @@ public class PhaseStar : MonoBehaviour
     {
         if (_previewRole == MusicalRole.None) return Color.gray;
 
-        float ready01 = GetChargeNormalized01(_previewRole);
+        float ready01 = _isEjectReadyLatched ? 1f : GetChargeNormalized01(_previewRole);
         Color gray = Color.Lerp(Color.gray, Color.lightGray, 0.65f);
         Color c = Color.Lerp(gray, _previewColor, ready01);
         c.a = 1f;
@@ -642,7 +648,7 @@ public class PhaseStar : MonoBehaviour
 
     // Passive decay first.
     float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
-    if (_starCharge.Count > 0 && passiveDecay > 0f)
+    if (!_isEjectReadyLatched && _starCharge.Count > 0 && passiveDecay > 0f)
     {
         float dec = passiveDecay * dt;
         var keys = _starCharge.Keys.ToList();
@@ -678,7 +684,8 @@ public class PhaseStar : MonoBehaviour
     bool dominantReady = IsEjectionReady();
 
     // Zap readiness persists until ejection; no passive timeout reset.
-    _ejectableTimer = 0f;
+    if (!_isEjectReadyLatched)
+        _ejectableTimer = 0f;
 
     if (_previewVisual != null && _disarmReason != DisarmReason.SiblingActive)
     {
@@ -727,7 +734,8 @@ public class PhaseStar : MonoBehaviour
         visuals.LerpBodyColor(bodyColor, _displayedCharge01);
     }
 
-    if (_isArmed &&
+    if (!_isEjectReadyLatched &&
+        _isArmed &&
         !_burstOffScreen &&
         _disarmReason == DisarmReason.None &&
         GetTotalCharge() < 0.01f &&
@@ -744,7 +752,8 @@ public class PhaseStar : MonoBehaviour
     }
 
     // If passive decay drains charge below ejection threshold while roaming, re-enter Dormant.
-    if (_isArmed
+    if (!_isEjectReadyLatched &&
+        _isArmed
         && _state == PhaseStarState.WaitingForPoke
         && _disarmReason == DisarmReason.None
         && !_burstOffScreen
@@ -753,6 +762,7 @@ public class PhaseStar : MonoBehaviour
     {
         _starCharge.Clear();
         _displayedCharge01 = 0f;
+        _isEjectReadyLatched = false;
         EnterDormantWaitState();
     }
 }
@@ -1456,6 +1466,7 @@ public class PhaseStar : MonoBehaviour
         // Consume only the dominant role’s charge for the ejection.
         _starCharge[ejectedRole] = Mathf.Max(0f, rawCharge - threshold);
         _displayedCharge01 = 0f;
+        _isEjectReadyLatched = false;
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
