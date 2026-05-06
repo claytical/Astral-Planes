@@ -1098,12 +1098,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             foreach (var tentacle in _tentacles)
                 ResetTentacleState(tentacle, starPos, destroyVisual: false);
         }
-        else if (_tentaclesActive)
-        {
-            // Retract-only pass complete; allow a fresh hunt wave.
-            _acquisitionEnabled = true;
-        }
-
         _zappedThisCycle.Clear();
         OnAllTentaclesRetracted?.Invoke();
     }
