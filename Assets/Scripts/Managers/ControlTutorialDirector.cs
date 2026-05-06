@@ -165,7 +165,7 @@ public class ControlTutorialDirector : MonoBehaviour
                 primaryInstance.SetVisible(true);
                 primaryInstance.BeginPressAnyButtonGuideAuto(
                     immediateFirst: true,
-                    text: "begin",
+                    text: "",
                     stepSeconds: pressAnyStepSeconds,
                     loop: pressAnyLoop
                 );

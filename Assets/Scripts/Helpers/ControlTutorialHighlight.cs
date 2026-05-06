@@ -601,7 +601,7 @@ public class ControlTutorialHighlight : MonoBehaviour
                 HighlightButton(ButtonId.Boost, immediate);
                 break;
             case Instruction.Release:
-                HighlightButton(ButtonId.South, immediate);
+                HighlightButton(ButtonId.East, immediate);
                 break;
         }
     }
