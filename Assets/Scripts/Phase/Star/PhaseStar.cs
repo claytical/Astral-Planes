@@ -502,9 +502,11 @@ public class PhaseStar : MonoBehaviour
             return false;
         }
 
-        int noteCount = planned.GetNoteList()?.Count ?? 0;
+        int noteCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
         if (noteCount <= 0)
-            noteCount = planned.GetStepList()?.Count ?? 0;
+            noteCount = planned.GetStepList()?.Distinct().Count() ?? 0;
+        if (noteCount <= 0)
+            noteCount = planned.GetNoteList()?.Count ?? 0;
 
         nextDescriptor.noteSet = planned;
         nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
