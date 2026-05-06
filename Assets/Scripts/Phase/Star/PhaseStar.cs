@@ -178,7 +178,6 @@ public class PhaseStar : MonoBehaviour
 
     private bool _ejectionInFlight;
     private int _spawnTicket;
-    private float _ejectableTimer;
     private int _lastPokeFrame = -999999;
     private InstrumentTrack _cachedTrack;
     private MineNode _activeNode;
@@ -251,10 +250,9 @@ public class PhaseStar : MonoBehaviour
         _disarmReason = DisarmReason.None;
         _burstOffScreen = false;
         _awaitingCollectableClear = false;
-        _ejectableTimer = 0f;
         _starCharge.Clear();
         _displayedCharge01 = 0f;
-        _isEjectReadyLatched = false;
+        TransitionZapState(ZapProgressState.Seeking, _previewRole, "phase-reset-enter-maze");
 
         if (motion != null)
         {
@@ -411,14 +409,9 @@ public class PhaseStar : MonoBehaviour
         return true;
     }
 
-    private bool HasDominantRoleEjectable()
-    {
-        if (_isEjectReadyLatched) return true;
-        return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
-               rawCharge >= threshold;
-    }
-    private bool IsEjectionReady() => HasDominantRoleEjectable() && IsZapReady();
-    private bool IsZapReady() => _requiredZapNoteSetAvailable && _currentEjectionZapCount >= _requiredEjectionZapCount;
+    private bool HasDominantRoleEjectable() =>
+        GetDominantRoleRaw(out _, out float rawCharge, out float threshold) && rawCharge >= threshold;
+    private bool IsEjectionReady() => _zapProgressState == ZapProgressState.ReadyLatched && HasDominantRoleEjectable();
     private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
     {
         if (track == null) return null;
@@ -437,7 +430,7 @@ public class PhaseStar : MonoBehaviour
 
         if (track == null)
         {
-            _requiredEjectionZapCount = int.MaxValue;
+            requiredZapCount = int.MaxValue;
             Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
             return false;
         }
@@ -445,7 +438,7 @@ public class PhaseStar : MonoBehaviour
         NoteSet planned = ResolvePlannedNoteSet(track);
         if (planned == null)
         {
-            _requiredEjectionZapCount = int.MaxValue;
+            requiredZapCount = int.MaxValue;
             Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
             return false;
         }
@@ -454,11 +447,11 @@ public class PhaseStar : MonoBehaviour
         int noteCount = planned.GetStepList()?.Count ?? 0;
         if (noteCount <= 0)
             noteCount = planned.GetNoteList()?.Count ?? 0;
-        _requiredEjectionZapCount = Mathf.Max(1, noteCount);
+        requiredZapCount = Mathf.Max(1, noteCount);
         if (resetCurrentZapCount)
-            _currentEjectionZapCount = 0;
-        _zapReadyLogged = false;
-        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount} reason={reason}");
+            zappedCount = 0;
+        TransitionZapState(resetCurrentZapCount ? ZapProgressState.Seeking : ZapProgressState.Zapping, role, $"refresh:{reason}");
+        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} reason={reason}");
         return true;
     }
     private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)
@@ -468,12 +461,18 @@ public class PhaseStar : MonoBehaviour
 
 
     private bool _dustDeliveryWired;
-    private int _currentEjectionZapCount;
-    private int _requiredEjectionZapCount = 1;
+    private enum ZapProgressState { Seeking, Zapping, ReadyLatched, Ejecting }
+    private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
+    private int zappedCount;
+    private int requiredZapCount = 1;
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
-    private bool _zapReadyLogged;
-    private bool _isEjectReadyLatched;
+    private void TransitionZapState(ZapProgressState next, MusicalRole role, string reason)
+    {
+        if (_zapProgressState == next) return;
+        Debug.Log($"[PhaseStar:ZapState] {_zapProgressState}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} reason={reason}");
+        _zapProgressState = next;
+    }
 
     private void EnsureSubcomponents()
     {
@@ -503,16 +502,11 @@ public class PhaseStar : MonoBehaviour
         _hasReceivedEnergy = true;
         if (deliveredUnits <= 0f || role == MusicalRole.None) return;
 
-        _currentEjectionZapCount++;
-        bool readyNow = IsZapReady();
-        if (readyNow)
-            _isEjectReadyLatched = true;
-        Debug.Log($"[PhaseStar:Zap] role={role} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount} ready={readyNow}");
-        if (readyNow && !_zapReadyLogged)
-        {
-            _zapReadyLogged = true;
-            Debug.Log($"[PhaseStar:Zap] READY role={role} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount}");
-        }
+        zappedCount++;
+        if (_zapProgressState == ZapProgressState.Seeking) TransitionZapState(ZapProgressState.Zapping, role, "first-delivery");
+        bool readyNow = _requiredZapNoteSetAvailable && zappedCount >= requiredZapCount;
+        if (readyNow) TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
+        Debug.Log($"[PhaseStar:Zap] role={role} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -581,7 +575,7 @@ public class PhaseStar : MonoBehaviour
         // Clear charge state for this new star.
         _starCharge.Clear();
         _displayedCharge01 = 0f;
-        _isEjectReadyLatched = false;
+        TransitionZapState(ZapProgressState.Seeking, _previewRole, "phase-reset-initialize");
 
         EnsureSubcomponents();
         if (visuals) visuals.Initialize();
@@ -623,7 +617,7 @@ public class PhaseStar : MonoBehaviour
     {
         if (_previewRole == MusicalRole.None) return Color.gray;
 
-        float ready01 = _isEjectReadyLatched ? 1f : GetChargeNormalized01(_previewRole);
+        float ready01 = _zapProgressState == ZapProgressState.ReadyLatched ? 1f : GetChargeNormalized01(_previewRole);
         Color gray = Color.Lerp(Color.gray, Color.lightGray, 0.65f);
         Color c = Color.Lerp(gray, _previewColor, ready01);
         c.a = 1f;
@@ -662,20 +656,7 @@ public class PhaseStar : MonoBehaviour
 
     EnsureDormantSeedVisuals();
 
-    // Passive decay first.
-    float passiveDecay = behaviorProfile != null ? behaviorProfile.passiveChargeDecayPerSec : 0f;
-    if (!_isEjectReadyLatched && _starCharge.Count > 0 && passiveDecay > 0f)
-    {
-        float dec = passiveDecay * dt;
-        var keys = _starCharge.Keys.ToList();
-        for (int i = 0; i < keys.Count; i++)
-        {
-            var r = keys[i];
-            _starCharge[r] = Mathf.Max(0f, _starCharge[r] - dec);
-        }
-    }
-
-    // Dominant-role tracking after decay.
+    // Dominant-role tracking.
     if (GetDominantRoleRaw(out var dominantRole, out float dominantRawCharge, out float dominantThreshold))
     {
         if (dominantRole != _previewRole)
@@ -699,10 +680,6 @@ public class PhaseStar : MonoBehaviour
     }
 
     bool dominantReady = IsEjectionReady();
-
-    // Zap readiness persists until ejection; no passive timeout reset.
-    if (!_isEjectReadyLatched)
-        _ejectableTimer = 0f;
 
     if (_previewVisual != null && _disarmReason != DisarmReason.SiblingActive)
     {
@@ -751,37 +728,6 @@ public class PhaseStar : MonoBehaviour
         visuals.LerpBodyColor(bodyColor, _displayedCharge01);
     }
 
-    if (!_isEjectReadyLatched &&
-        _isArmed &&
-        !_burstOffScreen &&
-        _disarmReason == DisarmReason.None &&
-        GetTotalCharge() < 0.01f &&
-        !(dust?.HasActiveTentacles ?? false))
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var genCheck = _gfm?.dustGenerator;
-        if (genCheck != null && !genCheck.HasAnyDustWithRole())
-        {
-            Disarm(DisarmReason.None);
-            cravingNavigator?.SetActive(false);
-            EnterDormantWaitState();
-        }
-    }
-
-    // If passive decay drains charge below ejection threshold while roaming, re-enter Dormant.
-    if (!_isEjectReadyLatched &&
-        _isArmed
-        && _state == PhaseStarState.WaitingForPoke
-        && _disarmReason == DisarmReason.None
-        && !_burstOffScreen
-        && !HasDominantRoleEjectable()
-        && GetTotalCharge() < 0.01f)
-    {
-        _starCharge.Clear();
-        _displayedCharge01 = 0f;
-        _isEjectReadyLatched = false;
-        EnterDormantWaitState();
-    }
 }
     private void EnsureDormantSeedVisuals()
     {
@@ -1483,7 +1429,6 @@ public class PhaseStar : MonoBehaviour
         // Consume only the dominant role’s charge for the ejection.
         _starCharge[ejectedRole] = Mathf.Max(0f, rawCharge - threshold);
         _displayedCharge01 = 0f;
-        _isEjectReadyLatched = false;
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
@@ -1498,10 +1443,13 @@ public class PhaseStar : MonoBehaviour
         Disarm(DisarmReason.NodeResolving, ejectedTrack.trackColor);
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
+        TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
         if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
             SpawnSuperNodeCommon(contact, ejectedTrack);
         else
             SpawnNodeCommon(contact, ejectedTrack);
+        if (_activeNode != null || _activeSuperNode != null)
+            TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
 
         _isDisposing = true;
         OnEjected?.Invoke(this, ejectedRole);
