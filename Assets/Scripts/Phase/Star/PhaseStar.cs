@@ -410,7 +410,12 @@ public class PhaseStar : MonoBehaviour
         return true;
     }
 
-    private bool HasDominantRoleEjectable() => IsZapReady();
+    private bool HasDominantRoleEjectable()
+    {
+        return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
+               rawCharge >= threshold;
+    }
+    private bool IsEjectionReady() => HasDominantRoleEjectable() && IsZapReady();
     private bool IsZapReady() => _currentEjectionZapCount >= _requiredEjectionZapCount;
     private int ResolveRequiredZapCountForPlannedNoteSet(InstrumentTrack track)
     {
@@ -670,7 +675,7 @@ public class PhaseStar : MonoBehaviour
         _displayedCharge01 = Mathf.Lerp(_displayedCharge01, 0f, dt * chargeDisplayLerpSpeed);
     }
 
-    bool dominantReady = HasDominantRoleEjectable();
+    bool dominantReady = IsEjectionReady();
 
     // Zap readiness persists until ejection; no passive timeout reset.
     _ejectableTimer = 0f;
@@ -885,7 +890,7 @@ public class PhaseStar : MonoBehaviour
         }
         motion?.SetFrozen(false);
         motion?.Enable(true);
-        if (HasDominantRoleEjectable())
+        if (IsEjectionReady())
             ArmNext();
         else
             visuals?.ShowDim(ResolvePreviewColorByReadiness());
@@ -1310,7 +1315,7 @@ public class PhaseStar : MonoBehaviour
             Trace("OnCollision: ignored, busy flags");
             return;
         }
-        if (!HasDominantRoleEjectable())
+        if (!IsEjectionReady())
         {
             Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
             return;
