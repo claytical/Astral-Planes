@@ -410,14 +410,46 @@ public class PhaseStar : MonoBehaviour
         return true;
     }
 
-    private bool HasDominantRoleEjectable()
+    private bool HasDominantRoleEjectable() => IsZapReady();
+    private bool IsZapReady() => _currentEjectionZapCount >= _requiredEjectionZapCount;
+    private int ResolveRequiredZapCountForPlannedNoteSet(InstrumentTrack track)
     {
-        return GetDominantRoleRaw(out _, out float rawCharge, out float threshold) &&
-               rawCharge >= threshold;
+        NoteSet planned = ResolvePlannedNoteSet(track);
+        if (planned == null) return 1;
+
+        int noteCount = planned.GetStepList()?.Count ?? 0;
+        if (noteCount <= 0)
+            noteCount = planned.GetNoteList()?.Count ?? 0;
+        return Mathf.Max(1, noteCount);
+    }
+    private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
+    {
+        if (track == null) return null;
+        NoteSet planned = track.GetCurrentNoteSet();
+        if (planned == null)
+        {
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var factory = _gfm != null ? _gfm.phaseTransitionManager.noteSetFactory : null;
+            if (factory != null)
+                planned = factory.Generate(track, _assignedMotif);
+        }
+        return planned;
+    }
+    private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)
+    {
+        _requiredZapRole = role;
+        _requiredEjectionZapCount = ResolveRequiredZapCountForPlannedNoteSet(track);
+        _currentEjectionZapCount = 0;
+        _zapReadyLogged = false;
+        Debug.Log($"[PhaseStar:Zap] primed role={_requiredZapRole} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount}");
     }
 
 
     private bool _dustDeliveryWired;
+    private int _currentEjectionZapCount;
+    private int _requiredEjectionZapCount = 1;
+    private MusicalRole _requiredZapRole = MusicalRole.None;
+    private bool _zapReadyLogged;
 
     private void EnsureSubcomponents()
     {
@@ -430,7 +462,7 @@ public class PhaseStar : MonoBehaviour
         }
         if (!_dustDeliveryWired && dust != null)
         {
-            dust.onDelivery += (_, __) => _hasReceivedEnergy = true;
+            dust.onDelivery += OnDustDelivery;
             _dustDeliveryWired = true;
         }
         if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
@@ -441,6 +473,20 @@ public class PhaseStar : MonoBehaviour
         StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
         StopManagedCoroutine(ref _burstOffScreenWaitCo);
+    }
+    private void OnDustDelivery(MusicalRole role, float deliveredUnits)
+    {
+        _hasReceivedEnergy = true;
+        if (deliveredUnits <= 0f || role == MusicalRole.None) return;
+
+        _currentEjectionZapCount++;
+        bool readyNow = IsZapReady();
+        Debug.Log($"[PhaseStar:Zap] role={role} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount} ready={readyNow}");
+        if (readyNow && !_zapReadyLogged)
+        {
+            _zapReadyLogged = true;
+            Debug.Log($"[PhaseStar:Zap] READY role={role} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount}");
+        }
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -626,24 +672,8 @@ public class PhaseStar : MonoBehaviour
 
     bool dominantReady = HasDominantRoleEjectable();
 
-    // Armed timeout: if fully charged but not ejected, reset and restart the drain cycle.
-    if (dominantReady && _isArmed && _disarmReason == DisarmReason.None && !_burstOffScreen)
-    {
-        _ejectableTimer += dt;
-        float timeout = behaviorProfile != null ? behaviorProfile.armedTimeoutSeconds : 0f;
-        if (timeout > 0f && _ejectableTimer >= timeout)
-        {
-            _ejectableTimer = 0f;
-            _starCharge.Clear();
-            _displayedCharge01 = 0f;
-            Debug.Log($"[PhaseStar] Armed timeout — resetting charge and re-entering dormant cycle.");
-            EnterDormantWaitState();
-        }
-    }
-    else
-    {
-        _ejectableTimer = 0f;
-    }
+    // Zap readiness persists until ejection; no passive timeout reset.
+    _ejectableTimer = 0f;
 
     if (_previewVisual != null && _disarmReason != DisarmReason.SiblingActive)
     {
@@ -1139,21 +1169,11 @@ public class PhaseStar : MonoBehaviour
         _cachedTrack = track;
 
         // --- Decide what NoteSet a "normal" node would use ---
-        // Primary: repeat whatever the track is already using.
-        NoteSet planned = track.GetCurrentNoteSet();
-
-        // Optional fallback: if your system expects a note set to exist,
-        // generate one in the same way HarmonyDirector does.
-        if (planned == null)
-        {
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var factory = _gfm != null ? _gfm.phaseTransitionManager.noteSetFactory : null;
-            if (factory != null)
-                planned = factory.Generate(track, _assignedMotif);
-        }
+        NoteSet planned = ResolvePlannedNoteSet(track);
         
         // SuperNode only when the track is fully expanded AND repeating the same NoteSet adds no new coverage.
         _cachedIsSuperNode = (planned != null && _cachedTrack != null) && ShouldSpawnSuperNodeForTrack(_cachedTrack);
+        PrimeZapRequirementForRole(role, track);
     }
     void BuildPreviewRing()
 {
