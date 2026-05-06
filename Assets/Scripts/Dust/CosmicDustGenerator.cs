@@ -67,6 +67,12 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Seconds to wait after a cell becomes visible again before enabling its collider.")]
     [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
 
+    [Header("Zap Clear Tuning")]
+    [Tooltip("Visual fade duration used when star zap logic clears a dust cell.")]
+    [SerializeField] private float zapFadeSeconds = 1.5f;
+    [Tooltip("Delay before a zapped cell is queued for regrow (-1 uses role/default timing).")]
+    [SerializeField] private float zapRegrowDelaySeconds = -1f;
+
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private MazePatternConfig _activeMazePattern;
     private readonly DustRegrowthScheduler _regrowthScheduler = new();
@@ -97,7 +103,10 @@ public class CosmicDustGenerator : MonoBehaviour
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
-    // Cells spawned by GrowVoidDustDiskFromGrid that should not regrow when carved by a vehicle.
+    // Cells spawned by GrowVoidDustDiskFromGrid.
+    // IMPORTANT: This set only affects vehicle carve behavior. Zap/drain clear paths can
+    // still regrow these cells when their tuning says they should, so do not reuse this
+    // set as a global "never regrow" rule.
     private readonly HashSet<Vector2Int> _voidGrowCells = new HashSet<Vector2Int>();
     // Ripeness: cells currently showing their true role color after a player carve.
     private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
@@ -1649,6 +1658,20 @@ private void AssignHiddenImprintsByNearestSeed(
                 results.Add(new Vector2Int(x, y));
         }
     }
+    public void ZapClearCell(Vector2Int cell)
+    {
+        if (!IsInBounds(cell)) return;
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+
+        ClearCell(
+            cell,
+            DustClearMode.FadeAndHide,
+            fadeSeconds: zapFadeSeconds,
+            scheduleRegrow: true,
+            regrowDelaySeconds: zapRegrowDelaySeconds,
+            runPreExplode: false);
+    }
+
     public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds)
     {
         if (!IsInBounds(cell)) return;
@@ -1664,20 +1687,20 @@ private void AssignHiddenImprintsByNearestSeed(
 
         var cellGo = _gridState.CellGo?[cell.x, cell.y];
 
-        bool isVoidCell = _voidGrowCells.Remove(cell);
-        if (isVoidCell)
-            _imprints?.Remove(cell); // no imprint = no future regrow triggers for this cell
+        bool wasVoidCell = _voidGrowCells.Remove(cell);
+        if (wasVoidCell)
+            _imprints?.Remove(cell);
         var explode = cellGo.GetComponentInChildren<Explode>(true);
         Debug.Log($"[DUST-CLEAR] explode={(explode != null ? explode.name : "NULL")} cell={cell} go={cellGo.name}");
         ClearCell(
             cell,
             DustClearMode.FadeAndHide,
             fadeSeconds,
-            scheduleRegrow: !isVoidCell,
+            scheduleRegrow: true,
             runPreExplode: true
         );
 
-        if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
         {
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
             if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
@@ -1713,12 +1736,12 @@ private void AssignHiddenImprintsByNearestSeed(
 
             _playerCarvedCells.Add(cell);
 
-            bool isVoidCell = _voidGrowCells.Remove(cell);
-            if (isVoidCell) _imprints?.Remove(cell);
+            bool wasVoidCell = _voidGrowCells.Remove(cell);
+            if (wasVoidCell) _imprints?.Remove(cell);
 
-            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: !isVoidCell, runPreExplode: true);
+            ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
 
-            if (!isVoidCell && _hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+            if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
             {
                 var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
                 if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
