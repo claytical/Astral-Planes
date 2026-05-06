@@ -29,6 +29,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private readonly Dictionary<MusicalRole, Vector2> _snifferDirs = new();
     private Vector2 _nearestColoredDustDir = Vector2.zero;
     private readonly List<Vector2Int> _coloredCellsScratch = new(512);
+    private readonly HashSet<Vector2Int> _zappedThisCycle = new();
 
     public void Initialize(
         PhaseStar star,
@@ -92,10 +93,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             var c = _coloredCellsScratch[i];
             if (excludedCells != null && excludedCells.Contains(c)) continue;
 
-            var dust = GetDust(gen, c);
-            if (dust == null || dust.Role != role) continue;
-            if (!gen.HasDustAt(c)) continue;
-            if (dust.currentEnergyUnits <= 0) continue;
+            if (!IsZapEligible(gen, c, role)) continue;
 
             float sqd = ((Vector2)drum.GridToWorldPosition(c) - starWorld).sqrMagnitude;
             if (sqd < bestSqDist)
@@ -127,6 +125,13 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             _replanTimer = 0f;
         }
     }
+
+    public void NotifyCellZappedThisCycle(Vector2Int cell)
+    {
+        _zappedThisCycle.Add(cell);
+    }
+
+    public bool WasCellZappedThisCycle(Vector2Int cell) => _zappedThisCycle.Contains(cell);
 
     public Vector2 GetDensitySteerDir() => (_huntingEnabled && _hasTarget) ? _targetDir : Vector2.zero;
     
@@ -188,10 +193,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
         {
             var cell = _coloredCellsScratch[i];
-            var dust = GetDust(gen, cell);
-            if (dust == null || dust.Role == MusicalRole.None) continue;
-            if (_attunedRole != MusicalRole.None && dust.Role != _attunedRole) continue;
-            if (dust.currentEnergyUnits <= 0) continue;
+            var expectedRole = _attunedRole != MusicalRole.None ? _attunedRole : MusicalRole.None;
+            if (!IsZapEligible(gen, cell, expectedRole)) continue;
 
             Vector2 cellWorld = drum.GridToWorldPosition(cell);
             float dist = (cellWorld - starWorld).magnitude;
@@ -272,6 +275,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         }
     }
 
+    private void LateUpdate()
+    {
+        _zappedThisCycle.Clear();
+    }
+
     private void RefreshTargetDir()
     {
         if (!_hasTarget)
@@ -334,11 +342,20 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         var gen = _gfm?.dustGenerator;
         if (gen == null) return false;
 
+        var expectedRole = _attunedRole != MusicalRole.None ? _attunedRole : MusicalRole.None;
+        return IsZapEligible(gen, cell, expectedRole);
+    }
+
+    private bool IsZapEligible(CosmicDustGenerator gen, Vector2Int cell, MusicalRole requiredRole)
+    {
+        if (!gen.HasDustAt(cell)) return false;
         var dust = GetDust(gen, cell);
-        return dust != null &&
-               dust.Role != MusicalRole.None &&
-               dust.currentEnergyUnits > 0 &&
-               gen.HasDustAt(cell);
+        if (dust == null || dust.Role == MusicalRole.None) return false;
+        if (requiredRole != MusicalRole.None && dust.Role != requiredRole) return false;
+        if (dust.currentEnergyUnits <= 0) return false;
+        if (_hasLockOnCell && _lockOnCell != cell) return false;
+        if (_zappedThisCycle.Contains(cell)) return false;
+        return true;
     }
 
     private static CosmicDust GetDust(CosmicDustGenerator gen, Vector2Int gp)
