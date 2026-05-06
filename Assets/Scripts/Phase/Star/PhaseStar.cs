@@ -1306,8 +1306,18 @@ public class PhaseStar : MonoBehaviour
         }
         if (!IsEjectionReady())
         {
-            Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
-            return;
+            // Recovery path: if charge already crossed the dominant-role threshold but
+            // zap state did not relatch (e.g. post-node flow edge cases), relatch now
+            // so a valid poke still ejects a node.
+            if (HasDominantRoleEjectable() && GetDominantRoleRaw(out var dominantRole, out _, out _))
+            {
+                TransitionZapState(ZapProgressState.ReadyLatched, dominantRole, "collision-recovery-latch");
+            }
+            else
+            {
+                Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
+                return;
+            }
         }
         if (_activeNode != null)
         {
