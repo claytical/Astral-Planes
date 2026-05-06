@@ -92,6 +92,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
+    private readonly Dictionary<Vector2Int, Tentacle> _reservedCells = new();
+    private readonly HashSet<Vector2Int> _zappedThisCycle = new();
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
@@ -226,6 +228,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return;
 
         float dt = Time.deltaTime;
+        _zappedThisCycle.Clear();
 
         _keepClearTimer += dt;
         if (_keepClearTimer >= KeepClearTick)
@@ -252,8 +255,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (gen == null || drum == null || _navigator == null) break;
                 if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole) break;
 
-                if (_navigator.TryGetTargetForRole(tentacle.role, out var cell) && IsTargetValid(cell, tentacle.role, out _))
+                if (_navigator.TryGetTargetForRole(tentacle.role, out var cell, BuildExcludedCells(tentacle)) &&
+                    IsTargetValid(cell, tentacle.role, tentacle, out _) &&
+                    TryReserveCell(tentacle, cell))
+                {
                     BeginGrowingTentacle(tentacle, cell, drum, starPos);
+                }
 
                 break;
             }
@@ -266,7 +273,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
                     if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var newCell) &&
-                        newCell != tentacle.targetCell && IsTargetValid(newCell, tentacle.role, out _))
+                        newCell != tentacle.targetCell && IsTargetValid(newCell, tentacle.role, tentacle, out _) && TryReserveCell(tentacle, newCell))
                     {
                         tentacle.targetCell      = newCell;
                         tentacle.targetWorldPos  = drum.GridToWorldPosition(newCell);
@@ -276,6 +283,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     else
                     {
                         ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
                         TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
                         break;
                     }
@@ -305,6 +313,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
                     ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
                     TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
                     break;
                 }
@@ -318,7 +327,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (tentacle.contactTimer >= minContactTime && TryZapTargetCell(tentacle, gen))
                 {
                     if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var nextCell) &&
-                        nextCell != tentacle.targetCell && IsTargetValid(nextCell, tentacle.role, out _))
+                        nextCell != tentacle.targetCell && IsTargetValid(nextCell, tentacle.role, tentacle, out _) && TryReserveCell(tentacle, nextCell))
                     {
                         BeginGrowingTentacle(tentacle, nextCell, drum, starPos);
                     }
@@ -334,6 +343,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             case TentacleState.Retracting:
             {
                 ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
 
                 tentacle.tipPos = Vector2.MoveTowards(tentacle.tipPos, starPos, tentacleRetractSpeed * dt);
                 UpdateTentacleRetractLine(tentacle, starPos);
@@ -350,6 +360,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             case TentacleState.Dissolving:
             {
                 ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
 
                 tentacle.dissolveTimer  += dt;
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
@@ -374,6 +385,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void BeginGrowingTentacle(Tentacle tentacle, Vector2Int cell, DrumTrack drum, Vector2 starPos)
     {
+        if (tentacle.targetCell != cell)
+            ReleaseReservation(tentacle, tentacle.targetCell);
+
         tentacle.targetCell     = cell;
         tentacle.targetWorldPos = drum.GridToWorldPosition(cell);
         tentacle.tipPos         = starPos;
@@ -413,6 +427,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
 
         tentacle.drainFlashTimer = DrainFlashDuration;
+        _zappedThisCycle.Add(tentacle.targetCell);
+        _navigator?.NotifyCellZappedThisCycle(tentacle.targetCell);
+        ReleaseReservation(tentacle, tentacle.targetCell);
         ZapAndClearCell(gen, tentacle.targetCell);
         return true;
     }
@@ -827,6 +844,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private void ResetTentacleState(Tentacle tentacle, Vector2 starPos, bool destroyVisual)
     {
         ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
         TransitionTentacleState(tentacle, TentacleState.Idle, "reset");
         tentacle.tipPos       = starPos;
         tentacle.growProgress = 0f;
@@ -873,7 +891,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private bool TryValidateOrHoldTarget(Tentacle tentacle, float dt, out string invalidReason)
     {
-        if (IsTargetValid(tentacle.targetCell, tentacle.role, out invalidReason))
+        if (IsTargetValid(tentacle.targetCell, tentacle.role, tentacle, out invalidReason))
         {
             ResetInvalidTargetRetry(tentacle);
             return true;
@@ -905,11 +923,17 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         Debug.Log($"[PhaseStarDustAffect] tentacle.role={tentacle.role} state={state} targetCell={tentacle.targetCell} reason={reason}");
     }
 
-    private bool IsTargetValid(Vector2Int cell, MusicalRole role, out string reason)
+    private bool IsTargetValid(Vector2Int cell, MusicalRole role, Tentacle requester, out string reason)
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var gen = _gfm?.dustGenerator;
-        if (gen == null || !gen.HasDustAt(cell))
+        if (gen == null)
+        {
+            reason = "missing generator";
+            return false;
+        }
+
+        if (!gen.HasDustAt(cell))
         {
             reason = "HasDustAt false";
             return false;
@@ -923,7 +947,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (dust.Role != role)
         {
-            reason = "missing dust";
+            reason = "role mismatch";
             return false;
         }
 
@@ -933,7 +957,52 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return false;
         }
 
+        if (IsReservedByAnotherTentacle(cell, requester))
+        {
+            reason = "reserved by another tentacle";
+            return false;
+        }
+
+        if (_zappedThisCycle.Contains(cell) || (_navigator != null && _navigator.WasCellZappedThisCycle(cell)))
+        {
+            reason = "already zapped this cycle";
+            return false;
+        }
+
         reason = "";
         return true;
+    }
+
+    private bool IsReservedByAnotherTentacle(Vector2Int cell, Tentacle requester)
+        => _reservedCells.TryGetValue(cell, out var owner) && owner != null && owner != requester;
+
+    private bool TryReserveCell(Tentacle tentacle, Vector2Int cell)
+    {
+        if (IsReservedByAnotherTentacle(cell, tentacle))
+            return false;
+
+        _reservedCells[cell] = tentacle;
+        return true;
+    }
+
+    private void ReleaseReservation(Tentacle tentacle, Vector2Int cell)
+    {
+        if (_reservedCells.TryGetValue(cell, out var owner) && owner == tentacle)
+            _reservedCells.Remove(cell);
+    }
+
+    private HashSet<Vector2Int> BuildExcludedCells(Tentacle requester)
+    {
+        var excluded = new HashSet<Vector2Int>();
+        foreach (var kv in _reservedCells)
+        {
+            if (kv.Value != null && kv.Value != requester)
+                excluded.Add(kv.Key);
+        }
+
+        foreach (var zappedCell in _zappedThisCycle)
+            excluded.Add(zappedCell);
+
+        return excluded;
     }
 }
