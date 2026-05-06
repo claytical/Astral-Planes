@@ -158,18 +158,30 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     public void SetTentaclesActive(bool active)
     {
-        _tentaclesActive = active;
         _acquisitionEnabled = active;
         _navigator?.SetHuntingEnabled(active);
 
         if (active)
         {
             _pendingDeactivateAfterRetract = false;
+            _tentaclesActive = true;
             return;
         }
 
         _pendingDeactivateAfterRetract = true;
-        BeginRetractAllTentacles();
+
+        if (HasActiveTentacles)
+        {
+            // Keep update ticks running so retract animation can complete deterministically.
+            _tentaclesActive = true;
+            BeginRetractAllTentacles();
+            return;
+        }
+
+        _tentaclesActive = false;
+        Vector2 starPos = transform.position;
+        foreach (var tentacle in _tentacles)
+            ResetTentacleState(tentacle, starPos, destroyVisual: false);
     }
 
     public void BeginRetractionForActiveTentacles()
@@ -1081,6 +1093,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (_pendingDeactivateAfterRetract)
         {
             _pendingDeactivateAfterRetract = false;
+            _tentaclesActive = false;
             Vector2 starPos = transform.position;
             foreach (var tentacle in _tentacles)
                 ResetTentacleState(tentacle, starPos, destroyVisual: false);
