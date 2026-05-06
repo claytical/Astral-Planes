@@ -66,11 +66,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     [Header("Press-Any-Button Guide (singular highlights)")]
     [SerializeField] private ButtonId[] pressAnySequence = new[]
     {
-        ButtonId.Stick,
-        ButtonId.North,
-        ButtonId.East,
-        ButtonId.West,
-        ButtonId.South
+        ButtonId.East
     };
     [Header("Instruction Label Fade + Attention")]
     [SerializeField] private CanvasGroup instructionGroup; // optional but recommended

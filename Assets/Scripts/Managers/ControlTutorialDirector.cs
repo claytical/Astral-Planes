@@ -174,7 +174,7 @@ public class ControlTutorialDirector : MonoBehaviour
             case PrimaryMode.JoinSouth:
                 primaryInstance.SetVisible(true);
                 primaryInstance.ShowWaitingFor(
-                    ControlTutorialHighlight.ButtonId.South,
+                    ControlTutorialHighlight.ButtonId.East,
                     immediate: true,
                     overrideText: "join"
                 );

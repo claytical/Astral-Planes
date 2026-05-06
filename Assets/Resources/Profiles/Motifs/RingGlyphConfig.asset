@@ -16,12 +16,12 @@ MonoBehaviour:
   ringThickness: 0.04
   ringSpacing: 0.5
   fitPaddingFraction: 0.05
-  ringMeshMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   ringAlpha: 0.45
   lineWidth: 0.04
-  segments: 64
-  tugDepthFraction: 0.25
-  tugHalfWidthRad: 0.3
+  segments: 256
+  tugDepthFraction: 0.5
+  tugHalfWidthRad: 0.75
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
@@ -32,5 +32,5 @@ MonoBehaviour:
   ringHoldScale: 0.25
   bouncePressScale: 0.12
   bouncePressDuration: 0.25
-  bounceSettleDuration: 0.22
-  rollOffDuration: 2.25
+  bounceSettleDuration: 0.35
+  rollOffDuration: 2
