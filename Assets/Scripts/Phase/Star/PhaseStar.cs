@@ -1467,7 +1467,8 @@ public class PhaseStar : MonoBehaviour
         if (_activeNode != null || _activeSuperNode != null)
             TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
 
-        _isDisposing = true;
+        // Keep the star live after ejection. NodeResolving + loop-boundary gates control
+        // dormancy/rearm while the MineNode is active; disposing here would block that flow.
         OnEjected?.Invoke(this, ejectedRole);
     }
     /// <summary>
@@ -1553,7 +1554,8 @@ public class PhaseStar : MonoBehaviour
         else
             SpawnNodeCommon(contact, _cachedTrack);
 
-        _isDisposing = true;
+        // Do not mark disposing on ejection; this star continues orchestrating post-node
+        // dormant recharge and subsequent tentacle/ready cycles.
         OnEjected?.Invoke(this, _attunedRole);
     }
     private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
