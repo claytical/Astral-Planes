@@ -80,7 +80,7 @@ public sealed class StarPool : MonoBehaviour
         if (_drum == null) return;
         _spawningThisFrame.Clear();
 
-        if (_pendingGateCheck && !_mineNodePending && !AnyCollectablesInFlight())
+        if (_pendingGateCheck && !_mineNodePending && !HasUnresolvedMineNodeSequence())
         {
             _pendingGateCheck = false;
             ResumeAll();
@@ -191,7 +191,7 @@ public sealed class StarPool : MonoBehaviour
     {
         if (_dustGen == null) { if (_gfm == null) _gfm = GameFlowManager.Instance; _dustGen = _gfm?.dustGenerator; }
         if (_dustGen == null || _drum == null) return;
-        if (_mineNodePending || AnyCollectablesInFlight()) return;
+        if (_mineNodePending || HasUnresolvedMineNodeSequence()) return;
         if (_remainingEjectionsTotal <= 0) return;
 
         var roles = _activeMotif?.GetActiveRoles();
@@ -408,7 +408,7 @@ public sealed class StarPool : MonoBehaviour
         // Pre-ejection expansion bursts arrive before the MineNode is destroyed, so
         // _mineNodeResolved is still false when they clear.
         bool isMineBurst = isEjectedTrack && _mineNodeResolved;
-        Debug.Log($"[StarPool] HandleCollectableBurstCleared track={track.assignedRole} burstId={burstId} hadNotes={hadNotes} isEjected={isEjectedTrack} mineResolved={_mineNodeResolved} isMineBurst={isMineBurst} CIF={AnyCollectablesInFlight()}");
+        Debug.Log($"[StarPool] HandleCollectableBurstCleared track={track.assignedRole} burstId={burstId} hadNotes={hadNotes} isEjected={isEjectedTrack} mineResolved={_mineNodeResolved} isMineBurst={isMineBurst} unresolved={HasUnresolvedMineNodeSequence()}");
 
         // Detect the empty-burst race: SpawnCollectableBurst fires OnCollectableBurstCleared
         // synchronously with hadNotes=false BEFORE TriggerExplosion sets _mineNodeResolved.
@@ -440,7 +440,7 @@ public sealed class StarPool : MonoBehaviour
             Debug.Log($"[StarPool] Mine burst cleared — _mineNodePending=false");
         }
 
-        if (AnyCollectablesInFlight())
+        if (HasUnresolvedMineNodeSequence())
         {
             // Manual-release path fires this event while collectables are still active in the
             // vehicle. Set a flag so Update() calls ResumeAll/CheckBridgeGate once they clear.
@@ -471,6 +471,26 @@ public sealed class StarPool : MonoBehaviour
         return false;
     }
 
+
+    private bool AnyVehicleCapturedCollectablesPendingRelease()
+    {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var vehicles = _gfm?.GetVehicles();
+        if (vehicles == null) return false;
+
+        for (int i = 0; i < vehicles.Count; i++)
+        {
+            var vehicle = vehicles[i];
+            if (vehicle != null && vehicle.HasCapturedCollectablesPendingRelease())
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasUnresolvedMineNodeSequence()
+        => AnyCollectablesInFlight() || AnyVehicleCapturedCollectablesPendingRelease();
+
     // ── Bridge gate ───────────────────────────────────────────────────────────
 
     private void CheckBridgeGate()
@@ -482,7 +502,7 @@ public sealed class StarPool : MonoBehaviour
         }
         if (_activeStars.Values.Any(s => s != null)) { Debug.Log($"[StarPool] CheckBridgeGate: activeStars still live — blocked"); return; }
         if (_pausedStars.Any(s => s != null)) { Debug.Log($"[StarPool] CheckBridgeGate: pausedStars still live — blocked"); return; }
-        if (AnyCollectablesInFlight()) { Debug.Log($"[StarPool] CheckBridgeGate: CIF — blocked"); return; }
+        if (HasUnresolvedMineNodeSequence()) { Debug.Log($"[StarPool] CheckBridgeGate: CIF — blocked"); return; }
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var gfm = _gfm;
