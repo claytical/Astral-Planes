@@ -164,6 +164,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (active)
         {
             _pendingDeactivateAfterRetract = false;
+            _zappedThisCycle.Clear();
             _tentaclesActive = true;
             return;
         }
@@ -283,7 +284,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return;
 
         float dt = Time.deltaTime;
-        _zappedThisCycle.Clear();
 
         _keepClearTimer += dt;
         if (_keepClearTimer >= KeepClearTick)
