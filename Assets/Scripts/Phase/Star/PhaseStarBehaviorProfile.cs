@@ -31,17 +31,11 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public float collectableClearTimeoutSeconds = 0f;
 
     // =====================================================================
-    // Charge accumulation (PhaseStar.cs)
+    // Dust -> Zap progression (PhaseStar.cs)
     // =====================================================================
-    [Header("Charge Accumulation (PhaseStar.cs)")]
-    [Tooltip("Multiplier applied to all energy delivered to the star. Raise to make charge build faster.")]
+    [Header("Dust -> Zap Progression (PhaseStar.cs)")]
+    [Tooltip("Multiplier applied to delivered dust energy before zap progress is evaluated.")]
     [Min(0f)] public float dustToStarChargeMul = 1.0f;
-
-    [Tooltip("Energy units lost per second per role (passive decay). 0 disables decay.")]
-    [Min(0f)] public float passiveChargeDecayPerSec = 1f;
-
-    [Tooltip("Seconds the star can remain fully charged without being ejected before charge resets and the drain/charge cycle restarts. 0 disables.")]
-    [Min(0f)] public float armedTimeoutSeconds = 15f;
 
     // =====================================================================
     // Star body motion (PhaseStarMotion2D)
