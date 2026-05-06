@@ -69,6 +69,8 @@ MonoBehaviour:
   drainTiltSpeed: 1.8
   chargeDisplayLerpSpeed: 2.5
   readyDisplayThreshold: 0.99
+  tentacleBloomMinScale: 0.22
+  dormantSeedScale: 0.08
   _assignedMotif: {fileID: 0}
 --- !u!114 &6754461597857711404
 MonoBehaviour:
@@ -92,6 +94,8 @@ MonoBehaviour:
   rejectFlashColor: {r: 0.9, g: 0.25, b: 0.05, a: 0.55}
   rejectFlashSeconds: 0.12
   particles: {fileID: 382306593780773728}
+  traceParticleState: 0
+  particleAlphaDriftTolerance: 0.02
   dualMaxSeparationDeg: 45
   dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
 --- !u!114 &4631393831486629443
@@ -106,7 +110,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
-  drainRatePerSec: 0.8
   minContactTime: 0.01
   colorTransitionTime: 0.5
   tentacleGrowSpeed: 0.5
@@ -116,8 +119,10 @@ MonoBehaviour:
   dissolveDuration: 2.1
   maxLinesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
-  growingRootAlpha: 0.65
-  growingTipAlpha: 0.4
+  invalidTargetRetryFrames: 3
+  invalidTargetRetryMs: 120
+  growingRootAlpha: 0.69
+  growingTipAlpha: 0.384
   drainingBaseAlpha: 0.751
   sag: 0.8
   noiseAmp: 0.15

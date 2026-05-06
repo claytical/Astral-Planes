@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
   patternType: 6
   dustTiming:
-    regrowDelay: 1
+    regrowDelay: 4
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5
