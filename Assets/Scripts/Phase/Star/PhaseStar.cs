@@ -517,7 +517,7 @@ public class PhaseStar : MonoBehaviour
 
 
     private bool _dustDeliveryWired;
-    private enum ZapProgressState { Seeking, Zapping, ReadyLatched, Ejecting }
+    private enum ZapProgressState { Seeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
     private int zappedCount;
     private int requiredZapCount = 1;
@@ -544,6 +544,7 @@ public class PhaseStar : MonoBehaviour
         if (!_dustDeliveryWired && dust != null)
         {
             dust.onDelivery += OnDustDelivery;
+            dust.OnAllTentaclesRetracted += OnAllTentaclesRetracted;
             _dustDeliveryWired = true;
         }
         if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
@@ -579,10 +580,24 @@ public class PhaseStar : MonoBehaviour
 
         bool readyNow = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
         if (readyNow)
-            TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
+        {
+            TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
+            dust?.BeginRetractionForActiveTentacles();
+        }
 
         OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
         Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
+    }
+
+    private void OnAllTentaclesRetracted()
+    {
+        if (_zapProgressState != ZapProgressState.WaitingForRetract)
+            return;
+
+        if (_requiredZapRole == MusicalRole.None)
+            return;
+
+        TransitionZapState(ZapProgressState.ReadyLatched, _requiredZapRole, "all-tentacles-retracted");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -835,6 +850,13 @@ public class PhaseStar : MonoBehaviour
 
     private void SafeUnsubscribeAll()
     {
+        if (dust != null && _dustDeliveryWired)
+        {
+            dust.onDelivery -= OnDustDelivery;
+            dust.OnAllTentaclesRetracted -= OnAllTentaclesRetracted;
+            _dustDeliveryWired = false;
+        }
+
         // Unhook both places we subscribe OnLoopBoundary:
         if (_drum != null)
         {
