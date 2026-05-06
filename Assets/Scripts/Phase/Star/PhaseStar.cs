@@ -198,6 +198,7 @@ public class PhaseStar : MonoBehaviour
     // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
     public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
+    public event Action<PhaseStar, MusicalRole, Vector2Int> OnTentacleZapResolved;
     private bool _isArmed;
     private int _baseSortingOrder;
 
@@ -467,6 +468,8 @@ public class PhaseStar : MonoBehaviour
     private int requiredZapCount = 1;
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
+    private Vector2Int _lastResolvedZapCell;
+    private MusicalRole _lastResolvedZapRole = MusicalRole.None;
     private void TransitionZapState(ZapProgressState next, MusicalRole role, string reason)
     {
         if (_zapProgressState == next) return;
@@ -501,12 +504,25 @@ public class PhaseStar : MonoBehaviour
     {
         _hasReceivedEnergy = true;
         if (deliveredUnits <= 0f || role == MusicalRole.None) return;
+        if (_zapProgressState == ZapProgressState.Seeking)
+            TransitionZapState(ZapProgressState.Zapping, role, "first-delivery");
+    }
 
+    public void OnTentacleZapResolved(MusicalRole role, Vector2Int targetCell)
+    {
+        if (role == MusicalRole.None) return;
+
+        // Canonical zap progress path: increment exactly once per confirmed dust clear.
         zappedCount++;
-        if (_zapProgressState == ZapProgressState.Seeking) TransitionZapState(ZapProgressState.Zapping, role, "first-delivery");
+        _lastResolvedZapRole = role;
+        _lastResolvedZapCell = targetCell;
+
         bool readyNow = _requiredZapNoteSetAvailable && zappedCount >= requiredZapCount;
-        if (readyNow) TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
-        Debug.Log($"[PhaseStar:Zap] role={role} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
+        if (readyNow)
+            TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
+
+        OnTentacleZapResolved?.Invoke(this, role, targetCell);
+        Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)

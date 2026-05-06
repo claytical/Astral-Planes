@@ -416,13 +416,19 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         _zappedThisCycle.Add(tentacle.targetCell);
         _navigator?.NotifyCellZappedThisCycle(tentacle.targetCell);
         ReleaseReservation(tentacle, tentacle.targetCell);
-        ZapAndClearCell(gen, tentacle.targetCell);
+        Vector2Int zappedCell = tentacle.targetCell;
+        if (TryZapAndConfirmClear(gen, zappedCell))
+            _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
         return true;
     }
 
-    private static void ZapAndClearCell(CosmicDustGenerator gen, Vector2Int cell)
+    private static bool TryZapAndConfirmClear(CosmicDustGenerator gen, Vector2Int cell)
     {
+        if (gen == null) return false;
         gen.ZapClearCell(cell);
+        if (!gen.TryGetCellState(cell, out var state))
+            return false;
+        return state != DustCellState.Solid;
     }
 
     // ---------------------------------------------------------------------------
