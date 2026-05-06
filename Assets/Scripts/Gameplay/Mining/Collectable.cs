@@ -70,7 +70,7 @@ public class Collectable : MonoBehaviour
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
-    public NoteTether tether;               // runtime
+    // tether is now owned by Vehicle — removed from Collectable
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
     private bool isInitialized = false;
@@ -211,85 +211,7 @@ public class Collectable : MonoBehaviour
     /// </summary>
     public void AttachTetherAtPickup()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var viz = _gfm ? _gfm.noteViz : null;
-        if (!assignedInstrumentTrack || !viz) return;
-
-        // Resolve tether prefab
-        GameObject tetherPrefabGO = viz.noteTetherPrefab;
-        if (!tetherPrefabGO) return;
-
-        Color trackColor = assignedInstrumentTrack.trackColor;
-
-        // If ribbonMarker wasn't bound at spawn, try to find it from the visualizer
-        if (ribbonMarker == null && intendedStep >= 0)
-        {
-            if (viz.noteMarkers != null &&
-                viz.noteMarkers.TryGetValue((assignedInstrumentTrack, intendedStep), out var m) && m)
-            {
-                ribbonMarker = m;
-            }
-        }
-
-        // Resolve anchor step (same logic as AttachTetherAtSpawn)
-        int resolvedStep = intendedStep >= 0 ? intendedStep : 0;
-        try
-        {
-            int binSize = Mathf.Max(1, assignedInstrumentTrack.BinSize());
-            int total   = Mathf.Max(binSize, assignedInstrumentTrack.GetTotalSteps());
-            int mult    = Mathf.Max(1, total / binSize);
-            int local   = ((resolvedStep % binSize) + binSize) % binSize;
-
-            if (intendedStep >= 0 && (intendedStep % binSize) == local && intendedStep < total)
-            {
-                resolvedStep = intendedStep;
-            }
-            else
-            {
-                bool found = false;
-                for (int b = 0; b < mult; b++)
-                {
-                    int abs = b * binSize + local;
-                    if (abs < 0 || abs >= total) continue;
-                    if (viz.noteMarkers != null &&
-                        viz.noteMarkers.TryGetValue((assignedInstrumentTrack, abs), out var tr) && tr)
-                    {
-                        resolvedStep = abs;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found && (resolvedStep < 0 || resolvedStep >= total))
-                    resolvedStep = local;
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogWarning($"[Collectable] AttachTetherAtPickup step resolution failed: {ex.Message}");
-        }
-
-        // Don't double-create
-        if (tether != null)
-        {
-            tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
-            tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
-            return;
-        }
-
-        var go = Instantiate(tetherPrefabGO);
-        go.name = $"Tether_{assignedInstrumentTrack.name}_s{resolvedStep}";
-        tether = go.GetComponent<NoteTether>();
-        if (!tether) tether = go.AddComponent<NoteTether>();
-
-        tether.SetEndpoints(transform, ribbonMarker, trackColor, 1f);
-        tether.BindByStep(assignedInstrumentTrack, resolvedStep, viz);
-
-        // Particle drip hookup
-        if (TryGetComponent(out CollectableParticles cp) && tether != null)
-            cp.RegisterTether(tether, pull: 0.7f);
-
-        Debug.Log($"[Collectable] AttachTetherAtPickup track={assignedInstrumentTrack.name} " +
-                  $"step={resolvedStep} marker={(ribbonMarker ? ribbonMarker.name : "(null)")}");
+        // Tether is now owned by Vehicle (single global tether). Nothing to do here.
     }
     [Header("Sequencer Link")]
     [Tooltip("Candidate step anchors this collectable may resolve to when attaching to the track ribbon.")]
@@ -450,14 +372,6 @@ private IEnumerator SpawnArrivalRoutine(
         try { UnregisterCarryOrbit(); } catch {}
 
         if (_carryRoutine != null) { StopCoroutine(_carryRoutine); _carryRoutine = null; }
-
-        // kill tether if any
-        if (tether != null)
-        {
-            var tg = tether.gameObject;
-            tether = null;
-            if (tg) Destroy(tg);
-        }
 
         var ex = GetComponent<Explode>();
         if (ex != null)
@@ -985,53 +899,20 @@ private IEnumerator SpawnArrivalRoutine(
     transform.SetParent(null, worldPositionStays: true);
     _carryParent = null;
 
-    // If tether vanished, just wait and snap at DSP time.
-    if (tether == null)
-    {
-        while (AudioSettings.dspTime < depositDspTime)
-            yield return null;
-
-        if (ribbonMarker) transform.position = ribbonMarker.position;
-        onArrived?.Invoke();
-
-        _inCarry = false;
-        yield break;
-    }
-
-    // DSP-driven interpolation from travelStartDsp -> depositDspTime.
-    // SmoothStep gives clean motion with less end “snap velocity” than cubic-in.
-    double dur = System.Math.Max(0.0005, depositDspTime - travelStartDsp);
-
-    while (tether != null)
-    {
-        double now = AudioSettings.dspTime;
-        if (now >= depositDspTime)
-            break;
-
-        float lin = (float)((now - travelStartDsp) / dur);
-        lin = Mathf.Clamp01(lin);
-
-        // SmoothStep: smooth accel/decel, avoids “bouncy fast end” that can skip frames.
-        float u = lin * lin * (3f - 2f * lin);
-
-        transform.position = tether.EvaluatePosition01(u);
+    // Wait for DSP deposit time then snap to marker.
+    while (AudioSettings.dspTime < depositDspTime)
         yield return null;
-    }
 
-    // Authoritative landing moment.
     if (ribbonMarker) transform.position = ribbonMarker.position;
-
     onArrived?.Invoke();
 
     _inCarry = false;
 
     var ml = ribbonMarker ? ribbonMarker.GetComponent<MarkerLight>() : null;
-    if (ml) ml.LightUp(tether != null ? tether.baseColor : Color.white);
+    if (ml) ml.LightUp(Color.white);
 
     ReportedCollected = true;
     NotifyDestroyedOnce();
-
-    if (tether) Destroy(tether.gameObject);
     Destroy(gameObject);
 } 
     public void BeginCarryThenDepositAtDsp(
@@ -1256,20 +1137,8 @@ private IEnumerator SpawnArrivalRoutine(
                 0f
             );
 
-            // --- Tether-world pull ---
-            // If this collectable has a tether, bias the drift toward the tether's far end
-            // so the energy visually strains toward the note world it's destined for.
-            Vector3 tetherBias = Vector3.zero;
-            if (tether != null && tether.end != null)
-            {
-                Vector3 toEnd = tether.end.position - _trailWorldTarget;
-                // Only the direction matters; we don't want it to escape the slot.
-                if (toEnd.sqrMagnitude > 0.0001f)
-                    tetherBias = toEnd.normalized * trailTetherPull;
-            }
-
             // --- Compose target and follow ---
-            Vector3 desiredPos = _trailWorldTarget + driftOffset + tetherBias;
+            Vector3 desiredPos = _trailWorldTarget + driftOffset;
             float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
             transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
 
@@ -1682,13 +1551,6 @@ private IEnumerator SpawnArrivalRoutine(
         {
             StopCoroutine(_carryRoutine);
             _carryRoutine = null;
-        }
-
-        if (tether != null)
-        {
-            var tg = tether.gameObject;
-            tether = null;
-            if (tg != null) Destroy(tg);
         }
 
         // Note is leaving the vehicle — remove from spawned list before destruction.

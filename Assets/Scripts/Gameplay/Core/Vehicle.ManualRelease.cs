@@ -9,20 +9,6 @@ public partial class Vehicle
         var spokenFor = new HashSet<int>();
         foreach (var ar in _armedReleases)
             spokenFor.Add(ar.targetAbsStep);
-
-        if (pending.collectable == null)
-            return spokenFor;
-
-        foreach (var other in _pendingNotes)
-        {
-            if (other.collectable == null || ReferenceEquals(other.collectable, pending.collectable))
-                break;
-
-            var otherTether = other.collectable.tether;
-            if (otherTether != null && otherTether.boundStep >= 0)
-                spokenFor.Add(otherTether.boundStep);
-        }
-
         return spokenFor;
     }
 
@@ -87,7 +73,7 @@ public partial class Vehicle
 
             if (crossed || fwd <= vehicleConfig.manualReleaseAutoCommitEpsSteps)
             {
-                CommitManualReleaseAtStep(armed, a.targetAbsStep);
+                CommitManualReleaseAtStep(armed, a.targetAbsStep, a.releaseVelocity);
                 if (_armedReleases.Count == 0) return;
                 _armedReleases.Dequeue();
                 spokenFor.Remove(a.targetAbsStep);
@@ -131,7 +117,7 @@ public partial class Vehicle
         _hasLastRawAbsStep = true;
     }
 
-    private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep)
+    private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep, float releaseVelocity = -1f)
     {
         if (gfm == null) gfm = GameFlowManager.Instance;
         var viz = (gfm != null) ? gfm.noteViz : null;
@@ -157,7 +143,7 @@ public partial class Vehicle
             resolvedDurationTicks = authoredDurationTicks;
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
-        float commitVel = p.velocity127;
+        float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;
         if (occupied)
             commitVel = Mathf.Clamp(commitVel * vehicleConfig.occupiedStepVelocityMultiplier, 1f, 127f);
 

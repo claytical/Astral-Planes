@@ -18,7 +18,7 @@ MonoBehaviour:
   manualReleaseUseArmLock: 1
   manualReleaseArmAheadSteps: 2
   manualReleaseAutoCommitEpsSteps: 0.35
-  manualReleaseGracePeriodSteps: 0.5
+  manualReleaseGracePeriodSteps: 1
   plowTickSeconds: 0.06
   plowFadeSeconds: 0.15
   inputTimeout: 0.15
