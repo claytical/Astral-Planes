@@ -436,11 +436,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private static void ZapAndClearCell(CosmicDustGenerator gen, Vector2Int cell)
     {
-        gen.ClearCell(
-            cell,
-            CosmicDustGenerator.DustClearMode.FadeAndHide,
-            fadeSeconds: 1.5f,
-            scheduleRegrow: true);
+        gen.ZapClearCell(cell);
     }
 
     // ---------------------------------------------------------------------------
