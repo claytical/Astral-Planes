@@ -198,7 +198,7 @@ public class PhaseStar : MonoBehaviour
     // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
     public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
-    public event Action<PhaseStar, MusicalRole, Vector2Int> OnTentacleZapResolved;
+    public event Action<PhaseStar, MusicalRole, Vector2Int> OnTentacleZapResolvedEvent;
     private bool _isArmed;
     private int _baseSortingOrder;
 
@@ -521,7 +521,7 @@ public class PhaseStar : MonoBehaviour
         if (readyNow)
             TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
 
-        OnTentacleZapResolved?.Invoke(this, role, targetCell);
+        OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
         Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
     }
     
