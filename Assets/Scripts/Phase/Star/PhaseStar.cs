@@ -177,6 +177,7 @@ public class PhaseStar : MonoBehaviour
     private bool _dormantSeedVisualPrimed;
 
     private bool _ejectionInFlight;
+    private bool _pendingDormantActivation;
     private int _spawnTicket;
     private int _lastPokeFrame = -999999;
     private InstrumentTrack _cachedTrack;
@@ -318,10 +319,21 @@ public class PhaseStar : MonoBehaviour
             return;
 
         StopManagedCoroutine(ref _waitForDustCo);
+        _pendingDormantActivation = true;
+        TransitionZapState(ZapProgressState.WaitingForRetract, _requiredZapRole, "dormant-threshold-hit");
+        dust?.BeginRetractionForActiveTentacles();
+    }
+
+    private void FinalizeDormantToActiveAfterRetract()
+    {
+        if (!_pendingDormantActivation || _state != PhaseStarState.Dormant)
+            return;
+
+        _pendingDormantActivation = false;
         _state = PhaseStarState.WaitingForPoke;
         _dormantSeedVisualPrimed = false;
 
-        // Star earned free movement — unfreeze and retract tentacles.
+        // Star earned free movement after all tentacles are fully retracted.
         motion?.SetFrozen(false);
         dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(true);
@@ -591,6 +603,9 @@ public class PhaseStar : MonoBehaviour
 
     private void OnAllTentaclesRetracted()
     {
+        if (_pendingDormantActivation)
+            FinalizeDormantToActiveAfterRetract();
+
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
             return;
 
