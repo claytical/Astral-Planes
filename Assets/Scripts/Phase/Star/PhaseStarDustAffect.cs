@@ -81,10 +81,13 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public int lineIndexInRole;
         public int invalidTargetFrames;
         public float invalidTargetMs;
+        public bool hasPendingZap;
+        public Vector2Int pendingZapCell;
     }
 
     public Action<MusicalRole, float> onDelivery;
     public event Action<MusicalRole> OnAttuned;
+    public event Action OnAllTentaclesRetracted;
 
     private GameFlowManager _gfm;
     private PhaseStarBehaviorProfile _profile;
@@ -93,6 +96,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private MusicalRole _attunedRole = MusicalRole.None;
 
     private bool _tentaclesActive;
+    private bool _acquisitionEnabled = true;
     private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
@@ -153,10 +157,26 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     public void SetTentaclesActive(bool active)
     {
         _tentaclesActive = active;
+        _acquisitionEnabled = active;
         _navigator?.SetHuntingEnabled(active);
 
         if (!active)
             ResetTentacles();
+    }
+
+    public void BeginRetractionForActiveTentacles()
+    {
+        _acquisitionEnabled = false;
+        _navigator?.SetHuntingEnabled(false);
+
+        Vector2 starPos = transform.position;
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.state == TentacleState.Idle) continue;
+            BeginRetractingTentacle(tentacle, starPos, "phase-star-waiting-for-retract");
+        }
+
+        TryNotifyAllTentaclesRetracted();
     }
 
     public void ResetTentacles()
@@ -165,6 +185,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         foreach (var tentacle in _tentacles)
             ResetTentacleState(tentacle, starPos, destroyVisual: false);
+
+        TryNotifyAllTentaclesRetracted();
     }
     
     public bool HasActiveTentacles
@@ -257,6 +279,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         {
             case TentacleState.Idle:
             {
+                if (!_acquisitionEnabled) break;
                 if (gen == null || drum == null || _navigator == null) break;
                 if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole) break;
 
@@ -325,9 +348,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 UpdateTentacleLine(tentacle, starPos, dt);
 
                 tentacle.contactTimer += dt;
-                if (tentacle.contactTimer >= minContactTime && TryZapTargetCell(tentacle, gen))
+                if (tentacle.contactTimer >= minContactTime && QueueZapAndRetract(tentacle, starPos))
                 {
-                    BeginRetractingTentacle(tentacle, starPos, "zap complete");
+                    // queued and now retracting
                 }
 
                 break;
@@ -341,8 +364,10 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 if (Vector2.Distance(tentacle.tipPos, starPos) < 0.05f)
                 {
+                    TryConsumePendingZap(tentacle, gen);
                     TransitionTentacleState(tentacle, TentacleState.Idle, "fully retracted");
                     tentacle.line.enabled = false;
+                    TryNotifyAllTentaclesRetracted();
                 }
 
                 break;
@@ -397,15 +422,26 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         UpdateTentacleLine(tentacle, starPos, 0f);
     }
 
-    private bool TryZapTargetCell(Tentacle tentacle, CosmicDustGenerator gen)
+    private bool QueueZapAndRetract(Tentacle tentacle, Vector2 starPos)
     {
-        if (gen == null) return false;
-        if (!gen.TryGetDustAt(tentacle.targetCell, out var dust) || dust == null || dust.currentEnergyUnits <= 0)
-            return false;
+        tentacle.hasPendingZap = true;
+        tentacle.pendingZapCell = tentacle.targetCell;
+        BeginRetractingTentacle(tentacle, starPos, "zap queued");
+        return true;
+    }
+
+    private void TryConsumePendingZap(Tentacle tentacle, CosmicDustGenerator gen)
+    {
+        if (!tentacle.hasPendingZap) return;
+        tentacle.hasPendingZap = false;
+        if (gen == null) return;
+        Vector2Int zapCell = tentacle.pendingZapCell;
+        if (!gen.TryGetDustAt(zapCell, out var dust) || dust == null || dust.currentEnergyUnits <= 0)
+            return;
 
         int actualUnits = dust.ChipEnergy(1);
         if (actualUnits <= 0)
-            return false;
+            return;
 
 
         if (_star != null)
@@ -418,18 +454,16 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
 
         tentacle.drainFlashTimer = DrainFlashDuration;
-        _zappedThisCycle.Add(tentacle.targetCell);
-        _navigator?.NotifyCellZappedThisCycle(tentacle.targetCell);
-        ReleaseReservation(tentacle, tentacle.targetCell);
-        Vector2Int zappedCell = tentacle.targetCell;
+        _zappedThisCycle.Add(zapCell);
+        _navigator?.NotifyCellZappedThisCycle(zapCell);
+        Vector2Int zappedCell = zapCell;
+        _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
         if (TryZapAndConfirmClear(gen, zappedCell))
         {
             _navigator?.ClearLockOn(zappedCell);
             tentacle.notifiedDrainLock = false;
             tentacle.targetCell = default;
-            _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
         }
-        return true;
     }
 
     private static bool TryZapAndConfirmClear(CosmicDustGenerator gen, Vector2Int cell)
@@ -854,6 +888,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.dissolveTimer = 0f;
         tentacle.alphaScale   = 1f;
         tentacle.drainFlashTimer = 0f;
+        tentacle.hasPendingZap = false;
+        tentacle.pendingZapCell = default;
 
         if (tentacle.line != null)
         {
@@ -1008,5 +1044,16 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             excluded.Add(zappedCell);
 
         return excluded;
+    }
+
+    private void TryNotifyAllTentaclesRetracted()
+    {
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.state != TentacleState.Idle)
+                return;
+        }
+
+        OnAllTentaclesRetracted?.Invoke();
     }
 }

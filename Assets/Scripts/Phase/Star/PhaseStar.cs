@@ -177,6 +177,7 @@ public class PhaseStar : MonoBehaviour
     private bool _dormantSeedVisualPrimed;
 
     private bool _ejectionInFlight;
+    private bool _pendingDormantActivation;
     private int _spawnTicket;
     private int _lastPokeFrame = -999999;
     private InstrumentTrack _cachedTrack;
@@ -318,10 +319,21 @@ public class PhaseStar : MonoBehaviour
             return;
 
         StopManagedCoroutine(ref _waitForDustCo);
+        _pendingDormantActivation = true;
+        TransitionZapState(ZapProgressState.WaitingForRetract, _requiredZapRole, "dormant-threshold-hit");
+        dust?.BeginRetractionForActiveTentacles();
+    }
+
+    private void FinalizeDormantToActiveAfterRetract(bool force = false)
+    {
+        if ((!_pendingDormantActivation && !force) || _state != PhaseStarState.Dormant)
+            return;
+
+        _pendingDormantActivation = false;
         _state = PhaseStarState.WaitingForPoke;
         _dormantSeedVisualPrimed = false;
 
-        // Star earned free movement — unfreeze and retract tentacles.
+        // Star earned free movement after all tentacles are fully retracted.
         motion?.SetFrozen(false);
         dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(true);
@@ -490,7 +502,9 @@ public class PhaseStar : MonoBehaviour
             return false;
         }
 
-        int noteCount = planned.GetStepList()?.Count ?? 0;
+        int noteCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
+        if (noteCount <= 0)
+            noteCount = planned.GetStepList()?.Distinct().Count() ?? 0;
         if (noteCount <= 0)
             noteCount = planned.GetNoteList()?.Count ?? 0;
 
@@ -506,7 +520,14 @@ public class PhaseStar : MonoBehaviour
         if (resetCurrentZapCount || (_zapProgressState == ZapProgressState.Seeking && descriptorChanged))
             zappedCount = 0;
 
-        TransitionZapState(resetCurrentZapCount ? ZapProgressState.Seeking : ZapProgressState.Zapping, role, $"refresh:{reason}");
+        if (resetCurrentZapCount)
+        {
+            TransitionZapState(ZapProgressState.Seeking, role, $"refresh:{reason}");
+        }
+        else if (_zapProgressState == ZapProgressState.Seeking || _zapProgressState == ZapProgressState.Zapping)
+        {
+            TransitionZapState(ZapProgressState.Zapping, role, $"refresh:{reason}");
+        }
         Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
         return true;
     }
@@ -517,7 +538,7 @@ public class PhaseStar : MonoBehaviour
 
 
     private bool _dustDeliveryWired;
-    private enum ZapProgressState { Seeking, Zapping, ReadyLatched, Ejecting }
+    private enum ZapProgressState { Seeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
     private int zappedCount;
     private int requiredZapCount = 1;
@@ -544,6 +565,7 @@ public class PhaseStar : MonoBehaviour
         if (!_dustDeliveryWired && dust != null)
         {
             dust.onDelivery += OnDustDelivery;
+            dust.OnAllTentaclesRetracted += OnAllTentaclesRetracted;
             _dustDeliveryWired = true;
         }
         if (!cravingNavigator) cravingNavigator = GetComponentInChildren<PhaseStarCravingNavigator>(true);
@@ -579,10 +601,30 @@ public class PhaseStar : MonoBehaviour
 
         bool readyNow = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
         if (readyNow)
-            TransitionZapState(ZapProgressState.ReadyLatched, role, "count-threshold-met");
+        {
+            TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
+            dust?.BeginRetractionForActiveTentacles();
+
+            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation)
+                TransitionDormantToActive();
+        }
 
         OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
         Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
+    }
+
+    private void OnAllTentaclesRetracted()
+    {
+        if (_pendingDormantActivation)
+            FinalizeDormantToActiveAfterRetract();
+        else if (_state == PhaseStarState.Dormant && _zapProgressState == ZapProgressState.WaitingForRetract)
+            FinalizeDormantToActiveAfterRetract(force: true);
+
+        if (_zapProgressState != ZapProgressState.WaitingForRetract)
+            return;
+
+        MusicalRole latchedRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
+        TransitionZapState(ZapProgressState.ReadyLatched, latchedRole, "all-tentacles-retracted");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -703,6 +745,9 @@ public class PhaseStar : MonoBehaviour
     void Update()
 {
     float dt = Time.deltaTime;
+
+    if (_pendingDormantActivation && dust != null && !dust.HasActiveTentacles)
+        FinalizeDormantToActiveAfterRetract();
 
     _accumulatorRotAngle += accumulatorRotSpeed * dt;
 
@@ -835,6 +880,13 @@ public class PhaseStar : MonoBehaviour
 
     private void SafeUnsubscribeAll()
     {
+        if (dust != null && _dustDeliveryWired)
+        {
+            dust.onDelivery -= OnDustDelivery;
+            dust.OnAllTentaclesRetracted -= OnAllTentaclesRetracted;
+            _dustDeliveryWired = false;
+        }
+
         // Unhook both places we subscribe OnLoopBoundary:
         if (_drum != null)
         {
