@@ -97,6 +97,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private bool _tentaclesActive;
     private bool _acquisitionEnabled = true;
+    private bool _allTentaclesRetractedNotified = true;
     private readonly List<Tentacle> _tentacles = new();
 
     private float _keepClearTimer;
@@ -166,7 +167,13 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     public void BeginRetractionForActiveTentacles()
     {
+        BeginRetractAllTentacles();
+    }
+
+    public void BeginRetractAllTentacles()
+    {
         _acquisitionEnabled = false;
+        _allTentaclesRetractedNotified = false;
         _navigator?.SetHuntingEnabled(false);
 
         Vector2 starPos = transform.position;
@@ -189,6 +196,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         TryNotifyAllTentaclesRetracted();
     }
     
+    public bool AreAllTentaclesRetracted => !HasActiveTentacles;
+
     public bool HasActiveTentacles
     {
         get
@@ -952,6 +961,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         if (tentacle.state == nextState) return;
         tentacle.state = nextState;
+        if (nextState != TentacleState.Idle)
+            _allTentaclesRetractedNotified = false;
         ResetInvalidTargetRetry(tentacle);
         LogTentacleTransition(tentacle, nextState, reason);
     }
@@ -1048,12 +1059,19 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void TryNotifyAllTentaclesRetracted()
     {
+        if (_allTentaclesRetractedNotified)
+            return;
+
         foreach (var tentacle in _tentacles)
         {
             if (tentacle.state != TentacleState.Idle)
                 return;
+
+            if (tentacle.line != null && tentacle.line.enabled)
+                return;
         }
 
+        _allTentaclesRetractedNotified = true;
         OnAllTentaclesRetracted?.Invoke();
     }
 }
