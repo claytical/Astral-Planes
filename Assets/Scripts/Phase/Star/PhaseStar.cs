@@ -418,37 +418,52 @@ public class PhaseStar : MonoBehaviour
                rawCharge >= threshold;
     }
     private bool IsEjectionReady() => HasDominantRoleEjectable() && IsZapReady();
-    private bool IsZapReady() => _currentEjectionZapCount >= _requiredEjectionZapCount;
-    private int ResolveRequiredZapCountForPlannedNoteSet(InstrumentTrack track)
-    {
-        NoteSet planned = ResolvePlannedNoteSet(track);
-        if (planned == null) return 1;
-
-        int noteCount = planned.GetStepList()?.Count ?? 0;
-        if (noteCount <= 0)
-            noteCount = planned.GetNoteList()?.Count ?? 0;
-        return Mathf.Max(1, noteCount);
-    }
+    private bool IsZapReady() => _requiredZapNoteSetAvailable && _currentEjectionZapCount >= _requiredEjectionZapCount;
     private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
     {
         if (track == null) return null;
-        NoteSet planned = track.GetCurrentNoteSet();
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        int entropy = CurrentEntropyForSelection();
+        return _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
+    }
+    private bool TryRefreshRequiredZapCountForPlannedRole(
+        MusicalRole role,
+        InstrumentTrack track,
+        bool resetCurrentZapCount,
+        string reason)
+    {
+        _requiredZapRole = role;
+        _requiredZapNoteSetAvailable = false;
+
+        if (track == null)
+        {
+            _requiredEjectionZapCount = int.MaxValue;
+            Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
+            return false;
+        }
+
+        NoteSet planned = ResolvePlannedNoteSet(track);
         if (planned == null)
         {
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var factory = _gfm != null ? _gfm.phaseTransitionManager.noteSetFactory : null;
-            if (factory != null)
-                planned = factory.Generate(track, _assignedMotif);
+            _requiredEjectionZapCount = int.MaxValue;
+            Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
+            return false;
         }
-        return planned;
+
+        _requiredZapNoteSetAvailable = true;
+        int noteCount = planned.GetStepList()?.Count ?? 0;
+        if (noteCount <= 0)
+            noteCount = planned.GetNoteList()?.Count ?? 0;
+        _requiredEjectionZapCount = Mathf.Max(1, noteCount);
+        if (resetCurrentZapCount)
+            _currentEjectionZapCount = 0;
+        _zapReadyLogged = false;
+        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount} reason={reason}");
+        return true;
     }
     private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)
     {
-        _requiredZapRole = role;
-        _requiredEjectionZapCount = ResolveRequiredZapCountForPlannedNoteSet(track);
-        _currentEjectionZapCount = 0;
-        _zapReadyLogged = false;
-        Debug.Log($"[PhaseStar:Zap] primed role={_requiredZapRole} requiredZaps={_requiredEjectionZapCount} currentZaps={_currentEjectionZapCount}");
+        TryRefreshRequiredZapCountForPlannedRole(role, track, resetCurrentZapCount: true, reason: "prime");
     }
 
 
@@ -456,6 +471,7 @@ public class PhaseStar : MonoBehaviour
     private int _currentEjectionZapCount;
     private int _requiredEjectionZapCount = 1;
     private MusicalRole _requiredZapRole = MusicalRole.None;
+    private bool _requiredZapNoteSetAvailable;
     private bool _zapReadyLogged;
     private bool _isEjectReadyLatched;
 
@@ -669,6 +685,7 @@ public class PhaseStar : MonoBehaviour
             _previewColor = ResolveRoleColor(dominantRole);
 
             _cachedTrack = FindTrackByRole(dominantRole);
+            TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
             visuals?.ResetDualDiamondVisualState();
         }
 
