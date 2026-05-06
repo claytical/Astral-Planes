@@ -324,9 +324,9 @@ public class PhaseStar : MonoBehaviour
         dust?.BeginRetractionForActiveTentacles();
     }
 
-    private void FinalizeDormantToActiveAfterRetract()
+    private void FinalizeDormantToActiveAfterRetract(bool force = false)
     {
-        if (!_pendingDormantActivation || _state != PhaseStarState.Dormant)
+        if ((!_pendingDormantActivation && !force) || _state != PhaseStarState.Dormant)
             return;
 
         _pendingDormantActivation = false;
@@ -604,6 +604,9 @@ public class PhaseStar : MonoBehaviour
         {
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
             dust?.BeginRetractionForActiveTentacles();
+
+            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation)
+                TransitionDormantToActive();
         }
 
         OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
@@ -614,6 +617,8 @@ public class PhaseStar : MonoBehaviour
     {
         if (_pendingDormantActivation)
             FinalizeDormantToActiveAfterRetract();
+        else if (_state == PhaseStarState.Dormant && _zapProgressState == ZapProgressState.WaitingForRetract)
+            FinalizeDormantToActiveAfterRetract(force: true);
 
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
             return;
