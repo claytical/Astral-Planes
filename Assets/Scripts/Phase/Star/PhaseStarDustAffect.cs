@@ -282,9 +282,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     }
                     else
                     {
-                        ReleaseDrainLock(tentacle);
-        ReleaseReservation(tentacle, tentacle.targetCell);
-                        TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
+                        BeginRetractingTentacle(tentacle, starPos, invalidReason);
                         break;
                     }
                 }
@@ -312,9 +310,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
-                    ReleaseDrainLock(tentacle);
-        ReleaseReservation(tentacle, tentacle.targetCell);
-                    TransitionTentacleState(tentacle, TentacleState.Retracting, invalidReason);
+                    BeginRetractingTentacle(tentacle, starPos, invalidReason);
                     break;
                 }
 
@@ -326,15 +322,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 tentacle.contactTimer += dt;
                 if (tentacle.contactTimer >= minContactTime && TryZapTargetCell(tentacle, gen))
                 {
-                    if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var nextCell) &&
-                        nextCell != tentacle.targetCell && IsTargetValid(nextCell, tentacle.role, tentacle, out _) && TryReserveCell(tentacle, nextCell))
-                    {
-                        BeginGrowingTentacle(tentacle, nextCell, drum, starPos);
-                    }
-                    else
-                    {
-                        TransitionTentacleState(tentacle, TentacleState.Retracting, "zap complete");
-                    }
+                    BeginRetractingTentacle(tentacle, starPos, "zap complete");
                 }
 
                 break;
@@ -342,11 +330,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             case TentacleState.Retracting:
             {
-                ReleaseDrainLock(tentacle);
-        ReleaseReservation(tentacle, tentacle.targetCell);
-
                 tentacle.tipPos = Vector2.MoveTowards(tentacle.tipPos, starPos, tentacleRetractSpeed * dt);
-                UpdateTentacleRetractLine(tentacle, starPos);
+                tentacle.targetWorldPos = tentacle.tipPos;
+                UpdateTentacleLine(tentacle, starPos, dt);
 
                 if (Vector2.Distance(tentacle.tipPos, starPos) < 0.05f)
                 {
@@ -594,14 +580,18 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
     }
 
-    private void UpdateTentacleRetractLine(Tentacle tentacle, Vector2 starPos)
+    private void BeginRetractingTentacle(Tentacle tentacle, Vector2 starPos, string reason)
     {
-        tentacle.line.positionCount = 2;
-        tentacle.line.widthMultiplier = tentacleWidth;
-        tentacle.line.SetPosition(0, new Vector3(starPos.x, starPos.y, transform.position.z));
-        tentacle.line.SetPosition(1, new Vector3(tentacle.tipPos.x, tentacle.tipPos.y, transform.position.z));
-        BuildGrowingGradient(tentacle, GetRoleColor(tentacle.role));
-        tentacle.line.colorGradient = tentacle.gradient;
+        ReleaseDrainLock(tentacle);
+        ReleaseReservation(tentacle, tentacle.targetCell);
+
+        tentacle.tipPos = tentacle.targetWorldPos;
+        tentacle.contactTimer = 0f;
+        tentacle.targetWorldPos = tentacle.tipPos;
+
+        TransitionTentacleState(tentacle, TentacleState.Retracting, reason);
+        tentacle.line.enabled = true;
+        UpdateTentacleLine(tentacle, starPos, 0f);
     }
 
     // ---------------------------------------------------------------------------
