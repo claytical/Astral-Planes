@@ -609,10 +609,8 @@ public class PhaseStar : MonoBehaviour
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
             return;
 
-        if (_requiredZapRole == MusicalRole.None)
-            return;
-
-        TransitionZapState(ZapProgressState.ReadyLatched, _requiredZapRole, "all-tentacles-retracted");
+        MusicalRole latchedRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
+        TransitionZapState(ZapProgressState.ReadyLatched, latchedRole, "all-tentacles-retracted");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -733,6 +731,9 @@ public class PhaseStar : MonoBehaviour
     void Update()
 {
     float dt = Time.deltaTime;
+
+    if (_pendingDormantActivation && dust != null && !dust.HasActiveTentacles)
+        FinalizeDormantToActiveAfterRetract();
 
     _accumulatorRotAngle += accumulatorRotSpeed * dt;
 
