@@ -82,6 +82,11 @@ public partial class CosmicDust : MonoBehaviour {
         [Header("Energy Drain")]
         [Min(0f)] public float energyDrainPerSecond;
     }
+    // Interaction-mode contract (implemented by CosmicDustGenerator):
+    // Carve: resistance-aware depletion used by Vehicle/MineNode interactions.
+    // Zap: discrete PhaseStar consume-and-clear path.
+    // Both modes converge on shared clear/regrow visuals here (Dissipate/Hide + Begin),
+    // while the generator controls mode flags (imprint mutation, regrow scheduling, void-grow exceptions, fade duration source).
     [Serializable]
     public struct DustClearingSettings
     {
