@@ -1582,7 +1582,8 @@ private void AssignHiddenImprintsByNearestSeed(
         go = _gridState.CellGo[gp.x, gp.y];
         return go != null;
     }
-    private bool TryGetCellState(Vector2Int gp, out DustCellState st)
+
+    public bool TryGetCellState(Vector2Int gp, out DustCellState st)
     {
         EnsureCellGrid();
         return _gridState.TryGetCellState(gp, toroidal, WrapCell, out st);
