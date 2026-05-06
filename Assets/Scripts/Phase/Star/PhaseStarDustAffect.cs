@@ -6,12 +6,16 @@ using UnityEngine.Rendering;
 [DisallowMultipleComponent]
 public sealed class PhaseStarDustAffect : MonoBehaviour
 {
-    [Header("Drain")]
+    [Header("Zap Cadence")]
+    [Tooltip("Hold time on target before a zap is committed.")]
     [SerializeField] private float minContactTime = .01f;
+    [Tooltip("Blend duration from seek colors into active drain colors.")]
     [SerializeField] private float colorTransitionTime = 0.5f;
 
-    [Header("Tentacle")]
+    [Header("Tentacle Motion")]
+    [Tooltip("Regrow speed for tentacle extension (progress per second).")]
     [SerializeField] private float tentacleGrowSpeed = 0.35f;   // progress/sec (0-1 range)
+    [Tooltip("Retract speed after zap resolve or target loss.")]
     [SerializeField] private float tentacleRetractSpeed = 12f;
     [SerializeField] private float tentacleFlowSpeed = 1.2f;
     [SerializeField] private float tentacleWidth = 0.13f;

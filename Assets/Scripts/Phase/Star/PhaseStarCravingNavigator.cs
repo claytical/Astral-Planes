@@ -5,10 +5,13 @@ using UnityEngine;
 public sealed class PhaseStarCravingNavigator : MonoBehaviour
 {
     [Header("Hunter Targeting")]
+    [Tooltip("How often target selection replans while hunting (zap cadence steering).")]
     [SerializeField] private float replanIntervalSeconds = 0.3f;
+    [Tooltip("If the current cell becomes invalid, immediately reacquire a new target.")]
     [SerializeField] private bool retargetOnTargetLost = true;
 
     [Header("Sniffer (per-role diamond facing)")]
+    [Tooltip("How often ambient dust direction is rescanned when not lock-zapping.")]
     [SerializeField] private float snifferIntervalSeconds = 0.25f;
 
     private GameFlowManager _gfm;
