@@ -7,7 +7,6 @@ using UnityEngine.Rendering;
 public sealed class PhaseStarDustAffect : MonoBehaviour
 {
     [Header("Drain")]
-    [SerializeField] private float drainRatePerSec = 5.0f;
     [SerializeField] private float minContactTime = .01f;
     [SerializeField] private float colorTransitionTime = 0.5f;
 
@@ -66,7 +65,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public Vector2 tipPos;
         public LineRenderer line;
         public ParticleSystem shimmerPS;
-        public float drainTimer;
         public float flowOffset;
         public Vector3[] linePts;
         public Gradient gradient;
@@ -291,7 +289,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     tentacle.tipPos      = tentacle.targetWorldPos;
                     TransitionTentacleState(tentacle, TentacleState.Draining, "reached target");
                     tentacle.contactTimer = 0f;
-                    tentacle.drainTimer  = 0f;
 
                     if (!tentacle.notifiedDrainLock)
                     {
@@ -312,19 +309,22 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     break;
                 }
 
-                tentacle.tipPos        = tentacle.targetWorldPos;
+                tentacle.tipPos          = tentacle.targetWorldPos;
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
 
                 UpdateTentacleLine(tentacle, starPos, dt);
 
                 tentacle.contactTimer += dt;
-                if (tentacle.contactTimer >= minContactTime)
+                if (tentacle.contactTimer >= minContactTime && TryZapTargetCell(tentacle, gen))
                 {
-                    tentacle.drainTimer += drainRatePerSec * dt;
-                    while (tentacle.drainTimer >= 1f)
+                    if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var nextCell) &&
+                        nextCell != tentacle.targetCell && IsTargetValid(nextCell, tentacle.role, out _))
                     {
-                        tentacle.drainTimer -= 1f;
-                        DrainTick(tentacle, gen);
+                        BeginGrowingTentacle(tentacle, nextCell, drum, starPos);
+                    }
+                    else
+                    {
+                        TransitionTentacleState(tentacle, TentacleState.Retracting, "zap complete");
                     }
                 }
 
@@ -377,7 +377,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.targetCell     = cell;
         tentacle.targetWorldPos = drum.GridToWorldPosition(cell);
         tentacle.tipPos         = starPos;
-        tentacle.drainTimer     = 0f;
         tentacle.growProgress   = 0f;
         tentacle.contactTimer   = 0f;
         tentacle.dissolveTimer  = 0f;
@@ -393,37 +392,38 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         UpdateTentacleLine(tentacle, starPos, 0f);
     }
 
-    private void DrainTick(Tentacle tentacle, CosmicDustGenerator gen)
+    private bool TryZapTargetCell(Tentacle tentacle, CosmicDustGenerator gen)
     {
-        if (gen == null) return;
-
-        if (!gen.TryGetDustAt(tentacle.targetCell, out var dust) || dust == null)
-            return;
+        if (gen == null) return false;
+        if (!gen.TryGetDustAt(tentacle.targetCell, out var dust) || dust == null || dust.currentEnergyUnits <= 0)
+            return false;
 
         int actualUnits = dust.ChipEnergy(1);
+        if (actualUnits <= 0)
+            return false;
 
-        if (actualUnits > 0 && _star != null)
+
+        if (_star != null)
         {
             bool wasUnattned = _star.AttunedRole == MusicalRole.None;
             _star.AddCharge(tentacle.role, actualUnits);
             onDelivery?.Invoke(tentacle.role, actualUnits);
-            tentacle.drainFlashTimer = DrainFlashDuration;
             if (wasUnattned)
                 OnAttuned?.Invoke(tentacle.role);
         }
 
-        if (dust.currentEnergyUnits <= 0)
-        {
-            gen.ClearCell(
-                tentacle.targetCell,
-                CosmicDustGenerator.DustClearMode.FadeAndHide,
-                fadeSeconds: 1.5f,
-                scheduleRegrow: false);
+        tentacle.drainFlashTimer = DrainFlashDuration;
+        ZapAndClearCell(gen, tentacle.targetCell);
+        return true;
+    }
 
-            TransitionTentacleState(tentacle, TentacleState.Dissolving, "energy 0");
-            tentacle.dissolveTimer = 0f;
-            tentacle.alphaScale   = 1f;
-        }
+    private static void ZapAndClearCell(CosmicDustGenerator gen, Vector2Int cell)
+    {
+        gen.ClearCell(
+            cell,
+            CosmicDustGenerator.DustClearMode.FadeAndHide,
+            fadeSeconds: 1.5f,
+            scheduleRegrow: true);
     }
 
     // ---------------------------------------------------------------------------
@@ -833,7 +833,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.contactTimer = 0f;
         tentacle.dissolveTimer = 0f;
         tentacle.alphaScale   = 1f;
-        tentacle.drainTimer   = 0f;
         tentacle.drainFlashTimer = 0f;
 
         if (tentacle.line != null)
