@@ -544,20 +544,14 @@ public class PhaseStar : MonoBehaviour
         // which previously caused a 1->2->3 ramp while charging.
         int noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
 
+        if (_currentBurstRequiredZaps > 0)
+            noteCount = Mathf.Max(noteCount, _currentBurstRequiredZaps);
+
         nextDescriptor.noteSet = planned;
         nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
 
         _requiredZapNoteSetAvailable = nextDescriptor.IsValid;
-
-        bool shouldLatchExistingCount =
-            !resetCurrentZapCount &&
-            zappedCount > 0 &&
-            (_zapProgressState == ZapProgressState.Zapping ||
-             _zapProgressState == ZapProgressState.WaitingForRetract ||
-             _zapProgressState == ZapProgressState.ReadyLatched);
-
-        if (!shouldLatchExistingCount)
-            requiredZapCount = nextDescriptor.requiredZapCount;
+        requiredZapCount = nextDescriptor.requiredZapCount;
 
         bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
         _plannedEjectionDescriptor = nextDescriptor;
@@ -589,6 +583,7 @@ public class PhaseStar : MonoBehaviour
     private bool _coordinatorLockOwnedByOtherStar;
     private int zappedCount;
     private int requiredZapCount = 1;
+    private int _currentBurstRequiredZaps = 0;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
@@ -1901,10 +1896,20 @@ void Update()
         int entropy = CurrentEntropyForSelection();
         ResolveGameFlowManager();
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
+        _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
  Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
     }
+    private static int GetNoteSetNoteCount(NoteSet noteSet)
+    {
+        if (noteSet == null) return 0;
+        int persistentTemplateCount = noteSet.persistentTemplate != null ? noteSet.persistentTemplate.Count : 0;
+        int distinctStepCount = noteSet.GetStepList()?.Distinct().Count() ?? 0;
+        int noteListCount = noteSet.GetNoteList()?.Count ?? 0;
+        return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+    }
+
     private int CurrentEntropyForSelection() {
         return 0;
     }
