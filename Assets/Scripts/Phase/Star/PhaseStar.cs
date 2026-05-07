@@ -82,7 +82,8 @@ public class PhaseStar : MonoBehaviour
     private Transform   _previewVisual;
     private Transform   _previewVisualB;   // second counter-rotating diamond
     private bool _isDisposing;
-    private bool _entryInProgress;
+    private readonly PhaseStarInteractionState _interactionState = new();
+    private bool _entryInProgress { get => _interactionState.Interaction.EntryInProgress; set => _interactionState.Interaction.EntryInProgress = value; }
     private bool _buildingPreview;
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
@@ -91,12 +92,12 @@ public class PhaseStar : MonoBehaviour
     // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
     [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
-    private bool _awaitingCollectableClear;
-    private bool _hasReceivedEnergy;   // set true on first drain delivery; drives gray→role color lerp
+    private bool _awaitingCollectableClear { get => _interactionState.Interaction.AwaitingCollectableClear; set => _interactionState.Interaction.AwaitingCollectableClear = value; }
+    private bool _hasReceivedEnergy { get => _interactionState.ChargeVisual.HasReceivedEnergy; set => _interactionState.ChargeVisual.HasReceivedEnergy = value; }   // set true on first drain delivery; drives gray→role color lerp
 
     // True while the star is parked off-screen during a collectable burst.
     // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
-    private bool _burstOffScreen;
+    private bool _burstOffScreen { get => _interactionState.Interaction.BurstOffScreen; set => _interactionState.Interaction.BurstOffScreen = value; }
     private Coroutine _burstOffScreenWaitCo;
     private Coroutine _entryApproachCo;
     private Coroutine _waitForDustCo;
@@ -113,32 +114,6 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Range(0f, 0.5f)] private float shardMinAlpha = 0.08f;
 
 
-
-    private enum DisarmReason
-    {
-        None = 0,
-
-        // Star was hit; we are in the process of spawning/resolving a MineNode.
-        NodeResolving,
-
-        // There exist collectables in flight (global), so we must not allow another poke.
-        CollectablesInFlight,
-
-        //A track is staged to expand on the net loop boundary; don't allow another collision that could queue an additional burst/bin change in the same window
-        ExpansionPending,
-
-        // Star has no shards remaining and we’re awaiting bridge transition.
-        AwaitBridge,
-
-        // The bridge is actively running (coral/transition).
-        Bridge,
-
-        // A sibling Star has ejected and its MineNode is being processed.
-        // Star freezes in place, goes gray, disables collision.
-        SiblingActive
-    }
-
-    private DisarmReason _disarmReason = DisarmReason.None;
 
     // -------------------- State & caches --------------------
     private PhaseStarState _state = PhaseStarState.WaitingForPoke;
@@ -168,9 +143,9 @@ public class PhaseStar : MonoBehaviour
     [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
     [SerializeField, Range(0f, 0.5f)] private float dormantSeedScale = 0.08f;
 
-    private float _displayedCharge01;
+    private float _displayedCharge01 { get => _interactionState.ChargeVisual.DisplayedCharge01; set => _interactionState.ChargeVisual.DisplayedCharge01 = value; }
 
-    private bool _dormantSeedVisualPrimed;
+    private bool _dormantSeedVisualPrimed { get => _interactionState.ChargeVisual.DormantSeedVisualPrimed; set => _interactionState.ChargeVisual.DormantSeedVisualPrimed = value; }
 
     private bool _ejectionInFlight;
     private bool _pendingDormantActivation;
@@ -196,7 +171,7 @@ public class PhaseStar : MonoBehaviour
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
     public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
     public event Action<PhaseStar, MusicalRole, Vector2Int> OnTentacleZapResolvedEvent;
-    private bool _isArmed;
+    private bool _isArmed { get => _interactionState.Interaction.IsArmed; set => _interactionState.Interaction.IsArmed = value; }
     private int _baseSortingOrder;
 
     public List<MusicalRole> GetMotifActiveRoles() =>
@@ -245,7 +220,7 @@ public class PhaseStar : MonoBehaviour
         dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(false);
         _isArmed = false;
-        _disarmReason = DisarmReason.None;
+        _disarmReason = PhaseStarDisarmReason.None;
         _burstOffScreen = false;
         _awaitingCollectableClear = false;
         _starCharge.Clear();
@@ -266,8 +241,7 @@ public class PhaseStar : MonoBehaviour
     
     private Vector2 ComputeDormantRestPosition()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _drum != null ? _drum : _gfm?.activeDrumTrack;
+        var drum = TryResolveContext(out var resolvedDrum, out _) ? resolvedDrum : null;
         if (drum == null) return transform.position;
         int gw = drum.GetSpawnGridWidth();
         int gh = drum.GetSpawnGridHeight();
@@ -281,7 +255,7 @@ public class PhaseStar : MonoBehaviour
         _entryInProgress = false;
         _state = PhaseStarState.Dormant;
         _isArmed = false;
-        _disarmReason = DisarmReason.None;
+        _disarmReason = PhaseStarDisarmReason.None;
 
         visuals?.HideSafetyBubble();
         visuals?.ToggleShardRenderers(true);
@@ -385,9 +359,7 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasColoredDustAvailable()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var gen = _gfm?.dustGenerator;
-        return gen != null && gen.HasAnyDustWithRole();
+        return TryResolveContext(out _, out var dustGen) && dustGen.HasAnyDustWithRole();
     }
 
     private void StopManagedCoroutine(ref Coroutine co)
@@ -395,6 +367,32 @@ public class PhaseStar : MonoBehaviour
         if (co == null) return;
         StopCoroutine(co);
         co = null;
+    }
+
+    private GameFlowManager ResolveGameFlowManager()
+    {
+        _gfm ??= GameFlowManager.Instance;
+        return _gfm;
+    }
+
+    private bool TryResolveContext(out DrumTrack drum, out CosmicDustGenerator dustGen)
+    {
+        var gfm = ResolveGameFlowManager();
+        drum = _drum != null ? _drum : gfm?.activeDrumTrack;
+        dustGen = gfm?.dustGenerator;
+        return drum != null && dustGen != null;
+    }
+
+    private PhaseStarInteractionSnapshot BuildInteractionSnapshot(bool anyCollectablesInFlight = false, bool anyExpansionPending = false)
+    {
+        return new PhaseStarInteractionSnapshot(
+            _state,
+            _waitForDustCo != null,
+            _activeNode != null || _activeSuperNode != null,
+            anyCollectablesInFlight,
+            anyExpansionPending,
+            ZapProgress01 >= 1f,
+            _interactionState.Interaction);
     }
 
     private float GetTotalCharge()
@@ -458,7 +456,7 @@ public class PhaseStar : MonoBehaviour
     private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
     {
         if (track == null) return null;
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        ResolveGameFlowManager();
         int entropy = CurrentEntropyForSelection();
         return _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
     }
@@ -570,7 +568,7 @@ public class PhaseStar : MonoBehaviour
     private void TransitionZapState(ZapProgressState next, MusicalRole role, string reason)
     {
         if (_zapProgressState == next) return;
-        Debug.Log($"[PhaseStar:ZapState] {_zapProgressState}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} reason={reason}");
+        Debug.Log($"[PhaseStar:ZapState] {_zapProgressState}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} reason={reason} interaction=({_interactionState.ToDebugString()})");
         _zapProgressState = next;
     }
 
@@ -909,7 +907,7 @@ void Update()
 
     bool dominantReady = IsEjectionReady();
 
-    if (_previewVisual != null && _disarmReason != DisarmReason.SiblingActive)
+    if (_previewVisual != null && _disarmReason != PhaseStarDisarmReason.SiblingActive)
     {
         visuals?.UpdateDualDiamonds(
             _previewColor,
@@ -942,7 +940,7 @@ void Update()
         if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
         if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
 
-        if (visualScale01 > 0.001f && _disarmReason != DisarmReason.SiblingActive)
+        if (visualScale01 > 0.001f && _disarmReason != PhaseStarDisarmReason.SiblingActive)
         {
             visuals?.ToggleShardRenderers(true);
             Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
@@ -950,7 +948,7 @@ void Update()
         }
     }
     // Continuously lerp body color between dim and role color using charge level.
-    else if (visuals != null && !_burstOffScreen && _disarmReason != DisarmReason.SiblingActive)
+    else if (visuals != null && !_burstOffScreen && _disarmReason != PhaseStarDisarmReason.SiblingActive)
     {
         Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
         visuals.LerpBodyColor(bodyColor, _displayedCharge01);
@@ -962,7 +960,7 @@ void Update()
         if (visuals == null) return;
         if (_state != PhaseStarState.Dormant) return;
         if (_burstOffScreen) return;
-        if (_disarmReason == DisarmReason.SiblingActive) return;
+        if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
 
         if (!_dormantSeedVisualPrimed)
         {
@@ -997,7 +995,7 @@ void Update()
 
     bool AnyExpansionPendingGlobal()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        ResolveGameFlowManager();
         var tc = _gfm != null ? _gfm.controller : null;
         return (tc != null && tc.AnyExpansionPending());
     }
@@ -1016,13 +1014,13 @@ void Update()
     
     private bool AnyCollectablesInFlightGlobal()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        if (_gfm == null || _gfm.controller == null || _gfm.controller.tracks == null)
+        var gfm = ResolveGameFlowManager();
+        if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
             return false;
 
         bool any = false;
 
-        foreach (var t in _gfm.controller.tracks)
+        foreach (var t in gfm.controller.tracks)
         {
             if (t == null) continue;
 
@@ -1047,22 +1045,22 @@ void Update()
     private void ArmNext()
     {
         _stateController ??= new PhaseStarStateController();
-        if (!_stateController.CanArm(_state, _entryInProgress, _waitForDustCo != null, _activeNode != null || _activeSuperNode != null, _awaitingCollectableClear, _burstOffScreen)) return;
+        if (!_stateController.CanArm(BuildInteractionSnapshot())) return;
 
         if (AnyCollectablesInFlightGlobal())
         {
-            Disarm(DisarmReason.CollectablesInFlight);
+            Disarm(PhaseStarDisarmReason.CollectablesInFlight);
             return;
         }
 
         if (AnyExpansionPendingGlobal())
         {
             DBG("ArmNext: blocked by ExpansionPending -> Disarm:ExpansionPendingGlobal");
-            Disarm(DisarmReason.ExpansionPending);
+            Disarm(PhaseStarDisarmReason.ExpansionPending);
             return;
         }
 
-        _disarmReason = DisarmReason.None;
+        _disarmReason = PhaseStarDisarmReason.None;
         _isArmed = true;
 
         DeactivateSafetyBubble();
@@ -1080,7 +1078,7 @@ void Update()
     }
     public void Pause()
     {
-        Disarm(DisarmReason.SiblingActive);
+        Disarm(PhaseStarDisarmReason.SiblingActive);
         motion?.SetFrozen(true);
     }
 
@@ -1088,7 +1086,7 @@ void Update()
     {
         if (_isDisposing) return;
         _burstCoordinator ??= new PhaseStarBurstCoordinator();
-        _disarmReason = DisarmReason.None;
+        _disarmReason = PhaseStarDisarmReason.None;
         if (_burstOffScreen)
         {
             if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
@@ -1131,8 +1129,7 @@ void Update()
     
     private void RelocateToAvailableCell()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _drum != null ? _drum : _gfm?.activeDrumTrack;
+        var drum = TryResolveContext(out var resolvedDrum, out _) ? resolvedDrum : null;
         if (drum == null) return;
         Vector2Int cell = drum.GetRandomAvailableCell();
         if (cell.x < 0) return;
@@ -1140,7 +1137,7 @@ void Update()
         transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
     }
     
-    private void Disarm(DisarmReason reason, Color? tintOverride = null)
+    private void Disarm(PhaseStarDisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
         _disarmReason = reason;
@@ -1149,7 +1146,7 @@ void Update()
         DisableColliders();
 
         // CollectablesInFlight: move off-screen for the burst duration.
-        if (reason == DisarmReason.CollectablesInFlight)
+        if (reason == PhaseStarDisarmReason.CollectablesInFlight)
             HideInPlaceForBurst();
 
         // Scout should not be visible while disarmed.
@@ -1163,8 +1160,8 @@ void Update()
         if (!_burstOffScreen)
         {
             bool nodeIsAlive = _activeNode != null || _activeSuperNode != null;
-            bool hideCompletely = reason == DisarmReason.NodeResolving
-                               || reason == DisarmReason.AwaitBridge
+            bool hideCompletely = reason == PhaseStarDisarmReason.NodeResolving
+                               || reason == PhaseStarDisarmReason.AwaitBridge
                                || nodeIsAlive;
             SetVisual(hideCompletely ? VisualMode.Hidden : VisualMode.Dim,
                       tintOverride ?? ResolvePreviewColorByReadiness());
@@ -1193,7 +1190,7 @@ void Update()
             $"activeNode={(_activeNode ? _activeNode.name : null)} ejectInFlight={_ejectionInFlight} CIF={cif} EP={ep}");
 
         if (_isDisposing || this == null) return;
-        if (_disarmReason == DisarmReason.SiblingActive) return;
+        if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
 
         // ------------------------------------------------------------
         // 1) Awaiting collectable clear (post-node-resolution latch)
@@ -1203,11 +1200,11 @@ void Update()
             if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _activeSuperNode != null || _ejectionInFlight))
             {
                 Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
                 return;
             }
 
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            ResolveGameFlowManager();
             var drums = _drum != null ? _drum : _gfm?.activeDrumTrack;
 
             bool timedOut = false;
@@ -1239,7 +1236,7 @@ void Update()
             if (!timedOut)
             {
                 Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
                 return;
             }
 
@@ -1251,7 +1248,7 @@ void Update()
 
             if (!CanAdvancePhaseNow())
             {
-                Disarm(DisarmReason.NodeResolving, _lockedTint);
+                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
                 return;
             }
 
@@ -1265,7 +1262,7 @@ void Update()
         // ------------------------------------------------------------
         bool anyCollectables = AnyCollectablesInFlightGlobal();
         bool anyExpansion = AnyExpansionPendingGlobal();
-        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(anyCollectables, anyExpansion, ZapProgress01 >= 1f) ?? false;
+        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(BuildInteractionSnapshot(anyCollectables, anyExpansion)) ?? false;
 
         if (shouldDisarmForGate)
         {
@@ -1274,7 +1271,7 @@ void Update()
             else
                 Debug.Log($"[PS:LB] Any Expanding Global True");
 
-            Disarm(anyCollectables ? DisarmReason.CollectablesInFlight : DisarmReason.ExpansionPending, _lockedTint);
+            Disarm(anyCollectables ? PhaseStarDisarmReason.CollectablesInFlight : PhaseStarDisarmReason.ExpansionPending, _lockedTint);
             return;
         }
 
@@ -1317,7 +1314,7 @@ void Update()
             if (!HasDominantRoleEjectable())
             {
                 DBG("[PS:LB] armed but dominant role not ejectable -> returning to dormant");
-                Disarm(DisarmReason.None, _lockedTint);
+                Disarm(PhaseStarDisarmReason.None, _lockedTint);
                 EnterDormantWaitState();
                 return;
             }
@@ -1328,8 +1325,8 @@ void Update()
     
     private void DBG(string msg)
     {
-        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} armed={_isArmed} " +
-                  $"awaitCollectClear={_awaitingCollectableClear} preview={(_previewVisual != null ? 1 : 0)} " +
+        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} interaction=({_interactionState.ToDebugString()}) " +
+                  $"preview={(_previewVisual != null ? 1 : 0)} " +
                   $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
     }
     
@@ -1345,7 +1342,7 @@ void Update()
 
     private void OnDisable()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        ResolveGameFlowManager();
         var drum = _gfm?.activeDrumTrack;
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
@@ -1435,7 +1432,7 @@ void Update()
     sr.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
     sr.sortingOrder = _baseSortingOrder;
 
-    if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving || _disarmReason == DisarmReason.AwaitBridge))
+    if (!_isArmed && (_disarmReason == PhaseStarDisarmReason.NodeResolving || _disarmReason == PhaseStarDisarmReason.AwaitBridge))
         sr.enabled = false;
 
     _previewVisual = go.transform;
@@ -1451,7 +1448,7 @@ void Update()
     srB.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
     srB.sortingOrder = _baseSortingOrder;
 
-    if (!_isArmed && (_disarmReason == DisarmReason.NodeResolving || _disarmReason == DisarmReason.AwaitBridge))
+    if (!_isArmed && (_disarmReason == PhaseStarDisarmReason.NodeResolving || _disarmReason == PhaseStarDisarmReason.AwaitBridge))
         srB.enabled = false;
 
     _previewVisualB = goB.transform;
@@ -1464,7 +1461,7 @@ void Update()
 }
     private InstrumentTrack FindTrackByRole(MusicalRole role)
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        ResolveGameFlowManager();
         var controller = _gfm?.controller;
         if (controller == null || controller.tracks == null) return null;
 
@@ -1500,7 +1497,7 @@ void Update()
 
         if (AnyCollectablesInFlightGlobal())
         {
-            Disarm(DisarmReason.CollectablesInFlight, _lockedTint);
+            Disarm(PhaseStarDisarmReason.CollectablesInFlight, _lockedTint);
             Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
             return;
         }
@@ -1558,13 +1555,13 @@ void Update()
         if (_cachedTrack == null)
         {
             Trace("OnCollision: no directive/track → disarm and wait");
-            Disarm(DisarmReason.NodeResolving, _lockedTint);
+            Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
             return;
 
         }
         if (_previewRole != MusicalRole.None)
         {
-            if (_disarmReason == DisarmReason.SiblingActive) return;
+            if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
             EjectActivePreviewShardAndFlow(coll);
             return;
         }
@@ -1605,7 +1602,7 @@ void Update()
         {
             _ejectionInFlight = false;
             _activeNode = null;
-            Disarm(DisarmReason.NodeResolving, spawnTint);
+            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
             return;
         }
 
@@ -1639,13 +1636,13 @@ void Update()
             if (_state == PhaseStarState.BridgeInProgress) return;
 
             _awaitingCollectableClear = true;
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            ResolveGameFlowManager();
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
                 : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
             HideInPlaceForBurst();
-            Disarm(DisarmReason.NodeResolving, spawnTint);
+            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
             LogState("OnResolved");
         };
 
@@ -1685,7 +1682,7 @@ void Update()
         visuals?.HideAll();
         dust?.ResetTentacles();
 
-        Disarm(DisarmReason.NodeResolving, ejectedTrack.trackColor);
+        Disarm(PhaseStarDisarmReason.NodeResolving, ejectedTrack.trackColor);
 
         Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
@@ -1754,13 +1751,13 @@ void Update()
 
             if (_state == PhaseStarState.BridgeInProgress) return;
             _awaitingCollectableClear = true;
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            ResolveGameFlowManager();
             _awaitingCollectableClearSinceLoop = (_drum != null)
                 ? _drum.completedLoops
                 : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
             _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
             HideInPlaceForBurst();
-            Disarm(DisarmReason.NodeResolving, spawnTint);
+            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
             LogState("OnSuperNodeResolved");
         };
 
@@ -1776,7 +1773,7 @@ void Update()
         _lastImpactDir = (starPos - vehiclePos).normalized;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
-        Disarm(DisarmReason.NodeResolving, _cachedTrack.trackColor);
+        Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.trackColor);
         ActivateSafetyBubble();
         if (_cachedIsSuperNode)
             SpawnSuperNodeCommon(contact, _cachedTrack);
@@ -1861,7 +1858,7 @@ void Update()
             rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
         }
         int entropy = CurrentEntropyForSelection();
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        ResolveGameFlowManager();
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
  Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
@@ -1904,8 +1901,7 @@ void Update()
 
         string targetRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
         Debug.Log(
-            $"[PhaseStar][{where}] state={_state} armed={_isArmed} entry={_entryInProgress} burstOff={_burstOffScreen} " +
-            $"awaitClr={_awaitingCollectableClear} disarm={_disarmReason} " +
+            $"[PhaseStar][{where}] state={_state} interaction=({_interactionState.ToDebugString()}) " +
             $"role={targetRole} attunedRole={_attunedRole} charge={GetTotalCharge():0.00}");
     }
 
