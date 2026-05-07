@@ -113,6 +113,7 @@ public class PhaseStar : MonoBehaviour
     private IPhaseStarChargeModel _chargeModel;
     private IPhaseStarStateController _stateController;
     private IPhaseStarBurstCoordinator _burstCoordinator;
+    [SerializeField] private bool allowConcurrentDormantCharging = true;
 
     [Header("Shard Visuals (Charge-Alpha)")]
     [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
@@ -523,8 +524,6 @@ public class PhaseStar : MonoBehaviour
             requiredZapCount = int.MaxValue;
             _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
-            if (_zapProgressState == ZapProgressState.Seeking)
-                zappedCount = 0;
             return false;
         }
 
@@ -534,8 +533,6 @@ public class PhaseStar : MonoBehaviour
             requiredZapCount = int.MaxValue;
             _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
-            if (_zapProgressState == ZapProgressState.Seeking)
-                zappedCount = 0;
             return false;
         }
 
@@ -554,7 +551,7 @@ public class PhaseStar : MonoBehaviour
         bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
         _plannedEjectionDescriptor = nextDescriptor;
 
-        if (resetCurrentZapCount || (_zapProgressState == ZapProgressState.Seeking && descriptorChanged))
+        if (resetCurrentZapCount)
             zappedCount = 0;
 
         if (resetCurrentZapCount)
@@ -584,6 +581,35 @@ public class PhaseStar : MonoBehaviour
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
+    public int GetDesiredTentacleCount()
+    {
+        int desired = Mathf.Max(1, RequiredZapCount);
+
+        try
+        {
+            if (_plannedEjectionDescriptor.IsValid && _plannedEjectionDescriptor.noteSet != null)
+            {
+                int plannedCount = _plannedEjectionDescriptor.noteSet.GetNoteList()?.Count ?? 0;
+                desired = Mathf.Max(desired, plannedCount);
+            }
+            else
+            {
+                InstrumentTrack track = _plannedEjectionDescriptor.track != null
+                    ? _plannedEjectionDescriptor.track
+                    : _cachedTrack;
+
+                if (track != null)
+                {
+                    NoteSet fallback = ResolvePlannedNoteSet(track);
+                    int fallbackCount = fallback != null ? (fallback.GetNoteList()?.Count ?? 0) : 0;
+                    desired = Mathf.Max(desired, fallbackCount);
+                }
+            }
+        }
+        catch { }
+
+        return Mathf.Max(1, desired);
+    }
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
     private Vector2Int _lastResolvedZapCell;
@@ -602,6 +628,9 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public void OnCoordinatorLockOwnedByAnotherStar()
     {
+        if (allowConcurrentDormantCharging)
+            return;
+
         if (_state != PhaseStarState.Dormant)
             return;
 
@@ -625,6 +654,9 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public void OnCoordinatorLockReleasedAfterOwnerCooldown()
     {
+        if (allowConcurrentDormantCharging)
+            return;
+
         _coordinatorLockOwnedByOtherStar = false;
 
         if (_state != PhaseStarState.Dormant)
