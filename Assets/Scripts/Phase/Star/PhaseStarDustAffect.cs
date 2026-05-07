@@ -243,8 +243,47 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             TickKeepClear();
         }
 
+        AssignIdleTentacleTargets();
+
         foreach (var tentacle in _tentacles)
             TickTentacle(tentacle, dt);
+    }
+
+    private void AssignIdleTentacleTargets()
+    {
+        if (!_acquisitionEnabled || _navigator == null || _attunedRole == MusicalRole.None)
+            return;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
+        if (drum == null) return;
+
+        int remainingZapCount = _star != null ? _star.RemainingZapCount : fallbackTentaclesPerRole;
+        int activeTentacles = CountTentaclesInGrowthOrDrain();
+        int assignableCount = Mathf.Max(0, remainingZapCount - activeTentacles);
+        if (assignableCount <= 0) return;
+
+        var idleTentacles = new List<Tentacle>(assignableCount);
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.state == TentacleState.Idle && tentacle.role == _attunedRole)
+                idleTentacles.Add(tentacle);
+        }
+        if (idleTentacles.Count == 0) return;
+
+        int batchCount = Mathf.Min(assignableCount, idleTentacles.Count);
+        var excluded = BuildExcludedCells(requester: null);
+        if (!_navigator.TryGetTargetsForRole(_attunedRole, batchCount, excluded, out var targetCells))
+            return;
+
+        int pairCount = Mathf.Min(idleTentacles.Count, targetCells.Count);
+        for (int i = 0; i < pairCount; i++)
+        {
+            var tentacle = idleTentacles[i];
+            var cell = targetCells[i];
+            if (!IsTargetValid(cell, tentacle.role, tentacle, out _)) continue;
+            if (!TryReserveCell(tentacle, cell)) continue;
+            BeginGrowingTentacle(tentacle, cell, drum, transform.position);
+        }
     }
 
     private void TickTentacle(Tentacle tentacle, float dt)
@@ -258,18 +297,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         {
             case TentacleState.Idle:
             {
-                if (!_acquisitionEnabled) break;
-                if (gen == null || drum == null || _navigator == null) break;
-                if (_attunedRole == MusicalRole.None || tentacle.role != _attunedRole) break;
-                if (CountTentaclesInGrowthOrDrain() >= Mathf.Max(1, _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole)) break;
-
-                if (_navigator.TryGetTargetForRole(tentacle.role, out var cell, BuildExcludedCells(tentacle)) &&
-                    IsTargetValid(cell, tentacle.role, tentacle, out _) &&
-                    TryReserveCell(tentacle, cell))
-                {
-                    BeginGrowingTentacle(tentacle, cell, drum, starPos);
-                }
-
                 break;
             }
 
@@ -1053,7 +1080,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var excluded = new HashSet<Vector2Int>();
         foreach (var kv in _reservedCells)
         {
-            if (kv.Value != null && kv.Value != requester)
+            if (requester == null || (kv.Value != null && kv.Value != requester))
                 excluded.Add(kv.Key);
         }
 
