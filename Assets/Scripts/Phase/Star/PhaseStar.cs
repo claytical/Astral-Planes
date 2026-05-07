@@ -702,6 +702,13 @@ public class PhaseStar : MonoBehaviour
     {
         if (role == MusicalRole.None) return;
 
+        // Once readiness has been reached for this cycle, ignore late/extra resolves so
+        // additional tentacles cannot keep extending the cycle.
+        if (_zapProgressState == ZapProgressState.WaitingForRetract ||
+            _zapProgressState == ZapProgressState.ReadyLatched ||
+            _zapProgressState == ZapProgressState.Ejecting)
+            return;
+
         // Canonical zap progress path: increment exactly once per confirmed dust clear.
         zappedCount++;
         _lastResolvedZapRole = role;
@@ -712,7 +719,7 @@ public class PhaseStar : MonoBehaviour
             Debug.LogWarning($"[PhaseStar:ZapResolved] missing planned ejection descriptor; readiness blocked. role={role} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
         }
 
-        bool readyNow = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
+        bool readyNow = zappedCount >= requiredZapCount;
         if (readyNow)
         {
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
@@ -739,7 +746,7 @@ public class PhaseStar : MonoBehaviour
             return;
 
         // Safety: only latch readiness if zap requirements are truly satisfied.
-        bool canLatchReady = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
+        bool canLatchReady = zappedCount >= requiredZapCount;
         if (!canLatchReady)
         {
             MusicalRole fallbackRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
