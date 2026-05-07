@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -45,6 +46,8 @@ public sealed class StarPool : MonoBehaviour
 
     // The most recent ejecting Star — routes gravity void safety bubble calls.
     private PhaseStar _lastEjectingStar;
+    // Authoritative owner of the ejection lock. -1 means unlocked.
+    private int currentEjectingStarId = -1;
     // Role of the most recent ejecting Star — used for rollback when a burst had no notes.
     private MusicalRole _lastEjectedRole = MusicalRole.None;
     // True from ejection until the burst fully clears; blocks new star spawning.
@@ -63,6 +66,10 @@ public sealed class StarPool : MonoBehaviour
     // immediately. Without this flag, AnyCollectablesInFlight()=false after the vehicle
     // collects and deactivates notes would incorrectly look like an empty burst.
     private bool _ejectedBurstWasEmpty;
+
+    public event Action<int> OnEjectionLockAcquired;
+    public event Action<int> OnEjectionOwnerEnteredCooldown;
+    public event Action<int> OnEjectionLockReleased;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     private void Awake()
@@ -126,6 +133,7 @@ public sealed class StarPool : MonoBehaviour
         _pausedStars.Clear();
 
         _lastEjectingStar = null;
+        currentEjectingStarId = -1;
         _lastEjectedRole = MusicalRole.None;
         _mineNodePending = false;
         _mineNodeResolved = false;
@@ -291,6 +299,9 @@ public sealed class StarPool : MonoBehaviour
         _mineNodeResolved = false;
         _ejectedBurstWasEmpty = false;
 
+        currentEjectingStarId = !ReferenceEquals(star, null) ? star.GetInstanceID() : -1;
+        BroadcastEjectionLockAcquired(currentEjectingStarId);
+
         // Remove from active dict so the slot can be refilled.
         if (_activeStars.TryGetValue(role, out var active) && active == star)
         {
@@ -394,6 +405,7 @@ public sealed class StarPool : MonoBehaviour
             _mineNodeResolved = false;
             _mineNodePending = false;
             _ejectedBurstWasEmpty = false;
+            BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
             ResumeAll();
             CheckBridgeGate();
         }
@@ -438,6 +450,7 @@ public sealed class StarPool : MonoBehaviour
             _mineNodeResolved = false;
             _mineNodePending = false;
             Debug.Log($"[StarPool] Mine burst cleared — _mineNodePending=false");
+            BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
         }
 
         if (HasUnresolvedMineNodeSequence())
@@ -536,6 +549,49 @@ public sealed class StarPool : MonoBehaviour
     private void OnDisable()
     {
         UnsubscribeFromTracks();
+    }
+
+    private IEnumerable<PhaseStar> GetAllLiveStars()
+    {
+        var seen = new HashSet<PhaseStar>();
+
+        foreach (var star in _activeStars.Values)
+        {
+            if (ReferenceEquals(star, null) || !seen.Add(star)) continue;
+            yield return star;
+        }
+
+        foreach (var star in _pausedStars)
+        {
+            if (ReferenceEquals(star, null) || !seen.Add(star)) continue;
+            yield return star;
+        }
+
+        if (!ReferenceEquals(_lastEjectingStar, null) && seen.Add(_lastEjectingStar))
+            yield return _lastEjectingStar;
+    }
+
+    private void BroadcastEjectionLockAcquired(int ownerId)
+    {
+        if (ownerId < 0) return;
+        OnEjectionLockAcquired?.Invoke(ownerId);
+        foreach (var star in GetAllLiveStars())
+        {
+            if (star.GetInstanceID() == ownerId) continue;
+            star.OnCoordinatorLockOwnedByAnotherStar();
+        }
+    }
+
+    private void BroadcastEjectionOwnerEnteredCooldownAndRelease(int ownerId)
+    {
+        if (ownerId < 0) return;
+
+        OnEjectionOwnerEnteredCooldown?.Invoke(ownerId);
+        foreach (var star in GetAllLiveStars())
+            star.OnCoordinatorLockReleasedAfterOwnerCooldown();
+
+        OnEjectionLockReleased?.Invoke(ownerId);
+        currentEjectingStarId = -1;
     }
 
     // ── Nested: destroy relay ─────────────────────────────────────────────────
