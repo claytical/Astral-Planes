@@ -689,6 +689,16 @@ public class PhaseStar : MonoBehaviour
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
             return;
 
+        // Safety: only latch readiness if zap requirements are truly satisfied.
+        bool canLatchReady = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
+        if (!canLatchReady)
+        {
+            MusicalRole fallbackRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
+            var fallback = zappedCount > 0 ? ZapProgressState.Zapping : ZapProgressState.Seeking;
+            TransitionZapState(fallback, fallbackRole, "retract-without-required-zaps");
+            return;
+        }
+
         MusicalRole latchedRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
         TransitionZapState(ZapProgressState.ReadyLatched, latchedRole, "all-tentacles-retracted");
     }
