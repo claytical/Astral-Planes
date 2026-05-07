@@ -35,6 +35,12 @@ public class CosmicDustGenerator : MonoBehaviour
         public int   maxEnergyUnits;
         public MusicalRole role;
     }
+    private struct DustResistanceProfile
+    {
+        public float carveResistance01;
+        public float drainResistance01;
+    }
+    private readonly HashSet<string> _loggedInvalidResistanceContexts = new HashSet<string>();
     [Header("Dust Visual Timings")]
     [SerializeField] private DustVisualTimingSettings dustVisualTimingSettings;
     private CosmicDust.DustVisualTimings DustTimings => dustVisualTimingSettings != null
@@ -483,7 +489,9 @@ public class CosmicDustGenerator : MonoBehaviour
                     HasDustAt(gp))
                 {
                     existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
-                    existingDust.clearing.hardness01 = imprintHardness01;
+                    var resistance = ResolveResistanceProfile(gp, imprintRole, context: "GrowVoidDustDisk:existing");
+                    existingDust.clearing.carveResistance01 = resistance.carveResistance01;
+                    existingDust.clearing.drainResistance01 = resistance.drainResistance01;
                     continue;
                 }
 
@@ -498,7 +506,7 @@ public class CosmicDustGenerator : MonoBehaviour
                     continue;
 
                 _voidGrowCells.Add(gp);
-                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, imprintHardness01, growInSeconds));
+                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, growInSeconds));
             }
         }
 
@@ -546,7 +554,7 @@ public class CosmicDustGenerator : MonoBehaviour
     /// never explicitly "cleared" by gameplay — this bridges that gap so the
     /// collider doesn't linger as an invisible wall.
     /// </summary>
-    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float hardness01, float growInSeconds)
+    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds)
     {
         if (!IsInBounds(gp)) { _regrowthScheduler.VoidGrowCoroutines.Remove(gp); yield break; }
 
@@ -584,8 +592,9 @@ public class CosmicDustGenerator : MonoBehaviour
 
             // void uses remaining-bin time
             dust.SetGrowInDuration(growInSeconds);
-
-            dust.clearing.hardness01 = hardness01;
+            var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
+            dust.clearing.carveResistance01 = resistance.carveResistance01;
+            dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();
@@ -1051,9 +1060,9 @@ public class CosmicDustGenerator : MonoBehaviour
                 healDelay           = 0f
             };
 
-            dust.clearing.hardness01        = _imprints[gp].hardness01;
-            dust.clearing.carveResistance01 = roleProfile != null ? roleProfile.GetCarveResistance01() : 0f;
-            dust.clearing.drainResistance01 = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f;
+            var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
+            dust.clearing.carveResistance01 = resistance.carveResistance01;
+            dust.clearing.drainResistance01 = resistance.drainResistance01;
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
@@ -1171,7 +1180,7 @@ public class CosmicDustGenerator : MonoBehaviour
     /// <summary>
     /// Assigns a MusicalRole to every cell in the growth list via Voronoi (or a future
     /// archetype-specific layout), then writes a DustImprint for each cell so that
-    /// GetCellHardness01 and GetCellVisualColor return per-cell role values during spawn.
+    /// ResolveResistanceProfile and GetCellVisualColor return per-cell role values during spawn.
     /// </summary>
 private void BuildMazeRoleImprints(
     Vector2Int starCell,
@@ -1436,7 +1445,7 @@ private void AssignHiddenImprintsByNearestSeed(
 
         // --- Voronoi role imprint pass ---
         // Write a DustImprint for every cell before StaggeredGrowthFitDuration spawns them.
-        // GetOrCreateCellGO reads GetCellHardness01(gp) and GetCellVisualColor(gp) which
+        // GetOrCreateCellGO reads ResolveResistanceProfile(gp, ...) and GetCellVisualColor(gp) which
         // consult _imprints, so each cell spawns with the correct role color + hardness
         // without any further per-cell logic in the spawn loop.
         BuildMazeRoleImprints(starCell, cellsToFill);
@@ -2025,12 +2034,48 @@ private void AssignHiddenImprintsByNearestSeed(
         return _mazeTint;
     }
 
-    private float GetCellHardness01(Vector2Int cell)
+    private DustResistanceProfile ResolveResistanceProfile(Vector2Int cell, MusicalRole fallbackRole, string context)
     {
-        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
-            return Mathf.Clamp01(imp.hardness01);
+        float carve = 0f;
+        float drain = 0f;
 
-        return Mathf.Clamp01(defaultMazeHardness01);
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+        {
+            carve = imp.carveResistance01;
+            drain = imp.drainResistance01;
+            return ValidateResistanceProfile(new DustResistanceProfile
+            {
+                carveResistance01 = carve,
+                drainResistance01 = drain
+            }, $"{context}:imprint:{cell.x},{cell.y}");
+        }
+
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(fallbackRole);
+        if (roleProfile != null)
+        {
+            carve = roleProfile.GetCarveResistance01();
+            drain = roleProfile.GetDrainResistance01();
+        }
+
+        return ValidateResistanceProfile(new DustResistanceProfile
+        {
+            carveResistance01 = carve,
+            drainResistance01 = drain
+        }, $"{context}:role:{fallbackRole}");
+    }
+
+    private DustResistanceProfile ValidateResistanceProfile(DustResistanceProfile profile, string context)
+    {
+        float carve = Mathf.Clamp01(profile.carveResistance01);
+        float drain = Mathf.Clamp01(profile.drainResistance01);
+        if ((carve != profile.carveResistance01 || drain != profile.drainResistance01)
+            && _loggedInvalidResistanceContexts.Add(context))
+        {
+            Debug.LogWarning($"[DustResistance] Clamped invalid resistance data at {context}. carve={profile.carveResistance01:F3}->{carve:F3}, drain={profile.drainResistance01:F3}->{drain:F3}");
+        }
+        profile.carveResistance01 = carve;
+        profile.drainResistance01 = drain;
+        return profile;
     }
 
     // ---------------------------------------------------------------------------
@@ -2206,6 +2251,7 @@ private void AssignHiddenImprintsByNearestSeed(
         if (profile == null) return;
 
         _activeProfile = profile;
+        _loggedInvalidResistanceContexts.Clear();
 
         // Authoritative default: phase-authored maze tint.
 //        _mazeTint = profile.mazeColor;
@@ -2383,9 +2429,10 @@ private void AssignHiddenImprintsByNearestSeed(
                         dust.SetGrowInDuration(hexGrowInSeconds);
 
                         // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
-                        // GetCellHardness01 reads hardness01 from _imprints if available.
                         Color cellColor = GetCellVisualColor(grid);
-                        dust.clearing.hardness01 = GetCellHardness01(grid);
+                        var resistance = ResolveResistanceProfile(grid, MusicalRole.None, context: "SpawnDust");
+                        dust.clearing.carveResistance01 = resistance.carveResistance01;
+                        dust.clearing.drainResistance01 = resistance.drainResistance01;
 
                         // Apply role AND color together so dust.Role is set from birth.
                         // SetTint alone leaves dust.Role = None, which means RetintExisting
@@ -2725,8 +2772,9 @@ private void AssignHiddenImprintsByNearestSeed(
 
         if (TryGetDustAt(cell, out var dust))
         {
-            dust.clearing.carveResistance01 = profile.GetCarveResistance01();
-            dust.clearing.drainResistance01 = profile.GetDrainResistance01();
+            var resistance = ResolveResistanceProfile(cell, role, context: "PaintDustExhaust");
+            dust.clearing.carveResistance01 = resistance.carveResistance01;
+            dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, color, (float)exhaustUnits / maxUnits, maxUnits);
             dust.SyncParticleColor();
         }
