@@ -109,6 +109,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private float _keepClearTimer;
     private readonly Dictionary<Vector2Int, Tentacle> _reservedCells = new();
     private readonly HashSet<Vector2Int> _zappedThisCycle = new();
+    private readonly List<Vector2Int> _coloredCellsScratch = new(512);
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
@@ -258,7 +259,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         if (_attunedRole == MusicalRole.None) return;
 
-        int desiredCount = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
+        int desiredCount = DetermineDesiredTentacleCount();
         int currentCount = 0;
         for (int i = 0; i < _tentacles.Count; i++)
             if (_tentacles[i].role == _attunedRole) currentCount++;
@@ -987,7 +988,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (role == MusicalRole.None) return;
 
-        int tentacleCount = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
+        int tentacleCount = DetermineDesiredTentacleCount();
         for (int i = 0; i < tentacleCount; i++)
         {
             var tentacle = new Tentacle
@@ -1002,6 +1003,28 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             tentacle.line = CreateTentacleLine(role, tentacle);
             _tentacles.Add(tentacle);
         }
+    }
+
+    private int DetermineDesiredTentacleCount()
+    {
+        int desiredByZap = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+        if (gen == null || _attunedRole == MusicalRole.None)
+            return desiredByZap;
+
+        gen.GetColoredDustCells(_coloredCellsScratch);
+        int matchingDust = 0;
+        for (int i = 0; i < _coloredCellsScratch.Count; i++)
+        {
+            var cell = _coloredCellsScratch[i];
+            if (!gen.TryGetDustAt(cell, out var dust) || dust == null) continue;
+            if (dust.Role != _attunedRole) continue;
+            if (dust.currentEnergyUnits <= 0) continue;
+            matchingDust++;
+        }
+
+        return Mathf.Max(desiredByZap, matchingDust);
     }
 
     private int CountTentaclesInGrowthOrDrain()
