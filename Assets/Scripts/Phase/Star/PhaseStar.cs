@@ -564,8 +564,6 @@ public class PhaseStar : MonoBehaviour
         if (_state != PhaseStarState.Dormant)
             return;
 
-        _coordinatorLockOwnedByOtherStar = true;
-
         bool canSuspend =
             _zapProgressState == ZapProgressState.Seeking ||
             _zapProgressState == ZapProgressState.Zapping ||
@@ -575,6 +573,7 @@ public class PhaseStar : MonoBehaviour
         if (!canSuspend)
             return;
 
+        _coordinatorLockOwnedByOtherStar = true;
         _preservedZapProgressStateBeforeCoordinatorLock = _zapProgressState;
         TransitionZapState(ZapProgressState.DormantNotSeeking, _requiredZapRole, "coordinator-lock-owned-by-other");
     }
@@ -801,9 +800,19 @@ public class PhaseStar : MonoBehaviour
         return c;
     }
 
-    void Update()
+void Update()
 {
     float dt = Time.deltaTime;
+
+    // Recovery guard: if we are already latched and not blocked by another star's
+    // coordinator lock, ensure we proceed to active wake/collision flow.
+    if (_state == PhaseStarState.Dormant &&
+        _zapProgressState == ZapProgressState.ReadyLatched &&
+        !_pendingDormantActivation &&
+        !_coordinatorLockOwnedByOtherStar)
+    {
+        TransitionDormantToActive();
+    }
 
     if (_pendingDormantActivation && dust != null && !dust.HasActiveTentacles)
         FinalizeDormantToActiveAfterRetract();
