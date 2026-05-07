@@ -922,7 +922,8 @@ void Update()
             _previewColor = ResolveRoleColor(dominantRole);
 
             _cachedTrack = FindTrackByRole(dominantRole);
-            TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
+            if (zappedCount == 0)
+                TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
             visuals?.ResetDualDiamondVisualState();
         }
         else
@@ -932,7 +933,8 @@ void Update()
             if (trackChanged)
             {
                 _cachedTrack = latestTrack;
-                TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+                if (zappedCount == 0)
+                    TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
             }
         }
 
