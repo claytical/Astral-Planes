@@ -491,7 +491,7 @@ public class PhaseStar : MonoBehaviour
         public NoteSet noteSet;
         public int requiredZapCount;
 
-        public bool IsValid => role != MusicalRole.None && track != null && noteSet != null && requiredZapCount > 0;
+        public bool IsValid => role != MusicalRole.None && track != null && requiredZapCount > 0;
     }
 
     private PlannedEjectionDescriptor _plannedEjectionDescriptor;
@@ -536,11 +536,17 @@ public class PhaseStar : MonoBehaviour
             return false;
         }
 
-        int noteCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-        if (noteCount <= 0)
-            noteCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-        if (noteCount <= 0)
-            noteCount = planned.GetNoteList()?.Count ?? 0;
+        int noteCount;
+        if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
+        {
+            int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
+            int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
+            int noteListCount = planned.GetNoteList()?.Count ?? 0;
+            noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+        }
+
+        if (_currentBurstRequiredZaps > 0)
+            noteCount = Mathf.Max(noteCount, _currentBurstRequiredZaps);
 
         nextDescriptor.noteSet = planned;
         nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
@@ -578,37 +584,15 @@ public class PhaseStar : MonoBehaviour
     private bool _coordinatorLockOwnedByOtherStar;
     private int zappedCount;
     private int requiredZapCount = 1;
+    private int _currentBurstRequiredZaps = 0;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
     public int GetDesiredTentacleCount()
     {
-        int desired = Mathf.Max(1, RequiredZapCount);
-
-        try
-        {
-            if (_plannedEjectionDescriptor.IsValid && _plannedEjectionDescriptor.noteSet != null)
-            {
-                int plannedCount = _plannedEjectionDescriptor.noteSet.GetNoteList()?.Count ?? 0;
-                desired = Mathf.Max(desired, plannedCount);
-            }
-            else
-            {
-                InstrumentTrack track = _plannedEjectionDescriptor.track != null
-                    ? _plannedEjectionDescriptor.track
-                    : _cachedTrack;
-
-                if (track != null)
-                {
-                    NoteSet fallback = ResolvePlannedNoteSet(track);
-                    int fallbackCount = fallback != null ? (fallback.GetNoteList()?.Count ?? 0) : 0;
-                    desired = Mathf.Max(desired, fallbackCount);
-                }
-            }
-        }
-        catch { }
-
-        return Mathf.Max(1, desired);
+        // Prefer the resolved burst payload count when available; this avoids first-frame/order
+        // races where requiredZapCount is still catching up from refresh probes.
+        return Mathf.Max(1, Mathf.Max(RequiredZapCount, _currentBurstRequiredZaps));
     }
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
@@ -718,6 +702,13 @@ public class PhaseStar : MonoBehaviour
     {
         if (role == MusicalRole.None) return;
 
+        // Once readiness has been reached for this cycle, ignore late/extra resolves so
+        // additional tentacles cannot keep extending the cycle.
+        if (_zapProgressState == ZapProgressState.WaitingForRetract ||
+            _zapProgressState == ZapProgressState.ReadyLatched ||
+            _zapProgressState == ZapProgressState.Ejecting)
+            return;
+
         // Canonical zap progress path: increment exactly once per confirmed dust clear.
         zappedCount++;
         _lastResolvedZapRole = role;
@@ -728,7 +719,7 @@ public class PhaseStar : MonoBehaviour
             Debug.LogWarning($"[PhaseStar:ZapResolved] missing planned ejection descriptor; readiness blocked. role={role} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
         }
 
-        bool readyNow = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
+        bool readyNow = zappedCount >= requiredZapCount;
         if (readyNow)
         {
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
@@ -755,7 +746,7 @@ public class PhaseStar : MonoBehaviour
             return;
 
         // Safety: only latch readiness if zap requirements are truly satisfied.
-        bool canLatchReady = _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount;
+        bool canLatchReady = zappedCount >= requiredZapCount;
         if (!canLatchReady)
         {
             MusicalRole fallbackRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
@@ -938,7 +929,8 @@ void Update()
             _previewColor = ResolveRoleColor(dominantRole);
 
             _cachedTrack = FindTrackByRole(dominantRole);
-            TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
+            if (zappedCount == 0)
+                TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
             visuals?.ResetDualDiamondVisualState();
         }
         else
@@ -948,7 +940,8 @@ void Update()
             if (trackChanged)
             {
                 _cachedTrack = latestTrack;
-                TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+                if (zappedCount == 0)
+                    TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
             }
         }
 
@@ -1912,10 +1905,41 @@ void Update()
         int entropy = CurrentEntropyForSelection();
         ResolveGameFlowManager();
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
+        if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
+            _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
  Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
     }
+    private bool TryResolveAuthoritativeZapCount(MusicalRole role, InstrumentTrack track, out int noteCount)
+    {
+        noteCount = 0;
+        if (_assignedMotif == null || track == null || role == MusicalRole.None)
+            return false;
+
+        int totalBins = Mathf.Max(1, track.maxLoopMultiplier);
+        // Zap objective corresponds to authored motif payload for the role.
+        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins);
+        if (cfg == null) return false;
+
+        if (cfg.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
+        {
+            noteCount = cfg.riff.riff.events.Count;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int GetNoteSetNoteCount(NoteSet noteSet)
+    {
+        if (noteSet == null) return 0;
+        int persistentTemplateCount = noteSet.persistentTemplate != null ? noteSet.persistentTemplate.Count : 0;
+        int distinctStepCount = noteSet.GetStepList()?.Distinct().Count() ?? 0;
+        int noteListCount = noteSet.GetNoteList()?.Count ?? 0;
+        return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+    }
+
     private int CurrentEntropyForSelection() {
         return 0;
     }
