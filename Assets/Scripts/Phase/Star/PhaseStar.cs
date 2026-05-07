@@ -113,6 +113,7 @@ public class PhaseStar : MonoBehaviour
     private IPhaseStarChargeModel _chargeModel;
     private IPhaseStarStateController _stateController;
     private IPhaseStarBurstCoordinator _burstCoordinator;
+    [SerializeField] private bool allowConcurrentDormantCharging = true;
 
     [Header("Shard Visuals (Charge-Alpha)")]
     [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
@@ -631,6 +632,9 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public void OnCoordinatorLockOwnedByAnotherStar()
     {
+        if (allowConcurrentDormantCharging)
+            return;
+
         if (_state != PhaseStarState.Dormant)
             return;
 
@@ -654,6 +658,9 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public void OnCoordinatorLockReleasedAfterOwnerCooldown()
     {
+        if (allowConcurrentDormantCharging)
+            return;
+
         _coordinatorLockOwnedByOtherStar = false;
 
         if (_state != PhaseStarState.Dormant)
