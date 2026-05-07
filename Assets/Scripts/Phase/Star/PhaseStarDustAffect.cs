@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 [DisallowMultipleComponent]
 public sealed class PhaseStarDustAffect : MonoBehaviour
@@ -20,7 +21,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [SerializeField] private float tentacleFlowSpeed = 1.2f;
     [SerializeField] private float tentacleWidth = 0.13f;
     [SerializeField] private float dissolveDuration = 0.8f;
-    [SerializeField, Min(1)] private int maxLinesPerRole = 3;
+    [FormerlySerializedAs("maxLinesPerRole")]
+    [SerializeField, Min(1)] private int fallbackTentaclesPerRole = 3;
     [SerializeField] private Material tentacleMaterial;
     [SerializeField, Min(1)] private int invalidTargetRetryFrames = 3;
     [SerializeField, Min(0f)] private float invalidTargetRetryMs = 120f;
@@ -129,7 +131,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         int slotIndex = 0;
         for (int i = 0; i < roles.Count; i++)
         {
-            for (int j = 0; j < maxLinesPerRole; j++, slotIndex++)
+            int tentaclesForRole = Mathf.Max(1, star != null ? star.RequiredZapCount : fallbackTentaclesPerRole);
+            for (int j = 0; j < tentaclesForRole; j++, slotIndex++)
             {
                 var tentacle = new Tentacle
                 {
