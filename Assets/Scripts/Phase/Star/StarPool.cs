@@ -301,6 +301,7 @@ public sealed class StarPool : MonoBehaviour
 
         currentEjectingStarId = !ReferenceEquals(star, null) ? star.GetInstanceID() : -1;
         BroadcastEjectionLockAcquired(currentEjectingStarId);
+        BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
 
         // Remove from active dict so the slot can be refilled.
         if (_activeStars.TryGetValue(role, out var active) && active == star)
@@ -405,7 +406,6 @@ public sealed class StarPool : MonoBehaviour
             _mineNodeResolved = false;
             _mineNodePending = false;
             _ejectedBurstWasEmpty = false;
-            BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
             ResumeAll();
             CheckBridgeGate();
         }
@@ -450,7 +450,6 @@ public sealed class StarPool : MonoBehaviour
             _mineNodeResolved = false;
             _mineNodePending = false;
             Debug.Log($"[StarPool] Mine burst cleared — _mineNodePending=false");
-            BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
         }
 
         if (HasUnresolvedMineNodeSequence())
