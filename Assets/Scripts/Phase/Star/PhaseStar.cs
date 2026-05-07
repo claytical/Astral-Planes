@@ -537,6 +537,7 @@ public class PhaseStar : MonoBehaviour
     private enum ZapProgressState { Seeking, DormantNotSeeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
     private ZapProgressState _preservedZapProgressStateBeforeCoordinatorLock = ZapProgressState.Seeking;
+    private bool _coordinatorLockOwnedByOtherStar;
     private int zappedCount;
     private int requiredZapCount = 1;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
@@ -563,8 +564,11 @@ public class PhaseStar : MonoBehaviour
         if (_state != PhaseStarState.Dormant)
             return;
 
+        _coordinatorLockOwnedByOtherStar = true;
+
         bool canSuspend =
             _zapProgressState == ZapProgressState.Seeking ||
+            _zapProgressState == ZapProgressState.Zapping ||
             _zapProgressState == ZapProgressState.WaitingForRetract ||
             _zapProgressState == ZapProgressState.ReadyLatched;
 
@@ -581,13 +585,29 @@ public class PhaseStar : MonoBehaviour
     /// </summary>
     public void OnCoordinatorLockReleasedAfterOwnerCooldown()
     {
+        _coordinatorLockOwnedByOtherStar = false;
+
+        if (_state != PhaseStarState.Dormant)
+            return;
+
+        if (_zapProgressState == ZapProgressState.ReadyLatched)
+        {
+            // Readiness was achieved while suspended. Now that the lock/cooldown is clear,
+            // proceed through the normal dormant->active wake path.
+            TransitionDormantToActive();
+            return;
+        }
+
         if (_zapProgressState != ZapProgressState.DormantNotSeeking)
             return;
 
         var restore = _preservedZapProgressStateBeforeCoordinatorLock;
         bool wasPreservedReady = restore == ZapProgressState.ReadyLatched || restore == ZapProgressState.WaitingForRetract;
-        var next = wasPreservedReady ? ZapProgressState.ReadyLatched : ZapProgressState.Seeking;
+        var next = wasPreservedReady ? ZapProgressState.WaitingForRetract : ZapProgressState.Seeking;
         TransitionZapState(next, _requiredZapRole, "coordinator-lock-released-owner-cooldown");
+
+        if (next == ZapProgressState.WaitingForRetract)
+            TransitionDormantToActive();
     }
 
     private void EnsureSubcomponents()
@@ -642,7 +662,7 @@ public class PhaseStar : MonoBehaviour
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
             dust?.BeginRetractionForActiveTentacles();
 
-            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation)
+            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation && !_coordinatorLockOwnedByOtherStar)
                 TransitionDormantToActive();
         }
 
@@ -654,7 +674,9 @@ public class PhaseStar : MonoBehaviour
     {
         if (_pendingDormantActivation)
             FinalizeDormantToActiveAfterRetract();
-        else if (_state == PhaseStarState.Dormant && _zapProgressState == ZapProgressState.WaitingForRetract)
+        else if (_state == PhaseStarState.Dormant &&
+                 _zapProgressState == ZapProgressState.WaitingForRetract &&
+                 !_coordinatorLockOwnedByOtherStar)
             FinalizeDormantToActiveAfterRetract(force: true);
 
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
