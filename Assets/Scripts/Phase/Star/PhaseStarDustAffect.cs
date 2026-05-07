@@ -22,7 +22,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [SerializeField] private float tentacleWidth = 0.13f;
     [SerializeField] private float dissolveDuration = 0.8f;
     [FormerlySerializedAs("maxLinesPerRole")]
-    [SerializeField, Min(1)] private int fallbackTentaclesPerRole = 3;
+    [SerializeField, Min(1)] private int fallbackTentaclesPerRole = 10;
     [SerializeField] private Material tentacleMaterial;
     [SerializeField, Min(1)] private int invalidTargetRetryFrames = 3;
     [SerializeField, Min(0f)] private float invalidTargetRetryMs = 120f;
