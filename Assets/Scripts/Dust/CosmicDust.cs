@@ -91,11 +91,12 @@ public partial class CosmicDust : MonoBehaviour {
     public struct DustClearingSettings
     {
         [Header("Imprint (from MineNodes)")]
-        [Range(0f, 1f)] public float hardness01; // Legacy — kept for migration. Use carveResistance01 / drainResistance01.
+        [Tooltip("Legacy migration-only field. Runtime gameplay should read carveResistance01 (vehicle) and drainResistance01 (PhaseStar).")]
+        [Range(0f, 1f)] public float hardness01; // Migration-only legacy value.
 
         [Header("Two-Axis Resistance")]
-        [Range(0f, 1f)] public float carveResistance01; // Vehicle plow resistance. 0=instant, 1=nearly indestructible.
-        [Range(0f, 1f)] public float drainResistance01; // PhaseStar drain resistance. 0=drains fast, 1=very slow.
+        [Range(0f, 1f)] public float carveResistance01; // Vehicle interaction resistance. 0=instant carve, 1=very resistant.
+        [Range(0f, 1f)] public float drainResistance01; // PhaseStar interaction resistance. 0=drains fast, 1=very slow.
     }
     [SerializeField] public DustVisualSettings visual = new DustVisualSettings
     {
@@ -678,7 +679,6 @@ private Coroutine _jiggleRoutine;
         var dormantTint = _currentTint;
         dormantTint.a = 0.35f;
         ApplyDisplayedTint(dormantTint);
-        clearing.hardness01        = 0f;
         clearing.carveResistance01 = 0f;
         clearing.drainResistance01 = 0f;
         _maxEnergyUnits            = 1;
