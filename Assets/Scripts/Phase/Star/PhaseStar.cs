@@ -316,6 +316,14 @@ public class PhaseStar : MonoBehaviour
 
         StopManagedCoroutine(ref _waitForDustCo);
         _pendingDormantActivation = true;
+
+        // If we are already latched/retracted, don't force WaitingForRetract again.
+        // Re-entering WaitingForRetract here can leave the star in a non-ejectable state
+        // when no additional retract event is emitted.
+        bool alreadyRetracted = _zapProgressState == ZapProgressState.ReadyLatched || (dust != null && !dust.HasActiveTentacles);
+        if (alreadyRetracted)
+            return;
+
         TransitionZapState(ZapProgressState.WaitingForRetract, _requiredZapRole, "dormant-threshold-hit");
         dust?.BeginRetractionForActiveTentacles();
     }
