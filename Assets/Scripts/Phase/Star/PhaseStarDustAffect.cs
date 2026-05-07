@@ -302,12 +302,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
-        int concurrentTentacleLimit = _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole;
-        int activeTentacles = CountTentaclesInGrowthOrDrain();
-        int assignableCount = Mathf.Max(0, concurrentTentacleLimit - activeTentacles);
-        if (assignableCount <= 0) return;
+        // Acquire targets for all currently-idle tentacles. Activation gating remains in PhaseStar
+        // (required zap count + retract completion), so over-targeting here is safe and avoids
+        // single-tentacle starvation/order races.
+        int assignableCount = 0;
 
-        var idleTentacles = new List<Tentacle>(assignableCount);
+        var idleTentacles = new List<Tentacle>();
         foreach (var tentacle in _tentacles)
         {
             if (tentacle.state == TentacleState.Idle && tentacle.role == _attunedRole)
@@ -315,6 +315,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
         if (idleTentacles.Count == 0) return;
 
+        assignableCount = idleTentacles.Count;
         int batchCount = Mathf.Min(assignableCount, idleTentacles.Count);
         if (batchCount <= 0) return;
 
