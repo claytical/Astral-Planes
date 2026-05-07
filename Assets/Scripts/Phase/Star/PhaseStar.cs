@@ -400,6 +400,24 @@ public class PhaseStar : MonoBehaviour
             _interactionState.Interaction);
     }
 
+    private bool TryEnterBurstHidden()
+    {
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
+        bool burstOffScreen = _burstOffScreen;
+        bool changed = _burstCoordinator.TryEnterBurstHidden(ref burstOffScreen);
+        _burstOffScreen = burstOffScreen;
+        return changed;
+    }
+
+    private bool TryExitBurstHidden()
+    {
+        _burstCoordinator ??= new PhaseStarBurstCoordinator();
+        bool burstOffScreen = _burstOffScreen;
+        bool changed = _burstCoordinator.TryExitBurstHidden(ref burstOffScreen);
+        _burstOffScreen = burstOffScreen;
+        return changed;
+    }
+
     private float GetTotalCharge()
     {
         _chargeModel ??= new PhaseStarChargeModel(_starCharge);
@@ -1090,11 +1108,10 @@ void Update()
     public void Resume()
     {
         if (_isDisposing) return;
-        _burstCoordinator ??= new PhaseStarBurstCoordinator();
         _disarmReason = PhaseStarDisarmReason.None;
         if (_burstOffScreen)
         {
-            if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+            if (TryExitBurstHidden())
                 motion?.Enable(true);
             EnterDormantWaitState();
             return;
@@ -1117,8 +1134,7 @@ void Update()
     // Guarded — safe to call repeatedly; only executes on the first call per burst.
     private void HideInPlaceForBurst()
     {
-        _burstCoordinator ??= new PhaseStarBurstCoordinator();
-        if (!_burstCoordinator.TryEnterBurstHidden(ref _burstOffScreen)) return;
+        if (!TryEnterBurstHidden()) return;
 
         StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
@@ -1293,12 +1309,11 @@ void Update()
         // ------------------------------------------------------------
         if (!_isArmed)
         {
-            _burstCoordinator ??= new PhaseStarBurstCoordinator();
             // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
             // CIF-triggered hide is safe to reset. Restore motion before arming.
             if (_burstOffScreen)
             {
-                if (_burstCoordinator?.TryExitBurstHidden(ref _burstOffScreen) ?? false)
+                if (TryExitBurstHidden())
                 {
                     motion?.Enable(true);
                     motion?.SetFrozen(false);
