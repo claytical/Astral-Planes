@@ -596,7 +596,7 @@ public class PhaseStar : MonoBehaviour
             {
                 InstrumentTrack track = _plannedEjectionDescriptor.track != null
                     ? _plannedEjectionDescriptor.track
-                    : (_cachedTrack != null ? _cachedTrack : GameFlowManager.Instance?.activeDrumTrack);
+                    : _cachedTrack;
 
                 if (track != null)
                 {
