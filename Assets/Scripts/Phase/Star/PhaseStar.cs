@@ -94,6 +94,11 @@ public class PhaseStar : MonoBehaviour
     [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
     private bool _awaitingCollectableClear { get => _interactionState.Interaction.AwaitingCollectableClear; set => _interactionState.Interaction.AwaitingCollectableClear = value; }
     private bool _hasReceivedEnergy { get => _interactionState.ChargeVisual.HasReceivedEnergy; set => _interactionState.ChargeVisual.HasReceivedEnergy = value; }   // set true on first drain delivery; drives gray→role color lerp
+    private PhaseStarDisarmReason _disarmReason
+    {
+        get => (PhaseStarDisarmReason)_interactionState.Interaction.DisarmReason;
+        set => _interactionState.Interaction.DisarmReason = (int)value;
+    }
 
     // True while the star is parked off-screen during a collectable burst.
     // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
