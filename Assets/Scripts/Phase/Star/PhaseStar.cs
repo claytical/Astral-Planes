@@ -1915,7 +1915,7 @@ void Update()
         var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins);
         if (cfg == null) return false;
 
-        if (cfg.riff != null && cfg.riff.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
+        if (cfg.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
         {
             noteCount = cfg.riff.riff.events.Count;
             return true;
