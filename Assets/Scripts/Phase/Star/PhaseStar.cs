@@ -822,7 +822,7 @@ void Update()
         TransitionDormantToActive();
     }
 
-    if (_pendingDormantActivation && dust != null && !dust.HasActiveTentacles)
+    if (_pendingDormantActivation && (dust == null || !dust.HasActiveTentacles))
         FinalizeDormantToActiveAfterRetract();
 
     _accumulatorRotAngle += accumulatorRotSpeed * dt;
