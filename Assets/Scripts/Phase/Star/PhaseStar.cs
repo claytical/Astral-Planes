@@ -584,6 +584,35 @@ public class PhaseStar : MonoBehaviour
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
+    public int GetDesiredTentacleCount()
+    {
+        int desired = Mathf.Max(1, RequiredZapCount);
+
+        try
+        {
+            if (_plannedEjectionDescriptor.IsValid && _plannedEjectionDescriptor.noteSet != null)
+            {
+                int plannedCount = _plannedEjectionDescriptor.noteSet.GetNoteList()?.Count ?? 0;
+                desired = Mathf.Max(desired, plannedCount);
+            }
+            else
+            {
+                InstrumentTrack track = _plannedEjectionDescriptor.track != null
+                    ? _plannedEjectionDescriptor.track
+                    : (_cachedTrack != null ? _cachedTrack : GameFlowManager.Instance?.activeDrumTrack);
+
+                if (track != null)
+                {
+                    NoteSet fallback = ResolvePlannedNoteSet(track);
+                    int fallbackCount = fallback != null ? (fallback.GetNoteList()?.Count ?? 0) : 0;
+                    desired = Mathf.Max(desired, fallbackCount);
+                }
+            }
+        }
+        catch { }
+
+        return Mathf.Max(1, desired);
+    }
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
     private Vector2Int _lastResolvedZapCell;

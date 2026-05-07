@@ -258,7 +258,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         if (_attunedRole == MusicalRole.None) return;
 
-        int desiredCount = Mathf.Max(1, _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole);
+        int desiredCount = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
         int currentCount = 0;
         for (int i = 0; i < _tentacles.Count; i++)
             if (_tentacles[i].role == _attunedRole) currentCount++;
@@ -302,7 +302,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
-        int concurrentTentacleLimit = _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole;
+        int concurrentTentacleLimit = _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole;
         int activeTentacles = CountTentaclesInGrowthOrDrain();
         int assignableCount = Mathf.Max(0, concurrentTentacleLimit - activeTentacles);
         if (assignableCount <= 0) return;
@@ -986,7 +986,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
         if (role == MusicalRole.None) return;
 
-        int tentacleCount = Mathf.Max(1, _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole);
+        int tentacleCount = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
         for (int i = 0; i < tentacleCount; i++)
         {
             var tentacle = new Tentacle
