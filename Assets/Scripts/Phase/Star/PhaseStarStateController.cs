@@ -2,19 +2,24 @@ using UnityEngine;
 
 public interface IPhaseStarStateController
 {
-    bool CanArm(PhaseStarState state, bool entryInProgress, bool hasWaitCoroutine, bool hasActiveNode, bool awaitingCollectableClear, bool burstOffScreen);
-    bool ShouldDisarmForGlobalGates(bool anyCollectablesInFlight, bool anyExpansionPending, bool isReadyDisplay);
+    bool CanArm(in PhaseStarInteractionSnapshot snapshot);
+    bool ShouldDisarmForGlobalGates(in PhaseStarInteractionSnapshot snapshot);
 }
 
 public sealed class PhaseStarStateController : IPhaseStarStateController
 {
-    public bool CanArm(PhaseStarState state, bool entryInProgress, bool hasWaitCoroutine, bool hasActiveNode, bool awaitingCollectableClear, bool burstOffScreen)
-        => state == PhaseStarState.WaitingForPoke && !entryInProgress && !hasWaitCoroutine && !hasActiveNode && !awaitingCollectableClear && !burstOffScreen;
+    public bool CanArm(in PhaseStarInteractionSnapshot snapshot)
+        => snapshot.State == PhaseStarState.WaitingForPoke
+           && !snapshot.Interaction.EntryInProgress
+           && !snapshot.HasWaitCoroutine
+           && !snapshot.HasActiveNode
+           && !snapshot.Interaction.AwaitingCollectableClear
+           && !snapshot.Interaction.BurstOffScreen;
 
-    public bool ShouldDisarmForGlobalGates(bool anyCollectablesInFlight, bool anyExpansionPending, bool isReadyDisplay)
+    public bool ShouldDisarmForGlobalGates(in PhaseStarInteractionSnapshot snapshot)
     {
-        if (anyCollectablesInFlight) return true;
-        if (!anyExpansionPending) return false;
-        return !isReadyDisplay;
+        if (snapshot.AnyCollectablesInFlight) return true;
+        if (!snapshot.AnyExpansionPending) return false;
+        return !snapshot.IsReadyDisplay;
     }
 }
