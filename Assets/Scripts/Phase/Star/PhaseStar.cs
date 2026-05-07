@@ -548,7 +548,16 @@ public class PhaseStar : MonoBehaviour
         nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
 
         _requiredZapNoteSetAvailable = nextDescriptor.IsValid;
-        requiredZapCount = nextDescriptor.requiredZapCount;
+
+        bool shouldLatchExistingCount =
+            !resetCurrentZapCount &&
+            zappedCount > 0 &&
+            (_zapProgressState == ZapProgressState.Zapping ||
+             _zapProgressState == ZapProgressState.WaitingForRetract ||
+             _zapProgressState == ZapProgressState.ReadyLatched);
+
+        if (!shouldLatchExistingCount)
+            requiredZapCount = nextDescriptor.requiredZapCount;
 
         bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
         _plannedEjectionDescriptor = nextDescriptor;
