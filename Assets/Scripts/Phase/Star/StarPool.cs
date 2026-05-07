@@ -588,7 +588,10 @@ public sealed class StarPool : MonoBehaviour
 
         OnEjectionOwnerEnteredCooldown?.Invoke(ownerId);
         foreach (var star in GetAllLiveStars())
+        {
+            if (star == null) continue;
             star.OnCoordinatorLockReleasedAfterOwnerCooldown();
+        }
 
         OnEjectionLockReleased?.Invoke(ownerId);
         currentEjectingStarId = -1;
