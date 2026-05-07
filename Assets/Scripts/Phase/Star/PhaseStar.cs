@@ -536,11 +536,13 @@ public class PhaseStar : MonoBehaviour
             return false;
         }
 
-        int noteCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-        if (noteCount <= 0)
-            noteCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-        if (noteCount <= 0)
-            noteCount = planned.GetNoteList()?.Count ?? 0;
+        int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
+        int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
+        int noteListCount = planned.GetNoteList()?.Count ?? 0;
+
+        // Use the largest stable signal for payload size. Some sources can lag/stream in,
+        // which previously caused a 1->2->3 ramp while charging.
+        int noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
 
         nextDescriptor.noteSet = planned;
         nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
