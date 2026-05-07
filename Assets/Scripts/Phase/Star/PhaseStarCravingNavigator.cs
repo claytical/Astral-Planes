@@ -112,6 +112,48 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         return found;
     }
 
+    public bool TryGetTargetsForRole(
+        MusicalRole role,
+        int maxCount,
+        HashSet<Vector2Int> excludedCells,
+        out List<Vector2Int> cells)
+    {
+        cells = new List<Vector2Int>();
+        if (maxCount <= 0) return false;
+        if (_attunedRole != MusicalRole.None && role != _attunedRole) return false;
+
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
+        if (gen == null || drum == null) return false;
+
+        gen.GetColoredDustCells(_coloredCellsScratch);
+        if (_coloredCellsScratch.Count == 0) return false;
+
+        Vector2 starWorld = transform.position;
+        var scored = new List<(Vector2Int cell, float sqDist)>(_coloredCellsScratch.Count);
+
+        for (int i = 0; i < _coloredCellsScratch.Count; i++)
+        {
+            var c = _coloredCellsScratch[i];
+            if (excludedCells != null && excludedCells.Contains(c)) continue;
+            if (_reservedCells.Contains(c)) continue;
+            if (!IsZapEligible(gen, c, role)) continue;
+
+            float sqd = ((Vector2)drum.GridToWorldPosition(c) - starWorld).sqrMagnitude;
+            scored.Add((c, sqd));
+        }
+
+        if (scored.Count == 0) return false;
+        scored.Sort((a, b) => a.sqDist.CompareTo(b.sqDist));
+
+        int targetCount = Mathf.Min(maxCount, scored.Count);
+        for (int i = 0; i < targetCount; i++)
+            cells.Add(scored[i].cell);
+
+        return cells.Count > 0;
+    }
+
     public void NotifyDraining(Vector2Int cell)
     {
         _hasLockOnCell = true;
