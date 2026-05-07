@@ -261,7 +261,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (!_acquisitionEnabled) break;
                 if (gen == null || drum == null || _navigator == null) break;
                 if (_attunedRole == MusicalRole.None || tentacle.role != _attunedRole) break;
-                if (CountTentaclesInFlightOrQueued() >= Mathf.Max(1, _star != null ? _star.RemainingZapCount : fallbackTentaclesPerRole)) break;
+                if (CountTentaclesInGrowthOrDrain() >= Mathf.Max(1, _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole)) break;
 
                 if (_navigator.TryGetTargetForRole(tentacle.role, out var cell, BuildExcludedCells(tentacle)) &&
                     IsTargetValid(cell, tentacle.role, tentacle, out _) &&
@@ -883,12 +883,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
     }
 
-    private int CountTentaclesInFlightOrQueued()
+    private int CountTentaclesInGrowthOrDrain()
     {
         int count = 0;
         foreach (var t in _tentacles)
         {
-            if (t.state == TentacleState.Growing || t.state == TentacleState.Draining || t.state == TentacleState.Retracting || t.hasPendingZap)
+            if (t.state == TentacleState.Growing || t.state == TentacleState.Draining)
                 count++;
         }
         return count;
