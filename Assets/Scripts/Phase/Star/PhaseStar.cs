@@ -314,6 +314,18 @@ public class PhaseStar : MonoBehaviour
         if (_entryInProgress || _state != PhaseStarState.Dormant)
             return;
 
+        bool zapReady =
+            (_requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid && zappedCount >= requiredZapCount) ||
+            _zapProgressState == ZapProgressState.WaitingForRetract ||
+            _zapProgressState == ZapProgressState.ReadyLatched;
+
+        if (!zapReady)
+        {
+            if (_tracePhaseStar)
+                Debug.Log($"[PhaseStar] TransitionDormantToActive blocked (not zap-ready). state={_state} zapState={_zapProgressState} zapped={zappedCount}/{requiredZapCount} descriptorValid={_plannedEjectionDescriptor.IsValid} requiredSetAvailable={_requiredZapNoteSetAvailable}", this);
+            return;
+        }
+
         StopManagedCoroutine(ref _waitForDustCo);
         _pendingDormantActivation = true;
 
