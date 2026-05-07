@@ -583,7 +583,6 @@ public class PhaseStar : MonoBehaviour
     private int requiredZapCount = 1;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
-    public bool IsRequiredZapCountReady => _requiredZapNoteSetAvailable && _plannedEjectionDescriptor.IsValid;
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
