@@ -491,7 +491,7 @@ public class PhaseStar : MonoBehaviour
         public NoteSet noteSet;
         public int requiredZapCount;
 
-        public bool IsValid => role != MusicalRole.None && track != null && noteSet != null && requiredZapCount > 0;
+        public bool IsValid => role != MusicalRole.None && track != null && requiredZapCount > 0;
     }
 
     private PlannedEjectionDescriptor _plannedEjectionDescriptor;
@@ -1899,7 +1899,8 @@ void Update()
         int entropy = CurrentEntropyForSelection();
         ResolveGameFlowManager();
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
-        _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
+        if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
+            _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
  Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
