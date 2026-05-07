@@ -88,6 +88,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public bool clearStarted;
         public float clearTimer;
         public float clearDuration;
+        public int pendingZapUnits;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -488,6 +489,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
+        tentacle.pendingZapUnits = 0;
 
         Vector3 root3 = new Vector3(starPos.x, starPos.y, transform.position.z);
         for (int i = 0; i < SplinePoints; i++)
@@ -510,9 +512,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             tentacle.clearDuration = Mathf.Max(0.01f, dissolveDuration);
             tentacle.hasPendingZap = true;
             tentacle.pendingZapCell = tentacle.targetCell;
+            tentacle.pendingZapUnits = 0;
 
             if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var dust) && dust != null)
-                dust.DissipateAndHideVisualOnly(tentacle.clearDuration);
+            {
+                tentacle.pendingZapUnits = dust.ChipEnergy(1);
+                if (tentacle.pendingZapUnits > 0)
+                    gen.ZapClearCell(tentacle.targetCell);
+            }
         }
 
         tentacle.clearTimer += dt;
@@ -524,15 +531,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         if (!tentacle.hasPendingZap) return;
         tentacle.hasPendingZap = false;
-        if (gen == null) return;
-        Vector2Int zapCell = tentacle.pendingZapCell;
-        if (!gen.TryGetDustAt(zapCell, out var dust) || dust == null || dust.currentEnergyUnits <= 0)
-            return;
 
-        int actualUnits = dust.ChipEnergy(1);
+        int actualUnits = Mathf.Max(0, tentacle.pendingZapUnits);
+        tentacle.pendingZapUnits = 0;
         if (actualUnits <= 0)
             return;
-
 
         if (_star != null)
         {
@@ -544,11 +547,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
 
         tentacle.drainFlashTimer = DrainFlashDuration;
-        _zappedThisCycle.Add(zapCell);
-        _navigator?.NotifyCellZappedThisCycle(zapCell);
-        Vector2Int zappedCell = zapCell;
+        Vector2Int zappedCell = tentacle.pendingZapCell;
+        _zappedThisCycle.Add(zappedCell);
+        _navigator?.NotifyCellZappedThisCycle(zappedCell);
         _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
-        if (TryZapAndConfirmClear(gen, zappedCell))
+        if (gen != null)
         {
             _navigator?.ClearLockOn(zappedCell);
             tentacle.notifiedDrainLock = false;
@@ -971,6 +974,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
+        tentacle.pendingZapUnits = 0;
     }
 
     private void RebuildTentaclesForRole(MusicalRole role)
@@ -1026,6 +1030,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
+        tentacle.pendingZapUnits = 0;
 
         if (tentacle.line != null)
         {
@@ -1047,6 +1052,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
+        tentacle.pendingZapUnits = 0;
     }
 
     private void ClearAllTentacleVisuals()
