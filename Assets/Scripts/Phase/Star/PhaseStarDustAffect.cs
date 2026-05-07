@@ -301,9 +301,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
-        int remainingZapCount = _star != null ? _star.RemainingZapCount : fallbackTentaclesPerRole;
+        int concurrentTentacleLimit = _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole;
         int activeTentacles = CountTentaclesInGrowthOrDrain();
-        int assignableCount = Mathf.Max(0, remainingZapCount - activeTentacles);
+        int assignableCount = Mathf.Max(0, concurrentTentacleLimit - activeTentacles);
         if (assignableCount <= 0) return;
 
         var idleTentacles = new List<Tentacle>(assignableCount);
