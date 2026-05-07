@@ -536,13 +536,14 @@ public class PhaseStar : MonoBehaviour
             return false;
         }
 
-        int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-        int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-        int noteListCount = planned.GetNoteList()?.Count ?? 0;
-
-        // Use the largest stable signal for payload size. Some sources can lag/stream in,
-        // which previously caused a 1->2->3 ramp while charging.
-        int noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+        int noteCount;
+        if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
+        {
+            int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
+            int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
+            int noteListCount = planned.GetNoteList()?.Count ?? 0;
+            noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+        }
 
         if (_currentBurstRequiredZaps > 0)
             noteCount = Mathf.Max(noteCount, _currentBurstRequiredZaps);
@@ -1903,6 +1904,26 @@ void Update()
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
     }
+    private bool TryResolveAuthoritativeZapCount(MusicalRole role, InstrumentTrack track, out int noteCount)
+    {
+        noteCount = 0;
+        if (_assignedMotif == null || track == null || role == MusicalRole.None)
+            return false;
+
+        int totalBins = Mathf.Max(1, track.maxLoopMultiplier);
+        // Zap objective corresponds to authored motif payload for the role.
+        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins);
+        if (cfg == null) return false;
+
+        if (cfg.riff != null && cfg.riff.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
+        {
+            noteCount = cfg.riff.riff.events.Count;
+            return true;
+        }
+
+        return false;
+    }
+
     private static int GetNoteSetNoteCount(NoteSet noteSet)
     {
         if (noteSet == null) return 0;
