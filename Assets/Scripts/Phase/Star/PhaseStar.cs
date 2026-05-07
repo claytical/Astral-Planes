@@ -583,32 +583,10 @@ public class PhaseStar : MonoBehaviour
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
     public int GetDesiredTentacleCount()
     {
-        int desired = Mathf.Max(1, RequiredZapCount);
-
-        try
-        {
-            if (_plannedEjectionDescriptor.IsValid && _plannedEjectionDescriptor.noteSet != null)
-            {
-                int plannedCount = _plannedEjectionDescriptor.noteSet.GetNoteList()?.Count ?? 0;
-                desired = Mathf.Max(desired, plannedCount);
-            }
-            else
-            {
-                InstrumentTrack track = _plannedEjectionDescriptor.track != null
-                    ? _plannedEjectionDescriptor.track
-                    : _cachedTrack;
-
-                if (track != null)
-                {
-                    NoteSet fallback = ResolvePlannedNoteSet(track);
-                    int fallbackCount = fallback != null ? (fallback.GetNoteList()?.Count ?? 0) : 0;
-                    desired = Mathf.Max(desired, fallbackCount);
-                }
-            }
-        }
-        catch { }
-
-        return Mathf.Max(1, desired);
+        // Tentacle concurrency should match the currently-required zap count for the active
+        // MineNode payload. Deriving this from mutable/fallback note-set probes can cause
+        // incremental 1->2->3 ramping mid-charge, which over-consumes dust.
+        return Mathf.Max(1, RequiredZapCount);
     }
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
