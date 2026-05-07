@@ -534,8 +534,9 @@ public class PhaseStar : MonoBehaviour
 
 
     private bool _dustDeliveryWired;
-    private enum ZapProgressState { Seeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
+    private enum ZapProgressState { Seeking, DormantNotSeeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
+    private ZapProgressState _preservedZapProgressStateBeforeCoordinatorLock = ZapProgressState.Seeking;
     private int zappedCount;
     private int requiredZapCount = 1;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
@@ -550,6 +551,43 @@ public class PhaseStar : MonoBehaviour
         if (_zapProgressState == next) return;
         Debug.Log($"[PhaseStar:ZapState] {_zapProgressState}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} reason={reason}");
         _zapProgressState = next;
+    }
+
+    /// <summary>
+    /// Called when a global coordinator lock is held by a different star.
+    /// Non-owner stars suspend dormant seeking/ready progression without clearing
+    /// zap counters or latch-related state.
+    /// </summary>
+    public void OnCoordinatorLockOwnedByAnotherStar()
+    {
+        if (_state != PhaseStarState.Dormant)
+            return;
+
+        bool canSuspend =
+            _zapProgressState == ZapProgressState.Seeking ||
+            _zapProgressState == ZapProgressState.WaitingForRetract ||
+            _zapProgressState == ZapProgressState.ReadyLatched;
+
+        if (!canSuspend)
+            return;
+
+        _preservedZapProgressStateBeforeCoordinatorLock = _zapProgressState;
+        TransitionZapState(ZapProgressState.DormantNotSeeking, _requiredZapRole, "coordinator-lock-owned-by-other");
+    }
+
+    /// <summary>
+    /// Called when the coordinator lock is released and the owner's cooldown event fires.
+    /// Restores dormant progression based on preserved readiness state.
+    /// </summary>
+    public void OnCoordinatorLockReleasedAfterOwnerCooldown()
+    {
+        if (_zapProgressState != ZapProgressState.DormantNotSeeking)
+            return;
+
+        var restore = _preservedZapProgressStateBeforeCoordinatorLock;
+        bool wasPreservedReady = restore == ZapProgressState.ReadyLatched || restore == ZapProgressState.WaitingForRetract;
+        var next = wasPreservedReady ? ZapProgressState.ReadyLatched : ZapProgressState.Seeking;
+        TransitionZapState(next, _requiredZapRole, "coordinator-lock-released-owner-cooldown");
     }
 
     private void EnsureSubcomponents()
