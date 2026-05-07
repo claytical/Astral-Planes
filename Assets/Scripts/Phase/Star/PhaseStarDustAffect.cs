@@ -315,18 +315,42 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (idleTentacles.Count == 0) return;
 
         int batchCount = Mathf.Min(assignableCount, idleTentacles.Count);
-        var excluded = BuildExcludedCells(requester: null);
-        if (!_navigator.TryGetTargetsForRole(_attunedRole, batchCount, excluded, out var targetCells))
-            return;
+        if (batchCount <= 0) return;
 
-        int pairCount = Mathf.Min(idleTentacles.Count, targetCells.Count);
-        for (int i = 0; i < pairCount; i++)
+        var excluded = BuildExcludedCells(requester: null);
+        var seededTargets = new List<Vector2Int>(batchCount);
+        if (_navigator.TryGetTargetsForRole(_attunedRole, batchCount, excluded, out var targetCells) && targetCells != null)
+            seededTargets.AddRange(targetCells);
+
+        int targetCursor = 0;
+        for (int i = 0; i < batchCount; i++)
         {
             var tentacle = idleTentacles[i];
-            var cell = targetCells[i];
-            if (!IsTargetValid(cell, tentacle.role, tentacle, out _)) continue;
-            if (!TryReserveCell(tentacle, cell)) continue;
-            BeginGrowingTentacle(tentacle, cell, drum, transform.position);
+            Vector2Int cell;
+            bool hasCell = false;
+
+            while (targetCursor < seededTargets.Count)
+            {
+                cell = seededTargets[targetCursor++];
+                if (!IsTargetValid(cell, tentacle.role, tentacle, out _))
+                    continue;
+                if (!TryReserveCell(tentacle, cell))
+                    continue;
+                BeginGrowingTentacle(tentacle, cell, drum, transform.position);
+                excluded.Add(cell);
+                hasCell = true;
+                break;
+            }
+
+            if (hasCell) continue;
+
+            if (_navigator.TryGetTargetForRole(tentacle.role, out cell) &&
+                IsTargetValid(cell, tentacle.role, tentacle, out _) &&
+                TryReserveCell(tentacle, cell))
+            {
+                BeginGrowingTentacle(tentacle, cell, drum, transform.position);
+                excluded.Add(cell);
+            }
         }
     }
 
