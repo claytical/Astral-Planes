@@ -165,7 +165,6 @@ public class PhaseStar : MonoBehaviour
 
     [Tooltip("Visual alpha threshold (0–1) at which the star starts moving and allows pokes. " +
              "Keeps locomotion and collision locked until the diamonds are visually at full opacity.")]
-    [SerializeField, Range(0.8f, 1f)] private float readyDisplayThreshold = 0.99f;
 
     [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
     [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
@@ -544,6 +543,7 @@ public class PhaseStar : MonoBehaviour
     private int requiredZapCount = 1;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
     public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
+    public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
     private Vector2Int _lastResolvedZapCell;
@@ -780,7 +780,7 @@ public class PhaseStar : MonoBehaviour
     EnsureDormantSeedVisuals();
 
     // Dominant-role tracking.
-    if (GetDominantRoleRaw(out var dominantRole, out float dominantRawCharge, out float dominantThreshold))
+    if (GetDominantRoleRaw(out var dominantRole, out _, out _))
     {
         if (dominantRole != _previewRole)
         {
@@ -803,8 +803,7 @@ public class PhaseStar : MonoBehaviour
             }
         }
 
-        float dominantCharge01 = Mathf.Clamp01(dominantRawCharge / Mathf.Max(0.001f, dominantThreshold));
-        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, dominantCharge01, dt * chargeDisplayLerpSpeed);
+        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, ZapProgress01, dt * chargeDisplayLerpSpeed);
     }
     else
     {
@@ -831,7 +830,7 @@ public class PhaseStar : MonoBehaviour
     // This block runs after UpdateDualDiamonds (which resets diamond localScale to 1),
     // so these assignments win for the Dormant phase.
     if ((_state == PhaseStarState.Dormant ||
-         (_state == PhaseStarState.WaitingForPoke && _displayedCharge01 < readyDisplayThreshold))
+         (_state == PhaseStarState.WaitingForPoke && ZapProgress01 < 1f))
         && !_burstOffScreen)
     {
         // Sqrt curve: front-loads visual growth so small charge values produce
@@ -978,7 +977,7 @@ public class PhaseStar : MonoBehaviour
         motion?.SetOverrideTarget(null);
         motion?.SetSpeedMultiplier(1f);
 
-        if (visuals != null && _displayedCharge01 >= readyDisplayThreshold)
+        if (visuals != null && ZapProgress01 >= 1f)
             visuals.transform.localScale = Vector3.one;
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
         OnArmed?.Invoke(this);
@@ -1170,7 +1169,7 @@ public class PhaseStar : MonoBehaviour
         // ------------------------------------------------------------
         bool anyCollectables = AnyCollectablesInFlightGlobal();
         bool anyExpansion = AnyExpansionPendingGlobal();
-        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(anyCollectables, anyExpansion, _displayedCharge01 >= readyDisplayThreshold) ?? false;
+        bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(anyCollectables, anyExpansion, ZapProgress01 >= 1f) ?? false;
 
         if (shouldDisarmForGate)
         {
@@ -1183,7 +1182,7 @@ public class PhaseStar : MonoBehaviour
             return;
         }
 
-        if (anyExpansion && _displayedCharge01 >= readyDisplayThreshold)
+        if (anyExpansion && ZapProgress01 >= 1f)
         {
             Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
             return;
