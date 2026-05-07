@@ -1049,10 +1049,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (!tentacle.notifiedDrainLock) return;
         _navigator?.ClearLockOn(tentacle.targetCell);
         tentacle.notifiedDrainLock = false;
-        tentacle.clearStarted = false;
-        tentacle.clearTimer = 0f;
-        tentacle.clearDuration = 0f;
-        tentacle.pendingZapUnits = 0;
     }
 
     private void ClearAllTentacleVisuals()
