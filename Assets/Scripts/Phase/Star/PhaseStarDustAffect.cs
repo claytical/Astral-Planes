@@ -85,6 +85,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public float invalidTargetMs;
         public bool hasPendingZap;
         public Vector2Int pendingZapCell;
+        public bool clearStarted;
+        public float clearTimer;
+        public float clearDuration;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -355,10 +358,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 UpdateTentacleLine(tentacle, starPos, dt);
 
                 tentacle.contactTimer += dt;
-                if (tentacle.contactTimer >= minContactTime && QueueZapAndRetract(tentacle, starPos))
-                {
-                    // queued and now retracting
-                }
+                if (tentacle.contactTimer >= minContactTime)
+                    HandleDrainContactAndClear(tentacle, dt, starPos);
 
                 break;
             }
@@ -419,6 +420,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.dissolveTimer  = 0f;
         tentacle.alphaScale     = 1f;
         tentacle.notifiedDrainLock = false;
+        tentacle.clearStarted = false;
+        tentacle.clearTimer = 0f;
+        tentacle.clearDuration = 0f;
 
         Vector3 root3 = new Vector3(starPos.x, starPos.y, transform.position.z);
         for (int i = 0; i < SplinePoints; i++)
@@ -429,12 +433,26 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         UpdateTentacleLine(tentacle, starPos, 0f);
     }
 
-    private bool QueueZapAndRetract(Tentacle tentacle, Vector2 starPos)
+    private void HandleDrainContactAndClear(Tentacle tentacle, float dt, Vector2 starPos)
     {
-        tentacle.hasPendingZap = true;
-        tentacle.pendingZapCell = tentacle.targetCell;
-        BeginRetractingTentacle(tentacle, starPos, "zap queued");
-        return true;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm?.dustGenerator;
+
+        if (!tentacle.clearStarted)
+        {
+            tentacle.clearStarted = true;
+            tentacle.clearTimer = 0f;
+            tentacle.clearDuration = Mathf.Max(0.01f, dissolveDuration);
+            tentacle.hasPendingZap = true;
+            tentacle.pendingZapCell = tentacle.targetCell;
+
+            if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var dust) && dust != null)
+                dust.DissipateAndHideVisualOnly(tentacle.clearDuration);
+        }
+
+        tentacle.clearTimer += dt;
+        if (tentacle.clearTimer >= tentacle.clearDuration)
+            BeginRetractingTentacle(tentacle, starPos, "dust faded out");
     }
 
     private void TryConsumePendingZap(Tentacle tentacle, CosmicDustGenerator gen)
@@ -469,6 +487,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         {
             _navigator?.ClearLockOn(zappedCell);
             tentacle.notifiedDrainLock = false;
+            tentacle.clearStarted = false;
+            tentacle.clearTimer = 0f;
+            tentacle.clearDuration = 0f;
             tentacle.targetCell = default;
         }
     }
@@ -882,6 +903,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.gradient  = new Gradient();
         tentacle.alphaScale = 1f;
         tentacle.notifiedDrainLock = false;
+        tentacle.clearStarted = false;
+        tentacle.clearTimer = 0f;
+        tentacle.clearDuration = 0f;
     }
 
     private void RebuildTentaclesForRole(MusicalRole role)
@@ -934,6 +958,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.drainFlashTimer = 0f;
         tentacle.hasPendingZap = false;
         tentacle.pendingZapCell = default;
+        tentacle.clearStarted = false;
+        tentacle.clearTimer = 0f;
+        tentacle.clearDuration = 0f;
 
         if (tentacle.line != null)
         {
@@ -952,6 +979,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (!tentacle.notifiedDrainLock) return;
         _navigator?.ClearLockOn(tentacle.targetCell);
         tentacle.notifiedDrainLock = false;
+        tentacle.clearStarted = false;
+        tentacle.clearTimer = 0f;
+        tentacle.clearDuration = 0f;
     }
 
     private void ClearAllTentacleVisuals()
