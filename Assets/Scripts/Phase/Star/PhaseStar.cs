@@ -163,9 +163,6 @@ public class PhaseStar : MonoBehaviour
              "Lower = slower, smoother rise from empty to full.")]
     [SerializeField, Min(0.1f)] private float chargeDisplayLerpSpeed = 2.5f;
 
-    [Tooltip("Visual alpha threshold (0–1) at which the star starts moving and allows pokes. " +
-             "Keeps locomotion and collision locked until the diamonds are visually at full opacity.")]
-
     [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
     [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
     [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
