@@ -524,8 +524,6 @@ public class PhaseStar : MonoBehaviour
             requiredZapCount = int.MaxValue;
             _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
-            if (_zapProgressState == ZapProgressState.Seeking)
-                zappedCount = 0;
             return false;
         }
 
@@ -535,8 +533,6 @@ public class PhaseStar : MonoBehaviour
             requiredZapCount = int.MaxValue;
             _plannedEjectionDescriptor = nextDescriptor;
             Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
-            if (_zapProgressState == ZapProgressState.Seeking)
-                zappedCount = 0;
             return false;
         }
 
@@ -555,7 +551,7 @@ public class PhaseStar : MonoBehaviour
         bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
         _plannedEjectionDescriptor = nextDescriptor;
 
-        if (resetCurrentZapCount || (_zapProgressState == ZapProgressState.Seeking && descriptorChanged))
+        if (resetCurrentZapCount)
             zappedCount = 0;
 
         if (resetCurrentZapCount)
