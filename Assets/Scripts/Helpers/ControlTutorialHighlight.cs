@@ -41,9 +41,9 @@ public class ControlTutorialHighlight : MonoBehaviour
     [SerializeField] private Image startImage;
 
     [Header("Copy (Instruction -> Label)")]
-    [SerializeField] private string driftText  = "Drift";
-    [SerializeField] private string boostText  = "Boost";
-    [SerializeField] private string releaseText = "Release";
+    [SerializeField] private string driftText  = "Fly";
+    [SerializeField] private string boostText  = "Push";
+    [SerializeField] private string releaseText = "Commit";
 
     [Header("Tint")]
     [SerializeField] private Color baseTint      = new Color(1f, 1f, 1f, 0.55f);

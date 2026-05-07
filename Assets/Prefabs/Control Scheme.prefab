@@ -671,8 +671,8 @@ MonoBehaviour:
   arrowsImage: {fileID: 7465947410740371477}
   startImage: {fileID: 6592055603358532050}
   driftText: Fly
-  boostText: Boost
-  releaseText: Release
+  boostText: Push
+  releaseText: Commit
   baseTint: {r: 1, g: 1, b: 1, a: 0.55}
   highlightTint: {r: 0, g: 1, b: 0.9721277, a: 1}
   tintLerpSpeed: 12
