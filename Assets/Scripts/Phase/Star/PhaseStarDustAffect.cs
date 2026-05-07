@@ -113,41 +113,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         _star = star;
         _navigator = GetComponent<PhaseStarCravingNavigator>();
 
-        var roles = star.GetMotifActiveRoles();
-        if (roles == null || roles.Count == 0)
-        {
-            roles = new List<MusicalRole>
-            {
-                MusicalRole.Bass,
-                MusicalRole.Harmony,
-                MusicalRole.Lead,
-                MusicalRole.Groove
-            };
-        }
-
-        ClearAllTentacleVisuals();
-        _tentacles.Clear();
-
-        int slotIndex = 0;
-        for (int i = 0; i < roles.Count; i++)
-        {
-            int tentaclesForRole = Mathf.Max(1, star != null ? star.RequiredZapCount : fallbackTentaclesPerRole);
-            for (int j = 0; j < tentaclesForRole; j++, slotIndex++)
-            {
-                var tentacle = new Tentacle
-                {
-                    role       = roles[i],
-                    tipIndex   = slotIndex % 4,
-                    lineIndexInRole = j,
-                    flowOffset = UnityEngine.Random.value,
-                    tipPos     = transform.position
-                };
-
-                AllocateTentacleBuffers(tentacle);
-                tentacle.line = CreateTentacleLine(roles[i], tentacle);
-                _tentacles.Add(tentacle);
-            }
-        }
+        RebuildTentaclesForRole(_attunedRole);
 
         star.OnDisarmed += _ => SetTentaclesActive(false);
     }
@@ -155,6 +121,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     public void SetAttunedRole(MusicalRole role)
     {
         _attunedRole = role;
+        RebuildTentaclesForRole(role);
         ResetTentacles();
     }
 
@@ -293,7 +260,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 if (!_acquisitionEnabled) break;
                 if (gen == null || drum == null || _navigator == null) break;
-                if (_attunedRole != MusicalRole.None && tentacle.role != _attunedRole) break;
+                if (_attunedRole == MusicalRole.None || tentacle.role != _attunedRole) break;
+                if (CountTentaclesInFlightOrQueued() >= Mathf.Max(1, _star != null ? _star.RemainingZapCount : fallbackTentaclesPerRole)) break;
 
                 if (_navigator.TryGetTargetForRole(tentacle.role, out var cell, BuildExcludedCells(tentacle)) &&
                     IsTargetValid(cell, tentacle.role, tentacle, out _) &&
@@ -887,6 +855,43 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.gradient  = new Gradient();
         tentacle.alphaScale = 1f;
         tentacle.notifiedDrainLock = false;
+    }
+
+    private void RebuildTentaclesForRole(MusicalRole role)
+    {
+        Vector2 starPos = transform.position;
+        foreach (var t in _tentacles)
+            ResetTentacleState(t, starPos, destroyVisual: true);
+        _tentacles.Clear();
+
+        if (role == MusicalRole.None) return;
+
+        int tentacleCount = Mathf.Max(1, _star != null ? _star.RequiredZapCount : fallbackTentaclesPerRole);
+        for (int i = 0; i < tentacleCount; i++)
+        {
+            var tentacle = new Tentacle
+            {
+                role = role,
+                tipIndex = i % 4,
+                lineIndexInRole = i,
+                flowOffset = UnityEngine.Random.value,
+                tipPos = transform.position
+            };
+            AllocateTentacleBuffers(tentacle);
+            tentacle.line = CreateTentacleLine(role, tentacle);
+            _tentacles.Add(tentacle);
+        }
+    }
+
+    private int CountTentaclesInFlightOrQueued()
+    {
+        int count = 0;
+        foreach (var t in _tentacles)
+        {
+            if (t.state == TentacleState.Growing || t.state == TentacleState.Draining || t.state == TentacleState.Retracting || t.hasPendingZap)
+                count++;
+        }
+        return count;
     }
 
     private void ResetTentacleState(Tentacle tentacle, Vector2 starPos, bool destroyVisual)

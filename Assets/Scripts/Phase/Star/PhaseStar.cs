@@ -543,6 +543,7 @@ public class PhaseStar : MonoBehaviour
     private int zappedCount;
     private int requiredZapCount = 1;
     public int RequiredZapCount => Mathf.Max(1, requiredZapCount);
+    public int RemainingZapCount => Mathf.Max(0, RequiredZapCount - Mathf.Max(0, zappedCount));
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
     private Vector2Int _lastResolvedZapCell;
