@@ -63,12 +63,12 @@ MonoBehaviour:
   cravingNavigator: {fileID: 4892159809986813886}
   disarmedPushScale: 0.1
   _tracePhaseStar: 1
+  allowConcurrentDormantCharging: 1
   shardMinAlpha: 0.5
   accumulatorRotSpeed: 90
   drainTiltDeg: 5
   drainTiltSpeed: 1.8
   chargeDisplayLerpSpeed: 2.5
-  readyDisplayThreshold: 0.99
   tentacleBloomMinScale: 0.22
   dormantSeedScale: 0.08
   _assignedMotif: {fileID: 0}
@@ -115,14 +115,14 @@ MonoBehaviour:
   tentacleGrowSpeed: 0.5
   tentacleRetractSpeed: 2
   tentacleFlowSpeed: 1
-  tentacleWidth: 0.05
+  tentacleWidth: 0.03
   dissolveDuration: 2.1
-  maxLinesPerRole: 10
+  fallbackTentaclesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120
   growingRootAlpha: 0.69
-  growingTipAlpha: 0.384
+  growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751
   sag: 0.8
   noiseAmp: 0.15

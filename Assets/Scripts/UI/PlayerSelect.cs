@@ -65,23 +65,26 @@ public class PlayerSelect : MonoBehaviour
         ShipMusicalProfile profile = vehicle.profile;
 
         const float maxCapacityForUI = 250f;
-        const float minBurnRateForUI = 0.25f;
-        const float maxBurnRateForUI = 1f;
+        const float accelTopEndForUI = 20f;
         const float speedTopEndForUI = 20f;
-        const float boostTopEndForUI = 280f;
+        const float boostTopEndForUI = 150f;
 
         float capacity = profile != null ? profile.capacity : vehicle.capacity;
-        float burnRate = profile != null ? profile.burnRate : minBurnRateForUI;
+        float burnRate = profile != null ? profile.burnRate : 1f;
+        float accel = profile != null ? profile.arcadeAccel : 0f;
         float maxSpeed = profile != null ? profile.arcadeMaxSpeed : vehicle.arcadeMaxSpeed;
         float boostAccel = profile != null ? profile.arcadeBoostAccel : 0f;
 
         float capacityRatio = capacity / maxCapacityForUI;
+        float accelRatio = accel / accelTopEndForUI;
         float speedRatio = maxSpeed / speedTopEndForUI;
-        float fuelEfficiencyRatio = Mathf.InverseLerp(minBurnRateForUI, maxBurnRateForUI, burnRate);
-        int efficiencyPct = Mathf.RoundToInt((1f - fuelEfficiencyRatio) * 100f);
-        int boostPct = Mathf.RoundToInt((boostAccel / boostTopEndForUI) * 100f);
+        float boostRatio = boostAccel / boostTopEndForUI;
 
-        fuel.UpdateSelectStats(capacityRatio, speedRatio, boostPct, efficiencyPct);
+        string[] burnTiers = { "drifting", "measured", "committed", "forceful", "relentless", "all-consuming" };
+        int burnTier = Mathf.Clamp(Mathf.CeilToInt(burnRate * 3f), 1, 6);
+        string burnRateLabel = burnTiers[burnTier - 1];
+
+        fuel.UpdateSelectStats(capacityRatio, accelRatio, speedRatio, boostRatio, burnRateLabel);
     }
 
     private void ApplyVisuals()

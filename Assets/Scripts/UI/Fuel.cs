@@ -8,11 +8,14 @@ public class Fuel : MonoBehaviour
     [Header("Runtime Fuel")]
     public Image fuelFill;
 
-    [Header("Player Select Stat Bars")]
+    [Header("Player Select — Storage")]
     public Image capacityBar;
+    public TMP_Text burnRateText;
+
+    [Header("Player Select — Speed Bars")]
+    public Image accelBar;
     public Image speedBar;
-    public TMP_Text boostText;
-    public TMP_Text efficiencyText;
+    public Image boostBar;
 
     public void UpdateFuelUI(float energyRatio)
     {
@@ -20,11 +23,17 @@ public class Fuel : MonoBehaviour
             fuelFill.fillAmount = Mathf.Clamp01(energyRatio);
     }
 
-    public void UpdateSelectStats(float capacityRatio, float speedRatio, int boostPct, int efficiencyPct)
+    public void UpdateSelectStats(
+        float capacityRatio,
+        float accelRatio,
+        float speedRatio,
+        float boostRatio,
+        string burnRateLabel)
     {
         if (capacityBar != null) capacityBar.fillAmount = Mathf.Clamp01(capacityRatio);
+        if (accelBar != null) accelBar.fillAmount = Mathf.Clamp01(accelRatio);
         if (speedBar != null) speedBar.fillAmount = Mathf.Clamp01(speedRatio);
-        if (boostText != null) boostText.text = $"{boostPct}%";
-        if (efficiencyText != null) efficiencyText.text = $"{efficiencyPct}%";
+        if (boostBar != null) boostBar.fillAmount = Mathf.Clamp01(boostRatio);
+        if (burnRateText != null) burnRateText.text = burnRateLabel;
     }
 }
