@@ -48,7 +48,7 @@ public sealed class BridgeCoordinator
         }
 
         _motifSnapshots.Add(motifSnap);
-        ConstellationMemoryStore.StoreSnapshot(_motifSnapshots);
+        RingSessionStore.SaveRingToDisk(motifSnap);
 
         // Suppress any queued bin-completion ring so the record is the only thing shown.
         _gameFlow.GetBinRingController()?.CancelPendingDraw();
@@ -90,7 +90,8 @@ public sealed class BridgeCoordinator
         snapshot.MotifKeyRootMidi = (_gameFlow.phaseTransitionManager != null && _gameFlow.phaseTransitionManager.currentMotif != null)
             ? _gameFlow.phaseTransitionManager.currentMotif.keyRootMidi
             : 60;
-        snapshot.PhaseIndex = _gameFlow.phaseTransitionManager?.CurrentPhaseIndex ?? 0;
+        snapshot.PhaseIndex  = _gameFlow.phaseTransitionManager?.CurrentPhaseIndex ?? 0;
+        snapshot.MotifIndex  = _gameFlow.phaseTransitionManager?.currentMotifIndex ?? 0;
 
         if (retained == null || retained.Count == 0) return snapshot;
 

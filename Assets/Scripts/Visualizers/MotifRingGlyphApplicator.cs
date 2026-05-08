@@ -30,6 +30,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("Material for contour LineRenderers (Sprites/Default works well).")]
     public Material lineMaterial;
 
+    [Tooltip("When true, rings rotate at speeds distributed evenly across [rotSpeedBase, rotSpeedMax] " +
+             "by ring index rather than by fill duration. Use on library cards for a spherical look.")]
+    public bool sphericalRotation = false;
+
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
@@ -60,7 +64,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
-    void Start() => GameFlowManager.Instance.RegisterRingGlyphApplicator(this);
+    void Start() => GameFlowManager.Instance?.RegisterRingGlyphApplicator(this);
     void OnDestroy() => Clear();
 
     // ── Gameplay ring API ────────────────────────────────────────────────────
@@ -287,6 +291,20 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             ringKeys.Add((bin.BinIndex, bin.Role, c2, fd));
         }
 
+        // Fallback for legacy snapshots saved before TrackBins serialization was added.
+        // Derive ring keys directly from CollectedNotes grouped by (binIndex, trackColor).
+        if (ringKeys.Count == 0)
+        {
+            var seenLegacy = new HashSet<(int, float, float, float)>();
+            foreach (var n in snapshot.CollectedNotes.OrderBy(n => n.BinIndex))
+            {
+                Color c = n.TrackColor;
+                var   ck = (n.BinIndex, c.r, c.g, c.b);
+                if (!seenLegacy.Add(ck)) continue;
+                ringKeys.Add((n.BinIndex, MusicalRole.None, c, 0f));
+            }
+        }
+
         if (ringKeys.Count == 0) return;
 
         var noteViz       = GameFlowManager.Instance?.controller?.noteVisualizer;
@@ -316,8 +334,16 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps);
             _recordRings.Add(entry);
 
-            float rotDeg = Mathf.Clamp(
-                config.rotSpeedBase * Mathf.Max(fillDur, 0.1f), 0f, config.rotSpeedMax);
+            float rotDeg;
+            if (sphericalRotation)
+            {
+                float t = ringKeys.Count > 1 ? (float)i / (ringKeys.Count - 1) : 0f;
+                rotDeg = Mathf.Lerp(config.rotSpeedBase, config.rotSpeedMax, t);
+            }
+            else
+            {
+                rotDeg = Mathf.Clamp(config.rotSpeedBase * Mathf.Max(fillDur, 0.1f), 0f, config.rotSpeedMax);
+            }
             if (i % 2 == 1) rotDeg = -rotDeg;
 
             float tugR    = outerR * (1f - config.tugDepthFraction);
@@ -617,7 +643,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         while (!shouldStop())
         {
             if (ringTransform == null) yield break;
-            ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0);
             yield return null;
         }
     }

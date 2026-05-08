@@ -17,7 +17,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/GeneratedTrack.unity
     guid: b400e953723d53a4f9da4ef9134d900b
+  - enabled: 1
+    path: Assets/Scenes/PhaseLibrary.unity
+    guid: 36f5f1221889b48f797590a3bed55768
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 2c4a111d6a8533a4298941607819b98e,
       type: 2}
-  m_UseUCBPForAssetBundles: 0

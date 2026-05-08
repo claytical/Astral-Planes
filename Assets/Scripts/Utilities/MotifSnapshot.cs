@@ -79,8 +79,12 @@ public class MotifSnapshot
     public int MotifKeyRootMidi;
 
     /// <summary>Zero-based index of the phase this motif belongs to.
-    /// Used to group records by phase in ConstellationMemoryStore.</summary>
+    /// Used to group records by phase in PhaseLibraryBrowser.</summary>
     public int PhaseIndex;
+
+    /// <summary>Zero-based index of this motif within its phase's motif list.
+    /// Used to map a saved record back to a specific MotifProfile in PhaseLibrary.</summary>
+    public int MotifIndex;
 
     // -------------------------------------------------------------------------
     // Runtime-typed properties (reconstruct from serializable backing)

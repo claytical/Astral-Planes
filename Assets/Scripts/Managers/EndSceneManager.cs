@@ -1,17 +1,5 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public class EndSceneManager : MonoBehaviour
-{ 
-    void Start()
-    {
-        List<MotifSnapshot> data = ConstellationMemoryStore.RetrieveSnapshot();
-        Debug.Log($"{data.Count} data points");
-        if (data != null && data.Count > 0)
-        {
-            // ✅ Save the session to disk
-            ConstellationMemoryStore.SaveSessionToDisk(data);
-        }
-    }
+{
 }
- 

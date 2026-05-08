@@ -140,6 +140,34 @@ public class PhaseTransitionManager : MonoBehaviour
         return currentMotif;
     }
 
+    /// <summary>
+    /// Override the active motif to a specific index within the current phase without
+    /// resetting phase state. Applies the new motif to audio and tracks immediately.
+    /// Intended for use during scene setup when starting from a PhaseLibrary selection.
+    /// </summary>
+    public void JumpToMotifIndex(int motifIdx, string who)
+    {
+        if (_chapterMotifs == null || motifIdx < 0 || motifIdx >= _chapterMotifs.Count)
+        {
+            Debug.LogWarning($"[MOTIF] JumpToMotifIndex {motifIdx} out of range (count={_chapterMotifs?.Count ?? 0}) by {who}");
+            return;
+        }
+
+        var prev = currentMotif;
+        currentMotifIndex = motifIdx;
+        currentMotif      = _chapterMotifs[motifIdx];
+
+        Debug.Log($"[MOTIF] JumpToMotifIndex {motifIdx}: motif={(currentMotif ? currentMotif.motifId : "null")} by {who}");
+
+        ApplyMotifToAudioAndTracks(
+            prev,
+            currentMotif,
+            armAtNextBoundary: false,
+            restartTransport: false,
+            who: $"PTM/JumpToMotif:{who}"
+        );
+    }
+
     // ---------------------------
     // INTERNALS
     // ---------------------------
