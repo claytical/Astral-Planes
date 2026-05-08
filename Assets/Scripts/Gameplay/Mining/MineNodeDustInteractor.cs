@@ -288,6 +288,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         }
 
         // No unpainted dust reachable within budget — clear target
+        Debug.Log($"[MineNodeDustInteractor] BFS exhausted ({huntBfsBudget} cells) from {fromCell} — no target found.");
         _hasHuntTarget = false;
     }
 

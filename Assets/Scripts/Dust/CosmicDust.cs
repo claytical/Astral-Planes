@@ -47,6 +47,12 @@ public partial class CosmicDust : MonoBehaviour {
     private bool _visualTimingsInitialized;
     private float _nextDustPluckTime = -999f;
     private Vehicle _currentPluckVehicle = null;
+    // Ownership contract:
+    // CosmicDust owns: visual fields (_currentTint, energy units, sprite scale, collision state).
+    // CosmicDustGenerator owns: grid cell state (DustGridState), imprint dictionary.
+    // CosmicDust never queries Generator directly; Generator drives CosmicDust via public API.
+    // PrepareForReuse() resets CosmicDust's local fields; callers must also update the grid via SetCellState().
+
     // Energy unit backing fields. Charge01 is derived — do NOT write to it directly.
     private int _maxEnergyUnits = 1;
     private int _currentEnergyUnits = 1;
@@ -119,7 +125,6 @@ public partial class CosmicDust : MonoBehaviour {
     private float _workSigned01 = 0f;
 
     [Header("Work / Preview (Boost Path)")]
-    private Coroutine _previewWorkRoutine;
     private Vector3 _initialLocalScale = Vector3.one;
     private bool _cachedInitialScale;
     private Vector3 _baseLocalScale = Vector3.one;
@@ -633,14 +638,19 @@ private Coroutine _jiggleRoutine;
         ApplyEmissionMultiplierImmediate(0f);
         
     }
-    public void PrepareForReuse()
+    private void StopAllVisualCoroutines()
     {
-        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
-        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
+        if (_fadeRoutine        != null) { StopCoroutine(_fadeRoutine);        _fadeRoutine        = null; }
+        if (_growInRoutine      != null) { StopCoroutine(_growInRoutine);      _growInRoutine      = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
-        if (_jiggleRoutine != null) { StopCoroutine(_jiggleRoutine); _jiggleRoutine = null; }
+        if (_jiggleRoutine      != null) { StopCoroutine(_jiggleRoutine);      _jiggleRoutine      = null; }
         CancelTintPulse(restoreToBase: false);
+    }
+
+    public void PrepareForReuse()
+    {
+        StopAllVisualCoroutines();
         _isBreaking = false;
         regrowAlphaCapped = false;
         _isDespawned = false;
@@ -864,16 +874,10 @@ private Coroutine _jiggleRoutine;
 }
     public void HideVisualsInstant()
     {
-        // Stop any running routines that might fight this.
-        if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }
-        if (_growInRoutine != null) { StopCoroutine(_growInRoutine); _growInRoutine = null; }
-        if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
-        if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
         // Jiggle resumes after bridge root-reactivation and overwrites the zero scale set below.
         // Must be stopped here (not just in PrepareForReuse) because HideVisualsInstant is called
         // for solid cells that may never go through PrepareForReuse if they aren't in the new maze.
-        if (_jiggleRoutine != null) { StopCoroutine(_jiggleRoutine); _jiggleRoutine = null; }
-        CancelTintPulse(restoreToBase: false);
+        StopAllVisualCoroutines();
 
         // Disable collisions immediately.
         SetTerrainColliderEnabled(false);

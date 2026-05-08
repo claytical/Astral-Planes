@@ -2,8 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// State drives physics path; Intent drives decision-making and animation.
+// Valid combinations: Drifting+Thinking, Drifting+Committing, Fleeing+Escaping.
+// A node in Fleeing always has Intent=Escaping. A Drifting node may be Thinking or Committing.
+// Mismatch (e.g. Drifting+Escaping) is representable but has undefined behavior.
 public enum MineNodeState { Drifting, Fleeing }
 public enum MineNodeBehaviorIntent { Thinking, Committing, Escaping }
+public enum MineNodeOutcome { Captured, Escaped, Expired }
 
 public class MineNode : MonoBehaviour
 {
@@ -56,7 +61,7 @@ public class MineNode : MonoBehaviour
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
     [SerializeField, Min(0)] private int expireAfterLoops = 3;
 
-    public event System.Action<MineNode> OnResolved;
+    public event System.Action<MineNode, MineNodeOutcome> OnResolved;
     public event System.Action<MineNodeBehaviorIntent> OnBehaviorIntentChanged;
 
     public bool WasCaptured { get; private set; }
@@ -100,12 +105,12 @@ public class MineNode : MonoBehaviour
     private MineNodeBehaviorIntent _behaviorIntent = MineNodeBehaviorIntent.Thinking;
 
     // Motion tunables (previously local consts in FixedUpdate)
-    private const float kStallSpeed        = 0.20f;
-    private const float kStuckDot          = 0.10f;
+    private const float kStallSpeed        = 0.20f; // below this velocity the node is considered stopped
+    private const float kStuckDot          = 0.10f; // carve dir vs velocity alignment — catches spinning-in-place
     private const float kEscapeJitterDeg   = 25f;
     private const float kMinSpeedFloor     = 0.25f;
-    private const float kStallSamplePeriod = 0.40f;
-    private const float kStallDistanceEps  = 0.12f;
+    private const float kStallSamplePeriod = 0.40f; // how often distance is sampled to confirm stall
+    private const float kStallDistanceEps  = 0.12f; // minimum travel over sample period to not count as stalled
     private const float kEscapeCooldown    = 0.30f;
 
     public MusicalRole GetImprintRole() => _role;
@@ -133,10 +138,7 @@ public class MineNode : MonoBehaviour
         SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         if (_drumTrack != null)
-        {
-            _drumTrack.RegisterMineNode(this);
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
-        }
 
         var dust = GetComponent<MineNodeDustInteractor>();
         if (dust != null) dust.SetLevelAuthority(_drumTrack);
@@ -154,6 +156,10 @@ public class MineNode : MonoBehaviour
             outlineSprite.color = outlineTint;
         }
         CacheAuthoredStepsFromNoteSet();
+        // Register after all fields are initialized so any subscriber that queries this node
+        // immediately on registration sees a fully initialized object.
+        if (_drumTrack != null)
+            _drumTrack.RegisterMineNode(this);
     }
 
     private void HandleLoopBoundary()
@@ -161,7 +167,14 @@ public class MineNode : MonoBehaviour
         if (_drumTrack == null) return;
 
         if (!_depletedHandled)
+        {
             _loopsSinceSpawn++;
+            if (expireAfterLoops > 0 && _loopsSinceSpawn >= expireAfterLoops)
+            {
+                HandleExpiry();
+                return;
+            }
+        }
 
         if (!pruneCarvedPathOnLoopBoundary) return;
         if (_carvedPath.Count < pruneMinPathCount) return;
@@ -187,6 +200,8 @@ public class MineNode : MonoBehaviour
         _dustInteractor = GetComponent<MineNodeDustInteractor>();
         _originalScale = transform.localScale;
         _strength = maxStrength;
+        Debug.Assert(_track != null && _drumTrack != null,
+            $"[MineNode] {name} reached Start() without Initialize() — node will be inert.");
     }
 
     private void Update()
@@ -212,6 +227,15 @@ public class MineNode : MonoBehaviour
         _hasBeenStruck = true;
         State = MineNodeState.Fleeing;
         Debug.Log($"[MineNode] {name} — transitioning to Fleeing.");
+    }
+
+    private void HandleExpiry()
+    {
+        if (_depletedHandled || _resolvedFired) return;
+        Debug.Log($"[MineNode] {name} — expired after {_loopsSinceSpawn} loops.");
+        // WasCaptured and WasEscaped stay false; FireResolvedOnce passes MineNodeOutcome.Expired.
+        FireResolvedOnce();
+        StartCoroutine(CleanupAndDestroy());
     }
 
     public void HandleEscape()
@@ -776,7 +800,10 @@ public class MineNode : MonoBehaviour
     {
         if (_resolvedFired) return;
         _resolvedFired = true;
-        OnResolved?.Invoke(this);
+        var outcome = WasCaptured ? MineNodeOutcome.Captured
+                    : WasEscaped  ? MineNodeOutcome.Escaped
+                                  : MineNodeOutcome.Expired;
+        OnResolved?.Invoke(this, outcome);
     }
 
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)

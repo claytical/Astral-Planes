@@ -63,6 +63,12 @@ public class CosmicDustGenerator : MonoBehaviour
 
     // ------------------------------------------------------------------
     // Authoritative grid (no pooling). The grid is the traffic cop.
+    // Ownership contract:
+    // CosmicDustGenerator owns: grid cell state (DustGridState), imprint dictionary, regrowth schedule.
+    // CosmicDust owns: visual fields (_currentTint, energy units, sprite scale, collision state).
+    // Generator drives CosmicDust via public API; CosmicDust never queries Generator directly.
+    // When recycling a cell: call PrepareForReuse() on the CosmicDust component AND update the
+    // grid via SetCellState() — both sides must agree or queries to either will diverge.
     // ------------------------------------------------------------------
     private readonly DustGridState _gridState = new();
     private Dictionary<GameObject, Vector2Int> _goToCell = new Dictionary<GameObject, Vector2Int>(1024);
@@ -268,9 +274,10 @@ public class CosmicDustGenerator : MonoBehaviour
          if (scheduleRegrow)
          {
              RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
-             // Density conservation: immediately fill a frontier cell so total coverage
-             // is maintained. The eroded cell's own regrow will be suppressed in
-             // CommitRegrowCell once the compensation cell is committed.
+             // TODO: density conservation — fill a frontier cell when one is eroded so total
+             // coverage stays constant. Deferred: TryQueueFrontierCompensation() interfered with
+             // role-assignment logic when multiple stars were active. Re-enable only after
+             // role-aware frontier selection is in place.
 //             TryQueueFrontierCompensation();
          }
     }
