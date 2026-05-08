@@ -510,7 +510,11 @@ private Coroutine _jiggleRoutine;
         if (terrainCollider != null && terrainCollider.enabled)
             currentlyEnabled = true;
 
-        // If already in the desired state, do nothing.
+        // If enabling, always enforce visual invariants even when collider state already matches.
+        if (enabled)
+            EnsureVisibleWhenCollidable();
+
+        // If already in the desired state, do nothing after visual consistency check above.
         if (currentlyEnabled == enabled)
             return;
 
@@ -546,24 +550,42 @@ private Coroutine _jiggleRoutine;
         {
             RebuildColliderForCurrentScale();
             SyncColliderRadiusToSprite();
-            // Invariant: active collider → visible sprite + particle renderers.
-            // HideVisualsInstant() can disable these; re-enable them so the cell is never
-            // an invisible wall with an active collider.
-            SetVisualsEnabled(true);
-            if (visual.particleSystem != null)
-            {
-                var systems = GetAllParticleSystems();
-                if (systems != null)
-                    for (int i = 0; i < systems.Length; i++)
-                    {
-                        if (systems[i] == null) continue;
-                        var pr = systems[i].GetComponent<ParticleSystemRenderer>();
-                        if (pr != null) pr.enabled = true;
-                    }
-            }
         }
 
         OnCollisionStateChanged?.Invoke(enabled);
+    }
+
+    private void EnsureVisibleWhenCollidable()
+    {
+        // Invariant: active collider → visible sprite + particle renderers.
+        // HideVisualsInstant() can disable these; re-enable them so the cell is never
+        // an invisible wall with an active collider.
+        SetVisualsEnabled(true);
+
+        if (visual.particleSystem != null)
+        {
+            var systems = GetAllParticleSystems();
+            if (systems != null)
+                for (int i = 0; i < systems.Length; i++)
+                {
+                    if (systems[i] == null) continue;
+                    var pr = systems[i].GetComponent<ParticleSystemRenderer>();
+                    if (pr != null) pr.enabled = true;
+                }
+        }
+
+        // Defensive sanity: if a solid cell somehow has a zeroed sprite scale, restore expected target.
+        if (visual.sprite != null && _spriteScaleTarget > 0f)
+        {
+            var ls = visual.sprite.transform.localScale;
+            if (Mathf.Abs(ls.x) <= 0.0001f || Mathf.Abs(ls.y) <= 0.0001f)
+                ResetSpriteScaleTo(_spriteScaleTarget);
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (visual.sprite != null && !visual.sprite.enabled)
+            Debug.LogWarning($"[{nameof(CosmicDust)}] Collider enabled while sprite renderer is disabled on '{name}'. Re-enabling visuals.", this);
+#endif
     }
     [Obsolete("Compatibility wrapper. Prefer visual-controller driven clear presentation.")]
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
