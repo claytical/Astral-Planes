@@ -1697,7 +1697,7 @@ private void AssignHiddenImprintsByNearestSeed(
         {
             if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
             var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0)
+            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting())
                 results.Add(new Vector2Int(x, y));
         }
     }
@@ -2735,7 +2735,7 @@ private void AssignHiddenImprintsByNearestSeed(
         {
             if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
             var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0) return true;
+            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting()) return true;
         }
         return false;
     }
@@ -2748,7 +2748,7 @@ private void AssignHiddenImprintsByNearestSeed(
         {
             if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
             var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role == role && dust.currentEnergyUnits > 0) return true;
+            if (dust != null && dust.Role == role && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting()) return true;
         }
         return false;
     }
