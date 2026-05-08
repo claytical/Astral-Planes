@@ -69,6 +69,12 @@ public class LocalPlayer : MonoBehaviour
     private int _dustKeepClearOwnerId;
     private Vector2Int _dustKeepClearCell;
     private bool _dustKeepClearActive;
+    // Scene-agnostic navigation delegates.
+    // Subscribe from any scene-level UI manager (e.g. PhaseLibraryCarousel).
+    public System.Action OnNavigateNext;
+    public System.Action OnNavigatePrevious;
+    public System.Action OnChooseConfirm;
+
     public bool IsReady
     {
         get => _isReady;
@@ -379,7 +385,9 @@ public class LocalPlayer : MonoBehaviour
             return;
         }
 
-        if (_isReady) return;
+        OnChooseConfirm?.Invoke();
+
+        if (_isReady || GameFlowManager.Instance == null) return;
 
         switch (GameFlowManager.Instance.CurrentState)
         {
@@ -445,7 +453,7 @@ public class LocalPlayer : MonoBehaviour
             Destroy(gameObject);
         }
     }
-    public void OnNextVehicle(InputValue value)
+    public void OnNext(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
@@ -455,9 +463,11 @@ public class LocalPlayer : MonoBehaviour
             _selection.NextVehicle();
             NotifySelectionNavigatedOnce();
         }
+
+        OnNavigateNext?.Invoke();
     }
 
-    public void OnPreviousVehicle(InputValue value)
+    public void OnPrevious(InputValue value)
     {
         if (!value.isPressed) return;
         GetComponent<AudioSource>().PlayOneShot(clickFx);
@@ -467,6 +477,8 @@ public class LocalPlayer : MonoBehaviour
             _selection.PreviousVehicle();
             NotifySelectionNavigatedOnce();
         }
+
+        OnNavigatePrevious?.Invoke();
     }
 
 

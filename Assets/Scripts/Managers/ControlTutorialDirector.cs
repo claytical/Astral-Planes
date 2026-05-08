@@ -176,7 +176,7 @@ public class ControlTutorialDirector : MonoBehaviour
                 primaryInstance.ShowWaitingFor(
                     ControlTutorialHighlight.ButtonId.East,
                     immediate: true,
-                    overrideText: "join"
+                    overrideText: "commit"
                 );
                 break;
 
