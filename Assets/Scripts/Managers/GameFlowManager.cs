@@ -73,7 +73,6 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
     private bool _setupInFlight, _setupDone;
-    private readonly List<MotifSnapshot> _motifSnapshots = new();
     private float _motifStartTime = 0f;
     private GameState currentState = GameState.Begin;
     private Dictionary<string, Action> sceneHandlers;
@@ -262,7 +261,16 @@ public partial class GameFlowManager : MonoBehaviour
     // STEP 1b: Load first chapter / motif and preconfigure track note sets
     // ------------------------------------------------------------
     Debug.Log("[GFM] [STEP 1b] StartChapter BEGIN");
-    phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+    if (PhaseLibraryStartConfig.HasPendingStart)
+    {
+        phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
+        phaseTransitionManager.JumpToMotifIndex(PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
+        PhaseLibraryStartConfig.Consume();
+    }
+    else
+    {
+        phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+    }
     Debug.Log("[GFM] [STEP 1b] StartChapter END");
 
     // ------------------------------------------------------------
@@ -436,9 +444,7 @@ public partial class GameFlowManager : MonoBehaviour
             //                galaxy.AddSnapshot(snapshot);
         }
       
-        yield return new WaitForSeconds(2f); if (_motifSnapshots != null && _motifSnapshots.Count > 0) { 
-            ConstellationMemoryStore.SaveSessionToDisk(_motifSnapshots);
-        }
+        yield return new WaitForSeconds(2f);
         StartCoroutine(TransitionToScene("TrackFinished"));
     }
     
