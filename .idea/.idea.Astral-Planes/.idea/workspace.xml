@@ -6,25 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Control Scheme.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/RingGlyphConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/RingGlyphConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/PhaseLibrary.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/PhaseLibrary.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/Fuel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/Fuel.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/MotifRecordCard.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/MotifRecordCard.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryBrowser.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryBrowser.cs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/TextMesh Pro/Shaders/TMP_SDF-URP Unlit.shadergraph.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TextMesh Pro/Shaders/TMP_SDF-URP Unlit.shadergraph.meta" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
