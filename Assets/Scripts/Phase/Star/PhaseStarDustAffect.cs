@@ -1160,6 +1160,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             return false;
         }
 
+        if (!dust.IsVisuallyPresentForTargeting())
+        {
+            reason = "visually hidden";
+            return false;
+        }
+
         if (IsReservedByAnotherTentacle(cell, requester))
         {
             reason = "reserved by another tentacle";

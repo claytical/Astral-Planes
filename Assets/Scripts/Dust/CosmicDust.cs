@@ -555,6 +555,23 @@ private Coroutine _jiggleRoutine;
         OnCollisionStateChanged?.Invoke(enabled);
     }
 
+
+    public bool IsVisuallyPresentForTargeting(float minEffectiveAlpha = 0.05f, float minAbsScale = 0.01f)
+    {
+        if (visual.sprite == null || !visual.sprite.enabled)
+            return false;
+
+        var srColor = visual.sprite.color;
+        float effectiveAlpha = srColor.a;
+        if (effectiveAlpha <= minEffectiveAlpha)
+            return false;
+
+        Vector3 lossy = visual.sprite.transform.lossyScale;
+        if (Mathf.Abs(lossy.x) <= minAbsScale || Mathf.Abs(lossy.y) <= minAbsScale)
+            return false;
+
+        return true;
+    }
     private void EnsureVisibleWhenCollidable()
     {
         // Invariant: active collider → visible sprite + particle renderers.
