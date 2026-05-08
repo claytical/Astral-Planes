@@ -1716,7 +1716,7 @@ public class PhaseStar : MonoBehaviour
 
         bool handledResolve = false;
 
-        node.OnResolved += (resolvedNode) =>
+        node.OnResolved += (_, outcome) =>
         {
             if (ticket != _spawnTicket) return;
             if (handledResolve) return;
@@ -1724,11 +1724,9 @@ public class PhaseStar : MonoBehaviour
 
             _activeNode = null;
 
-            LastNodeWasCaptured = resolvedNode.WasCaptured;
-            LastNodeWasEscaped  = resolvedNode.WasEscaped;
-            // Expired = not captured AND not escaped (ran out of loops with no interaction)
-            if (!resolvedNode.WasCaptured && !resolvedNode.WasEscaped)
-                LastNodeWasExpired = true;
+            LastNodeWasCaptured = outcome == MineNodeOutcome.Captured;
+            LastNodeWasEscaped  = outcome == MineNodeOutcome.Escaped;
+            LastNodeWasExpired  = outcome == MineNodeOutcome.Expired;
 
             // Fire before any Unity component access — safe even when the star
             // GameObject was already destroyed by DestroyStarAfterDelay.
