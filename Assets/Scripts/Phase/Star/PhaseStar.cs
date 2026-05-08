@@ -60,9 +60,14 @@ public class PhaseStar : MonoBehaviour
     
     private bool _previewInitialized;
 
-    [Header("Safety / Self-heal")]
+    // _awaitingCollectableClear: true while we are blocked waiting for in-flight collectables
+    // to land before re-arming the star. Two independent timers enforce a timeout so a
+    // stalled or destroyed collectable can't lock the star forever:
+    //   • SinceLoop — counts loop boundaries elapsed (reliable in sync with music tempo).
+    //   • SinceDsp  — counts real wall-clock DSP seconds (catches edge cases where loop
+    //                 boundaries stop firing, e.g. if DrumTrack is paused mid-flight).
+    // Both timers start on the first loop boundary that arrives while waiting. -1 means unset.
     private int _awaitingCollectableClearSinceLoop = -1;
-
     private double _awaitingCollectableClearSinceDsp = -1.0;
 
     [Header("Subcomponents (optional)")] [SerializeField]
@@ -102,9 +107,10 @@ public class PhaseStar : MonoBehaviour
 
     // True while the star is parked off-screen during a collectable burst.
     // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
+    // All mutations should go through TryEnterBurstHidden() / TryExitBurstHidden()
+    // so the coordinator is the single write path. The one exception is the hard
+    // reset in EnterInMaze(), which resets all interaction state together.
     private bool _burstOffScreen { get => _interactionState.Interaction.BurstOffScreen; set => _interactionState.Interaction.BurstOffScreen = value; }
-    private Coroutine _burstOffScreenWaitCo;
-    private Coroutine _entryApproachCo;
     private Coroutine _waitForDustCo;
 
     [SerializeField] private bool _tracePhaseStar = true;
@@ -213,7 +219,6 @@ public class PhaseStar : MonoBehaviour
     public void EnterInMaze(Vector2 worldPos)
     {
         EnsureSubcomponents();
-        StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
 
         _entryInProgress = false;
@@ -256,8 +261,6 @@ public class PhaseStar : MonoBehaviour
 
     private void EnterDormantWaitState()
     {
-        StopManagedCoroutine(ref _entryApproachCo);
-
         _entryInProgress = false;
         _state = PhaseStarState.Dormant;
         _isArmed = false;
@@ -334,7 +337,13 @@ public class PhaseStar : MonoBehaviour
         dust?.SetTentaclesActive(false);
         cravingNavigator?.SetActive(true);
 
-        ArmNext();
+        // If paused for a sibling's node cycle, defer arming to Resume(). The state has
+        // already advanced to WaitingForPoke here, so CanArm() will pass when Resume()
+        // calls ArmNext(). Calling ArmNext() now would fail (CIF from the sibling's burst)
+        // and cascade into HideInPlaceForBurst(), forcing an unnecessary dormant reset.
+        if (_disarmReason != PhaseStarDisarmReason.SiblingActive)
+            ArmNext();
+
         LogState("DormantWake+Armed");
     }
 
@@ -578,10 +587,28 @@ public class PhaseStar : MonoBehaviour
 
 
     private bool _dustDeliveryWired;
+
+    // Zap progress state machine.
+    // Seeking          → star has no zaps yet and is accumulating.
+    // DormantNotSeeking → a sibling star holds the coordinator lock; this star suspends
+    //                    progression without losing its counters. Enters only when
+    //                    allowConcurrentDormantCharging is false.
+    // Zapping          → at least one zap delivered, still accumulating toward threshold.
+    // WaitingForRetract → threshold met; tentacles are retracting before readiness is latched.
+    // ReadyLatched      → all zaps confirmed + tentacles retracted; poke can now eject a node.
+    // Ejecting          → node spawn in flight.
     private enum ZapProgressState { Seeking, DormantNotSeeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
     private ZapProgressState _preservedZapProgressStateBeforeCoordinatorLock = ZapProgressState.Seeking;
     private bool _coordinatorLockOwnedByOtherStar;
+
+    // Zap count authority chain (highest to lowest priority):
+    //   1. _currentBurstRequiredZaps — set by DirectSpawnMineNode() from the actual node payload;
+    //      overrides everything else because the node is already spawned.
+    //   2. TryResolveAuthoritativeZapCount() — motif/phase authored count from the NoteSet.
+    //   3. NoteSet cardinality fallback (Max of persistentTemplate, distinct steps, note list).
+    // requiredZapCount stores the resolved value; _currentBurstRequiredZaps is the burst-phase
+    // floor so tentacle pool sizing stays stable even if requiredZapCount refreshes mid-cycle.
     private int zappedCount;
     private int requiredZapCount = 1;
     private int _currentBurstRequiredZaps = 0;
@@ -590,8 +617,8 @@ public class PhaseStar : MonoBehaviour
     public float ZapProgress01 => Mathf.Clamp01((float)Mathf.Max(0, zappedCount) / Mathf.Max(1, RequiredZapCount));
     public int GetDesiredTentacleCount()
     {
-        // Prefer the resolved burst payload count when available; this avoids first-frame/order
-        // races where requiredZapCount is still catching up from refresh probes.
+        // Take the max of both counts: requiredZapCount may still be catching up from a
+        // refresh probe on the first frame after a burst spawn.
         return Mathf.Max(1, Mathf.Max(RequiredZapCount, _currentBurstRequiredZaps));
     }
     private MusicalRole _requiredZapRole = MusicalRole.None;
@@ -686,9 +713,7 @@ public class PhaseStar : MonoBehaviour
 
     private void CleanupManagedCoroutines()
     {
-        StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
-        StopManagedCoroutine(ref _burstOffScreenWaitCo);
     }
     private void OnDustDelivery(MusicalRole role, float deliveredUnits)
     {
@@ -874,135 +899,142 @@ public class PhaseStar : MonoBehaviour
         return c;
     }
 
-void Update()
-{
-    float dt = Time.deltaTime;
-
-    // Recovery guard: if we are already latched and not blocked by another star's
-    // coordinator lock, ensure we proceed to active wake/collision flow.
-    if (_state == PhaseStarState.Dormant &&
-        _zapProgressState == ZapProgressState.ReadyLatched &&
-        !_pendingDormantActivation &&
-        !_coordinatorLockOwnedByOtherStar)
+    void Update()
     {
-        TransitionDormantToActive();
-    }
+        float dt = Time.deltaTime;
 
-    if (_pendingDormantActivation && (dust == null || !dust.HasActiveTentacles))
-        FinalizeDormantToActiveAfterRetract();
+        UpdateStateRecovery();
 
-    _accumulatorRotAngle += accumulatorRotSpeed * dt;
+        _accumulatorRotAngle += accumulatorRotSpeed * dt;
 
-    float rotA, rotB;
-    bool aLocked = false, bLocked = false;
-
-    if (dust != null)
-    {
-        dust.GetDiamondLockState(0, out aLocked, out float aLockDeg, out bool aDraining);
-        dust.GetDiamondLockState(1, out bLocked, out float bLockDeg, out bool bDraining);
-
-        if (aDraining || bDraining)
-            _accumulatorDrainTimer += dt;
-        else
-            _accumulatorDrainTimer = 0f;
-
-        float sway = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
-
-        rotA = aLocked ? aLockDeg + (aDraining ? sway : 0f) : _accumulatorRotAngle;
-        rotB = bLocked ? bLockDeg + (bDraining ? sway : 0f) : -_accumulatorRotAngle;
-    }
-    else
-    {
-        rotA = _accumulatorRotAngle;
-        rotB = -_accumulatorRotAngle;
-    }
-
-    EnsureDormantSeedVisuals();
-
-    // Dominant-role tracking.
-    if (GetDominantRoleRaw(out var dominantRole, out _, out _))
-    {
-        if (dominantRole != _previewRole)
+        // Compute diamond rotation angles and lock state for this frame.
+        float rotA, rotB;
+        bool aLocked = false, bLocked = false;
+        if (dust != null)
         {
-            _previewRole = dominantRole;
+            dust.GetDiamondLockState(0, out aLocked, out float aLockDeg, out bool aDraining);
+            dust.GetDiamondLockState(1, out bLocked, out float bLockDeg, out bool bDraining);
 
-            _previewColor = ResolveRoleColor(dominantRole);
+            if (aDraining || bDraining)
+                _accumulatorDrainTimer += dt;
+            else
+                _accumulatorDrainTimer = 0f;
 
-            _cachedTrack = FindTrackByRole(dominantRole);
-            if (zappedCount == 0)
-                TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
-            visuals?.ResetDualDiamondVisualState();
+            float sway = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
+            rotA = aLocked ? aLockDeg + (aDraining ? sway : 0f) : _accumulatorRotAngle;
+            rotB = bLocked ? bLockDeg + (bDraining ? sway : 0f) : -_accumulatorRotAngle;
         }
         else
         {
-            InstrumentTrack latestTrack = FindTrackByRole(dominantRole);
-            bool trackChanged = !ReferenceEquals(latestTrack, _plannedEjectionDescriptor.track);
-            if (trackChanged)
+            rotA = _accumulatorRotAngle;
+            rotB = -_accumulatorRotAngle;
+        }
+
+        EnsureDormantSeedVisuals();
+        UpdateDominantRole(dt);
+        UpdateChargeVisuals(rotA, aLocked, rotB, bLocked);
+    }
+
+    // Handles latched-but-dormant recovery and pending-activation finalization each frame.
+    private void UpdateStateRecovery()
+    {
+        if (_state == PhaseStarState.Dormant &&
+            _zapProgressState == ZapProgressState.ReadyLatched &&
+            !_pendingDormantActivation &&
+            !_coordinatorLockOwnedByOtherStar)
+        {
+            TransitionDormantToActive();
+        }
+
+        if (_pendingDormantActivation && (dust == null || !dust.HasActiveTentacles))
+            FinalizeDormantToActiveAfterRetract();
+    }
+
+    // Tracks which role currently has the highest charge, refreshes the planned ejection
+    // descriptor when the dominant role or its track changes, and updates the charge display lerp.
+    private void UpdateDominantRole(float dt)
+    {
+        if (GetDominantRoleRaw(out var dominantRole, out _, out _))
+        {
+            if (dominantRole != _previewRole)
             {
-                _cachedTrack = latestTrack;
+                _previewRole = dominantRole;
+                _previewColor = ResolveRoleColor(dominantRole);
+                _cachedTrack = FindTrackByRole(dominantRole);
                 if (zappedCount == 0)
-                    TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+                    TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
+                visuals?.ResetDualDiamondVisualState();
+            }
+            else
+            {
+                InstrumentTrack latestTrack = FindTrackByRole(dominantRole);
+                bool trackChanged = !ReferenceEquals(latestTrack, _plannedEjectionDescriptor.track);
+                if (trackChanged)
+                {
+                    _cachedTrack = latestTrack;
+                    if (zappedCount == 0)
+                        TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+                }
+            }
+
+            _displayedCharge01 = Mathf.Lerp(_displayedCharge01, ZapProgress01, dt * chargeDisplayLerpSpeed);
+        }
+        else
+        {
+            _previewRole = MusicalRole.None;
+            _displayedCharge01 = Mathf.Lerp(_displayedCharge01, 0f, dt * chargeDisplayLerpSpeed);
+        }
+    }
+
+    // Drives diamond rendering and the charge-scale/body-color visuals each frame.
+    // Must be called after UpdateDominantRole() and after diamond rotation angles are computed.
+    // Note: UpdateDualDiamonds resets diamond localScale to 1, so the charge-scale block
+    // below must run after it to win for the Dormant phase.
+    private void UpdateChargeVisuals(float rotA, bool aLocked, float rotB, bool bLocked)
+    {
+        bool dominantReady = IsEjectionReady();
+
+        if (_previewVisual != null && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+        {
+            visuals?.UpdateDualDiamonds(
+                _previewColor,
+                _displayedCharge01,
+                rotA, aLocked,
+                rotB, bLocked,
+                dominantReady,
+                readyRotSpeedMul);
+        }
+
+        // Scale 0→1 as charge builds. _previewVisual and _previewVisualB are children of
+        // PhaseStar (not of visuals), so they must be scaled explicitly here.
+        // Sqrt curve: front-loads growth so small charge values are perceptible.
+        // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
+        if ((_state == PhaseStarState.Dormant ||
+             (_state == PhaseStarState.WaitingForPoke && ZapProgress01 < 1f))
+            && !_burstOffScreen)
+        {
+            float visualScale01 = Mathf.Max(dormantSeedScale, Mathf.Sqrt(_displayedCharge01));
+            if (dust != null && dust.HasActiveTentacles)
+                visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
+
+            Vector3 chargeScale = Vector3.one * visualScale01;
+            if (visuals != null) visuals.transform.localScale = chargeScale;
+            if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
+            if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
+
+            if (visualScale01 > 0.001f && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+            {
+                visuals?.ToggleShardRenderers(true);
+                Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
+                visuals?.LerpBodyColor(roleColor, _displayedCharge01);
             }
         }
-
-        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, ZapProgress01, dt * chargeDisplayLerpSpeed);
-    }
-    else
-    {
-        _previewRole = MusicalRole.None;
-        _displayedCharge01 = Mathf.Lerp(_displayedCharge01, 0f, dt * chargeDisplayLerpSpeed);
-    }
-
-    bool dominantReady = IsEjectionReady();
-
-    if (_previewVisual != null && _disarmReason != PhaseStarDisarmReason.SiblingActive)
-    {
-        visuals?.UpdateDualDiamonds(
-            _previewColor,
-            _displayedCharge01,
-            rotA, aLocked,
-            rotB, bLocked,
-            dominantReady,
-            readyRotSpeedMul);
-    }
-
-    // Scale 0→1 as charge builds toward the ejection threshold.
-    // _previewVisual and _previewVisualB are children of PhaseStar (not of visuals),
-    // so they must be scaled explicitly — visuals.transform.localScale doesn't reach them.
-    // This block runs after UpdateDualDiamonds (which resets diamond localScale to 1),
-    // so these assignments win for the Dormant phase.
-    if ((_state == PhaseStarState.Dormant ||
-         (_state == PhaseStarState.WaitingForPoke && ZapProgress01 < 1f))
-        && !_burstOffScreen)
-    {
-        // Sqrt curve: front-loads visual growth so small charge values produce
-        // a perceptible scale instead of staying near-invisible until threshold.
-        // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
-        float visualScale01 = Mathf.Max(dormantSeedScale, Mathf.Sqrt(_displayedCharge01));
-        bool tentaclesDrawing = dust != null && dust.HasActiveTentacles;
-        if (tentaclesDrawing)
-            visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
-
-        Vector3 chargeScale = Vector3.one * visualScale01;
-        if (visuals != null) visuals.transform.localScale = chargeScale;
-        if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
-        if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
-
-        if (visualScale01 > 0.001f && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+        else if (visuals != null && !_burstOffScreen && _disarmReason != PhaseStarDisarmReason.SiblingActive)
         {
-            visuals?.ToggleShardRenderers(true);
-            Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
-            visuals?.LerpBodyColor(roleColor, _displayedCharge01);
+            Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
+            visuals.LerpBodyColor(bodyColor, _displayedCharge01);
         }
     }
-    // Continuously lerp body color between dim and role color using charge level.
-    else if (visuals != null && !_burstOffScreen && _disarmReason != PhaseStarDisarmReason.SiblingActive)
-    {
-        Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
-        visuals.LerpBodyColor(bodyColor, _displayedCharge01);
-    }
-
-}
     private void EnsureDormantSeedVisuals()
     {
         if (visuals == null) return;
@@ -1101,7 +1133,11 @@ void Update()
             return;
         }
 
-        if (AnyExpansionPendingGlobal())
+        // Mirror ShouldDisarmForGlobalGates(): a fully-charged star is exempt from the
+        // expansion-pending gate. Blocking it here would leave it permanently un-armable
+        // while expansion is active (the loop boundary's "EP + ready = hold armed" guard
+        // also returns early, so the re-arm path in section 3 is never reached).
+        if (AnyExpansionPendingGlobal() && ZapProgress01 < 1f)
         {
             DBG("ArmNext: blocked by ExpansionPending -> Disarm:ExpansionPendingGlobal");
             Disarm(PhaseStarDisarmReason.ExpansionPending);
@@ -1161,7 +1197,6 @@ void Update()
     {
         if (!TryEnterBurstHidden()) return;
 
-        StopManagedCoroutine(ref _entryApproachCo);
         StopManagedCoroutine(ref _waitForDustCo);
 
         // Stay at current world position — do NOT teleport off-screen.
@@ -1321,7 +1356,10 @@ void Update()
             return;
         }
 
-        if (anyExpansion && ZapProgress01 >= 1f)
+        // Only hold when already armed. Without the _isArmed check, a fully-charged
+        // but un-armed star (e.g. just resumed after a sibling's cycle) would skip section
+        // 3 and never reach ArmNext().
+        if (anyExpansion && ZapProgress01 >= 1f && _isArmed)
         {
             Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
             return;
@@ -1336,6 +1374,7 @@ void Update()
         {
             // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
             // CIF-triggered hide is safe to reset. Restore motion before arming.
+            // This must run before the WaitingForPoke branch so CanArm() sees BurstOffScreen=false.
             if (_burstOffScreen)
             {
                 if (TryExitBurstHidden())
@@ -1347,9 +1386,30 @@ void Update()
 
             DBG("[PS:LB] -> re-arm");
             if (_state == PhaseStarState.WaitingForPoke)
+            {
                 ArmNext();
+            }
             else
+            {
+                // Only re-enter dormant wait if not already committed to a retract/latch sequence.
+                // EnterDormantWaitState() calls SetTentaclesActive(true), which re-enables
+                // acquisition and starts a new grow/drain/retract cycle — preventing
+                // ReadyLatched from ever being reached until all matching dust is exhausted.
+                // The recovery guard in UpdateStateRecovery() and OnAllTentaclesRetracted()
+                // will advance the star once retractions finish.
+                bool retractOrLatchInProgress =
+                    _zapProgressState == ZapProgressState.WaitingForRetract ||
+                    _zapProgressState == ZapProgressState.ReadyLatched ||
+                    _pendingDormantActivation;
+
+                if (retractOrLatchInProgress)
+                {
+                    DBG("[PS:LB] -> retract/latch committed, skip dormant re-enter");
+                    return;
+                }
+
                 EnterDormantWaitState();
+            }
         }
         else
         {
