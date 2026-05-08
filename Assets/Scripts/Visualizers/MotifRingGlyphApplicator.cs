@@ -381,6 +381,90 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         RefreshPlayAreaFit(_recordRings.Count);
     }
 
+    /// <summary>
+    /// Render rings from a snapshot instantly with no draw-in animation or rotation.
+    /// Used for non-highlighted carousel slots in the PhaseLibrary scene.
+    /// Passing null clears the slot.
+    /// </summary>
+    public void ApplyStatic(MotifSnapshot snapshot)
+    {
+        StopAllCoroutines();
+        _recordFadingOut   = false;
+        _gameplayFadingOut = false;
+        DestroyList(_recordRings);
+
+        if (snapshot == null || config == null) return;
+
+        var seen     = new HashSet<(int, MusicalRole)>();
+        var ringKeys = new List<(int binIndex, MusicalRole role, Color color, float fillDur)>();
+
+        var fillDurs = new Dictionary<(int, float, float, float), float>();
+        foreach (var bin in snapshot.TrackBins)
+        {
+            Color c = bin.TrackColor;
+            var   k = (bin.BinIndex, c.r, c.g, c.b);
+            if (!fillDurs.TryGetValue(k, out float ex) || bin.FillDurationSeconds > ex)
+                fillDurs[k] = bin.FillDurationSeconds;
+        }
+
+        foreach (var bin in snapshot.TrackBins
+                     .Where(b => b.IsFilled || b.CollectedSteps.Count > 0)
+                     .OrderBy(b => b.BinIndex).ThenBy(b => (int)b.Role))
+        {
+            var key = (bin.BinIndex, bin.Role);
+            if (!seen.Add(key)) continue;
+            Color c2 = bin.TrackColor;
+            fillDurs.TryGetValue((bin.BinIndex, c2.r, c2.g, c2.b), out float fd);
+            ringKeys.Add((bin.BinIndex, bin.Role, c2, fd));
+        }
+
+        if (ringKeys.Count == 0)
+        {
+            var seenLegacy = new HashSet<(int, float, float, float)>();
+            foreach (var n in snapshot.CollectedNotes.OrderBy(n => n.BinIndex))
+            {
+                Color c = n.TrackColor;
+                var   ck = (n.BinIndex, c.r, c.g, c.b);
+                if (!seenLegacy.Add(ck)) continue;
+                ringKeys.Add((n.BinIndex, MusicalRole.None, c, 0f));
+            }
+        }
+
+        if (ringKeys.Count == 0) return;
+
+        int segs = Mathf.Max(16, config.segments);
+
+        for (int i = 0; i < ringKeys.Count; i++)
+        {
+            var (binIndex, role, color, _) = ringKeys[i];
+            float innerR = RingInnerRadius(i);
+            float outerR = innerR + config.ringThickness;
+
+            var ringNotes = snapshot.CollectedNotes
+                .Where(n => n.BinIndex == binIndex
+                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
+                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
+                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
+                .ToList();
+
+            var entry = BuildRingEntry($"StaticRing_Bin{binIndex}_{role}",
+                innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps);
+            _recordRings.Add(entry);
+
+            // Render mesh and contour immediately — no coroutines.
+            var mesh = entry.Fill.GetComponent<MeshFilter>().sharedMesh;
+            mesh.SetTriangles(entry.FullTris, 0);
+            mesh.RecalculateBounds();
+
+            entry.Contour.positionCount = entry.ContourPoints.Count;
+            for (int j = 0; j < entry.ContourPoints.Count; j++)
+                entry.Contour.SetPosition(j, new Vector3(
+                    entry.ContourPoints[j].x, entry.ContourPoints[j].y, 0f));
+        }
+
+        RefreshPlayAreaFit(_recordRings.Count);
+    }
+
     /// <summary>Fade all record rings to transparent, then destroy.</summary>
     public IEnumerator FadeOutAndClear(float duration)
     {

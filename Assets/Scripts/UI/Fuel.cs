@@ -1,49 +1,30 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-[AddComponentMenu("UI/Vehicle Stat Bars (Fuel Legacy)")]
+[AddComponentMenu("UI/Vehicle Stat Bars")]
 public class Fuel : MonoBehaviour
 {
-    // Legacy name: this component now manages both runtime fuel and player-select stat bars.
-    // It can live on a single GameObject and drive Image refs anywhere in the canvas.
-
-    [Header("Primary Fill")]
+    [Header("Runtime Fuel")]
     public Image fuelFill;
 
-    [Header("Player Select Comparison Fills (same component, assign any 4 Images)")]
-    public Image capacityFill;
-    public Image efficiencyFill;
-    public Image speedFill;
-    public Image boostFill;
+    [Header("Player Select Stat Bars")]
+    public Image capacityBar;
+    public Image speedBar;
+    public TMP_Text boostText;
+    public TMP_Text efficiencyText;
 
     public void UpdateFuelUI(float energyRatio)
     {
         if (fuelFill != null)
-        {
             fuelFill.fillAmount = Mathf.Clamp01(energyRatio);
-        }
     }
 
-    public void UpdateProfileComparisonUI(float capacityRatio, float fuelEfficiencyRatio, float speedRatio, float boostRatio)
+    public void UpdateSelectStats(float capacityRatio, float speedRatio, int boostPct, int efficiencyPct)
     {
-        if (capacityFill != null)
-        {
-            capacityFill.fillAmount = Mathf.Clamp01(capacityRatio);
-        }
-
-        if (efficiencyFill != null)
-        {
-            efficiencyFill.fillAmount = Mathf.Clamp01(fuelEfficiencyRatio);
-        }
-
-        if (speedFill != null)
-        {
-            speedFill.fillAmount = Mathf.Clamp01(speedRatio);
-        }
-
-        if (boostFill != null)
-        {
-            boostFill.fillAmount = Mathf.Clamp01(boostRatio);
-        }
+        if (capacityBar != null) capacityBar.fillAmount = Mathf.Clamp01(capacityRatio);
+        if (speedBar != null) speedBar.fillAmount = Mathf.Clamp01(speedRatio);
+        if (boostText != null) boostText.text = $"{boostPct}%";
+        if (efficiencyText != null) efficiencyText.text = $"{efficiencyPct}%";
     }
 }

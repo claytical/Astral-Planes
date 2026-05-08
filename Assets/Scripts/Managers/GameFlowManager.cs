@@ -416,7 +416,6 @@ public partial class GameFlowManager : MonoBehaviour
     {
         currentState = GameState.Selection;
         hasGameOverStarted = false;
-        // Remove null/destroyed references first
         localPlayers = localPlayers.Where(p => p != null).ToList();
         foreach (var player in localPlayers)
         {

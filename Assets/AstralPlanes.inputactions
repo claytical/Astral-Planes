@@ -7,7 +7,7 @@
             "id": "c3baa163-c269-44e2-8d7b-94beef48a8da",
             "actions": [
                 {
-                    "name": "NextVehicle",
+                    "name": "Next",
                     "type": "Button",
                     "id": "1abf4dc0-2f1c-4957-b433-053155dcb2f9",
                     "expectedControlType": "",
@@ -16,7 +16,7 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "NextColor",
+                    "name": "Up",
                     "type": "Button",
                     "id": "7e5987d9-6667-4b82-8c9a-ff55697ed190",
                     "expectedControlType": "",
@@ -25,7 +25,7 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "PreviousVehicle",
+                    "name": "Previous",
                     "type": "Button",
                     "id": "5b946c89-f459-4d27-acfb-76f2cd8e5c2c",
                     "expectedControlType": "",
@@ -34,7 +34,7 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "PreviousColor",
+                    "name": "Down",
                     "type": "Button",
                     "id": "43297345-e770-4d26-bd90-2bc2dd9c6a75",
                     "expectedControlType": "",
@@ -78,7 +78,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "NextVehicle",
+                    "action": "Next",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -89,7 +89,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "NextVehicle",
+                    "action": "Next",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -100,7 +100,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PreviousVehicle",
+                    "action": "Previous",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -111,7 +111,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PreviousVehicle",
+                    "action": "Previous",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -177,7 +177,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
-                    "action": "NextColor",
+                    "action": "Up",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -188,7 +188,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "NextColor",
+                    "action": "Up",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -199,7 +199,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
-                    "action": "PreviousColor",
+                    "action": "Down",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -210,7 +210,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PreviousColor",
+                    "action": "Down",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

@@ -76,11 +76,12 @@ public class PlayerSelect : MonoBehaviour
         float boostAccel = profile != null ? profile.arcadeBoostAccel : 0f;
 
         float capacityRatio = capacity / maxCapacityForUI;
-        float fuelEfficiencyRatio = Mathf.InverseLerp(minBurnRateForUI, maxBurnRateForUI, burnRate);
         float speedRatio = maxSpeed / speedTopEndForUI;
-        float boostRatio = boostAccel / boostTopEndForUI;
+        float fuelEfficiencyRatio = Mathf.InverseLerp(minBurnRateForUI, maxBurnRateForUI, burnRate);
+        int efficiencyPct = Mathf.RoundToInt((1f - fuelEfficiencyRatio) * 100f);
+        int boostPct = Mathf.RoundToInt((boostAccel / boostTopEndForUI) * 100f);
 
-        fuel.UpdateProfileComparisonUI(capacityRatio, fuelEfficiencyRatio, speedRatio, boostRatio);
+        fuel.UpdateSelectStats(capacityRatio, speedRatio, boostPct, efficiencyPct);
     }
 
     private void ApplyVisuals()
