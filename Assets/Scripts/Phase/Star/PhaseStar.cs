@@ -762,6 +762,18 @@ public class PhaseStar : MonoBehaviour
 
         if (!_requiredZapNoteSetAvailable || !_plannedEjectionDescriptor.IsValid)
         {
+            // Self-heal: derive descriptor from the role that actually resolved a zap.
+            // Without this, stars can become ReadyLatched with an invalid descriptor
+            // and remain unejectable while acquisition stays disabled.
+            var resolvedTrack = FindTrackByRole(role);
+            if (resolvedTrack != null)
+            {
+                TryRefreshRequiredZapCountForPlannedRole(
+                    role,
+                    resolvedTrack,
+                    resetCurrentZapCount: false,
+                    reason: "zap-resolved-descriptor-repair");
+            }
             Debug.LogWarning($"[PhaseStar:ZapResolved] missing planned ejection descriptor; readiness blocked. role={role} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
         }
 
@@ -803,6 +815,35 @@ public class PhaseStar : MonoBehaviour
         }
 
         MusicalRole latchedRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
+
+        // Descriptor must be valid before latching readiness, otherwise the star can
+        // stop acquiring dust and never become ejectable.
+        if (!_plannedEjectionDescriptor.IsValid || !_requiredZapNoteSetAvailable)
+        {
+            MusicalRole repairRole = latchedRole != MusicalRole.None ? latchedRole : _lastResolvedZapRole;
+            if (repairRole != MusicalRole.None)
+            {
+                var repairTrack = FindTrackByRole(repairRole);
+                if (repairTrack != null)
+                {
+                    TryRefreshRequiredZapCountForPlannedRole(
+                        repairRole,
+                        repairTrack,
+                        resetCurrentZapCount: false,
+                        reason: "retract-descriptor-repair");
+                }
+            }
+        }
+
+        if (!_plannedEjectionDescriptor.IsValid || !_requiredZapNoteSetAvailable)
+        {
+            MusicalRole fallbackRole = _lastResolvedZapRole != MusicalRole.None ? _lastResolvedZapRole : latchedRole;
+            var fallback = zappedCount > 0 ? ZapProgressState.Zapping : ZapProgressState.Seeking;
+            TransitionZapState(fallback, fallbackRole, "retract-descriptor-invalid");
+            dust?.SetAcquisitionEnabled(true, "retract-descriptor-invalid-resume-acquire");
+            return;
+        }
+
         TransitionZapState(ZapProgressState.ReadyLatched, latchedRole, "all-tentacles-retracted");
         dust?.SetAcquisitionEnabled(false, "ready-latched-keep-disabled");
     }
