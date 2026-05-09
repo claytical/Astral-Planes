@@ -133,11 +133,18 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     public void SetTentaclesActive(bool active)
     {
         _tentaclesActive = active;
-        _acquisitionEnabled = active;
-        _navigator?.SetHuntingEnabled(active);
+        SetAcquisitionEnabled(active, "set-tentacles-active");
 
         if (!active)
             ResetTentacles();
+    }
+
+
+    public void SetAcquisitionEnabled(bool enabled, string reason)
+    {
+        _acquisitionEnabled = enabled;
+        _navigator?.SetHuntingEnabled(enabled && _tentaclesActive);
+        Debug.Log($"[PhaseStarDust] acquisition enabled={_acquisitionEnabled} tentaclesActive={_tentaclesActive} reason={reason}");
     }
 
     public void BeginRetractionForActiveTentacles()
@@ -147,9 +154,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     public void BeginRetractAllTentacles()
     {
-        _acquisitionEnabled = false;
+        SetAcquisitionEnabled(false, "begin-retract-all");
         _isRetractAllInProgress = true;
-        _navigator?.SetHuntingEnabled(false);
 
         Vector2 starPos = transform.position;
         foreach (var tentacle in _tentacles)
