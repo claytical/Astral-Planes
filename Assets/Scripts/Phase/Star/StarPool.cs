@@ -212,13 +212,17 @@ public sealed class StarPool : MonoBehaviour
         {
             bool hasKey = _activeStars.ContainsKey(role);
             bool notNull = hasKey && _activeStars[role] != null;
-            if (hasKey && notNull) continue;
-            Debug.Log($"[StarPool] Tick: {role} slot open (hasKey={hasKey} notNull={notNull}) — attempting spawn");
-            if (_spawningThisFrame.Contains(role)) continue;
-            if (!_dustGen.HasAnyDustWithRole(role)) continue;
+            bool slotEmpty = !hasKey || !notNull;
+            bool alreadySpawning = _spawningThisFrame.Contains(role);
+            bool hasDust = _dustGen.HasAnyDustWithRole(role);
+            bool canSpawn = slotEmpty && !alreadySpawning && hasDust;
 
-            _spawningThisFrame.Add(role);
-            SpawnStarForRole(role);
+            if (canSpawn)
+            {
+                Debug.Log($"[StarPool] Tick spawn-check role={role} minePending={_mineNodePending} unresolved={HasUnresolvedMineNodeSequence()} slotEmpty={slotEmpty} alreadySpawning={alreadySpawning} hasDust={hasDust} remainingEjections={_remainingEjectionsTotal}");
+                _spawningThisFrame.Add(role);
+                SpawnStarForRole(role);
+            }
         }
     }
 
