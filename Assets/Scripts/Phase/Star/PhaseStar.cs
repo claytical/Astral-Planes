@@ -1682,7 +1682,7 @@ public class PhaseStar : MonoBehaviour
         var tracks = _gfm?.controller?.tracks;
         if (tracks != null)
         {
-            for (int i = 0; i < tracks.Count; i++)
+            for (int i = 0; i < tracks.Length; i++)
             {
                 var t = tracks[i];
                 if (t == null || t.assignedRole == MusicalRole.None) continue;
