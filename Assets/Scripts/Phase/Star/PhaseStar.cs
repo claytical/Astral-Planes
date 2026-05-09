@@ -625,11 +625,32 @@ public class PhaseStar : MonoBehaviour
     private bool _requiredZapNoteSetAvailable;
     private Vector2Int _lastResolvedZapCell;
     private MusicalRole _lastResolvedZapRole = MusicalRole.None;
+
+    private bool MayAcquireDustTargets()
+    {
+        bool zapStateAllowsAcquire =
+            _zapProgressState == ZapProgressState.Seeking ||
+            _zapProgressState == ZapProgressState.Zapping;
+        bool globallyGatedOrDisarmed =
+            _disarmReason != PhaseStarDisarmReason.None ||
+            _state != PhaseStarState.Dormant ||
+            _coordinatorLockOwnedByOtherStar;
+        return zapStateAllowsAcquire && !globallyGatedOrDisarmed;
+    }
+
+    private void ApplyDustAcquisitionPolicy(string reason)
+    {
+        bool enabled = MayAcquireDustTargets();
+        dust?.SetAcquisitionEnabled(enabled, $"{reason}|zap={_zapProgressState}|state={_state}|disarm={_disarmReason}");
+    }
     private void TransitionZapState(ZapProgressState next, MusicalRole role, string reason)
     {
         if (_zapProgressState == next) return;
-        Debug.Log($"[PhaseStar:ZapState] {_zapProgressState}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} reason={reason} interaction=({_interactionState.ToDebugString()})");
+        var prev = _zapProgressState;
         _zapProgressState = next;
+        ApplyDustAcquisitionPolicy($"zap-transition:{reason}");
+        bool acquisitionEnabled = MayAcquireDustTargets();
+        Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");
     }
 
     /// <summary>
@@ -748,6 +769,7 @@ public class PhaseStar : MonoBehaviour
         if (readyNow)
         {
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
+            dust?.SetAcquisitionEnabled(false, "waiting-for-retract-threshold-met");
             dust?.BeginRetractionForActiveTentacles();
 
             if (_state == PhaseStarState.Dormant && !_pendingDormantActivation && !_coordinatorLockOwnedByOtherStar)
@@ -782,6 +804,7 @@ public class PhaseStar : MonoBehaviour
 
         MusicalRole latchedRole = _requiredZapRole != MusicalRole.None ? _requiredZapRole : _previewRole;
         TransitionZapState(ZapProgressState.ReadyLatched, latchedRole, "all-tentacles-retracted");
+        dust?.SetAcquisitionEnabled(false, "ready-latched-keep-disabled");
     }
     
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
@@ -1794,7 +1817,10 @@ public class PhaseStar : MonoBehaviour
         else
             SpawnNodeCommon(contact, ejectedTrack);
         if (_activeNode != null || _activeSuperNode != null)
+        {
             TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
+            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
+        }
 
         // Keep the star live after ejection. NodeResolving + loop-boundary gates control
         // dormancy/rearm while the MineNode is active; disposing here would block that flow.
