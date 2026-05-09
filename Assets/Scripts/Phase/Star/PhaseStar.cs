@@ -1601,7 +1601,34 @@ public class PhaseStar : MonoBehaviour
         // Stable role identity per star: once attuned, always plan/eject for that role.
         if (_attunedRole != MusicalRole.None) return _attunedRole;
         if (_previewRole != MusicalRole.None) return _previewRole;
-        return MusicalRole.Bass;
+
+        // Fallback must come from motif-authored active roles, not a hardcoded musical role.
+        // Some motifs intentionally omit Bass.
+        var motifRoles = _assignedMotif?.GetActiveRoles();
+        if (motifRoles != null)
+        {
+            for (int i = 0; i < motifRoles.Count; i++)
+            {
+                var role = motifRoles[i];
+                if (role == MusicalRole.None) continue;
+                if (FindTrackByRole(role) != null) return role;
+            }
+        }
+
+        // Last-resort: pick any track role currently available.
+        ResolveGameFlowManager();
+        var tracks = _gfm?.controller?.tracks;
+        if (tracks != null)
+        {
+            for (int i = 0; i < tracks.Count; i++)
+            {
+                var t = tracks[i];
+                if (t == null || t.assignedRole == MusicalRole.None) continue;
+                return t.assignedRole;
+            }
+        }
+
+        return MusicalRole.None;
     }
     public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
     {
