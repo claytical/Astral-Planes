@@ -163,6 +163,35 @@ public partial class GameFlowManager : MonoBehaviour
             track, phaseTransitionManager.currentMotif, targetBin, entropy);
 
     }
+
+    /// <summary>
+    /// Single source of truth for "any collectables are currently in flight" across all tracks.
+    /// Also owns stale-list pruning so all callers share identical list hygiene.
+    /// </summary>
+    public bool AnyCollectablesInFlightGlobal()
+    {
+        var trackController = controller;
+        var trackList = trackController?.tracks;
+        if (trackList == null) return false;
+
+        foreach (var track in trackList)
+        {
+            if (track == null) continue;
+            track.PruneSpawnedCollectables();
+
+            var spawned = track.spawnedCollectables;
+            if (spawned == null) continue;
+
+            for (int i = 0; i < spawned.Count; i++)
+            {
+                var go = spawned[i];
+                if (go != null && go.activeInHierarchy)
+                    return true;
+            }
+        }
+
+        return false;
+    }
     void Start()
     {
         sceneHandlers = new()

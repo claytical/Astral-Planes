@@ -1118,31 +1118,28 @@ public class PhaseStar : MonoBehaviour
     private bool AnyCollectablesInFlightGlobal()
     {
         var gfm = ResolveGameFlowManager();
+        bool unified = gfm != null && gfm.AnyCollectablesInFlightGlobal();
+        bool legacy = LegacyAnyCollectablesInFlightGlobal(gfm);
+
+        if (legacy != unified)
+            Debug.LogWarning($"[ASSERT:CIF] PhaseStar mismatch legacy={legacy} unified={unified} star={name}");
+
+        return unified;
+    }
+
+    private static bool LegacyAnyCollectablesInFlightGlobal(GameFlowManager gfm)
+    {
         if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
             return false;
-
-        bool any = false;
-
         foreach (var t in gfm.controller.tracks)
         {
             if (t == null) continue;
-
-            // Prune destroyed + inactive objects so pooled/reused collectables
-            // that have been returned to their pool don't keep the gate locked.
             if (t.spawnedCollectables != null)
                 t.spawnedCollectables.RemoveAll(go => go == null || !go.activeInHierarchy);
-
-            int count = (t.spawnedCollectables != null) ? t.spawnedCollectables.Count : 0;
-
-            if (count > 0)
-            {
-                any = true;
-                // Optional: leave this on until you confirm the fix
-                Debug.Log($"[PS:CIF] track={t.name} spawnedCollectables={count}");
-            }
+            if (t.spawnedCollectables != null && t.spawnedCollectables.Count > 0)
+                return true;
         }
-
-        return any;
+        return false;
     }
     
     private void ArmNext()
