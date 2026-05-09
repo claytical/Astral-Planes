@@ -1598,7 +1598,10 @@ public class PhaseStar : MonoBehaviour
     }
     private MusicalRole GetPlannedRoleForHighlightedShard()
     {
-        return _previewRole != MusicalRole.None ? _previewRole : MusicalRole.Bass;
+        // Stable role identity per star: once attuned, always plan/eject for that role.
+        if (_attunedRole != MusicalRole.None) return _attunedRole;
+        if (_previewRole != MusicalRole.None) return _previewRole;
+        return MusicalRole.Bass;
     }
     public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
     {
@@ -1647,6 +1650,21 @@ public class PhaseStar : MonoBehaviour
         }
         if (!IsEjectionReady())
         {
+            // Keep descriptor role synchronized to the authoritative dominant role before
+            // attempting recovery latch. Prevents ReadyLatched+role=None deadlocks.
+            if (GetDominantRoleRaw(out var dominantRoleForDescriptor, out _, out _))
+            {
+                var dominantTrack = FindTrackByRole(dominantRoleForDescriptor);
+                if (dominantTrack != null)
+                {
+                    TryRefreshRequiredZapCountForPlannedRole(
+                        dominantRoleForDescriptor,
+                        dominantTrack,
+                        resetCurrentZapCount: false,
+                        reason: "collision-recovery-refresh");
+                }
+            }
+
             // Recovery path: if charge already crossed the dominant-role threshold but
             // zap state did not relatch (e.g. post-node flow edge cases), relatch now
             // so a valid poke still ejects a node.
