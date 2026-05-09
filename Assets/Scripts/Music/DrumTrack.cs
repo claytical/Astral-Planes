@@ -1364,8 +1364,10 @@ public class DrumTrack : MonoBehaviour
         float gx = (worldPos.x - area.left) / tileX;
         float gy = (worldPos.y - area.bottom) / tileY;
 
-        int ix = Mathf.FloorToInt(gx);
-        int iy = Mathf.FloorToInt(gy);
+        // Use nearest-cell mapping instead of floor-bias so minor play-area/camera
+        // drift does not slowly push the reconstructed dust grid downward/leftward.
+        int ix = Mathf.RoundToInt(gx);
+        int iy = Mathf.RoundToInt(gy);
 
         if (_dust != null && _dust.toroidal)
         {
