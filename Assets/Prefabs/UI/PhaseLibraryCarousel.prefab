@@ -51,7 +51,13 @@ MonoBehaviour:
   - {fileID: 4310944924945027113}
   - {fileID: 205164797312018208}
   - {fileID: 9004058700579888019}
-  nextSceneName: TrackSelection
+  slideDuration: 0.25
+  trackSelectionScene: TrackSelection
+  inputCooldown: 0.2
+  pressToStartCue: {fileID: 0}
+  onMotifConfirmed:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &4750113069443986395
 GameObject:
   m_ObjectHideFlags: 0
@@ -143,7 +149,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6167996e666794377a6ed1f2b6c7b742, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
-  config: {fileID: 11400000, guid: 9216c4094117f455394a5948ffc67f35, type: 2}
+  config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   sphericalRotation: 0
 --- !u!1 &8905245117782567966
@@ -190,6 +196,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6167996e666794377a6ed1f2b6c7b742, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
-  config: {fileID: 11400000, guid: 9216c4094117f455394a5948ffc67f35, type: 2}
+  config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   sphericalRotation: 0
