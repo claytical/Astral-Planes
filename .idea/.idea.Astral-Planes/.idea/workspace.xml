@@ -7,8 +7,10 @@
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/Fuel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/Fuel.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Stats.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Stats.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/CollectionSoundManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

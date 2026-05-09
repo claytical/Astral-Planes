@@ -53,9 +53,9 @@ public class CollectionSoundManager : MonoBehaviour
         }
 
         // Set default program for FX
-        fxVoice.PlayOneShotMs127(60, 1, 1, defaultFxPreset, fxBank); // "poke" to force channel init
-       // fxVoice.SetProgram((int)defaultFxPreset, fxBank);
-
+        if(fxVoice != null)
+            fxVoice.PlayOneShotMs127(60, 1, 1, defaultFxPreset, fxBank); // "poke" to force channel init
+    
         Debug.Log("✅ SoundFont ready. CollectionSoundManager FX voice initialized.");
     }
 
