@@ -1241,7 +1241,28 @@ public class PhaseStar : MonoBehaviour
         motion?.SetFrozen(false);
         motion?.Enable(true);
         if (IsEjectionReady())
+        {
             ArmNext();
+            return;
+        }
+
+        // When resumed after a sibling MineNode flow, a non-ready dormant star must
+        // re-enter dormant wait so tentacle acquisition restarts. Showing dim alone
+        // leaves tentacles disabled and the star appears stuck despite valid dust.
+        if (_state == PhaseStarState.Dormant)
+        {
+            EnterDormantWaitState();
+            return;
+        }
+
+        if (!_isArmed)
+        {
+            ArmNext();
+            if (!_isArmed)
+                EnterDormantWaitState();
+            return;
+        }
+
         else
             visuals?.ShowDim(ResolvePreviewColorByReadiness());
     }
