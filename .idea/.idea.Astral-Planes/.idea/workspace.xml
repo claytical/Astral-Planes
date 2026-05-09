@@ -6,9 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Fonts/DawningofaNewDay-Regular.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Fonts/DawningofaNewDay-Regular.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Together.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Together.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TextMesh Pro/Resources/Fonts &amp; Materials/LiberationSans SDF - Fallback.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TextMesh Pro/Resources/Fonts &amp; Materials/LiberationSans SDF - Fallback.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,7 +66,7 @@
   &quot;keyToString&quot;: {
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;codex/analyze-phasestar-and-minenode-behavior&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
