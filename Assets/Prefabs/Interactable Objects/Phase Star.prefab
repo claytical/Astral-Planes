@@ -113,10 +113,10 @@ MonoBehaviour:
   minContactTime: 0.01
   colorTransitionTime: 0.5
   tentacleGrowSpeed: 0.5
-  tentacleRetractSpeed: 2
+  tentacleRetractSpeed: 5
   tentacleFlowSpeed: 1
   tentacleWidth: 0.03
-  dissolveDuration: 2.1
+  dissolveDuration: 1
   fallbackTentaclesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   invalidTargetRetryFrames: 3

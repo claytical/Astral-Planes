@@ -21,6 +21,10 @@ public sealed class SceneFlowCoordinator
     private bool _setupInFlight;
     private bool _setupDone;
 
+    private const float IntroFadeInDuration  = 1.0f;
+    private const float IntroHoldDuration    = 2.0f;
+    private const float IntroFadeOutDuration = 0.8f;
+
     public SceneFlowCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, BridgeCoordinator bridge)
     {
         _gameFlow = gameFlow;
@@ -178,12 +182,24 @@ public sealed class SceneFlowCoordinator
             yield break;
         }
 
+        yield return _gameFlow.StartCoroutine(PlayIntroScreenSequenceAsync());
+
         var shipProfiles = _session.Players
             .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
             .ToList();
 
         _gameFlow.controller.ConfigureTracksFromShips(shipProfiles);
-        _gameFlow.phaseTransitionManager.StartChapter(_gameFlow.phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+
+        if (PhaseLibraryStartConfig.HasPendingStart)
+        {
+            _gameFlow.phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
+            _gameFlow.phaseTransitionManager.JumpToMotifIndex(PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
+            PhaseLibraryStartConfig.Consume();
+        }
+        else
+        {
+            _gameFlow.phaseTransitionManager.StartChapter(_gameFlow.phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+        }
         _gameFlow.noteViz.Initialize();
         _gameFlow.harmony.Initialize(_gameFlow.activeDrumTrack, _gameFlow.controller);
         _gameFlow.activeDrumTrack.ManualStart();
@@ -204,6 +220,48 @@ public sealed class SceneFlowCoordinator
         _session.SetCurrentState(GameState.Playing);
         _setupDone = true;
         _setupInFlight = false;
+    }
+
+    private IEnumerator PlayIntroScreenSequenceAsync()
+    {
+        GameObject introGo = null;
+        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+        {
+            var match = root.GetComponentsInChildren<Transform>(includeInactive: true)
+                            .FirstOrDefault(t => t.name == "Intro Screen");
+            if (match != null) { introGo = match.gameObject; break; }
+        }
+
+        if (introGo == null)
+        {
+            Debug.LogWarning("[SceneFlow] 'Intro Screen' not found — skipping intro sequence.");
+            yield break;
+        }
+
+        var cg = introGo.GetComponent<CanvasGroup>() ?? introGo.AddComponent<CanvasGroup>();
+        introGo.SetActive(true);
+        cg.alpha = 0f;
+
+        float elapsed = 0f;
+        while (elapsed < IntroFadeInDuration)
+        {
+            elapsed += Time.deltaTime;
+            cg.alpha = Mathf.Clamp01(elapsed / IntroFadeInDuration);
+            yield return null;
+        }
+        cg.alpha = 1f;
+
+        yield return new WaitForSeconds(IntroHoldDuration);
+
+        elapsed = 0f;
+        while (elapsed < IntroFadeOutDuration)
+        {
+            elapsed += Time.deltaTime;
+            cg.alpha = 1f - Mathf.Clamp01(elapsed / IntroFadeOutDuration);
+            yield return null;
+        }
+        cg.alpha = 0f;
+        introGo.SetActive(false);
     }
 
     private void BindSceneVoicesToTimingAuthority()
