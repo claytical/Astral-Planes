@@ -473,6 +473,16 @@ public sealed class StarPool : MonoBehaviour
 
     private bool AnyCollectablesInFlight()
     {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        bool unified = _gfm != null && _gfm.AnyCollectablesInFlightGlobal();
+        bool legacy = LegacyAnyCollectablesInFlight();
+        if (legacy != unified)
+            Debug.LogWarning($"[ASSERT:CIF] StarPool mismatch legacy={legacy} unified={unified}");
+        return unified;
+    }
+
+    private bool LegacyAnyCollectablesInFlight()
+    {
         if (_tracks == null) return false;
         foreach (var t in _tracks)
         {
@@ -480,9 +490,7 @@ public sealed class StarPool : MonoBehaviour
             t.PruneSpawnedCollectables();
             if (t.spawnedCollectables == null) continue;
             foreach (var go in t.spawnedCollectables)
-            {
                 if (go != null && go.activeInHierarchy) return true;
-            }
         }
         return false;
     }

@@ -1098,34 +1098,8 @@ public class InstrumentTrackController : MonoBehaviour
 
     private bool AnyCollectablesInFlight()
     {
-        if (tracks == null) return false;
-
-        bool any = false;
-
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-
-            // prune stale refs (null/inactive) so we don't get stuck on ghosts
-            t.PruneSpawnedCollectables();
-
-            if (t.spawnedCollectables == null) continue;
-
-            // only count truly alive + active objects
-            for (int i = 0; i < t.spawnedCollectables.Count; i++)
-            {
-                var go = t.spawnedCollectables[i];
-                if (go != null && go.activeInHierarchy)
-                {
-                    any = true;
-                    break;
-                }
-            }
-
-            if (any) break;
-        }
-
-        return any;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        return _gfm != null && _gfm.AnyCollectablesInFlightGlobal();
     }
 
     private int ForceDestroyAllCollectablesInFlight(string reason)
