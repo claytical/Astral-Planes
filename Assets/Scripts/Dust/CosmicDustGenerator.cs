@@ -605,6 +605,11 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();
+            // Defensive: ensure visuals are enabled immediately for gravity-void dust.
+            // Some recycled cells can retain disabled renderer state until later events.
+            var spriteRenderer = dust.GetComponentInChildren<SpriteRenderer>(true);
+            if (spriteRenderer != null)
+                spriteRenderer.enabled = true;
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);
