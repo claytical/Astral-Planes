@@ -602,24 +602,22 @@ public class CosmicDustGenerator : MonoBehaviour
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.carveResistance01 = resistance.carveResistance01;
             dust.clearing.drainResistance01 = resistance.drainResistance01;
-            dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, tintWithAlpha.a);
+            // Gravity-void growth should preserve the requested imprint tint/role while
+            // the cell is still non-colliding.
+            dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
+            dust.regrowAlphaCapped = true;
             dust.Begin();
-            // Defensive: ensure visuals are enabled immediately for gravity-void dust.
-            // Some recycled cells can retain disabled renderer state until later events.
-            var spriteRenderer = dust.GetComponentInChildren<SpriteRenderer>(true);
-            if (spriteRenderer != null)
-                spriteRenderer.enabled = true;
+            EnsureDustSpriteRendererEnabled(dust);
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);
         }
-        if (dust != null)
-        {
-            var sr = dust.GetComponentInChildren<SpriteRenderer>(true);
-        }
         float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
         yield return new WaitForSeconds(enableDelay);
+
+        if (dust != null)
+            EnsureDustSpriteRendererEnabled(dust);
 
         if (!IsInBounds(gp) || _permanentClearCells.Contains(gp))
         {
@@ -655,10 +653,24 @@ public class CosmicDustGenerator : MonoBehaviour
 
         // Otherwise: become solid.
         SetCellState(gp, DustCellState.Solid);
-        if (dust != null) SetDustCollision(dust, true);
+        if (dust != null)
+        {
+            dust.regrowAlphaCapped = false;
+            dust.EnsureMinSolidAlpha(0.55f);
+            EnsureDustSpriteRendererEnabled(dust);
+            SetDustCollision(dust, true);
+        }
 
 //        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
         _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+    }
+
+    private static void EnsureDustSpriteRendererEnabled(CosmicDust dust)
+    {
+        if (dust == null) return;
+        var spriteRenderer = dust.GetComponentInChildren<SpriteRenderer>(true);
+        if (spriteRenderer != null)
+            spriteRenderer.enabled = true;
     }
     private void SetDustCollision(CosmicDust dust, bool _enabled)
         {
