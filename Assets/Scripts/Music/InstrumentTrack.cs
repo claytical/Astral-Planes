@@ -800,7 +800,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // track can still sound across a wider leader loop while following harmonic shifts.
         int trackBins = Mathf.Max(1, loopMultiplier);
         int globalBin = WrapIndex(playheadBin, Mathf.Max(1, leaderBins));
-        int trackBin = WrapIndex(globalBin, trackBins);
+
+        // Do not mirror/wrap sparse content into later bins.
+        // If this track has no authored/committed notes in the currently audible bin,
+        // it should remain silent for that bin.
+        if (globalBin < 0 || globalBin >= trackBins) return;
+        if (!HasAnyNoteInBin(globalBin)) return;
+
+        int trackBin = globalBin;
         float gain = 1f;
 
         if (localStep == 0)
