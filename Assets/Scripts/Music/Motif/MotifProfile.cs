@@ -23,6 +23,11 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Intensity loops: index maps to intensity (0 = B / low, last = E / high).")]
     public List<AudioClip> intensityDrumLoops = new();
 
+    [Tooltip("Absolute burn-rate thresholds (tanks/sec) that gate intensity clip steps. " +
+             "Provide exactly (intensityDrumLoops.Count - 1) ascending values. " +
+             "If empty, falls back to the adaptive EMA-ratio path.")]
+    public List<float> intensityThresholds = new();
+
     [Min(0), Tooltip("How many full drum loops to stay in the entry loop(s) before mapping intensity.")]
     public int entryLoopCount = 1;
 
@@ -58,11 +63,15 @@ public class MotifProfile : ScriptableObject
 
     [Tooltip("If true, drums are driven by player energy expenditure through beatProfileSequence.")]
     public bool driveBeatsFromEnergy = true;
-    private void OnValidate() { 
-        if (beatIntroCount < 0) beatIntroCount = 0; 
+    private void OnValidate() {
+        if (beatIntroCount < 0) beatIntroCount = 0;
         if (entryDrumLoops == null) entryDrumLoops = new List<AudioClip>();
         if (intensityDrumLoops == null) intensityDrumLoops = new List<AudioClip>();
-        if (beatIntroCount > entryDrumLoops.Count) beatIntroCount = entryDrumLoops.Count; 
+        if (intensityThresholds == null) intensityThresholds = new List<float>();
+        if (beatIntroCount > entryDrumLoops.Count) beatIntroCount = entryDrumLoops.Count;
+        if (intensityThresholds.Count > 0 && intensityThresholds.Count != intensityDrumLoops.Count - 1)
+            Debug.LogWarning($"[MotifProfile] {motifId}: intensityThresholds.Count ({intensityThresholds.Count}) " +
+                             $"should be intensityDrumLoops.Count-1 ({Mathf.Max(0, intensityDrumLoops.Count - 1)})");
     }
 
     /// <summary>
