@@ -95,6 +95,7 @@ public class DrumTrack : MonoBehaviour
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;
     private List<AudioClip> _intensityLoops;
+    private List<float>     _intensityThresholds;
 
     private int _entryLoopsRemaining;
 
@@ -115,6 +116,7 @@ public class DrumTrack : MonoBehaviour
 
     private float _lastSpentTanksSample = -1f; // baseline at last boundary
     private float _lastIntensity01 = 0f; // for hysteresis
+    private float _burnTier = 0f;        // ramp counter: steps up while burning, down when idle
     
     private float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
@@ -303,8 +305,9 @@ public class DrumTrack : MonoBehaviour
     // 2) Apply motif refs (idempotent with respect to counters when same motif)
     // ------------------------------------------------------------
     _motif = motif;
-    _entryLoops     = (_motif != null) ? _motif.entryDrumLoops : null;
-    _intensityLoops = (_motif != null) ? _motif.intensityDrumLoops : null;
+    _entryLoops          = (_motif != null) ? _motif.entryDrumLoops : null;
+    _intensityLoops      = (_motif != null) ? _motif.intensityDrumLoops : null;
+    _intensityThresholds = (_motif != null) ? _motif.intensityThresholds : null;
 
     _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
     // Only (re)open the entry window and reset intensity sampling when motif actually changed,
@@ -317,6 +320,7 @@ public class DrumTrack : MonoBehaviour
         _lastSpentTanksSample = -1f;
         _lastTotalSpentSample = -1f;
         _burnBaselineEma = 0f;
+        _burnTier = 0f;
         // Preserve intensity when timing is identical — same BPM and step count means the drum
         // clips loop at the same rate, so there's no perceptual discontinuity to reset from.
         if (stepsChanged || bpmChanged)
@@ -816,30 +820,27 @@ public class DrumTrack : MonoBehaviour
         float delta = Mathf.Max(0f, totalSpent - _lastTotalSpentSample);
         _lastTotalSpentSample = totalSpent;
 
-        // Update EMA baseline
-        float d = Mathf.Max(0.0001f, delta);
-        if (_burnBaselineEma <= 0f) _burnBaselineEma = d;
+        // Ramp _burnTier up by one clip step each loop the player burns, down each loop they don’t.
+        // This maps "time spent boosting" directly to intensity: keep burning to climb, stop to decay.
+        int clipCount = _intensityLoops.Count;
+        float maxTier = clipCount - 1;
+        if (delta > 0f)
+            _burnTier = Mathf.Min(_burnTier + 1f, maxTier);
+        else
+            _burnTier = Mathf.Max(_burnTier - 1f, 0f);
 
-    // Normalize burn to "tanks per second" so tempo/loop-length changes don’t blow up ratio.
-        float burnRate = delta / Mathf.Max(0.0001f, loopSeconds);
+        float rawIntensity = (clipCount > 1) ? _burnTier / maxTier : 0f;
 
-        if (_burnBaselineEma <= 0f)
-            _burnBaselineEma = burnRate; // baseline in tanks/sec
-
-        float a = Mathf.Clamp01(sessionBurnEmaAlpha);
-        _burnBaselineEma = Mathf.Lerp(_burnBaselineEma, burnRate, a);
-
-        float ratio = burnRate / Mathf.Max(0.0001f, _burnBaselineEma);
-        float full = Mathf.Max(1.0001f, burnMultipleAtFullIntensity);
-        float x = Mathf.Max(0f, ratio - 1f);
-        float intensity01 = Mathf.Clamp01(x / (full - 1f));
-    // Smooth intensity changes (prevents persistent maxing due to spikes)
-        const float kIntensitySmooth = 0.35f; // 0..1; higher = faster
-        intensity01 = Mathf.Lerp(_lastIntensity01, intensity01, kIntensitySmooth);
-        // Hysteresis
+        const float kIntensitySmooth = 0.35f;
+        float intensity01 = Mathf.Lerp(_lastIntensity01, rawIntensity, kIntensitySmooth);
         if (Mathf.Abs(intensity01 - _lastIntensity01) < intensityHysteresis)
             intensity01 = _lastIntensity01;
         _lastIntensity01 = intensity01;
+
+        if (logBeatSeqGates) Debug.Log(
+            $"[DRUM][BeatSeq] motif={_motif.motifId} delta={delta:F3} tier={_burnTier:F0}/{maxTier:F0} " +
+            $"intensity={intensity01:F3} loops={loopsCt}"
+        );
 
         // Empty-bin gate: if every track has no notes in the bin currently playing,
         // force intensity to 0. Intentionally does NOT update _lastIntensity01 so the
@@ -859,11 +860,6 @@ public class DrumTrack : MonoBehaviour
             }
             if (allEmpty) intensity01 = 0f;
         }
-
-        if (logBeatSeqGates) Debug.Log(
-            $"[DRUM][BeatSeq] motif={_motif.motifId} total={totalSpent:F3} delta={delta:F3} ema={_burnBaselineEma:F3} " +
-            $"ratio={ratio:F3} intensity={intensity01:F3} loops={loopsCt}"
-        );
 
         // 4) Select target clip
         var targetClip = ResolveIntensityClip(intensity01);
@@ -1094,6 +1090,7 @@ public class DrumTrack : MonoBehaviour
         _lastSpentTanksSample = -1f;
         _lastTotalSpentSample = -1f;
         _burnBaselineEma = 0f;
+        _burnTier = 0f;
         _lastIntensity01 = 0f;
 
         Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");

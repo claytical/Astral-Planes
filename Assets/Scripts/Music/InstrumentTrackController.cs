@@ -1147,6 +1147,12 @@ public class InstrumentTrackController : MonoBehaviour
         // Hard reset visuals last (they mirror track state).
         if (noteVisualizer != null)
             noteVisualizer.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
+
+        // BeginNewMotifHardClear resets loopMultiplier to 1 on every track, but
+        // DrumTrack._binCount still holds the previous motif's committed value. Without
+        // an immediate flush, InstrumentTrack.leaderBins = max(stale, 1) stays at the
+        // old count for the entire first leader loop, silencing tracks on bars 1-N.
+        ResyncLeaderBinsNow();
     }
     public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
     {
