@@ -459,8 +459,8 @@ public class NoteVisualizer : MonoBehaviour
         // Emitter should live on the playhead line (it is a child, but we sample world pos anyway).
         Vector3 now = playheadParticles.transform.position;
 
-        if (!float.IsNaN(playheadTrailWorldZOverride))
-            now.z = playheadTrailWorldZOverride;
+//        if (!float.IsNaN(playheadTrailWorldZOverride))
+//            now.z = playheadTrailWorldZOverride;
 
         // First frame after enable/reset: just seed the position.
         if (!_hasLastPlayheadParticleWorldPos)
