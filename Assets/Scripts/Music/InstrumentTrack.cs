@@ -795,22 +795,17 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             return;
         }
 
-        // Simple Case A rule:
-        // - DrumTrack defines the global playheadBin (0..leaderBins-1)
-        // - This track only has content for bins 0..(loopMultiplier-1)
-        // - If playheadBin exceeds that, remain silent until the loop wraps.
+        // Global transport bin should continue to drive harmony/chord movement.
+        // Track content selection wraps into this track's authored bins so a 1-bin
+        // track can still sound across a wider leader loop while following harmonic shifts.
         int trackBins = Mathf.Max(1, loopMultiplier);
-        if (playheadBin < 0 || playheadBin >= trackBins)
-        {
-            return;
-        }
-
-        int trackBin = playheadBin;
+        int globalBin = WrapIndex(playheadBin, Mathf.Max(1, leaderBins));
+        int trackBin = WrapIndex(globalBin, trackBins);
         float gain = 1f;
 
         if (localStep == 0)
         {
-            int chordIdx = Harmony_GetChordIndexForBin(trackBin);
+            int chordIdx = Harmony_GetChordIndexForBin(globalBin);
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var hd = _gfm?.harmony;
             if (hd != null && hd.TryGetChordAt(chordIdx, out var c))
