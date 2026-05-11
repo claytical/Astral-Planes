@@ -805,7 +805,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // If this track has no authored/committed notes in the currently audible bin,
         // it should remain silent for that bin.
         if (globalBin < 0 || globalBin >= trackBins) return;
-        if (!IsBinFilled(globalBin)) return;
+        if (!HasAnyNoteInBin(globalBin)) return;
 
         int trackBin = globalBin;
         float gain = 1f;
