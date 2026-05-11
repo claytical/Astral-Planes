@@ -695,10 +695,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
 //        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
         int committedLeaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
-        int activeLeaderBins    = Mathf.Max(1, controller.GetMaxLoopMultiplier());
-        int leaderBins          = Mathf.Max(committedLeaderBins, activeLeaderBins);
-// Use runtime leader-space bin so chord progression doesn't flatten while committed bins catch up.
-        int playbackBin = WrapIndex(barIndex, leaderBins);
+        int leaderBins          = committedLeaderBins;
+
+        // IMPORTANT: drive playback from the transport's audible bin, not from speculative
+        // width (max loop multiplier) or recomputed barIndex wrapping.
+        //
+        // Using a wider, non-committed leader bin count here can create "ghost" bins where
+        // 1-bin tracks are forced silent on alternate bars while visuals still show bin 0 content.
+        int playbackBin = WrapIndex(playheadBin, leaderBins);
 
 // Play every missed step exactly once, in order.
         // Guard: if the target wrapped below the last-played step without a bar change
