@@ -391,6 +391,61 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         _loopCacheDirtyPending = true;
+        controller?.EndGravityVoidForPendingExpand(this);
+        controller?.UpdateVisualizer();
+    }
+
+    /// <summary>
+    /// Instantly contracts this track to <paramref name="targetMult"/> bins, clearing any notes
+    /// and allocation state above that count. Mirrors OnDrumDownbeat_CommitCollapse but runs
+    /// synchronously. Called by SuperNode when reverting a temporarily-filled track.
+    /// </summary>
+    public void InstantCollapseToLoopMultiplier(int targetMult)
+    {
+        // 0 is valid: track had no active bins before the SuperNode; restore to silent empty state.
+        targetMult = Mathf.Clamp(targetMult, 0, loopMultiplier);
+
+        // Keep at least 1 bin so the scheduler never divides by zero.
+        int effectiveMult = Mathf.Max(1, targetMult);
+
+        bool atTarget   = effectiveMult == loopMultiplier;
+        bool notesClean = persistentLoopNotes == null || persistentLoopNotes.Count == 0;
+        if (atTarget && (targetMult > 0 || notesClean)) return;
+
+        loopMultiplier = effectiveMult;
+
+        EnsureBinList();
+        // When targetMult=0 clear ALL bins (track was empty before SuperNode).
+        // When targetMult>0 clear only the bins above the new count.
+        int clearFrom = targetMult;
+        for (int b = clearFrom; b < maxLoopMultiplier; b++)
+        {
+            SetBinAllocated(b, false);
+            if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
+            if (_binCompletionTime != null && b < _binCompletionTime.Length) _binCompletionTime[b] = -1f;
+            Harmony_OnBinEmptied(b);
+        }
+
+        _totalSteps = BinSize() * loopMultiplier;
+
+        if (targetMult == 0)
+            persistentLoopNotes.Clear();  // bin 0 keeps its allocation slot but must be silent
+        else
+            persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
+
+        _loopCacheDirtyPending = true;
+        RecomputeBinsFromLoop();
+
+        if (controller != null && controller.noteVisualizer != null && drumTrack != null)
+        {
+            int leaderSteps = drumTrack.GetLeaderSteps();
+            if (leaderSteps <= 0) leaderSteps = _totalSteps;
+            controller.noteVisualizer.RequestLeaderGridChange(leaderSteps);
+            controller.noteVisualizer.ForceSyncMarkersToPersistentLoop(this);
+        }
+
+        controller?.UpdateVisualizer();
+        controller?.ResyncLeaderBinsNow();
     }
 
     public bool IsStepInFilledBin(int step)
@@ -2280,6 +2335,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
+
+        // Force immediate cache rebuild so the scheduler uses retuned pitches from this
+        // frame onward. Without this a script-execution-order race between DrumTrack.Update
+        // (which fires OnLoopBoundary / retune) and InstrumentTrack.Update (which rebuilds
+        // via boundarySerial) can cause the first steps of the new loop to play old pitches.
+        RebuildLoopCache_FORCE();
+        _loopCacheDirtyPending = false;
     }
 
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
@@ -3098,17 +3160,25 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         bool anyBinChecked = false;
         var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
         
-        for (int b = 0; b < activeBins; b++) { 
+        for (int b = 0; b < activeBins; b++) {
             if (!IsBinFilled(b)) continue;  // bin exists but player hasn't harvested it yet — skip
-            var binNoteSet = GetNoteSetForBin(b) ?? incoming; 
-            binNoteSet.Initialize(this, bSz); 
-            var allowed = binNoteSet.GetStepList(); 
+            var binNoteSet = GetNoteSetForBin(b);
+            if (binNoteSet == null)
+            {
+                // No stored per-bin note set — using the incoming set as a reference would compare
+                // against the wrong step pattern (this bin was filled with a different set).
+                // The bin is already filled, so count it as satisfied and move on.
+                anyBinChecked = true;
+                continue;
+            }
+            binNoteSet.Initialize(this, bSz);
+            var allowed = binNoteSet.GetStepList();
             if (allowed == null || allowed.Count == 0) continue;
-            
-            foreach (int localStep in allowed) { 
-                int absStep = b * bSz + (localStep % bSz); 
+
+            foreach (int localStep in allowed) {
+                int absStep = b * bSz + (localStep % bSz);
                 if (!occupied.Contains(absStep)) return false;
-            } 
+            }
             anyBinChecked = true;
         }
         // If no filled bins exist yet, we are not saturated.

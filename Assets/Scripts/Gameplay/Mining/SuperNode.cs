@@ -6,26 +6,25 @@ public class SuperNode : MonoBehaviour
 {
     [SerializeField] private SoloVoice soloVoice;
     [SerializeField] public DrumTrack drumTrack;
-    private InstrumentTrack _track;
-    [SerializeField] private float spawnCollisionGraceSeconds = 0.15f;
-    [SerializeField] private float minImpactSpeed = 2.0f;   // tune
     [SerializeField] private bool despawnOnNextBoundary = true;
+    [SerializeField] private GameObject shardPrefab;
 
     public System.Action OnResolved;
 
     private GameFlowManager _gfm;
-    private float _spawnTime;
     private bool _sawFirstBoundary;
-    private bool _triggered;
     private bool _resolvedFired;
+
+    private readonly List<SuperNodeShard>            _shards       = new();
+    private readonly Dictionary<InstrumentTrack, int> _snapshotMult = new();
+    private ChordProgressionProfile _alternateProg;
+    private bool _allShardsCollected;
+    private int  _collectedCount;
 
     private void Awake()
     {
-        _spawnTime = Time.time;
-
         if (!soloVoice) soloVoice = FindAnyObjectByType<SoloVoice>();
 
-        // Late bind if not inspector-wired
         if (drumTrack == null)
         {
             if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -35,27 +34,56 @@ public class SuperNode : MonoBehaviour
                 drumTrack = FindAnyObjectByType<DrumTrack>();
         }
     }
-    public void Initialize(SoloVoice sv, DrumTrack drum, InstrumentTrack track = null)
+
+    public void Initialize(SoloVoice sv, DrumTrack drum,
+                           InstrumentTrack initiatingTrack,
+                           List<InstrumentTrack> shardTracks,
+                           ChordProgressionProfile alternateProgression)
     {
-        soloVoice = sv;
-        drumTrack = drum;
-        _track    = track;
+        soloVoice      = sv;
+        drumTrack      = drum;
+        _alternateProg = alternateProgression;
+
+        if (shardTracks == null || shardTracks.Count == 0) return;
+
+        int total = shardTracks.Count;
+        for (int i = 0; i < total; i++)
+        {
+            var track = shardTracks[i];
+            if (track == null) continue;
+
+            if (shardPrefab == null)
+            {
+                Debug.LogError("[SuperNode] shardPrefab is null — cannot spawn shards.");
+                break;
+            }
+
+            var go    = Instantiate(shardPrefab, transform.position, Quaternion.identity);
+            var shard = go.GetComponent<SuperNodeShard>();
+            if (shard == null)
+            {
+                Debug.LogError("[SuperNode] shardPrefab missing SuperNodeShard component.");
+                Destroy(go);
+                continue;
+            }
+
+            float angle = 2f * Mathf.PI * i / total;
+            shard.Setup(track, transform, angle);
+            _snapshotMult[track] = track.loopMultiplier;
+            shard.OnHit += OnShardHit;
+            _shards.Add(shard);
+        }
     }
+
     private void OnEnable()
     {
-        _spawnTime = Time.time;
         TrySubscribeToBoundary();
     }
+
     private void OnDisable()
     {
         if (drumTrack != null)
             drumTrack.OnLoopBoundary -= OnLoopBoundary;
-    }
-    private void FireResolvedOnce()
-    {
-        if (_resolvedFired) return;
-        _resolvedFired = true;
-        OnResolved?.Invoke();
     }
 
     private void TrySubscribeToBoundary()
@@ -69,66 +97,70 @@ public class SuperNode : MonoBehaviour
 
         if (drumTrack != null)
         {
-            // prevent double-subscribe
             drumTrack.OnLoopBoundary -= OnLoopBoundary;
             drumTrack.OnLoopBoundary += OnLoopBoundary;
         }
     }
-    private void OnCollisionEnter2D(Collision2D collision)
+
+    private void OnShardHit(SuperNodeShard shard)
     {
-        if (_triggered) return;
-
-        // Grace period so it doesn't trigger instantly on spawn overlap
-        if (Time.time - _spawnTime < spawnCollisionGraceSeconds)
-            return;
-
-        // Resolve Vehicle robustly (child colliders)
-        var vehicle =
-            (collision.collider != null ? collision.collider.GetComponentInParent<Vehicle>() : null)
-            ?? (collision.rigidbody != null ? collision.rigidbody.GetComponent<Vehicle>() : null);
-
-        if (vehicle == null)
-            return;
-
-        // Require a real "hit", not gentle contact
-        float impact = collision.relativeVelocity.magnitude;
-        if (impact < minImpactSpeed)
-            return;
-
-        _triggered = true;
-
-        if (_track != null)
-            _track.InstantFillAllBins();
-
-        FireResolvedOnce();
-        Destroy(gameObject);
-
+        shard.AssignedTrack?.InstantFillAllBins();
+        _collectedCount++;
+        if (_collectedCount >= _shards.Count)
+            OnAllShardsCollected();
     }
+
+    private void OnAllShardsCollected()
+    {
+        _allShardsCollected = true;
+
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        Debug.Log($"[SuperNode] All shards collected. _alternateProg={((_alternateProg != null) ? _alternateProg.name : "NULL")} harmony={(_gfm?.harmony != null ? "found" : "NULL")}");
+
+        if (_alternateProg != null)
+        {
+            _gfm?.harmony?.SetActiveProfile(_alternateProg, applyImmediately: false);
+            Debug.Log($"[SuperNode] Staged alternate progression '{_alternateProg.name}' for next boundary.");
+        }
+    }
+
     private void OnLoopBoundary()
     {
-        // First boundary after spawn: arm despawn
         if (!_sawFirstBoundary)
-        {
             _sawFirstBoundary = true;
-            if (despawnOnNextBoundary)
-            {
-                FireResolvedOnce();
-                Destroy(gameObject);
-            }
-            return;
-        }
 
-        // If you ever decide to keep it for >1 loop, you can use _triggered here.
-        if (_triggered)
+        if (_allShardsCollected || despawnOnNextBoundary)
         {
+            RevertCollectedShards();
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            _gfm?.controller?.UpdateVisualizer();
             FireResolvedOnce();
             Destroy(gameObject);
         }
     }
-    private IEnumerable<InstrumentTrack> ResolveTracks()
+
+    private void RevertCollectedShards()
     {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var ctrl = _gfm != null ? _gfm.controller : null;
-        return (ctrl != null) ? ctrl.tracks : null;
+        foreach (var shard in _shards)
+        {
+            if (shard == null || !shard.IsCollected) continue;
+            if (!_snapshotMult.TryGetValue(shard.AssignedTrack, out int snap)) continue;
+            shard.AssignedTrack?.InstantCollapseToLoopMultiplier(snap);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        foreach (var shard in _shards)
+            if (shard != null)
+                Destroy(shard.gameObject);
+        _shards.Clear();
+    }
+
+    private void FireResolvedOnce()
+    {
+        if (_resolvedFired) return;
+        _resolvedFired = true;
+        OnResolved?.Invoke();
     }
 }

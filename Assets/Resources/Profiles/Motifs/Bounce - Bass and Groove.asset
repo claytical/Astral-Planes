@@ -24,13 +24,16 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 659e1c5e63a24435cb474ead32ce79a5, type: 3}
   - {fileID: 8300000, guid: d89e1873c3d7d45ae87e26f8f1755dc1, type: 3}
   - {fileID: 8300000, guid: 87150af2ac42e4e2d8ec025d5b7d9ead, type: 3}
+  intensityThresholds: []
   entryLoopCount: 0
   bpm: 175
   stepsPerLoop: 16
-  nodesPerStar: 4
+  nodesPerStar: 5
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   chordProgression: {fileID: 11400000, guid: b01d7470b74ef474cb1e52438d661bf0, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7,
+    type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 8d0238b52ba48444aa574c56f55c92ef, type: 2}
   - {fileID: 11400000, guid: 01400bf7515ba4097a293273fd4ec006, type: 2}

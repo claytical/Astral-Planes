@@ -26,7 +26,7 @@ public class RainbowLerp : MonoBehaviour
         // Convert HSV to RGB. 
         // Full saturation (1f) & full value (1f) to get bright rainbow colors.
         Color rainbowColor = Color.HSVToRGB(hue, 1f, 1f);
-
+        rainbowColor.a = .2f;
         spriteRenderer.color = rainbowColor;
     }
 }
