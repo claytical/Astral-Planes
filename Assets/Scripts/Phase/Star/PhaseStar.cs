@@ -899,7 +899,9 @@ public class PhaseStar : MonoBehaviour
         _drum = drum;
         if (_drum != null)
         {
-            _drum.SetBinCount(1);
+            // Do NOT call SetBinCount here — committed bin count is owned by
+            // ArmCohortsOnLoopBoundary and ResyncLeaderBinsNow. Resetting to 1 on
+            // every star spawn would clobber the expanded 2-bin state mid-loop.
             WireBinSource(_drum);
             Debug.Log($"[PhaseStar] loop={_drum.GetLoopLengthInSeconds():0.##}s  targets={_targets?.Count ?? 0}");
 

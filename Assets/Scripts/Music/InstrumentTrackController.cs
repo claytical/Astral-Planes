@@ -842,8 +842,12 @@ public class InstrumentTrackController : MonoBehaviour
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return 1;
-        return Mathf.Max(1, drum.GetCommittedBinCount());
+        if (drum == null) { Debug.Log("[ITC:GET_LEADER_BINS] drum=NULL → returning 1"); return 1; }
+        int count = drum.GetCommittedBinCount();
+        // Only log when the result is unexpectedly low — avoids per-frame spam.
+        if (count <= 1)
+            Debug.Log($"[ITC:GET_LEADER_BINS] drum_id={drum.GetInstanceID()} _binCount={count}");
+        return Mathf.Max(1, count);
     }
 
     void Update()
@@ -950,6 +954,8 @@ public class InstrumentTrackController : MonoBehaviour
         int committedBins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
         if (drum != null)
             drum.SetBinCount(committedBins);
+        Debug.Log($"[ITC:ARM_COHORTS] committedBins={committedBins} " +
+                  $"trackMuls=[{string.Join(",", tracks.Where(t => t != null).Select(t => $"{t.name}:{t.loopMultiplier}"))}]");
 
         int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
         if (leaderSteps <= 0)

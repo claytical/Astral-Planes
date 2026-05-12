@@ -773,7 +773,9 @@ public class NoteVisualizer : MonoBehaviour
     
 // --- Visual clock MUST match playheadLine clock ---
 // Use the leader loop length for both x-position AND step sampling.
-    int drumTotalSteps = Mathf.Max(1, _drum.totalSteps);
+// GetLeaderSteps() returns the expanded step count (e.g. 32 for a 2-bin loop),
+// so stepDuration and currentStep stay in phase with the audio clock.
+    int drumTotalSteps = Mathf.Max(1, _drum.GetLeaderSteps());
     float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
 
 // Seconds per step in the VISUAL loop timeline

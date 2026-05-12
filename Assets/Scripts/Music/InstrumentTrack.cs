@@ -693,15 +693,31 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
 // ----- PLAYBACK (catch-up deterministically) -----
         // Audio must follow the committed leader bins (transport), not the UI's visual bins.
-//        int leaderBins = Mathf.Max(1, controller.GetMaxActiveLoopMultiplier());
         int committedLeaderBins = Mathf.Max(1, controller.GetCommittedLeaderBins());
         int leaderBins          = committedLeaderBins;
 
-        // IMPORTANT: drive playback from the transport's audible bin, not from speculative
-        // width (max loop multiplier) or recomputed barIndex wrapping.
-        //
-        // Using a wider, non-committed leader bin count here can create "ghost" bins where
-        // 1-bin tracks are forced silent on alternate bars while visuals still show bin 0 content.
+        // Diagnostic: log on every bar transition.
+        if (barIndex != _lastBarIndex)
+        {
+            Debug.Log($"[TRK:BAR_ENTER] track={name} barIndex={barIndex} " +
+                      $"committedLeaderBins={committedLeaderBins} loopMul={loopMultiplier} " +
+                      $"playheadBin={playheadBin} leaderStart={drumTrack.leaderStartDspTime:F3} " +
+                      $"dsp={AudioSettings.dspTime:F3}");
+        }
+
+        // Guard: if barIndex has advanced past the committed leader width, DrumTrack hasn't
+        // processed the loop boundary yet this frame (script-execution-order race). Skip note
+        // playback entirely — the next frame will use the correct updated transport state.
+        // This prevents a 1-bin track from ghosting its bin-0 content into bar 1 of the new
+        // expanded loop during the single frame before leaderStartDspTime is advanced.
+        if (barIndex >= committedLeaderBins)
+        {
+            Debug.Log($"[TRK:BAR_GUARD] track={name} barIndex={barIndex} " +
+                      $"committedLeaderBins={committedLeaderBins} loopMul={loopMultiplier} SKIPPING");
+            _lastLocalStep = targetCurLocal;
+            return;
+        }
+
         int playbackBin = WrapIndex(playheadBin, leaderBins);
 
 // Play every missed step exactly once, in order.

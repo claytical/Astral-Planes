@@ -239,7 +239,9 @@ public class DrumTrack : MonoBehaviour
         // Authority:
         // - InstrumentTrackController (or callers) decide the current *committed* leader bin count.
         // - DrumTrack simply clamps and applies it.
+        int prev = _binCount;
         _binCount = Mathf.Max(1, bins);
+        Debug.Log($"[DRUM:SET_BIN_COUNT] id={GetInstanceID()} {prev} → {_binCount}");
     }
     private AudioClip ChooseEntryClip()
     {
