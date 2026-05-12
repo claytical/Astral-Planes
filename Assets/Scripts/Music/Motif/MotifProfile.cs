@@ -50,6 +50,9 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;
 
+    [Tooltip("If set, collecting all SuperNode shards triggers this progression at the next loop boundary.")]
+    public ChordProgressionProfile alternateChordProgressionProfile;
+
     [Header("Per-role NoteSet configs")]
     [Tooltip("Per-role NoteSet generation configs for this motif.")]
     public List<RoleMotifNoteSetConfig> roleNoteConfigs = new List<RoleMotifNoteSetConfig>();

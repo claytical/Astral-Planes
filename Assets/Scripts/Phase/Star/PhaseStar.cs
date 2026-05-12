@@ -1971,9 +1971,21 @@ public class PhaseStar : MonoBehaviour
             Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
             return;
         }
-        sn.Initialize(soloVoice, _drum, targetTrack);
-
         Color spawnTint = targetTrack != null ? targetTrack.trackColor : Color.white;
+
+        // Build shard list: all MotifProfile role-matched tracks except the initiating (maxed) track.
+        var activeRoles = _assignedMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>();
+        var ctrl        = _gfm?.controller;
+        var shardTracks = new System.Collections.Generic.List<InstrumentTrack>();
+        if (ctrl?.tracks != null)
+            foreach (var t in ctrl.tracks)
+                if (t != null && t != targetTrack && activeRoles.Contains(t.assignedRole))
+                    shardTracks.Add(t);
+
+        var alternateProg = _assignedMotif?.alternateChordProgressionProfile;
+        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg);
+        go.GetComponent<Explode>()?.SetTint(spawnTint);
+
         _activeSuperNode = sn;
         sn.OnResolved += () =>
         {
@@ -2023,25 +2035,14 @@ public class PhaseStar : MonoBehaviour
     {
         if (track == null) return false;
 
-        // --- Interpret "fully expanded" in a bin-count safe way ---
-        // If your loopMultiplier is already 1..maxBins, this works.
-        // If it's 0..(maxBins-1), this also works because we treat it as "bins = loopMultiplier + 1".
         int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
-
-        // Try to interpret loopMultiplier robustly
-        int binsIfMultiplierIsCount = Mathf.Max(1, track.loopMultiplier);
-        int binsIfMultiplierIsIndex = Mathf.Max(1, track.loopMultiplier + 1);
-
-        bool fullyExpanded =
-            (binsIfMultiplierIsCount >= maxBins) ||
-            (binsIfMultiplierIsIndex >= maxBins);
+        bool fullyExpanded = track.loopMultiplier >= maxBins;
 
         if (!fullyExpanded)
         {
             Debug.Log(
                 $"[SuperNodeGate] NO: not fully expanded. " +
-                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
-                $"bins(count)={binsIfMultiplierIsCount} bins(index+1)={binsIfMultiplierIsIndex}"
+                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
             );
             return false;
         }
