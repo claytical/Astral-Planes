@@ -6,10 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Fonts/DawningofaNewDay-Regular.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Fonts/DawningofaNewDay-Regular.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -64,7 +66,7 @@
   "keyToString": {
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "codex/fix-cosmicdustgenerator-cell-grid-movement",
+    "git-widget-placeholder": "codex/fix-audio-visualization-issue-in-notevisualizer",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -289,6 +291,7 @@
       <workItem from="1777558396234" duration="2146000" />
       <workItem from="1777929968148" duration="14678000" />
       <workItem from="1778446478754" duration="7840000" />
+      <workItem from="1778544595359" duration="7989000" />
     </task>
     <servers />
   </component>
