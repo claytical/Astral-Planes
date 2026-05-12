@@ -811,7 +811,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (globalBin < 0 || globalBin >= trackBins) return;
         if (globalBin > highestContentBin) return;
-        if (!IsBinFilled(globalBin) || !HasAnyNoteInBin(globalBin)) return;
+        if (!HasAnyNoteInBin(globalBin)) return;
 
         int trackBin = globalBin;
         float gain = 1f;
