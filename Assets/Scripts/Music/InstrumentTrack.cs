@@ -804,13 +804,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Limit audibility to bins that currently contain committed persistent content.
         // This avoids newly-extended/allocated bins on other tracks from causing this
         // track to mirror bin-0 content into bin-1 (or higher) before it has notes there.
-        int binSize = Mathf.Max(1, BinSize());
-        int highestContentBin = -1;
-        for (int i = 0; i < persistentLoopNotes.Count; i++)
-            highestContentBin = Mathf.Max(highestContentBin, persistentLoopNotes[i].stepIndex / binSize);
-
         if (globalBin < 0 || globalBin >= trackBins) return;
-        if (globalBin > highestContentBin) return;
         if (!HasAnyNoteInBin(globalBin)) return;
 
         int trackBin = globalBin;
