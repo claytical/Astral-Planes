@@ -145,6 +145,47 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     }
 
     /// <summary>
+    /// Reset all active ascension countdowns as if they are starting a new phrasing —
+    /// keeps markers in place visually but resets loopsRemaining to ascendLoops and
+    /// recomputes stepY from the marker's current position. Called on chord-progression
+    /// changes so notes don't arrive at the line mid-phrase.
+    /// </summary>
+    public void ResetPhrasing()
+    {
+        if (_ascendTasks.Count == 0) return;
+
+        float targetY = GetAscendTargetWorldY();
+        int   loops   = Mathf.Max(1, ascendLoops);
+
+        var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
+        foreach (var trk in keys)
+        {
+            var task = _ascendTasks[trk];
+            for (int i = 0; i < task.markers.Count; i++)
+            {
+                var ms = task.markers[i];
+                if (ms.go == null) continue;
+
+                float remainingY = targetY - ms.go.transform.position.y;
+                ms.stepY         = remainingY / loops;
+                ms.loopsRemaining = loops;
+                ms.delayLoopsRemaining = 0;
+
+                // Refresh commit-time snapshot (same pattern as TriggerBurstAscend merge).
+                int mStep = ms.committedStep >= 0 ? ms.committedStep
+                           : (ms.tag != null ? ms.tag.step : -1);
+                ms.commitTimeAtStart = (ms.tag?.track != null && mStep >= 0)
+                    ? ms.tag.track.GetNoteCommitTime(mStep)
+                    : -1f;
+
+                task.markers[i] = ms;
+            }
+            task.delayLoopsRemaining = 0;
+            _ascendTasks[trk] = task;
+        }
+    }
+
+    /// <summary>
     /// Clear all ascend tasks without tearing down the drum subscription.
     /// Used by NoteVisualizer.BeginNewMotif_ClearAll().
     /// </summary>

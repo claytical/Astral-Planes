@@ -349,17 +349,31 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// Instantly overwrites the entire track with perfect authored notes for every bin,
     /// following each bin's chord progression. Called by SuperNode on collision.
     /// </summary>
-    public void InstantFillAllBins()
+    public void InstantFillAllBins(bool toMaxCapacity = false)
     {
         int binSz = BinSize();
-        int bins  = Mathf.Max(1, loopMultiplier);
+        int bins  = toMaxCapacity ? Mathf.Max(1, maxLoopMultiplier) : Mathf.Max(1, loopMultiplier);
 
-        // Clear all existing notes first
-        for (int b = 0; b < bins; b++)
+        // When expanding to max capacity, only fill bins above the current count so that the
+        // player's already-collected notes in existing bins survive the fill and are restored
+        // correctly when InstantCollapseToLoopMultiplier reverts this track at the boundary.
+        int fillFrom = toMaxCapacity ? loopMultiplier : 0;
+
+        if (bins > loopMultiplier)
+        {
+            loopMultiplier = bins;
+            _totalSteps    = binSz * bins;
+            EnsureBinList();
+            for (int b = 0; b < bins; b++)
+                SetBinAllocated(b, true);
+        }
+
+        // Clear only the bins we are about to fill (preserves existing bins when toMaxCapacity).
+        for (int b = fillFrom; b < bins; b++)
             ClearBinNotesKeepAllocated(b);
 
-        // Write authored notes bin-by-bin
-        for (int b = 0; b < bins; b++)
+        // Write authored notes bin-by-bin (new bins only when toMaxCapacity).
+        for (int b = fillFrom; b < bins; b++)
         {
             var ns = GetNoteSetForBin(b);
             if (ns == null) continue;
@@ -393,6 +407,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _loopCacheDirtyPending = true;
         controller?.EndGravityVoidForPendingExpand(this);
         controller?.UpdateVisualizer();
+        // Sync leader bin count immediately when loopMultiplier expanded beyond the previous
+        // committed value. Without this, GetCommittedBinCount() stays at the old value for up
+        // to one full leader loop, causing barIndex >= committedLeaderBins to fire on the extra
+        // bars and silence all tracks for half the extended loop.
+        if (toMaxCapacity) controller?.ResyncLeaderBinsNow();
     }
 
     /// <summary>
@@ -435,6 +454,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         _loopCacheDirtyPending = true;
         RecomputeBinsFromLoop();
+        RebuildLoopCache_FORCE();
+        _loopCacheDirtyPending = false;
 
         if (controller != null && controller.noteVisualizer != null && drumTrack != null)
         {
@@ -875,10 +896,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Limit audibility to bins that currently contain committed persistent content.
         // This avoids newly-extended/allocated bins on other tracks from causing this
         // track to mirror bin-0 content into bin-1 (or higher) before it has notes there.
-        if (globalBin < 0 || globalBin >= trackBins) return;
-        if (!HasAnyNoteInBin(globalBin)) return;
-
-        int trackBin = globalBin;
+        // Wrap into this track's authored bins so a 1-bin track repeats across a wider leader.
+        int trackBin = WrapIndex(globalBin, trackBins);
+        if (!HasAnyNoteInBin(trackBin)) return;
         float gain = 1f;
 
         if (localStep == 0)
@@ -2277,7 +2297,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// in the current HarmonyDirector progression. Use this instead of RetuneLoopToChord(chord0)
     /// when a profile change should respect the full chord progression across bins.
     /// </summary>
-    public void RetuneLoopToCurrentProgression()
+    public void RetuneLoopToCurrentProgression(bool forceHarmonyDirector = false)
     {
         if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
 
@@ -2286,10 +2306,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         {
             int bin = BinIndexForStep(step);
 
-            // Use the NoteSet's chordRegion (adjusted absolute roots) — same reason as
-            // QuantizeNoteToBinChord: HarmonyDirector.profile may have unadjusted roots.
+            // When a new ChordProgressionProfile is being committed (forceHarmonyDirector=true),
+            // skip the NoteSet's chordRegion — it was baked from the OLD progression and would
+            // override the new one. Always read directly from HarmonyDirector in that case.
             var ns = GetNoteSetForBin(bin);
-            var region = ns?.chordRegion;
+            var region = (!forceHarmonyDirector) ? ns?.chordRegion : null;
             Chord chord;
             if (region != null && region.Count > 0)
             {
@@ -3161,7 +3182,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
         
         for (int b = 0; b < activeBins; b++) {
-            if (!IsBinFilled(b)) continue;  // bin exists but player hasn't harvested it yet — skip
+            if (!IsBinAllocated(b)) continue;         // bin not yet reached — skip
+            if (!IsBinFilled(b)) return false;        // allocated but incomplete — not saturated
             var binNoteSet = GetNoteSetForBin(b);
             if (binNoteSet == null)
             {
@@ -3277,7 +3299,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         persistentLoopNotes.Clear();
         _noteCommitTimes.Clear();
         _loopCacheDirtyPending = true;
-        foreach (var obj in _spawnedNotes) if (obj) Destroy(obj);
+        // Keep existing marker GameObjects alive — chord retune never changes step positions,
+        // only pitches. ForceSyncMarkersToPersistentLoop at the end will reposition/reconcile.
+        // Destroying here caused a deferred-destroy timing bug: markers appeared alive during
+        // the sync but were deleted end-of-frame, leaving the track visually empty.
         _spawnedNotes.Clear();
 
         if (modified != null)
@@ -3291,6 +3316,12 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                     _noteCommitTimes[step] = originalTime;
             }
         }
+
+        // AddNoteToLoop above tries to update noteMarkers by key lookup, but those GameObjects
+        // were just destroyed by the _spawnedNotes loop above. Dead Transform entries remain in
+        // noteMarkers, so AddNoteToLoop finds them but skips creation (t != null fails).
+        // ForceSyncMarkersToPersistentLoop purges dead entries and re-creates any missing markers.
+        controller?.noteVisualizer?.ForceSyncMarkersToPersistentLoop(this);
     }
 
     public void PruneSpawnedCollectables()

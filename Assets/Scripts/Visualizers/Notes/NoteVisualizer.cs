@@ -1540,6 +1540,15 @@ public class NoteVisualizer : MonoBehaviour
         for (int i = 0; i < deadKeys.Count; i++)
             noteMarkers.Remove(deadKeys[i]);
     }
+    /// <summary>
+    /// Reset all active ascension countdowns as a new phrasing (called on chord-progression swap).
+    /// Keeps markers visually in place but resets their loop countdown from the current position.
+    /// </summary>
+    public void ResetAscensionPhrasing()
+    {
+        ascensionDirector?.ResetPhrasing();
+    }
+
     public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds)
     {
         if (ascensionDirector == null) return;
