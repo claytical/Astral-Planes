@@ -1973,17 +1973,29 @@ public class PhaseStar : MonoBehaviour
         }
         Color spawnTint = targetTrack != null ? targetTrack.trackColor : Color.white;
 
-        // Build shard list: all MotifProfile role-matched tracks except the initiating (maxed) track.
+        // Shards: role-matched tracks that are NOT yet at max bins (non-maxed need to "catch up").
+        // Fully-maxed tracks get no shard — when all tracks are maxed the SuperNode has 0 shards
+        // and the player triggers the chord transition by hitting the central body directly.
         var activeRoles = _assignedMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>();
         var ctrl        = _gfm?.controller;
         var shardTracks = new System.Collections.Generic.List<InstrumentTrack>();
         if (ctrl?.tracks != null)
             foreach (var t in ctrl.tracks)
-                if (t != null && t != targetTrack && activeRoles.Contains(t.assignedRole))
+                if (t != null && t != targetTrack && activeRoles.Contains(t.assignedRole)
+                    && t.loopMultiplier < t.maxLoopMultiplier)
                     shardTracks.Add(t);
 
+        // Toggle: if already on the alternate progression, switch back to the original motif
+        // progression; otherwise switch to the alternate. This lets the player oscillate
+        // between the two progressions by filling tracks and triggering SuperNodes repeatedly.
+        var hd            = _gfm?.harmony;
+        var originalProg  = _assignedMotif?.chordProgression;
         var alternateProg = _assignedMotif?.alternateChordProgressionProfile;
-        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg);
+        ChordProgressionProfile progToStage =
+            (hd != null && alternateProg != null && hd.ActiveProfile == alternateProg)
+                ? originalProg
+                : alternateProg;
+        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, progToStage);
         go.GetComponent<Explode>()?.SetTint(spawnTint);
 
         _activeSuperNode = sn;
@@ -2027,6 +2039,16 @@ public class PhaseStar : MonoBehaviour
         else
             SpawnNodeCommon(contact, _cachedTrack);
 
+        // Reset zap accumulation for the next acquisition cycle, mirroring
+        // EjectActivePreviewShardAndFlow. Without this, _zapProgressState stays at
+        // ReadyLatched after the node resolves, causing TransitionDormantToActive to
+        // return early (alreadyRetracted) and the star to stay permanently frozen.
+        if (_activeNode != null || _activeSuperNode != null)
+        {
+            TransitionZapState(ZapProgressState.Seeking, _attunedRole, "ejection-succeeded");
+            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
+        }
+
         // Do not mark disposing on ejection; this star continues orchestrating post-node
         // dormant recharge and subsequent tentacle/ready cycles.
         OnEjected?.Invoke(this, _attunedRole);
@@ -2034,6 +2056,11 @@ public class PhaseStar : MonoBehaviour
     private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
     {
         if (track == null) return false;
+
+        // A SuperNode transitions the chord progression. Without an alternate progression
+        // on the motif there is nothing to switch to, so fall back to normal density-injection
+        // MineNodes. (Prevents the star from appearing stuck when the motif isn't configured.)
+        if (_assignedMotif?.alternateChordProgressionProfile == null) return false;
 
         int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
         bool fullyExpanded = track.loopMultiplier >= maxBins;

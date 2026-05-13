@@ -222,37 +222,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
---- !u!1 &63749557
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 63749558}
-  m_Layer: 0
-  m_Name: Reef
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &63749558
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 63749557}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -1.86, z: 0}
-  m_LocalScale: {x: 0.68, y: 0.68, z: 0.68}
-  m_ConstrainProportionsScale: 1
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &269415555
 GameObject:
   m_ObjectHideFlags: 0
@@ -1131,7 +1100,8 @@ MonoBehaviour:
   coralRoot: {fileID: 0}
   fadeSpiralCoralDuringBridge: 1
   spiralCoralFadeTarget: 0.65
-  vehiclePhaseInFxPrefab: {fileID: 0}
+  vehiclePhaseInFxPrefab: {fileID: 4807525718738022760, guid: 5962a9437261f4908b0f4999318283dd,
+    type: 3}
   vehiclePhaseInDelaySeconds: 1.2
   demoMode: 0
   harmony: {fileID: 1151719980}
@@ -1714,4 +1684,3 @@ SceneRoots:
   - {fileID: 3032964157223298668}
   - {fileID: 1725700397}
   - {fileID: 1151719977}
-  - {fileID: 63749558}

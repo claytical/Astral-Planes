@@ -7,6 +7,7 @@ public class HarmonyDirector : MonoBehaviour
 {
     
     [SerializeField] private ChordProgressionProfile profile;
+    public ChordProgressionProfile ActiveProfile => profile;
     [SerializeField] private int cursor = 0;
 
     private bool _armedChordAdvance, _previewActiveThisLoop, _heldThroughBoundary, _previewStartedInsideWindow, _hasPendingProfileSwap;
@@ -282,6 +283,8 @@ public class HarmonyDirector : MonoBehaviour
             if (appliedProfileSwap && profile.chordSequence != null && profile.chordSequence.Count > 0)
             {
                 // New profile committed: reset personal sequences and retune per-bin.
+                // forceHarmonyDirector=true bypasses the NoteSet's stale chordRegion (baked
+                // from the old profile) so notes snap to the new progression's actual chords.
                 foreach (var tr in GameFlowManager.Instance.controller.tracks)
                 {
                     if (tr == null) continue;
@@ -289,11 +292,16 @@ public class HarmonyDirector : MonoBehaviour
                     _trackPos[tr] = 0;
 
                     if (tr.GetPersistentLoopNotes().Count > 0)
-                        tr.RetuneLoopToCurrentProgression();
+                        tr.RetuneLoopToCurrentProgression(forceHarmonyDirector: true);
                 }
 
-                _globalBuiltCount = 1; // I is now the built baseline again
+                _globalBuiltCount = 1;
                 _previewChordIdx = -1;
+
+                // Reset ascension phrasings so notes don't arrive at the line mid-phrase
+                // after a chord swap — they restart their countdown from current position.
+                var nv = GameFlowManager.Instance?.controller?.noteVisualizer;
+                nv?.ResetAscensionPhrasing();
             }
 
             _forceCommitNextBoundary = false;

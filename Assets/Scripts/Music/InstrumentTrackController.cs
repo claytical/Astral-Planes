@@ -1065,7 +1065,10 @@ public class InstrumentTrackController : MonoBehaviour
         // If pushing would exceed capacity, inject density deterministically.
         if (cursorTarget > trackMaxBinIndex)
         {
-            // round-robin into a filled bin (prefer content already in loop)
+            // Before density-injecting, complete any allocated-but-unfilled bin (missed note).
+            for (int b = 0; b <= trackMaxBinIndex; b++)
+                if (track.IsBinAllocated(b) && !track.IsBinFilled(b))
+                    return b;
             return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
         }
         return cursorTarget;
@@ -1075,9 +1078,14 @@ public class InstrumentTrackController : MonoBehaviour
     bool cursorFilled = track.IsBinFilled(cursorTarget);
     int proposed = (cursorFilled) ? (clampedGlobalFrontier + 1) : cursorTarget;
 
-    // If advancing would exceed capacity, inject density deterministically.
+    // If advancing would exceed capacity, complete any unfilled bin before density injection.
     if (proposed > trackMaxBinIndex)
+    {
+        for (int b = 0; b <= trackMaxBinIndex; b++)
+            if (track.IsBinAllocated(b) && !track.IsBinFilled(b))
+                return b;
         return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
+    }
 
     return proposed;
 }
