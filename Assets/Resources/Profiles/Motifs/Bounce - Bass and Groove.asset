@@ -31,7 +31,7 @@ MonoBehaviour:
   nodesPerStar: 5
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
-  chordProgression: {fileID: 11400000, guid: b01d7470b74ef474cb1e52438d661bf0, type: 2}
+  chordProgression: {fileID: 11400000, guid: 4430fcc89b9fa405185bfb16e06e8d8b, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7,
     type: 2}
   roleNoteConfigs:

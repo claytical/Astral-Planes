@@ -28,6 +28,9 @@ public class ControlTutorialDirector : MonoBehaviour
 
     [SerializeField, Min(0.1f)] private float tutorialStepSeconds = 1.2f; // Drift -> Boost -> Charge timing
 
+    [SerializeField] private Vector3 primaryFullScale    = Vector3.one;
+    [SerializeField] private Vector3 primaryCompactScale = new Vector3(0.5f, 0.5f, 1f);
+
     // The current scene instance of the primary UI (destroyed on scene load, re-instantiated).
     private ControlTutorialHighlight primaryInstance;
 
@@ -118,7 +121,7 @@ public class ControlTutorialDirector : MonoBehaviour
         var go = Instantiate(primaryPrefab, anchor);
         go.transform.localPosition = Vector3.zero;
         go.transform.localRotation = Quaternion.identity;
-        go.transform.localScale = Vector3.one;
+//        go.transform.localScale = Vector3.one;
 
         primaryInstance = go.GetComponentInChildren<ControlTutorialHighlight>(true);
         if (!primaryInstance)
@@ -154,6 +157,11 @@ public class ControlTutorialDirector : MonoBehaviour
 
         // Never assume active; enforce it here.
         primaryInstance.gameObject.SetActive(true);
+
+        primaryInstance.transform.localScale =
+            (_desiredMode == PrimaryMode.TutorialSequenceTimed || _desiredMode == PrimaryMode.JoinSouth)
+                ? primaryFullScale
+                : primaryCompactScale;
 
         switch (_desiredMode)
         {
@@ -250,8 +258,8 @@ public class ControlTutorialDirector : MonoBehaviour
         // TrackSelection behavior: once any player joins, hide primary (global).
         if (primaryInstance) primaryInstance.HideAndClear(immediate: true);
 
-        mini.gameObject.SetActive(false);
-//        mini.ShowWaitingFor(ControlTutorialHighlight.ButtonId.Arrows, immediate: true, overrideText: "choose");
+        mini.gameObject.SetActive(true);
+        mini.ShowWaitingFor(ControlTutorialHighlight.ButtonId.Arrows, immediate: true, overrideText: "choose");
     }
 
     public void Mini_SetConfirmStage(LocalPlayer lp)
@@ -259,11 +267,7 @@ public class ControlTutorialDirector : MonoBehaviour
         var mini = GetMini(lp);
         if (!mini) return;
 
-        // Hide the arrows callout once they’ve used it
-        mini.HideAndClear(immediate: true);
-
-        // If you want confirm prompt instead:
-        // mini.ShowWaitingFor(ControlTutorialHighlight.ButtonId.South, immediate: true, overrideText: "South to Confirm");
+        mini.ShowWaitingFor(ControlTutorialHighlight.ButtonId.South, immediate: true, overrideText: "confirm");
     }
 
     public void Mini_Clear(LocalPlayer lp)

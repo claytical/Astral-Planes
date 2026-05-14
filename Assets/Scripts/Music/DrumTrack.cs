@@ -117,8 +117,8 @@ public class DrumTrack : MonoBehaviour
     private float _lastSpentTanksSample = -1f; // baseline at last boundary
     private float _lastIntensity01 = 0f; // for hysteresis
     private float _burnTier = 0f;        // ramp counter: steps up while burning, down when idle
-    
-    private float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
+
+    public float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
     public float GetClipLengthInSeconds() => _clipLengthSec; // new helper for audio-bound code
     public struct PlayArea

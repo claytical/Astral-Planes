@@ -30,8 +30,15 @@ public class PhaseLibraryCarousel : MonoBehaviour
     [SerializeField] private string trackSelectionScene = "TrackSelection";
     [SerializeField] private float inputCooldown = 0.2f;
 
+    [Tooltip("Alpha applied to non-center (unselected) carousel slots.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float unselectedAlpha = 0.25f;
+
     [Tooltip("Shown when no ring records exist yet. Hide when rings are present.")]
     [SerializeField] private GameObject pressToStartCue;
+
+    [Tooltip("Plays audio preview of the centered ring.")]
+    [SerializeField] private RingPreviewPlayer previewPlayer;
 
     /// <summary>Fired when the player confirms a motif, before the scene loads.</summary>
     public UnityEvent onMotifConfirmed;
@@ -58,9 +65,15 @@ public class PhaseLibraryCarousel : MonoBehaviour
         if (pressToStartCue != null) pressToStartCue.SetActive(!hasRings);
 
         if (hasRings)
+        {
             Refresh();
+            if (previewPlayer != null)
+                previewPlayer.Play(_rings[_centerDataIndex]);
+        }
         else
+        {
             foreach (var s in slots) s.gameObject.SetActive(false);
+        }
     }
 
     // ── Setup ──────────────────────────────────────────────────────────────────
@@ -91,7 +104,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             if (!inBounds) continue;
 
             if (i == center) slots[i].AnimateApply(_rings[dataIdx]);
-            else             slots[i].ApplyStatic(_rings[dataIdx]);
+            else             slots[i].ApplyStatic(_rings[dataIdx], unselectedAlpha);
         }
     }
 
@@ -182,12 +195,18 @@ public class PhaseLibraryCarousel : MonoBehaviour
         Refresh();
 
         _sliding = false;
+
+        if (previewPlayer != null)
+            previewPlayer.Play(_rings[_centerDataIndex]);
     }
 
     // ── Confirm ────────────────────────────────────────────────────────────────
 
     private void Confirm()
     {
+        if (previewPlayer != null)
+            previewPlayer.Stop();
+
         if (_rings.Count == 0)
         {
             SceneManager.LoadScene(trackSelectionScene);
