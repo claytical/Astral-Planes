@@ -34,6 +34,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
              "by ring index rather than by fill duration. Use on library cards for a spherical look.")]
     public bool sphericalRotation = false;
 
+    [Tooltip("NoteVisualizer whose noteMarkers provide travel-dot start positions for gameplay rings.")]
+    [SerializeField] private NoteVisualizer noteVisualizer;
+
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
@@ -52,6 +55,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
     private bool _recordFadingOut;
     private bool _gameplayFadingOut;
+    private int  _revealPendingCount;
 
     private struct NoteAnimInfo
     {
@@ -74,7 +78,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// note-tug contour at its outer rim. No travel dots for gameplay rings.
     /// </summary>
     public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
-                              List<MotifSnapshot.NoteEntry> notes, int totalSteps)
+                              List<MotifSnapshot.NoteEntry> notes, int totalSteps,
+                              InstrumentTrack track = null)
     {
         if (config == null) return;
 
@@ -95,14 +100,12 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             entry.Fill.GetComponent<MeshFilter>().sharedMesh,
             entry.FullTris, segs, delay: 0f, config.ringDrawInDuration));
 
-        StartCoroutine(AnimateSingleRing(
-            entry.Contour, entry.ContourPoints,
-            delay: 0f, config.ringDrawInDuration,
-            entry.Root.transform, rotDeg,
-            new List<NoteAnimInfo>(), noteViz: null,
+        _revealPendingCount++;
+        StartCoroutine(AnimateNoteReveal(
+            entry, notes, totalSteps, outerR,
+            role, binIndex, color, rotDeg, track,
             shouldStop: () => _gameplayFadingOut));
-
-        StartCoroutine(BounceToHoldScale(entry.Root.transform, config.ringDrawInDuration));
+        // BounceToHoldScale is now started by AnimateNoteReveal after note reveals complete.
 
         RefreshPlayAreaFit(_gameplayRings.Count);
     }
@@ -131,10 +134,18 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// </summary>
     public IEnumerator RollOffGameplayRingsAfterBounce()
     {
-        float delay = config != null
-            ? config.ringDrawInDuration + config.bouncePressDuration + config.bounceSettleDuration
-            : 0.82f;
-        if (delay > 0f) yield return new WaitForSeconds(delay);
+        // Wait for draw-in to finish so note reveals have a chance to start incrementing the counter.
+        float drawIn = config != null ? config.ringDrawInDuration : 0.5f;
+        if (drawIn > 0f) yield return new WaitForSeconds(drawIn);
+
+        // Wait until every ring has finished its note reveal and started its bounce.
+        yield return new WaitUntil(() => _revealPendingCount == 0);
+
+        // Wait for the bounces to settle.
+        float bounceWait = config != null
+            ? config.bouncePressDuration + config.bounceSettleDuration : 0.32f;
+        if (bounceWait > 0f) yield return new WaitForSeconds(bounceWait);
+
         yield return RollOffGameplayRings();
     }
 
@@ -384,9 +395,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// <summary>
     /// Render rings from a snapshot instantly with no draw-in animation or rotation.
     /// Used for non-highlighted carousel slots in the PhaseLibrary scene.
-    /// Passing null clears the slot.
+    /// Passing null clears the slot. <paramref name="alphaScale"/> dims all layers (0–1).
     /// </summary>
-    public void ApplyStatic(MotifSnapshot snapshot)
+    public void ApplyStatic(MotifSnapshot snapshot, float alphaScale = 1f)
     {
         StopAllCoroutines();
         _recordFadingOut   = false;
@@ -462,6 +473,12 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                     entry.ContourPoints[j].x, entry.ContourPoints[j].y, 0f));
         }
 
+        if (alphaScale < 1f)
+        {
+            var mpbs = MakeMpbs(_recordRings.Count);
+            ApplyAlpha(_recordRings.ToArray(), alphaScale, mpbs);
+        }
+
         RefreshPlayAreaFit(_recordRings.Count);
     }
 
@@ -487,6 +504,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// <summary>Destroy all rings (both layers).</summary>
     public void Clear()
     {
+        _revealPendingCount = 0;
         foreach (Transform child in transform) Destroy(child.gameObject);
         _recordRings.Clear();
         _gameplayRings.Clear();
@@ -730,6 +748,151 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0);
             yield return null;
         }
+    }
+
+    private IEnumerator AnimateNoteReveal(
+        RingEntry ring,
+        List<MotifSnapshot.NoteEntry> notes,
+        int totalSteps, float outerR,
+        MusicalRole role, int binIndex, Color color,
+        float rotDegPerSec, InstrumentTrack track,
+        System.Func<bool> shouldStop)
+    {
+        // Step timing: use raw clip length ÷ drum step count — same formula DrumTrack uses.
+        var   drumTrack = GameFlowManager.Instance?.activeDrumTrack;
+        int   binSteps  = drumTrack != null ? drumTrack.totalSteps : totalSteps;
+        float clipSec   = drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0f;
+        float stepSec   = clipSec > 0f
+            ? clipSec / Mathf.Max(1, binSteps)
+            : 60f / Mathf.Max(1f, drumTrack?.drumLoopBPM ?? 120f) * 8f / Mathf.Max(1, binSteps);
+
+        // Flat-circle polyline (no note dips).
+        var flatPoly   = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
+            role, binIndex, color, new List<MotifSnapshot.NoteEntry>(), binSteps, outerR, config);
+        var currentPts = flatPoly?.Points ?? new List<Vector2>();
+
+        // ── Phase 1: Draw-in ───────────────────────────────────────────────────
+        // Trace the flat circle progressively over ringDrawInDuration so fill and
+        // contour reveal the same arc at the same rate (no axis mismatch).
+        float loopStart = Time.time;
+        int   totalPts  = currentPts.Count;
+        ring.Contour.positionCount = 2;
+        float elapsed = 0f;
+        while (elapsed < config.ringDrawInDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / config.ringDrawInDuration);
+            int   count    = Mathf.Clamp(Mathf.RoundToInt(progress * totalPts), 2, totalPts);
+            ring.Contour.positionCount = count;
+            for (int i = 0; i < count; i++)
+                ring.Contour.SetPosition(i, new Vector3(currentPts[i].x, currentPts[i].y, 0f));
+            yield return null;
+        }
+        ApplyContourPoints(ring.Contour, currentPts);
+
+        if (shouldStop())
+        {
+            _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
+            yield break;
+        }
+
+        // ── Phase 2: Note reveals ──────────────────────────────────────────────
+        var sortedNotes   = notes == null
+            ? new List<MotifSnapshot.NoteEntry>()
+            : notes.OrderBy(n => n.Step % binSteps).ToList();
+        var revealedNotes = new List<MotifSnapshot.NoteEntry>();
+        float tugR        = outerR * (1f - config.tugDepthFraction);
+
+        foreach (var note in sortedNotes)
+        {
+            if (shouldStop()) break;
+
+            int   localStep  = note.Step % binSteps;
+            float targetTime = loopStart + localStep * stepSec;
+            float wait       = targetTime - Time.time;
+            if (wait > 0.001f) yield return new WaitForSeconds(wait);
+            if (shouldStop()) break;
+
+            float angle    = localStep / (float)binSteps * Mathf.PI * 2f;
+            float cos      = Mathf.Cos(angle);
+            float sin      = Mathf.Sin(angle);
+            var   tugLocal = new Vector3(cos * tugR, sin * tugR, 0f);
+
+            // Start dot from the actual note marker; fall back to outside-ring position.
+            Vector3 dotWorld;
+            Transform markerTr = null;
+            if (noteVisualizer?.noteMarkers != null && track != null)
+                noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
+            dotWorld = markerTr != null
+                ? markerTr.position
+                : ring.Root.transform.TransformPoint(
+                      new Vector3(cos * outerR * 1.5f, sin * outerR * 1.5f, 0f));
+
+            StartCoroutine(TravelNoteDot(
+                dotWorld, ring.Root.transform, tugLocal,
+                config.noteTravelDuration, note.TrackColor));
+
+            revealedNotes.Add(note);
+            var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
+                role, binIndex, color, revealedNotes, binSteps, outerR, config);
+            var targetPts  = targetPoly?.Points ?? currentPts;
+            StartCoroutine(TweenContour(ring.Contour, targetPts, config.noteTravelDuration));
+            currentPts = targetPts;
+        }
+
+        if (sortedNotes.Count > 0 && !shouldStop())
+            yield return new WaitForSeconds(config.noteTravelDuration);
+        ApplyContourPoints(ring.Contour, currentPts);
+
+        // Contour fully built — now bounce the ring and open the roll-off gate.
+        StartCoroutine(BounceToHoldScale(ring.Root.transform, delay: 0f));
+        _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
+
+        float bounceWait = config != null
+            ? config.bouncePressDuration + config.bounceSettleDuration : 0.32f;
+        if (bounceWait > 0f && !shouldStop())
+            yield return new WaitForSeconds(bounceWait);
+
+        // ── Phase 3: Continuous rotation ──────────────────────────────────────
+        while (!shouldStop())
+        {
+            if (ring.Root == null) yield break;
+            ring.Root.transform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
+            yield return null;
+        }
+    }
+
+    private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration)
+    {
+        if (lr == null || to == null || lr.positionCount != to.Count) yield break;
+        // Snapshot the ring's current state — no snap-forward when tweens overlap.
+        var from = new List<Vector2>(lr.positionCount);
+        for (int i = 0; i < lr.positionCount; i++)
+        {
+            var p = lr.GetPosition(i);
+            from.Add(new Vector2(p.x, p.y));
+        }
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            for (int i = 0; i < from.Count; i++)
+            {
+                var pt = Vector2.Lerp(from[i], to[i], t);
+                lr.SetPosition(i, new Vector3(pt.x, pt.y, 0f));
+            }
+            yield return null;
+        }
+        ApplyContourPoints(lr, to);
+    }
+
+    private static void ApplyContourPoints(LineRenderer lr, List<Vector2> pts)
+    {
+        if (lr == null || pts == null) return;
+        lr.positionCount = pts.Count;
+        for (int i = 0; i < pts.Count; i++)
+            lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
     }
 
     private IEnumerator TravelNoteDot(

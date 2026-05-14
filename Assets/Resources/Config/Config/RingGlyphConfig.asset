@@ -17,7 +17,7 @@ MonoBehaviour:
   ringSpacing: 0.3
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
-  ringAlpha: 0.2
+  ringAlpha: 0.246
   lineWidth: 0.02
   segments: 256
   tugDepthFraction: 0.25

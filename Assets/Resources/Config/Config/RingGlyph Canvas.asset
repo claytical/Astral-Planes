@@ -17,10 +17,10 @@ MonoBehaviour:
   ringSpacing: 0.05
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
-  ringAlpha: 0.1
-  lineWidth: 0.04
+  ringAlpha: 0.35
+  lineWidth: 0.03
   segments: 256
-  tugDepthFraction: 0.25
+  tugDepthFraction: 0.192
   tugHalfWidthRad: 0.75
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08

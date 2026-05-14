@@ -42,7 +42,7 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float keyboardAccelRate = 5f;
     [Header("Tutorial UI")]
     [SerializeField] private ControlTutorialHighlight miniTutorialPrefab;
-    [SerializeField] private Vector3 miniTutorialScale = new Vector3(0.65f, 0.65f, 1f);
+    [SerializeField] private Vector3 miniTutorialScale = new Vector3(0.5f, 0.5f, 1f);
 
     private ControlTutorialHighlight _miniTutorial;
     private bool _hasNavigatedSelectionOnce;

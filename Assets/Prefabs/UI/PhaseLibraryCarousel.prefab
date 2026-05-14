@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6462711525076251061}
   - component: {fileID: 2282495354990635995}
+  - component: {fileID: 3751250523553378462}
   m_Layer: 0
   m_Name: PhaseLibraryCarousel
   m_TagString: Untagged
@@ -54,10 +55,26 @@ MonoBehaviour:
   slideDuration: 0.25
   trackSelectionScene: TrackSelection
   inputCooldown: 0.2
+  unselectedAlpha: 0.25
   pressToStartCue: {fileID: 0}
+  previewPlayer: {fileID: 0}
   onMotifConfirmed:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3751250523553378462
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2018841000974329430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d48a6a56820fc460286118583df0a83a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RingPreviewPlayer
+  midiStreamPlayer: {fileID: 0}
+  phaseLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
 --- !u!1 &4750113069443986395
 GameObject:
   m_ObjectHideFlags: 0

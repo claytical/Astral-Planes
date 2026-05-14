@@ -127,7 +127,7 @@ public class BinRingController : MonoBehaviour
                 if (!t.IsBinFilled(b)) continue;
                 _ringApplicator.SpawnBinRing(
                     t.assignedRole, b, t.trackColor,
-                    t.GetBinNoteEntries(b), totalSteps);
+                    t.GetBinNoteEntries(b), totalSteps, t);
             }
         }
     }
