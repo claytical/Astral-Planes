@@ -27,3 +27,7 @@ MonoBehaviour:
     motifs:
     - {fileID: 11400000, guid: d128ad57d4e11486bba9dd57cd935bbc, type: 2}
     loopMotifs: 0
+  - phaseName: Groove
+    motifs:
+    - {fileID: 11400000, guid: 471683db0fd1148bdb3ab5ba73459190, type: 2}
+    loopMotifs: 0

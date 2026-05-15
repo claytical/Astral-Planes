@@ -1,0 +1,138 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: palm-newgroove
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: palm-newgroove
+    authoredRootMidi: 55
+    loopSteps: 256
+    events:
+    - step: 0
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 8
+      midiNote: 69
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 16
+      midiNote: 71
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 24
+      midiNote: 65
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 32
+      midiNote: 64
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 40
+      midiNote: 69
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 48
+      midiNote: 62
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 56
+      midiNote: 71
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 64
+      midiNote: 69
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 72
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 80
+      midiNote: 65
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 88
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 96
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 104
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 112
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 120
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 128
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 136
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 144
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 152
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 160
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 168
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 176
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 184
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 192
+      midiNote: 69
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 200
+      midiNote: 71
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 208
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 216
+      midiNote: 67
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 224
+      midiNote: 67
+      durSteps: 32
+      velocity01: 0.78740156
+    overlapPolicy: 1
+    clampToTrackRange: 0
+    octaveShift: 0

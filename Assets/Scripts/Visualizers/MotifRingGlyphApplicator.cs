@@ -758,13 +758,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float rotDegPerSec, InstrumentTrack track,
         System.Func<bool> shouldStop)
     {
-        // Step timing: use raw clip length ÷ drum step count — same formula DrumTrack uses.
-        var   drumTrack = GameFlowManager.Instance?.activeDrumTrack;
-        int   binSteps  = drumTrack != null ? drumTrack.totalSteps : totalSteps;
-        float clipSec   = drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0f;
-        float stepSec   = clipSec > 0f
-            ? clipSec / Mathf.Max(1, binSteps)
-            : 60f / Mathf.Max(1f, drumTrack?.drumLoopBPM ?? 120f) * 8f / Mathf.Max(1, binSteps);
+        int binSteps = Mathf.Max(1, totalSteps);   // caller-supplied — matches ring geometry and note entries
 
         // Flat-circle polyline (no note dips).
         var flatPoly   = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
@@ -774,8 +768,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         // ── Phase 1: Draw-in ───────────────────────────────────────────────────
         // Trace the flat circle progressively over ringDrawInDuration so fill and
         // contour reveal the same arc at the same rate (no axis mismatch).
-        float loopStart = Time.time;
-        int   totalPts  = currentPts.Count;
+        int totalPts = currentPts.Count;
         ring.Contour.positionCount = 2;
         float elapsed = 0f;
         while (elapsed < config.ringDrawInDuration)
@@ -796,56 +789,85 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             yield break;
         }
 
-        // ── Phase 2: Note reveals ──────────────────────────────────────────────
-        var sortedNotes   = notes == null
+        // ── Phase 2: Reveal notes driven by OnStepChanged ────────────────────────
+        // Notes are sorted and timed against the leader-step grid (leaderSteps =
+        // totalSteps × loopMultiplier) so bin-1 notes at absolute step 28 fire at
+        // the correct position in a 2-bin effective loop, not collapsed to step 12.
+        var drumRef     = GameFlowManager.Instance?.activeDrumTrack;
+        int leaderSteps = drumRef != null ? drumRef.GetLeaderSteps() : binSteps;
+
+        var   sortedNotes   = notes == null
             ? new List<MotifSnapshot.NoteEntry>()
-            : notes.OrderBy(n => n.Step % binSteps).ToList();
-        var revealedNotes = new List<MotifSnapshot.NoteEntry>();
-        float tugR        = outerR * (1f - config.tugDepthFraction);
+            : notes.OrderBy(n => n.Step % leaderSteps).ToList();
+        var   revealedNotes = new List<MotifSnapshot.NoteEntry>();
+        float tugR          = outerR * (1f - config.tugDepthFraction);
 
-        foreach (var note in sortedNotes)
+        if (sortedNotes.Count > 0)
         {
-            if (shouldStop()) break;
+            if (shouldStop() || ring.Root == null)
+            {
+                _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
+                yield break;
+            }
 
-            int   localStep  = note.Step % binSteps;
-            float targetTime = loopStart + localStep * stepSec;
-            float wait       = targetTime - Time.time;
-            if (wait > 0.001f) yield return new WaitForSeconds(wait);
-            if (shouldStop()) break;
+            int currentLeaderStep = drumRef != null ? drumRef.currentStep : 0;
 
-            float angle    = localStep / (float)binSteps * Mathf.PI * 2f;
-            float cos      = Mathf.Cos(angle);
-            float sin      = Mathf.Sin(angle);
-            var   tugLocal = new Vector3(cos * tugR, sin * tugR, 0f);
+            foreach (var note in sortedNotes)
+            {
+                if (shouldStop() || ring.Root == null) break;
 
-            // Start dot from the actual note marker; fall back to outside-ring position.
-            Vector3 dotWorld;
-            Transform markerTr = null;
-            if (noteVisualizer?.noteMarkers != null && track != null)
-                noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
-            dotWorld = markerTr != null
-                ? markerTr.position
-                : ring.Root.transform.TransformPoint(
-                      new Vector3(cos * outerR * 1.5f, sin * outerR * 1.5f, 0f));
+                int noteLeaderStep = note.Step % leaderSteps;
 
-            StartCoroutine(TravelNoteDot(
-                dotWorld, ring.Root.transform, tugLocal,
-                config.noteTravelDuration, note.TrackColor));
+                // Wait for the drum to reach this note's step, unless it has passed.
+                if (drumRef != null && noteLeaderStep > currentLeaderStep)
+                {
+                    bool stepFired = false;
+                    System.Action<int, int> onStep = (s, _) => {
+                        if (s == noteLeaderStep) stepFired = true;
+                    };
+                    drumRef.OnStepChanged += onStep;
+                    yield return new WaitUntil(() => stepFired || shouldStop() || ring.Root == null);
+                    drumRef.OnStepChanged -= onStep;
+                    if (shouldStop() || ring.Root == null) break;
+                    currentLeaderStep = drumRef.currentStep;
+                }
 
-            revealedNotes.Add(note);
-            var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
-                role, binIndex, color, revealedNotes, binSteps, outerR, config);
-            var targetPts  = targetPoly?.Points ?? currentPts;
-            StartCoroutine(TweenContour(ring.Contour, targetPts, config.noteTravelDuration));
-            currentPts = targetPts;
+                int   localStep = note.Step % binSteps;
+                float angle     = localStep / (float)binSteps * Mathf.PI * 2f;
+                float cos       = Mathf.Cos(angle);
+                float sin       = Mathf.Sin(angle);
+                var   tugLocal  = new Vector3(cos * tugR, sin * tugR, 0f);
+
+                Vector3 dotWorld;
+                Transform markerTr = null;
+                if (noteVisualizer?.noteMarkers != null && track != null)
+                    noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
+                dotWorld = markerTr != null
+                    ? markerTr.position
+                    : ring.Root.transform.TransformPoint(
+                          new Vector3(cos * outerR * 1.5f, sin * outerR * 1.5f, 0f));
+
+                StartCoroutine(TravelNoteDot(
+                    dotWorld, ring.Root.transform, tugLocal,
+                    config.noteTravelDuration, note.TrackColor));
+
+                revealedNotes.Add(note);
+                var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
+                    role, binIndex, color, revealedNotes, binSteps, outerR, config);
+                var targetPts  = targetPoly?.Points ?? currentPts;
+                StartCoroutine(TweenContour(ring.Contour, targetPts, config.noteTravelDuration));
+                currentPts = targetPts;
+            }
+
+            if (!shouldStop())
+                yield return new WaitForSeconds(config.noteTravelDuration);
         }
 
-        if (sortedNotes.Count > 0 && !shouldStop())
-            yield return new WaitForSeconds(config.noteTravelDuration);
         ApplyContourPoints(ring.Contour, currentPts);
 
-        // Contour fully built — now bounce the ring and open the roll-off gate.
-        StartCoroutine(BounceToHoldScale(ring.Root.transform, delay: 0f));
+        // Contour fully built — bounce the ring and open the roll-off gate.
+        if (ring.Root != null)
+            StartCoroutine(BounceToHoldScale(ring.Root.transform, delay: 0f));
         _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
 
         float bounceWait = config != null
@@ -865,7 +887,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration)
     {
         if (lr == null || to == null || lr.positionCount != to.Count) yield break;
-        // Snapshot the ring's current state — no snap-forward when tweens overlap.
         var from = new List<Vector2>(lr.positionCount);
         for (int i = 0; i < lr.positionCount; i++)
         {
