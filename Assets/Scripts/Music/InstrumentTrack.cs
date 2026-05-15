@@ -887,17 +887,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             return;
         }
 
-        // Global transport bin should continue to drive harmony/chord movement.
-        // Track content selection wraps into this track's authored bins so a 1-bin
-        // track can still sound across a wider leader loop while following harmonic shifts.
-        int trackBins = Mathf.Max(1, loopMultiplier);
         int globalBin = WrapIndex(playheadBin, Mathf.Max(1, leaderBins));
 
-        // Limit audibility to bins that currently contain committed persistent content.
-        // This avoids newly-extended/allocated bins on other tracks from causing this
-        // track to mirror bin-0 content into bin-1 (or higher) before it has notes there.
-        // Wrap into this track's authored bins so a 1-bin track repeats across a wider leader.
-        int trackBin = WrapIndex(globalBin, trackBins);
+        // Silence if leader is ahead of this track's allocated extent,
+        // or if this bin's burst is still in flight (allocated-but-unfilled).
+        if (globalBin >= loopMultiplier || !IsBinFilled(globalBin)) return;
+
+        int trackBin = globalBin;
         if (!HasAnyNoteInBin(trackBin)) return;
         float gain = 1f;
 

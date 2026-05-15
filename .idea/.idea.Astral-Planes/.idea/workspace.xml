@@ -6,12 +6,16 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/BinRingController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/BinRingController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Descent.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Descent.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Folding.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Folding.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Lights.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Lights.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -292,7 +296,7 @@
       <workItem from="1778446478754" duration="7840000" />
       <workItem from="1778544595359" duration="8125000" />
       <workItem from="1778601380265" duration="47828000" />
-      <workItem from="1778783304035" duration="24737000" />
+      <workItem from="1778783304035" duration="30563000" />
     </task>
     <servers />
   </component>
