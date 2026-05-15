@@ -199,7 +199,6 @@ public sealed class StarPool : MonoBehaviour
     {
         if (_dustGen == null) { if (_gfm == null) _gfm = GameFlowManager.Instance; _dustGen = _gfm?.dustGenerator; }
         if (_dustGen == null || _drum == null) return;
-        if (_mineNodePending || HasUnresolvedMineNodeSequence()) return;
         if (_remainingEjectionsTotal <= 0) return;
 
         var roles = _activeMotif?.GetActiveRoles();
@@ -210,6 +209,9 @@ public sealed class StarPool : MonoBehaviour
 
         foreach (var role in roles)
         {
+            // Only block this role's slot if its own MineNode sequence is pending.
+            if (role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence())) continue;
+
             bool hasKey = _activeStars.ContainsKey(role);
             bool notNull = hasKey && _activeStars[role] != null;
             bool slotEmpty = !hasKey || !notNull;
@@ -285,6 +287,17 @@ public sealed class StarPool : MonoBehaviour
 
         _activeStars[role] = star;
         Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");
+
+        // If another role's MineNode is in flight, pause this star immediately so it
+        // cannot charge and eject before the active sequence resolves. It will resume
+        // via ResumeAll() when _mineNodePending clears.
+        if (_mineNodePending && role != _lastEjectedRole)
+        {
+            star.Pause();
+            if (!_pausedStars.Contains(star))
+                _pausedStars.Add(star);
+            Debug.Log($"[StarPool] SpawnStarForRole: pre-paused {role} star (SiblingActive) — waiting for {_lastEjectedRole} mine sequence to resolve.");
+        }
 
         // Free the grid cell when the star is destroyed.
         var relay = go.AddComponent<StarDestroyRelay>();

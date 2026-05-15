@@ -1465,6 +1465,7 @@ public partial class Vehicle : MonoBehaviour
     // Find nearest forward unlit placeholder that isn't already armed.
     if (viz == null || !viz.TryGetNextUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int targetAbsStep))
     {
+        p.track?.PlayOneShotMidi(p.collectedMidi, p.velocity127, p.durationTicks);
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
@@ -1507,6 +1508,7 @@ public partial class Vehicle : MonoBehaviour
     if (!pass)
     {
         Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
+        p.track?.PlayOneShotMidi(p.collectedMidi, p.velocity127, p.durationTicks);
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
