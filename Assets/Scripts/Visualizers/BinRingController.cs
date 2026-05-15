@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 // =========================================================================
@@ -6,17 +7,16 @@ using UnityEngine;
 //
 //  Single-boundary lifecycle per bin fill:
 //
-//  OnBinFilled    → queue a draw; cancel any in-progress roll-off.
-//  Boundary 1     → draw all completed-bin rings with the normal draw-in,
-//                   then immediately queue the roll-off to start once the
-//                   bounce animation finishes (~ringDrawInDuration +
-//                   bouncePressDuration + bounceSettleDuration).
+//  OnBinFilled    → record which bin just filled; cancel any in-progress
+//                   roll-off; clear visible rings.
+//  Boundary       → spawn a ring only for the bin(s) that filled since the
+//                   last spawn, then queue the roll-off.
 //
+//  Only the newly completed bin is ever shown — not the full history.
 //  If a new bin fills while a roll-off is running, the roll-off is
-//  cancelled, rings are cleared, and the cycle restarts from the next
-//  boundary.
+//  cancelled, the current ring is cleared, and the new bin is queued.
 //
-//  At bridge time, ClearGameplayRings() removes them instantly before the
+//  At bridge time, CancelPendingDraw() discards the queue before the
 //  full-motif record is shown via AnimateApply.
 // =========================================================================
 public class BinRingController : MonoBehaviour
@@ -25,7 +25,7 @@ public class BinRingController : MonoBehaviour
     private InstrumentTrack[]        _tracks;
     private MotifRingGlyphApplicator _ringApplicator;
 
-    private bool      _pendingDraw;
+    private readonly List<(InstrumentTrack track, int binIndex)> _pendingBins = new();
     private Coroutine _rollOffCoroutine;
 
     void Start()
@@ -53,6 +53,8 @@ public class BinRingController : MonoBehaviour
 
     private void Teardown()
     {
+        _pendingBins.Clear();
+
         if (_rollOffCoroutine != null) { StopCoroutine(_rollOffCoroutine); _rollOffCoroutine = null; }
 
         if (_drumTrack != null)
@@ -71,14 +73,14 @@ public class BinRingController : MonoBehaviour
     // ── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Cancel any queued draw and running roll-off without clearing already-visible rings.
-    /// Called by BridgeCoordinator before AnimateApply so the bin-completion ring is never
-    /// drawn after the full record takes over.
+    /// Discard any queued draw and stop any running roll-off without clearing
+    /// already-visible rings. Called by BridgeCoordinator before AnimateApply
+    /// so a pending bin ring is never drawn after the full record takes over.
     /// </summary>
     public void CancelPendingDraw()
     {
         if (_rollOffCoroutine != null) { StopCoroutine(_rollOffCoroutine); _rollOffCoroutine = null; }
-        _pendingDraw = false;
+        _pendingBins.Clear();
     }
 
     // ── Event handlers ───────────────────────────────────────────────────────
@@ -89,46 +91,42 @@ public class BinRingController : MonoBehaviour
             _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
         if (_ringApplicator == null) return;
 
-        // Cancel any running roll-off and clear rings; redraw at the next boundary.
         if (_rollOffCoroutine != null) { StopCoroutine(_rollOffCoroutine); _rollOffCoroutine = null; }
         _ringApplicator.ClearGameplayRings();
-        _pendingDraw = true;
+        _pendingBins.Add((track, binIndex));
     }
 
     private void OnLoopBoundary()
     {
         if (_ringApplicator == null) return;
 
-        if (_pendingDraw)
+        if (_pendingBins.Count > 0)
         {
-            SpawnAllBinRings();
-            _pendingDraw      = false;
+            SpawnPendingBinRings();
             _rollOffCoroutine = StartCoroutine(_ringApplicator.RollOffGameplayRingsAfterBounce());
         }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private void SpawnAllBinRings()
+    private void SpawnPendingBinRings()
     {
-        if (_ringApplicator == null || _tracks == null) return;
+        if (_ringApplicator == null) return;
 
         int totalSteps = (_drumTrack != null && _drumTrack.totalSteps > 0)
             ? _drumTrack.totalSteps : 16;
 
         _ringApplicator.ClearGameplayRings();
 
-        foreach (var t in _tracks)
+        foreach (var (t, b) in _pendingBins)
         {
             if (t == null) continue;
-            int allocatedBins = Mathf.Max(1, t.loopMultiplier);
-            for (int b = 0; b < allocatedBins; b++)
-            {
-                if (!t.IsBinFilled(b)) continue;
-                _ringApplicator.SpawnBinRing(
-                    t.assignedRole, b, t.trackColor,
-                    t.GetBinNoteEntries(b), totalSteps, t);
-            }
+            if (!t.IsBinFilled(b)) continue;
+            _ringApplicator.SpawnBinRing(
+                t.assignedRole, b, t.trackColor,
+                t.GetBinNoteEntries(b), totalSteps, t);
         }
+
+        _pendingBins.Clear();
     }
 }

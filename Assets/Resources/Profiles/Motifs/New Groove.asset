@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: New Groove
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: new groove
+  displayName: new groove
+  keyRootMidi: 55
+  entryDrumLoops:
+  - {fileID: 8300000, guid: 880a78c762d9d45b58418a64adf5abab, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: 02810767ddbe8457a9c7d7dc247f2e13, type: 3}
+  - {fileID: 8300000, guid: a366fd566c0a240228fd4be1d54f4349, type: 3}
+  - {fileID: 8300000, guid: 799839257d1494e2395ef91bccc352b4, type: 3}
+  - {fileID: 8300000, guid: 465fc9bc192024f0cbe8d17d8f089410, type: 3}
+  - {fileID: 8300000, guid: 618ce53fddcb9408886349de7d098cc6, type: 3}
+  intensityThresholds: []
+  entryLoopCount: 1
+  bpm: 147
+  stepsPerLoop: 256
+  nodesPerStar: 4
+  starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
+  mazePattern: {fileID: 11400000, guid: e33ec23797f8442308d50f9624f2d657, type: 2}
+  chordProgression: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: 76e423e0ba7ee4506b2c81c2fcb3ef78,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 17275505c991545a59645f50b10db1b1, type: 2}
+  - {fileID: 11400000, guid: 05e10c7bc60d2481ab0056ad9b197b7b, type: 2}
+  - {fileID: 11400000, guid: aac9d7580fe6d46e0b9eb1047eaf9cc4, type: 2}
+  - {fileID: 11400000, guid: dcf3f5ea7adf84449915ef52f817a4f4, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1

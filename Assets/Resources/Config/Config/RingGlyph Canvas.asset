@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd00e28313c0446baaeebe34dc651322, type: 3}
   m_Name: RingGlyph Canvas
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
-  innerRadius: 0.2
-  ringThickness: 0.25
-  ringSpacing: 0.05
+  innerRadius: 0.1
+  ringThickness: 0.15
+  ringSpacing: 0.025
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
-  ringAlpha: 0.35
+  ringAlpha: 0.145
   lineWidth: 0.03
   segments: 256
   tugDepthFraction: 0.192

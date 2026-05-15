@@ -53,6 +53,13 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     /// </summary>
     public float LineCharge01 { get; private set; }
 
+    /// <summary>
+    /// Fired at the loop boundary when a marker reaches the ascent line (loopsRemaining == 0).
+    /// Payload: (InstrumentTrack track, int step, Vector3 worldPosition).
+    /// MotifRingGlyphApplicator subscribes per-ring to trigger note-contour dots.
+    /// </summary>
+    public static event System.Action<InstrumentTrack, int, Vector3> OnNoteReachedAscent;
+
     // -------------------------------------------------------------------------
     // Internal structs (mirrors of NoteVisualizer private structs)
     // -------------------------------------------------------------------------
@@ -311,8 +318,17 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
                 ms.loopsRemaining = Mathf.Max(0, ms.loopsRemaining - 1);
 
+                FadeMarkerParticles(ms.go, (float)ms.loopsRemaining / Mathf.Max(1, ascendLoops));
+
                 if (ms.loopsRemaining <= 0)
                 {
+                    // Fire ring-dot event before the marker is destroyed.
+                    if (ms.tag?.track != null)
+                    {
+                        int fireStep = ms.committedStep >= 0 ? ms.committedStep : ms.tag.step;
+                        OnNoteReachedAscent?.Invoke(ms.tag.track, fireStep, ms.go.transform.position);
+                    }
+
                     // Arrived at ascent line — bump line charge
                     LineCharge01 = Mathf.Min(1f, LineCharge01 + 0.25f);
 
@@ -375,6 +391,18 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         float currentCommit = track.GetNoteCommitTime(step);
         if (currentCommit <= commitTimeAtStart)
             track.RemovePersistentNoteAtStep(step);
+    }
+
+    private static void FadeMarkerParticles(GameObject go, float alpha)
+    {
+        if (go == null) return;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>())
+        {
+            var main = ps.main;
+            var c    = main.startColor.color;
+            c.a      = alpha;
+            main.startColor = c;
+        }
     }
 
     private void TryCollapseIfHighestBinEmpty(InstrumentTrackController ctrl)
