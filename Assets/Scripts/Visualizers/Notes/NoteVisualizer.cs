@@ -807,7 +807,6 @@ public class NoteVisualizer : MonoBehaviour
     bool shimmer = false;
     float maxVelocity = 0f;
 
-    if (_gfm == null) _gfm = GameFlowManager.Instance;
     var controller = _gfm?.controller;
     if (controller != null && controller.tracks != null)
     {

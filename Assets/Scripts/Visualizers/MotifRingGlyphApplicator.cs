@@ -37,6 +37,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("NoteVisualizer whose noteMarkers provide travel-dot start positions for gameplay rings.")]
     [SerializeField] private NoteVisualizer noteVisualizer;
 
+    [Tooltip("Prefab instantiated for each note travel dot. Must have a LineRenderer or SpriteRenderer to receive the note color.")]
+    [SerializeField] private GameObject noteTravelDotPrefab;
+
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
@@ -855,7 +858,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
                     role, binIndex, color, revealedNotes, binSteps, outerR, config);
                 var targetPts  = targetPoly?.Points ?? currentPts;
-                StartCoroutine(TweenContour(ring.Contour, targetPts, config.noteTravelDuration));
+                StartCoroutine(TweenContour(ring.Contour, targetPts, config.noteTravelDuration, config.noteTravelDuration));
                 currentPts = targetPts;
             }
 
@@ -884,8 +887,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         }
     }
 
-    private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration)
+    private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration, float delay = 0f)
     {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
         if (lr == null || to == null || lr.positionCount != to.Count) yield break;
         var from = new List<Vector2>(lr.positionCount);
         for (int i = 0; i < lr.positionCount; i++)
@@ -920,25 +924,42 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         Vector3 startWorld, Transform ringTransform, Vector3 tugLocalPos,
         float duration, Color color)
     {
-        var go = new GameObject("NoteTravelDot");
-        go.transform.SetParent(transform, worldPositionStays: true);
-
-        var lr = go.AddComponent<LineRenderer>();
-        if (lineMaterial != null) lr.material = lineMaterial;
-        lr.startColor = lr.endColor = color;
-        lr.widthMultiplier   = config.lineWidth * 2f;
-        lr.useWorldSpace     = false;
-        lr.loop              = false;
-        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows    = false;
-
-        const int segs = 8;
-        float dotR = config.noteDotRadius;
-        lr.positionCount = segs + 1;
-        for (int i = 0; i <= segs; i++)
+        GameObject go;
+        if (noteTravelDotPrefab != null)
         {
-            float a = i / (float)segs * Mathf.PI * 2f;
-            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * dotR, Mathf.Sin(a) * dotR, 0f));
+            go = Instantiate(noteTravelDotPrefab, startWorld, Quaternion.identity, transform);
+            go.transform.localScale = Vector3.one * (config.noteDotRadius * 2f);
+            var lr2 = go.GetComponentInChildren<LineRenderer>();
+            if (lr2 != null) { lr2.startColor = lr2.endColor = color; }
+            else
+            {
+                var sr = go.GetComponentInChildren<SpriteRenderer>();
+                if (sr != null) sr.color = color;
+            }
+        }
+        else
+        {
+            go = new GameObject("NoteTravelDot");
+            go.transform.SetParent(transform, worldPositionStays: true);
+            go.transform.position = startWorld;
+
+            var lr = go.AddComponent<LineRenderer>();
+            if (lineMaterial != null) lr.material = lineMaterial;
+            lr.startColor        = lr.endColor = color;
+            lr.widthMultiplier   = config.lineWidth * 2f;
+            lr.useWorldSpace     = false;
+            lr.loop              = false;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows    = false;
+
+            const int segs = 8;
+            float dotR = config.noteDotRadius;
+            lr.positionCount = segs + 1;
+            for (int i = 0; i <= segs; i++)
+            {
+                float a = i / (float)segs * Mathf.PI * 2f;
+                lr.SetPosition(i, new Vector3(Mathf.Cos(a) * dotR, Mathf.Sin(a) * dotR, 0f));
+            }
         }
 
         float elapsed = 0f;

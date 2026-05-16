@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2392770564444568233}
   - component: {fileID: 5783055505139726743}
   - component: {fileID: 804483875256567276}
+  - component: {fileID: 6117052640320155993}
   m_Layer: 9
   m_Name: Void
   m_TagString: Untagged
@@ -4836,3 +4837,24 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!114 &6117052640320155993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9142743768792165380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Explode
+  explosion: {fileID: 2567590292593330884, guid: 95e71e582f0ce4b44959d703d22207e9,
+    type: 3}
+  preExplosion: {fileID: 0}
+  lifetime: 0
+  randomizeLifetimer: 0
+  tintExplosions: 1
+  explosionTint: {r: 1, g: 1, b: 1, a: 1}
+  multiplyWithAuthoredColor: 1
+  tintTrails: 1

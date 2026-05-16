@@ -12442,6 +12442,8 @@ MonoBehaviour:
   lineMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   sphericalRotation: 0
   noteVisualizer: {fileID: 45202786}
+  noteTravelDotPrefab: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
+    type: 3}
 --- !u!120 &1355805402
 LineRenderer:
   serializedVersion: 3

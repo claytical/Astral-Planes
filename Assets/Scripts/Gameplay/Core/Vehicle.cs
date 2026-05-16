@@ -1465,7 +1465,15 @@ public partial class Vehicle : MonoBehaviour
     // Find nearest forward unlit placeholder that isn't already armed.
     if (viz == null || !viz.TryGetNextUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int targetAbsStep))
     {
-        p.track?.PlayOneShotMidi(p.collectedMidi, p.velocity127, p.durationTicks);
+        bool compositionModeNoStep = p.track.controller != null && p.track.controller.noteCommitMode == NoteCommitMode.Composition;
+        int midiNoStep = compositionModeNoStep ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(floorAbs);
+        int durNoStep = p.durationTicks;
+        int binSzNoStep = Mathf.Max(1, p.track.BinSize());
+        int localStepNoStep = ((floorAbs % binSzNoStep) + binSzNoStep) % binSzNoStep;
+        var noteSetNoStep = p.track.GetNoteSetForBin(p.track.BinIndexForStep(floorAbs));
+        if (noteSetNoStep != null && noteSetNoStep.TryGetTemplateTimingAtStep(localStepNoStep, out int authoredDurNoStep, out _))
+            durNoStep = authoredDurNoStep;
+        p.track.PlayOneShotMidi(midiNoStep, p.velocity127, durNoStep);
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
@@ -1508,7 +1516,15 @@ public partial class Vehicle : MonoBehaviour
     if (!pass)
     {
         Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
-        p.track?.PlayOneShotMidi(p.collectedMidi, p.velocity127, p.durationTicks);
+        bool compositionMode = p.track.controller != null && p.track.controller.noteCommitMode == NoteCommitMode.Composition;
+        int midiToPlay = compositionMode ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
+        int durToPlay = p.durationTicks;
+        int binSz = Mathf.Max(1, p.track.BinSize());
+        int localStep = ((targetAbsStep % binSz) + binSz) % binSz;
+        var noteSet = p.track.GetNoteSetForBin(p.track.BinIndexForStep(targetAbsStep));
+        if (noteSet != null && noteSet.TryGetTemplateTimingAtStep(localStep, out int authoredDur, out _))
+            durToPlay = authoredDur;
+        p.track.PlayOneShotMidi(midiToPlay, p.velocity127, durToPlay);
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
