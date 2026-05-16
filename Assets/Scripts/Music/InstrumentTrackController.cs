@@ -327,6 +327,9 @@ public class InstrumentTrackController : MonoBehaviour
             var pool = _gfm?.activeDrumTrack?._starPool;
             pool?.SetGravityVoidSafetyBubbleActive(false);
         }
+        var explode = _gravityVoidInstance.GetComponent<Explode>();
+        if (explode != null) explode.Permanent();
+
         DespawnGravityVoid();
     }
     // Canonical role order for rainbow ring cycling.
@@ -582,7 +585,6 @@ public class InstrumentTrackController : MonoBehaviour
     {
         if (_gravityVoidInstance == null)
             return;
-
         Destroy(_gravityVoidInstance);
 
         _gravityVoidInstance = null;

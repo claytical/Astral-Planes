@@ -80,6 +80,7 @@ public partial class GameFlowManager : MonoBehaviour
 
     // Scratch list for dust regrow veto (prevents collider "trap" when a cell regrows under a vehicle).
     private readonly List<Vector2Int> _vehicleCellsScratch = new List<Vector2Int>(8);
+    private float _vehicleScanCooldown = 0f;
     public List<InstrumentTrack> _activeTracks = new();
     private bool _remixArmed = false;                  // true once previous star’s set is completed
     private bool _nextPhaseLoopArmed = false;
@@ -669,12 +670,20 @@ public partial class GameFlowManager : MonoBehaviour
         }
         else
         {
-            vs = FindObjectsOfType<Vehicle>();
-            for (int i = 0; i < vs.Length; i++)
+            _vehicleScanCooldown -= Time.deltaTime;
+            if (_vehicleScanCooldown <= 0f)
             {
-                var v = vs[i];
-                if (v == null || !v.isActiveAndEnabled) continue;
-                _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
+                vs = FindObjectsOfType<Vehicle>();
+                _vehicleScanCooldown = 1f;
+            }
+            if (vs != null)
+            {
+                for (int i = 0; i < vs.Length; i++)
+                {
+                    var v = vs[i];
+                    if (v == null || !v.isActiveAndEnabled) continue;
+                    _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
+                }
             }
         }
         dustGenerator.SetReservedVehicleCells(_vehicleCellsScratch);

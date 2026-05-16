@@ -1,18 +1,15 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class Explosion : MonoBehaviour {
-    // Use this for initialization
+    private ParticleSystem _ps;
+
+    void Awake() { _ps = GetComponent<ParticleSystem>(); }
 
     void Update()
     {
-        if(GetComponent<ParticleSystem>())
-        {
-            if(!GetComponent<ParticleSystem>().isPlaying)
-            {
-                Destroy(this.gameObject);
-            }
-        }    
+        if (_ps != null && !_ps.isPlaying)
+            Destroy(gameObject);
     }
 }

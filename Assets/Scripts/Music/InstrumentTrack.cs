@@ -891,7 +891,14 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         // Silence if leader is ahead of this track's allocated extent,
         // or if this bin's burst is still in flight (allocated-but-unfilled).
-        if (globalBin >= loopMultiplier || !IsBinFilled(globalBin)) return;
+        if (globalBin >= loopMultiplier || !IsBinFilled(globalBin))
+        {
+            // Visual markers light as each note is collected, but audio is suppressed until
+            // the entire burst is complete (IsBinFilled). Log on step 0 to avoid spam.
+            if (localStep == 0 && globalBin < loopMultiplier && !IsBinFilled(globalBin) && HasAnyNoteInBin(globalBin))
+                Debug.Log($"[TRK:BIN_UNFILLED] track={name} bin={globalBin} — notes present but burst incomplete; audio suppressed.");
+            return;
+        }
 
         int trackBin = globalBin;
         if (!HasAnyNoteInBin(trackBin)) return;
@@ -1601,7 +1608,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // --- A) Compute collection intensity for this burst ---
             if(_burstWroteBin.TryGetValue(collectable.burstId, out var b))
                 filledBin = b;
-            SetBinFilled(filledBin, true); 
+            SetBinFilled(filledBin, true);
+            // Sync drum._binCount immediately so the audio guard (barIndex >= committedLeaderBins)
+            // unblocks the new bin on the same loop rather than waiting for the next OnLoopBoundary.
+            controller?.ResyncLeaderBinsNow();
             // --- VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately ---
             // Without this, the visualizer can remain at the prior width until some other system updates
             // the controller leader multiplier or until a later refresh happens, which looks like bins

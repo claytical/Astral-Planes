@@ -66,6 +66,7 @@ public class BoundaryWrap : MonoBehaviour
     private const float WrapCooldown = 0.3f;
     private static readonly Dictionary<Rigidbody2D, float> _lastWrapTime = new();
     private static readonly Dictionary<Rigidbody2D, float> _lastMineBounceTime = new();
+    private readonly Dictionary<Rigidbody2D, Vehicle> _vehicleCache = new();
 
     private BoxCollider2D _self;
 
@@ -81,12 +82,21 @@ public class BoundaryWrap : MonoBehaviour
 
         var vehicle = rb.GetComponentInParent<Vehicle>();
         if (vehicle != null)
+        {
+            _vehicleCache[rb] = vehicle; // cache for Stay
             return; // vehicles handled continuously in OnTriggerStay2D
+        }
 
         var mine = rb.GetComponent<MineNode>();
         if (mine != null) { HandleMineNodeBoundary(mine, rb); return; }
 
         BounceRigidbody(rb);
+    }
+
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        var rb = other.attachedRigidbody;
+        if (rb != null) _vehicleCache.Remove(rb);
     }
 
     private void HandleMineNodeBoundary(MineNode mine, Rigidbody2D rb)
@@ -145,8 +155,7 @@ public class BoundaryWrap : MonoBehaviour
         var rb = other.attachedRigidbody;
         if (rb == null) return;
 
-        var vehicle = rb.GetComponentInParent<Vehicle>();
-        if (vehicle == null) return;
+        if (!_vehicleCache.TryGetValue(rb, out var vehicle) || vehicle == null) return;
 
         HandleVehicleMembrane(rb, vehicle);
     }

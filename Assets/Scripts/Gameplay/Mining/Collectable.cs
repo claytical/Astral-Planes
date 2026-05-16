@@ -104,6 +104,9 @@ public class Collectable : MonoBehaviour
     static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
     private int _dustClaimOwnerId;
+    private DustClaimManager _dustClaims;
+    private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
+    private static readonly Collider2D[] _dustProbeHits = new Collider2D[16];
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
     // ---- Autonomy (Loop Boundary "Idea") ----
@@ -635,14 +638,13 @@ private IEnumerator SpawnArrivalRoutine(
         }
     }
     private bool IsPositionInsideDust(Vector2 worldPos) {
-                // Robust: if ClosestPoint == query point, we are inside that collider.
-        var hits = Physics2D.OverlapCircleAll(worldPos, dustAdjacencyProbe); 
-        for (int i = 0; i < hits.Length; i++) {
-            var dust = hits[i] ? hits[i].GetComponent<CosmicDust>() : null; 
-            if (!dust) continue; 
-            Vector2 cp = hits[i].ClosestPoint(worldPos); 
+        int count = Physics2D.OverlapCircleNonAlloc(worldPos, dustAdjacencyProbe, _dustProbeHits);
+        for (int i = 0; i < count; i++) {
+            var dust = _dustProbeHits[i] ? _dustProbeHits[i].GetComponent<CosmicDust>() : null;
+            if (!dust) continue;
+            Vector2 cp = _dustProbeHits[i].ClosestPoint(worldPos);
             if ((cp - worldPos).sqrMagnitude < 1e-6f) return true;
-        } 
+        }
         return false;
     }
     private IEnumerator MovementRoutine()
@@ -780,9 +782,7 @@ private IEnumerator SpawnArrivalRoutine(
             // Prefer CellOf if present; otherwise your existing WorldToGridPosition is fine.
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
-            var dustClaims = FindObjectOfType<DustClaimManager>();
-            if (dustClaims != null)
-                dustClaims.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
+            GetDustClaims()?.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
 
             // Re-carve the cell at arrival time. The jail created at enqueue may have expired
             // (long step delay + travel), or the cell may have had no dust at enqueue but
@@ -975,9 +975,7 @@ private IEnumerator SpawnArrivalRoutine(
         UnregisterOccupant();
         UnregisterCarryOrbit();
         StopDustPocket();
-        var dustClaims = FindObjectOfType<DustClaimManager>();
-        if (dustClaims != null)
-            dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
+        GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
         NotifyDestroyedOnce();
     }
 
@@ -989,9 +987,7 @@ private IEnumerator SpawnArrivalRoutine(
         UnregisterOccupant();
         StopDustPocket();
         ReleaseDustPocket();
-        var dustClaims = FindObjectOfType<DustClaimManager>();
-        if (dustClaims != null)
-            dustClaims.ReleaseOwner($"Collectable#{GetInstanceID()}");
+        GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
 
         NotifyDestroyedOnce();
     } // pooling-safe

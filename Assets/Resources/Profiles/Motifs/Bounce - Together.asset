@@ -16,13 +16,15 @@ MonoBehaviour:
   displayName: Bounce Together
   keyRootMidi: 60
   entryDrumLoops:
-  - {fileID: 8300000, guid: 229ee4e306a2f4619b3e01eb63efc84d, type: 3}
+  - {fileID: 8300000, guid: 8a64f814c188d4d348ad8d4b54986a90, type: 3}
   intensityDrumLoops:
+  - {fileID: 8300000, guid: f0961db8d0c3f44f0b32ae0659286d3e, type: 3}
   - {fileID: 8300000, guid: 229ee4e306a2f4619b3e01eb63efc84d, type: 3}
   - {fileID: 8300000, guid: 76bee1efcda8f40aca1acd16839ba2c3, type: 3}
   - {fileID: 8300000, guid: 659e1c5e63a24435cb474ead32ce79a5, type: 3}
   - {fileID: 8300000, guid: d89e1873c3d7d45ae87e26f8f1755dc1, type: 3}
   - {fileID: 8300000, guid: 87150af2ac42e4e2d8ec025d5b7d9ead, type: 3}
+  intensityThresholds: []
   entryLoopCount: 1
   bpm: 175
   stepsPerLoop: 16
@@ -30,6 +32,7 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   chordProgression: {fileID: 11400000, guid: 991c67d1ca5c243d6ac378f043d7169a, type: 2}
+  alternateChordProgressionProfile: {fileID: 0}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 8d0238b52ba48444aa574c56f55c92ef, type: 2}
   - {fileID: 11400000, guid: 01400bf7515ba4097a293273fd4ec006, type: 2}
