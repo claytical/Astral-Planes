@@ -261,7 +261,6 @@ public class LocalPlayer : MonoBehaviour
         if (sceneName == "TrackSelection")
         {
             CreatePlayerSelect();
-            _playerInput.SwitchCurrentActionMap("Selection");
         }
 
         _confirmAction = _playerInput.actions["Choose"]; // use your actual action name
@@ -275,6 +274,11 @@ public class LocalPlayer : MonoBehaviour
         {
             _confirmEnabled = true;
         };
+        // Arm confirm only if no bound button is currently held.
+        // If the join button is still down, we wait for its release (canceled above).
+        // If it was already released before we got here, the first real press will confirm.
+        if (_confirmAction.ReadValue<float>() <= 0f)
+            _confirmEnabled = true;
 
         // Optional: manual note release action
         _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);
@@ -374,13 +378,11 @@ public class LocalPlayer : MonoBehaviour
 
     private void HandleConfirm()
     {
-        // If we're in the "primary tutorial gate" (post-ready, pre-game), confirm advances it.
         if (GameFlowManager.Instance != null &&
             GameFlowManager.Instance.CurrentState == GameState.Selection &&
             ControlTutorialDirector.Instance != null &&
             ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)
         {
-            // Advance (skip wait) to the next tutorial step
             ControlTutorialDirector.Instance.SkipCurrentTutorialStep();
             return;
         }
@@ -400,13 +402,11 @@ public class LocalPlayer : MonoBehaviour
                 IsReady = true;
                 if (ControlTutorialDirector.Instance != null)
                     ControlTutorialDirector.Instance.Mini_Clear(this);
-
                 GameFlowManager.Instance.CheckAllPlayersReady();
                 break;
 
             case GameState.GameOver:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
-                
                 Restart();
                 break;
         }
