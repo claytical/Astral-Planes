@@ -829,7 +829,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 0.552
+      value: 0.332
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -879,7 +879,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showUnitySynthEffect
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -1751,7 +1751,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5fc8a054b054664d86e518b31d75b7c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MidiPlayer.Run::MidiPlayerTK.MPTKEffectUnity
-  applyReverb: 0
+  applyReverb: 1
   reverbRoom: 0.9
   reverbRoomHF: 0.99
   reverbRoomLF: 1
@@ -2161,7 +2161,7 @@ PrefabInstance:
     - target: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

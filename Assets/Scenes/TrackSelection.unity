@@ -939,12 +939,20 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Join
         m_Flags: 0
-      - m_Name: 
+      - m_Name:
         m_Id: 529c4061-3fc2-4643-8a1c-177a8adad720
         m_Path: <Gamepad>/buttonEast
-        m_Interactions: 
-        m_Processors: 
-        m_Groups: 
+        m_Interactions:
+        m_Processors:
+        m_Groups:
+        m_Action: Join
+        m_Flags: 0
+      - m_Name:
+        m_Id: b8e4f2a1-d3c5-4e67-9f1d-2a8b5c0e7d43
+        m_Path: <Gamepad>/buttonSouth
+        m_Interactions:
+        m_Processors:
+        m_Groups:
         m_Action: Join
         m_Flags: 0
       m_Flags: 0

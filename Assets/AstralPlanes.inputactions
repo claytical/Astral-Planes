@@ -49,7 +49,7 @@
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": true
+                    "initialStateCheck": false
                 },
                 {
                     "name": "Leave",
@@ -119,7 +119,7 @@
                     "name": "",
                     "id": "7d273e39-804a-473b-8b09-75298a288889",
                     "path": "<Gamepad>/buttonSouth",
-                    "interactions": "Hold",
+                    "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Choose",
@@ -151,10 +151,10 @@
                 {
                     "name": "",
                     "id": "ba47cf2c-4c5d-4404-a4f8-97b7a0878a5f",
-                    "path": "<Gamepad>/buttonSouth",
+                    "path": "<Keyboard>/escape",
                     "interactions": "",
                     "processors": "",
-                    "groups": "Generic Gamepad",
+                    "groups": "",
                     "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -232,17 +232,6 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Join",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "bcf7da95-c80f-4db8-895d-62df972d2984",
-                    "path": "<Gamepad>/buttonSouth",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Generic Gamepad",
                     "action": "Join",
                     "isComposite": false,
                     "isPartOfComposite": false
