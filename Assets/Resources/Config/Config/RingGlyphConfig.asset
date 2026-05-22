@@ -34,3 +34,9 @@ MonoBehaviour:
   bouncePressDuration: 0.25
   bounceSettleDuration: 0.35
   rollOffDuration: 2
+  ringAppearDuration: 0.1
+  noteLaunchLeadSteps: 2
+  launchSfx: {fileID: 8300000, guid: 474d3fbcec9f0da499e11f859b18cc5b, type: 3}
+  launchSfxVolume: 0.6
+  spinOffExtraDegPerSec: 720
+  spinOffDuration: 0.45

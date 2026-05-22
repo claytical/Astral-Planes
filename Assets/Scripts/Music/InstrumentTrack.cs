@@ -897,8 +897,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // the entire burst is complete (IsBinFilled). Log on step 0 to avoid spam.
             if (localStep == 0 && globalBin < loopMultiplier && !IsBinFilled(globalBin) && HasAnyNoteInBin(globalBin))
                 Debug.Log($"[TRK:BIN_UNFILLED] track={name} bin={globalBin} — notes present but burst incomplete; audio suppressed.");
+            if (localStep == 0)
+                Debug.Log($"[SYNC] {name} BLOCKED bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
             return;
         }
+
+        if (localStep == 0)
+            Debug.Log($"[SYNC] {name} PLAYING bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
 
         int trackBin = globalBin;
         if (!HasAnyNoteInBin(trackBin)) return;
@@ -1073,9 +1078,18 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Commit the audible span to match filled bins.
         SyncSpanFromBins();
 
+        // Force cache rebuild so PlayLoopedNotesInBin hears this bin immediately.
+        if (filled) _loopCacheDirtyPending = true;
+
         if (filled) OnBinFilled?.Invoke(this, bin);
     }
-    private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0f;
+    // Use clip length (one bar), not the full effective-leader length, so that
+    // LeaderLengthSec() and TimeInLeader() measure the right cycle. Using
+    // GetLoopLengthInSeconds() here caused a 3× compounding error: e.g. with a
+    // 3-bin leader, BaseLoopSeconds returned 3×clipLen and LeaderMultiplier
+    // returned 3 again, giving a 9-bar "leader" period — notes on a 1-bin track
+    // were trimmed to 10 ms for 2 of every 3 leader loops (inaudible).
+    private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);
     private int   MyMultiplier()     => Mathf.Max(1, loopMultiplier);
     private float TimeSinceStart() =>
@@ -1083,10 +1097,18 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private float LeaderLengthSec() =>
         BaseLoopSeconds() * LeaderMultiplier();
     private float TimeInLeader() {
+        if (drumTrack == null) return 0f;
         float L = LeaderLengthSec();
         if (L <= 0f) return 0f;
-        float t = TimeSinceStart();
-        return t % L;
+        // Anchor to leaderStartDspTime (the rolling loop boundary) so this resets to
+        // 0 at each actual boundary. Using startDspTime caused drift: if leaderStartDspTime
+        // advanced by more than 1 bar relative to startDspTime, Groove's 1-bar window
+        // appeared to have already expired, trimming every note to 10 ms (inaudible).
+        double anchor = drumTrack.leaderStartDspTime > 0.0
+            ? drumTrack.leaderStartDspTime
+            : drumTrack.startDspTime;
+        float elapsed = Mathf.Max(0f, (float)(AudioSettings.dspTime - anchor));
+        return elapsed % L;
     }
     public int ForceDestroyCollectablesInFlight(string reason)
     {
@@ -1339,6 +1361,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         ? chord.rootNote - authoredRootMidi
         : chord.rootNote - baseChord.rootNote;
 
+    if (Mathf.Abs(rootDelta) > 3)
+        Debug.LogWarning($"[QUANTIZE:DELTA] track={name} step={stepIndex} note={midiNote} chord.root={chord.rootNote} authoredRoot={authoredRootMidi} rootDelta={rootDelta}");
+
     bool noteAlreadyInTargetChord = false;
     if (chord.intervals != null && chord.intervals.Count > 0)
     {
@@ -1587,8 +1612,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         {
             int binIdx    = BinIndexForStep(finalTargetStep);
             int localStep = finalTargetStep % Mathf.Max(1, BinSize());
-            var ns        = GetNoteSetForBin(binIdx);
-            if (ns != null) authoredRootMidi = ns.GetAuthoredRootMidi(localStep);
+            // Only use the bin-specific NoteSet's authoredRootMidi — falling back to
+            // _currentNoteSet (bin 0) for a different bin causes rootDelta ≠ 0 and
+            // shifts non-chord tones to the wrong octave.
+            if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
+                authoredRootMidi = _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
         }
         // IMPORTANT: this is what feeds the audible loop.
         CollectNote(finalTargetStep, note, durationTicks, force, authoredRootMidi);
@@ -1663,7 +1691,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 controller.AdvanceOtherTrackCursors(this, 1); // silence = absence on others
 
             // --- E) Loop-based fuse for ascension (note markers rising) ---
-            int binCount = BinSize();
+            int binCount = loopMultiplier; // bin count, not step count
 
             int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
 
@@ -1853,10 +1881,17 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int collectedMidi = collectable.GetNote();
 
         // Anchor authoredRootMidi to the chord that was active at the authored bin.
-        // QuantizeNoteToBinChord uses rootDelta = (targetChordRoot - authoredRootMidi), so
-        // this must reflect which chord the collectable was spawned under, not the I-chord static field.
-        int rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi); // fallback
-        if (rootShiftNotesByChord && authoredAbs >= 0)
+        // Prefer the bin-specific NoteSet's stored authoredRootMidi (set by NoteSetFactory to
+        // the exact bin chord root), so QuantizeNoteToBinChord sees rootDelta = 0.
+        // Fall back to HarmonyDirector nudging only when no bin-specific NoteSet is available.
+        int rootInRegister = int.MinValue;
+        if (authoredAbs >= 0)
+        {
+            int authoredBin = BinIndexForStep(authoredAbs);
+            if (_binNoteSets != null && authoredBin >= 0 && authoredBin < _binNoteSets.Length && _binNoteSets[authoredBin] != null)
+                rootInRegister = _binNoteSets[authoredBin].GetAuthoredRootMidi(authoredLocal);
+        }
+        if (rootInRegister == int.MinValue && rootShiftNotesByChord && authoredAbs >= 0)
         {
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var hd = _gfm?.harmony;
@@ -1873,6 +1908,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 }
             }
         }
+        if (rootInRegister == int.MinValue)
+            rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi);
 
         var pending = new Vehicle.PendingCollectedNote
         {
@@ -1943,6 +1980,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                     filledBin = b;
 
                 SetBinFilled(filledBin, true);
+                controller?.ResyncLeaderBinsNow();
 
                 // VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately
                 if (controller != null && controller.noteVisualizer != null && drumTrack != null)
@@ -2045,6 +2083,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (_burstWroteBin.TryGetValue(burstId, out var filledBin))
         {
             SetBinFilled(filledBin, true);
+            controller?.ResyncLeaderBinsNow();
 
             if (controller?.noteVisualizer != null && drumTrack != null)
             {
@@ -2077,6 +2116,37 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         _burstTargetBin.Remove(burstId);
 
         OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
+    }
+
+    /// <summary>
+    /// Called at each loop boundary: if a bin has notes in the persistent loop but is still
+    /// marked unfilled AND no live collectables for that bin remain in the world, the burst
+    /// tracking counter drifted — resolve it now so audio unblocks within 1 boundary.
+    /// </summary>
+    public void ResolveStrandedBursts()
+    {
+        for (int b = 0; b < maxLoopMultiplier; b++)
+        {
+            if (IsBinFilled(b)) continue;
+            if (!HasAnyNoteInBin(b)) continue;
+            bool hasLiveCollectable = false;
+            for (int i = 0; i < spawnedCollectables.Count; i++)
+            {
+                var go = spawnedCollectables[i];
+                if (go == null) continue;
+                if (go.TryGetComponent<Collectable>(out var c) && c.intendedBin == b)
+                {
+                    hasLiveCollectable = true;
+                    break;
+                }
+            }
+            if (!hasLiveCollectable)
+            {
+                Debug.Log($"[SYNC:RESOLVE] {name} bin={b} has notes but unfilled with no live collectables — resolving.");
+                SetBinFilled(b, true);
+                controller?.ResyncLeaderBinsNow();
+            }
+        }
     }
 
     /// <summary>True if there is already a persistent note committed at the given absolute step.</summary>
@@ -2261,6 +2331,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             return;
         }
 
+        if (RemainingActiveWindowSec() <= 0f)
+            Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
         midiVoice.PlayNoteTicks(note, durationTicks, velocity);
     }
     public void RetuneLoopToChord(Chord chord)
@@ -2751,7 +2823,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
 
         int note = noteSet.GetNoteForPhaseAndRole(this, step);
-        int dur = CalculateNoteDurationFromSteps(step, noteSet);
+        int dur;
+        if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
+            dur = CalculateNoteDurationFromSteps(step, noteSet);
 
         int absStep = targetBin * binSize + step;
 
@@ -2997,7 +3071,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (!usedAbsSteps.Add(absStep)) continue;
 
             int note = noteSet.GetNoteForPhaseAndRole(this, step);
-            int dur  = CalculateNoteDurationFromSteps(step, noteSet);
+            int dur;
+            if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
+                dur = CalculateNoteDurationFromSteps(step, noteSet);
 
             float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
 
@@ -3340,7 +3416,8 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     private int CollectNote(int stepIndex, int note, int durationTicks, float force, int authoredRootMidi = int.MinValue)
     {
-        Debug.Log($"[COLLECT] Adding Note {note} to Loop at Index {stepIndex} for {durationTicks}");
+        int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
+        Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
 

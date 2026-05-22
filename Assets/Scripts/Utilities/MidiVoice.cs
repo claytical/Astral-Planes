@@ -110,6 +110,8 @@ public class MidiVoice : MonoBehaviour
             if (!float.IsPositiveInfinity(remainSec) && remainSec < float.MaxValue)
             {
                 int maxMs = Mathf.Max(10, Mathf.FloorToInt(remainSec * 1000f));
+                if (durationMs != Mathf.Min(durationMs, maxMs))
+                    Debug.Log($"[MIDI:TRIM] note={note} durationMs={durationMs} → {maxMs} (remainSec={remainSec:F3})");
                 durationMs = Mathf.Min(durationMs, maxMs);
             }
         }

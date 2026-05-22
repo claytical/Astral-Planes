@@ -25,7 +25,11 @@ public partial class GameFlowManager
     private void OnDestroy()
     {
         if (Instance == this)
+        {
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            if (phaseTransitionManager != null)
+                phaseTransitionManager.OnMotifChanged -= OnMotifChangedHandler;
+        }
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)

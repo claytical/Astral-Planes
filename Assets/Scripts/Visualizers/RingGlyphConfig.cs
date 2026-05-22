@@ -86,4 +86,23 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Seconds for the ring to slide from center to off the left edge at the second loop boundary.")]
     public float rollOffDuration = 1.5f;
+
+    [Tooltip("Duration for the quick ring appear animation (dipped contour drawn in fast).")]
+    public float ringAppearDuration = 0.1f;
+
+    [Tooltip("Steps before the note's beat to launch the travel dot, so it arrives at the dip on the beat.")]
+    public int noteLaunchLeadSteps = 2;
+
+    [Tooltip("Percussive AudioClip played when a note travel dot launches.")]
+    public AudioClip launchSfx;
+
+    [Range(0f, 1f)]
+    [Tooltip("Volume for the launch SFX.")]
+    public float launchSfxVolume = 0.6f;
+
+    [Tooltip("Additional degrees/sec applied to the ring's rotation during the spin-off exit.")]
+    public float spinOffExtraDegPerSec = 720f;
+
+    [Tooltip("Duration of the spin-off exit in seconds (replaces rollOffDuration for gameplay rings).")]
+    public float spinOffDuration = 0.45f;
 }

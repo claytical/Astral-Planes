@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: lead-bounce
   roleProfile: {fileID: 11400000, guid: 88ba87390b412400b88142811cf0e3ba, type: 2}
-  riff: {fileID: 11400000, guid: 790b753a73ac84c8bb4cf005296fc9db, type: 2}
+  riff: {fileID: 11400000, guid: e58b3a11250e04ebcb57daafbf32de7f, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []
   patterns: []

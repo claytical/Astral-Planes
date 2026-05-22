@@ -21,7 +21,7 @@ public class MarkerLight : MonoBehaviour
     {
         if (sr) sr.color = color;
         Color c = sr.color;
-        c.a = .3f;
+        c.a = .75f;
         sr.color = c;
     }
     public void SetAvailable(Color color)

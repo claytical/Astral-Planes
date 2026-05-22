@@ -370,6 +370,7 @@ public sealed class SceneFlowCoordinator
         if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
             yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
 
+        _gameFlow.SpawnVehicleTraps(_gameFlow.phaseTransitionManager?.currentMotif);
         drums.RequestPhaseStar(starCell);
         dust.ResetMazeGenerationFlag();
     }

@@ -43,7 +43,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     [Header("Copy (Instruction -> Label)")]
     [SerializeField] private string driftText  = "Fly";
     [SerializeField] private string boostText  = "Push";
-    [SerializeField] private string releaseText = "Commit";
+    [SerializeField] private string releaseText = "Press";
 
     [Header("Tint")]
     [SerializeField] private Color baseTint      = new Color(1f, 1f, 1f, 0.55f);

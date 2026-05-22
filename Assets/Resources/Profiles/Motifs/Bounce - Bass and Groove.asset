@@ -24,7 +24,12 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 659e1c5e63a24435cb474ead32ce79a5, type: 3}
   - {fileID: 8300000, guid: d89e1873c3d7d45ae87e26f8f1755dc1, type: 3}
   - {fileID: 8300000, guid: 87150af2ac42e4e2d8ec025d5b7d9ead, type: 3}
-  intensityThresholds: []
+  intensityThresholds:
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
   entryLoopCount: 0
   bpm: 175
   stepsPerLoop: 16
@@ -40,3 +45,9 @@ MonoBehaviour:
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1
+  spawnVehicleTrap: 1
+  trapShape: 0
+  trapRadius: 10
+  trapGrowSeconds: 0.4
+  trapRole: 4
+  trapHardness01: 0.5
