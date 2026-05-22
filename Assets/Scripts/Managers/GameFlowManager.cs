@@ -202,6 +202,8 @@ public partial class GameFlowManager : MonoBehaviour
             { "TrackSelection", HandleTrackSelectionSceneSetup },
         };
 
+        if (phaseTransitionManager != null)
+            phaseTransitionManager.OnMotifChanged += OnMotifChangedHandler;
     }
     
     public void QuitToSelection()
@@ -645,7 +647,8 @@ public partial class GameFlowManager : MonoBehaviour
     if (vehiclePhaseInDelaySeconds > 0f)
         yield return new WaitForSeconds(vehiclePhaseInDelaySeconds);
 
-    // ── 6) Spawn star (off-screen entry via EnterFromOffScreen) ───────────────
+    // ── 6) Spawn vehicle traps then star ──────────────────────────────────────
+    SpawnVehicleTraps(phaseTransitionManager?.currentMotif);
     drums.RequestPhaseStar(starCell);
     dust.ResetMazeGenerationFlag();
 }
@@ -797,6 +800,79 @@ public partial class GameFlowManager : MonoBehaviour
             var fx = Instantiate(vehiclePhaseInFxPrefab, v.transform.position, Quaternion.identity);
             fx.Play();
             Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
+        }
+    }
+
+    private void OnMotifChangedHandler(MotifProfile oldMotif, MotifProfile newMotif)
+    {
+        if (!_setupDone) return;
+        SpawnVehicleTraps(newMotif);
+    }
+
+    public void SpawnVehicleTraps(MotifProfile motif)
+    {
+        if (motif == null || !motif.spawnVehicleTrap)
+        {
+            Debug.Log($"[TRAP] SpawnVehicleTraps skipped: motif={motif?.motifId ?? "null"} spawnVehicleTrap={motif?.spawnVehicleTrap}");
+            return;
+        }
+        if (dustGenerator == null || activeDrumTrack == null)
+        {
+            Debug.LogWarning($"[TRAP] SpawnVehicleTraps skipped: dustGenerator={dustGenerator} activeDrumTrack={activeDrumTrack}");
+            return;
+        }
+
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(motif.trapRole);
+        Color roleColor = roleProfile != null ? roleProfile.GetBaseColor() : Color.white;
+
+        var allVehicles = vehicles != null && vehicles.Count > 0
+            ? vehicles
+            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+
+        Debug.Log($"[TRAP] SpawnVehicleTraps motif={motif.motifId} shape={motif.trapShape} radius={motif.trapRadius} vehicles={allVehicles.Count}");
+
+        for (int i = 0; i < allVehicles.Count; i++)
+        {
+            var v = allVehicles[i];
+            if (v == null || !v.isActiveAndEnabled) continue;
+            Vector2Int center = activeDrumTrack.WorldToGridPosition(v.transform.position);
+            Debug.Log($"[TRAP] Spawning trap around vehicle[{i}] at grid {center}");
+
+            if (motif.trapShape == TrapShape.Circle)
+            {
+                int inner = Mathf.Max(0, motif.trapRadius - 1);
+                int processed = dustGenerator.GrowVoidDustDiskFromGrid(
+                    centerGP: center,
+                    outerRadiusCells: motif.trapRadius,
+                    imprintRole: motif.trapRole,
+                    hueRgb: roleColor,
+                    imprintHardness01: motif.trapHardness01,
+                    energyAtCenter01: 1f,
+                    falloffExp: 1f,
+                    growInSeconds: motif.trapGrowSeconds,
+                    fillWedges01To4: 4,
+                    vehicleCells: null,
+                    vehicleNoSpawnRadiusCells: 0,
+                    innerRadiusCellsExclusive: inner);
+                Debug.Log($"[TRAP] GrowVoidDustDiskFromGrid processed={processed} center={center} outer={motif.trapRadius} inner={inner}");
+            }
+            else
+            {
+                int r = motif.trapRadius;
+                var perimeter = new List<Vector2Int>(r * 8);
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    perimeter.Add(new Vector2Int(center.x + dx, center.y + r));
+                    perimeter.Add(new Vector2Int(center.x + dx, center.y - r));
+                }
+                for (int dy = -r + 1; dy <= r - 1; dy++)
+                {
+                    perimeter.Add(new Vector2Int(center.x - r, center.y + dy));
+                    perimeter.Add(new Vector2Int(center.x + r, center.y + dy));
+                }
+                dustGenerator.SpawnDustAtCells(perimeter, motif.trapRole, roleColor,
+                    motif.trapHardness01, 1f, motif.trapGrowSeconds);
+            }
         }
     }
 

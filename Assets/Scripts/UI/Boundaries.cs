@@ -104,6 +104,8 @@ public class Boundaries : MonoBehaviour
         yield return null;
         Debug.Log("[BOUNDARIES] Aligning to NoteViz");
         AlignBottomToVisualizer(GameFlowManager.Instance.noteViz);
+        // Re-lock DrumTrack play area now that Canvas layout is final and the anchor Y is valid.
+        GameFlowManager.Instance?.activeDrumTrack?.RefreshPlayAreaLock();
     }
 
     private void AlignBottomToVisualizer(NoteVisualizer viz)

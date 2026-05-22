@@ -112,9 +112,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
   minContactTime: 0.01
   colorTransitionTime: 0.5
-  tentacleGrowSpeed: 0.5
+  tentacleGrowSpeed: 0.25
   tentacleRetractSpeed: 5
-  tentacleFlowSpeed: 1
+  tentacleFlowSpeed: 0.2
   tentacleWidth: 0.03
   dissolveDuration: 1
   fallbackTentaclesPerRole: 10

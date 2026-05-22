@@ -65,6 +65,9 @@ public class DrumTrack : MonoBehaviour
     [Tooltip("Bottom UI padding in pixels to exclude from the grid area (e.g., 160).")] [SerializeField]
     private int uiBottomPaddingPx = 160;
 
+    [Tooltip("Optional RectTransform whose top world-Y overrides uiBottomPaddingPx for grid bottom — set to NoteVisualizer RT for pixel-perfect alignment with the physical boundary.")]
+    [SerializeField] private RectTransform _playAreaBottomAnchor;
+
     [Tooltip("If true, DrumTrack will resize SpawnGrid at runtime to fill the usable screen.")] [SerializeField]
     private bool autoSizeSpawnGridToScreen = true;
 
@@ -212,6 +215,14 @@ public class DrumTrack : MonoBehaviour
 				? Mathf.Lerp(-halfH, halfH, uiBotV)
 				: cam.ViewportToWorldPoint(new Vector3(0f, uiBotV, z)).y;
 			bottom = Mathf.Max(bottom, uiBottomWorld);
+		}
+		if (_playAreaBottomAnchor != null)
+		{
+			var corners = new Vector3[4];
+			_playAreaBottomAnchor.GetWorldCorners(corners);
+			// Only override when Canvas layout has been applied (rect has non-zero width).
+			if (corners[2].x - corners[0].x > 0.001f)
+				bottom = corners[1].y;  // top-left corner — same source as NoteVisualizer.GetTopWorldY()
 		}
 		// Validate.
 		if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
@@ -1475,6 +1486,11 @@ public class DrumTrack : MonoBehaviour
                Mathf.Abs(a.right - b.right) < eps &&
                Mathf.Abs(a.bottom - b.bottom) < eps &&
                Mathf.Abs(a.top - b.top) < eps;
+    }
+    public void RefreshPlayAreaLock()
+    {
+        _hasLockedPlayArea = false;
+        TryGetPlayAreaWorld(out _);
     }
     public void SyncTileWithScreen()
     {

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum TrapShape { Circle, Box }
+
 /// <summary>
 /// A complete musical motif: beat mood + chord progression + role strategies + per-role NoteSet configs.
 /// This is what a PhaseStar should reference.
@@ -66,6 +68,18 @@ public class MotifProfile : ScriptableObject
 
     [Tooltip("If true, drums are driven by player energy expenditure through beatProfileSequence.")]
     public bool driveBeatsFromEnergy = true;
+
+    [Header("Vehicle Trap")]
+    [Tooltip("If true, a ring or box of CosmicDust spawns around each vehicle when this motif begins.")]
+    public bool spawnVehicleTrap = false;
+    public TrapShape trapShape = TrapShape.Circle;
+    [Min(1), Tooltip("Ring radius in grid cells (circle) or half-side length (box).")]
+    public int trapRadius = 3;
+    [Min(0.01f)] public float trapGrowSeconds = 0.4f;
+    [Tooltip("MusicalRole assigned to trap dust. Affects color and pluck sound.")]
+    public MusicalRole trapRole = MusicalRole.None;
+    [Range(0f, 1f)] public float trapHardness01 = 0.5f;
+
     private void OnValidate() {
         if (beatIntroCount < 0) beatIntroCount = 0;
         if (entryDrumLoops == null) entryDrumLoops = new List<AudioClip>();

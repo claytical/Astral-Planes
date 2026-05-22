@@ -40,8 +40,13 @@ MonoBehaviour:
   chordProgression: {fileID: 11400000, guid: 2dbd76c1bfa6c49569e90a5939007775, type: 2}
   alternateChordProgressionProfile: {fileID: 0}
   roleNoteConfigs:
-  - {fileID: 11400000, guid: bd93d1e00f28144d29f7858ce75ba73a, type: 2}
-  - {fileID: 11400000, guid: f697ea234c7d147239524534ec7c8bce, type: 2}
+  - {fileID: 11400000, guid: e5c6d92508fe04aa3af50a206feb02e3, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1
+  spawnVehicleTrap: 1
+  trapShape: 1
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 1
+  trapHardness01: 0.1

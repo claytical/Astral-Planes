@@ -981,6 +981,11 @@ public class InstrumentTrackController : MonoBehaviour
         {
             if (t == null) continue;
 
+            // Safety: if a bin has notes in the persistent loop but the burst-remaining
+            // counter drifted (e.g. a collectable was collected via a secondary path),
+            // resolve the fill now so audio unblocks within 1 boundary instead of never.
+            t.ResolveStrandedBursts();
+
             int trackSteps = Mathf.Max(1, t.GetTotalSteps()); // <- NO extra * loopMultiplier
             // Map [0..endLeader) from leader-space into this track’s local modulus
             int endTrack = Mathf.Clamp(endLeader, 1, trackSteps);

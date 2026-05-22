@@ -159,16 +159,18 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     const int ticksPerQuarter = 480;
     int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar); // 120 ticks/step
 
-    // Use this bin's chord root as the transpose anchor so each bin produces
-    // the note that belongs to its chord slot in the progression.
-    // Use chordSeq[0].rootNote (= keyRootMidi, always correct) as the authoring anchor
-    // rather than riff.authoredRootMidi, which defaults to 0 in Unity's Inspector when
-    // not explicitly set — making delta wildly wrong (e.g. 65 - 0 = 65 → midi 125).
+    // Transpose riff notes to the current bin's chord root. normalizedTarget is clamped
+    // into the authored anchor's octave [authoredAnchor, authoredAnchor+11] so chord
+    // progressions that store roots in a different register don't cause octave jumps.
+    // authoredRootMidi = targetRoot (stored below) keeps QuantizeNoteToBinChord rootDelta = 0.
     int authoredAnchor = (chordSeq != null && chordSeq.Count > 0) ? chordSeq[0].rootNote : rootMidi;
     int targetRoot = (chordSeq != null && chordSeq.Count > 0)
         ? chordSeq[binIndex % chordSeq.Count].rootNote
         : rootMidi;
-    int delta = targetRoot - authoredAnchor + (riff.octaveShift * 12);
+    int normalizedTarget = targetRoot;
+    while (normalizedTarget > authoredAnchor + 11) normalizedTarget -= 12;
+    while (normalizedTarget < authoredAnchor)       normalizedTarget += 12;
+    int delta = normalizedTarget - authoredAnchor + riff.octaveShift * 12;
 
     Debug.Log(
         $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} authoredAnchor={authoredAnchor} " +
@@ -184,23 +186,12 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
 
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
-        int midi = e.midiNote + delta; // delta = (binChordRoot - riff.authoredRootMidi) + octaveShift
+        int midi = e.midiNote + delta; // (normalizedBinChordRoot - authoredAnchor) + octaveShift
 
         if (riff.clampToTrackRange)
             midi = Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote);
 
         int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
-
-        // Optional overlap clamp (within this one authored sequence)
-        if (riff.overlapPolicy == RiffOverlapPolicy.ClampToNextOnset && i < ordered.Count - 1)
-        {
-            int nextStep = ordered[i + 1].step;
-            if (nextStep > step)
-            {
-                int maxSteps = nextStep - step;
-                durTicks = Mathf.Min(durTicks, maxSteps * ticksPerStep);
-            }
-        }
 
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;
         // Store targetRoot as authoredRootMidi so QuantizeNoteToBinChord computes

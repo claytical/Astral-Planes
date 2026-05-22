@@ -520,6 +520,46 @@ public class CosmicDustGenerator : MonoBehaviour
         return processed;
     }
 
+    public void SpawnDustAtCells(
+        IReadOnlyList<Vector2Int> cells,
+        MusicalRole role, Color hue, float hardness01, float energy01, float growInSeconds)
+    {
+        if (cells == null || cells.Count == 0) return;
+        EnsureCellGrid();
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>(256);
+        const float kMinVisibleAlpha = 0.55f;
+        Color c = hue;
+        c.a = Mathf.Max(energy01, kMinVisibleAlpha);
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            var gp = cells[i];
+            if (!IsInBounds(gp)) continue;
+            _imprints[gp] = new DustImprint { color = c, hardness01 = hardness01, role = role };
+
+            if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
+                existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
+                existingDust != null && HasDustAt(gp))
+            {
+                existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
+                var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
+                existingDust.clearing.carveResistance01 = res.carveResistance01;
+                existingDust.clearing.drainResistance01 = res.drainResistance01;
+                continue;
+            }
+
+            if (_permanentClearCells.Contains(gp)) continue;
+            if (IsKeepClearCell(gp)) continue;
+            if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
+            if (IsDustSpawnBlocked(gp)) continue;
+            if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp)) continue;
+
+            _voidGrowCells.Add(gp);
+            _regrowthScheduler.VoidGrowCoroutines[gp] =
+                StartCoroutine(VoidGrowCellNow(gp, role, c, growInSeconds));
+        }
+    }
+
     private void StopActiveStaggeredGrowth()
     {
         if (_spawnRoutine != null)
