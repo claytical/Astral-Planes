@@ -890,13 +890,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         int globalBin = WrapIndex(playheadBin, Mathf.Max(1, leaderBins));
 
         // Silence if leader is ahead of this track's allocated extent,
-        // or if this bin's burst is still in flight (allocated-but-unfilled).
-        if (globalBin >= loopMultiplier || !IsBinFilled(globalBin))
+        // or if the bin has no committed notes yet.
+        if (globalBin >= loopMultiplier || !HasAnyNoteInBin(globalBin))
         {
-            // Visual markers light as each note is collected, but audio is suppressed until
-            // the entire burst is complete (IsBinFilled). Log on step 0 to avoid spam.
-            if (localStep == 0 && globalBin < loopMultiplier && !IsBinFilled(globalBin) && HasAnyNoteInBin(globalBin))
-                Debug.Log($"[TRK:BIN_UNFILLED] track={name} bin={globalBin} — notes present but burst incomplete; audio suppressed.");
             if (localStep == 0)
                 Debug.Log($"[SYNC] {name} BLOCKED bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
             return;

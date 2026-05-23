@@ -41,3 +41,9 @@ MonoBehaviour:
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1
+  spawnVehicleTrap: 0
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 4
+  trapHardness01: 0.5
