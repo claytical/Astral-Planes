@@ -16,7 +16,7 @@ MonoBehaviour:
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
   manualReleaseUseArmLock: 1
-  manualReleaseArmAheadSteps: 8
+  manualReleaseArmAheadSteps: 1
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 1
   plowTickSeconds: 0.06

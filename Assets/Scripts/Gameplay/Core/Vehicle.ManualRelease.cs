@@ -73,10 +73,26 @@ public partial class Vehicle
 
             if (crossed || fwd <= vehicleConfig.manualReleaseAutoCommitEpsSteps)
             {
+                bool cancelHoldArm = _lastArmWasFromHold && !_releaseButtonHeld;
+                _lastArmWasFromHold = false;
+
+                if (cancelHoldArm)
+                {
+                    _armedReleases.Dequeue();
+                    _pendingNotes.Enqueue(armed);
+                    spokenFor.Remove(a.targetAbsStep);
+                    return;
+                }
+
                 CommitManualReleaseAtStep(armed, a.targetAbsStep, a.releaseVelocity);
                 if (_armedReleases.Count == 0) return;
                 _armedReleases.Dequeue();
                 spokenFor.Remove(a.targetAbsStep);
+                if (_releaseButtonHeld && _armedReleases.Count == 0 && _pendingNotes.Count > 0)
+                {
+                    TryReleaseQueuedNote();
+                    _lastArmWasFromHold = _armedReleases.Count > 0;
+                }
             }
 
             _lastRawAbsStep = rawAbs;

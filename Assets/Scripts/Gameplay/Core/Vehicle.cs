@@ -72,6 +72,13 @@ public partial class Vehicle : MonoBehaviour
     private NoteTether _vehicleTether;
     private double _lastRawAbsStep = 0.0;
     private bool _hasLastRawAbsStep = false;
+    private bool _releaseButtonHeld;
+    private bool _lastArmWasFromHold;
+
+    public void SetReleaseButtonHeld(bool held)
+    {
+        _releaseButtonHeld = held;
+    }
 
     [Header("Release Cue")]
     [Tooltip("Optional VehicleReleaseCue component on this vehicle (or a child). Drives the ring fill and beat-dot countdown.")]
@@ -108,6 +115,8 @@ public partial class Vehicle : MonoBehaviour
     {
         _pendingNotes.Clear();
         _armedReleases.Clear();
+        _releaseButtonHeld = false;
+        _lastArmWasFromHold = false;
         DestroyVehicleTether();
     }
 

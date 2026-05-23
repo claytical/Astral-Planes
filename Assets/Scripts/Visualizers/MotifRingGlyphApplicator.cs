@@ -923,8 +923,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             : notes.OrderBy(n => n.Step % leaderSteps).ToList();
 
         // Shared tween state — updated by each note's onLaunch callback.
-        var      revealedNotes = new List<MotifSnapshot.NoteEntry>();
-        Coroutine contourTween = null;
+        var      revealedNotes  = new List<MotifSnapshot.NoteEntry>();
+        Coroutine contourTween  = null;
+        bool contourSettled     = sortedNotes.Count == 0;
 
         foreach (var note in sortedNotes)
         {
@@ -956,9 +957,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                     var targetPts = targetPoly?.Points;
                     if (targetPts != null)
                     {
+                        contourSettled = false;
                         if (contourTween != null) StopCoroutine(contourTween);
                         contourTween = StartCoroutine(
-                            TweenContour(ring.Contour, targetPts, config.noteTravelDuration));
+                            TweenContour(ring.Contour, targetPts, config.noteTravelDuration,
+                                onComplete: () => contourSettled = true));
                     }
                 }));
         }
@@ -978,6 +981,18 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             }
             ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             binElapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Don't advance to Phase 3 until every note has fired and the last curvature tween settles.
+        while ((!contourSettled || revealedNotes.Count < sortedNotes.Count) && !shouldStop())
+        {
+            if (ring.Root == null)
+            {
+                _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
+                yield break;
+            }
+            ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
 
@@ -1030,7 +1045,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         StartCoroutine(TravelNoteDot(dotWorld, ringTransform, tugLocal, travelDuration, dotColor));
     }
 
-    private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration)
+    private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration,
+        System.Action onComplete = null)
     {
         if (lr == null || to == null || lr.positionCount != to.Count) yield break;
         var from = new List<Vector2>(lr.positionCount);
@@ -1052,6 +1068,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             yield return null;
         }
         ApplyContourPoints(lr, to);
+        onComplete?.Invoke();
     }
 
     private static void ApplyContourPoints(LineRenderer lr, List<Vector2> pts)

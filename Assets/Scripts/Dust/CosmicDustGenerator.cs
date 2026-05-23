@@ -1776,7 +1776,7 @@ private void AssignHiddenImprintsByNearestSeed(
     // - Visual fade duration comes from zapFadeSeconds tuning.
     public void ZapCell(Vector2Int cell)
     {
-        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, zapFadeSeconds, true, zapRegrowDelaySeconds, false);
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, zapFadeSeconds, true, zapRegrowDelaySeconds, true);
         ClearCellByInteraction(cell, req);
     }
 

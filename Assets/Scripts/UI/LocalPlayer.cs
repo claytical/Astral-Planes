@@ -287,7 +287,15 @@ public class LocalPlayer : MonoBehaviour
             _releaseAction.performed += ctx =>
             {
                 if (plane != null)
+                {
                     plane.TryReleaseQueuedNote();
+                    plane.SetReleaseButtonHeld(true);
+                }
+            };
+            _releaseAction.canceled += ctx =>
+            {
+                if (plane != null)
+                    plane.SetReleaseButtonHeld(false);
             };
         }
     }
@@ -369,10 +377,19 @@ public class LocalPlayer : MonoBehaviour
             else if (Keyboard.current.spaceKey.wasReleasedThisFrame)
                 plane.TurnOffBoost();
 
-            // Enter / numpad Enter = release note.
-            if (Keyboard.current.enterKey.wasPressedThisFrame ||
-                Keyboard.current.numpadEnterKey.wasPressedThisFrame)
-                plane.TryReleaseQueuedNote();
+            // Enter / numpad Enter = release note (fallback only when no Input Action is bound).
+            if (_releaseAction == null)
+            {
+                if (Keyboard.current.enterKey.wasPressedThisFrame ||
+                    Keyboard.current.numpadEnterKey.wasPressedThisFrame)
+                {
+                    plane.TryReleaseQueuedNote();
+                    plane.SetReleaseButtonHeld(true);
+                }
+                if (Keyboard.current.enterKey.wasReleasedThisFrame ||
+                    Keyboard.current.numpadEnterKey.wasReleasedThisFrame)
+                    plane.SetReleaseButtonHeld(false);
+            }
         }
     }
 
