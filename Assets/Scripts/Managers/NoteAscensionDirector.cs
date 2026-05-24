@@ -456,10 +456,22 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         }
 
         // Highest bin is empty on all tracks — collapse every track that owns it.
+        // Skip any track that is mid-expansion; the expand and a concurrent collapse would
+        // net zero at the next boundary and send the staged burst to the wrong bin.
         Debug.Log($"[ASCENSION] Highest bin {globalMaxMult - 1} empty on all tracks — collapsing loop by 1.");
         foreach (var t in ctrl.tracks)
-            if (t != null && t.loopMultiplier >= globalMaxMult)
+        {
+            if (t == null) continue;
+            if (t.IsExpansionPending)
+            {
+                Debug.Log($"[ASCENSION] Skipping collapse on '{t.name}' — expansion pending; will re-check at next boundary.");
+                _deferredCollapseControllers ??= new HashSet<InstrumentTrackController>();
+                _deferredCollapseControllers.Add(ctrl);
+                continue;
+            }
+            if (t.loopMultiplier >= globalMaxMult)
                 t.RequestLoopCollapseByOne();
+        }
     }
 
     // -------------------------------------------------------------------------

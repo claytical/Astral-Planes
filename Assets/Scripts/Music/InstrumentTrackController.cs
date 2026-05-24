@@ -1001,6 +1001,12 @@ public class InstrumentTrackController : MonoBehaviour
 
     int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
 
+    // If expansion is already staged, advancing the frontier would propose bin N again,
+    // which SpawnCollectableBurst would reject (TryStageExpand returns false) and drop
+    // the burst entirely. Redirect to density injection in an existing filled bin instead.
+    if (track.IsExpansionPending)
+        return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
+
     // Consume exactly once (IMPORTANT).
     bool allowAdvance = ConsumeAllowAdvanceNextBurst(track);
 

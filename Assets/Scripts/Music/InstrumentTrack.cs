@@ -1228,7 +1228,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// </summary>
     public void RequestLoopCollapseByOne()
     {
-        if (loopMultiplier <= 1 || _pendingCollapse) return;
+        if (loopMultiplier <= 1 || _pendingCollapse || IsExpansionPending) return;
         _collapseTargetMultiplier = loopMultiplier - 1;
         _pendingCollapse = true;
         if (!_hookedBoundaryForCollapse && drumTrack != null)
@@ -2651,7 +2651,11 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     if (forcedTargetBin >= 0)
     {
         // Clamp to current committed width to avoid accidental re-stage.
-        targetBin = Mathf.Clamp(forcedTargetBin, 0, Mathf.Max(0, loopMultiplier - 1));
+        int clampedForcedBin = Mathf.Clamp(forcedTargetBin, 0, Mathf.Max(0, loopMultiplier - 1));
+        if (clampedForcedBin != forcedTargetBin)
+            Debug.LogWarning($"[TRK:BURST] forcedTargetBin={forcedTargetBin} clamped to {clampedForcedBin} " +
+                             $"(loopMul={loopMultiplier}) — possible expand/collapse conflict. track={name} burstId={burstId}");
+        targetBin = clampedForcedBin;
     }
     else if (_expansionCtrl != null && _expansionCtrl.OverrideNextSpawnBin >= 0)
     {
