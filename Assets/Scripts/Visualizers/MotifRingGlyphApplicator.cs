@@ -65,6 +65,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         public InstrumentTrack         Track;
         public int                     AbsStep;
         public float                   NoteAngle;
+        public Vector3                 RingLocalPos;
         public Vector3                 TugLocalPos;
         public Color                   DotColor;
         public MotifSnapshot.NoteEntry SourceNote; // for tween-in on the last ring
@@ -401,12 +402,13 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 float angle     = localStep / (float)binSize * Mathf.PI * 2f;
                 noteInfos.Add(new NoteAnimInfo
                 {
-                    Track       = track,
-                    AbsStep     = n.Step,
-                    NoteAngle   = angle,
-                    TugLocalPos = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f),
-                    DotColor    = color,
-                    SourceNote  = n,
+                    Track        = track,
+                    AbsStep      = n.Step,
+                    NoteAngle    = angle,
+                    RingLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f),
+                    TugLocalPos  = new Vector3(Mathf.Cos(angle) * tugR,   Mathf.Sin(angle) * tugR,   0f),
+                    DotColor     = color,
+                    SourceNote   = n,
                 });
             }
             noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
@@ -776,7 +778,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                     markerTr != null)
                 {
                     StartCoroutine(TravelNoteDot(
-                        markerTr.position, ringTransform, info.TugLocalPos,
+                        markerTr.position, ringTransform,
+                        info.RingLocalPos, info.TugLocalPos,
                         config.noteTravelDuration, info.DotColor));
                 }
             }
@@ -1039,10 +1042,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             : ringTransform.TransformPoint(
                   new Vector3(Mathf.Cos(angle) * outerR * 1.5f, Mathf.Sin(angle) * outerR * 1.5f, 0f));
 
-        // Tween the ring dip in over the same duration as the dot travel.
-        onLaunch?.Invoke();
+        // Ring surface position in local ring space — dot arrives here first, then pushes inward.
+        var ringLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f);
 
-        StartCoroutine(TravelNoteDot(dotWorld, ringTransform, tugLocal, travelDuration, dotColor));
+        // onLaunch fires at impact (when the dot reaches the ring surface), not at departure.
+        StartCoroutine(TravelNoteDot(dotWorld, ringTransform, ringLocalPos, tugLocal, travelDuration, dotColor, onLaunch));
     }
 
     private IEnumerator TweenContour(LineRenderer lr, List<Vector2> to, float duration,
@@ -1080,8 +1084,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     }
 
     private IEnumerator TravelNoteDot(
-        Vector3 startWorld, Transform ringTransform, Vector3 tugLocalPos,
-        float duration, Color color)
+        Vector3 startWorld, Transform ringTransform,
+        Vector3 ringLocalPos, Vector3 tugLocalPos,
+        float duration, Color color,
+        System.Action onImpact = null)
     {
         GameObject go;
         if (noteTravelDotPrefab != null)
@@ -1121,13 +1127,37 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             }
         }
 
+        // Phase 1 — approach: dot travels from the note marker to the ring surface.
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             go.transform.position = Vector3.Lerp(
-                startWorld, ringTransform.TransformPoint(tugLocalPos),
+                startWorld,
+                ringTransform.TransformPoint(ringLocalPos),
                 Mathf.Clamp01(elapsed / duration));
+            yield return null;
+        }
+
+        // Impact: dot has reached the ring surface — start the note and contour deformation.
+        if (config?.impactSfx != null)
+        {
+            var cam = Camera.main;
+            AudioSource.PlayClipAtPoint(
+                config.impactSfx,
+                cam != null ? cam.transform.position : Vector3.zero,
+                config.impactSfxVolume);
+        }
+        onImpact?.Invoke();
+
+        // Phase 2 — push: dot moves inward from ring surface to tug point as the ring curves.
+        elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            go.transform.position = ringTransform.TransformPoint(
+                Vector3.Lerp(ringLocalPos, tugLocalPos, t));
             yield return null;
         }
 

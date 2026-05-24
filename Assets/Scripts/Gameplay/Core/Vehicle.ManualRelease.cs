@@ -90,7 +90,9 @@ public partial class Vehicle
                 spokenFor.Remove(a.targetAbsStep);
                 if (_releaseButtonHeld && _armedReleases.Count == 0 && _pendingNotes.Count > 0)
                 {
-                    TryReleaseQueuedNote();
+                    // Don't sacrifice — if next note's step isn't in window yet, leave it
+                    // in the queue and try again next tick when the step comes around.
+                    TryReleaseQueuedNote(allowSacrifice: false);
                     _lastArmWasFromHold = _armedReleases.Count > 0;
                 }
             }

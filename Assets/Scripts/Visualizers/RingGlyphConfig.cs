@@ -100,6 +100,13 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Volume for the launch SFX.")]
     public float launchSfxVolume = 0.6f;
 
+    [Tooltip("Percussive AudioClip played when a note travel dot impacts the ring surface.")]
+    public AudioClip impactSfx;
+
+    [Range(0f, 1f)]
+    [Tooltip("Volume for the impact SFX.")]
+    public float impactSfxVolume = 0.6f;
+
     [Tooltip("Additional degrees/sec applied to the ring's rotation during the spin-off exit.")]
     public float spinOffExtraDegPerSec = 720f;
 
