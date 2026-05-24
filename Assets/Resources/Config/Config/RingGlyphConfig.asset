@@ -36,7 +36,9 @@ MonoBehaviour:
   rollOffDuration: 2
   ringAppearDuration: 0.1
   noteLaunchLeadSteps: 2
-  launchSfx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
-  launchSfxVolume: 0.6
+  launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
+  launchSfxVolume: 0.563
+  impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
+  impactSfxVolume: 0.6
   spinOffExtraDegPerSec: 720
   spinOffDuration: 0.45

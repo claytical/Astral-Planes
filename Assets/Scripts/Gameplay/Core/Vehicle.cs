@@ -1433,7 +1433,7 @@ public partial class Vehicle : MonoBehaviour
     // Back-compat with earlier patches / external callers.
     public bool EnqueuePendingNote(PendingCollectedNote p) => EnqueuePendingCollectedNote(p);
     
-    public bool TryReleaseQueuedNote()
+    public bool TryReleaseQueuedNote(bool allowSacrifice = true)
 {
     if (_pendingNotes.Count <= 0) return false;
 
@@ -1524,6 +1524,10 @@ public partial class Vehicle : MonoBehaviour
 
     if (!pass)
     {
+        // Hold-cascade callers pass allowSacrifice=false: leave the note in queue so it
+        // can be armed on a later tick when its step enters the window.
+        if (!allowSacrifice) return false;
+
         Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
         bool compositionMode = p.track.controller != null && p.track.controller.noteCommitMode == NoteCommitMode.Composition;
         int midiToPlay = compositionMode ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
