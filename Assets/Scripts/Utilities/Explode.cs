@@ -207,6 +207,14 @@ public class Explode : MonoBehaviour
         }
     }
 
+    public void ZapExplode()
+    {
+        var go = Instantiate(explosion, transform.position, Quaternion.identity);
+        ApplyTintToInstance(go, explosionTint);
+        if (_burstDir.sqrMagnitude > 0.0001f)
+            ApplyDirectionToInstance(go, _burstDir);
+        
+    }
     public void PreExplode()
     {
         if (preExplosion == null)

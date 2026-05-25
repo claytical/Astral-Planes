@@ -26,6 +26,6 @@ MonoBehaviour:
     type: 2}
   defaultMineNodeArchetypeId: Steady
   mineNodeArchetypeVariants: []
-  midiPreset: 10
+  midiPreset: 11
   ripeDuration: 512
   regrowthDelay: 0.8

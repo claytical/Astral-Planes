@@ -243,7 +243,7 @@ public class CosmicDustGenerator : MonoBehaviour
                      tint.a = 1f;
                      explode.SetTint(tint);
                      Debug.Log($"[CLEARCELL] preexplode tint={dust.CurrentTint} forcedVisible={(new Color(dust.CurrentTint.r, dust.CurrentTint.g, dust.CurrentTint.b, 1f))}");
-                     explode.PreExplode();
+                     explode.ZapExplode();
                  }
              }
 
