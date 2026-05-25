@@ -1050,6 +1050,8 @@ public class DrumTrack : MonoBehaviour
         {
             ApplyMotif(bootMotif, armAtNextBoundary: false, who: "DrumTrack/ManualStart", restartTransport: false);
         }
+        initialClip = ChooseEntryClip();
+
         // Fallback: use whatever is on the inspector source
         if (initialClip == null)
             initialClip = drumAudioSource.clip;
