@@ -60,7 +60,7 @@ public class LoopPattern : MonoBehaviour
             if (b >= 0 && b < binCounts.Length) binCounts[b]++;
         }
 
-        Debug.Log($"[TRK:LOOPCACHE] {track.name} bins=" + string.Join(",", binCounts));
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:LOOPCACHE] {track.name} bins=" + string.Join(",", binCounts));
 
         if (src.Count > 0 && track.MutableLoopNotes.Count == 0)
         {

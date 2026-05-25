@@ -1513,7 +1513,7 @@ private IEnumerator SpawnArrivalRoutine(
 
         // Define what "max hit" means. arcadeMaxSpeed is usually too easy to hit constantly;
         // use a higher value to avoid pegging.
-        float maxApproach = Mathf.Max(0.01f, vehicle.arcadeMaxSpeed * 1.5f);
+        float maxApproach = Mathf.Max(0.01f, vehicle.arcadeMaxSpeed * vehicle.HitVelocityMultiplier);
 
         float x = Mathf.Clamp01(approachSpeed / maxApproach);
 

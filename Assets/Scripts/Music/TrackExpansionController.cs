@@ -171,7 +171,7 @@ public class TrackExpansionController
             _host.EnsureBinList();
             _host.SetBinAllocated(targetBin, true);
 
-            Debug.Log($"[TEC:STAGE] LOOP MULTIPLIER MAXED. {_host.TrackName}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TEC:STAGE] LOOP MULTIPLIER MAXED. {_host.TrackName}");
 
             OverrideNextSpawnBin = _host.PickRandomExistingBinForDensity();
             int forcedBin = OverrideNextSpawnBin;
@@ -299,7 +299,7 @@ public class TrackExpansionController
             bool   exp0      = ExpandCommitted;
             bool   pendExp0  = PendingExpandForBurst;
 
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[TEC:COMMIT_EXPAND] track={_host.TrackName} ENTER " +
                 $"loopMul={loopMul0} totalSteps={total0} binSize={binSize0} " +
                 $"pendExpand={pendExp0} pendReq={hasReq} " +
@@ -308,7 +308,7 @@ public class TrackExpansionController
 
             if (!PendingExpandForBurst && !_pendingBurstAfterExpand.HasValue)
             {
-                Debug.Log($"[TEC:COMMIT_EXPAND] track={_host.TrackName} EXIT(noop) reason=no_pending_flags");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[TEC:COMMIT_EXPAND] track={_host.TrackName} EXIT(noop) reason=no_pending_flags");
                 UnhookExpandBoundary();
                 _host.EndGravityVoidForPendingExpand();
                 return;
@@ -318,7 +318,7 @@ public class TrackExpansionController
             if (ExpandCommitted && !PendingExpandForBurst &&
                 _host.TotalSteps >= OldTotalAtExpand + _host.BinSize)
             {
-                Debug.Log(
+                if (GameFlowManager.VerboseLogging) Debug.Log(
                     $"[TEC:COMMIT_EXPAND] track={_host.TrackName} PATH=ALREADY_EXPANDED " +
                     $"totalSteps={_host.TotalSteps} oldTotalAtExpand={OldTotalAtExpand} binSize={_host.BinSize}");
 
@@ -405,7 +405,7 @@ public class TrackExpansionController
             _host.EnsureBinList();
             _host.ResyncLeaderBinsNow();
 
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[TEC:COMMIT_EXPAND] track={_host.TrackName} PATH=WIDEN_APPLIED " +
                 $"newBins={newBins} loopMulNow={_host.LoopMultiplier} totalStepsNow={_host.TotalSteps} " +
                 $"halfOffset={HalfOffsetAtExpand} mapSecondHalf={MapIncomingCollectionsToSecondHalf}");
@@ -451,7 +451,7 @@ public class TrackExpansionController
             _host.ResetStepCursors();
             UnhookExpandBoundary();
 
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[TEC:COMMIT_EXPAND] track={_host.TrackName} EXIT " +
                 $"loopMulNow={_host.LoopMultiplier} totalStepsNow={_host.TotalSteps} " +
                 $"mapSecondHalf={MapIncomingCollectionsToSecondHalf} expandCommitted={ExpandCommitted}");

@@ -236,7 +236,7 @@ public class CosmicDustGenerator : MonoBehaviour
          if (dust != null) {
              if (runPreExplode)
              {
-                 var explode = go.GetComponent<Explode>();
+                 var explode = go.GetComponentInChildren<Explode>(true);
                  if (explode != null)
                  {
                      var tint = dust.CurrentTint;
@@ -388,7 +388,8 @@ public class CosmicDustGenerator : MonoBehaviour
         List<Vector2Int> vehicleCells,
         int vehicleNoSpawnRadiusCells,
         int maxCellsThisCall = -1,
-        int innerRadiusCellsExclusive = -1)
+        int innerRadiusCellsExclusive = -1,
+        bool hideRole = false)
     {
         EnsureCellGrid();
         _imprints ??= new Dictionary<Vector2Int, DustImprint>(2048);
@@ -481,12 +482,25 @@ public class CosmicDustGenerator : MonoBehaviour
                 // Vehicle pocket is a hard exclusion — no imprint, no spawn, no visual update.
                 if (NearAnyVehicle(gp)) continue;
 
+                // When hideRole is true, store role in _hiddenImprints and spawn gray so
+                // PhaseStar cannot detect the cell until the vehicle reveals it by carving.
+                MusicalRole spawnRole = imprintRole;
+                Color spawnColor = c;
+                if (hideRole && imprintRole != MusicalRole.None)
+                {
+                    _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+                    _hiddenImprints[gp] = imprintRole;
+                    spawnRole = MusicalRole.None;
+                    spawnColor = _mazeTint;
+                    spawnColor.a = c.a;
+                }
+
                 // Always write persistent imprint (so regrow picks it up later)
                 _imprints[gp] = new DustImprint
                 {
-                    color = c,
+                    color = spawnColor,
                     hardness01 = imprintHardness01,
-                    role = imprintRole
+                    role = spawnRole
                 };
                 processed++;
 
@@ -513,16 +527,105 @@ public class CosmicDustGenerator : MonoBehaviour
                     continue;
 
                 _voidGrowCells.Add(gp);
-                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, imprintRole, c, growInSeconds));
+                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
             }
         }
 
         return processed;
     }
 
+    // Appends trap ring/disk cells directly into the maze stagger list so they grow in
+    // alongside every other cell. Call from the onBeforeGrowth callback inside
+    // GenerateMazeForPhaseWithPaths — _imprints and _hiddenImprints are already initialised at
+    // that point and will not be cleared again before the stagger runs.
+    public void InjectTrapCellsIntoStagger(
+        List<(Vector2Int, Vector3)> cellsToFill,
+        Vector2Int centerGP,
+        int outerRadiusCells,
+        int innerRadiusCellsExclusive,
+        MusicalRole hiddenRole,
+        float hardness01)
+    {
+        if (drums == null || cellsToFill == null || outerRadiusCells <= 0) return;
+        EnsureCellGrid();
+        _imprints      ??= new Dictionary<Vector2Int, DustImprint>(2048);
+        _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+
+        int rOuterSq = outerRadiusCells * outerRadiusCells;
+        int rInnerSq = innerRadiusCellsExclusive >= 0 ? innerRadiusCellsExclusive * innerRadiusCellsExclusive : -1;
+
+        for (int dy = -outerRadiusCells; dy <= outerRadiusCells; dy++)
+        {
+            for (int dx = -outerRadiusCells; dx <= outerRadiusCells; dx++)
+            {
+                int dSq = dx * dx + dy * dy;
+                if (dSq > rOuterSq) continue;
+                if (rInnerSq >= 0 && dSq <= rInnerSq) continue;
+
+                var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+                if (!IsInBounds(gp)) continue;
+                if (_permanentClearCells.Contains(gp)) continue;
+
+                // Hidden role — revealed only when the vehicle carves this cell.
+                if (hiddenRole != MusicalRole.None)
+                    _hiddenImprints[gp] = hiddenRole;
+
+                _imprints[gp] = new DustImprint
+                {
+                    role              = MusicalRole.None,
+                    color             = _mazeTint,
+                    hardness01        = hardness01,
+                    carveResistance01 = 0f,
+                    drainResistance01 = 0f,
+                    maxEnergyUnits    = 1,
+                    healDelay         = 0f,
+                };
+
+                Vector3 worldPos = drums.GridToWorldPosition(gp);
+                cellsToFill.Add((gp, worldPos));
+            }
+        }
+    }
+
+    public void InjectTrapCellsFromList(
+        List<(Vector2Int, Vector3)> cellsToFill,
+        IEnumerable<Vector2Int> trapCells,
+        MusicalRole hiddenRole,
+        float hardness01)
+    {
+        if (drums == null || cellsToFill == null || trapCells == null) return;
+        EnsureCellGrid();
+        _imprints      ??= new Dictionary<Vector2Int, DustImprint>(256);
+        _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+
+        foreach (var gp in trapCells)
+        {
+            if (!IsInBounds(gp)) continue;
+            if (_permanentClearCells.Contains(gp)) continue;
+
+            if (hiddenRole != MusicalRole.None)
+                _hiddenImprints[gp] = hiddenRole;
+
+            _imprints[gp] = new DustImprint
+            {
+                role              = MusicalRole.None,
+                color             = _mazeTint,
+                hardness01        = hardness01,
+                carveResistance01 = 0f,
+                drainResistance01 = 0f,
+                maxEnergyUnits    = 1,
+                healDelay         = 0f,
+            };
+
+            Vector3 worldPos = drums.GridToWorldPosition(gp);
+            cellsToFill.Add((gp, worldPos));
+        }
+    }
+
     public void SpawnDustAtCells(
         IReadOnlyList<Vector2Int> cells,
-        MusicalRole role, Color hue, float hardness01, float energy01, float growInSeconds)
+        MusicalRole role, Color hue, float hardness01, float energy01, float growInSeconds,
+        bool hideRole = false)
     {
         if (cells == null || cells.Count == 0) return;
         EnsureCellGrid();
@@ -535,7 +638,19 @@ public class CosmicDustGenerator : MonoBehaviour
         {
             var gp = cells[i];
             if (!IsInBounds(gp)) continue;
-            _imprints[gp] = new DustImprint { color = c, hardness01 = hardness01, role = role };
+
+            MusicalRole spawnRole = role;
+            Color spawnColor = c;
+            if (hideRole && role != MusicalRole.None)
+            {
+                _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+                _hiddenImprints[gp] = role;
+                spawnRole = MusicalRole.None;
+                spawnColor = _mazeTint;
+                spawnColor.a = c.a;
+            }
+
+            _imprints[gp] = new DustImprint { color = spawnColor, hardness01 = hardness01, role = spawnRole };
 
             if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
                 existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
@@ -556,7 +671,7 @@ public class CosmicDustGenerator : MonoBehaviour
 
             _voidGrowCells.Add(gp);
             _regrowthScheduler.VoidGrowCoroutines[gp] =
-                StartCoroutine(VoidGrowCellNow(gp, role, c, growInSeconds));
+                StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
         }
     }
 
@@ -1285,7 +1400,10 @@ private void BuildMazeRoleImprints(
         };
     }
 
-    _hiddenImprints.Clear();
+    // Clear only the entries for maze cells — ring/trap cell entries injected before this
+    // call (via InjectTrapCellsIntoStagger) are NOT in `cells` and must be preserved.
+    foreach (var (gp, _) in cells)
+        _hiddenImprints.Remove(gp);
 
     var occupied = BuildOccupiedCells(cells);
 
@@ -1437,7 +1555,7 @@ private void AssignHiddenImprintsByNearestSeed(
     {
         _mazeAlreadyGenerated = false;
     }
-    public IEnumerator GenerateMazeForPhaseWithPaths(Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f)
+    public IEnumerator GenerateMazeForPhaseWithPaths(Vector2Int starCell, IReadOnlyList<Vector2Int> vehicleCells, float totalSpawnDuration = 1.0f, System.Action<List<(Vector2Int, Vector3)>> onBeforeGrowth = null)
     {
         _isBootstrappingMaze = true;
         if (_mazeAlreadyGenerated)
@@ -1481,47 +1599,72 @@ private void AssignHiddenImprintsByNearestSeed(
         // Resolve pattern config from the active motif; null falls back to FullFill inside the method.
         _activeMazePattern = phaseTransitionManager?.currentMotif?.mazePattern;
         _runtimeVoidOnlyDustCreation = false;
-        var reserved = new HashSet<Vector2Int> { starCell }; 
-        // Pattern-driven growth list
-        var cellsToFill = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
-        Debug.Log($"[MAZE] cellsToFill(pattern) count={cellsToFill.Count}"); 
+        var reserved = new HashSet<Vector2Int> { starCell };
+
+        // --- Step 1: inject ring/trap cells FIRST (before the maze topology builds) ---
+        // The callback (e.g. vehicle trap ring) appends cells into an empty list and writes
+        // _imprints / _hiddenImprints for each position. We then add those positions to
+        // `reserved` so BuildMazeGrowthFromConfig never claims the same slots, eliminating
+        // position conflicts and ensuring ring cells are first in the combined list.
+        var cellsToFill = new List<(Vector2Int grid, Vector3 world)>();
+        onBeforeGrowth?.Invoke(cellsToFill);
+        int preinjectCount = cellsToFill.Count;
+        for (int pi = 0; pi < preinjectCount; pi++)
+            reserved.Add(cellsToFill[pi].grid);
+
+        // --- Step 2: permanent-clear zones (star pocket + vehicle reserve radius) ---
         _permanentClearCells.Add(starCell);
         const int startupVehicleReserveRadiusCells = 2;
-        if (vehicleCells != null) { 
-            for (int i = 0; i < vehicleCells.Count; i++) { 
-                var v = vehicleCells[i]; 
-                for (int dx = -startupVehicleReserveRadiusCells; dx <= startupVehicleReserveRadiusCells; dx++) { 
-                    for (int dy = -startupVehicleReserveRadiusCells; dy <= startupVehicleReserveRadiusCells; dy++) { 
-                        if (dx * dx + dy * dy > startupVehicleReserveRadiusCells * startupVehicleReserveRadiusCells) 
+        if (vehicleCells != null) {
+            for (int i = 0; i < vehicleCells.Count; i++) {
+                var v = vehicleCells[i];
+                for (int dx = -startupVehicleReserveRadiusCells; dx <= startupVehicleReserveRadiusCells; dx++) {
+                    for (int dy = -startupVehicleReserveRadiusCells; dy <= startupVehicleReserveRadiusCells; dy++) {
+                        if (dx * dx + dy * dy > startupVehicleReserveRadiusCells * startupVehicleReserveRadiusCells)
                             continue;
-                        var gp = new Vector2Int(v.x + dx, v.y + dy); 
+                        var gp = new Vector2Int(v.x + dx, v.y + dy);
                         if (!IsInBounds(gp)) continue;
-                        reserved.Add(gp); 
+                        reserved.Add(gp);
                         _permanentClearCells.Add(gp);
                     }
                 }
             }
         }
-        // Cache pattern oracle so frontier compensation can prefer original wall cells.
-        _mazePatternCells = new HashSet<Vector2Int>(cellsToFill.Count);
-        foreach (var (cell, _) in cellsToFill)
+
+        // --- Step 3: build maze pattern (ring positions already excluded via `reserved`) ---
+        var mazeResult = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
+        Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
+
+        // Cache pattern oracle (maze cells only; ring cells are not "pattern" cells and
+        // must not participate in frontier compensation).
+        _mazePatternCells = new HashSet<Vector2Int>(mazeResult.Count);
+        foreach (var (cell, _) in mazeResult)
             _mazePatternCells.Add(cell);
 
-        // --- Voronoi role imprint pass ---
-        // Write a DustImprint for every cell before StaggeredGrowthFitDuration spawns them.
-        // GetOrCreateCellGO reads ResolveResistanceProfile(gp, ...) and GetCellVisualColor(gp) which
-        // consult _imprints, so each cell spawns with the correct role color + hardness
-        // without any further per-cell logic in the spawn loop.
-        BuildMazeRoleImprints(starCell, cellsToFill);
+        // --- Step 4: Voronoi role imprints for maze cells only ---
+        // Ring imprints were already written by the callback (InjectTrapCellsIntoStagger /
+        // InjectTrapCellsFromList). BuildMazeRoleImprints must not overwrite them.
+        BuildMazeRoleImprints(starCell, mazeResult);
+
+        // --- Step 5: merge, shuffle, stagger ---
+        // Ring cells are at the front; maze cells appended. Shuffle distributes them uniformly.
+        cellsToFill.AddRange(mazeResult);
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
         Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
-        if (_spawnRoutine != null) { 
-            StopCoroutine(_spawnRoutine); 
+        if (_spawnRoutine != null) {
+            StopCoroutine(_spawnRoutine);
             _spawnRoutine = null;
-        } 
-        _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToFill, spawnDuration)); 
-        yield return _spawnRoutine; 
+        }
+        for (int s = cellsToFill.Count - 1; s > 0; s--)
+        {
+            int r = Random.Range(0, s + 1);
+            var tmp = cellsToFill[s];
+            cellsToFill[s] = cellsToFill[r];
+            cellsToFill[r] = tmp;
+        }
+        _spawnRoutine = StartCoroutine(StaggeredGrowthFitDuration(cellsToFill, spawnDuration));
+        yield return _spawnRoutine;
         EnterRuntimeVoidOnlyDustCreationMode();        
         _spawnRoutine = null;
         // 2) Carve generous holes around the star and each vehicle
@@ -2463,11 +2606,15 @@ private void AssignHiddenImprintsByNearestSeed(
                     // ---------------------------
                     // GATING
                     // ---------------------------
-                    if (_permanentClearCells.Contains(grid)) continue; 
-                    if (IsKeepClearCell(grid)) continue; 
-                    if (HasDustAt(grid)) continue; 
-                    if (IsDustSpawnBlocked(grid)) continue;           
-                    // includes permanent + keepclear + claims/holds// if (!Collectable.IsCellFreeStatic(grid)) continue; // never grow dust on top of a collectable
+                    if (_permanentClearCells.Contains(grid)) continue;
+                    if (IsKeepClearCell(grid)) continue;
+                    // Skip cells already queued for void-growth (e.g. vehicle trap ring spawned
+                    // via onBeforeGrowth callback). _voidGrowCells is populated synchronously so
+                    // this check is race-free regardless of coroutine scheduling order.
+                    if (_voidGrowCells.Contains(grid)) continue;
+                    if (TryGetCellState(grid, out var existSt) &&
+                        (existSt == DustCellState.Solid || existSt == DustCellState.Regrowing)) continue;
+                    if (IsDustSpawnBlocked(grid)) continue;
                     // IMPORTANT
                     // // During startup maze bootstrap, cells blocked by a vehicle should remain
                     // unspawned/neutral, not be pushed into the generic regrow pipeline.
@@ -2536,8 +2683,11 @@ private void AssignHiddenImprintsByNearestSeed(
                         dust.Begin();
 
                         // Critical: keep collider OFF during bulk topology changes.
+                        // PrepareForReuse already disables the collider; this is a safety guard for
+                        // edge cases. regrowAlphaCapped is intentionally NOT set here — Begin() already
+                        // set sprite alpha to _currentTint.a, and the physics phase restores that same
+                        // value, so no cap is needed (and setting it would cause a visible pop on lift).
                         SetDustCollision(dust, false);
-                        dust.regrowAlphaCapped = true;
                         spawnedDust.Add(dust);
                     }
 
@@ -2591,8 +2741,8 @@ private void AssignHiddenImprintsByNearestSeed(
                     }
 
 // At this point, it is legitimately solid terrain.
-                    d.regrowAlphaCapped = false;
-                    d.EnsureMinSolidAlpha(0.55f);
+                    // SetTerrainColliderEnabled(true) now restores _currentTint.a directly, so
+                    // regrowAlphaCapped and EnsureMinSolidAlpha are not needed here.
                     SetDustCollision(d, true);
                 }
 

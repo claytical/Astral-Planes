@@ -363,14 +363,54 @@ public sealed class SceneFlowCoordinator
         if (profileForPhase != null) dust.ApplyProfile(profileForPhase);
         dust.ApplyActiveRoles(_gameFlow.phaseTransitionManager?.currentMotif?.GetActiveRoles());
 
-        yield return _gameFlow.StartCoroutine(dust.GenerateMazeForPhaseWithPaths(starCell, _vehicleCellsScratch, 1.0f));
+        var trapMotif = _gameFlow.phaseTransitionManager?.currentMotif;
+        System.Action<List<(Vector2Int, Vector3)>> trapCallback = null;
+        if (trapMotif != null && trapMotif.spawnVehicleTrap)
+        {
+            trapCallback = cellsToFill =>
+            {
+                var allVehicles = _gameFlow.GetVehicles();
+                var vehicleList = allVehicles != null && allVehicles.Count > 0
+                    ? new List<Vehicle>(allVehicles)
+                    : new List<Vehicle>(UnityEngine.Object.FindObjectsOfType<Vehicle>());
+                foreach (var v in vehicleList)
+                {
+                    if (v == null || !v.isActiveAndEnabled) continue;
+                    Vector2Int center = drums.WorldToGridPosition(v.transform.position);
+                    if (trapMotif.trapShape == TrapShape.Circle)
+                    {
+                        int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
+                        dust.InjectTrapCellsIntoStagger(
+                            cellsToFill, center, trapMotif.trapRadius, inner,
+                            trapMotif.trapRole, trapMotif.trapHardness01);
+                    }
+                    else
+                    {
+                        int r = trapMotif.trapRadius;
+                        var perim = new List<Vector2Int>(r * 8);
+                        for (int dx = -r; dx <= r; dx++)
+                        {
+                            perim.Add(new Vector2Int(center.x + dx, center.y + r));
+                            perim.Add(new Vector2Int(center.x + dx, center.y - r));
+                        }
+                        for (int dy = -r + 1; dy <= r - 1; dy++)
+                        {
+                            perim.Add(new Vector2Int(center.x - r, center.y + dy));
+                            perim.Add(new Vector2Int(center.x + r, center.y + dy));
+                        }
+                        dust.InjectTrapCellsFromList(cellsToFill, perim, trapMotif.trapRole, trapMotif.trapHardness01);
+                    }
+                }
+            };
+        }
+
+        yield return _gameFlow.StartCoroutine(dust.GenerateMazeForPhaseWithPaths(starCell, _vehicleCellsScratch, 1.0f, onBeforeGrowth: trapCallback));
 
         _gameFlow.PlayVehiclePhaseInFx();
 
         if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
             yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
 
-        _gameFlow.SpawnVehicleTraps(_gameFlow.phaseTransitionManager?.currentMotif);
         drums.RequestPhaseStar(starCell);
         dust.ResetMazeGenerationFlag();
     }

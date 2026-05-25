@@ -36,3 +36,5 @@ MonoBehaviour:
   soulScaleLerpSpeed: 14
   soulAlphaMin: 0
   soulAlphaMax: 0.85
+  impactSpeedCap: 15
+  hitVelocityMultiplier: 1

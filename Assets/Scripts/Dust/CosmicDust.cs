@@ -536,7 +536,10 @@ private Coroutine _jiggleRoutine;
             Color c = _displayTint;
             if (enabled)
             {
-                c.a = kRegrowAlphaCap;
+                // Restore authoritative tint alpha — do not cap at kRegrowAlphaCap here,
+                // which would cause a visible brightness drop on cells that are already at
+                // proper alpha when their collider is re-enabled after spawn or regrowth.
+                c.a = _currentTint.a;
             }
             else
             {
@@ -643,7 +646,7 @@ private Coroutine _jiggleRoutine;
             ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: _workSigned01);
         else
             SetDustColorAllParticles(tint);
-        var explode = GetComponent<Explode>();
+        var explode = GetComponentInChildren<Explode>(true);
         if (explode != null) explode.SetTint(tint);
     }
     internal void RunSpawnVisuals(float growSeconds)
@@ -696,6 +699,7 @@ private Coroutine _jiggleRoutine;
         _nonBoostClearSeconds = 0f;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
+        _growInOverride = -1f;
         SetWorkSigned01(0f);
 
         // Restore captured prefab/base scale instead of Vector3.one
