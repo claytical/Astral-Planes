@@ -278,13 +278,13 @@ public class InstrumentTrackController : MonoBehaviour
             var pool = _gfm?.activeDrumTrack?._starPool;
             if (pool != null)
             {
-                Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at pos={_gravityVoidCenterWorld}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at pos={_gravityVoidCenterWorld}");
                 pool.SetGravityVoidSafetyBubbleActive(true, _gravityVoidCenterWorld);
                 _gravityVoidBubbleInnerR = pool.GetSafetyBubbleRadiusCells();
             }
             else
             {
-                Debug.Log("[BUBBLE] BeginGravityVoid → no active StarPool found; bubble skipped");
+                if (GameFlowManager.VerboseLogging) Debug.Log("[BUBBLE] BeginGravityVoid → no active StarPool found; bubble skipped");
                 _gravityVoidBubbleInnerR = 0;
             }
 
@@ -844,11 +844,11 @@ public class InstrumentTrackController : MonoBehaviour
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
-        if (drum == null) { Debug.Log("[ITC:GET_LEADER_BINS] drum=NULL → returning 1"); return 1; }
+        if (drum == null) { if (GameFlowManager.VerboseLogging) Debug.Log("[ITC:GET_LEADER_BINS] drum=NULL → returning 1"); return 1; }
         int count = drum.GetCommittedBinCount();
         // Only log when the result is unexpectedly low — avoids per-frame spam.
         if (count <= 1)
-            Debug.Log($"[ITC:GET_LEADER_BINS] drum_id={drum.GetInstanceID()} _binCount={count}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[ITC:GET_LEADER_BINS] drum_id={drum.GetInstanceID()} _binCount={count}");
         return Mathf.Max(1, count);
     }
 
@@ -956,7 +956,7 @@ public class InstrumentTrackController : MonoBehaviour
         int committedBins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
         if (drum != null)
             drum.SetBinCount(committedBins);
-        Debug.Log($"[ITC:ARM_COHORTS] committedBins={committedBins} " +
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[ITC:ARM_COHORTS] committedBins={committedBins} " +
                   $"trackMuls=[{string.Join(",", tracks.Where(t => t != null).Select(t => $"{t.name}:{t.loopMultiplier}"))}]");
 
         int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
@@ -1148,7 +1148,7 @@ public class InstrumentTrackController : MonoBehaviour
     /// and before any new note spawning occurs.
     /// </summary>
     public void BeginNewMotif(string reason = "BeginNewMotif") {
-        Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         _gfm?.activeDrumTrack.ResetBeatSequencingState("InstrumentTrackController/BeginNewMotif");
         // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.

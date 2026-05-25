@@ -280,7 +280,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
     private void OnEnable()
     {
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[TRACK:LIFECYCLE] ENABLE name={name} " +
             $"goActiveSelf={gameObject.activeSelf} " +
             $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
@@ -643,7 +643,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (drumTrack == null)
         {
-            Debug.Log("No drumtrack assigned!");
+            if (GameFlowManager.VerboseLogging) Debug.Log("No drumtrack assigned!");
             return;
         }
         _waitingForDrumReady = true;
@@ -672,7 +672,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (drumTrack == null) return;
         if (_nextFrameQueue.Count > 0)
         {
-            Debug.Log($"[TRK:NEXTFRAME_RUN] track={name} queueCount={_nextFrameQueue.Count} waitingForDrum={_waitingForDrumReady}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:NEXTFRAME_RUN] track={name} queueCount={_nextFrameQueue.Count} waitingForDrum={_waitingForDrumReady}");
             var count = _nextFrameQueue.Count; // snapshot to avoid reentrancy issues
             for (int i = 0; i < count; i++)
             {
@@ -775,7 +775,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Diagnostic: log on every bar transition.
         if (barIndex != _lastBarIndex)
         {
-            Debug.Log($"[TRK:BAR_ENTER] track={name} barIndex={barIndex} " +
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BAR_ENTER] track={name} barIndex={barIndex} " +
                       $"committedLeaderBins={committedLeaderBins} loopMul={loopMultiplier} " +
                       $"playheadBin={playheadBin} leaderStart={drumTrack.leaderStartDspTime:F3} " +
                       $"dsp={AudioSettings.dspTime:F3}");
@@ -788,7 +788,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         // expanded loop during the single frame before leaderStartDspTime is advanced.
         if (barIndex >= committedLeaderBins)
         {
-            Debug.Log($"[TRK:BAR_GUARD] track={name} barIndex={barIndex} " +
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BAR_GUARD] track={name} barIndex={barIndex} " +
                       $"committedLeaderBins={committedLeaderBins} loopMul={loopMultiplier} SKIPPING");
             _lastLocalStep = targetCurLocal;
             return;
@@ -894,12 +894,12 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (globalBin >= loopMultiplier || !HasAnyNoteInBin(globalBin))
         {
             if (localStep == 0)
-                Debug.Log($"[SYNC] {name} BLOCKED bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[SYNC] {name} BLOCKED bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
             return;
         }
 
         if (localStep == 0)
-            Debug.Log($"[SYNC] {name} PLAYING bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[SYNC] {name} PLAYING bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
 
         int trackBin = globalBin;
         if (!HasAnyNoteInBin(trackBin)) return;
@@ -911,9 +911,9 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var hd = _gfm?.harmony;
             if (hd != null && hd.TryGetChordAt(chordIdx, out var c))
-                Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot={c.rootNote}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot={c.rootNote}");
             else
-                Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot=<na>");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Play] track={name} playheadBin={playheadBin} trackBin={trackBin} loopMul={loopMultiplier} chordIdx={chordIdx} chordRoot=<na>");
         }
 
         // Ask LoopPattern for notes at this bin/step (velocity returned already gain-scaled per your API).
@@ -1456,7 +1456,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         ascensionCohort.SetSteps(steps);
         ascensionCohort.armed = (ascensionCohort.stepsRemaining != null && ascensionCohort.stepsRemaining.Count > 0);
 
-        Debug.Log($"[CHORD][ARMED] {name} window=[{windowStartInclusive},{windowEndExclusive}) " +
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][ARMED] {name} window=[{windowStartInclusive},{windowEndExclusive}) " +
                   $"count={(ascensionCohort.stepsRemaining != null ? ascensionCohort.stepsRemaining.Count : 0)} armed={ascensionCohort.armed}");
     }
 
@@ -1619,7 +1619,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         // Mark bin filled + hooks
         int targetBin = BinIndexForStep(finalTargetStep);
-        Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
         RegisterBurstStep(collectable.burstId, finalTargetStep);
         spawnedCollectables?.Remove(collectable.gameObject);
     // 5) Per-burst decrement + rise + cursor advance
@@ -1698,10 +1698,10 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (controller != null && controller.noteVisualizer != null)
                     controller.noteVisualizer.TriggerBurstAscend(this, collectable.burstId, seconds);
             });
-            Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reported Step: {reportedStep}  remainingOnTrack={spawnedCollectables.Count} bin cursor: {_binCursor} ");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reported Step: {reportedStep}  remainingOnTrack={spawnedCollectables.Count} bin cursor: {_binCursor} ");
             
             OnCollectableBurstCleared?.Invoke(this, collectable.burstId, true);
-            Debug.Log($"[TRKDBG] {name} OnCollectableCollected: burstId={collectable.burstId} -> HandleCollectableBurstCleared (_burstRemaining={_burstRemaining?.Count ?? -1})");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRKDBG] {name} OnCollectableCollected: burstId={collectable.burstId} -> HandleCollectableBurstCleared (_burstRemaining={_burstRemaining?.Count ?? -1})");
 
         }
         else
@@ -1774,7 +1774,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // Fallback: behave like before (base loop), but this should not happen in your normal flow.
             depositDsp = AudioSettings.dspTime + 0.05;
         }
-        Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal(reportedStep)={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={AudioSettings.dspTime:F6} dt={(depositDsp-AudioSettings.dspTime):F4}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal(reportedStep)={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={AudioSettings.dspTime:F6} dt={(depositDsp-AudioSettings.dspTime):F4}");
         double now = AudioSettings.dspTime;
         float dt = Mathf.Max(0f, (float)(depositDsp - now));
 // IMMINENT: shrink travel so we still land exactly at depositDsp.
@@ -2138,7 +2138,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             }
             if (!hasLiveCollectable)
             {
-                Debug.Log($"[SYNC:RESOLVE] {name} bin={b} has notes but unfilled with no live collectables — resolving.");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[SYNC:RESOLVE] {name} bin={b} has notes but unfilled with no live collectables — resolving.");
                 SetBinFilled(b, true);
                 controller?.ResyncLeaderBinsNow();
             }
@@ -2404,7 +2404,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             if (step % BinSize() == 0)
             {
-                Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
             }
 
             var allowed = new List<int>();
@@ -2442,7 +2442,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
     {
         int qNote = skipChordQuantize ? ShiftByOctavesIntoTrackRange(note) : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
-        Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
         _noteCommitTimes[stepIndex] = Time.time;
 
@@ -2475,7 +2475,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             // Using -1 here was the original intent (loop-owned), but it breaks ascension.
             int burst = currentBurstId;
             noteMarker = controller?.noteVisualizer?.PlacePersistentNoteMarker(this, stepIndex, lit: lit, burstId: burst);
-            Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False lit={lit} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False lit={lit} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
         }
 
         if (noteMarker != null) _spawnedNotes.Add(noteMarker);
@@ -2592,7 +2592,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
     }
 
-    Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
               $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
               $"loopMul={loopMultiplier} pendingExpand={IsExpansionPending} MaxSpawnCount: {maxToSpawn}");
 
@@ -2670,7 +2670,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     
     if (targetBin >= loopMultiplier)
     {
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[TRK:BURST] OUTCOME=STAGE_EXPAND track={name} burstId={burstId} " +
             $"targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
 
@@ -2704,7 +2704,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             foreach (var t in controller.tracks)
             {
-                Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
                 if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
             }
 
@@ -2713,13 +2713,13 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         // TryStageExpand rejected (another expansion already pending for this track).
         // Fall through to SPAWN_NOW on an existing bin so collectables still appear.
-        Debug.Log($"[TRK:BURST] STAGE_EXPAND rejected (already pending) → density spawn track={name} burstId={burstId}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] STAGE_EXPAND rejected (already pending) → density spawn track={name} burstId={burstId}");
         targetBin = Mathf.Clamp(GetNextBinForSpawn(), 0, Mathf.Max(0, loopMultiplier - 1));
     }
 
 
 
-    Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
 
     // --- Composition mode: step-sequenced spawn (one collectable per loop step) ---
     if (controller != null && controller.noteCommitMode == NoteCommitMode.Composition)
@@ -2938,7 +2938,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return;
     }
 
-    Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
 
     _burstRemaining[burstId] = spawnedCount;
     _burstTotalSpawned[burstId] = spawnedCount;
@@ -3145,7 +3145,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
             _compositionSpawnEffect.Play();
         }
 
-        Debug.Log($"[TRK:COMP] QUEUED track={name} burstId={burstId} count={queued} targetBin={targetBin}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:COMP] QUEUED track={name} burstId={burstId} count={queued} targetBin={targetBin}");
     }
 
     /// <summary>
@@ -3417,7 +3417,7 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int CollectNote(int stepIndex, int note, int durationTicks, float force, int authoredRootMidi = int.MinValue)
     {
         int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
-        Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
 
@@ -3445,6 +3445,6 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
     private void DebugBins(string where)
     {
         string s = string.Join("", _binFilled.Select(b => b ? "1" : "0"));
-        Debug.Log($"[{name}] {where} | cursor={_binCursor} loopMul={loopMultiplier} filled={s} firstEmpty={FirstEmptyBin()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[{name}] {where} | cursor={_binCursor} loopMul={loopMultiplier} filled={s} firstEmpty={FirstEmptyBin()}");
     }
 }

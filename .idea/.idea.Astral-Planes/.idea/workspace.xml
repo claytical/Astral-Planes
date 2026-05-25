@@ -6,10 +6,34 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/Astral Planes_data.bytes" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/Astral Planes_data.bytes" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Bass-'74-Maple-Jazz.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Bass-'74-Maple-Jazz.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-0.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-1.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-2.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-3.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-3.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-1.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-2.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-0.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-1.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-2.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd0.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd1.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd2.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Drifter.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Drifter.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/NoteAscensionDirector.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/TrackExpansionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/TrackExpansionController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -290,7 +314,8 @@
       <workItem from="1778446478754" duration="7840000" />
       <workItem from="1778544595359" duration="8125000" />
       <workItem from="1778601380265" duration="47828000" />
-      <workItem from="1778783304035" duration="122278000" />
+      <workItem from="1778783304035" duration="123989000" />
+      <workItem from="1779661810458" duration="13224000" />
     </task>
     <servers />
   </component>

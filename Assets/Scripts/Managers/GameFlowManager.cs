@@ -58,6 +58,10 @@ public partial class GameFlowManager : MonoBehaviour
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
 
+    [Header("Debug")]
+    [SerializeField] public bool verboseLogging;
+    public static bool VerboseLogging => Instance != null && Instance.verboseLogging;
+
 
     public HarmonyDirector harmony;
     public InstrumentTrackController controller;
@@ -615,12 +619,55 @@ public partial class GameFlowManager : MonoBehaviour
     var motifRoles = phaseTransitionManager?.currentMotif?.GetActiveRoles();
     dust.ApplyActiveRoles(motifRoles);
 
-    // 4) Build maze.
+    // 4) Build maze; vehicle trap ring cells are injected into the stagger list so they
+    //    grow in simultaneously with maze cells rather than appearing as a separate event.
+    var trapMotif = phaseTransitionManager?.currentMotif;
+    System.Action<List<(Vector2Int, Vector3)>> trapCallback = null;
+    if (trapMotif != null && trapMotif.spawnVehicleTrap && dustGenerator != null && activeDrumTrack != null)
+    {
+        trapCallback = cellsToFill =>
+        {
+            var allVehicles = vehicles != null && vehicles.Count > 0
+                ? vehicles
+                : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+            foreach (var v in allVehicles)
+            {
+                if (v == null || !v.isActiveAndEnabled) continue;
+                Vector2Int center = activeDrumTrack.WorldToGridPosition(v.transform.position);
+                if (trapMotif.trapShape == TrapShape.Circle)
+                {
+                    int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
+                    dustGenerator.InjectTrapCellsIntoStagger(
+                        cellsToFill, center, trapMotif.trapRadius, inner,
+                        trapMotif.trapRole, trapMotif.trapHardness01);
+                }
+                else
+                {
+                    int r = trapMotif.trapRadius;
+                    var perim = new List<Vector2Int>(r * 8);
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        perim.Add(new Vector2Int(center.x + dx, center.y + r));
+                        perim.Add(new Vector2Int(center.x + dx, center.y - r));
+                    }
+                    for (int dy = -r + 1; dy <= r - 1; dy++)
+                    {
+                        perim.Add(new Vector2Int(center.x - r, center.y + dy));
+                        perim.Add(new Vector2Int(center.x + r, center.y + dy));
+                    }
+                    dustGenerator.InjectTrapCellsFromList(
+                        cellsToFill, perim,
+                        trapMotif.trapRole, trapMotif.trapHardness01);
+                }
+            }
+        };
+    }
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
             starCell,
             _vehicleCellsScratch,
-            totalSpawnDuration: 1.0f
+            totalSpawnDuration: 1.0f,
+            onBeforeGrowth: trapCallback
         )
     );
 
@@ -647,8 +694,7 @@ public partial class GameFlowManager : MonoBehaviour
     if (vehiclePhaseInDelaySeconds > 0f)
         yield return new WaitForSeconds(vehiclePhaseInDelaySeconds);
 
-    // ── 6) Spawn vehicle traps then star ──────────────────────────────────────
-    SpawnVehicleTraps(phaseTransitionManager?.currentMotif);
+    // ── 6) Start the star (vehicle traps already growing from step 4 callback) ──
     drums.RequestPhaseStar(starCell);
     dust.ResetMazeGenerationFlag();
 }
@@ -805,8 +851,8 @@ public partial class GameFlowManager : MonoBehaviour
 
     private void OnMotifChangedHandler(MotifProfile oldMotif, MotifProfile newMotif)
     {
-        if (!_setupDone) return;
-        SpawnVehicleTraps(newMotif);
+        // Trap ring is injected during GenerateMazeForPhaseWithPaths (onBeforeGrowth callback).
+        // Do not respawn here — that would cause a late instant-spawn on motif advance.
     }
 
     public void SpawnVehicleTraps(MotifProfile motif)
@@ -853,7 +899,8 @@ public partial class GameFlowManager : MonoBehaviour
                     fillWedges01To4: 4,
                     vehicleCells: null,
                     vehicleNoSpawnRadiusCells: 0,
-                    innerRadiusCellsExclusive: inner);
+                    innerRadiusCellsExclusive: inner,
+                    hideRole: true);
                 Debug.Log($"[TRAP] GrowVoidDustDiskFromGrid processed={processed} center={center} outer={motif.trapRadius} inner={inner}");
             }
             else
@@ -871,7 +918,7 @@ public partial class GameFlowManager : MonoBehaviour
                     perimeter.Add(new Vector2Int(center.x + r, center.y + dy));
                 }
                 dustGenerator.SpawnDustAtCells(perimeter, motif.trapRole, roleColor,
-                    motif.trapHardness01, 1f, motif.trapGrowSeconds);
+                    motif.trapHardness01, 1f, motif.trapGrowSeconds, hideRole: true);
             }
         }
     }

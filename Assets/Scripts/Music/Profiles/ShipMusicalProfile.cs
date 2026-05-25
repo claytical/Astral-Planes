@@ -25,6 +25,13 @@ public class ShipMusicalProfile : ScriptableObject
     [Header("Physics")]
     public float mass = 1.5f;
 
+    [Header("Impact")]
+    [Tooltip("Speed (world units/s) that counts as a full-strength collision hit. Used by GetForceAsDamage. Set to arcadeMaxSpeed for a ship that should deal full damage at top speed.")]
+    public float impactSpeedCap = 32f;
+    [Range(0.5f, 3f)]
+    [Tooltip("Multiplier on arcadeMaxSpeed used as the velocity ceiling in ComputeHitVelocity127. 1.0 = max speed is a full hit. 1.5 = spread hits across a wider range (harder to peg).")]
+    public float hitVelocityMultiplier = 1.0f;
+
     [Header("Fuel Tradeoffs")]
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)
     [Range(0.25f, 2f)] public float burnRate = 1.0f; // fuel units/sec at full trigger pressure

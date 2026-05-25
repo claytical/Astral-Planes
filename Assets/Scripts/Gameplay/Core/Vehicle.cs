@@ -1061,7 +1061,7 @@ public partial class Vehicle : MonoBehaviour
     public int GetForceAsDamage()
         {
             float speed = rb.linearVelocity.magnitude;
-            float impactCapVelocity = 32f;
+            float impactCapVelocity = profile != null ? profile.impactSpeedCap : 32f;
             float normalizedSpeed = Mathf.InverseLerp(0f, impactCapVelocity, speed);
             float curvedSpeed = Mathf.Pow(normalizedSpeed, 1.75f);
             float baseDamage = Mathf.Lerp(25f, 100f, curvedSpeed); 
@@ -1079,6 +1079,8 @@ public partial class Vehicle : MonoBehaviour
 
             return Mathf.RoundToInt(Mathf.Clamp(damage, 0f, 120f));
         }
+    public float HitVelocityMultiplier => profile != null ? profile.hitVelocityMultiplier : 1.0f;
+
     public float GetForceAsMidiVelocity()
     {
         float speed = rb.linearVelocity.magnitude;
