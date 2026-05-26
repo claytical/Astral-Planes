@@ -48,6 +48,10 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Pattern config for maze generation while this motif is active. If null, falls back to FullFill.")]
     public MazePatternConfig mazePattern;
 
+    [Header("Maze Geography")]
+    [Tooltip("Per-role geographic feature overrides. When empty, feature defaults are derived from mazePattern.patternType (e.g. RingChokepoints → Rings, DrunkenStrokes → Archipelago). Add entries here only to break the natural pairing.")]
+    public List<MazeRoleGeoConfig> roleGeoConfigs = new();
+
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;

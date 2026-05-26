@@ -152,6 +152,11 @@ public partial class Vehicle
             ? p.collectedMidi
             : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
+        // Pre-quantize in Performance mode so SFX and loop commit use the same final pitch.
+        // Composition mode keeps the raw note (octave-fit only, no chord snap — by design).
+        if (!compositionMode)
+            chosenMidi = p.track.QuantizeNoteForStep(targetAbsStep, chosenMidi, p.authoredRootMidi);
+
         int resolvedDurationTicks = p.durationTicks;
         int binSize = Mathf.Max(1, p.track.BinSize());
         int targetBin = p.track.BinIndexForStep(targetAbsStep);
@@ -176,7 +181,7 @@ public partial class Vehicle
             authoredRootMidi: p.authoredRootMidi,
             burstId: p.burstId,
             lightMarkerNow: true,
-            skipChordQuantize: compositionMode
+            skipChordQuantize: true   // already quantized above (Composition mode: octave-fit only regardless)
         );
 
         p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);

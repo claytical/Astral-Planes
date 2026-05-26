@@ -455,6 +455,22 @@ public sealed class NoteAscensionDirector : MonoBehaviour
             }
         }
 
+        // Guard: if the highest bin is allocated but not yet filled, an expansion burst
+        // may have been enqueued via EnqueueNextFrame and hasn't spawned yet.
+        // HasOutstandingNotesInRange won't catch it because _burstSteps isn't populated
+        // until the next frame. Defer one boundary so the burst has time to register.
+        foreach (var t in ctrl.tracks)
+        {
+            if (t == null) continue;
+            if (t.IsBinAllocated(globalMaxMult - 1) && !t.IsBinFilled(globalMaxMult - 1))
+            {
+                _deferredCollapseControllers ??= new HashSet<InstrumentTrackController>();
+                _deferredCollapseControllers.Add(ctrl);
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[ASCENSION] Collapse deferred — highest bin {globalMaxMult - 1} allocated-but-unfilled on '{t.name}'; expansion burst may be in flight.");
+                return;
+            }
+        }
+
         // Highest bin is empty on all tracks — collapse every track that owns it.
         // Skip any track that is mid-expansion; the expand and a concurrent collapse would
         // net zero at the next boundary and send the staged burst to the wrong bin.

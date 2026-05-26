@@ -1367,11 +1367,11 @@ private IEnumerator SpawnArrivalRoutine(
     // ------------------------------------------------------------
     float force = vehicle.GetForceAsMidiVelocity();
     vehicle.CollectEnergy(amount);
-    assignedInstrumentTrack.PlayNote127(assignedNote, 2, force);
     int stepToReportBase =
         (matchedStep >= 0) ? matchedStep :
         (intendedStep >= 0) ? (((intendedStep % baseSteps) + baseSteps) % baseSteps) :
         0;
+    assignedInstrumentTrack.PlayQuantizedNoteForStep(stepToReportBase, assignedNote, noteDurationTicks, force);
 // ----- TRACE: collision timing vs transport -----
     double dspNowDbg = AudioSettings.dspTime;
     double loopLenDbg = drumTrack.GetLoopLengthInSeconds();

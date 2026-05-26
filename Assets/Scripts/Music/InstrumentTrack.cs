@@ -1414,6 +1414,24 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         return ShiftByOctavesIntoTrackRange(best);
 }
 
+    public int QuantizeNoteForStep(int stepIndex, int rawMidi, int authoredRootMidi)
+        => QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRootMidi);
+
+    public void PlayQuantizedNoteForStep(int stepIndex, int rawMidi, int durationTicks, float velocity)
+    {
+        int binSize   = Mathf.Max(1, BinSize());
+        int binIdx    = BinIndexForStep(stepIndex);
+        int localStep = ((stepIndex % binSize) + binSize) % binSize;
+
+        int authoredRoot = int.MinValue;
+        if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
+            authoredRoot = _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
+        if (authoredRoot == int.MinValue)
+            authoredRoot = GetAuthoredRootMidiInRegister(rawMidi);
+
+        PlayNote127(QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRoot), durationTicks, velocity);
+    }
+
     /// <summary>
     /// Moves a MIDI note by octaves to fit this track's playable range.
     /// If the range is narrower than one octave and no exact octave fit exists,
