@@ -44,7 +44,8 @@ public partial class Vehicle : MonoBehaviour
     public PlayerStats playerStatsUI; // Reference to the PlayerStats UI element
     public PlayerStatsTracking playerStats;
     
-    private GameObject activeTrail; // Reference to the currently active trail instance 
+    private GameObject activeTrail; // Reference to the currently active trail instance
+    private TrailRenderer _activeTrailRenderer;
     public Rigidbody2D rb;
     private AudioManager audioManager;
     private SpriteRenderer baseSprite;
@@ -114,6 +115,7 @@ public partial class Vehicle : MonoBehaviour
 
     private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
     private readonly HashSet<InstrumentTrack> _carriedTracksScratch = new HashSet<InstrumentTrack>();
+    private readonly HashSet<int> _spokenForScratch = new HashSet<int>();
 
     public void ClearPendingNotesForBridge()
     {
@@ -145,11 +147,8 @@ public partial class Vehicle : MonoBehaviour
         _posHistoryLast  = transform.position;
 
         // Clear the rendered trail geometry.
-        if (activeTrail != null)
-        {
-            var tr = activeTrail.GetComponent<TrailRenderer>();
-            if (tr != null) tr.Clear();
-        }
+        if (_activeTrailRenderer != null)
+            _activeTrailRenderer.Clear();
     }
 
     // ------------------------------------------------------------
@@ -240,35 +239,14 @@ public partial class Vehicle : MonoBehaviour
 
         float dt = Time.fixedDeltaTime;
 
-        // --- PhaseStar Safety Bubble: refuge zone during gravity void expansion ---
-        // While inside the bubble the vehicle is a guest, not an agent:
-        //   - Skip keep-clear carving so refuge dust is preserved.
-        //   - Skip the rest of FixedUpdate physics (movement still runs via rb).
-        // Energy drain from dust contact is suppressed in CosmicDust.OnCollisionStay2D
-        // because that method checks Vehicle.boosting; inside the bubble the player
-        // still pilots normally, so no change is needed there.
-        if (StarPool.IsPointInsideAnySafetyBubble(transform.position))
-        {
-            // Release any existing keep-clear claim so refuge cells can regrow.
-            if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
-            {
-                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
-            }
-
-            // Still run the loop-boundary timer and input hygiene below,
-            // but skip keep-clear refresh entirely.
-        }
-// After the safety bubble block, before RefreshVehicleKeepClearIfNeeded:
         bool insideBubble = StarPool.IsPointInsideAnySafetyBubble(transform.position);
+        _isActivePlow = false;   // always reset; DoPlowTick sets true only when cells are carved
 
         if (insideBubble)
         {
             // Release keep-clear claim so refuge dust regrows.
             if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
-            {
                 gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
-            }
-            // Skip keep-clear refresh — we're a guest inside the bubble.
         }
         else
         {
@@ -300,13 +278,14 @@ public partial class Vehicle : MonoBehaviour
             }
             else
             {
-                float minDist = float.MaxValue;
+                float minSqrDist = float.MaxValue;
                 for (int i = 0; i < pCount; i++)
                 {
                     if (_pressureHits[i] == null) continue;
-                    float d = Vector2.Distance(rb.position, _pressureHits[i].transform.position);
-                    if (d < minDist) minDist = d;
+                    float sqr = ((Vector2)_pressureHits[i].transform.position - rb.position).sqrMagnitude;
+                    if (sqr < minSqrDist) minSqrDist = sqr;
                 }
+                float minDist = Mathf.Sqrt(minSqrDist);
                 _lastPressureFactor = 1f - Mathf.InverseLerp(0f, profile.pressureInstabilityRadius, minDist);
             }
         }
@@ -362,7 +341,6 @@ public partial class Vehicle : MonoBehaviour
         // Fuel burn only while boosting
         if (boosting && energyLevel > 0f && !_boostCostFree)
         {
-            Debug.Log($"[ENERGY] {energyLevel} : {_burnRateMultiplier} * {profile.burnRate}");
             float burn = _burnRateMultiplier * profile.burnRate;
             ConsumeEnergy(burn);
         }
@@ -538,12 +516,12 @@ public partial class Vehicle : MonoBehaviour
                 int total = Mathf.Max(1, totalP);
 
                 // Reuse the spoken-for set so we agree with the ghost cue.
-                var spokenFor = new HashSet<int>();
+                _spokenForScratch.Clear();
                 foreach (var ar in _armedReleases)
-                    spokenFor.Add(ar.targetAbsStep);
+                    _spokenForScratch.Add(ar.targetAbsStep);
 
                 if (viz != null && viz.TryGetNextUnlitStepExcluding(
-                        p.track, rawAbsP, total, spokenFor, out int nextStep))
+                        p.track, rawAbsP, total, _spokenForScratch, out int nextStep))
                 {
                     double fwdSteps = (nextStep - rawAbsP + total) % total;
 
@@ -1171,12 +1149,11 @@ public partial class Vehicle : MonoBehaviour
             if (trail != null && activeTrail == null)
             {
                 activeTrail = Instantiate(trail, transform);
+                _activeTrailRenderer = activeTrail.GetComponent<TrailRenderer>();
             }
 
-            if (activeTrail != null)
-            {
-                activeTrail.GetComponent<TrailRenderer>().emitting = true; // Enable the trail's emission
-            }
+            if (_activeTrailRenderer != null)
+                _activeTrailRenderer.emitting = true;
         }
     public void SetBoostFree(bool free)
     {
@@ -1202,13 +1179,11 @@ public partial class Vehicle : MonoBehaviour
             audioManager.StopSound();
         }
         boosting = false;
+        _isActivePlow = false;
         _burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
-        // Disable the trail's emission when boosting stops
-        if (activeTrail != null)
-        {
-            activeTrail.GetComponent<TrailRenderer>().emitting = false;
-        }
+        if (_activeTrailRenderer != null)
+            _activeTrailRenderer.emitting = false;
     }
     public float GetCumulativeSpentTanks() {
         if (capacity <= 0f) return 0f;
@@ -1316,8 +1291,7 @@ public partial class Vehicle : MonoBehaviour
     private void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
-            Debug.Log($"[ENERGY] energy level: {energyLevel} / draining {amount}");
-            energyLevel = Mathf.Max(0, energyLevel); // Clamp to 0
+            energyLevel = Mathf.Max(0, energyLevel);
             _cumulativeEnergySpent += Mathf.Max(0f, amount);
             if (energyLevel <= 0)
             {
@@ -1405,7 +1379,6 @@ public partial class Vehicle : MonoBehaviour
 
         int chipAmount = Mathf.Max(1, profile.plowChipAmount);
         float totalVelocityDrain = 0f;
-        _isActivePlow = false;
 
         for (int d = 0; d <= depth; d++)
         {
