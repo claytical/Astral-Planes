@@ -8,6 +8,10 @@ public partial class Vehicle : MonoBehaviour
 {
 
     private float _nextPlowTickAt;
+    private bool  _isActivePlow;
+    private float _lastPressureFactor;
+    private static readonly Collider2D[] _pressureHits = new Collider2D[8];
+    private int _mineNodeLayerMask;
     public ShipMusicalProfile profile;
     [SerializeField] private VehicleConfig vehicleConfig;
     [HideInInspector] public float capacity = 10f;
@@ -155,6 +159,7 @@ public partial class Vehicle : MonoBehaviour
         {
             rb = GetComponent<Rigidbody2D>();
             gfm = GameFlowManager.Instance;
+            _mineNodeLayerMask = LayerMask.GetMask("MineNode");
             var col = GetComponent<Collider2D>();
             Debug.Log(
                 $"[VEHICLE:INIT] '{name}' layer={gameObject.layer} " +
@@ -284,12 +289,48 @@ public partial class Vehicle : MonoBehaviour
         // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
         if (Time.time - _lastMoveStamp > vehicleConfig.inputTimeout) _moveInput = Vector2.zero;
 
+        // --- Pressure instability: proximity of nearest MineNode (Needle archetype) ---
+        if (profile.pressureInstabilityRadius > 0f && profile.pressureInstabilityStrength01 > 0f)
+        {
+            int pCount = Physics2D.OverlapCircleNonAlloc(rb.position, profile.pressureInstabilityRadius,
+                                                         _pressureHits, _mineNodeLayerMask);
+            if (pCount == 0)
+            {
+                _lastPressureFactor = 0f;
+            }
+            else
+            {
+                float minDist = float.MaxValue;
+                for (int i = 0; i < pCount; i++)
+                {
+                    if (_pressureHits[i] == null) continue;
+                    float d = Vector2.Distance(rb.position, _pressureHits[i].transform.position);
+                    if (d < minDist) minDist = d;
+                }
+                _lastPressureFactor = 1f - Mathf.InverseLerp(0f, profile.pressureInstabilityRadius, minDist);
+            }
+        }
+        else
+        {
+            _lastPressureFactor = 0f;
+        }
+
         bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
 
         // ---- movement ----
         if (hasInput || boosting) {
-            Vector2 steerDir   = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
-            Vector2 desiredVel = steerDir * arcadeMaxSpeed;
+            Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
+
+            // Directional authority: blend input direction toward current heading (Drifter/Plow).
+            // authority=1 (default) → immediate snap to input (unchanged). authority=0.2 → very slidey.
+            float authority = GetEffectiveAuthority();
+            Vector2 effectiveDir;
+            if (authority >= 1f || rb.linearVelocity.sqrMagnitude < 0.01f)
+                effectiveDir = steerDir;
+            else
+                effectiveDir = Vector2.Lerp(rb.linearVelocity.normalized, steerDir, authority).normalized;
+
+            Vector2 desiredVel = effectiveDir * arcadeMaxSpeed;
             float accelUsed    = boosting ? profile.arcadeBoostAccel : profile.arcadeAccel;
 
             if (accelUsed > 0f)
@@ -1097,6 +1138,19 @@ public partial class Vehicle : MonoBehaviour
         return Mathf.Lerp(40f, 127f, x);
     }
 
+    private float GetEffectiveAuthority()
+    {
+        float auth = profile.directionalAuthority01;
+
+        if (profile.plowSteeringPenalty01 > 0f && _isActivePlow)
+            auth *= 1f - profile.plowSteeringPenalty01;
+
+        if (profile.pressureInstabilityStrength01 > 0f && _lastPressureFactor > 0f)
+            auth *= 1f - _lastPressureFactor * profile.pressureInstabilityStrength01;
+
+        return Mathf.Clamp01(auth);
+    }
+
     public void Move(Vector2 direction)
     {
         if (direction.magnitude < profile.inputDeadzone) direction = Vector2.zero;
@@ -1350,6 +1404,9 @@ public partial class Vehicle : MonoBehaviour
         int depth = Mathf.Max(0, profile.plowDepthCells);
 
         int chipAmount = Mathf.Max(1, profile.plowChipAmount);
+        float totalVelocityDrain = 0f;
+        _isActivePlow = false;
+
         for (int d = 0; d <= depth; d++)
         {
             for (int s = -halfW; s <= halfW; s++)
@@ -1358,10 +1415,20 @@ public partial class Vehicle : MonoBehaviour
                     + forward * (d * cellSize)
                     + perp    * (s * cellSize);
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
-                if (gen.HasDustAt(cell))
-                    gen.ChipDustByVehicle(cell, chipAmount, fade);
+                if (!gen.HasDustAt(cell)) continue;
+
+                // Accumulate velocity drain (Cutter): each resistant cell bleeds speed.
+                if (profile.carveVelocityDrainPerCell > 0f && gen.TryGetDustAt(cell, out var dustCell) && dustCell != null)
+                    totalVelocityDrain += dustCell.clearing.carveResistance01 * profile.carveVelocityDrainPerCell;
+
+                gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01);
+                _isActivePlow = true;
             }
         }
+
+        // Apply accumulated speed drain after the carve pass.
+        if (totalVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
+            rb.linearVelocity *= Mathf.Max(0f, 1f - totalVelocityDrain);
     }
 
     private void TriggerThud(Vector2 collisionPoint)

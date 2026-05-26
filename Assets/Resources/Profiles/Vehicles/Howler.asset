@@ -13,24 +13,32 @@ MonoBehaviour:
   m_Name: Howler
   m_EditorClassIdentifier: 
   shipName: Howler
-  description: Aggressive and bold. Favors wild leads and gritty percussion.
-  arcadeMaxSpeed: 16
-  arcadeAccel: 8
+  description: Cutter
+  arcadeMaxSpeed: 18
+  arcadeAccel: 12
   arcadeBoostAccel: 110
   arcadeLinearDamping: 0.1
   arcadeAngularDamping: 0.5
-  coastBrakeForce: 1
+  coastBrakeForce: 1.1
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  mass: 1.2
+  mass: 0.8
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
   capacity: 150
   burnRate: 1
-  plowHalfWidthCells: 1
-  plowDepthCells: 2
+  plowHalfWidthCells: 0
+  plowDepthCells: 3
   plowMinSpeed: 2
-  plowChipAmount: 1
+  plowChipAmount: 3
   vehicleKeepClearRadiusCells: 0
+  carveResistanceBypass01: 0
+  carveVelocityDrainPerCell: 0.12
+  directionalAuthority01: 0.9
+  plowSteeringPenalty01: 0
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14

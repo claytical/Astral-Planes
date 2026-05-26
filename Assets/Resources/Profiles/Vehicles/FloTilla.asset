@@ -13,10 +13,9 @@ MonoBehaviour:
   m_Name: FloTilla
   m_EditorClassIdentifier: 
   shipName: FloTilla
-  description: Swirling and collaborative. Prefers pads, ambient keys, and light
-    rhythmic FX.
-  arcadeMaxSpeed: 17
-  arcadeAccel: 7
+  description: The needle
+  arcadeMaxSpeed: 20
+  arcadeAccel: 14
   arcadeBoostAccel: 70
   arcadeLinearDamping: 0.1
   arcadeAngularDamping: 0.5
@@ -24,14 +23,22 @@ MonoBehaviour:
   stopSpeed: 0.06
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  mass: 1.5
+  mass: 0.6
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
   capacity: 75
   burnRate: 0.4
-  plowHalfWidthCells: 1
-  plowDepthCells: 3
+  plowHalfWidthCells: 0
+  plowDepthCells: 1
   plowMinSpeed: 2
-  plowChipAmount: 2
+  plowChipAmount: 1
   vehicleKeepClearRadiusCells: 1
+  carveResistanceBypass01: 0
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 0.95
+  plowSteeringPenalty01: 0
+  pressureInstabilityRadius: 3
+  pressureInstabilityStrength01: 0.55
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14
