@@ -618,6 +618,7 @@ public partial class GameFlowManager : MonoBehaviour
     // Read from phaseTransitionManager.currentMotif — the star doesn't exist yet at this point.
     var motifRoles = phaseTransitionManager?.currentMotif?.GetActiveRoles();
     dust.ApplyActiveRoles(motifRoles);
+    dust.ApplyMotifGeoConfig(phaseTransitionManager?.currentMotif);
 
     // 4) Build maze; vehicle trap ring cells are injected into the stagger list so they
     //    grow in simultaneously with maze cells rather than appearing as a separate event.

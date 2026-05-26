@@ -103,6 +103,20 @@ public class MineNode : MonoBehaviour
     private float _nextDirectionDecisionAt;
     private float _pathCommitUntil;
     private MineNodeBehaviorIntent _behaviorIntent = MineNodeBehaviorIntent.Thinking;
+    private CosmicDustGenerator _dustGenerator;
+    private MineNodeBehaviorCategory _behaviorCategory;
+    private MusicalRoleProfile _roleProfile;
+    private Vehicle _trackedVehicle;
+
+    // Orbital (Harmony): orbit chirality, persists until stall or territory exit
+    private int  _orbitSign = 1;
+    private bool _orbitSignLocked;
+
+    // Rhythmic (Groove): beat-snapped burst-pause cycle
+    private bool  _isInBurst = true;
+    private float _burstPauseTimer;
+    private bool  _burstPauseSnapPending;
+    private float _burstPauseSnapAt;
 
     // Motion tunables (previously local consts in FixedUpdate)
     private const float kStallSpeed        = 0.20f; // below this velocity the node is considered stopped
@@ -125,16 +139,23 @@ public class MineNode : MonoBehaviour
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);
-        if (prof != null) _speed = prof.mineNodeSpeed;
+        if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
         ResolveDecisionArchetype(prof);
+        _roleProfile = prof;
+        _behaviorCategory = _role.GetBehaviorCategory();
+        _orbitSign = UnityEngine.Random.value < 0.5f ? 1 : -1;
+        _orbitSignLocked = false;
+        _isInBurst = true;
+        _burstPauseTimer = prof?.burstDuration ?? 0.4f;
+        _burstPauseSnapPending = false;
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetTint(_lockedColor, multiply: true);
 
         float a = UnityEngine.Random.Range(0f, 360f);
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
         _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
-        _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
+        _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
         SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         if (_drumTrack != null)
@@ -160,6 +181,9 @@ public class MineNode : MonoBehaviour
         // immediately on registration sees a fully initialized object.
         if (_drumTrack != null)
             _drumTrack.RegisterMineNode(this);
+        _dustGenerator = GameFlowManager.Instance?.dustGenerator;
+        var vehicles = GameFlowManager.Instance?.GetVehicles();
+        _trackedVehicle = (vehicles != null && vehicles.Count > 0) ? vehicles[0] : null;
     }
 
     private void HandleLoopBoundary()
@@ -279,9 +303,35 @@ public class MineNode : MonoBehaviour
         if (_hasPrevPhysicsPos) EnforceGridContainment(_prevPhysicsPos, _rb.position);
 
         Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
-        RunCorridorLookahead(myCell);
 
-        ApplyLocomotion(0f, driftSpeedMultiplier);
+        if (_behaviorCategory == MineNodeBehaviorCategory.Orbital)
+        {
+            UpdateOrbitSign(myCell);
+            CheckOrbitTerritoryFlip(myCell);
+        }
+
+        float burstMult = 1f;
+        if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic)
+        {
+            UpdateBurstPause();
+            burstMult = _isInBurst ? (_roleProfile?.burstSpeedMultiplier ?? 2f) : 0.05f;
+        }
+
+        // Skip direction decisions during Groove pause — node is nearly stationary
+        if (_behaviorCategory != MineNodeBehaviorCategory.Rhythmic || _isInBurst)
+            RunCorridorLookahead(myCell);
+
+        // Category speed baselines × profile fine-tune; applied here so all paths use the same scale
+        float catSpeedMult = _behaviorCategory switch {
+            MineNodeBehaviorCategory.Deliberate => 0.6f,
+            MineNodeBehaviorCategory.Darting    => 1.5f,
+            _                                   => 1.0f,
+        };
+        ApplyLocomotion(0f, driftSpeedMultiplier * burstMult * catSpeedMult * (_roleProfile?.behaviorSpeedMultiplier ?? 1f));
+
+        // Groove pause: actively damp velocity; kMinSpeedFloor inside ApplyLocomotion prevents a true stop otherwise
+        if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic && !_isInBurst)
+            _rb.linearVelocity = Vector2.Lerp(_rb.linearVelocity, Vector2.zero, 0.25f);
 
         RunStallEscape(myCell);
         if (!ShouldSkipBoundaryClampThisTick())
@@ -536,15 +586,112 @@ public class MineNode : MonoBehaviour
                 }
                 float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
                 score += riskBias * Mathf.Clamp01(score / 3f);
+                // Territory affinity — strength driven by profile (Bass defaults high)
+                if (_dustGenerator != null)
+                {
+                    float affinityWeight = _roleProfile?.territoryAffinity01 ?? 0.3f;
+                    var affinityProbe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * 2), Mathf.RoundToInt(dir.y * 2));
+                    if (_dustGenerator.GetZoneRole(affinityProbe) == _role) score += affinityWeight;
+                }
+                // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
+                if (_behaviorCategory == MineNodeBehaviorCategory.Orbital)
+                {
+                    float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0f);
+                    var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
+                    score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
+                }
+                // Proximity evasion (Lead/Darting): 7-cell category default; profile overrides if > 0
+                if (_behaviorCategory == MineNodeBehaviorCategory.Darting && _trackedVehicle != null)
+                {
+                    float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 7f;
+                    float worldRadius = cells * GetCellSize();
+                    float dist = Vector2.Distance(_rb.position, _trackedVehicle.transform.position);
+                    if (dist < worldRadius)
+                    {
+                        Vector2 away = (_rb.position - (Vector2)_trackedVehicle.transform.position).normalized;
+                        score += 0.6f * Mathf.Max(0f, Vector2.Dot(dir.normalized, away));
+                    }
+                }
                 if (Vector2.Dot(dir, _carveDir) < -0.5f) score *= 0.1f;
                 if (score > bestScore) { bestScore = score; bestDir = dir; }
             }
             float jitter = UnityEngine.Random.Range(-_decisionArchetype.turnJitter, _decisionArchetype.turnJitter);
             _carveDir = Rotate(bestDir.normalized, jitter).normalized;
             _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
-            _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration);
+            _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
             SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
         }
+    }
+
+    // Returns the commit-duration multiplier for this category.
+    // Deliberate (Bass): 2.5x base * profile fine-tune. Darting (Lead): 0.35x base. Others: 1x.
+    private float CategoryCommitScale()
+    {
+        return _behaviorCategory switch {
+            MineNodeBehaviorCategory.Deliberate => 2.5f * (_roleProfile?.commitDurationScale ?? 1f),
+            MineNodeBehaviorCategory.Darting    => 0.35f,
+            _                                   => 1f,
+        };
+    }
+
+    private void UpdateOrbitSign(Vector2Int myCell)
+    {
+        if (_stallHits == 0) { _orbitSignLocked = false; return; }
+        if (_orbitSignLocked) return;
+        _orbitSign = -_orbitSign;
+        _orbitSignLocked = true;
+    }
+
+    private void CheckOrbitTerritoryFlip(Vector2Int myCell)
+    {
+        if (_dustGenerator == null || _orbitSignLocked) return;
+        if (_dustGenerator.GetZoneRole(myCell) != _role)
+        {
+            _orbitSign = -_orbitSign;
+            _orbitSignLocked = true;
+        }
+    }
+
+    private void UpdateBurstPause()
+    {
+        if (_burstPauseSnapPending)
+        {
+            if (Time.time >= _burstPauseSnapAt)
+            {
+                _isInBurst = !_isInBurst;
+                _burstPauseSnapPending = false;
+                _burstPauseTimer = _isInBurst
+                    ? (_roleProfile?.burstDuration  ?? 0.4f)
+                    : (_roleProfile?.pauseDuration  ?? 0.35f);
+            }
+            return;
+        }
+        _burstPauseTimer -= Time.fixedDeltaTime;
+        if (_burstPauseTimer > 0f) return;
+
+        // Schedule transition at next DSP beat-step boundary
+        if (_drumTrack != null && _drumTrack.leaderStartDspTime > 0)
+        {
+            double dspNow     = AudioSettings.dspTime;
+            double loopLen    = _drumTrack.GetClipLengthInSeconds();
+            double stepDur    = _stepsPerLoop > 0 ? loopLen / _stepsPerLoop : 0.1;
+            double timeInStep = (dspNow - _drumTrack.leaderStartDspTime) % stepDur;
+            _burstPauseSnapAt = Time.time + (float)(stepDur - timeInStep);
+        }
+        else
+        {
+            _burstPauseSnapAt = Time.time;
+        }
+        _burstPauseSnapPending = true;
+    }
+
+    private float GetCellSize()
+    {
+        if (_drumTrack != null)
+            return Vector2.Distance(
+                _drumTrack.GridToWorldPosition(Vector2Int.zero),
+                _drumTrack.GridToWorldPosition(Vector2Int.right));
+        return 1f;
     }
 
     private void RunStallEscape(Vector2Int myCell)

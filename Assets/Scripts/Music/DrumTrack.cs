@@ -93,7 +93,7 @@ public class DrumTrack : MonoBehaviour
     private float _cachedTileDiameterWorld = -1f;
 
     private int _binIdx = -1;
-    private int _binCount = 4; // default; PhaseStar can override per-spawn
+    private int _binCount = 1; // 1 bin until ArmCohortsOnLoopBoundary / ResyncLeaderBinsNow sets it
     
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;

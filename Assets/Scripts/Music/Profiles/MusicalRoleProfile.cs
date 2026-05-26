@@ -66,6 +66,31 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Optional role-specific variant overrides (e.g. Lead_A, Lead_B).")]
     public MineNodeArchetypeVariant[] mineNodeArchetypeVariants;
 
+    [Header("MineNode Behavior Modifiers")]
+    [Tooltip("Scales base speed within this role's behavioral category. 1.0 = default. Electronic Bass ~1.3, Acoustic Bass ~0.7.")]
+    [Range(0.3f, 2.5f)] public float behaviorSpeedMultiplier = 1.0f;
+
+    [Tooltip("Deliberate (Bass): strength of territory affinity bias in corridor scoring.")]
+    [Range(0f, 1f)] public float territoryAffinity01 = 0.3f;
+
+    [Tooltip("Deliberate (Bass): multiplier on pathCommitmentDuration. Higher = slower to change direction.")]
+    [Range(0.5f, 3f)] public float commitDurationScale = 1.0f;
+
+    [Tooltip("Orbital (Harmony): weight added to perpendicular-curve directions in corridor scoring. 0 = no orbital bias.")]
+    [Range(0f, 1.5f)] public float orbitalTurnBias = 0.6f;
+
+    [Tooltip("Rhythmic (Groove): seconds at burst speed before snapping to next beat boundary.")]
+    [Min(0.1f)] public float burstDuration = 0.4f;
+
+    [Tooltip("Rhythmic (Groove): seconds at near-standstill after each burst.")]
+    [Min(0.05f)] public float pauseDuration = 0.35f;
+
+    [Tooltip("Rhythmic (Groove): speed multiplier during burst phase relative to base driftSpeedMultiplier.")]
+    [Range(1f, 3f)] public float burstSpeedMultiplier = 2.0f;
+
+    [Tooltip("Darting (Lead): grid-cell radius within which a Vehicle triggers directional evasion. Keep small (2–4) for 1v1 pursuit — fires only on close approach.")]
+    [Range(0f, 10f)] public float evasionCells = 3f;
+
     [Header("Presets")] public int midiPreset;
 
     [Header("Ripeness / Decay")]

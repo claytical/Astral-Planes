@@ -143,6 +143,8 @@ public class CosmicDustGenerator : MonoBehaviour
     // has no role imprint (e.g. vehicle-carved cells whose imprint was removed).
     // ---------------------------------------------------------------------------
     private List<MusicalRole> _activeRoles; // set from motif at phase start via ApplyActiveRoles
+    private List<MazeRoleGeoConfig> _roleGeoConfigs;
+    private MazePatternType _activePatternType = MazePatternType.FullFill;
     private readonly Dictionary<MusicalRole, int> _solidCountByRole = new Dictionary<MusicalRole, int>
     {
         { MusicalRole.Bass,    0 },
@@ -1433,10 +1435,11 @@ private void BuildMazeRoleImprints(
     // region is only a subset of the full spawn grid.
     // ------------------------------------------------------------
 
-    var (seedCells, seedRoles, actualSeedCount) = SelectRoleSeeds(occupied, rolesList, starCell);
+    var (seedCells, seedRoles, actualSeedCount) = SelectRoleSeedsWithGeo(occupied, rolesList, starCell);
 
     // Assign each occupied cell to the nearest chosen seed.
     AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedRoles, actualSeedCount);
+    PostProcessGeoImprints(occupied, seedCells, seedRoles, actualSeedCount, rolesList);
 
     // Helpful distribution log for validation.
     var counts = new Dictionary<MusicalRole, int>();
@@ -1551,6 +1554,266 @@ private void AssignHiddenImprintsByNearestSeed(
         _hiddenImprints[gp] = seedRoles[bestSeed];
     }
 }
+
+    // Geo-aware seed selection. Returns an expanded seed list where Archipelago roles appear
+    // seedCount times, Ridge roles appear twice, and Ring roles get radius-based positions.
+    // AssignHiddenImprintsByNearestSeed handles duplicate roles correctly via nearest-seed logic.
+    private (Vector2Int[] seedCells, MusicalRole[] seedRoles, int actualSeedCount) SelectRoleSeedsWithGeo(
+        List<Vector2Int> occupied,
+        List<MusicalRole> rolesList,
+        Vector2Int starCell)
+    {
+        if (occupied.Count == 0) return (System.Array.Empty<Vector2Int>(), System.Array.Empty<MusicalRole>(), 0);
+
+        // Compute bounding box and max radius from star for ring/ridge math.
+        int minX = occupied[0].x, maxX = occupied[0].x;
+        int minY = occupied[0].y, maxY = occupied[0].y;
+        for (int i = 1; i < occupied.Count; i++)
+        {
+            if (occupied[i].x < minX) minX = occupied[i].x;
+            if (occupied[i].x > maxX) maxX = occupied[i].x;
+            if (occupied[i].y < minY) minY = occupied[i].y;
+            if (occupied[i].y > maxY) maxY = occupied[i].y;
+        }
+
+        float maxDistFromStar = 0f;
+        for (int i = 0; i < occupied.Count; i++)
+        {
+            float d = (occupied[i] - starCell).sqrMagnitude;
+            if (d > maxDistFromStar) maxDistFromStar = d;
+        }
+        maxDistFromStar = Mathf.Sqrt(maxDistFromStar);
+
+        // Build the expanded slot list.
+        var slotRoles = new List<MusicalRole>();
+        for (int ri = 0; ri < rolesList.Count; ri++)
+        {
+            MusicalRole role = rolesList[ri];
+            MazeGeoFeature feature = ResolveGeoFeature(role, ri);
+            MazeRoleGeoConfig cfg = ResolveGeoConfig(role);
+
+            switch (feature)
+            {
+                case MazeGeoFeature.Archipelago:
+                    int n = cfg != null ? Mathf.Clamp(cfg.seedCount, 2, 8) : 3;
+                    for (int k = 0; k < n; k++) slotRoles.Add(role);
+                    break;
+                case MazeGeoFeature.Ridge:
+                    slotRoles.Add(role);
+                    slotRoles.Add(role); // two antipodal seeds
+                    break;
+                default:
+                    slotRoles.Add(role); // Continent, Island, Glade, Rings — one seed each
+                    break;
+            }
+        }
+
+        int totalSlots = Mathf.Min(slotRoles.Count, occupied.Count);
+        var seedCells = new Vector2Int[totalSlots];
+        var seedRoles = new MusicalRole[totalSlots];
+        var chosen = new HashSet<Vector2Int>();
+
+        // Separate pass for Ring roles: place seeds at evenly-spaced radii from star.
+        var ringRoles = new List<MusicalRole>();
+        for (int ri = 0; ri < rolesList.Count; ri++)
+            if (ResolveGeoFeature(rolesList[ri], ri) == MazeGeoFeature.Rings)
+                ringRoles.Add(rolesList[ri]);
+
+        int filled = 0;
+        if (ringRoles.Count > 0 && maxDistFromStar > 0f)
+        {
+            for (int k = 0; k < ringRoles.Count && filled < totalSlots; k++)
+            {
+                float targetRadius = (k + 0.5f) * (maxDistFromStar / ringRoles.Count);
+                int bestIdx = -1;
+                float bestDelta = float.MaxValue;
+                for (int i = 0; i < occupied.Count; i++)
+                {
+                    if (chosen.Contains(occupied[i])) continue;
+                    float dist = Mathf.Sqrt((occupied[i] - starCell).sqrMagnitude);
+                    float delta = Mathf.Abs(dist - targetRadius);
+                    if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+                }
+                if (bestIdx < 0) continue;
+                seedCells[filled] = occupied[bestIdx];
+                seedRoles[filled] = ringRoles[k];
+                chosen.Add(occupied[bestIdx]);
+                filled++;
+            }
+        }
+
+        // Ridge pass: place pairs at opposing ends of the bounding box's long axis.
+        bool widerX = (maxX - minX) >= (maxY - minY);
+        for (int ri = 0; ri < rolesList.Count && filled < totalSlots; ri++)
+        {
+            if (ResolveGeoFeature(rolesList[ri], ri) != MazeGeoFeature.Ridge) continue;
+            // Seed A: extreme in the long-axis + direction.
+            for (int pass = 0; pass < 2 && filled < totalSlots; pass++)
+            {
+                int bestIdx2 = -1;
+                float bestVal = pass == 0 ? float.MinValue : float.MaxValue;
+                for (int i = 0; i < occupied.Count; i++)
+                {
+                    if (chosen.Contains(occupied[i])) continue;
+                    float v = widerX ? occupied[i].x : occupied[i].y;
+                    if (pass == 0 && v > bestVal) { bestVal = v; bestIdx2 = i; }
+                    if (pass == 1 && v < bestVal) { bestVal = v; bestIdx2 = i; }
+                }
+                if (bestIdx2 < 0) continue;
+                seedCells[filled] = occupied[bestIdx2];
+                seedRoles[filled] = rolesList[ri];
+                chosen.Add(occupied[bestIdx2]);
+                filled++;
+            }
+        }
+
+        // Remaining slots via farthest-point sampling (Continent, Island, Glade, Archipelago extras).
+        for (int s = 0; s < totalSlots && filled < totalSlots; s++)
+        {
+            // Find the next unfilled slot role.
+            MusicalRole slotRole = slotRoles[s];
+            bool alreadyFilledBySpecialPass = false;
+            // Count how many seeds of this role were already placed specially.
+            int specialCount = 0;
+            for (int f = 0; f < filled; f++)
+                if (seedRoles[f] == slotRole) specialCount++;
+            // Count how many slots of this role precede slot s.
+            int slotsBeforeS = 0;
+            for (int k = 0; k < s; k++)
+                if (slotRoles[k] == slotRole) slotsBeforeS++;
+            if (slotsBeforeS < specialCount) { alreadyFilledBySpecialPass = true; }
+            if (alreadyFilledBySpecialPass) continue;
+
+            int bestIdx3 = -1;
+            float bestMinDist = float.MinValue;
+
+            for (int i = 0; i < occupied.Count; i++)
+            {
+                Vector2Int candidate = occupied[i];
+                if (chosen.Contains(candidate)) continue;
+
+                float minDistToChosen;
+                if (chosen.Count == 0)
+                {
+                    // No seeds yet — farthest from star preserves original dominant-seed behavior.
+                    minDistToChosen = (candidate - starCell).sqrMagnitude;
+                }
+                else
+                {
+                    minDistToChosen = float.MaxValue;
+                    foreach (var c in chosen)
+                    {
+                        float d = (candidate - c).sqrMagnitude;
+                        if (d < minDistToChosen) minDistToChosen = d;
+                    }
+                }
+
+                if (minDistToChosen > bestMinDist) { bestMinDist = minDistToChosen; bestIdx3 = i; }
+            }
+
+            if (bestIdx3 < 0) break;
+            seedCells[filled] = occupied[bestIdx3];
+            seedRoles[filled] = slotRole;
+            chosen.Add(occupied[bestIdx3]);
+            filled++;
+        }
+
+        string geoSummary = string.Join(", ", System.Linq.Enumerable.Range(0, rolesList.Count)
+            .Select(ri => $"{rolesList[ri]}={ResolveGeoFeature(rolesList[ri], ri)}"));
+        Debug.Log($"[MAZE] SelectRoleSeedsWithGeo: pattern={_activePatternType}, seeds={filled}, geoFeatures=({geoSummary})");
+
+        return (seedCells, seedRoles, filled);
+    }
+
+    private void PostProcessGeoImprints(
+        List<Vector2Int> occupied,
+        Vector2Int[] seedCells,
+        MusicalRole[] seedRoles,
+        int seedCount,
+        List<MusicalRole> rolesList)
+    {
+        for (int ri = 0; ri < rolesList.Count; ri++)
+        {
+            MusicalRole role = rolesList[ri];
+            MazeGeoFeature feature = ResolveGeoFeature(role, ri);
+            MazeRoleGeoConfig cfg = ResolveGeoConfig(role);
+
+            if (feature == MazeGeoFeature.Island || feature == MazeGeoFeature.Archipelago)
+            {
+                float radius = cfg != null ? cfg.radiusCells : 6f;
+                float radiusSq = radius * radius;
+
+                // For each cell assigned to this role, clip it if too far from its nearest own seed.
+                for (int i = 0; i < occupied.Count; i++)
+                {
+                    Vector2Int gp = occupied[i];
+                    if (!_hiddenImprints.TryGetValue(gp, out MusicalRole assigned) || assigned != role)
+                        continue;
+
+                    float minOwnSeedDistSq = float.MaxValue;
+                    for (int s = 0; s < seedCount; s++)
+                        if (seedRoles[s] == role)
+                        {
+                            float d = (gp - seedCells[s]).sqrMagnitude;
+                            if (d < minOwnSeedDistSq) minOwnSeedDistSq = d;
+                        }
+
+                    if (minOwnSeedDistSq <= radiusSq) continue;
+
+                    // Reassign to nearest seed of a different role.
+                    float bestOtherDist = float.MaxValue;
+                    int bestOtherSeed = -1;
+                    for (int s = 0; s < seedCount; s++)
+                    {
+                        if (seedRoles[s] == role) continue;
+                        float d = (gp - seedCells[s]).sqrMagnitude;
+                        if (d < bestOtherDist) { bestOtherDist = d; bestOtherSeed = s; }
+                    }
+                    if (bestOtherSeed >= 0)
+                        _hiddenImprints[gp] = seedRoles[bestOtherSeed];
+                }
+            }
+            else if (feature == MazeGeoFeature.Glade)
+            {
+                // Find the softest other role (lowest carveResistance) to use as clearing fill.
+                MusicalRole softRole = role;
+                float softestResistance = float.MaxValue;
+                for (int ri2 = 0; ri2 < rolesList.Count; ri2++)
+                {
+                    if (rolesList[ri2] == role) continue;
+                    var prof = MusicalRoleProfileLibrary.GetProfile(rolesList[ri2]);
+                    float r = prof != null ? prof.GetCarveResistance01() : 0.5f;
+                    if (r < softestResistance) { softestResistance = r; softRole = rolesList[ri2]; }
+                }
+
+                // Collect glade territory cells.
+                var territory = new List<Vector2Int>();
+                for (int i = 0; i < occupied.Count; i++)
+                    if (_hiddenImprints.TryGetValue(occupied[i], out MusicalRole r2) && r2 == role)
+                        territory.Add(occupied[i]);
+
+                if (territory.Count == 0) continue;
+
+                int gladeCount2 = cfg != null ? cfg.gladeCount : 2;
+                float gladeRadius2 = cfg != null ? cfg.gladeRadius : 3f;
+                float gladeRadiusSq = gladeRadius2 * gladeRadius2;
+
+                for (int g = 0; g < gladeCount2; g++)
+                {
+                    // Pick a random interior cell as the clearing center (avoid border by ≥gladeRadius).
+                    Vector2Int center = territory[UnityEngine.Random.Range(0, territory.Count)];
+
+                    // Reassign cells within gladeRadius to the soft role.
+                    for (int i = 0; i < territory.Count; i++)
+                    {
+                        if ((territory[i] - center).sqrMagnitude <= gladeRadiusSq)
+                            _hiddenImprints[territory[i]] = softRole;
+                    }
+                }
+            }
+        }
+    }
+
     public void ResetMazeGenerationFlag()
     {
         _mazeAlreadyGenerated = false;
@@ -2443,6 +2706,48 @@ private void AssignHiddenImprintsByNearestSeed(
         _activeRoles = roles != null && roles.Count > 0
             ? new List<MusicalRole>(roles)
             : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+    }
+
+    public void ApplyMotifGeoConfig(MotifProfile motif)
+    {
+        _roleGeoConfigs = motif?.roleGeoConfigs != null && motif.roleGeoConfigs.Count > 0
+            ? new List<MazeRoleGeoConfig>(motif.roleGeoConfigs)
+            : null;
+        _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
+    }
+
+    public MusicalRole GetZoneRole(Vector2Int cell)
+    {
+        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var r))
+            return r;
+        return MusicalRole.None;
+    }
+
+    private MazeGeoFeature ResolveGeoFeature(MusicalRole role, int roleIndex)
+    {
+        if (_roleGeoConfigs != null)
+            for (int i = 0; i < _roleGeoConfigs.Count; i++)
+                if (_roleGeoConfigs[i].role == role)
+                    return _roleGeoConfigs[i].feature;
+
+        return _activePatternType switch
+        {
+            MazePatternType.RingChokepoints => MazeGeoFeature.Rings,
+            MazePatternType.DrunkenStrokes  => MazeGeoFeature.Archipelago,
+            MazePatternType.DiagonalLanes   => MazeGeoFeature.Archipelago,
+            MazePatternType.ClearBoxes      => roleIndex == 0 ? MazeGeoFeature.Glade : MazeGeoFeature.Continent,
+            MazePatternType.Tunnels         => roleIndex == 0 ? MazeGeoFeature.Ridge : MazeGeoFeature.Continent,
+            _                               => MazeGeoFeature.Continent,
+        };
+    }
+
+    private MazeRoleGeoConfig ResolveGeoConfig(MusicalRole role)
+    {
+        if (_roleGeoConfigs != null)
+            for (int i = 0; i < _roleGeoConfigs.Count; i++)
+                if (_roleGeoConfigs[i].role == role)
+                    return _roleGeoConfigs[i];
+        return null;
     }
 
     // Returns true if the role is present in the current motif's active role list.

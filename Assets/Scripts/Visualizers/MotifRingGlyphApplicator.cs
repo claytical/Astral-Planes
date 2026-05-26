@@ -553,6 +553,58 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         _recordFadingOut = false;
     }
 
+    /// <summary>
+    /// Spin the whole record 360° clockwise over <paramref name="spinDuration"/>, then
+    /// slide it off the left edge over <paramref name="rollDuration"/>. Replaces
+    /// FadeOutAndClear at bridge exit when the record hold finishes.
+    /// </summary>
+    public IEnumerator SpinAndRollOffRecordRings(float spinDuration, float rollDuration)
+    {
+        _recordFadingOut = true;  // stop per-ring rotation coroutines
+
+        Vector3 startPos = transform.position;
+
+        float targetX = startPos.x - 20f;
+        var gfm = GameFlowManager.Instance;
+        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
+        {
+            float worldScale  = transform.lossyScale.x;
+            float outerRWorld = worldScale > 0f
+                ? worldScale * (RingInnerRadius(Mathf.Max(0, _recordRings.Count - 1)) + config.ringThickness)
+                : config.ringThickness;
+            float holdScale = config != null ? config.ringHoldScale : 0.25f;
+            targetX = area.left - outerRWorld * holdScale;
+        }
+
+        // Phase 1: spin parent 360° clockwise over spinDuration
+        float elapsed = 0f;
+        while (elapsed < spinDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / spinDuration);
+            transform.rotation = Quaternion.Euler(0f, 0f, -360f * t);
+            yield return null;
+        }
+        transform.rotation = Quaternion.identity;
+
+        // Phase 2: translate parent off screen over rollDuration
+        elapsed = 0f;
+        while (elapsed < rollDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / rollDuration);
+            var pos = transform.position;
+            pos.x = Mathf.Lerp(startPos.x, targetX, t);
+            transform.position = pos;
+            yield return null;
+        }
+
+        DestroyList(_recordRings);
+        _recordFadingOut = false;
+        transform.position = startPos;
+        transform.rotation = Quaternion.identity;
+    }
+
     /// <summary>Destroy all rings (both layers).</summary>
     public void Clear()
     {
