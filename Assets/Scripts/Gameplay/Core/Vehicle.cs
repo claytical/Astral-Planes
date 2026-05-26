@@ -532,11 +532,11 @@ public partial class Vehicle : MonoBehaviour
                     double pStepDur = pLoopLen / total;
                     double fwdDsp   = fwdSteps * pStepDur;
 
-                    // Ring window is always manualReleaseArmAheadSteps wide regardless of
+                    // Ring window is always effectiveArmSteps wide regardless of
                     // whether the target is in an expansion bin. The +lead gives a visible
                     // heads-up before the commit gate opens.
                     const float ringWindowLead = 1.5f;
-                    double windowDsp = (vehicleConfig.manualReleaseArmAheadSteps + ringWindowLead) * pStepDur;
+                    double windowDsp = (vehicleConfig.EffectiveArmAheadSteps(pStepDur) + ringWindowLead) * pStepDur;
                     pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, windowDsp)));
                     inTimingWindow = fwdDsp <= windowDsp;
                     atExactStep = fwdSteps <= 0.025;
@@ -666,7 +666,7 @@ public partial class Vehicle : MonoBehaviour
         int    pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(tot / (float)pBinSize));
         double pLoopLen    = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
         double pStepDur    = pLoopLen / tot;
-        double tetherWin   = vehicleConfig.manualReleaseArmAheadSteps  * pStepDur;
+        double tetherWin   = vehicleConfig.EffectiveArmAheadSteps(pStepDur) * pStepDur;
         double graceDsp    = vehicleConfig.manualReleaseGracePeriodSteps * pStepDur;
         double playheadInLoop = rawAbsP % tot;
 
@@ -1538,7 +1538,14 @@ public partial class Vehicle : MonoBehaviour
     int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
     double fwdToTarget = (targetAbsStep - rawAbs + effectiveTotal) % effectiveTotal;
 
-    bool inAheadWindow = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
+    // Hoist stepDur here so effectiveArmSteps can use it for the minimum-seconds floor,
+    // and so the arm-lock path below can reuse it without a second GetLoopLengthInSeconds call.
+    int leaderBins = Mathf.Max(1, Mathf.CeilToInt(effectiveTotal / (float)binSize));
+    double leaderLoopLen = p.track.drumTrack.GetLoopLengthInSeconds() * leaderBins;
+    double stepDur = leaderLoopLen / Mathf.Max((float)1.0, effectiveTotal);
+    float effectiveArmSteps = vehicleConfig.EffectiveArmAheadSteps(stepDur);
+
+    bool inAheadWindow = fwdToTarget <= effectiveArmSteps;
     double backFromTarget = effectiveTotal - fwdToTarget;
     bool inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
                          backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
@@ -1548,21 +1555,21 @@ public partial class Vehicle : MonoBehaviour
         viz.TryGetNearestUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int nearestAbsStep, out double nearestFwd))
     {
         double nearestBack = effectiveTotal - nearestFwd;
-        bool nearestPass = nearestFwd <= vehicleConfig.manualReleaseArmAheadSteps ||
+        bool nearestPass = nearestFwd <= effectiveArmSteps ||
                            (vehicleConfig.manualReleaseGracePeriodSteps > 0f && nearestBack <= vehicleConfig.manualReleaseGracePeriodSteps);
         if (nearestPass)
         {
             targetAbsStep = nearestAbsStep;
             fwdToTarget = nearestFwd;
             backFromTarget = nearestBack;
-            inAheadWindow = fwdToTarget <= vehicleConfig.manualReleaseArmAheadSteps;
+            inAheadWindow = fwdToTarget <= effectiveArmSteps;
             inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
                             backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
             pass = true;
             Debug.Log($"[RELEASE_RETARGET] oldTarget rejected, newTarget={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} PASS=True");
         }
     }
-    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
+    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={effectiveArmSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
 
     if (!pass)
     {
@@ -1596,7 +1603,7 @@ public partial class Vehicle : MonoBehaviour
 
     // Timing-based velocity: 0 = earliest window open (~vel 40), 1 = exact step (vel 127).
     float releaseWindowLerp = inAheadWindow
-        ? 1f - Mathf.Clamp01((float)(fwdToTarget / Mathf.Max(0.001f, vehicleConfig.manualReleaseArmAheadSteps)))
+        ? 1f - Mathf.Clamp01((float)(fwdToTarget / Mathf.Max(0.001f, effectiveArmSteps)))
         : inGraceWindow
             ? 1f - Mathf.Clamp01((float)(backFromTarget / Mathf.Max(0.001f, vehicleConfig.manualReleaseGracePeriodSteps)))
             : 0f;
@@ -1604,14 +1611,7 @@ public partial class Vehicle : MonoBehaviour
 
     if (pass && vehicleConfig.manualReleaseUseArmLock && !lateGracePass)
     {
-        // stepDur must use the full leader loop length (all bins × clip length), because
-        // totalSteps from TryGetRawPlayheadAbsStep is also leader-scoped.
-        // Using GetLoopLengthInSeconds() (single bin) here produces a stepDur that is
-        // leaderBins× too small, making gapDurationDsp leaderBins× too small.
-        var drum = p.track.drumTrack;
-        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(effectiveTotal / (float)binSize));
-        double leaderLoopLen = drum.GetLoopLengthInSeconds() * leaderBins;
-        double stepDur = leaderLoopLen / Mathf.Max(1.0f, effectiveTotal);
+        // stepDur and leaderBins already computed above for the gate checks.
         double gapDsp  = fwdToTarget * stepDur;
 
         _armedReleases.Enqueue(new ArmedRelease
@@ -1633,7 +1633,7 @@ public partial class Vehicle : MonoBehaviour
     }
 
     // Defensive guard: all non-pass paths should have returned above.
-    Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={vehicleConfig.manualReleaseArmAheadSteps:F1} PASS=False commitSkipped=True");
+    Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={effectiveArmSteps:F1} PASS=False commitSkipped=True");
     return false;
 }
 }

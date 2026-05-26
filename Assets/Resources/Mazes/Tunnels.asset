@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 61c29f65464264bd8aaca35b6879dc9a, type: 3}
-  m_Name: 6 Strokes
+  m_Name: Tunnels
   m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
-  patternType: 4
+  patternType: 6
   dustTiming:
-    regrowDelay: 3
+    regrowDelay: 4
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5

@@ -1245,6 +1245,8 @@ public class PhaseStar : MonoBehaviour
         if (IsEjectionReady())
         {
             ArmNext();
+            if (!_isArmed)
+                EnterDormantWaitState();
             return;
         }
 
