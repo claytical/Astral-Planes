@@ -1333,6 +1333,7 @@ MonoBehaviour:
     type: 3}
   vehiclePhaseInDelaySeconds: 1.2
   demoMode: 0
+  verboseLogging: 0
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}
@@ -2070,17 +2071,17 @@ PrefabInstance:
     - target: {fileID: 843980262099424911, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.8915782
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 843980262099424911, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.3439015
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 843980262099424911, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.09206924
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 843980262099424911, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
@@ -2130,7 +2131,7 @@ PrefabInstance:
     - target: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -27,8 +27,8 @@ MonoBehaviour:
   rotSpeedBase: 25
   rotSpeedMax: 174
   fadeOutDuration: 0.5
-  noteDotRadius: 0.2
-  noteTravelDuration: 0.5
+  noteDotRadius: 0.01
+  noteTravelDuration: 1
   ringHoldScale: 0.25
   bouncePressScale: 0.12
   bouncePressDuration: 0.25
