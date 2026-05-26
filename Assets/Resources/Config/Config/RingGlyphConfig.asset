@@ -17,7 +17,7 @@ MonoBehaviour:
   ringSpacing: 0.3
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
-  ringAlpha: 0.246
+  ringAlpha: 0.339
   lineWidth: 0.02
   segments: 256
   tugDepthFraction: 0.25
@@ -26,9 +26,9 @@ MonoBehaviour:
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 174
-  fadeOutDuration: 1
-  noteDotRadius: 0.02
-  noteTravelDuration: 1
+  fadeOutDuration: 0.5
+  noteDotRadius: 0.2
+  noteTravelDuration: 0.5
   ringHoldScale: 0.25
   bouncePressScale: 0.12
   bouncePressDuration: 0.25
@@ -37,8 +37,8 @@ MonoBehaviour:
   ringAppearDuration: 0.1
   noteLaunchLeadSteps: 2
   launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
-  launchSfxVolume: 0.563
+  launchSfxVolume: 0.115
   impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
-  impactSfxVolume: 0.6
+  impactSfxVolume: 0.135
   spinOffExtraDegPerSec: 720
-  spinOffDuration: 0.45
+  spinOffDuration: 2

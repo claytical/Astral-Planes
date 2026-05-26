@@ -13,24 +13,32 @@ MonoBehaviour:
   m_Name: HeartDrive
   m_EditorClassIdentifier: 
   shipName: HeartDrive
-  description: Expressive and melodic. Leans into solos and emotional tones.
-  arcadeMaxSpeed: 12
-  arcadeAccel: 4
+  description: Plow
+  arcadeMaxSpeed: 11
+  arcadeAccel: 5
   arcadeBoostAccel: 140
   arcadeLinearDamping: 0.08
   arcadeAngularDamping: 0.5
-  coastBrakeForce: 0.6
+  coastBrakeForce: 0.7
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  mass: 2.2
+  mass: 2.5
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
   capacity: 250
   burnRate: 0.35
   plowHalfWidthCells: 2
   plowDepthCells: 4
   plowMinSpeed: 2
-  plowChipAmount: 1
+  plowChipAmount: 2
   vehicleKeepClearRadiusCells: 0
+  carveResistanceBypass01: 0.8
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 0.85
+  plowSteeringPenalty01: 0.65
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14

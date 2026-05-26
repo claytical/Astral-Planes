@@ -49,6 +49,31 @@ public class ShipMusicalProfile : ScriptableObject
     [Tooltip("Radius around the vehicle kept clear of dust (cells). 0 = use Inspector value.")]
     public int vehicleKeepClearRadiusCells = 0;
 
+    [Header("Archetype Traits")]
+    [Tooltip("Cutter/Plow: fraction of dust carveResistance01 this vehicle ignores. " +
+             "0 = fully subject to resistance (Cutter). 1 = punches through any dust (Plow).")]
+    [Range(0f, 1f)] public float carveResistanceBypass01 = 0f;
+
+    [Tooltip("Cutter: speed fraction lost per resistant cell carved each plow tick. " +
+             "Accumulates as: drain += cell.carveResistance01 * carveVelocityDrainPerCell. Plow = 0.")]
+    [Range(0f, 0.5f)] public float carveVelocityDrainPerCell = 0f;
+
+    [Tooltip("How strongly player input can redirect current velocity direction. " +
+             "1 = snap to input (default). 0.2 = very slidey — can barely redirect at speed. " +
+             "Drifter: ~0.2. Needle: ~0.95. Plow base: ~0.85 (further reduced by plowSteeringPenalty01 while carving).")]
+    [Range(0.05f, 1f)] public float directionalAuthority01 = 1f;
+
+    [Tooltip("Plow: additional authority reduction WHILE actively carving (boosting + speed ≥ plowMinSpeed). " +
+             "Effective authority while plowing = directionalAuthority01 × (1 - plowSteeringPenalty01). Plow: ~0.65. Others: 0.")]
+    [Range(0f, 1f)] public float plowSteeringPenalty01 = 0f;
+
+    [Tooltip("Needle: world-unit radius within which a MineNode triggers handling instability. 0 = disabled.")]
+    [Min(0f)] public float pressureInstabilityRadius = 0f;
+
+    [Tooltip("Needle: maximum authority reduction when a MineNode is at the inner edge of pressureInstabilityRadius. " +
+             "0.55 → controls become ~45% effective at full pressure.")]
+    [Range(0f, 1f)] public float pressureInstabilityStrength01 = 0f;
+
     [Header("Soul Sprite")]
     [Tooltip("Local scale for the hidden soul sprite when inactive.")]
     public float soulMinScale = 0.3f;

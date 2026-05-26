@@ -14,16 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   shipName: Drifter
   description: Ambient and steady. Prefers low-end and smooth textures.
-  arcadeMaxSpeed: 15
-  arcadeAccel: 5
+  arcadeMaxSpeed: 16
+  arcadeAccel: 8
   arcadeBoostAccel: 90
   arcadeLinearDamping: 0.02
   arcadeAngularDamping: 0.5
-  coastBrakeForce: 0.3
+  coastBrakeForce: 0.25
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  mass: 1.6
+  mass: 2
+  impactSpeedCap: 15
+  hitVelocityMultiplier: 1
   capacity: 100
   burnRate: 0.25
   plowHalfWidthCells: 1
@@ -31,10 +33,14 @@ MonoBehaviour:
   plowMinSpeed: 2
   plowChipAmount: 1
   vehicleKeepClearRadiusCells: 0
+  carveResistanceBypass01: 0
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 0.6
+  plowSteeringPenalty01: 0
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14
   soulAlphaMin: 0
   soulAlphaMax: 0.85
-  impactSpeedCap: 15
-  hitVelocityMultiplier: 1

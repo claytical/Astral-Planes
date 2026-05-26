@@ -2240,7 +2240,7 @@ private void AssignHiddenImprintsByNearestSeed(
     // Incremental plow carve: removes energyAmount units from the cell, scaled by carveResistance01.
     // Full removal triggers ClearCell + regrowth + ripeness — same as CarveDustByVehicle.
     // Partial chips leave the cell solid at reduced energy.
-    public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds)
+    public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
@@ -2249,8 +2249,10 @@ private void AssignHiddenImprintsByNearestSeed(
         if (cellGo == null) return;
         if (!cellGo.TryGetComponent<CosmicDust>(out var dust) || dust == null) return;
 
-        // Scale chip amount by carve resistance: high resistance = fewer units removed per tick.
-        float resistMul = 1f - dust.clearing.carveResistance01;
+        // Scale chip amount by carve resistance, reduced by vehicle's bypass.
+        // bypass=0 (default): full resistance applies. bypass=1: resistance ignored entirely.
+        float effectiveResistance = dust.clearing.carveResistance01 * (1f - Mathf.Clamp01(resistanceBypass01));
+        float resistMul = 1f - effectiveResistance;
         int effectiveChip = Mathf.Max(1, Mathf.RoundToInt(energyAmount * resistMul));
 
         int removed = dust.ChipEnergy(effectiveChip);
