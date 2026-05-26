@@ -2735,7 +2735,31 @@ public class InstrumentTrack : MonoBehaviour, IExpansionHost
         targetBin = Mathf.Clamp(GetNextBinForSpawn(), 0, Mathf.Max(0, loopMultiplier - 1));
     }
 
-
+    // Backfill: for any preceding bin (0..targetBin-1) with no persistent notes,
+    // fire a separate burst so those bins don't stay silent after ascension.
+    // forcedTargetBin >= 0 marks child calls and prevents recursion.
+    if (forcedTargetBin < 0 && targetBin > 0)
+    {
+        for (int b = 0; b < targetBin; b++)
+        {
+            if (b < loopMultiplier && !HasAnyNoteInBin(b))
+            {
+                SpawnCollectableBurst(
+                    noteSet,
+                    maxToSpawn,
+                    /* forcedBurstId= */ -1,
+                    originWorld,
+                    repelFromWorld,
+                    burstImpulse,
+                    spreadAngleDeg,
+                    spawnJitterRadius,
+                    placementMode,
+                    trapSearchRadiusCells,
+                    trapBufferCells,
+                    /* forcedTargetBin= */ b);
+            }
+        }
+    }
 
     if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
 

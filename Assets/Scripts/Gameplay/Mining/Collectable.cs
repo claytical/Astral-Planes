@@ -808,23 +808,18 @@ private IEnumerator SpawnArrivalRoutine(
         float ttl = Mathf.Max(3f, drums.GetLoopLengthInSeconds() * 1.1f);
         yield return new WaitForSeconds(ttl);
 
-        // Become "dark" (muted look), but keep collider & collection live
-        IsDark = true;
+        // If the vehicle already picked this up, let the carry/release path handle cleanup.
+        if (_handled) yield break;
 
-        if (energySprite != null)
-        {
-            var c = energySprite.color;
-            // desaturate & lower alpha a bit
-            var grey = new Color(0.25f, 0.25f, 0.25f, Mathf.Clamp01(c.a * 0.55f));
-            energySprite.color = grey;
-        }
+        // Uncollected collectable expired — release the burst slot so the StarPool gate
+        // can clear, then destroy. Leaving the GO alive (old behavior) kept
+        // AnyCollectablesInFlightGlobal() returning true indefinitely, permanently
+        // blocking ResumeAll() and new star spawning.
+        track.spawnedCollectables?.Remove(gameObject);
+        if (burstId != 0)
+            track.NotifyNoteDiscarded(burstId, intendedStep);
 
-        // If we have a marker, ensure it’s greyed
-        if (ribbonMarker != null)
-        {
-            var ml = ribbonMarker.GetComponent<MarkerLight>() ?? ribbonMarker.gameObject.AddComponent<MarkerLight>();
-            ml.SetGrey(new Color(1f, 1f, 1f, 0.18f));
-        }
+        Destroy(gameObject);
     }
 
    private IEnumerator TravelRoutine(

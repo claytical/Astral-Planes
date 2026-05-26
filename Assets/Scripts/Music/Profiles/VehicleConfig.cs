@@ -14,6 +14,9 @@ public class VehicleConfig : ScriptableObject
     [Range(0.5f, 16f)]
     [Tooltip("How far ahead (in steps) the next placeholder can be for the press to count as an ARM.")]
     public float manualReleaseArmAheadSteps = 6f;
+    [Range(0f, 2f)]
+    [Tooltip("Minimum arm window in real time (seconds). Overrides manualReleaseArmAheadSteps when step duration is short (e.g. high stepsPerLoop profiles). Set to 0 to disable.")]
+    public float manualReleaseArmAheadMinSeconds = 0.5f;
     [Range(0.05f, 1.0f)]
     [Tooltip("How close (in steps) the playhead must be to the armed target for auto-commit.")]
     public float manualReleaseAutoCommitEpsSteps = 0.35f;
@@ -73,6 +76,18 @@ public class VehicleConfig : ScriptableObject
     public float spawnRestPocketFadeSeconds = 0.05f;
     [Tooltip("Delay (seconds) before carving the pocket.")]
     public float spawnRestPocketDelaySeconds = 0.0f;
+
+    /// <summary>
+    /// Returns the effective arm-ahead window in steps, respecting the minimum
+    /// real-time floor so high-resolution profiles (large stepsPerLoop) remain playable.
+    /// </summary>
+    public float EffectiveArmAheadSteps(double stepDurSeconds)
+    {
+        if (manualReleaseArmAheadMinSeconds <= 0f || stepDurSeconds <= 0.0)
+            return manualReleaseArmAheadSteps;
+        float fromSeconds = (float)(manualReleaseArmAheadMinSeconds / stepDurSeconds);
+        return Mathf.Max(manualReleaseArmAheadSteps, fromSeconds);
+    }
 
     [Header("Note Trail")]
     [Tooltip("World-space spacing between queued notes trailing behind the vehicle.")]
