@@ -26,6 +26,9 @@ public class DrumTrack : MonoBehaviour
 
     [SerializeField, Tooltip("How many multiples above baseline maps to full intensity (>=1). 2.5 means 2.5x baseline => intensity 1.")]
     private float burnMultipleAtFullIntensity = 2.5f;
+
+    [SerializeField, Tooltip("Intensity ceiling when exactly 1 instrument track has notes in the upcoming bin (0=low clip only, 1=uncapped). 2+ tracks always uncap.")]
+    private float singleTrackIntensityCeiling = 0.45f;
     private float _lateBindMotifTimer = 0f;
     private const float kLateBindMotifInterval = 1.0f;
     private float _lastTotalSpentSample = -1f; // baseline sample of TOTAL spent tanks (cumulative)
@@ -855,23 +858,25 @@ public class DrumTrack : MonoBehaviour
             $"intensity={intensity01:F3} loops={loopsCt}"
         );
 
-        // Empty-bin gate: if every track has no notes in the bin currently playing,
-        // force intensity to 0. Intentionally does NOT update _lastIntensity01 so the
-        // energy-burn history is preserved and intensity recovers smoothly when notes appear.
+        // Per-bin intensity ceiling: check the upcoming bin (completedLoops is already
+        // incremented to the new loop at this point) so the scheduled clip reflects
+        // what's actually about to play. Does NOT update _lastIntensity01 with the
+        // clamped value so energy-burn history is preserved across empty bins.
+        // 0 filled tracks → ceiling 0, 1 → singleTrackIntensityCeiling, 2+ → uncapped.
         var _ctrl = _gfm?.controller;
         if (_ctrl?.tracks != null)
         {
-            bool allEmpty = true;
+            int filledCount = 0;
             foreach (var track in _ctrl.tracks)
             {
                 if (track == null) continue;
-                // On a boundary callback, completedLoops has already been incremented
-                // to the *new* loop. For "what just played" checks, use the previous loop
-                // index so we do not accidentally sample bin 0 at wrap (e.g., I-II -> I-I).
-                int bin = (Mathf.Max(0, completedLoops - 1)) % Mathf.Max(1, track.loopMultiplier);
-                if (track.HasAnyNoteInBin(bin)) { allEmpty = false; break; }
+                int upcomingBin = completedLoops % Mathf.Max(1, track.loopMultiplier);
+                if (track.HasAnyNoteInBin(upcomingBin)) filledCount++;
             }
-            if (allEmpty) intensity01 = 0f;
+            float ceiling = filledCount == 0 ? 0f
+                          : filledCount == 1 ? singleTrackIntensityCeiling
+                          : 1f;
+            intensity01 = Mathf.Min(intensity01, ceiling);
         }
 
         // 4) Select target clip
