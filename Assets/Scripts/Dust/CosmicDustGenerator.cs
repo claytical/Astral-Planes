@@ -79,6 +79,10 @@ public class CosmicDustGenerator : MonoBehaviour
     [Tooltip("Seconds to wait after a cell becomes visible again before enabling its collider.")]
     [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
 
+    [Header("Void Grow Visuals")]
+    [Tooltip("Sprite scale-in and tint fade duration for gravity void dust. Decoupled from remaining bin time so the visual is consistently organic.")]
+    [Range(0.1f, 2f)] [SerializeField] private float voidDustGrowInSeconds = 0.40f;
+
     [Header("Zap Clear Tuning")]
     [Tooltip("Visual fade duration used when star zap logic clears a dust cell.")]
     [SerializeField] private float zapFadeSeconds = 1.5f;
@@ -754,18 +758,21 @@ public class CosmicDustGenerator : MonoBehaviour
             dust.PrepareForReuse();
             dust.InitializeVisuals(DustTimings);
 
-            // void uses remaining-bin time
-            dust.SetGrowInDuration(growInSeconds);
+            dust.SetGrowInDuration(voidDustGrowInSeconds);
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.carveResistance01 = resistance.carveResistance01;
             dust.clearing.drainResistance01 = resistance.drainResistance01;
-            // Gravity-void growth should preserve the requested imprint tint/role while
-            // the cell is still non-colliding.
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.regrowAlphaCapped = true;
             dust.Begin();
             EnsureDustSpriteRendererEnabled(dust);
+
+            // Organic grow-in: start at maze gray and fade to role color over the full visual duration.
+            Color dormantStart = _mazeTint;
+            dormantStart.a = tintWithAlpha.a;
+            dust.ApplyTintVisual(dormantStart);
+            dust.StartCoroutine(dust.TintFadeIn(voidDustGrowInSeconds, dormantStart, tintWithAlpha));
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);

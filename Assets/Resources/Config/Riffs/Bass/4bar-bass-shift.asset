@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 4bar-bass-shift
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: 4bar-bass
-  roleProfile: {fileID: 0}
+  roleProfile: {fileID: 11400000, guid: b63a78a8afc9544ffaeacdd2306d6ee8, type: 2}
   riff: {fileID: 11400000, guid: fb0f2935acb574b4693c50ccf9b077e4, type: 2}
   useRiffAsAuthoritativeScore: 1
   scales: []

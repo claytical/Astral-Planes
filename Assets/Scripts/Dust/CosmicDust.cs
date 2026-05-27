@@ -755,7 +755,22 @@ private Coroutine _jiggleRoutine;
             SetBaseTint(now, applyImmediatelyIfNoPulse: false);
             yield return null;
         }
-        SetBaseTint(toTint, applyImmediatelyIfNoPulse: true);    }    
+        SetBaseTint(toTint, applyImmediatelyIfNoPulse: true);
+    }
+
+    public IEnumerator TintFadeIn(float seconds, Color fromTint, Color toTint)
+    {
+        float t = 0f;
+        while (t < seconds)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.0001f, seconds));
+            ApplyTintVisual(Color.Lerp(fromTint, toTint, u));
+            yield return null;
+        }
+        ApplyTintVisual(toTint);
+    }
+
     private ParticleSystem[] GetAllParticleSystems()
 {
     if (visual.particleSystem == null) return null;

@@ -198,7 +198,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             startPositions[i] = snapshot[i].Root != null
                 ? snapshot[i].Root.transform.position : transform.position;
 
-        float holdScale = config != null ? config.ringHoldScale  : 0.25f;
         float duration  = config != null ? config.rollOffDuration : 1.5f;
         float targetX   = startPositions[0].x - 20f;
         var   gfm       = GameFlowManager.Instance;
@@ -208,7 +207,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             float outerRWorld = worldScale > 0f
                 ? worldScale * (RingInnerRadius(snapshot.Length - 1) + config.ringThickness)
                 : config.ringThickness;
-            targetX = area.left - outerRWorld * holdScale;
+            targetX = area.left - outerRWorld;
         }
 
         float elapsed = 0f;
@@ -385,6 +384,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             {
                 float t = ringKeys.Count > 1 ? (float)i / (ringKeys.Count - 1) : 0f;
                 rotDeg = Mathf.Lerp(config.rotSpeedBase, config.rotSpeedMax, t);
+                // Distribute rings at evenly-spaced Y angles so they form tilted orbits.
+                entry.Root.transform.localEulerAngles =
+                    new Vector3(0f, (float)i / ringKeys.Count * 180f, 0f);
             }
             else
             {
@@ -426,7 +428,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                     entry.Root.transform, rotDeg,
                     noteInfos, noteViz,
                     role, binIndex, color, binSize, outerR,
-                    shouldStop: () => _recordFadingOut));
+                    shouldStop: () => _recordFadingOut,
+                    spherical: sphericalRotation));
             }
             else
             {
@@ -437,7 +440,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                     entry.Root.transform, rotDeg,
                     new List<NoteAnimInfo>(),
                     noteViz,
-                    shouldStop: () => _recordFadingOut));
+                    shouldStop: () => _recordFadingOut,
+                    spherical: sphericalRotation));
             }
         }
 
@@ -572,8 +576,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             float outerRWorld = worldScale > 0f
                 ? worldScale * (RingInnerRadius(Mathf.Max(0, _recordRings.Count - 1)) + config.ringThickness)
                 : config.ringThickness;
-            float holdScale = config != null ? config.ringHoldScale : 0.25f;
-            targetX = area.left - outerRWorld * holdScale;
+            targetX = area.left - outerRWorld;
         }
 
         // Phase 1: spin parent 360° clockwise over spinDuration
@@ -807,7 +810,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float delay, float drawDuration,
         Transform ringTransform, float rotDegPerSec,
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
-        System.Func<bool> shouldStop)
+        System.Func<bool> shouldStop,
+        bool spherical = false)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
@@ -850,7 +854,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         while (!shouldStop())
         {
             if (ringTransform == null) yield break;
-            ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            if (spherical)
+                ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
+            else
+                ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
     }
@@ -864,7 +871,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         Transform ringTransform, float rotDegPerSec,
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         MusicalRole role, int binIndex, Color color, int binSteps, float outerR,
-        System.Func<bool> shouldStop)
+        System.Func<bool> shouldStop,
+        bool spherical = false)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
         if (shouldStop()) yield break;
@@ -919,7 +927,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         while (!shouldStop())
         {
             if (ringTransform == null) yield break;
-            ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            if (spherical)
+                ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
+            else
+                ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
     }
