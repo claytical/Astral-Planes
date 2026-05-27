@@ -6,7 +6,7 @@ using System.Linq;
 // One completed playthrough of one authored chapter.
 // Sealed at phase completion and added to GardenRecord.
 
-public class DrumTrack : MonoBehaviour
+public partial class DrumTrack : MonoBehaviour
 {
     private int _boundarySerial = 0;
     private PlayArea _lastPlayAreaForTileCache;
@@ -288,7 +288,7 @@ public class DrumTrack : MonoBehaviour
     string incomingId = motif ? motif.motifId : "null";
     double dspNow = AudioSettings.dspTime;
 
-    // Detect “motif spam”: same motif being applied again within ~1–2 loops.
+    // Detect "motif spam": same motif being applied again within ~1–2 loops.
     if (_lastApplyMotifId == incomingId && _lastApplyMotifDsp > 0 && (dspNow - _lastApplyMotifDsp) < 10.0)
     {
         Debug.LogWarning(
@@ -332,7 +332,7 @@ public class DrumTrack : MonoBehaviour
     {
         _entryLoopsRemaining = (_motif != null) ? Mathf.Max(0, _motif.entryLoopCount) : 0;
 
-        // Reset intensity sampling for new motif (prevents “stuck at 0” after first motif).
+        // Reset intensity sampling for new motif (prevents "stuck at 0" after first motif).
         _lastSpentTanksSample = -1f;
         _lastTotalSpentSample = -1f;
         _burnBaselineEma = 0f;
@@ -413,55 +413,55 @@ public class DrumTrack : MonoBehaviour
         );
     }
 
-    // ------------------------------------------------------------
-    // 4) Clip guards + scheduling
-    // ------------------------------------------------------------
-    if (clip == null)
-    {
-        Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
-        return;
-    }
-
-    // If we haven't started yet, let ManualStart handle scheduling.
-    if (!_started)
-        return;
-
-    if (restartTransport)
-    {
-        // Hard reset both decks, then schedule fresh.
-        try { if (_activeDrum != null) _activeDrum.Stop(); } catch { }
-        try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
-        _pendingDrumLoop = null;
-        _pendingDrumLoopArmed = false;
-
-        // Since we're restarting, timing must be committed immediately.
-        if (_motif != null)
-        {
-            drumLoopBPM = _motif.bpm;
-            totalSteps  = _motif.stepsPerLoop;
-        }
-        _pendingTimingValid = false;
-
-        EnsureDualDrumSources();
-        if (_activeDrum == null) return;
-
-        _activeDrum.clip = clip;
-        _activeDrum.loop = true;
-        _clipLengthSec = Mathf.Max(clip.length, 0f);
-
-        double dspStart = AudioSettings.dspTime + 0.05;
-        _activeDrum.PlayScheduled(dspStart);
-        drumAudioSource = _activeDrum;
-        startDspTime = dspStart;
-        leaderStartDspTime = dspStart;
-        _currentDrumClip = clip;
-        return;
-    }
-
-    // Normal path: arm a pending clip and let Update() schedule the swap at a safe boundary.
-    _pendingDrumLoop = clip;
-    _pendingDrumLoopArmed = armAtNextBoundary;
+    ScheduleClipChange(clip, armAtNextBoundary, restartTransport, who);
 }
+
+    // Applies clip to the transport: hard-restarts decks if restartTransport, otherwise arms a pending swap.
+    private void ScheduleClipChange(AudioClip clip, bool armAtNextBoundary, bool restartTransport, string who)
+    {
+        if (clip == null)
+        {
+            Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
+            return;
+        }
+
+        if (!_started)
+            return;
+
+        if (restartTransport)
+        {
+            try { if (_activeDrum != null) _activeDrum.Stop(); } catch { }
+            try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+            _pendingDrumLoop = null;
+            _pendingDrumLoopArmed = false;
+
+            if (_motif != null)
+            {
+                drumLoopBPM = _motif.bpm;
+                totalSteps  = _motif.stepsPerLoop;
+            }
+            _pendingTimingValid = false;
+
+            EnsureDualDrumSources();
+            if (_activeDrum == null) return;
+
+            _activeDrum.clip = clip;
+            _activeDrum.loop = true;
+            _clipLengthSec = Mathf.Max(clip.length, 0f);
+
+            double dspStart = AudioSettings.dspTime + 0.05;
+            _activeDrum.PlayScheduled(dspStart);
+            drumAudioSource = _activeDrum;
+            startDspTime = dspStart;
+            leaderStartDspTime = dspStart;
+            _currentDrumClip = clip;
+            return;
+        }
+
+        _pendingDrumLoop = clip;
+        _pendingDrumLoopArmed = armAtNextBoundary;
+    }
+
     public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {
         ApplyMotif(motif, armAtNextBoundary, who, restartTransport);
     }
@@ -542,218 +542,188 @@ public class DrumTrack : MonoBehaviour
 
     private void Update()
 {
-    // 0) Manager may exist but not be ready (or still wiring scenes)
     if (_gfm == null || !_gfm.ReadyToPlay())
         return;
 
-    // ---------------------------------------------------------------------
-    // 0.5) Motif late-bind (recovery) — ONE SHOT ONLY, only if we truly have no motif.
+    TickMotifLateBind();
+    TickGridValidation();
+
+    if (drumAudioSource == null || totalSteps <= 0)
+        return;
+    if (!HasValidClipLen)
+        return;
+
+    if (leaderStartDspTime <= 0.0)
+        leaderStartDspTime = startDspTime;
+
+    TickLoopBoundaries();
+    TickDeckSwap();
+    if (!TickStepAndBinIndexing()) return;
+    TickWatchdog();
+
+    if (activeMineNodes != null && activeMineNodes.Count > 0)
+        activeMineNodes.RemoveAll(n => n == null);
+}
+
+    // ONE SHOT ONLY: only if we truly have no motif (late-bind recovery).
     // Do NOT late-bind just because intensityLoops is empty, drive is false, etc.
-    // Those are authored motif settings; late-binding would fight intentional content.
-    // ---------------------------------------------------------------------
-    _lateBindMotifTimer += Time.deltaTime;
-    if (_lateBindMotifTimer >= kLateBindMotifInterval)
+    private void TickMotifLateBind()
     {
+        _lateBindMotifTimer += Time.deltaTime;
+        if (_lateBindMotifTimer < kLateBindMotifInterval) return;
         _lateBindMotifTimer = 0f;
 
-        if (_motif == null) // <-- critical: only if we have no motif at all
-        {
-            var ptm = _phaseTransitionManager != null ? _phaseTransitionManager : GameFlowManager.Instance?.phaseTransitionManager;
-            var m = ptm != null ? ptm.currentMotif : null;
+        if (_motif != null) return;
 
-            if (m != null)
-            {
-                Debug.Log($"[DRUM][MOTIF] Late-bind applying PTM motif={m.motifId}");
-                ApplyMotif(m, armAtNextBoundary: true, who: "DrumTrack/LateBind", restartTransport: false);
-            }
+        var ptm = _phaseTransitionManager != null ? _phaseTransitionManager : GameFlowManager.Instance?.phaseTransitionManager;
+        var m = ptm != null ? ptm.currentMotif : null;
+        if (m != null)
+        {
+            Debug.Log($"[DRUM][MOTIF] Late-bind applying PTM motif={m.motifId}");
+            ApplyMotif(m, armAtNextBoundary: true, who: "DrumTrack/LateBind", restartTransport: false);
         }
     }
 
-    // 1) Watchdog timer for the spawn grid
-    _gridCheckTimer += Time.deltaTime;
-    if (_gridCheckTimer >= _gridCheckInterval)
+    private void TickGridValidation()
     {
+        _gridCheckTimer += Time.deltaTime;
+        if (_gridCheckTimer < _gridCheckInterval) return;
         ValidateSpawnGrid();
         _gridCheckTimer = 0f;
     }
 
-    // ---------------------------------------------------------------------
-    // 2) Transport guards (but do NOT return before finalizing pending swap)
-    // ---------------------------------------------------------------------
-    if (drumAudioSource == null || totalSteps <= 0)
-        return;
-
-    // Ensure we have a stable clip length (ManualStart sets _clipLengthSec)
-    if (!HasValidClipLen)
-        return;
-
-    // ---- Leader-loop transport (single source of truth) ----
-    if (leaderStartDspTime <= 0.0)
-        leaderStartDspTime = startDspTime;
-
-    // Clamp effective loop len defensively
-    double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
-
-    const int kMaxBoundaryCatchup = 4;
-    int catchup = 0;
-
-    // ---------------------------------------------------------------------
-    // 2.5) Catch up loop boundaries (in case of hitches)
-    // ---------------------------------------------------------------------
-    while (AudioSettings.dspTime - leaderStartDspTime >= effLen && catchup < kMaxBoundaryCatchup)
+    private void TickLoopBoundaries()
     {
-        // We crossed a boundary: advance the anchor to the start of the new loop.
-        leaderStartDspTime += effLen;
-        completedLoops++;
-        _boundarySerial++;
+        double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
+        const int kMaxBoundaryCatchup = 4;
+        int catchup = 0;
 
-        // This is the boundary we just crossed (start of the *new* loop)
-        double boundaryDsp = leaderStartDspTime;
-
-        // Decide target clip based on what happened during the previous loop
-        if (logBeatSeqGates) Debug.Log($"[DRUM] Loop boundary dsp={boundaryDsp:F3}");
-        HandleBeatSequencingAtLoopBoundary((float)effLen);
-
-        // Fire loop boundary event (expansion/commit handlers may modify EffectiveLoopLengthSec)
-        OnLoopBoundary?.Invoke();
-
-        // Re-snapshot effLen *after* handlers
-        effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
-
-        // Schedule any pending drum swap for the NEXT boundary (musically stable: listen → respond next loop)
-        double nextBoundaryDsp = boundaryDsp + effLen;
-
-        // Ensure scheduling is strictly in the future.
-        double dspNow = AudioSettings.dspTime;
-        const double kMinLead = 0.010; // 10ms
-        if (nextBoundaryDsp <= dspNow + kMinLead)
-            nextBoundaryDsp = dspNow + 0.050; // fallback lead if we’re already too close
-
-        ArmPendingDrumLoopForNextLeaderBoundary(nextBoundaryDsp, effLen);
-
-        catchup++;
-    }
-
-    // ---------------------------------------------------------------------
-    // 3) Finalize any pending A/B deck swap as soon as it becomes audible.
-    // Put this BEFORE step/bin so downstream listeners see the current deck ASAP.
-    // ---------------------------------------------------------------------
-    if (_pendingDrumLoopDspStart > 0.0)
-    {
-        double dspNow = AudioSettings.dspTime;
-        const double kSwapEps = 0.002; // 2ms guard
-        if (dspNow + kSwapEps >= _pendingDrumLoopDspStart)
+        while (AudioSettings.dspTime - leaderStartDspTime >= effLen && catchup < kMaxBoundaryCatchup)
         {
-            // Swap deck references NOW that the new deck is actually audible.
-            var prevActive = _activeDrum;
-            _activeDrum = _inactiveDrum;
-            _inactiveDrum = prevActive;
-            drumAudioSource = _activeDrum;
-            if (_inactiveDrum != null)
-            {
-                try { _inactiveDrum.Stop(); } catch { }
-            }
+            leaderStartDspTime += effLen;
+            completedLoops++;
+            _boundarySerial++;
 
-            StopAllOtherDrumSources(keepPlaying: _activeDrum);
-            // Clip length is now driven by the active deck.
-            _clipLengthSec = (_activeDrum != null && _activeDrum.clip != null)
-                ? Mathf.Max(_activeDrum.clip.length, 0f)
-                : 0f;
+            double boundaryDsp = leaderStartDspTime;
 
-            _currentDrumClip = (_activeDrum != null) ? _activeDrum.clip : null;
+            if (logBeatSeqGates) Debug.Log($"[DRUM] Loop boundary dsp={boundaryDsp:F3}");
+            HandleBeatSequencingAtLoopBoundary((float)effLen);
 
-            // ✅ COMMIT PENDING TIMING NOW THAT THE NEW DECK IS AUDIBLE
-            if (_pendingTimingValid)
-            {
-                drumLoopBPM = _pendingBpm;
-                totalSteps  = Mathf.Max(1, _pendingTotalSteps);
-                _pendingTimingValid = false;
+            OnLoopBoundary?.Invoke();
 
-                if (logBeatSeqGates) Debug.Log(
-                    $"[DRUM][MOTIF] Committed pending timing at swap: bpm={drumLoopBPM} steps={totalSteps} " +
-                    $"clip={(_currentDrumClip ? _currentDrumClip.name : "null")}"
-                );
-            }
+            effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
 
-            if (logBeatSeqGates) Debug.Log($"[DRUM] Finalized drum loop swap at dsp={_pendingDrumLoopDspStart:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
-
-            _pendingDrumLoopDspStart = -1.0;
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // 4) Step indexing aligned to EFFECTIVE loop length
-    // ---------------------------------------------------------------------
-    int leaderSteps = GetLeaderSteps();
-
-    float effectiveLen = EffectiveLoopLengthSec;
-    if (effectiveLen <= 0f) return;
-
-    float elapsedTime = (float)(AudioSettings.dspTime - leaderStartDspTime);
-    float stepDuration = (leaderSteps > 0) ? (effectiveLen / leaderSteps) : 0f;
-    if (stepDuration <= 0f || float.IsInfinity(stepDuration))
-        return;
-
-    float tInLoop = elapsedTime % effectiveLen;
-    int absoluteStep = Mathf.FloorToInt(tInLoop / stepDuration);
-    currentStep = absoluteStep % leaderSteps;
-
-    if (currentStep != _lastStepIdx)
-    {
-        _lastStepIdx = currentStep;
-        OnStepChanged?.Invoke(currentStep, leaderSteps);
-    }
-
-    // ---------------------------------------------------------------------
-    // 5) Loop/bins driven by EFFECTIVE loop length
-    // ---------------------------------------------------------------------
-    if (effectiveLen > kMinLen)
-    {
-        int bins = Mathf.Max(1, _binCount);
-        double dsp = AudioSettings.dspTime;
-        double pos = (dsp - leaderStartDspTime) % effectiveLen;
-        if (pos < 0) pos += effectiveLen;
-
-        double binDur = effectiveLen / bins;
-        const double Eps = 1e-5;
-
-        int idx = (int)((pos + Eps) / binDur);
-        if (idx >= bins) idx -= bins;
-
-        if (idx != _binIdx)
-        {
-            _binIdx = idx;
-            //OnBinChanged?.Invoke(_binIdx, bins);
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // 6) Transport watchdog: if scheduling ever fails, don't stay silent
-    // ---------------------------------------------------------------------
-    if (_activeDrum != null && _activeDrum.clip != null)
-    {
-        if (leaderStartDspTime > 0.0 && !_activeDrum.isPlaying)
-        {
+            double nextBoundaryDsp = boundaryDsp + effLen;
             double dspNow = AudioSettings.dspTime;
-            double restart = dspNow + 0.05;
+            const double kMinLead = 0.010;
+            if (nextBoundaryDsp <= dspNow + kMinLead)
+                nextBoundaryDsp = dspNow + 0.050;
 
-            try { _activeDrum.Stop(); } catch { }
-            _activeDrum.loop = true;
-            _activeDrum.PlayScheduled(restart);
-
-            startDspTime = restart;
-            leaderStartDspTime = restart;
-
-            _clipLengthSec = Mathf.Max(_activeDrum.clip.length, 0f);
-
-            Debug.LogWarning($"[DRUM] Watchdog restart: clip={_activeDrum.clip.name} dsp={restart:F3}");
+            ArmPendingDrumLoopForNextLeaderBoundary(nextBoundaryDsp, effLen);
+            catchup++;
         }
     }
 
-    // 7) Housekeeping
-    if (activeMineNodes != null && activeMineNodes.Count > 0)
-        activeMineNodes.RemoveAll(n => n == null);
-}
+    // Finalizes the pending A/B deck swap as soon as the new deck becomes audible.
+    // Must run before step/bin indexing so downstream listeners see the current deck ASAP.
+    private void TickDeckSwap()
+    {
+        if (_pendingDrumLoopDspStart <= 0.0) return;
+
+        double dspNow = AudioSettings.dspTime;
+        const double kSwapEps = 0.002;
+        if (dspNow + kSwapEps < _pendingDrumLoopDspStart) return;
+
+        var prevActive = _activeDrum;
+        _activeDrum = _inactiveDrum;
+        _inactiveDrum = prevActive;
+        drumAudioSource = _activeDrum;
+        if (_inactiveDrum != null)
+        {
+            try { _inactiveDrum.Stop(); } catch { }
+        }
+
+        StopAllOtherDrumSources(keepPlaying: _activeDrum);
+        _clipLengthSec = (_activeDrum != null && _activeDrum.clip != null)
+            ? Mathf.Max(_activeDrum.clip.length, 0f)
+            : 0f;
+
+        _currentDrumClip = (_activeDrum != null) ? _activeDrum.clip : null;
+
+        if (_pendingTimingValid)
+        {
+            drumLoopBPM = _pendingBpm;
+            totalSteps  = Mathf.Max(1, _pendingTotalSteps);
+            _pendingTimingValid = false;
+
+            if (logBeatSeqGates) Debug.Log(
+                $"[DRUM][MOTIF] Committed pending timing at swap: bpm={drumLoopBPM} steps={totalSteps} " +
+                $"clip={(_currentDrumClip ? _currentDrumClip.name : "null")}"
+            );
+        }
+
+        if (logBeatSeqGates) Debug.Log($"[DRUM] Finalized drum loop swap at dsp={_pendingDrumLoopDspStart:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
+        _pendingDrumLoopDspStart = -1.0;
+    }
+
+    // Returns false if the effective loop length is not yet valid (caller should return early).
+    private bool TickStepAndBinIndexing()
+    {
+        int leaderSteps = GetLeaderSteps();
+        float effectiveLen = EffectiveLoopLengthSec;
+        if (effectiveLen <= 0f) return false;
+
+        float elapsedTime = (float)(AudioSettings.dspTime - leaderStartDspTime);
+        float stepDuration = (leaderSteps > 0) ? (effectiveLen / leaderSteps) : 0f;
+        if (stepDuration <= 0f || float.IsInfinity(stepDuration)) return false;
+
+        float tInLoop = elapsedTime % effectiveLen;
+        int absoluteStep = Mathf.FloorToInt(tInLoop / stepDuration);
+        currentStep = absoluteStep % leaderSteps;
+
+        if (currentStep != _lastStepIdx)
+        {
+            _lastStepIdx = currentStep;
+            OnStepChanged?.Invoke(currentStep, leaderSteps);
+        }
+
+        if (effectiveLen > kMinLen)
+        {
+            int bins = Mathf.Max(1, _binCount);
+            double dsp = AudioSettings.dspTime;
+            double pos = (dsp - leaderStartDspTime) % effectiveLen;
+            if (pos < 0) pos += effectiveLen;
+
+            double binDur = effectiveLen / bins;
+            const double Eps = 1e-5;
+            int idx = (int)((pos + Eps) / binDur);
+            if (idx >= bins) idx -= bins;
+
+            if (idx != _binIdx)
+                _binIdx = idx;
+        }
+
+        return true;
+    }
+
+    private void TickWatchdog()
+    {
+        if (_activeDrum == null || _activeDrum.clip == null) return;
+        if (leaderStartDspTime <= 0.0 || _activeDrum.isPlaying) return;
+
+        double dspNow = AudioSettings.dspTime;
+        double restart = dspNow + 0.05;
+
+        try { _activeDrum.Stop(); } catch { }
+        _activeDrum.loop = true;
+        _activeDrum.PlayScheduled(restart);
+
+        startDspTime = restart;
+        leaderStartDspTime = restart;
+        _clipLengthSec = Mathf.Max(_activeDrum.clip.length, 0f);
+
+        Debug.LogWarning($"[DRUM] Watchdog restart: clip={_activeDrum.clip.name} dsp={restart:F3}");
+    }
     public bool TryGetNextBaseStepDsp(out double nextStepDsp, out float stepDurationSec, int stepOffset = 1)
     {
         nextStepDsp = 0;
@@ -823,61 +793,19 @@ public class DrumTrack : MonoBehaviour
             return;
         }
 
-        // 3) Aggregate spent (session-relative)
+        // 3) Compute burn-tier intensity from aggregate energy spent
         float totalSpent = _gfm.GetTotalSpentEnergyTanks();
-
-        if (_lastTotalSpentSample < 0f)
+        if (!ComputeBurnIntensity(totalSpent, loopsCt, out float intensity01))
         {
-            _lastTotalSpentSample = totalSpent;
-            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] baseline acquired totalSpent={totalSpent:F3} motif={_motif.motifId}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] baseline acquired motif={_motif.motifId}");
             return;
         }
 
-        float delta = Mathf.Max(0f, totalSpent - _lastTotalSpentSample);
-        _lastTotalSpentSample = totalSpent;
-
-        // Ramp _burnTier up by one clip step each loop the player burns, down each loop they don’t.
-        // This maps "time spent boosting" directly to intensity: keep burning to climb, stop to decay.
-        int clipCount = _intensityLoops.Count;
-        float maxTier = clipCount - 1;
-        if (delta > 0f)
-            _burnTier = Mathf.Min(_burnTier + 1f, maxTier);
-        else
-            _burnTier = Mathf.Max(_burnTier - 1f, 0f);
-
-        float rawIntensity = (clipCount > 1) ? _burnTier / maxTier : 0f;
-
-        const float kIntensitySmooth = 0.35f;
-        float intensity01 = Mathf.Lerp(_lastIntensity01, rawIntensity, kIntensitySmooth);
-        if (Mathf.Abs(intensity01 - _lastIntensity01) < intensityHysteresis)
-            intensity01 = _lastIntensity01;
-        _lastIntensity01 = intensity01;
-
         if (logBeatSeqGates) Debug.Log(
-            $"[DRUM][BeatSeq] motif={_motif.motifId} delta={delta:F3} tier={_burnTier:F0}/{maxTier:F0} " +
-            $"intensity={intensity01:F3} loops={loopsCt}"
+            $"[DRUM][BeatSeq] motif={_motif.motifId} tier={_burnTier:F0} intensity={intensity01:F3} loops={loopsCt}"
         );
 
-        // Per-bin intensity ceiling: check the upcoming bin (completedLoops is already
-        // incremented to the new loop at this point) so the scheduled clip reflects
-        // what's actually about to play. Does NOT update _lastIntensity01 with the
-        // clamped value so energy-burn history is preserved across empty bins.
-        // 0 filled tracks → ceiling 0, 1 → singleTrackIntensityCeiling, 2+ → uncapped.
-        var _ctrl = _gfm?.controller;
-        if (_ctrl?.tracks != null)
-        {
-            int filledCount = 0;
-            foreach (var track in _ctrl.tracks)
-            {
-                if (track == null) continue;
-                int upcomingBin = completedLoops % Mathf.Max(1, track.loopMultiplier);
-                if (track.HasAnyNoteInBin(upcomingBin)) filledCount++;
-            }
-            float ceiling = filledCount == 0 ? 0f
-                          : filledCount == 1 ? singleTrackIntensityCeiling
-                          : 1f;
-            intensity01 = Mathf.Min(intensity01, ceiling);
-        }
+        ApplyPerBinIntensityCeiling(ref intensity01);
 
         // 4) Select target clip
         var targetClip = ResolveIntensityClip(intensity01);
@@ -909,7 +837,61 @@ public class DrumTrack : MonoBehaviour
         // 6) Schedule at boundary
         ScheduleDrumLoopChange(targetClip);
         if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] scheduled clip={targetClip.name}");
-    }    
+    }
+
+    // Returns false if the baseline sample hasn't been acquired yet (caller should return early).
+    // Updates _lastTotalSpentSample, _burnTier, _lastIntensity01; outputs smoothed intensity01.
+    private bool ComputeBurnIntensity(float totalSpent, int clipCount, out float intensity01)
+    {
+        intensity01 = _lastIntensity01;
+
+        if (_lastTotalSpentSample < 0f)
+        {
+            _lastTotalSpentSample = totalSpent;
+            return false;
+        }
+
+        float delta = Mathf.Max(0f, totalSpent - _lastTotalSpentSample);
+        _lastTotalSpentSample = totalSpent;
+
+        float maxTier = clipCount - 1;
+        if (delta > 0f)
+            _burnTier = Mathf.Min(_burnTier + 1f, maxTier);
+        else
+            _burnTier = Mathf.Max(_burnTier - 1f, 0f);
+
+        float rawIntensity = (clipCount > 1) ? _burnTier / maxTier : 0f;
+
+        const float kIntensitySmooth = 0.35f;
+        intensity01 = Mathf.Lerp(_lastIntensity01, rawIntensity, kIntensitySmooth);
+        if (Mathf.Abs(intensity01 - _lastIntensity01) < intensityHysteresis)
+            intensity01 = _lastIntensity01;
+        _lastIntensity01 = intensity01;
+
+        return true;
+    }
+
+    // Per-bin ceiling: clamps intensity based on how many tracks have filled bins.
+    // Does NOT update _lastIntensity01 so energy-burn history is preserved across empty bins.
+    // 0 filled tracks → ceiling 0, 1 → singleTrackIntensityCeiling, 2+ → uncapped.
+    private void ApplyPerBinIntensityCeiling(ref float intensity01)
+    {
+        var ctrl = _gfm?.controller;
+        if (ctrl?.tracks == null) return;
+
+        int filledCount = 0;
+        foreach (var track in ctrl.tracks)
+        {
+            if (track == null) continue;
+            int upcomingBin = completedLoops % Mathf.Max(1, track.loopMultiplier);
+            if (track.HasAnyNoteInBin(upcomingBin)) filledCount++;
+        }
+        float ceiling = filledCount == 0 ? 0f
+                      : filledCount == 1 ? singleTrackIntensityCeiling
+                      : 1f;
+        intensity01 = Mathf.Min(intensity01, ceiling);
+    }
+
     private void EnsureDualDrumSources()
     {
         if (drumAudioSource == null)

@@ -35,7 +35,7 @@ public enum PhaseStarState
     Completed        = 2,
     BridgeInProgress
 }
-public class PhaseStar : MonoBehaviour
+public partial class PhaseStar : MonoBehaviour
 {
     // -------------------- Serialized config --------------------
     [Header("Profiles & Prefs")]
@@ -471,28 +471,6 @@ public class PhaseStar : MonoBehaviour
 
     private bool HasDominantRoleEjectable() =>
         GetDominantRoleRaw(out _, out float rawCharge, out float threshold) && rawCharge >= threshold;
-    private bool IsEjectionReady()
-    {
-        if (!_plannedEjectionDescriptor.IsValid)
-        {
-            if (!_missingDescriptorWarned)
-            {
-                Debug.LogWarning($"[PhaseStar:Zap] planned ejection descriptor missing; readiness blocked. role={_requiredZapRole} track={_plannedEjectionDescriptor.track?.name ?? "null"}");
-                _missingDescriptorWarned = true;
-            }
-            return false;
-        }
-
-        _missingDescriptorWarned = false;
-        return _zapProgressState == ZapProgressState.ReadyLatched && HasDominantRoleEjectable();
-    }
-    private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
-    {
-        if (track == null) return null;
-        ResolveGameFlowManager();
-        int entropy = CurrentEntropyForSelection();
-        return _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
-    }
     private struct PlannedEjectionDescriptor
     {
         public MusicalRole role;
@@ -506,84 +484,6 @@ public class PhaseStar : MonoBehaviour
     private PlannedEjectionDescriptor _plannedEjectionDescriptor;
     private bool _missingDescriptorWarned;
 
-    private static bool PlannedDescriptorEquals(in PlannedEjectionDescriptor a, in PlannedEjectionDescriptor b)
-    {
-        return a.role == b.role &&
-               ReferenceEquals(a.track, b.track) &&
-               ReferenceEquals(a.noteSet, b.noteSet) &&
-               a.requiredZapCount == b.requiredZapCount;
-    }
-
-    private bool TryRefreshRequiredZapCountForPlannedRole(
-        MusicalRole role,
-        InstrumentTrack track,
-        bool resetCurrentZapCount,
-        string reason)
-    {
-        _requiredZapRole = role;
-        _requiredZapNoteSetAvailable = false;
-
-        PlannedEjectionDescriptor previousDescriptor = _plannedEjectionDescriptor;
-        PlannedEjectionDescriptor nextDescriptor = default;
-        nextDescriptor.role = role;
-        nextDescriptor.track = track;
-
-        if (track == null)
-        {
-            requiredZapCount = int.MaxValue;
-            _plannedEjectionDescriptor = nextDescriptor;
-            Debug.LogWarning($"[PhaseStar:Zap] missing track for required zap refresh. role={role} reason={reason}");
-            return false;
-        }
-
-        NoteSet planned = ResolvePlannedNoteSet(track);
-        if (planned == null)
-        {
-            requiredZapCount = int.MaxValue;
-            _plannedEjectionDescriptor = nextDescriptor;
-            Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
-            return false;
-        }
-
-        int noteCount;
-        if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
-        {
-            int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-            int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-            int noteListCount = planned.GetNoteList()?.Count ?? 0;
-            noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
-        }
-
-        if (_currentBurstRequiredZaps > 0)
-            noteCount = Mathf.Max(noteCount, _currentBurstRequiredZaps);
-
-        nextDescriptor.noteSet = planned;
-        nextDescriptor.requiredZapCount = Mathf.Max(1, noteCount);
-
-        _requiredZapNoteSetAvailable = nextDescriptor.IsValid;
-        requiredZapCount = nextDescriptor.requiredZapCount;
-
-        bool descriptorChanged = !PlannedDescriptorEquals(previousDescriptor, nextDescriptor);
-        _plannedEjectionDescriptor = nextDescriptor;
-
-        if (resetCurrentZapCount)
-            zappedCount = 0;
-
-        if (resetCurrentZapCount)
-        {
-            TransitionZapState(ZapProgressState.Seeking, role, $"refresh:{reason}");
-        }
-        else if (_zapProgressState == ZapProgressState.Seeking || _zapProgressState == ZapProgressState.Zapping)
-        {
-            TransitionZapState(ZapProgressState.Zapping, role, $"refresh:{reason}");
-        }
-        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
-        return true;
-    }
-    private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)
-    {
-        TryRefreshRequiredZapCountForPlannedRole(role, track, resetCurrentZapCount: true, reason: "prime");
-    }
 
 
     private bool _dustDeliveryWired;
@@ -626,93 +526,6 @@ public class PhaseStar : MonoBehaviour
     private Vector2Int _lastResolvedZapCell;
     private MusicalRole _lastResolvedZapRole = MusicalRole.None;
 
-    private bool MayAcquireDustTargets()
-    {
-        bool zapStateAllowsAcquire =
-            _zapProgressState == ZapProgressState.Seeking ||
-            _zapProgressState == ZapProgressState.Zapping;
-        bool globallyGatedOrDisarmed =
-            _disarmReason != PhaseStarDisarmReason.None ||
-            _state != PhaseStarState.Dormant ||
-            _coordinatorLockOwnedByOtherStar;
-        return zapStateAllowsAcquire && !globallyGatedOrDisarmed;
-    }
-
-    private void ApplyDustAcquisitionPolicy(string reason)
-    {
-        bool enabled = MayAcquireDustTargets();
-        dust?.SetAcquisitionEnabled(enabled, $"{reason}|zap={_zapProgressState}|state={_state}|disarm={_disarmReason}");
-    }
-    private void TransitionZapState(ZapProgressState next, MusicalRole role, string reason)
-    {
-        if (_zapProgressState == next) return;
-        var prev = _zapProgressState;
-        _zapProgressState = next;
-        ApplyDustAcquisitionPolicy($"zap-transition:{reason}");
-        bool acquisitionEnabled = MayAcquireDustTargets();
-        Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");
-    }
-
-    /// <summary>
-    /// Called when a global coordinator lock is held by a different star.
-    /// Non-owner stars suspend dormant seeking/ready progression without clearing
-    /// zap counters or latch-related state.
-    /// </summary>
-    public void OnCoordinatorLockOwnedByAnotherStar()
-    {
-        if (allowConcurrentDormantCharging)
-            return;
-
-        if (_state != PhaseStarState.Dormant)
-            return;
-
-        bool canSuspend =
-            _zapProgressState == ZapProgressState.Seeking ||
-            _zapProgressState == ZapProgressState.Zapping ||
-            _zapProgressState == ZapProgressState.WaitingForRetract ||
-            _zapProgressState == ZapProgressState.ReadyLatched;
-
-        if (!canSuspend)
-            return;
-
-        _coordinatorLockOwnedByOtherStar = true;
-        _preservedZapProgressStateBeforeCoordinatorLock = _zapProgressState;
-        TransitionZapState(ZapProgressState.DormantNotSeeking, _requiredZapRole, "coordinator-lock-owned-by-other");
-    }
-
-    /// <summary>
-    /// Called when the coordinator lock is released and the owner's cooldown event fires.
-    /// Restores dormant progression based on preserved readiness state.
-    /// </summary>
-    public void OnCoordinatorLockReleasedAfterOwnerCooldown()
-    {
-        if (allowConcurrentDormantCharging)
-            return;
-
-        _coordinatorLockOwnedByOtherStar = false;
-
-        if (_state != PhaseStarState.Dormant)
-            return;
-
-        if (_zapProgressState == ZapProgressState.ReadyLatched)
-        {
-            // Readiness was achieved while suspended. Now that the lock/cooldown is clear,
-            // proceed through the normal dormant->active wake path.
-            TransitionDormantToActive();
-            return;
-        }
-
-        if (_zapProgressState != ZapProgressState.DormantNotSeeking)
-            return;
-
-        var restore = _preservedZapProgressStateBeforeCoordinatorLock;
-        bool wasPreservedReady = restore == ZapProgressState.ReadyLatched || restore == ZapProgressState.WaitingForRetract;
-        var next = wasPreservedReady ? ZapProgressState.WaitingForRetract : ZapProgressState.Seeking;
-        TransitionZapState(next, _requiredZapRole, "coordinator-lock-released-owner-cooldown");
-
-        if (next == ZapProgressState.WaitingForRetract)
-            TransitionDormantToActive();
-    }
 
     private void EnsureSubcomponents()
     {
@@ -1359,76 +1172,82 @@ public class PhaseStar : MonoBehaviour
         if (_isDisposing || this == null) return;
         if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
 
-        // ------------------------------------------------------------
-        // 1) Awaiting collectable clear (post-node-resolution latch)
-        // ------------------------------------------------------------
-        if (_awaitingCollectableClear)
-        {
-            if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _activeSuperNode != null || _ejectionInFlight))
-            {
-                Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
-                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
+        if (HandleAwaitingCollectableClear()) return;
 
-            ResolveGameFlowManager();
-            var drums = _drum != null ? _drum : _gfm?.activeDrumTrack;
-
-            bool timedOut = false;
-
-            if (CollectableClearTimeoutLoops > 0 && drums != null)
-            {
-                int nowLoop = drums.completedLoops;
-                if (_awaitingCollectableClearSinceLoop < 0)
-                    _awaitingCollectableClearSinceLoop = nowLoop;
-
-                int waitedLoops = nowLoop - _awaitingCollectableClearSinceLoop;
-                if (waitedLoops >= CollectableClearTimeoutLoops)
-                    timedOut = true;
-
-                Debug.Log(
-                    $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
-            }
-
-            if (!timedOut && CollectableClearTimeoutSeconds > 0f)
-            {
-                double nowDsp = AudioSettings.dspTime;
-                if (_awaitingCollectableClearSinceDsp < 0.0)
-                    _awaitingCollectableClearSinceDsp = nowDsp;
-
-                if ((nowDsp - _awaitingCollectableClearSinceDsp) >= CollectableClearTimeoutSeconds)
-                    timedOut = true;
-            }
-
-            if (!timedOut)
-            {
-                Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
-                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            Debug.LogWarning($"[PhaseStar][Timeout] AwaitingCollectableClear timed out. Forcing recovery. star={name}");
-
-            _awaitingCollectableClear = false;
-            _awaitingCollectableClearSinceLoop = -1;
-            _awaitingCollectableClearSinceDsp = -1.0;
-
-            if (!CanAdvancePhaseNow())
-            {
-                Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
-                return;
-            }
-
-            Debug.Log($"[PS:LB] Recovery -> Dormant wait");
-            EnterDormantWaitState();
-            return;
-        }
-
-        // ------------------------------------------------------------
-        // 2) Global gate checks
-        // ------------------------------------------------------------
         bool anyCollectables = AnyCollectablesInFlightGlobal();
         bool anyExpansion = AnyExpansionPendingGlobal();
+        if (HandleGlobalGateCheck(anyCollectables, anyExpansion)) return;
+
+        LogState("LoopBoundary entry");
+        ExecuteRearmPath();
+    }
+
+    private bool HandleAwaitingCollectableClear()
+    {
+        if (!_awaitingCollectableClear) return false;
+
+        if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _activeSuperNode != null || _ejectionInFlight))
+        {
+            Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
+            Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
+            return true;
+        }
+
+        ResolveGameFlowManager();
+        var drums = _drum != null ? _drum : _gfm?.activeDrumTrack;
+
+        bool timedOut = false;
+
+        if (CollectableClearTimeoutLoops > 0 && drums != null)
+        {
+            int nowLoop = drums.completedLoops;
+            if (_awaitingCollectableClearSinceLoop < 0)
+                _awaitingCollectableClearSinceLoop = nowLoop;
+
+            int waitedLoops = nowLoop - _awaitingCollectableClearSinceLoop;
+            if (waitedLoops >= CollectableClearTimeoutLoops)
+                timedOut = true;
+
+            Debug.Log(
+                $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
+        }
+
+        if (!timedOut && CollectableClearTimeoutSeconds > 0f)
+        {
+            double nowDsp = AudioSettings.dspTime;
+            if (_awaitingCollectableClearSinceDsp < 0.0)
+                _awaitingCollectableClearSinceDsp = nowDsp;
+
+            if ((nowDsp - _awaitingCollectableClearSinceDsp) >= CollectableClearTimeoutSeconds)
+                timedOut = true;
+        }
+
+        if (!timedOut)
+        {
+            Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
+            Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
+            return true;
+        }
+
+        Debug.LogWarning($"[PhaseStar][Timeout] AwaitingCollectableClear timed out. Forcing recovery. star={name}");
+
+        _awaitingCollectableClear = false;
+        _awaitingCollectableClearSinceLoop = -1;
+        _awaitingCollectableClearSinceDsp = -1.0;
+
+        if (!CanAdvancePhaseNow())
+        {
+            Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
+            return true;
+        }
+
+        Debug.Log($"[PS:LB] Recovery -> Dormant wait");
+        EnterDormantWaitState();
+        return true;
+    }
+
+    private bool HandleGlobalGateCheck(bool anyCollectables, bool anyExpansion)
+    {
         bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(BuildInteractionSnapshot(anyCollectables, anyExpansion)) ?? false;
 
         if (shouldDisarmForGate)
@@ -1439,23 +1258,23 @@ public class PhaseStar : MonoBehaviour
                 Debug.Log($"[PS:LB] Any Expanding Global True");
 
             Disarm(anyCollectables ? PhaseStarDisarmReason.CollectablesInFlight : PhaseStarDisarmReason.ExpansionPending, _lockedTint);
-            return;
+            return true;
         }
 
         // Only hold when already armed. Without the _isArmed check, a fully-charged
-        // but un-armed star (e.g. just resumed after a sibling's cycle) would skip section
-        // 3 and never reach ArmNext().
+        // but un-armed star (e.g. just resumed after a sibling's cycle) would skip the
+        // re-arm path and never reach ArmNext().
         if (anyExpansion && ZapProgress01 >= 1f && _isArmed)
         {
             Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
-            return;
+            return true;
         }
 
-        LogState("LoopBoundary entry");
+        return false;
+    }
 
-        // ------------------------------------------------------------
-        // 3) Normal re-arm path
-        // ------------------------------------------------------------
+    private void ExecuteRearmPath()
+    {
         if (!_isArmed)
         {
             // Stale burst-hide: all global gates cleared, so _burstOffScreen from a prior
@@ -1703,237 +1522,6 @@ public class PhaseStar : MonoBehaviour
 
     public int GetSafetyBubbleRadiusCells() => 0;
 
-    private void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
-
-        // Disarmed push: bypass the CIF/EP gates so the vehicle always shoves the star.
-        if (!_isArmed
-            && _state == PhaseStarState.WaitingForPoke
-            && !_ejectionInFlight)
-        {
-            HandleDisarmedVehicleHit(coll);
-            return;
-        }
-
-        if (AnyCollectablesInFlightGlobal())
-        {
-            Disarm(PhaseStarDisarmReason.CollectablesInFlight, _lockedTint);
-            Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
-            return;
-        }
-
-        if (AnyExpansionPendingGlobal())
-        {
-            Trace("OnCollisionEnter2D: expansion pending — ignoring poke, star stays armed");
-            return; // don't disarm; player can retry once expansion clears
-        }
-
-        // --- Safety & gating ---
-        if (_state != PhaseStarState.WaitingForPoke)
-        {
-            Trace($"OnCollision: ignored, state={_state}");
-            return;
-        }
-
-        if (_ejectionInFlight)
-        {
-            Trace("OnCollision: ignored, busy flags");
-            return;
-        }
-        if (!IsEjectionReady())
-        {
-            // Keep descriptor role synchronized to the authoritative dominant role before
-            // attempting recovery latch. Prevents ReadyLatched+role=None deadlocks.
-            if (GetDominantRoleRaw(out var dominantRoleForDescriptor, out _, out _))
-            {
-                var dominantTrack = FindTrackByRole(dominantRoleForDescriptor);
-                if (dominantTrack != null)
-                {
-                    TryRefreshRequiredZapCountForPlannedRole(
-                        dominantRoleForDescriptor,
-                        dominantTrack,
-                        resetCurrentZapCount: false,
-                        reason: "collision-recovery-refresh");
-                }
-            }
-
-            // Recovery path: if charge already crossed the dominant-role threshold but
-            // zap state did not relatch (e.g. post-node flow edge cases), relatch now
-            // so a valid poke still ejects a node.
-            if (HasDominantRoleEjectable() && GetDominantRoleRaw(out var dominantRole, out _, out _))
-            {
-                TransitionZapState(ZapProgressState.ReadyLatched, dominantRole, "collision-recovery-latch");
-            }
-            else
-            {
-                Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
-                return;
-            }
-        }
-        if (_activeNode != null)
-        {
-            Trace("OnCollision: ignored, activeNode != null");
-            return;
-        }
-
-        if (Time.frameCount == _lastPokeFrame)
-        {
-            Trace("OnCollision: ignored, same frame");
-            return;
-        }
-
-        _lastPokeFrame = Time.frameCount;
-
-        if (_cachedTrack == null)
-            PrepareNextDirective();
-        // --- Handle missing directive fallback ---
-        if (_cachedTrack == null)
-        {
-            Trace("OnCollision: no directive/track → disarm and wait");
-            Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
-            return;
-
-        }
-        if (_previewRole != MusicalRole.None)
-        {
-            if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
-            EjectActivePreviewShardAndFlow(coll);
-            return;
-        }
-
-        EjectCachedDirectiveAndFlow(coll);
-    }
-
-    private void HandleDisarmedVehicleHit(Collision2D coll)
-    {
-        if (motion != null)
-        {
-            Vector2 starPos   = transform.position;
-            Vector2 pushDir   = coll.contacts.Length > 0
-                ? (starPos - (Vector2)coll.contacts[0].point).normalized
-                : ((starPos - (Vector2)coll.transform.position).normalized);
-            float   pushSpeed = Mathf.Clamp(coll.relativeVelocity.magnitude * disarmedPushScale,
-                                             0f, MaxImpactStrength);
-            motion.ApplyPushImpulse(pushDir * pushSpeed);
-        }
-        visuals?.FlashReject();
-    }
-
-    void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
-    {
-        LastNodeWasSuperNode = false;
-        LastNodeWasExpired   = false;
-        LastNodeWasEscaped   = false;
-        LastNodeWasCaptured  = false;
-        int ticket = ++_spawnTicket;
-        _ejectionInFlight = true;
-        visuals?.EjectParticles(behaviorProfile?.ejectionPrefab);
-
-        Color spawnTint = _previewVisual != null ? _previewColor : usedTrack.trackColor;
-        _lockedTint = spawnTint;
-
-        var node = DirectSpawnMineNode(contactPoint, usedTrack, spawnTint);
-        if (node == null)
-        {
-            _ejectionInFlight = false;
-            _activeNode = null;
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            return;
-        }
-
-        _activeNode = node;
-        _ejectionInFlight = false;
-
-        bool handledResolve = false;
-
-        node.OnResolved += (_, outcome) =>
-        {
-            if (ticket != _spawnTicket) return;
-            if (handledResolve) return;
-            handledResolve = true;
-
-            _activeNode = null;
-
-            LastNodeWasCaptured = outcome == MineNodeOutcome.Captured;
-            LastNodeWasEscaped  = outcome == MineNodeOutcome.Escaped;
-            LastNodeWasExpired  = outcome == MineNodeOutcome.Expired;
-
-            // Fire before any Unity component access — safe even when the star
-            // GameObject was already destroyed by DestroyStarAfterDelay.
-            OnMineNodeResolved?.Invoke(this, _attunedRole);
-
-            // Guard Unity component access: star may be destroyed if the player
-            // took longer than starExitDuration to kill the node.
-            if (this == null) return;
-
-            if (_state == PhaseStarState.BridgeInProgress) return;
-
-            _awaitingCollectableClear = true;
-            ResolveGameFlowManager();
-            _awaitingCollectableClearSinceLoop = (_drum != null)
-                ? _drum.completedLoops
-                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
-            _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            HideInPlaceForBurst();
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            LogState("OnResolved");
-        };
-
-        CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
-        PrepareNextDirective();
-        Trace("SpawnNodeCommon: end");
-    }
-
-    void EjectActivePreviewShardAndFlow(Collision2D coll)
-    {
-        if (behaviorProfile == null || visuals == null) return;
-
-        if (!GetDominantRoleRaw(out MusicalRole ejectedRole, out float rawCharge, out float threshold))
-            return;
-
-        if (rawCharge < threshold)
-            return;
-
-        InstrumentTrack ejectedTrack = FindTrackByRole(ejectedRole);
-        if (ejectedTrack == null)
-        {
-            Debug.LogError($"[PhaseStar] Missing track for ejected role={ejectedRole} (cannot spawn node).");
-            return;
-        }
-
-        // Consume only the dominant role’s charge for the ejection.
-        _starCharge[ejectedRole] = Mathf.Max(0f, rawCharge - threshold);
-        _displayedCharge01 = 0f;
-        var contact = coll.GetContact(0).point;
-        var starPos = (Vector2)transform.position;
-        var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
-
-        Vector2 incoming = (starPos - vehiclePos);
-        _lastImpactDir = (incoming.sqrMagnitude > 0.0001f) ? incoming.normalized : Vector2.right;
-        _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-
-        visuals?.HideAll();
-        dust?.ResetTentacles();
-
-        Disarm(PhaseStarDisarmReason.NodeResolving, ejectedTrack.trackColor);
-
-        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
-        TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
-        if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
-            SpawnSuperNodeCommon(contact, ejectedTrack);
-        else
-            SpawnNodeCommon(contact, ejectedTrack);
-        if (_activeNode != null || _activeSuperNode != null)
-        {
-            TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
-            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
-        }
-
-        // Keep the star live after ejection. NodeResolving + loop-boundary gates control
-        // dormancy/rearm while the MineNode is active; disposing here would block that flow.
-        OnEjected?.Invoke(this, ejectedRole);
-    }
     /// <summary>
     /// 0 = satiated (at least one shard is above shardReadyThreshold).
     /// 1 = starving (no shard has crossed the threshold).
@@ -1944,245 +1532,8 @@ public class PhaseStar : MonoBehaviour
         if (_previewRole == MusicalRole.None) return 1f;
         return 1f - GetChargeNormalized01(_previewRole);
     }
-    private void SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
-    {
-        LastNodeWasSuperNode = true;
-        if (superNodePrefab == null)
-        {
-            Debug.LogError("[PhaseStar] superNodePrefab is null.");
-            return;
-        }
-
-        if (soloVoice == null)
-        {
-            soloVoice = FindAnyObjectByType<SoloVoice>();
-            if (soloVoice == null)
-            {
-                Debug.LogError("[PhaseStar] SoloVoice not found.");
-                return;
-            }
-        }
-
-        // Spawn
-        var go = Instantiate(superNodePrefab, contactWorld, Quaternion.identity);
-
-        // Initialize component
-        var sn = go.GetComponent<SuperNode>();
-        if (sn == null)
-        {
-            Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
-            return;
-        }
-        Color spawnTint = targetTrack != null ? targetTrack.trackColor : Color.white;
-
-        // Shards: role-matched tracks that are NOT yet at max bins (non-maxed need to "catch up").
-        // Fully-maxed tracks get no shard — when all tracks are maxed the SuperNode has 0 shards
-        // and the player triggers the chord transition by hitting the central body directly.
-        var activeRoles = _assignedMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>();
-        var ctrl        = _gfm?.controller;
-        var shardTracks = new System.Collections.Generic.List<InstrumentTrack>();
-        if (ctrl?.tracks != null)
-            foreach (var t in ctrl.tracks)
-                if (t != null && t != targetTrack && activeRoles.Contains(t.assignedRole)
-                    && t.loopMultiplier < t.maxLoopMultiplier)
-                    shardTracks.Add(t);
-
-        // Toggle: if already on the alternate progression, switch back to the original motif
-        // progression; otherwise switch to the alternate. This lets the player oscillate
-        // between the two progressions by filling tracks and triggering SuperNodes repeatedly.
-        var hd            = _gfm?.harmony;
-        var originalProg  = _assignedMotif?.chordProgression;
-        var alternateProg = _assignedMotif?.alternateChordProgressionProfile;
-        ChordProgressionProfile progToStage =
-            (hd != null && alternateProg != null && hd.ActiveProfile == alternateProg)
-                ? originalProg
-                : alternateProg;
-        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, progToStage);
-        go.GetComponent<Explode>()?.SetTint(spawnTint);
-
-        _activeSuperNode = sn;
-        sn.OnResolved += () =>
-        {
-            _activeSuperNode = null;
-
-            // Fire before any Unity component access — safe even when star is destroyed.
-            OnMineNodeResolved?.Invoke(this, _attunedRole);
-
-            if (this == null) return;
-
-            if (_state == PhaseStarState.BridgeInProgress) return;
-            _awaitingCollectableClear = true;
-            ResolveGameFlowManager();
-            _awaitingCollectableClearSinceLoop = (_drum != null)
-                ? _drum.completedLoops
-                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
-            _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            HideInPlaceForBurst();
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            LogState("OnSuperNodeResolved");
-        };
-
-        PrepareNextDirective();
-    }
-
-    void EjectCachedDirectiveAndFlow(Collision2D coll)
-    {
-        var contact = coll.GetContact(0).point;
-        var starPos = (Vector2)transform.position;
-        var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
-
-        _lastImpactDir = (starPos - vehiclePos).normalized;
-        _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-
-        Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.trackColor);
-        ActivateSafetyBubble();
-        if (_cachedIsSuperNode)
-            SpawnSuperNodeCommon(contact, _cachedTrack);
-        else
-            SpawnNodeCommon(contact, _cachedTrack);
-
-        // Reset zap accumulation for the next acquisition cycle, mirroring
-        // EjectActivePreviewShardAndFlow. Without this, _zapProgressState stays at
-        // ReadyLatched after the node resolves, causing TransitionDormantToActive to
-        // return early (alreadyRetracted) and the star to stay permanently frozen.
-        if (_activeNode != null || _activeSuperNode != null)
-        {
-            TransitionZapState(ZapProgressState.Seeking, _attunedRole, "ejection-succeeded");
-            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
-        }
-
-        // Do not mark disposing on ejection; this star continues orchestrating post-node
-        // dormant recharge and subsequent tentacle/ready cycles.
-        OnEjected?.Invoke(this, _attunedRole);
-    }
-    private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
-    {
-        if (track == null) return false;
-
-        // A SuperNode transitions the chord progression. Without an alternate progression
-        // on the motif there is nothing to switch to, so fall back to normal density-injection
-        // MineNodes. (Prevents the star from appearing stuck when the motif isn't configured.)
-        if (_assignedMotif?.alternateChordProgressionProfile == null) return false;
-
-        int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
-        bool fullyExpanded = track.loopMultiplier >= maxBins;
-
-        if (!fullyExpanded)
-        {
-            Debug.Log(
-                $"[SuperNodeGate] NO: not fully expanded. " +
-                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
-            );
-            return false;
-        }
-
-        // --- Must have a current note set ---
-        var planned = track.GetCurrentNoteSet();
-        if (planned == null)
-        {
-            Debug.Log(
-                $"[SuperNodeGate] NO: planned noteSet is null. " +
-                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
-            );
-            return false;
-        }
-
-        // --- The actual differentiator: repeating set is already saturated ---
-        bool saturated = track.IsSaturatedForRepeatingNoteSet(planned);
-
-        Debug.Log(
-            $"[SuperNodeGate] {(saturated ? "YES" : "NO")}: " +
-            $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
-            $"saturated={saturated}"
-        );
-
-        return saturated;
-    }
-    private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)
-    {
-        if (track == null || _drum == null) return null;
-
-        Vector2Int cell = _drum.GetRandomAvailableCell(); // ✅ DrumTrack wrapper
-        if (cell.x < 0) return null;
-        _drum.OccupySpawnCell(cell.x, cell.y, GridObjectType.Node);
-        var go = Instantiate(_drum.mineNodePrefab, spawnFrom, Quaternion.identity);
-        var node = go.GetComponent<MineNode>();
-        if (!node)
-        {
-            Destroy(go);
-            _drum.FreeSpawnCell(cell.x, cell.y);            
-            return null;
-        }
-
-        // color shell immediately so it never flashes white
-        var sr = go.GetComponentInChildren<SpriteRenderer>();
-        if (sr) sr.color = color;
-        var rb = go.GetComponent<Rigidbody2D>();
-        if (rb != null && _lastImpactDir.sqrMagnitude > 0.0001f && _lastImpactStrength > 0f)
-        {
-            rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
-        }
-        int entropy = CurrentEntropyForSelection();
-        ResolveGameFlowManager();
-        var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
-        if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
-            _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
- Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
-        node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
-        return node;
-    }
-    private bool TryResolveAuthoritativeZapCount(MusicalRole role, InstrumentTrack track, out int noteCount)
-    {
-        noteCount = 0;
-        if (_assignedMotif == null || track == null || role == MusicalRole.None)
-            return false;
-
-        int totalBins = Mathf.Max(1, track.maxLoopMultiplier);
-        // Zap objective corresponds to authored motif payload for the role.
-        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins);
-        if (cfg == null) return false;
-
-        if (cfg.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
-        {
-            noteCount = cfg.riff.riff.events.Count;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static int GetNoteSetNoteCount(NoteSet noteSet)
-    {
-        if (noteSet == null) return 0;
-        int persistentTemplateCount = noteSet.persistentTemplate != null ? noteSet.persistentTemplate.Count : 0;
-        int distinctStepCount = noteSet.GetStepList()?.Distinct().Count() ?? 0;
-        int noteListCount = noteSet.GetNoteList()?.Count ?? 0;
-        return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
-    }
-
     private int CurrentEntropyForSelection() {
         return 0;
-    }
-    private void EnableColliders()
-    {
-        if (_isDisposing || this == null) return;
-        var cols = GetComponentsInChildren<Collider2D>(true);
-        foreach (var c in cols)
-        {
-            if (!c) continue;
-            c.enabled = true;
-        }
-    }
-
-    private void DisableColliders()
-    {
-        if (_isDisposing || this == null) return;
-        var cols = GetComponentsInChildren<Collider2D>(true);
-        foreach (var c in cols)
-        {
-            if (!c) continue;
-            c.enabled = false;
-        }
     }
 
     private void Trace(string msg)
