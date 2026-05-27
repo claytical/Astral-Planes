@@ -113,13 +113,22 @@ public class RingPreviewPlayer : MonoBehaviour
         _totalSteps    = playbackBinCount * stepsPerLoop;
         _loopLengthSec = _totalSteps * _stepDurationSec;
 
-        // Cache presets per channel.
+        // Cache presets per channel — use the motif's own roleProfile, fall back to library.
         _channelPresets = new int[16];
         foreach (var kvp in RoleChannel)
         {
-            var prof = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
-            if (prof != null && kvp.Value < 16)
-                _channelPresets[kvp.Value] = prof.midiPreset;
+            MusicalRoleProfile roleProf = null;
+            var cfg = motif.GetConfigForRoleAtBin(kvp.Key, 0, 1);
+            if (cfg?.roleProfile != null)
+                roleProf = cfg.roleProfile;
+            else
+                roleProf = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
+
+            if (roleProf != null && kvp.Value < 16)
+            {
+                _channelPresets[kvp.Value] = roleProf.midiPreset;
+                Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {roleProf.midiPreset}");
+            }
         }
 
         // Build step table: spread notes across sequential bins and retune to per-bin chord.
