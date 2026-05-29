@@ -110,6 +110,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public AscensionCohort ascensionCohort;
     [Header("Musical Role Assignment")]
     public MusicalRole assignedRole;
+    public int voiceIndex { get; private set; }
+    public void SetVoiceIndex(int index) => voiceIndex = index;
     public int lowestAllowedNote = 36; // 🎵 Lowest MIDI note allowed for this track
     public int highestAllowedNote = 84; // 🎵 Highest MIDI note
     public InstrumentTrackController controller; // 🎛️ Reference to main controller
@@ -988,6 +990,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             if(_burstWroteBin.TryGetValue(collectable.burstId, out var b))
                 filledBin = b;
             SetBinFilled(filledBin, true);
+            controller?.NotifyBinFilled(this, filledBin);
             // Sync drum._binCount immediately so the audio guard (barIndex >= committedLeaderBins)
             // unblocks the new bin on the same loop rather than waiting for the next OnLoopBoundary.
             controller?.ResyncLeaderBinsNow();
@@ -1028,7 +1031,13 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             _burstTargetBin.Remove(collectable.burstId);
 
             // --- D) Existing bin cursor + cross-track behavior ---
-            AdvanceBinCursor(1); // only THIS track advances its cursor for the next spawn
+            // ByVoice chord tracks: cursor advances via NotifyBinFilled when the chord group
+            // completes, not per individual burst. Suppress here to prevent solo-voice advance.
+            {
+                var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+                if (_rp == null || _rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
+                    AdvanceBinCursor(1); // only THIS track advances its cursor for the next spawn
+            }
             bool extendedLeader = false;
             if (_burstLeaderBinsBeforeWrite.TryGetValue(collectable.burstId, out var Lbefore) &&
                 _burstWroteBin.TryGetValue(collectable.burstId, out var wroteBin))
@@ -1331,6 +1340,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                     filledBin = b;
 
                 SetBinFilled(filledBin, true);
+                controller?.NotifyBinFilled(this, filledBin);
                 controller?.ResyncLeaderBinsNow();
 
                 // VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately
@@ -1434,6 +1444,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (_burstWroteBin.TryGetValue(burstId, out var filledBin))
         {
             SetBinFilled(filledBin, true);
+            controller?.NotifyBinFilled(this, filledBin);
             controller?.ResyncLeaderBinsNow();
 
             if (controller?.noteVisualizer != null && drumTrack != null)
@@ -2051,7 +2062,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (staged)
         {
-            if (controller != null && drumTrack != null)
+            var _rpByVoice = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+            bool _isByVoice = _rpByVoice != null && _rpByVoice.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+            if (!_isByVoice && controller != null && drumTrack != null)
             {
                 Vector2Int gp = drumTrack.WorldToGridPosition(voidPos);
                 controller.BeginGravityVoidForPendingExpand(this, voidPos, gp);
@@ -2328,10 +2341,19 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
 // Keep cursor moving forward once we allocate a bin.
 // Without this, cursor can stay at 0 and repeatedly bias selection at boundaries.
-    if (GetBinCursor() <= targetBin)
-        SetBinCursor(targetBin + 1);
-    if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier)
-        SetBinCursor(loopMultiplier);
+// ByVoice chord tracks suppress this advance — cursor only moves when the whole
+// chord group fills the bin (controller.NotifyBinFilled handles it).
+    {
+        var _roleProfileForCursor = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        bool _isByVoice = _roleProfileForCursor != null && _roleProfileForCursor.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+        if (!_isByVoice)
+        {
+            if (GetBinCursor() <= targetBin)
+                SetBinCursor(targetBin + 1);
+            if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier)
+                SetBinCursor(loopMultiplier);
+        }
+    }
 
     controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
 }
@@ -2503,8 +2525,15 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         SetBinAllocated(targetBin, true);
         _burstTargetBin[burstId] = targetBin;
-        if (GetBinCursor() <= targetBin)  SetBinCursor(targetBin + 1);
-        if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
+        {
+            var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+            bool _isByVoice = _rp != null && _rp.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+            if (!_isByVoice)
+            {
+                if (GetBinCursor() <= targetBin)  SetBinCursor(targetBin + 1);
+                if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
+            }
+        }
 
         // Subscribe to per-step events (idempotent).
         if (!_compositionStepListenerActive && drumTrack != null)
@@ -2692,10 +2721,14 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (collected > 0) { 
                     // At least one note was harvested — treat bin as partially filled
                     // and let the normal progression continue.
-                    if (_burstWroteBin.TryGetValue(c.burstId, out var filledBin)) 
+                    if (_burstWroteBin.TryGetValue(c.burstId, out var filledBin))
                         SetBinFilled(filledBin, true);
-                    if (controller != null) controller.AllowAdvanceNextBurst(this); 
-                    AdvanceBinCursor(1);
+                    if (controller != null) controller.AllowAdvanceNextBurst(this);
+                    {
+                        var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+                        if (_rp == null || _rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
+                            AdvanceBinCursor(1);
+                    }
                     OnCollectableBurstCleared?.Invoke(this, c.burstId, true);
                 } 
                 else { 

@@ -357,6 +357,142 @@ MonoBehaviour:
   sfChorusSpeed: 0.2
   sfChorusDepth: 4.25
   sfChorusWidth: 10
+--- !u!1001 &134273147
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 318370297}
+    m_Modifications:
+    - target: {fileID: 1367716147436054, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_Name
+      value: Rhythm
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 82252122336247308, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: OutputAudioMixerGroup
+      value: 
+      objectReference: {fileID: -7502792225068152454, guid: 07985bf4f6d469340930e958ef313c14,
+        type: 2}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: playNoteOff
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showDefault
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showVerbose
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: volumeGlobal
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: MPTK_EffectUnity
+      value: 
+      objectReference: {fileID: 1248500726}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showSpatialization
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showSynthParameter
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showSoundFontEffect
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: MPTK_EffectSoundFont
+      value: 
+      objectReference: {fileID: 67942256}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showUnitySynthEffect
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+        type: 3}
+      propertyPath: showExperimentalFeature
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f1aa4788763f8854c9826e449686c328, type: 3}
+--- !u!4 &134273148 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4977113046780174, guid: f1aa4788763f8854c9826e449686c328,
+    type: 3}
+  m_PrefabInstance: {fileID: 134273147}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &134273149 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
+    type: 3}
+  m_PrefabInstance: {fileID: 134273147}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a10fc17731b73e545b0078250340235c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &150479617
 GameObject:
   m_ObjectHideFlags: 0
@@ -10500,6 +10636,7 @@ Transform:
   - {fileID: 1654847335}
   - {fileID: 1849649913}
   - {fileID: 608598249}
+  - {fileID: 134273148}
   - {fileID: 1798320909}
   - {fileID: 480221061}
   - {fileID: 1750563041}
@@ -11535,6 +11672,7 @@ MonoBehaviour:
   tileDiameterWorld: 1
   regrowCellsPerStep: 1
   regrowColliderEnableDelaySeconds: 0.2
+  voidDustGrowInSeconds: 0.4
   zapFadeSeconds: 1.5
   zapRegrowDelaySeconds: -1
   _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.2901961}
@@ -11762,6 +11900,119 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &996539884
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 996539885}
+  - component: {fileID: 996539888}
+  - component: {fileID: 996539887}
+  - component: {fileID: 996539886}
+  m_Layer: 0
+  m_Name: Rhythm Voice 3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &996539885
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 996539884}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1354683683}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &996539886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 996539884}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd0eca0389ef4d998136c071db692965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoopPattern
+--- !u!114 &996539887
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 996539884}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ce2ca362e448e6abebcc17c72aa1e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MidiVoice
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  channel: 4
+  bank: 0
+--- !u!114 &996539888
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 996539884}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trackColor: {r: 0.2, g: 0.5217388, b: 0.7490196, a: 1}
+  collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
+    type: 3}
+  collectableParent: {fileID: 996539885}
+  ascensionCohort:
+    stepsRemainingSerialized: 
+    armed: 0
+  assignedRole: 5
+  lowestAllowedNote: 40
+  highestAllowedNote: 68
+  controller: {fileID: 1354683684}
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  authoredRootMidi: 0
+  loopMultiplier: 1
+  maxLoopMultiplier: 4
+  ascendLoopCount: 32
+  ascensionLoopsPerExtraBin: 2
+  rootShiftNotesByChord: 1
+  spawnedCollectables: []
+  currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
+  binAllocated: 
+  _binCursor: 0
+  midiVoice: {fileID: 996539887}
+  loopPattern: {fileID: 0}
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
+  _loopCacheDirtyPending: 0
+  spawnBlockedMask:
+    serializedVersion: 2
+    m_Bits: 0
+  spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!1 &1190942844
 GameObject:
   m_ObjectHideFlags: 0
@@ -12157,6 +12408,7 @@ MonoBehaviour:
   logBeatSeqGates: 1
   sessionBurnEmaAlpha: 0.25
   burnMultipleAtFullIntensity: 2.5
+  singleTrackIntensityCeiling: 0.45
   drumLoopBPM: 120
   totalSteps: 32
   gridPadding: 0
@@ -12192,6 +12444,9 @@ Transform:
   - {fileID: 1690824281}
   - {fileID: 627412778}
   - {fileID: 652946507}
+  - {fileID: 1583544669}
+  - {fileID: 1889521209}
+  - {fileID: 996539885}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1354683684
@@ -12212,6 +12467,9 @@ MonoBehaviour:
   - {fileID: 1690824280}
   - {fileID: 627412777}
   - {fileID: 652946508}
+  - {fileID: 1583544672}
+  - {fileID: 1889521212}
+  - {fileID: 996539888}
   noteVisualizer: {fileID: 45202786}
   cohortWindowFraction: 0.5
   gravityVoidPrefab: {fileID: 9142743768792165380, guid: 3c8cf7e4f7b0f479b9cd36dffc6bdbe5,
@@ -13235,6 +13493,119 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &1583544668
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1583544669}
+  - component: {fileID: 1583544672}
+  - component: {fileID: 1583544671}
+  - component: {fileID: 1583544670}
+  m_Layer: 0
+  m_Name: Rhythm Voice 1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1583544669
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583544668}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1354683683}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1583544670
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583544668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd0eca0389ef4d998136c071db692965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoopPattern
+--- !u!114 &1583544671
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583544668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ce2ca362e448e6abebcc17c72aa1e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MidiVoice
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  channel: 4
+  bank: 0
+--- !u!114 &1583544672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583544668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trackColor: {r: 0.2, g: 0.5217388, b: 0.7490196, a: 1}
+  collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
+    type: 3}
+  collectableParent: {fileID: 1583544669}
+  ascensionCohort:
+    stepsRemainingSerialized: 
+    armed: 0
+  assignedRole: 5
+  lowestAllowedNote: 40
+  highestAllowedNote: 68
+  controller: {fileID: 1354683684}
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  authoredRootMidi: 0
+  loopMultiplier: 1
+  maxLoopMultiplier: 4
+  ascendLoopCount: 32
+  ascensionLoopsPerExtraBin: 2
+  rootShiftNotesByChord: 1
+  spawnedCollectables: []
+  currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
+  binAllocated: 
+  _binCursor: 0
+  midiVoice: {fileID: 1583544671}
+  loopPattern: {fileID: 0}
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
+  _loopCacheDirtyPending: 0
+  spawnBlockedMask:
+    serializedVersion: 2
+    m_Bits: 0
+  spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!1 &1596281810
 GameObject:
   m_ObjectHideFlags: 0
@@ -14283,6 +14654,119 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 1849649911}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1889521208
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1889521209}
+  - component: {fileID: 1889521212}
+  - component: {fileID: 1889521211}
+  - component: {fileID: 1889521210}
+  m_Layer: 0
+  m_Name: Rhythm Voice 2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1889521209
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1889521208}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1354683683}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1889521210
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1889521208}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd0eca0389ef4d998136c071db692965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoopPattern
+--- !u!114 &1889521211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1889521208}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ce2ca362e448e6abebcc17c72aa1e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MidiVoice
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  channel: 4
+  bank: 0
+--- !u!114 &1889521212
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1889521208}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trackColor: {r: 0.2, g: 0.5217388, b: 0.7490196, a: 1}
+  collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
+    type: 3}
+  collectableParent: {fileID: 1889521209}
+  ascensionCohort:
+    stepsRemainingSerialized: 
+    armed: 0
+  assignedRole: 5
+  lowestAllowedNote: 40
+  highestAllowedNote: 68
+  controller: {fileID: 1354683684}
+  midiStreamPlayer: {fileID: 134273149}
+  drumTrack: {fileID: 1354683682}
+  authoredRootMidi: 0
+  loopMultiplier: 1
+  maxLoopMultiplier: 4
+  ascendLoopCount: 32
+  ascensionLoopsPerExtraBin: 2
+  rootShiftNotesByChord: 1
+  spawnedCollectables: []
+  currentBurstId: 0
+  _binFilled: 
+  _maxBins: 4
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
+  binAllocated: 
+  _binCursor: 0
+  midiVoice: {fileID: 1889521211}
+  loopPattern: {fileID: 0}
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
+  _loopCacheDirtyPending: 0
+  spawnBlockedMask:
+    serializedVersion: 2
+    m_Bits: 0
+  spawnPickMaxTries: 80
+  spawnColumnBandFraction: 0.25
 --- !u!1 &1975552306
 GameObject:
   m_ObjectHideFlags: 0

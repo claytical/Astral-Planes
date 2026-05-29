@@ -20,7 +20,7 @@ MonoBehaviour:
     clearBoxWidth: 5
     clearBoxHeight: 5
   cellularAutomata:
-    fillChance: 0.3
+    fillChance: 0.829
     iterations: 3
   ring:
     spacing: 6

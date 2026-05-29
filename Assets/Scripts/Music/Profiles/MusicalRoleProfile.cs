@@ -7,8 +7,11 @@ public enum MusicalRole
     Harmony,
     Lead,
     Groove,
-    None
+    None,
+    Rhythm
 }
+
+public enum RoleConfigSelectionMode { ByBin, ByVoice }
 [System.Serializable]
 public struct DustColorSet
 {
@@ -91,6 +94,12 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Darting (Lead): grid-cell radius within which a Vehicle triggers directional evasion. Keep small (2–4) for 1v1 pursuit — fires only on close approach.")]
     [Range(0f, 10f)] public float evasionCells = 3f;
 
+    [Header("Chord Voices")]
+    [Tooltip("ByBin: configs rotate by bin index (default for all roles). ByVoice: configs are pinned by voiceIndex — voice 0 always uses config[0], voice 1 uses config[1], etc.")]
+    public RoleConfigSelectionMode configSelectionMode = RoleConfigSelectionMode.ByBin;
+    [Tooltip("Override colors for chord voices 1, 2, … (voice 0 uses dustColors.baseColor). Only relevant when configSelectionMode = ByVoice.")]
+    public Color[] chordVoiceColors;
+
     [Header("Presets")] public int midiPreset;
 
     [Header("Ripeness / Decay")]
@@ -108,6 +117,24 @@ public class MusicalRoleProfile : ScriptableObject
         c.a = baseAlpha;
         return c;
     }
+
+    public Color GetColorForVoice(int voiceIndex)
+    {
+        if (voiceIndex <= 0 || configSelectionMode != RoleConfigSelectionMode.ByVoice ||
+            chordVoiceColors == null || voiceIndex - 1 >= chordVoiceColors.Length)
+            return GetBaseColor();
+        var c = chordVoiceColors[voiceIndex - 1];
+        c.a = baseAlpha;
+        return c;
+    }
+    public Color GetRandomVoiceColor()
+    {
+        if (configSelectionMode != RoleConfigSelectionMode.ByVoice ||
+            chordVoiceColors == null || chordVoiceColors.Length == 0)
+            return GetBaseColor();
+        return GetColorForVoice(Random.Range(0, 1 + chordVoiceColors.Length));
+    }
+
     public Color GetShadowColor()
     {
         var c = dustColors.shadowColor;

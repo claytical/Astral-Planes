@@ -58,21 +58,31 @@ public partial class PhaseStar
         }
 
         NoteSet planned = ResolvePlannedNoteSet(track);
-        if (planned == null)
-        {
-            requiredZapCount = int.MaxValue;
-            _plannedEjectionDescriptor = nextDescriptor;
-            Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; blocking readiness. role={role} track={track.name} reason={reason}");
-            return false;
-        }
 
         int noteCount;
-        if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
+        if (planned == null)
         {
-            int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-            int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-            int noteListCount = planned.GetNoteList()?.Count ?? 0;
-            noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+            // NoteSet not yet generated (prebuilt missing, motif not applied yet).
+            // Fall back to authoritative riff count so the star can still reach
+            // ReadyLatched — DirectSpawnMineNode will generate the NoteSet fresh.
+            if (!TryResolveAuthoritativeZapCount(role, track, out noteCount) || noteCount <= 0)
+            {
+                requiredZapCount = int.MaxValue;
+                _plannedEjectionDescriptor = nextDescriptor;
+                Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable and no authoritative riff count; blocking readiness. role={role} track={track.name} reason={reason}");
+                return false;
+            }
+            Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; using authoritative riff count={noteCount}. role={role} track={track.name} reason={reason}");
+        }
+        else
+        {
+            if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
+            {
+                int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
+                int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
+                int noteListCount = planned.GetNoteList()?.Count ?? 0;
+                noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+            }
         }
 
         if (_currentBurstRequiredZaps > 0)

@@ -666,21 +666,13 @@ public partial class PhaseStar : MonoBehaviour
         var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
         if (roleProfile != null)
         {
-            return new Color(
-                roleProfile.dustColors.baseColor.r,
-                roleProfile.dustColors.baseColor.g,
-                roleProfile.dustColors.baseColor.b,
-                1f);
+            int voiceIdx = fallbackTrack?.voiceIndex ?? 0;
+            var c = roleProfile.GetColorForVoice(voiceIdx);
+            return new Color(c.r, c.g, c.b, 1f);
         }
 
         if (fallbackTrack != null)
-        {
-            return new Color(
-                fallbackTrack.trackColor.r,
-                fallbackTrack.trackColor.g,
-                fallbackTrack.trackColor.b,
-                1f);
-        }
+            return new Color(fallbackTrack.trackColor.r, fallbackTrack.trackColor.g, fallbackTrack.trackColor.b, 1f);
 
         return Color.white;
     }
@@ -765,6 +757,14 @@ public partial class PhaseStar : MonoBehaviour
         cravingNavigator?.SetAttunedRole(role);
         dust?.SetAttunedRole(role);
         Debug.Log($"[PhaseStar] Attuned to {role}");
+
+        // Prime before first zap so requiredZapCount isn't still 1 when the first dust clears.
+        if (_assignedMotif != null && zappedCount == 0)
+        {
+            var track = FindTrackByRole(role);
+            if (track != null)
+                TryRefreshRequiredZapCountForPlannedRole(role, track, resetCurrentZapCount: false, reason: "attune-prime");
+        }
     }
 
     private Color ResolvePreviewColorByReadiness()
@@ -838,8 +838,8 @@ public partial class PhaseStar : MonoBehaviour
             if (dominantRole != _previewRole)
             {
                 _previewRole = dominantRole;
-                _previewColor = ResolveRoleColor(dominantRole);
                 _cachedTrack = FindTrackByRole(dominantRole);
+                _previewColor = ResolveRoleColor(dominantRole, _cachedTrack);
                 if (zappedCount == 0)
                     TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
                 visuals?.ResetDualDiamondVisualState();
@@ -1474,6 +1474,21 @@ public partial class PhaseStar : MonoBehaviour
         ResolveGameFlowManager();
         var controller = _gfm?.controller;
         if (controller == null || controller.tracks == null) return null;
+
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        {
+            // Cycle through voices: pick the first one whose current-target bin isn't allocated yet.
+            // This ensures each ejection targets a different voice (A → C → E) rather than
+            // always reusing voice 0 before the chord group is complete.
+            foreach (var t in controller.tracks)
+            {
+                if (t == null || t.assignedRole != role) continue;
+                if (!t.IsBinAllocated(t.GetBinCursor()))
+                    return t;
+            }
+            // All voices are mid-burst — fall back to first match.
+        }
 
         foreach (var t in controller.tracks)
             if (t != null && t.assignedRole == role)

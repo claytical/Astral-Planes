@@ -390,7 +390,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                         tentacle.targetCell      = newCell;
                         tentacle.targetWorldPos  = drum.GridToWorldPosition(newCell);
                         ResetInvalidTargetRetry(tentacle);
-                        LogTentacleTransition(tentacle, TentacleState.Growing, "retargeted");
+                        //LogTentacleTransition(tentacle, TentacleState.Growing, "retargeted");
                     }
                     else
                     {
@@ -1124,7 +1124,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (tentacle.state == nextState) return;
         tentacle.state = nextState;
         ResetInvalidTargetRetry(tentacle);
-        LogTentacleTransition(tentacle, nextState, reason);
+        //LogTentacleTransition(tentacle, nextState, reason);
     }
 
     private void LogTentacleTransition(Tentacle tentacle, TentacleState state, string reason)
