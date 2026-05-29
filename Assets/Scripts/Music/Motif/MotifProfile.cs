@@ -105,7 +105,7 @@ public class MotifProfile : ScriptableObject
     /// which is essential for saturation detection and for MineNode re-spawns being
     /// consistent with what was originally placed.
     /// </summary>
-    public RoleMotifNoteSetConfig GetConfigForRoleAtBin(MusicalRole role, int binIndex, int totalBins)
+    public RoleMotifNoteSetConfig GetConfigForRoleAtBin(MusicalRole role, int binIndex, int totalBins, int voiceIndex = 0)
     {
         if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
             return null;
@@ -118,15 +118,24 @@ public class MotifProfile : ScriptableObject
                 matches.Add(cfg);
             }
         }
- 
+
         if (matches == null || matches.Count == 0) return null;
 
-        // Single config: same pattern every bin (root-shift via chord progression handles variation).
+        // Single config: same pattern every bin and every voice.
         if (matches.Count == 1) return matches[0];
 
-        // Multiple configs: deterministic round-robin so bin 0 → cfg[0], bin 1 → cfg[1], etc.
-        int idx = Mathf.Abs(binIndex) % matches.Count;
-        return matches[idx];
+        // ByVoice roles: voice 0 always gets config[0], voice 1 gets config[1], etc.
+        // Bins within a voice all use the same authored RiffAsset (chord tone stays constant).
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        {
+            int idx = Mathf.Abs(voiceIndex) % matches.Count;
+            return matches[idx];
+        }
+
+        // Default ByBin: deterministic round-robin so bin 0 → cfg[0], bin 1 → cfg[1], etc.
+        int binIdx = Mathf.Abs(binIndex) % matches.Count;
+        return matches[binIdx];
     }
 
     /// <summary>

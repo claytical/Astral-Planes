@@ -252,7 +252,7 @@ public class PhaseTransitionManager : MonoBehaviour
             track.authoredRootMidi = currentMotif.keyRootMidi;
             track.SetNoteSet(bin0NoteSet);
 
-            var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier);
+            var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier, track.voiceIndex);
             track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
         }
     }

@@ -35,7 +35,7 @@ public class NoteSetFactory : MonoBehaviour
         Debug.LogWarning("[NoteSetFactory] Motif is null; cannot generate motif-based NoteSet.");
         return null;
     }
-    var cfg = motif.GetConfigForRoleAtBin(track.assignedRole, binIndex, track.maxLoopMultiplier);
+    var cfg = motif.GetConfigForRoleAtBin(track.assignedRole, binIndex, track.maxLoopMultiplier, track.voiceIndex);
     if (cfg == null)
     {
         Debug.LogWarning($"[NoteSetFactory] No RoleMotifNoteSetConfig for role {track.assignedRole} in motif {motif.name}. Cannot generate motif-based NoteSet.");

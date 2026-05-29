@@ -12,7 +12,7 @@ public partial class InstrumentTrack
         var prof = overrideProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
         if (prof == null) return;
 
-        trackColor       = prof.GetBaseColor();
+        trackColor       = prof.GetColorForVoice(voiceIndex);
         trackShadowColor = prof.GetShadowColor();
         preset           = prof.midiPreset;
         midiVoice?.SetPreset(prof.midiPreset);

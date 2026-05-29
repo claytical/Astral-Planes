@@ -431,6 +431,60 @@ public partial class NoteVisualizer : MonoBehaviour
                 row.offsetMax = new Vector2(0f, row.offsetMax.y);
             }
         }
+
+    // Creates rows for any tracks beyond the inspector-configured set.
+    // Redistributes the total Y anchor range evenly so all rows fit without overflowing.
+    private void EnsureTrackRowsForAllTracks()
+    {
+        if (trackRows == null || trackRows.Count == 0 || _ctrl?.tracks == null) return;
+
+        int needed = 0;
+        for (int i = 0; i < _ctrl.tracks.Length; i++)
+            if (_ctrl.tracks[i] != null) needed = i + 1;
+
+        int existing = trackRows.Count;
+        if (existing >= needed) return;
+
+        // Measure total Y anchor range that existing rows collectively cover.
+        float totalMin = float.MaxValue, totalMax = float.MinValue;
+        foreach (var r in trackRows)
+        {
+            if (r == null) continue;
+            if (r.anchorMin.y < totalMin) totalMin = r.anchorMin.y;
+            if (r.anchorMax.y > totalMax) totalMax = r.anchorMax.y;
+        }
+        if (totalMin >= totalMax) { totalMin = 0f; totalMax = 1f; }
+
+        // Find a non-null template to clone offsetMin/Max.y from.
+        RectTransform template = null;
+        for (int i = trackRows.Count - 1; i >= 0; i--)
+            if (trackRows[i] != null) { template = trackRows[i]; break; }
+        if (template == null || template.parent == null) return;
+
+        // Create missing row GameObjects.
+        for (int i = existing; i < needed; i++)
+        {
+            var go = new GameObject($"TrackRow_Auto_{i}", typeof(RectTransform));
+            go.transform.SetParent(template.parent, worldPositionStays: false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.offsetMin = new Vector2(0f, template.offsetMin.y);
+            rt.offsetMax = new Vector2(0f, template.offsetMax.y);
+            trackRows.Add(rt);
+        }
+
+        // Redistribute all rows equally across the total Y range.
+        float rowHeight = (totalMax - totalMin) / needed;
+        for (int i = 0; i < needed; i++)
+        {
+            var row = trackRows[i];
+            if (row == null) continue;
+            float yMin = totalMin + rowHeight * i;
+            row.anchorMin = new Vector2(0f, yMin);
+            row.anchorMax = new Vector2(1f, yMin + rowHeight);
+            row.offsetMin = new Vector2(0f, row.offsetMin.y);
+            row.offsetMax = new Vector2(0f, row.offsetMax.y);
+        }
+    }
     private void UpdatePlayheadParticleTrailWorld()
     {
 //        if (!playheadTrailEnabled) return;
@@ -1143,6 +1197,7 @@ public partial class NoteVisualizer : MonoBehaviour
         Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
         var key = (track, stepIndex);
 
+        EnsureTrackRowsForAllTracks();
         int trackIndex = Array.IndexOf(_ctrl.tracks, track);
         if (trackIndex < 0 || trackIndex >= trackRows.Count) return null;
         RectTransform row = trackRows[trackIndex];

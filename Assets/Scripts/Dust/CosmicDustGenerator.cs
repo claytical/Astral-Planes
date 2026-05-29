@@ -155,6 +155,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         { MusicalRole.Harmony, 0 },
         { MusicalRole.Lead,    0 },
         { MusicalRole.Groove,  0 },
+        { MusicalRole.Rhythm,  0 },
     };
     // Counts ALL solid cells regardless of role (including MusicalRole.None).
     // _solidCountByRole excludes None-role cells, so TotalSolidCount() uses _gridState.AllSolidCount.
@@ -1233,7 +1234,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
-            Color regrowTint = (roleProfile != null) ? roleProfile.GetBaseColor() : _mazeTint;
+            Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : _mazeTint;
 
             // Write / update the imprint so future regrows of this cell remember the role.
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
@@ -1608,7 +1609,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Use only motif-active roles so regrowth doesn't introduce roles the motif doesn't use.
         var roles = (_activeRoles != null && _activeRoles.Count > 0)
             ? new List<MusicalRole>(_activeRoles)
-            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
 
         // Shuffle order for tie-breaking
         for (int i = roles.Count - 1; i > 0; i--)
@@ -1632,7 +1633,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Use only motif-active roles so regrowth doesn't introduce roles the motif doesn't use.
         var roles = (_activeRoles != null && _activeRoles.Count > 0)
             ? (IReadOnlyList<MusicalRole>)_activeRoles
-            : new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+            : new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
 
         foreach (var r in roles)
         {
@@ -1727,7 +1728,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         _activeRoles = roles != null && roles.Count > 0
             ? new List<MusicalRole>(roles)
-            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+            : new List<MusicalRole> { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
     }
 
     public void ApplyMotifGeoConfig(MotifProfile motif)
@@ -2128,7 +2129,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 _ripenessByCell[gp] = ripeness;
                 // Mid-decay: lerp color only (Role stays set so PhaseStar can still drain).
-                Color roleColor = profile != null ? profile.GetBaseColor() : Color.white;
+                // Use the per-cell imprint color so random voice colors are preserved through decay.
+                Color roleColor = Color.white;
+                if (_imprints != null && _imprints.TryGetValue(gp, out var imp))
+                    roleColor = new Color(imp.color.r, imp.color.g, imp.color.b, 1f);
+                else if (profile != null)
+                    roleColor = profile.GetBaseColor();
                 Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
                 Color gray = new Color(_mazeTint.r, _mazeTint.g, _mazeTint.b, dust.Charge01);
                 float effectiveRipeness = Mathf.Max(ripeness, dust.Charge01);

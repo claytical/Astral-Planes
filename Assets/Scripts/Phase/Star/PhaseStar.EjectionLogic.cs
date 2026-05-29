@@ -392,18 +392,27 @@ public partial class PhaseStar
     {
         noteCount = 0;
         if (_assignedMotif == null || track == null || role == MusicalRole.None)
+        {
+            Debug.LogWarning($"[PhaseStar:ZapCount] Early exit: motif={_assignedMotif != null} track={track != null} role={role}");
             return false;
+        }
 
         int totalBins = Mathf.Max(1, track.maxLoopMultiplier);
-        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins);
-        if (cfg == null) return false;
+        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins, track.voiceIndex);
+        if (cfg == null)
+        {
+            Debug.LogWarning($"[PhaseStar:ZapCount] cfg null for role={role} voiceIndex={track.voiceIndex} totalBins={totalBins} motif={_assignedMotif.name}");
+            return false;
+        }
 
         if (cfg.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
         {
             noteCount = cfg.riff.riff.events.Count;
+            Debug.Log($"[PhaseStar:ZapCount] role={role} voiceIndex={track.voiceIndex} riff={cfg.riff.name} events={noteCount}");
             return true;
         }
 
+        Debug.LogWarning($"[PhaseStar:ZapCount] riff empty/null for role={role} cfg={cfg} riff={cfg.riff?.name ?? "null"} useRiff={cfg.useRiffAsAuthoritativeScore}");
         return false;
     }
 

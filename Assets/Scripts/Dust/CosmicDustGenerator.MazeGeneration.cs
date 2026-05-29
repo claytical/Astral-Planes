@@ -79,7 +79,8 @@ public partial class CosmicDustGenerator
                 MusicalRole.Bass,
                 MusicalRole.Harmony,
                 MusicalRole.Lead,
-                MusicalRole.Groove
+                MusicalRole.Groove,
+                MusicalRole.Rhythm
             };
 
         var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);

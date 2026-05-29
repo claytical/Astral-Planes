@@ -142,6 +142,11 @@ public class InstrumentTrackController : MonoBehaviour
     public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
         if (track == null) return;
+        // ByVoice chord groups advance together; NotifyBinFilled grants the token
+        // to all sibling voices simultaneously when the last one fills the bin.
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+            return;
         _allowAdvanceNextBurst[track] = true;
     }
     private bool ConsumeAllowAdvanceNextBurst(InstrumentTrack track)
@@ -327,6 +332,7 @@ public class InstrumentTrackController : MonoBehaviour
             var pool = _gfm?.activeDrumTrack?._starPool;
             pool?.SetGravityVoidSafetyBubbleActive(false);
         }
+        if (_gravityVoidInstance == null) return;
         var explode = _gravityVoidInstance.GetComponent<Explode>();
         if (explode != null) explode.Permanent();
 
@@ -334,7 +340,7 @@ public class InstrumentTrackController : MonoBehaviour
     }
     // Canonical role order for rainbow ring cycling.
     private static readonly MusicalRole[] kVoidRoleOrder =
-        { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+        { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
     
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
@@ -346,7 +352,7 @@ public class InstrumentTrackController : MonoBehaviour
         var pool = _gfm?.activeDrumTrack?._starPool;
         IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
         if (activeRoles == null || activeRoles.Count == 0)
-            activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove };
+            activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
 
         int N = activeRoles.Count;
         int W = voidRingWidthCells;
@@ -1001,6 +1007,17 @@ public class InstrumentTrackController : MonoBehaviour
 
     int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
 
+    // ByVoice chord tracks advance only when the whole chord group fills a bin
+    // (via NotifyBinFilled → AdvanceBinCursor). Return the cursor directly —
+    // no frontier comparison, no advance token needed.
+    var byVoiceCheck = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+    if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+    {
+        int cursor = track.GetBinCursor();
+        if (track.maxLoopMultiplier > 0) cursor = cursor % track.maxLoopMultiplier;
+        return Mathf.Clamp(cursor, 0, trackMaxBinIndex);
+    }
+
     // If expansion is already staged, advancing the frontier would propose bin N again,
     // which SpawnCollectableBurst would reject (TryStageExpand returns false) and drop
     // the burst entirely. Redirect to density injection in an existing filled bin instead.
@@ -1111,15 +1128,11 @@ public class InstrumentTrackController : MonoBehaviour
                 if (t) t.ResetBinsForPhase();
         } 
     public bool AnyExpansionPending() {
-        var offenders = tracks.Where(t => t != null && t.IsExpansionPending).Select(t => t.name).ToArray();
-        
-        if (tracks == null || tracks.Length == 0) return false; 
+        if (tracks == null || tracks.Length == 0) return false;
         foreach (var t in tracks) {
-            if (t.IsExpansionPending) {
-            }
             if (!t) continue;
-            if (t.IsExpansionPending) return true; 
-        } 
+            if (t.IsExpansionPending) return true;
+        }
         return false;
     }
 
@@ -1206,8 +1219,63 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
     {
+        AssignVoiceIndices();
+        if (tracks != null)
+            foreach (var t in tracks)
+                if (t != null) t.RefreshRoleColorsFromProfile();
         UpdateVisualizer();
-    } 
+    }
+
+    private void AssignVoiceIndices()
+    {
+        if (tracks == null) return;
+        var roleCounts = new Dictionary<MusicalRole, int>();
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (t == null) continue;
+            if (!roleCounts.TryGetValue(t.assignedRole, out int count)) count = 0;
+            t.SetVoiceIndex(count);
+            roleCounts[t.assignedRole] = count + 1;
+        }
+    }
+
+    public event Action<MusicalRole, int> OnChordGroupBinFilled;
+
+    public bool IsChordGroupComplete(MusicalRole role, int binIndex)
+    {
+        if (tracks == null) return false;
+        bool found = false;
+        for (int i = 0; i < tracks.Length; i++)
+        {
+            var t = tracks[i];
+            if (t == null || t.assignedRole != role) continue;
+            found = true;
+            if (!t.IsBinFilled(binIndex)) return false;
+        }
+        return found;
+    }
+
+    public void NotifyBinFilled(InstrumentTrack track, int binIndex)
+    {
+        if (track == null) return;
+        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        if (roleProfile == null || roleProfile.configSelectionMode != RoleConfigSelectionMode.ByVoice) return;
+        if (!IsChordGroupComplete(track.assignedRole, binIndex)) return;
+
+        OnChordGroupBinFilled?.Invoke(track.assignedRole, binIndex);
+        // All voices filled this bin together — advance cursors for the whole group so
+        // the next GenerateNotes call returns the correct next bin.
+        // Do NOT grant _allowAdvanceNextBurst: that token feeds TrackExpansionController,
+        // which would passively spawn bin-1 collectables on the next drum downbeat.
+        // ByVoice tracks advance only through star pokes (MineNode ejection).
+        foreach (var t in tracks)
+        {
+            if (t == null || t.assignedRole != track.assignedRole) continue;
+            if (t.GetBinCursor() <= binIndex)
+                t.AdvanceBinCursor();
+        }
+    }
     private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
     {
         float startVolume = player.MPTK_Volume;
@@ -1277,7 +1345,10 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public int GetMaxLoopMultiplier()
     {
-        return tracks.Max(track => track.loopMultiplier);
+        int max = 1;
+        foreach (var t in tracks)
+            if (t != null) max = Mathf.Max(max, t.loopMultiplier);
+        return max;
     }
 
     /// <summary>
