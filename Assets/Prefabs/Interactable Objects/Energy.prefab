@@ -214,11 +214,10 @@ MonoBehaviour:
   carryMinLeadSeconds: 0.02
   amount: 10
   ribbonMarker: {fileID: 0}
-  tether: {fileID: 0}
   intendedStep: -1
   carrySettings:
     localOffset: {x: 0, y: 0.65, z: 0}
-    localOffsetJitter: 0.05
+    localOffsetJitter: 0.075
   pulseSpeed: 1.6
   minAlpha: 0.25
   maxAlpha: 0.65
@@ -227,10 +226,10 @@ MonoBehaviour:
   ideaLookaheadCells: 5
   ideaBiasStrength: 0.55
   ideaTurnLerp: 6
-  microTurbulenceStrength: 0.2
+  microTurbulenceStrength: 0.35
   carryOrbitRadius: 0.25
   carryOrbitAngularSpeed: 4
-  carryOrbitFollowLerp: 18
+  carryOrbitFollowLerp: 15
   carryOrbitVerticalBias: 0.05
   trailFollowLerp: 12
   trailIdleScaleMin: 0.85
@@ -242,7 +241,7 @@ MonoBehaviour:
   trailDriftFocusMul: 0.15
   sharedTargetSteps: 
   minSpeed: 0.8
-  maxSpeed: 3.5
+  maxSpeed: 5
   arriveRadius: 0.05
   chooseNextEvery: 0.15
   lingerLongNote: 0.25

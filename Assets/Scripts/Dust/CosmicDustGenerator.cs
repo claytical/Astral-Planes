@@ -704,6 +704,35 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
 
     /// <summary>
+    /// Promotes hidden Solid cells within <paramref name="radiusCells"/> of <paramref name="centerGP"/>
+    /// whose Voronoi role matches <paramref name="role"/> to their true role color,
+    /// firing OnRoleChanged so PhaseStar can target them (player retry path after MineNode expiry).
+    /// </summary>
+    public void RevealHiddenDustByRole(Vector2Int centerGP, int radiusCells, MusicalRole role)
+    {
+        if (radiusCells <= 0 || _gridState.CellState == null || _hiddenImprints == null) return;
+
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        if (profile == null) return;
+        Color roleColor = profile.GetBaseColor();
+
+        int rSq = radiusCells * radiusCells;
+        for (int dy = -radiusCells; dy <= radiusCells; dy++)
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        {
+            if (dx * dx + dy * dy > rSq) continue;
+            var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
+            if (!IsInBounds(gp)) continue;
+            if (!_hiddenImprints.TryGetValue(gp, out var hiddenRole) || hiddenRole != role) continue;
+            if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid) continue;
+            if (!TryGetDustAt(gp, out var dust) || dust.Role != MusicalRole.None) continue;
+
+            if (!PromoteHiddenRole(gp)) continue;
+            dust.ApplyRoleAndCharge(role, roleColor, dust.Charge01);
+        }
+    }
+
+    /// <summary>
     /// Called by CosmicDust.DrainCharge when a cell's visual alpha drops below the
     /// solid-visibility threshold (0.55). The cell is physically drained but was
     /// never explicitly "cleared" by gameplay — this bridges that gap so the

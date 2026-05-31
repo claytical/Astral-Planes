@@ -12,20 +12,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
   m_Name: Contact
   m_EditorClassIdentifier: 
-  role: 3
+  role: 2
   dustColors:
-    baseColor: {r: 0, g: 0.9764706, b: 1, a: 0.7607843}
+    baseColor: {r: 0.6901961, g: 0, b: 0.42745098, a: 0.7607843}
     shadowColor: {r: 0, g: 0.54350716, b: 0.5566038, a: 1}
   baseAlpha: 0.65
   maxEnergyUnits: 2
   carveResistance01: 0.3
   drainResistance01: 0.75
-  dustHardness01: 0.5
   mineNodeSpeed: 0.85
   mineNodeLocomotionProfile: {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7,
     type: 2}
   defaultMineNodeArchetypeId: Steady
   mineNodeArchetypeVariants: []
+  behaviorSpeedMultiplier: 1
+  territoryAffinity01: 0.3
+  commitDurationScale: 1
+  orbitalTurnBias: 0.6
+  burstDuration: 0.4
+  pauseDuration: 0.35
+  burstSpeedMultiplier: 2
+  evasionCells: 3
+  configSelectionMode: 0
+  chordVoiceColors: []
   midiPreset: 2
   ripeDuration: 256
   regrowthDelay: 0.2

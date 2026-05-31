@@ -9,6 +9,7 @@ public class Explode : MonoBehaviour
 {
     public GameObject explosion;
     public GameObject preExplosion;
+    public GameObject expireExplosion;
     public float lifetime;
     public bool randomizeLifetimer = false;
     private float explosionTimer;
@@ -205,6 +206,13 @@ public class Explode : MonoBehaviour
                 lifetime = 0;
             }
         }
+    }
+
+    public void ExpireExplode()
+    {
+        if (expireExplosion == null) return;
+        var go = Instantiate(expireExplosion, transform.position, Quaternion.identity);
+        ApplyTintToInstance(go, explosionTint);
     }
 
     public void ZapExplode()
