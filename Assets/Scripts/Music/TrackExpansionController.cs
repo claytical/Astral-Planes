@@ -286,6 +286,12 @@ public class TrackExpansionController
     
     private void OnDrumDownbeat_CommitExpand()
     {
+        // Defer if any vehicle is carrying notes — expanding while carrying recomputes
+        // all track layouts and invalidates the vehicle's NoteVisualizer target steps.
+        // HookedBoundaryForExpand stays true, so this retries every loop boundary.
+        if (Vehicle.AnyVehicleCarrying())
+            return;
+
         bool hadAnyPending = PendingExpandForBurst || _pendingBurstAfterExpand.HasValue;
 
         try

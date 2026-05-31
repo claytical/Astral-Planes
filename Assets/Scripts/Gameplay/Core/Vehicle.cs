@@ -121,12 +121,35 @@ public partial class Vehicle : MonoBehaviour
     private readonly HashSet<InstrumentTrack> _carriedTracksScratch = new HashSet<InstrumentTrack>();
     private readonly HashSet<int> _spokenForScratch = new HashSet<int>();
 
+    private InstrumentTrack _lockedTrack = null;
+    private static int _s_vehiclesCarrying = 0;
+
+    public static bool AnyVehicleCarrying() => _s_vehiclesCarrying > 0;
+
+    public bool CanAcceptCollectable(InstrumentTrack track) =>
+        _lockedTrack == null || _lockedTrack == track;
+
+    private void AcquireTrackLock(InstrumentTrack track)
+    {
+        if (_lockedTrack != null) return;
+        _lockedTrack = track;
+        _s_vehiclesCarrying++;
+    }
+
+    private void ReleaseTrackLock()
+    {
+        if (_lockedTrack == null) return;
+        _lockedTrack = null;
+        _s_vehiclesCarrying = Mathf.Max(0, _s_vehiclesCarrying - 1);
+    }
+
     public void ClearPendingNotesForBridge()
     {
         _pendingNotes.Clear();
         _armedReleases.Clear();
         _releaseButtonHeld = false;
         _lastArmWasFromHold = false;
+        ReleaseTrackLock();
         DestroyVehicleTether();
     }
 
@@ -469,6 +492,7 @@ public partial class Vehicle : MonoBehaviour
 
         if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
         {
+            ReleaseTrackLock();
             DestroyVehicleTether();
             if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
             UpdateVehiclePlacementResonance(0f, null);
@@ -1288,6 +1312,8 @@ public partial class Vehicle : MonoBehaviour
     }
     private void OnDestroy()
     {
+        ReleaseTrackLock();
+
         // Unhook step-tick before the object is gone.
         if (gfm == null) gfm = GameFlowManager.Instance;
         var drum = gfm?.activeDrumTrack;
@@ -1478,6 +1504,7 @@ public partial class Vehicle : MonoBehaviour
             dropped.track?.NotifyNoteDiscarded(dropped.burstId, dropped.authoredAbsStep);
         }
 
+        AcquireTrackLock(p.track);
         _pendingNotes.Enqueue(p);
         return true;
     }

@@ -86,6 +86,16 @@ public partial class PhaseStar
             Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
             return;
         }
+
+        // Block expansion-triggering ejections while notes from other tracks are still live
+        // in the world — either carried by a vehicle or physically floating unresolved.
+        if (_cachedTrack.GetBinCursor() >= _cachedTrack.loopMultiplier
+            && (Vehicle.AnyVehicleCarrying() || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
+        {
+            Trace("OnCollisionEnter2D: new-bin expansion blocked — notes from other tracks in play");
+            return;
+        }
+
         if (_previewRole != MusicalRole.None)
         {
             if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;

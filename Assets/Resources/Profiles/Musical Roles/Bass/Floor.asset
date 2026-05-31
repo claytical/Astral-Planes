@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
-  m_Name: Fender Bass
+  m_Name: Floor
   m_EditorClassIdentifier: 
   role: 0
   dustColors:
-    baseColor: {r: 0.29411766, g: 0, b: 0.50980395, a: 0.6509804}
+    baseColor: {r: 0.3647059, g: 0.101960786, b: 0.6392157, a: 1}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
   baseAlpha: 0.65
   maxEnergyUnits: 5
@@ -35,6 +35,6 @@ MonoBehaviour:
   evasionCells: 3
   configSelectionMode: 0
   chordVoiceColors: []
-  midiPreset: 11
+  midiPreset: 0
   ripeDuration: 512
-  regrowthDelay: 0.8
+  regrowthDelay: 1
