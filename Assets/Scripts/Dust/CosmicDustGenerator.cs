@@ -20,16 +20,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
     public float cellClearanceWorld = 0f;
     private bool _mazeAlreadyGenerated = false;
-    [Header("Hardness")]
-    [Tooltip("Baseline dust hardness for non-imprinted maze cells. Imprinted MineNode cells override this via DustImprint.hardness01.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float defaultMazeHardness01 = 0f;
     private bool _regrowthSuppressed = false;
     struct DustImprint
     {
         public Color color;
         public float healDelay;
-        public float hardness01;          // Legacy — kept for migration.
         public float carveResistance01;
         public float drainResistance01;
         public int   maxEnergyUnits;
@@ -119,6 +114,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
+    private Dictionary<Vector2Int, float> _carveAccumulator = new();
     // Cells spawned by GrowVoidDustDiskFromGrid.
     // IMPORTANT: This set only affects vehicle carve behavior. Zap/drain clear paths can
     // still regrow these cells when their tuning says they should, so do not reuse this
@@ -249,7 +245,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                      var tint = dust.CurrentTint;
                      tint.a = 1f;
                      explode.SetTint(tint);
-                     Debug.Log($"[CLEARCELL] preexplode tint={dust.CurrentTint} forcedVisible={(new Color(dust.CurrentTint.r, dust.CurrentTint.g, dust.CurrentTint.b, 1f))}");
                      explode.ZapExplode();
                  }
              }
@@ -387,7 +382,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         int outerRadiusCells,
         MusicalRole imprintRole,
         Color hueRgb,
-        float imprintHardness01,
         float energyAtCenter01,
         float falloffExp,
         float growInSeconds,
@@ -403,7 +397,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         if (outerRadiusCells <= 0) return 0;
 
-        imprintHardness01 = Mathf.Clamp01(imprintHardness01);
         energyAtCenter01 = Mathf.Clamp01(energyAtCenter01);
         falloffExp = Mathf.Max(0.01f, falloffExp);
         growInSeconds = Mathf.Max(0.01f, growInSeconds);
@@ -479,7 +472,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 _imprints[gp] = new DustImprint
                 {
                     color = spawnColor,
-                    hardness01 = imprintHardness01,
                     role = spawnRole
                 };
                 processed++;
@@ -491,7 +483,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 {
                     existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
                     var resistance = ResolveResistanceProfile(gp, imprintRole, context: "GrowVoidDustDisk:existing");
-                    existingDust.clearing.carveResistance01 = resistance.carveResistance01;
                     existingDust.clearing.drainResistance01 = resistance.drainResistance01;
                     continue;
                 }
@@ -550,8 +541,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         Vector2Int centerGP,
         int outerRadiusCells,
         int innerRadiusCellsExclusive,
-        MusicalRole hiddenRole,
-        float hardness01)
+        MusicalRole hiddenRole)
     {
         if (drums == null || cellsToFill == null || outerRadiusCells <= 0) return;
         EnsureCellGrid();
@@ -581,7 +571,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 {
                     role              = MusicalRole.None,
                     color             = _mazeTint,
-                    hardness01        = hardness01,
                     carveResistance01 = 0f,
                     drainResistance01 = 0f,
                     maxEnergyUnits    = 1,
@@ -597,8 +586,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void InjectTrapCellsFromList(
         List<(Vector2Int, Vector3)> cellsToFill,
         IEnumerable<Vector2Int> trapCells,
-        MusicalRole hiddenRole,
-        float hardness01)
+        MusicalRole hiddenRole)
     {
         if (drums == null || cellsToFill == null || trapCells == null) return;
         EnsureCellGrid();
@@ -617,7 +605,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 role              = MusicalRole.None,
                 color             = _mazeTint,
-                hardness01        = hardness01,
                 carveResistance01 = 0f,
                 drainResistance01 = 0f,
                 maxEnergyUnits    = 1,
@@ -631,7 +618,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     public void SpawnDustAtCells(
         IReadOnlyList<Vector2Int> cells,
-        MusicalRole role, Color hue, float hardness01, float energy01, float growInSeconds,
+        MusicalRole role, Color hue, float energy01, float growInSeconds,
         bool hideRole = false)
     {
         if (cells == null || cells.Count == 0) return;
@@ -657,7 +644,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 spawnColor.a = c.a;
             }
 
-            _imprints[gp] = new DustImprint { color = spawnColor, hardness01 = hardness01, role = spawnRole };
+            _imprints[gp] = new DustImprint { color = spawnColor, role = spawnRole };
 
             if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
                 existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
@@ -665,7 +652,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
-                existingDust.clearing.carveResistance01 = res.carveResistance01;
                 existingDust.clearing.drainResistance01 = res.drainResistance01;
                 continue;
             }
@@ -761,7 +747,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             dust.SetGrowInDuration(voidDustGrowInSeconds);
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
-            dust.clearing.carveResistance01 = resistance.carveResistance01;
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
@@ -842,6 +827,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (dust == null) return;
             dust.SetTerrainColliderEnabled(_enabled);
         }
+
+    public void DisableCellCollider(Vector2Int cell)
+    {
+        if (!IsInBounds(cell)) return;
+        var dust = _gridState.CellDust?[cell.x, cell.y];
+        if (dust != null) SetDustCollision(dust, false);
+    }
     private void EnsureImprints()
     {
         if (_imprints == null)
@@ -1150,6 +1142,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
     private IEnumerator CommitRegrowCell(Vector2Int gp)
     {
+        Debug.Log($"[Regrow] COMMIT_START {gp} suppressed={_regrowthSuppressed} vehicleOverlap={IsVehicleOverlappingCell(gp)}");
         if (_regrowthSuppressed)
         {
             if (TryGetCellGo(gp, out var existing) && existing != null)
@@ -1181,7 +1174,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Regrowing);
         CosmicDust dust = null;
         MusicalRole regrowRole = MusicalRole.None;
-        bool playerCarved = _playerCarvedCells.Remove(gp);
+        _playerCarvedCells.Remove(gp);
         if (go.TryGetComponent<CosmicDust>(out dust) && dust != null)
         {
             dust.PrepareForReuse();
@@ -1201,8 +1194,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 if (existingImp.role == MusicalRole.None)
                 {
-                    // Maze cells (gray start) stay gray on regrowth.
-                    // Roles are only earned through GravityVoid or MineNode, not regrowth.
                     regrowRole = MusicalRole.None;
                 }
                 else if (IsRoleActive(existingImp.role))
@@ -1225,13 +1216,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     : GetLeastDenseRoleExcluding(excludedRole);
             }
 
-            // --- Ripeness gate (applied before visual coloring) ---
-            // Only player-carved cells earn their role color on regrowth.
-            // All other regrowth (initial maze spawn, tentacle drain, bridge reset, etc.)
-            // must stay gray so no role-color flash occurs during the grow-in animation.
-            if (!playerCarved && regrowRole != MusicalRole.None)
-                regrowRole = MusicalRole.None;
-
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : _mazeTint;
@@ -1241,7 +1225,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             _imprints[gp] = new DustImprint
             {
                 color               = regrowTint,
-                hardness01          = roleProfile != null ? roleProfile.GetDustHardness01() : defaultMazeHardness01,
                 carveResistance01   = roleProfile != null ? roleProfile.GetCarveResistance01() : 0f,
                 drainResistance01   = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f,
                 maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : 1,
@@ -1250,7 +1233,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             };
 
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
-            dust.clearing.carveResistance01 = resistance.carveResistance01;
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
@@ -1296,10 +1278,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
         _regrowExcludeRoleByCell.Remove(gp);
 
-        // Ripeness: player-carved cells that regrew with a real role start fully ripe.
-        // Non-player-carved cells already have regrowRole = None (forced above) so no
-        // late override is needed — the cell is already gray from ApplyRoleAndCharge.
-        if (playerCarved && regrowRole != MusicalRole.None)
+        if (regrowRole != MusicalRole.None)
             _ripenessByCell[gp] = 1f;
     }
 
@@ -1529,32 +1508,37 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     private DustResistanceProfile ResolveResistanceProfile(Vector2Int cell, MusicalRole fallbackRole, string context)
     {
-        float carve = 0f;
-        float drain = 0f;
+        // Determine the most authoritative role for this cell, from most to least specific:
+        //   hidden imprint (pre-reveal true identity) > revealed imprint role > caller fallback
+        MusicalRole role = fallbackRole;
 
-        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.role != MusicalRole.None)
+            role = imp.role;
+
+        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole) && hiddenRole != MusicalRole.None)
+            role = hiddenRole;
+
+        // Live profile is always authoritative when a role is known.
+        if (role != MusicalRole.None)
         {
-            carve = imp.carveResistance01;
-            drain = imp.drainResistance01;
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+            if (roleProfile != null)
+                return ValidateResistanceProfile(new DustResistanceProfile
+                {
+                    carveResistance01 = roleProfile.GetCarveResistance01(),
+                    drainResistance01 = roleProfile.GetDrainResistance01()
+                }, $"{context}:live:{role}");
+        }
+
+        // Fallback: baked imprint values (None-role cells, trap cells with explicit overrides).
+        if (_imprints != null && _imprints.TryGetValue(cell, out var baked))
             return ValidateResistanceProfile(new DustResistanceProfile
             {
-                carveResistance01 = carve,
-                drainResistance01 = drain
-            }, $"{context}:imprint:{cell.x},{cell.y}");
-        }
+                carveResistance01 = baked.carveResistance01,
+                drainResistance01 = baked.drainResistance01
+            }, $"{context}:baked:{cell.x},{cell.y}");
 
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(fallbackRole);
-        if (roleProfile != null)
-        {
-            carve = roleProfile.GetCarveResistance01();
-            drain = roleProfile.GetDrainResistance01();
-        }
-
-        return ValidateResistanceProfile(new DustResistanceProfile
-        {
-            carveResistance01 = carve,
-            drainResistance01 = drain
-        }, $"{context}:role:{fallbackRole}");
+        return ValidateResistanceProfile(new DustResistanceProfile(), $"{context}:default");
     }
 
     private DustResistanceProfile ValidateResistanceProfile(DustResistanceProfile profile, string context)
@@ -1569,6 +1553,18 @@ public partial class CosmicDustGenerator : MonoBehaviour
         profile.carveResistance01 = carve;
         profile.drainResistance01 = drain;
         return profile;
+    }
+
+    public bool TryGetCellPosition(GameObject go, out Vector2Int gridPos)
+    {
+        _goToCell ??= new Dictionary<GameObject, Vector2Int>(1024);
+        return _goToCell.TryGetValue(go, out gridPos);
+    }
+
+    public float GetLiveCarveResistance01(Vector2Int cell)
+    {
+        if (!TryGetDustAt(cell, out var dust) || dust == null) return 0f;
+        return ResolveResistanceProfile(cell, dust.Role, "VelocityDrain").carveResistance01;
     }
 
     // ---------------------------------------------------------------------------
@@ -1970,7 +1966,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                         // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
                         Color cellColor = GetCellVisualColor(grid);
                         var resistance = ResolveResistanceProfile(grid, MusicalRole.None, context: "SpawnDust");
-                        dust.clearing.carveResistance01 = resistance.carveResistance01;
                         dust.clearing.drainResistance01 = resistance.drainResistance01;
 
                         // Apply role AND color together so dust.Role is set from birth.
@@ -1980,7 +1975,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                         if (_imprints != null && _imprints.TryGetValue(grid, out var spawnImprint)
                             && spawnImprint.role != MusicalRole.None)
                         {
-                            dust.ApplyRoleAndCharge(spawnImprint.role, cellColor, cellColor.a);
+                            dust.ApplyRoleAndCharge(spawnImprint.role, cellColor, 1f);
                         }
                         else
                         {
@@ -1988,7 +1983,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
                             // Roles are earned dynamically through vehicle carving + regrowth.
                             // dust.Role must be None here so TickDrain's Role guard treats these as
                             // inert gray cells and the star cannot drain them while dormant.
-                            dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, cellColor.a);
+                            // Full charge (1f) — plow energy system requires non-zero units to chip.
+                            dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, 1f);
                         }
 
                         // Use the role's shadow color as the deny feedback color.
@@ -2311,7 +2307,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             role               = role,
             color              = color,
-            hardness01         = profile.GetDustHardness01(),
             carveResistance01  = profile.GetCarveResistance01(),
             drainResistance01  = profile.GetDrainResistance01(),
             maxEnergyUnits     = maxUnits
@@ -2320,7 +2315,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (TryGetDustAt(cell, out var dust))
         {
             var resistance = ResolveResistanceProfile(cell, role, context: "PaintDustExhaust");
-            dust.clearing.carveResistance01 = resistance.carveResistance01;
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, color, (float)exhaustUnits / maxUnits, maxUnits);
             dust.SyncParticleColor();

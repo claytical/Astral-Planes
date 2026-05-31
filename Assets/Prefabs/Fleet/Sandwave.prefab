@@ -59,6 +59,9 @@ MonoBehaviour:
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 0
+  dustLayerMask:
+    serializedVersion: 2
+    m_Bits: 128
   energyLevel: 85
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: b8208b79aa374604699ea6099e1fbff6, type: 3}

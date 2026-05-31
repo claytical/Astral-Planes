@@ -75,13 +75,12 @@ public partial class CosmicDustGenerator
 
         _playerCarvedCells.Add(cell);
 
-        var cellGo = _gridState.CellGo?[cell.x, cell.y];
+        var cellDust = _gridState.CellDust?[cell.x, cell.y];
+        if (cellDust != null) SetDustCollision(cellDust, false);
 
         bool wasVoidCell = _voidGrowCells.Remove(cell);
         if (wasVoidCell)
             _imprints?.Remove(cell);
-        var explode = cellGo.GetComponentInChildren<Explode>(true);
-        Debug.Log($"[DUST-CLEAR] explode={(explode != null ? explode.name : "NULL")} cell={cell} go={cellGo.name}");
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
 
         if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
@@ -101,15 +100,23 @@ public partial class CosmicDustGenerator
         if (cellGo == null) return;
         if (!cellGo.TryGetComponent<CosmicDust>(out var dust) || dust == null) return;
 
-        float effectiveResistance = dust.clearing.carveResistance01 * (1f - Mathf.Clamp01(resistanceBypass01));
+        var resistProfile = ResolveResistanceProfile(cell, dust.Role, "ChipByVehicle");
+        float effectiveResistance = resistProfile.carveResistance01 * (1f - Mathf.Clamp01(resistanceBypass01));
         float resistMul = 1f - effectiveResistance;
-        int effectiveChip = Mathf.Max(1, Mathf.RoundToInt(energyAmount * resistMul));
+
+        _carveAccumulator.TryGetValue(cell, out float acc);
+        acc += energyAmount * resistMul;
+        int effectiveChip = Mathf.FloorToInt(acc);
+        _carveAccumulator[cell] = acc - effectiveChip;
+        if (effectiveChip <= 0) return;
 
         int removed = dust.ChipEnergy(effectiveChip);
         if (removed <= 0) return;
 
         if (dust.currentEnergyUnits <= 0)
         {
+            Debug.Log($"[Regrow] CHIP_DONE {cell} hasImprint={_imprints?.ContainsKey(cell)} wasVoid={_voidGrowCells.Contains(cell)}");
+            _carveAccumulator.Remove(cell);
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
             if (!RestoreVoronoiImprint(cell))
                 PromoteHiddenRole(cell);
@@ -182,7 +189,10 @@ public partial class CosmicDustGenerator
     private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (_regrowthSuppressed)
+        {
+            Debug.Log($"[Regrow] REQUEST_BLOCKED {gridPos} reason=suppressed");
             return;
+        }
         if (!IsInBounds(gridPos)) {
 
             if (_regrowthScheduler.RegrowthCoroutines != null && _regrowthScheduler.RegrowthCoroutines.TryGetValue(gridPos, out var pending))
@@ -202,10 +212,14 @@ public partial class CosmicDustGenerator
             shouldSchedule = false;
 
         if (!shouldSchedule)
+        {
+            Debug.Log($"[Regrow] REQUEST_BLOCKED {gridPos} reason=shouldSchedule=false permanent={_permanentClearCells.Contains(gridPos)} hasDust={HasDustAt(gridPos)} hasImprint={_imprints?.ContainsKey(gridPos)}");
             return;
+        }
 
         float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.dustTiming.regrowDelay : 8f);
 
+        Debug.Log($"[Regrow] REQUEST_OK {gridPos} delay={delay:F2} regrow={_regrow != null}");
         EnsureRegrowController();
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
     }

@@ -82,7 +82,6 @@ public class MotifProfile : ScriptableObject
     [Min(0.01f)] public float trapGrowSeconds = 0.4f;
     [Tooltip("MusicalRole assigned to trap dust. Affects color and pluck sound.")]
     public MusicalRole trapRole = MusicalRole.None;
-    [Range(0f, 1f)] public float trapHardness01 = 0.5f;
 
     private void OnValidate() {
         if (beatIntroCount < 0) beatIntroCount = 0;

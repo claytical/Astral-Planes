@@ -505,9 +505,6 @@ public static class CosmicDustMazePatterns
     /// If 2–4 roles, the first role gets the farthest seed (dominant territory);
     /// remaining roles get evenly-distributed closer seeds.
     ///
-    /// Role → hardness tier (via MusicalRoleProfile.dustHardness01):
-    ///   Lead ≈ 0.15 (softest)  →  Harmony ≈ 0.35  →  Groove ≈ 0.55  →  Bass ≈ 0.75 (hardest)
-    /// Authors set the exact values in the MusicalRoleProfile assets.
     /// </summary>
     /// <param name="cells">Growth cells produced by the maze pattern builder.</param>
     /// <param name="starCell">Grid-space position of the PhaseStar spawn.</param>

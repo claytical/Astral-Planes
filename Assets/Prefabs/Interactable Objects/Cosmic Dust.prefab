@@ -79,9 +79,8 @@ MonoBehaviour:
     particleFootprintMul: 0.5
     sprite: {fileID: 8999714297043290424}
   interaction:
-    energyDrainPerSecond: 0
+    energyDrainPerSecond: 1
   clearing:
-    hardness01: 0
     carveResistance01: 0
     drainResistance01: 0
   useWorkShaderParams: 1

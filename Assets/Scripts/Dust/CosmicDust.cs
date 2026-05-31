@@ -11,9 +11,6 @@ public partial class CosmicDust : MonoBehaviour {
         public Vector3 prefabReferenceScale; // authored prefab baseline (cell-driven scale overrides at runtime)
         public ParticleSystem particleSystem;
 
-        [Header("Visual Footprint")]
-        [Range(0.5f, 1.6f)] public float particleFootprintMul; // % of cell; prevents edge bleed
-        
         public SpriteRenderer sprite;
     }
     [System.Serializable]
@@ -96,18 +93,12 @@ public partial class CosmicDust : MonoBehaviour {
     [Serializable]
     public struct DustClearingSettings
     {
-        [Header("Imprint (from MineNodes)")]
-        [Tooltip("Legacy migration-only field. Runtime gameplay should read carveResistance01 (vehicle) and drainResistance01 (PhaseStar).")]
-        [Range(0f, 1f)] public float hardness01; // Migration-only legacy value.
-
-        [Header("Two-Axis Resistance")]
-        [Range(0f, 1f)] public float carveResistance01; // Vehicle interaction resistance. 0=instant carve, 1=very resistant.
-        [Range(0f, 1f)] public float drainResistance01; // PhaseStar interaction resistance. 0=drains fast, 1=very slow.
+        [Tooltip("Energy drain resistance when a vehicle boosts through. 0 = full drain rate, 1 = no drain.")]
+        [Range(0f, 1f)] public float drainResistance01;
     }
     [SerializeField] public DustVisualSettings visual = new DustVisualSettings
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
-        particleFootprintMul   = 0.85f
     };
 
     [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
@@ -115,10 +106,7 @@ public partial class CosmicDust : MonoBehaviour {
         energyDrainPerSecond  = 0.01f
     };
 
-    [SerializeField] public DustClearingSettings clearing = new DustClearingSettings
-    {
-        hardness01                = 0
-    };
+    [SerializeField] public DustClearingSettings clearing = new DustClearingSettings();
     [Header("Shader Params")]
     [SerializeField] private bool useWorkShaderParams = true;
     private MaterialPropertyBlock _mpb;
@@ -666,9 +654,13 @@ private Coroutine _jiggleRoutine;
         SetTerrainColliderEnabled(false);
         AnimateSpriteScale(1f, 0f, fadeSeconds);
         SetEmissionMultiplier(0f, seconds: fadeSeconds);
+        // Kill in-flight particles immediately so they don't outlive the sprite fade.
+        var systems = GetAllParticleSystems();
+        if (systems != null)
+            for (int i = 0; i < systems.Length; i++)
+                if (systems[i] != null) systems[i].Clear(true);
     }
     // Called by the generator when a Clearing -> Empty transition is finalized.
-    // Keeps particles alive (no Stop/Clear), but ensures the cell is visually "carved".
     public void FinalizeClearedVisuals()
     {
         SetTerrainColliderEnabled(false);
@@ -732,7 +724,6 @@ private Coroutine _jiggleRoutine;
         var dormantTint = _currentTint;
         dormantTint.a = 0.35f;
         ApplyDisplayedTint(dormantTint);
-        clearing.carveResistance01 = 0f;
         clearing.drainResistance01 = 0f;
         _maxEnergyUnits            = 1;
         _currentEnergyUnits        = 1;
@@ -1168,14 +1159,6 @@ private Coroutine _jiggleRoutine;
 
     private void ApplyParticleFootprint()
     {
-        if (visual.particleSystem == null) return;
-        
-        var main = visual.particleSystem.main;
-
-        float mul = Mathf.Clamp(visual.particleFootprintMul, 0.05f, 2.0f);
-        float size = _cellWorldSize * mul;
-//        main.startSize = size;
-
     }
     private void CaptureBaseVisual()
     {

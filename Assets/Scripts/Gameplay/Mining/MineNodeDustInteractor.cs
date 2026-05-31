@@ -11,9 +11,12 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
     public float extraBrake = 0.25f;
 
-    [Header("Maze Exhaust Painting")]
-    [Tooltip("If true, this node paints adjacent dust cells with its role at reduced energy.")]
-    public bool carveMaze = false;
+    [Header("Exhaust Role Painting")]
+    [Tooltip("Paints adjacent dust with this node's role via exhaust. " +
+             "Painted cells become eligible for PhaseStar drain. " +
+             "Because painting does not update the cell's hidden imprint, " +
+             "carving a painted cell re-rolls its role via neighbor-plurality / least-dense.")]
+    public bool exhaustPaintRole = false;
 
     [Tooltip("Fraction of maxEnergyUnits to assign when exhaust-painting a cell (0=empty, 1=full).")]
     [SerializeField, Range(0f, 1f)] private float exhaustEnergyFraction = 0.4f;
@@ -134,7 +137,7 @@ public class MineNodeDustInteractor : MonoBehaviour
             }
         }
 
-        if (!carveMaze)
+        if (!exhaustPaintRole)
         {
             _prevPos = _rb.position;
             _hasPrevPos = true;
@@ -231,7 +234,6 @@ public class MineNodeDustInteractor : MonoBehaviour
         Color roleColor = prof.GetBaseColor();
         roleColor.a = 1f;
         dust.ApplyRoleAndCharge(role, roleColor, 1f, prof.maxEnergyUnits);
-        dust.clearing.carveResistance01 = prof.GetCarveResistance01();
         dust.clearing.drainResistance01 = prof.GetDrainResistance01();
 
         gen.PaintDustExhaust(cell, role, 1f);

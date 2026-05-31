@@ -24,15 +24,15 @@ public class VehicleConfig : ScriptableObject
     [Tooltip("Grace period (in steps) after a commit window closes for retroactive acceptance.")]
     public float manualReleaseGracePeriodSteps = 0.5f;
 
-    [Header("Dust Plow Timing")]
-    public float plowTickSeconds = 0.06f;
+    [Header("Plow")]
+    [Tooltip("Fade duration when a cell is carved. Also controls how long cells stay in Clearing state, which sustains velocity drain on the vehicle.")]
     public float plowFadeSeconds = 0.15f;
 
-    [Header("Input Filtering")]
+    [Header("Input")]
     [Tooltip("Seconds before auto-zero if Move() isn't called.")]
     public float inputTimeout = 0.15f;
 
-    [Header("Recovery / Out-of-Bounds")]
+    [Header("Recovery")]
     public bool enableRecovery = true;
     [Tooltip("Allow some overshoot before recovery triggers.")]
     public float viewportOobMargin = 0.15f;
@@ -48,24 +48,19 @@ public class VehicleConfig : ScriptableObject
     public string gravityVoidTag = "GravityVoid";
     public float voidProbeRadiusWorld = 0.6f;
 
-    [Header("Dust Legibility Pocket")]
-    public bool keepDustClearAroundVehicle = true;
-    public float vehicleKeepClearRefreshSeconds = 0.10f;
-
-    [Header("Vehicle Placement Resonance")]
+    [Header("Vehicle Resonance")]
     public bool useVehiclePlacementResonance = true;
     [Tooltip("How quickly the vehicle sprite color moves toward the target color.")]
     public float vehiclePlacementColorLerpSpeed = 10f;
     [Range(0f, 1f)]
     [Tooltip("Minimum tint amount once a valid placement window exists.")]
     public float vehiclePlacementMinTint = 0.08f;
-    [Range(0f, 1f)]
-    [Tooltip("Extra rhythmic breathing layered on top of the placement pulse.")]
-    public float vehiclePlacementOscillation = 0.18f;
-    [Tooltip("Oscillation speed multiplier.")]
-    public float vehiclePlacementOscillationSpeed = 1f;
 
-    [Header("Dust Spawn Rest Pocket")]
+    [Header("Collision Safety Clearance")]
+    [Tooltip("Seconds between keep-clear refreshes while boosting. Throttles the grid query to avoid per-frame overhead.")]
+    public float vehicleKeepClearRefreshSeconds = 0.10f;
+
+    [Header("Spawn Pocket")]
     [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
     public bool carveSpawnRestPocket = true;
     [Tooltip("If true, compute pocket radius from vehicle collider bounds and drum grid cell size.")]
@@ -96,6 +91,4 @@ public class VehicleConfig : ScriptableObject
     public float trailFirstSlotOffset = 0.7f;
     [Tooltip("Number of historical positions stored for trail direction sampling.")]
     public int trailHistoryCapacity = 48;
-    [Tooltip("Steps ahead within which the release pulse starts building.")]
-    public float trailReleasePulseSteps = 4f;
 }
