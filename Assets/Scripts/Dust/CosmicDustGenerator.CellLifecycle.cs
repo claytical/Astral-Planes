@@ -115,7 +115,6 @@ public partial class CosmicDustGenerator
 
         if (dust.currentEnergyUnits <= 0)
         {
-            Debug.Log($"[Regrow] CHIP_DONE {cell} hasImprint={_imprints?.ContainsKey(cell)} wasVoid={_voidGrowCells.Contains(cell)}");
             _carveAccumulator.Remove(cell);
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
             if (!RestoreVoronoiImprint(cell))
@@ -189,10 +188,7 @@ public partial class CosmicDustGenerator
     private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (_regrowthSuppressed)
-        {
-            Debug.Log($"[Regrow] REQUEST_BLOCKED {gridPos} reason=suppressed");
             return;
-        }
         if (!IsInBounds(gridPos)) {
 
             if (_regrowthScheduler.RegrowthCoroutines != null && _regrowthScheduler.RegrowthCoroutines.TryGetValue(gridPos, out var pending))
@@ -212,14 +208,10 @@ public partial class CosmicDustGenerator
             shouldSchedule = false;
 
         if (!shouldSchedule)
-        {
-            Debug.Log($"[Regrow] REQUEST_BLOCKED {gridPos} reason=shouldSchedule=false permanent={_permanentClearCells.Contains(gridPos)} hasDust={HasDustAt(gridPos)} hasImprint={_imprints?.ContainsKey(gridPos)}");
             return;
-        }
 
         float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.dustTiming.regrowDelay : 8f);
 
-        Debug.Log($"[Regrow] REQUEST_OK {gridPos} delay={delay:F2} regrow={_regrow != null}");
         EnsureRegrowController();
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
     }

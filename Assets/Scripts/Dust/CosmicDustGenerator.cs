@@ -1142,7 +1142,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
     private IEnumerator CommitRegrowCell(Vector2Int gp)
     {
-        Debug.Log($"[Regrow] COMMIT_START {gp} suppressed={_regrowthSuppressed} vehicleOverlap={IsVehicleOverlappingCell(gp)}");
         if (_regrowthSuppressed)
         {
             if (TryGetCellGo(gp, out var existing) && existing != null)

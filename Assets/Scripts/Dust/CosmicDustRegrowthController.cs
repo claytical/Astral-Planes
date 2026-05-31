@@ -208,7 +208,6 @@ public sealed class CosmicDustRegrowthController
             // Keep-clear: wait until released, then retry immediately.
             if (_isKeepClearCell(gridPos))
             {
-                UnityEngine.Debug.Log($"[Regrow] KEEP_CLEAR_WAIT {gridPos}");
                 yield return new WaitUntil(() =>
                     !_isKeepClearCell(gridPos) ||
                     _isPermanentClear(gridPos) ||
@@ -233,13 +232,11 @@ public sealed class CosmicDustRegrowthController
             bool collectBlock  = !_isCollectableCellFree(gridPos);
             if (spawnBlocked || spawnUnavail || vehicleHere || collectBlock)
             {
-                UnityEngine.Debug.Log($"[Regrow] VETO {gridPos} spawnBlocked={spawnBlocked} spawnUnavail={spawnUnavail} vehicle={vehicleHere} collectBlock={collectBlock}");
                 delaySeconds = Mathf.Max(0.05f, _getRegrowVetoRetryDelaySeconds());
                 continue;
             }
 
             // Success: mark PendingRegrow + enqueue step-gate promotion.
-            UnityEngine.Debug.Log($"[Regrow] PENDING {gridPos}");
             _setCellPendingRegrow(gridPos);
             EnqueueStepRegrow(gridPos);
 
