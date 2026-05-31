@@ -60,6 +60,8 @@ public class MineNode : MonoBehaviour
     [Header("Expiry")]
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
     [SerializeField, Min(0)] private int expireAfterLoops = 3;
+    [Tooltip("Radius in grid cells within which hidden dust matching this node's role is revealed on expiry.")]
+    [SerializeField, Min(0)] private int expireBlastRadiusCells = 5;
 
     public event System.Action<MineNode, MineNodeOutcome> OnResolved;
     public event System.Action<MineNodeBehaviorIntent> OnBehaviorIntentChanged;
@@ -257,7 +259,16 @@ public class MineNode : MonoBehaviour
     {
         if (_depletedHandled || _resolvedFired) return;
         Debug.Log($"[MineNode] {name} — expired after {_loopsSinceSpawn} loops.");
-        // WasCaptured and WasEscaped stay false; FireResolvedOnce passes MineNodeOutcome.Expired.
+
+        var explode = GetComponent<Explode>();
+        if (explode != null) explode.ExpireExplode();
+
+        if (_dustGenerator != null && _drumTrack != null && expireBlastRadiusCells > 0)
+        {
+            Vector2Int center = _drumTrack.WorldToGridPosition(transform.position);
+            _dustGenerator.RevealHiddenDustByRole(center, expireBlastRadiusCells, _role);
+        }
+
         FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy());
     }
