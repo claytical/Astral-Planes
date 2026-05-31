@@ -148,6 +148,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _nextBurstId = 0;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
     private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
+    private readonly HashSet<int> _gateReleasedBurstIds = new(); // burst ids whose spawn gate has been released without note-discard
     private readonly Dictionary<int,int> _burstTotalSpawned = new(); // burstId -> total spawned
     private readonly Dictionary<int,int> _burstCollected    = new(); // burstId -> collected count
     private bool _pendingCollapse;
@@ -1476,8 +1477,22 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         _burstLeaderBinsBeforeWrite.Remove(burstId);
         _burstWroteBin.Remove(burstId);
         _burstTargetBin.Remove(burstId);
+        _gateReleasedBurstIds.Remove(burstId);
 
         OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
+    }
+
+    /// <summary>
+    /// Releases the StarPool spawn gate for a burst without touching _burstRemaining.
+    /// Called by DarkTimeoutRoutine when a collectable's TTL expires but the GO lives on.
+    /// The gate fires once per burst (idempotent); _burstRemaining is decremented only when
+    /// the player actually places or discards each note via the normal commit path.
+    /// </summary>
+    public void ReleaseSpawnGate(int burstId)
+    {
+        if (burstId == 0) return;
+        if (!_gateReleasedBurstIds.Add(burstId)) return; // already released
+        OnCollectableBurstCleared?.Invoke(this, burstId, false);
     }
 
     /// <summary>

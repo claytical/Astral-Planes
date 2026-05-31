@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
+  m_Name: Palm Guitar
+  m_EditorClassIdentifier: 
+  role: 2
+  dustColors:
+    baseColor: {r: 0.99215686, g: 0, b: 1, a: 1}
+    shadowColor: {r: 0.5619831, g: 0, b: 1, a: 0.72156864}
+  baseAlpha: 0.65
+  maxEnergyUnits: 3
+  carveResistance01: 0.25
+  drainResistance01: 1
+  mineNodeSpeed: 0.4
+  mineNodeLocomotionProfile: {fileID: 11400000, guid: 729b36cbed0cf40df8012d4b5b1866b2,
+    type: 2}
+  defaultMineNodeArchetypeId: Steady
+  mineNodeArchetypeVariants: []
+  behaviorSpeedMultiplier: 1
+  territoryAffinity01: 0.3
+  commitDurationScale: 1
+  orbitalTurnBias: 0.6
+  burstDuration: 0.4
+  pauseDuration: 0.35
+  burstSpeedMultiplier: 2
+  evasionCells: 3
+  configSelectionMode: 0
+  chordVoiceColors: []
+  midiPreset: 24
+  ripeDuration: 128
+  regrowthDelay: -1

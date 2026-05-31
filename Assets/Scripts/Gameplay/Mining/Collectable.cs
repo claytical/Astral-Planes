@@ -103,6 +103,14 @@ public class Collectable : MonoBehaviour
     static readonly Dictionary<Vector2Int, Collectable> _occupantByCell = new();
     static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
+    private static readonly Dictionary<InstrumentTrack, int> _s_liveByTrack = new();
+
+    public static bool AnyLiveFromOtherTracks(InstrumentTrack excl)
+    {
+        foreach (var kv in _s_liveByTrack)
+            if (kv.Key != excl && kv.Value > 0) return true;
+        return false;
+    }
     private int _dustClaimOwnerId;
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
@@ -232,7 +240,14 @@ public class Collectable : MonoBehaviour
 
     private Rigidbody2D _rb;
     private float _speed;
-    private System.Random _rng;  
+    private System.Random _rng;
+    private MusicalRole _role = MusicalRole.None;
+    private MusicalRoleProfile _roleProfile;
+    private float _orbitalChirality = 1f;   // +1 CCW, -1 CW — locked per instance
+    private float _leadRefreshTimer = 0f;
+    private bool _grooveBurstActive = true;
+    private float _groovePhaseTimer = 0f;
+
     public void BeginSpawnArrival(
     Vector3 originWorld,
     Vector3 targetWorld,
@@ -518,6 +533,26 @@ private IEnumerator SpawnArrivalRoutine(
                 score -= 2.0f;
         }
 
+        // Lead: bonus for directions that have dust walls on either flank — hugs maze edges.
+        if (_role == MusicalRole.Lead)
+        {
+            var probe1 = c + dir;
+            var perp1 = new Vector2Int(-dir.y, dir.x);
+            var perp2 = new Vector2Int(dir.y, -dir.x);
+            if (dustGen.HasDustAt(probe1 + perp1)) score += 1.5f;
+            if (dustGen.HasDustAt(probe1 + perp2)) score += 1.5f;
+        }
+
+        // Harmony: prefer directions that continue the orbital arc (chirality-locked turn bias).
+        if (_role == MusicalRole.Harmony && _ideaDirSmoothed.sqrMagnitude > 0.01f)
+        {
+            Vector2 perpCCW = new Vector2(-_ideaDirSmoothed.y, _ideaDirSmoothed.x).normalized;
+            Vector2 wdir2 = new Vector2(dir.x, dir.y).normalized;
+            float alignment = Vector2.Dot(wdir2, perpCCW) * _orbitalChirality;
+            float orbBias = _roleProfile != null ? _roleProfile.orbitalTurnBias : 0.6f;
+            score += alignment * orbBias;
+        }
+
         // Tiny randomness breaks ties and makes behavior feel "alive".
         score += UnityEngine.Random.Range(-0.15f, +0.15f);
 
@@ -623,7 +658,9 @@ private IEnumerator SpawnArrivalRoutine(
     {
         // Invert so long notes are slow: v = lerp(maxSpeed -> minSpeed, duration01)
         float d = Duration01();
-        return Mathf.Lerp(maxSpeed, minSpeed, d);
+        float base_ = Mathf.Lerp(maxSpeed, minSpeed, d);
+        float roleMul = _roleProfile != null ? _roleProfile.behaviorSpeedMultiplier : 1f;
+        return base_ * roleMul;
     }
 
     // stable seed so different InstrumentTracks exhibit slightly different “turn biases”
@@ -681,7 +718,19 @@ private IEnumerator SpawnArrivalRoutine(
             continue;
         }
         
-        Vector2 step = Vector2.zero; 
+        Vector2 step = Vector2.zero;
+
+        // Lead: re-evaluate idea direction more frequently for darting wall-racing.
+        if (_role == MusicalRole.Lead && dt != null && dustGen != null)
+        {
+            _leadRefreshTimer -= Time.fixedDeltaTime;
+            if (_leadRefreshTimer <= 0f)
+            {
+                _leadRefreshTimer = dt.GetLoopLengthInSeconds() * 0.25f;
+                HandleLoopBoundaryIdea();
+            }
+        }
+
 // ------------------------------------------------------------
 // LOOP-BOUNDARY IDEA BIAS
 // - On each leader loop boundary, we choose an "idea direction".
@@ -701,6 +750,28 @@ private IEnumerator SpawnArrivalRoutine(
         if (turb.sqrMagnitude > 0.0001f)
             step += turb.normalized * (microTurbulenceStrength * _speed * Time.fixedDeltaTime);
 
+        // Bass: BPM-synced vertical bob — note drifts with the pulse of the music.
+        if (_role == MusicalRole.Bass && dt != null)
+        {
+            float beatsPerSec = dt.drumLoopBPM / 60f;
+            float bob = Mathf.Sin((float)(AudioSettings.dspTime * beatsPerSec * Mathf.PI * 2.0));
+            step.y += bob * 0.012f;
+        }
+
+        // Groove: beat-snapped burst/pause — note stutters in time with the rhythm.
+        if (_role == MusicalRole.Groove && dt != null)
+        {
+            float burst = _roleProfile != null ? _roleProfile.burstDuration : 0.4f;
+            float pause = _roleProfile != null ? _roleProfile.pauseDuration : 0.35f;
+            _groovePhaseTimer -= Time.fixedDeltaTime;
+            if (_groovePhaseTimer <= 0f)
+            {
+                _grooveBurstActive = !_grooveBurstActive;
+                _groovePhaseTimer = _grooveBurstActive ? burst : pause;
+            }
+            if (!_grooveBurstActive)
+                step = Vector2.zero;
+        }
 
         if (insideDust)
             step *= TRAPPED_DRIFT_MUL;
@@ -754,6 +825,13 @@ private IEnumerator SpawnArrivalRoutine(
 
         if (sharedTargetSteps.Count == 0)
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
+
+        _role = assignedInstrumentTrack != null ? assignedInstrumentTrack.assignedRole : MusicalRole.None;
+        _roleProfile = MusicalRoleProfileLibrary.GetProfile(_role);
+        _orbitalChirality = (GetInstanceID() & 1) == 0 ? 1f : -1f;
+        if (assignedInstrumentTrack != null)
+            _s_liveByTrack[assignedInstrumentTrack] =
+                (_s_liveByTrack.TryGetValue(assignedInstrumentTrack, out int lc) ? lc : 0) + 1;
 
         ApplyTrackVisuals(track);
         if (assignedInstrumentTrack == null)
@@ -811,15 +889,12 @@ private IEnumerator SpawnArrivalRoutine(
         // If the vehicle already picked this up, let the carry/release path handle cleanup.
         if (_handled) yield break;
 
-        // Uncollected collectable expired — release the burst slot so the StarPool gate
-        // can clear, then destroy. Leaving the GO alive (old behavior) kept
-        // AnyCollectablesInFlightGlobal() returning true indefinitely, permanently
-        // blocking ResumeAll() and new star spawning.
+        // Release the burst slot so the StarPool gate can clear and new stars can
+        // spawn, but do NOT destroy — collectables must persist until the player
+        // collects or discards them (or the phase ends via ForceDestroyCollectablesInFlight).
         track.spawnedCollectables?.Remove(gameObject);
         if (burstId != 0)
-            track.NotifyNoteDiscarded(burstId, intendedStep);
-
-        Destroy(gameObject);
+            track.ReleaseSpawnGate(burstId);
     }
 
    private IEnumerator TravelRoutine(
@@ -965,6 +1040,9 @@ private IEnumerator SpawnArrivalRoutine(
 
     private void OnDestroy()
     {
+        if (assignedInstrumentTrack != null &&
+            _s_liveByTrack.TryGetValue(assignedInstrumentTrack, out int lc))
+            _s_liveByTrack[assignedInstrumentTrack] = Mathf.Max(0, lc - 1);
         ClearReservation();
         UnbindLoopBoundary();
         UnregisterOccupant();
@@ -1253,6 +1331,9 @@ private IEnumerator SpawnArrivalRoutine(
     {
         var vehicle = coll.GetComponent<Vehicle>();
         if (vehicle == null || _handled) return;
+
+        // Vehicle owns the track lock — ask before any state changes.
+        if (!vehicle.CanAcceptCollectable(assignedInstrumentTrack)) return;
 
         _collector = vehicle.transform;
 

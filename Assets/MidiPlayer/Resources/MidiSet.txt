@@ -3,9 +3,9 @@
   <SoundFonts>
     <SoundFontInfo>
       <Name>Astral Planes</Name>
-      <PatchCount>14</PatchCount>
-      <WaveCount>87</WaveCount>
-      <WaveSize>22855674</WaveSize>
+      <PatchCount>30</PatchCount>
+      <WaveCount>329</WaveCount>
+      <WaveSize>49352778</WaveSize>
       <SF2Path>/Users/clayewing/Library/Application Support/NERDLab/AstralPlanes/SoundFont/Astral Planes.sf2</SF2Path>
     </SoundFontInfo>
   </SoundFonts>
