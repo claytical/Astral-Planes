@@ -39,24 +39,19 @@ public class MusicalRoleProfile : ScriptableObject
 
 
     [Header("Dust Energy")]
-    [Tooltip("Maximum energy units this role's dust holds. Default=1, Lead=2, Groove=3, Harmony=4, Bass=5.")]
+    [Tooltip("HP of this dust cell. Cells with unbypassable resistance require (maxEnergyUnits ÷ plowChipAmount) plow ticks to clear.")]
     [Min(1)] public int maxEnergyUnits = 1;
 
     [Range(0f, 1f)]
-    [Tooltip("How hard vehicle plow carving is against this dust. 0=instant, 1=nearly indestructible by vehicle.")]
+    [Tooltip("How hard this cell is to carve. 0 = instant carve, 1 = fully blocked. Intermediate values slow and drain the vehicle proportionally.")]
     public float carveResistance01 = 0.50f;
 
     [Range(0f, 1f)]
-    [Tooltip("How hard PhaseStar draining is against this dust. 0=drains instantly, 1=very slow. Invert carveResistance for ecological tension.")]
+    [Tooltip("How much this cell resists boost energy drain on contact. 0 = full drain rate, 1 = no drain.")]
     public float drainResistance01 = 0.50f;
 
-    [Header("Dust Mining (Legacy)")]
-    [Range(0f, 1f)]
-    [Tooltip("Legacy single-axis hardness. Superseded by carveResistance01 + drainResistance01. Kept for migration.")]
-    public float dustHardness01 = 0.50f;
-
     [Header("MineNode Locomotion")]
-    [Tooltip("Legacy selector used to choose a locomotion archetype/variant when no explicit profile is assigned.")]
+    [Tooltip("Base speed for this role's MineNode. Applied at init; category multipliers are layered on top in FixedUpdateDrifting.")]
     [Range(0f, 1f)] public float mineNodeSpeed = 0.5f;
 
     [Tooltip("Direct locomotion profile override for this role.")]
@@ -106,7 +101,7 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("How long (seconds) the revealed role color stays visible before fading back to gray. Must be > 0.")]
     public float ripeDuration = 8f;
 
-    [Tooltip("Per-role regrowth delay override (seconds). -1 = use maze pattern default.")]
+    [Tooltip("Seconds before this cell regrows after being carved. −1 = use the active maze pattern's default.")]
     public float regrowthDelay = -1f;
 
     // ---------- Color helpers (authority) ----------
@@ -132,7 +127,9 @@ public class MusicalRoleProfile : ScriptableObject
         if (configSelectionMode != RoleConfigSelectionMode.ByVoice ||
             chordVoiceColors == null || chordVoiceColors.Length == 0)
             return GetBaseColor();
-        return GetColorForVoice(Random.Range(0, 1 + chordVoiceColors.Length));
+        var c = chordVoiceColors[Random.Range(0, chordVoiceColors.Length)];
+        c.a = baseAlpha;
+        return c;
     }
 
     public Color GetShadowColor()
@@ -141,7 +138,6 @@ public class MusicalRoleProfile : ScriptableObject
         c.a = baseAlpha;
         return c;
     }
-    public float GetDustHardness01()    => Mathf.Clamp01(dustHardness01);
     public float GetCarveResistance01() => Mathf.Clamp01(carveResistance01);
     public float GetDrainResistance01() => Mathf.Clamp01(drainResistance01);
 

@@ -640,7 +640,7 @@ public partial class GameFlowManager : MonoBehaviour
                     int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
                     dustGenerator.InjectTrapCellsIntoStagger(
                         cellsToFill, center, trapMotif.trapRadius, inner,
-                        trapMotif.trapRole, trapMotif.trapHardness01);
+                        trapMotif.trapRole);
                 }
                 else
                 {
@@ -658,7 +658,7 @@ public partial class GameFlowManager : MonoBehaviour
                     }
                     dustGenerator.InjectTrapCellsFromList(
                         cellsToFill, perim,
-                        trapMotif.trapRole, trapMotif.trapHardness01);
+                        trapMotif.trapRole);
                 }
             }
         };
@@ -893,7 +893,6 @@ public partial class GameFlowManager : MonoBehaviour
                     outerRadiusCells: motif.trapRadius,
                     imprintRole: motif.trapRole,
                     hueRgb: roleColor,
-                    imprintHardness01: motif.trapHardness01,
                     energyAtCenter01: 1f,
                     falloffExp: 1f,
                     growInSeconds: motif.trapGrowSeconds,
@@ -919,7 +918,7 @@ public partial class GameFlowManager : MonoBehaviour
                     perimeter.Add(new Vector2Int(center.x + r, center.y + dy));
                 }
                 dustGenerator.SpawnDustAtCells(perimeter, motif.trapRole, roleColor,
-                    motif.trapHardness01, 1f, motif.trapGrowSeconds, hideRole: true);
+                    1f, motif.trapGrowSeconds, hideRole: true);
             }
         }
     }

@@ -93,7 +93,6 @@ public partial class CosmicDustGenerator
             {
                 role               = MusicalRole.None,
                 color              = _mazeTint,
-                hardness01         = defaultMazeHardness01,
                 carveResistance01  = 0f,
                 drainResistance01  = 0f,
                 maxEnergyUnits     = 1,

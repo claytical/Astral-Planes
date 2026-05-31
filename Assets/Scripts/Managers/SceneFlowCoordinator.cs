@@ -382,7 +382,7 @@ public sealed class SceneFlowCoordinator
                         int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
                         dust.InjectTrapCellsIntoStagger(
                             cellsToFill, center, trapMotif.trapRadius, inner,
-                            trapMotif.trapRole, trapMotif.trapHardness01);
+                            trapMotif.trapRole);
                     }
                     else
                     {
@@ -398,7 +398,7 @@ public sealed class SceneFlowCoordinator
                             perim.Add(new Vector2Int(center.x - r, center.y + dy));
                             perim.Add(new Vector2Int(center.x + r, center.y + dy));
                         }
-                        dust.InjectTrapCellsFromList(cellsToFill, perim, trapMotif.trapRole, trapMotif.trapHardness01);
+                        dust.InjectTrapCellsFromList(cellsToFill, perim, trapMotif.trapRole);
                     }
                 }
             };

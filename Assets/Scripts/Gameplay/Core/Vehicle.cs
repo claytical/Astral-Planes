@@ -7,8 +7,8 @@ using Random = UnityEngine.Random;
 public partial class Vehicle : MonoBehaviour
 {
 
-    private float _nextPlowTickAt;
     private bool  _isActivePlow;
+    private float _plowVelocityDrain;
     private float _lastPressureFactor;
     private static readonly Collider2D[] _pressureHits = new Collider2D[8];
     private int _mineNodeLayerMask;
@@ -19,12 +19,17 @@ public partial class Vehicle : MonoBehaviour
     private bool _boostCostFree;           // When true, boost ignores energy requirement and skips burn
     [HideInInspector] public float arcadeMaxSpeed = 14f;
     private float _cumulativeEnergySpent = 0f;
+    [HideInInspector] [SerializeField] private int vehicleKeepClearRadiusCells = 0;
+    private float _nextVehicleKeepClearRefreshAt = 0f;
 
     [Tooltip("Child SpriteRenderer clone of the vehicle art. Normally hidden. Scales up as placement becomes available.")]
     [SerializeField] private SpriteRenderer soulSprite;
 
     [Header("Gravity Void Detection")]
     [SerializeField] private LayerMask gravityVoidMask; // set in inspector OR leave 0 and use tag fallback in VehicleConfig
+
+    [Header("Boost Collision")]
+    [SerializeField] private LayerMask dustLayerMask; // assign to dust layer so boost ignores dust colliders
 
     private Vector3 _lastSafeWorld;
     private Vector2Int _lastSafeCell;
@@ -56,8 +61,7 @@ public partial class Vehicle : MonoBehaviour
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
     
-    [HideInInspector] [SerializeField] private int vehicleKeepClearRadiusCells = 0;
-    private float _nextVehicleKeepClearRefreshAt = 0f;
+
 
     private Coroutine _spawnRestPocketCo;
 
@@ -250,9 +254,11 @@ public partial class Vehicle : MonoBehaviour
         }
         else
         {
-            RefreshVehicleKeepClearIfNeeded();
             DoPlowTick();
+            RefreshVehicleKeepClearIfNeeded();
         }
+
+        if (!boosting) _plowVelocityDrain = 0f;
         // --- Loop boundary check (null-safe) ---
         if (drumTrack != null)
         {
@@ -337,6 +343,10 @@ public partial class Vehicle : MonoBehaviour
                 rb.angularVelocity = 0f;
             }
         }
+
+        // Plow drag: applied after acceleration so high-resistance cells create real terminal velocity
+        if (_plowVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
+            rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
 
         // Fuel burn only while boosting
         if (boosting && energyLevel > 0f && !_boostCostFree)
@@ -1191,9 +1201,8 @@ public partial class Vehicle : MonoBehaviour
     }
     private void RefreshVehicleKeepClearIfNeeded() {
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
-        if (!vehicleConfig.keepDustClearAroundVehicle) return;
 
-        // Throttle refresh
+        // Throttle refresh — collision safety clearance, not a dust design feature
         if (Time.time < _nextVehicleKeepClearRefreshAt) return;
         _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleConfig.vehicleKeepClearRefreshSeconds);
         if (gfm == null) return;
@@ -1214,13 +1223,14 @@ public partial class Vehicle : MonoBehaviour
             return;
         }
 
-        // While boosting, maintain the full pocket and actively clear any dust inside it.
+        // While boosting, claim the pocket (prevents regrowth) but don't force-remove existing
+        // dust — the plow owns carving with resistance applied. forceRemoveExisting is only
+        // used for the one-time spawn rest pocket, not for live carving.
         gen.SetVehicleKeepClear(
             ownerId,
             centerCell,
             Mathf.Max(0, vehicleKeepClearRadiusCells),
-            forceRemoveExisting: true,
-            forceRemoveFadeSeconds: 0.20f
+            forceRemoveExisting: false
         );
     }
     private IEnumerator Co_CarveSpawnRestPocket()
@@ -1359,25 +1369,23 @@ public partial class Vehicle : MonoBehaviour
 
     private void DoPlowTick()
     {
+        _plowVelocityDrain = 0f;
         if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
         if (!boosting) return;
 
         Vector2 vel = rb.linearVelocity;
-        if (vel.magnitude < profile.plowMinSpeed) return;
-        if (Time.time < _nextPlowTickAt) return;
-        _nextPlowTickAt = Time.time + Mathf.Max(0.01f, vehicleConfig.plowTickSeconds);
-
         var gen = gfm.dustGenerator;
-        float cellSize = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+        float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 forward = vel.normalized;
         Vector2 perp    = new Vector2(-forward.y, forward.x);
-        var motif = gfm?.phaseTransitionManager?.currentMotif;
-        float fade = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
-        int halfW = Mathf.Max(0, profile.plowHalfWidthCells);
-        int depth = Mathf.Max(0, profile.plowDepthCells);
+        float fade      = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
+        int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
+        int depth       = Mathf.Max(0, profile.plowDepthCells);
+        int chipAmount  = Mathf.Max(1, profile.plowChipAmount);
 
-        int chipAmount = Mathf.Max(1, profile.plowChipAmount);
+        // Drain is felt regardless of speed; chipping requires min speed to carve.
+        bool canCarve = vel.magnitude >= profile.plowMinSpeed;
         float totalVelocityDrain = 0f;
 
         for (int d = 0; d <= depth; d++)
@@ -1388,20 +1396,28 @@ public partial class Vehicle : MonoBehaviour
                     + forward * (d * cellSize)
                     + perp    * (s * cellSize);
                 Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
-                if (!gen.HasDustAt(cell)) continue;
+                if (!gen.TryGetCellState(cell, out var cellState)) continue;
+                bool isSolid    = cellState == DustCellState.Solid;
+                bool isClearing = cellState == DustCellState.Clearing;
+                if (!isSolid && !isClearing) continue;
 
-                // Accumulate velocity drain (Cutter): each resistant cell bleeds speed.
-                if (profile.carveVelocityDrainPerCell > 0f && gen.TryGetDustAt(cell, out var dustCell) && dustCell != null)
-                    totalVelocityDrain += dustCell.clearing.carveResistance01 * profile.carveVelocityDrainPerCell;
+                float liveRes      = gen.GetLiveCarveResistance01(cell);
+                float effectiveRes = liveRes * (1f - Mathf.Clamp01(profile.carveResistanceBypass01));
 
+                if (profile.carveVelocityDrainPerCell > 0f)
+                    totalVelocityDrain = Mathf.Max(totalVelocityDrain, liveRes * profile.carveVelocityDrainPerCell);
+
+                if (!isSolid) continue;
+                if (effectiveRes >= 1f) continue;
+                if (!canCarve) continue;
+
+                gen.DisableCellCollider(cell);
                 gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01);
                 _isActivePlow = true;
             }
         }
 
-        // Apply accumulated speed drain after the carve pass.
-        if (totalVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
-            rb.linearVelocity *= Mathf.Max(0f, 1f - totalVelocityDrain);
+        _plowVelocityDrain = totalVelocityDrain;
     }
 
     private void TriggerThud(Vector2 collisionPoint)

@@ -36,28 +36,32 @@ public class ShipMusicalProfile : ScriptableObject
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)
     [Range(0.25f, 2f)] public float burnRate = 1.0f; // fuel units/sec at full trigger pressure
 
-    [Header("Ecological Role")]
-    [Tooltip("Half-width of the forward plow in grid cells. 0 = plow disabled.")]
+    [Header("Plow — Footprint")]
+    [Tooltip("Role-capture half-width (cells). Only plow-carved cells have their Voronoi role promoted into the active imprint, " +
+             "so this is the primary axis of per-pass role-capture luck. " +
+             "0 = single-cell column, 1 = 3-wide, 2 = 5-wide.")]
     public int plowHalfWidthCells = 1;
-    [Tooltip("Depth (forward reach) of the plow in grid cells.")]
+    [Tooltip("Collision safety clearance radius (cells) maintained around the vehicle while boosting. " +
+             "Prevents regrowth directly under the vehicle hull. Not a carve — suppressed cells keep their role.")]
+    public int vehicleKeepClearRadiusCells = 0;
+    [Tooltip("Forward depth of the plow (cells). Combined with plowHalfWidthCells, sets total role-capture area per boost pass. " +
+             "0 = center cell only.")]
     public int plowDepthCells = 2;
-    [Tooltip("Minimum speed (world units/s) before the plow activates.")]
+    [Tooltip("Minimum speed (world units/s) before the plow chips cells. Drag is still felt below this threshold.")]
     public float plowMinSpeed = 2f;
     [Min(1)]
-    [Tooltip("Energy units removed per plow tick per cell. Scaled down by dust carveResistance01. Default=1.")]
+    [Tooltip("HP removed per plow tick (before resistance). Higher values chip through thick cells faster " +
+             "and reduce the number of passes needed to earn a role-capture.")]
     public int plowChipAmount = 1;
-    [Tooltip("Radius around the vehicle kept clear of dust (cells). 0 = use Inspector value.")]
-    public int vehicleKeepClearRadiusCells = 0;
 
-    [Header("Archetype Traits")]
-    [Tooltip("Cutter/Plow: fraction of dust carveResistance01 this vehicle ignores. " +
-             "0 = fully subject to resistance (Cutter). 1 = punches through any dust (Plow).")]
+    [Header("Plow — Carving Feel")]
+    [Tooltip("Fraction of a cell's carve resistance this vehicle ignores. 0 = fully resisted, 1 = punches through anything below resistance=1.")]
     [Range(0f, 1f)] public float carveResistanceBypass01 = 0f;
 
-    [Tooltip("Cutter: speed fraction lost per resistant cell carved each plow tick. " +
-             "Accumulates as: drain += cell.carveResistance01 * carveVelocityDrainPerCell. Plow = 0.")]
+    [Tooltip("Speed fraction drained per resistive cell per FixedUpdate while the plow is active. Drain scales with the cell's live carve resistance and persists while cells are in the Clearing state.")]
     [Range(0f, 0.5f)] public float carveVelocityDrainPerCell = 0f;
 
+    [Header("Plow — Steering")]
     [Tooltip("How strongly player input can redirect current velocity direction. " +
              "1 = snap to input (default). 0.2 = very slidey — can barely redirect at speed. " +
              "Drifter: ~0.2. Needle: ~0.95. Plow base: ~0.85 (further reduced by plowSteeringPenalty01 while carving).")]
@@ -67,10 +71,11 @@ public class ShipMusicalProfile : ScriptableObject
              "Effective authority while plowing = directionalAuthority01 × (1 - plowSteeringPenalty01). Plow: ~0.65. Others: 0.")]
     [Range(0f, 1f)] public float plowSteeringPenalty01 = 0f;
 
-    [Tooltip("Needle: world-unit radius within which a MineNode triggers handling instability. 0 = disabled.")]
+    [Header("Archetype — Needle")]
+    [Tooltip("World-unit radius within which a MineNode triggers handling instability. 0 = disabled.")]
     [Min(0f)] public float pressureInstabilityRadius = 0f;
 
-    [Tooltip("Needle: maximum authority reduction when a MineNode is at the inner edge of pressureInstabilityRadius. " +
+    [Tooltip("Maximum authority reduction when a MineNode is at the inner edge of pressureInstabilityRadius. " +
              "0.55 → controls become ~45% effective at full pressure.")]
     [Range(0f, 1f)] public float pressureInstabilityStrength01 = 0f;
 

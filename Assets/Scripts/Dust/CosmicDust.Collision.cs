@@ -49,16 +49,19 @@ public partial class CosmicDust
     {
         float drainRes = Mathf.Clamp01(clearing.drainResistance01);
         float drainPerSec = Mathf.Max(0f, interaction.energyDrainPerSecond);
-        float chargeDrain = drainPerSec * Mathf.Lerp(1.0f, 0.33f, drainRes) * dt;
-        float taken = DrainCharge(chargeDrain);
-
-        vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(0.1f, 1.0f, drainRes) * dt);
-        if (taken > 0.001f) TriggerChargeTintPulse();
-        if (_currentEnergyUnits > 0) return;
 
         var gp = _drumTrack.WorldToGridPosition(transform.position);
-        gen.ClearCell(gp, CosmicDustGenerator.DustClearMode.FadeAndHide,
-            fadeSeconds: _timings.clearFadeOutSeconds, scheduleRegrow: true, runPreExplode: true);
+        float bypass = vehicle.profile != null ? vehicle.profile.carveResistanceBypass01 : 0f;
+        float liveResistance = gen.GetLiveCarveResistance01(gp);
+        float effectiveResistance = liveResistance * (1f - Mathf.Clamp01(bypass));
+
+        float energyCostMul = Mathf.Lerp(1f, 5f, liveResistance);
+        vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(0.1f, 1.0f, drainRes) * energyCostMul * dt);
+
+        if (effectiveResistance >= 1f) return;
+
+        gen.CarveDustByVehicle(gp, _timings.clearFadeOutSeconds);
+        TriggerChargeTintPulse();
     }
 
     private void HandleNonBoostCollision(Vehicle vehicle, float dt)

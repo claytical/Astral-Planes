@@ -17,10 +17,11 @@ MonoBehaviour:
   occupiedStepOctaveAccent: 1
   manualReleaseUseArmLock: 1
   manualReleaseArmAheadSteps: 1
+  manualReleaseArmAheadMinSeconds: 0.5
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 1
-  plowTickSeconds: 0.06
-  plowFadeSeconds: 0.15
+  plowTickSeconds: 0.03
+  plowFadeSeconds: 0.04
   inputTimeout: 0.15
   enableRecovery: 1
   viewportOobMargin: 0.1

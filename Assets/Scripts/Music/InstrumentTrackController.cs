@@ -72,7 +72,6 @@ public class InstrumentTrackController : MonoBehaviour
     private Vector3 _gravityVoidCenterWorld;
     private Color _gravityVoidParticleTint;
     private Color _gravityVoidDustImprintTint;
-    private float _gravityVoidDustHardness01;
     private float _gravityVoidGrowSecondsRuntime = -1f;
     private int   _gravityVoidMaxRadiusRuntime   = -1;
     // Inner radius (cells) where void ring growth begins — set to safety bubble radius so rings grow outward from the bubble perimeter.
@@ -225,21 +224,16 @@ public class InstrumentTrackController : MonoBehaviour
         _gravityVoidCenterGP = centerGP;
         _gravityVoidHasCenterGP = true;
 
-        // Resolve tint/hardness from role profile (or fallback).
         var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
         if (roleProfile != null)
         {
             _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
-            _gravityVoidDustHardness01 = roleProfile.GetDustHardness01();
-
             _gravityVoidParticleTint = roleProfile.GetBaseColor();
             _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
         }
         else
         {
             _gravityVoidDustImprintTint = ownerTrack.trackColor;
-            _gravityVoidDustHardness01 = 0.5f;
-
             _gravityVoidParticleTint = ownerTrack.trackColor;
             _gravityVoidParticleTint.a = 1f;
         }
@@ -397,8 +391,7 @@ public class InstrumentTrackController : MonoBehaviour
                         centerGP:                  _gravityVoidCenterGP,
                         outerRadiusCells:          outerR,
                         imprintRole:               ringRole,
-                        hueRgb:                    roleProfile?.GetBaseColor()      ?? _gravityVoidDustImprintTint,
-                        imprintHardness01:         roleProfile?.GetDustHardness01() ?? _gravityVoidDustHardness01,
+                        hueRgb:                    roleProfile?.GetBaseColor() ?? _gravityVoidDustImprintTint,
                         energyAtCenter01:          1f,
                         falloffExp:                0.3f,
                         growInSeconds:             growIn,
