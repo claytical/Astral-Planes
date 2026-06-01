@@ -69,26 +69,10 @@ public partial class CosmicDustGenerator
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
-        _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-        if (!RestoreVoronoiImprint(cell))
-            PromoteHiddenRole(cell);
-
-        _playerCarvedCells.Add(cell);
-
         var cellDust = _gridState.CellDust?[cell.x, cell.y];
         if (cellDust != null) SetDustCollision(cellDust, false);
 
-        bool wasVoidCell = _voidGrowCells.Remove(cell);
-        if (wasVoidCell)
-            _imprints?.Remove(cell);
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
-
-        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
-        {
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
-            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
-        }
+        FinalizeVehicleCarve(cell, fadeSeconds);
     }
 
     public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f)
@@ -116,23 +100,28 @@ public partial class CosmicDustGenerator
         if (dust.currentEnergyUnits <= 0)
         {
             _carveAccumulator.Remove(cell);
-            _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-            if (!RestoreVoronoiImprint(cell))
-                PromoteHiddenRole(cell);
+            FinalizeVehicleCarve(cell, fadeSeconds);
+        }
+    }
 
-            _playerCarvedCells.Add(cell);
+    private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds)
+    {
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>();
+        if (!RestoreVoronoiImprint(cell))
+            PromoteHiddenRole(cell);
 
-            bool wasVoidCell = _voidGrowCells.Remove(cell);
-            if (wasVoidCell) _imprints?.Remove(cell);
+        _playerCarvedCells.Add(cell);
 
-            CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
+        bool wasVoidCell = _voidGrowCells.Remove(cell);
+        if (wasVoidCell) _imprints?.Remove(cell);
 
-            if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
-            {
-                var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
-                if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                    RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
-            }
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
+
+        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+        {
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
+            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
         }
     }
 
@@ -227,14 +216,7 @@ public partial class CosmicDustGenerator
         radiusCells = Mathf.Max(0, radiusCells);
 
         var next = new HashSet<Vector2Int>();
-        for (int dy = -radiusCells; dy <= radiusCells; dy++)
-        for (int dx = -radiusCells; dx <= radiusCells; dx++)
-        {
-            if ((dx * dx + dy * dy) > radiusCells * radiusCells) continue;
-            var gp = new Vector2Int(centerCell.x + dx, centerCell.y + dy);
-            if (gp.x < 0 || gp.y < 0 || gp.x >= w || gp.y >= h) continue;
-            next.Add(gp);
-        }
+        FillDisk(next, centerCell, radiusCells, w, h);
 
         _exclusions.UpdateStarPocket(next, _tmpReleased, _tmpClaimed);
 
@@ -267,26 +249,14 @@ public partial class CosmicDustGenerator
 
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {
-        if (drums == null)
-            return;
+        if (drums == null) return;
 
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
 
-        for (int dx = -radiusCells; dx <= radiusCells; dx++)
-        {
-            for (int dy = -radiusCells; dy <= radiusCells; dy++)
-            {
-                var gp = new Vector2Int(center.x + dx, center.y + dy);
-
-                if (gp.x < 0 || gp.y < 0 || gp.x >= w || gp.y >= h)
-                    continue;
-
-                if (dx * dx + dy * dy > radiusCells * radiusCells)
-                    continue;
-
-                DespawnDustAtAndMarkPermanent(gp);
-            }
-        }
+        var cells = new HashSet<Vector2Int>();
+        FillDisk(cells, center, radiusCells, w, h);
+        foreach (var gp in cells)
+            DespawnDustAtAndMarkPermanent(gp);
     }
 }
