@@ -687,7 +687,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         spawnedCollectables.Clear();
-        // IMPORTANT: don’t leave the controller stuck because remaining counts still think something is pending.
+        // IMPORTANT: don't leave the controller stuck because remaining counts still think something is pending.
         // If you track remaining per-burst, clear that too.
         _burstRemaining?.Clear();
         _burstSteps?.Clear();
@@ -882,328 +882,146 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         _loopCacheDirtyPending = true;
 
     }
-    public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force) {
+    public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force)
+    {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
         controller.NotifyCollected(this);
-        
-        if (collectable.burstId != 0)
+
+        // 1) Track burst energy meter
+        IncrementBurstCollectedMeter(collectable.burstId);
+
+        // 2) Free the vacated grid cell
+        if (drumTrack != null)
         {
-            if (_burstCollected.TryGetValue(collectable.burstId, out var c))
-                _burstCollected[collectable.burstId] = c + 1;
-            else
-                _burstCollected[collectable.burstId] = 1; // defensive if we missed init
-            
-            if (controller != null && controller.noteVisualizer != null &&
-                _burstTotalSpawned.TryGetValue(collectable.burstId, out var total) && total > 0)
-            {
-                float frac = Mathf.Clamp01(_burstCollected[collectable.burstId] / (float)total);
-                controller.noteVisualizer.SetPlayheadEnergy01(frac);
-            }
-        }
-        // 1) Free the vacated grid cell (defensive)
-        if (drumTrack != null) {
             Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
             drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
             drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
         }
 
-        // 2) Final target step must be deterministic (never time-based).
-        int finalTargetStep = -1;
-// Primary: the absolute step decided at spawn.
-        if (collectable.intendedStep >= 0)
-        {
-            finalTargetStep = collectable.intendedStep;
-        }
-// Secondary: use the reported step (still deterministic, not time-based).
-        else if (reportedStep >= 0)
-        {
-            finalTargetStep = reportedStep;
-            Debug.LogWarning($"[COLLECT:FALLBACK] {name} using reportedStep={reportedStep} because intendedStep was missing. burstId={collectable.burstId}");
-        }
-        else
-        {
-            Debug.LogWarning($"[COLLECT:ABORT] {name} no valid step (intendedStep={collectable.intendedStep}, reportedStep={reportedStep}) burstId={collectable.burstId}");
-            return;
-        }
-        int binSize = Mathf.Max(1, BinSize());
-        if (collectable.intendedStep < 0 && finalTargetStep >= 0)
-        {
-            int local = ((finalTargetStep % binSize) + binSize) % binSize;
+        // 3) Resolve authoritative target step (never time-based)
+        int finalTargetStep = ResolveTargetStep(collectable, reportedStep);
+        if (finalTargetStep < 0) return;
 
-            int bin = collectable.intendedBin;
-            if (bin < 0)
-            {
-                // last resort fallback: keep your old behavior, but log loudly
-                var tf = controller != null ? controller.GetTransportFrame() : default;
-                bin = tf.playheadBin;
-                Debug.LogWarning($"[COLLECT:BASE->ABS:FALLBACK_BIN] {name} missing intendedBin; using playheadBin={bin} (nondeterministic) burstId={collectable.burstId}");
-            }
-            finalTargetStep = bin * binSize + local;
-
-
-            Debug.LogWarning($"[COLLECT:BASE->ABS] {name} mapped baseStep={reportedStep} into absStep={finalTargetStep} using intendedBin={collectable.intendedBin}");
-        }
-
-// Optional sanity: log if reported differs from intended (useful for chasing bad assignment upstream).
         if (reportedStep >= 0 && collectable.intendedStep >= 0 && reportedStep != collectable.intendedStep)
-        {
             Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep} burstId={collectable.burstId}");
-        }
 
+        // 4) Snapshot leader bins before first write (for cross-track nudge)
+        SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
 
-        // 3) Snapshot leader bins BEFORE we write (used for cross-track nudge later)
-        int leaderBinsBeforeWrite = (controller != null) ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
-        if (collectable.burstId != 0 && !_burstLeaderBinsBeforeWrite.ContainsKey(collectable.burstId)) { 
-            _burstLeaderBinsBeforeWrite[collectable.burstId] = leaderBinsBeforeWrite; 
-            _burstWroteBin[collectable.burstId]              = BinIndexForStep(finalTargetStep);
-        }
+        // 5) Commit note to the audible loop
         int note = collectable.GetNote();
-        // Look up the authoredRootMidi stored in the template for this step.
-        // NoteSetFactory pre-transposes riff notes to each bin's chord root and stores
-        // that root as authoredRootMidi, so QuantizeNoteToBinChord sees rootDelta = 0
-        // and only snaps the already-correct note to the nearest chord tone.
-        int authoredRootMidi = int.MinValue;
-        {
-            int binIdx    = BinIndexForStep(finalTargetStep);
-            int localStep = finalTargetStep % Mathf.Max(1, BinSize());
-            // Only use the bin-specific NoteSet's authoredRootMidi — falling back to
-            // _currentNoteSet (bin 0) for a different bin causes rootDelta ≠ 0 and
-            // shifts non-chord tones to the wrong octave.
-            if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
-                authoredRootMidi = _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
-        }
-        // IMPORTANT: this is what feeds the audible loop.
+        int authoredRootMidi = LookUpAuthoredRootMidi(finalTargetStep);
         CollectNote(finalTargetStep, note, durationTicks, force, authoredRootMidi);
 
-        // Mark bin filled + hooks
         int targetBin = BinIndexForStep(finalTargetStep);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
         RegisterBurstStep(collectable.burstId, finalTargetStep);
         spawnedCollectables?.Remove(collectable.gameObject);
-    // 5) Per-burst decrement + rise + cursor advance
-    if (collectable.burstId != 0 && _burstRemaining.TryGetValue(collectable.burstId, out var rem))
-    {
-        rem--;
-        if (rem <= 0)
+
+        // 6) Per-burst decrement — on last note: fill bin and clean up
+        if (collectable.burstId != 0 && _burstRemaining.TryGetValue(collectable.burstId, out var rem))
         {
-            int filledBin = targetBin;
-            // --- A) Compute collection intensity for this burst ---
-            if(_burstWroteBin.TryGetValue(collectable.burstId, out var b))
-                filledBin = b;
-            SetBinFilled(filledBin, true);
-            controller?.NotifyBinFilled(this, filledBin);
-            // Sync drum._binCount immediately so the audio guard (barIndex >= committedLeaderBins)
-            // unblocks the new bin on the same loop rather than waiting for the next OnLoopBoundary.
-            controller?.ResyncLeaderBinsNow();
-            // --- VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately ---
-            // Without this, the visualizer can remain at the prior width until some other system updates
-            // the controller leader multiplier or until a later refresh happens, which looks like bins
-            // failing to shrink to 1/2, 1/3, etc.
-            if (controller != null && controller.noteVisualizer != null && drumTrack != null) { 
-                binSize = Mathf.Max(1, drumTrack.totalSteps);
-                // This track now requires at least (filledBin+1) bins to represent its authored content.
-                int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
-                // Also respect the global leader if it is already larger.
-                int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
-                controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * binSize);
-            }
-
-            // This track is now eligible to push the global frontier forward by 1 bin on its next burst.
-            if (controller != null)
+            rem--;
+            if (rem <= 0)
             {
-                controller.AllowAdvanceNextBurst(this);
+                int filledBin = _burstWroteBin.TryGetValue(collectable.burstId, out var b) ? b : targetBin;
+
+                // Unique to auto-collect: playhead pulse + harmony hook
+                controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                Harmony_OnBinFilled(filledBin, _gfm?.harmony?.ProgressionLength ?? 0);
+
+                // Unique to auto-collect: extra dict cleanup before shared completion
+                _burstTotalSpawned.Remove(collectable.burstId);
+                _burstCollected.Remove(collectable.burstId);
+
+                // Unique to auto-collect: cursor advance (ByVoice tracks suppress this)
+                var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+                if (rp == null || rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
+                    AdvanceBinCursor(1);
+
+                // Precompute extendedLeader before CompleteBurst removes the dicts
+                bool extendedLeader =
+                    _burstLeaderBinsBeforeWrite.TryGetValue(collectable.burstId, out var Lbefore) &&
+                    _burstWroteBin.TryGetValue(collectable.burstId, out var wroteBin) &&
+                    wroteBin >= Lbefore;
+
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reportedStep={reportedStep} remainingOnTrack={spawnedCollectables.Count} binCursor={_binCursor}");
+
+                CompleteBurst(collectable.burstId, filledBin, hadNotes: true, ascendBinCount: loopMultiplier);
+
+                // Unique to auto-collect: advance sibling cursors if this burst extended the leader
+                if (extendedLeader && controller != null)
+                    controller.AdvanceOtherTrackCursors(this, 1);
             }
-            
-            
-            // Visual: "release" the charged playhead when the burst resolves.
-            if (controller != null && controller.noteVisualizer != null)
+            else
             {
-                controller.noteVisualizer.TriggerPlayheadReleasePulse(assignedRole);
+                _burstRemaining[collectable.burstId] = rem;
             }
-
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var hd = _gfm?.harmony;
-            int progLen = hd != null ? hd.ProgressionLength : 0;
-            Harmony_OnBinFilled(filledBin, progLen);
-            // --- C) Clean up per-burst tracking ---
-            _burstRemaining.Remove(collectable.burstId);
-            _burstTotalSpawned.Remove(collectable.burstId);
-            _burstCollected.Remove(collectable.burstId);
-            _burstTargetBin.Remove(collectable.burstId);
-
-            // --- D) Existing bin cursor + cross-track behavior ---
-            // ByVoice chord tracks: cursor advances via NotifyBinFilled when the chord group
-            // completes, not per individual burst. Suppress here to prevent solo-voice advance.
-            {
-                var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-                if (_rp == null || _rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
-                    AdvanceBinCursor(1); // only THIS track advances its cursor for the next spawn
-            }
-            bool extendedLeader = false;
-            if (_burstLeaderBinsBeforeWrite.TryGetValue(collectable.burstId, out var Lbefore) &&
-                _burstWroteBin.TryGetValue(collectable.burstId, out var wroteBin))
-            {
-                extendedLeader = (wroteBin >= Lbefore);
-            }
-            _burstLeaderBinsBeforeWrite.Remove(collectable.burstId);
-            _burstWroteBin.Remove(collectable.burstId);
-
-            if (extendedLeader && controller != null)
-                controller.AdvanceOtherTrackCursors(this, 1); // silence = absence on others
-
-            // --- E) Loop-based fuse for ascension (note markers rising) ---
-            int binCount = loopMultiplier; // bin count, not step count
-
-            int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
-
-            float seconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
-
-            EnqueueNextFrame(() =>
-            {
-                if (controller != null && controller.noteVisualizer != null)
-                    controller.noteVisualizer.TriggerBurstAscend(this, collectable.burstId, seconds);
-            });
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reported Step: {reportedStep}  remainingOnTrack={spawnedCollectables.Count} bin cursor: {_binCursor} ");
-            
-            OnCollectableBurstCleared?.Invoke(this, collectable.burstId, true);
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRKDBG] {name} OnCollectableCollected: burstId={collectable.burstId} -> HandleCollectableBurstCleared (_burstRemaining={_burstRemaining?.Count ?? -1})");
-
         }
-        else
-        {
-            _burstRemaining[collectable.burstId] = rem;
-        }
-    }
 
-        // 6) Animate the pickup and finalize
-// Visual: ensure marker exists but stays “waiting” until deposit.
+        // 7) Place marker and schedule deposit animation
         GameObject markerGo = null;
         if (controller != null && controller.noteVisualizer != null)
-        {
             markerGo = controller.noteVisualizer.PlacePersistentNoteMarker(this, finalTargetStep, lit: false, burstId: collectable.burstId);
-        }
-        if (markerGo != null)
-        {
-            collectable.ribbonMarker = markerGo.transform;
-        }
-        double loopLen = drumTrack != null ? drumTrack.GetLoopLengthInSeconds() : 0.0;
-        if (loopLen <= 0.0001) loopLen = drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0.0;
-        if (loopLen <= 0.0001) loopLen = 0.1; // last resort
-        
 
-// Hard-coded tuning knobs
-        const float orbitMax  = 0.65f;  // allowable orbit budget
-        const float travelHard = 0.35f; // your desired travel time
+        if (markerGo != null)
+            collectable.ribbonMarker = markerGo.transform;
+
+        double depositDsp = ComputeDepositDsp(finalTargetStep);
+
+        const float orbitMax   = 0.65f;
+        const float travelHard = 0.35f;
         const float minTravel  = 0.02f;
 
-// --- Compute deposit time in LEADER step space (includes bins) ---
-// This prevents "bin expansion" from shifting the particle/confirm timing
-// relative to where the note actually lives in persistentLoopNotes.
-
-        int leaderSteps = (drumTrack != null) ? drumTrack.GetLeaderSteps() : Mathf.Max(1, binSize);
-        leaderSteps = Mathf.Max(1, leaderSteps);
-
-// finalTargetStep is already absolute (bin*binSize + local).
-        int targetLeaderStep = ((finalTargetStep % leaderSteps) + leaderSteps) % leaderSteps;
-
-        double depositDsp = 0.0;
-        if (drumTrack != null)
-        {
-            // Compute next occurrence of a specific leader step using the DrumTrack authority.
-            // (inline to avoid needing new DrumTrack API)
-            double effLen = System.Math.Max(0.0001, drumTrack.GetLoopLengthInSeconds());
-            double stepDur = effLen / leaderSteps;
-
-            double dspNow = AudioSettings.dspTime;
-            double elapsed = dspNow - drumTrack.leaderStartDspTime;
-            if (elapsed < 0) elapsed = 0;
-
-            double tInLoop = elapsed % effLen;
-
-            int curLeaderStep = Mathf.FloorToInt((float)(tInLoop / stepDur));
-            int deltaSteps = targetLeaderStep - curLeaderStep;
-
-            // IMPORTANT: if we're already at/past the step this frame, push to NEXT occurrence.
-            // This avoids "one behind" and frame-boundary ambiguity.
-            if (deltaSteps <= 0) deltaSteps += leaderSteps;
-
-            depositDsp = drumTrack.leaderStartDspTime + (curLeaderStep + deltaSteps) * stepDur;
-
-            // safety: ensure future
-            const double kMinLead = 0.005;
-            if (depositDsp <= dspNow + kMinLead)
-                depositDsp = dspNow + 0.010;
-        }
-        else
-        {
-            // Fallback: behave like before (base loop), but this should not happen in your normal flow.
-            depositDsp = AudioSettings.dspTime + 0.05;
-        }
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal(reportedStep)={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={AudioSettings.dspTime:F6} dt={(depositDsp-AudioSettings.dspTime):F4}");
         double now = AudioSettings.dspTime;
         float dt = Mathf.Max(0f, (float)(depositDsp - now));
-// IMMINENT: shrink travel so we still land exactly at depositDsp.
         float travelSec = Mathf.Clamp(Mathf.Min(travelHard, dt), minTravel, travelHard);
-
-// Whatever time remains before travel starts becomes orbit time (capped).
-        float orbitSec = Mathf.Clamp(dt - travelSec, 0f, orbitMax);
-
-// If it’s basically imminent, don’t bother orbiting.
+        float orbitSec  = Mathf.Clamp(dt - travelSec, 0f, orbitMax);
         if (orbitSec < 0.05f) orbitSec = 0f;
 
-        collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>  {
-        // -----------------------------------------------------------------
-        // ✅ NOTIFY COMMIT AT DEPOSIT (DSP-authoritative moment)
-        // -----------------------------------------------------------------
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={now:F6} dt={(depositDsp - now):F4}");
 
-        // If your collectable carries authoredRootMidi, use it here.
-        // Otherwise keep int.MinValue (your existing default).
-        int authoredRootMidi = int.MinValue;
-
-
-        // If NotifyCommitted is part of your causality grammar / stinger,
-        // it should happen AFTER the note exists in the loop.
-        if (controller != null)
-            controller.NotifyCommitted(this, finalTargetStep);
-
-        // -----------------------------------------------------------------
-        // ✅ VISUAL CONFIRM SCHEDULING (still uses depositDsp)
-        // -----------------------------------------------------------------
-        if (controller == null || controller.noteVisualizer == null || markerGo == null)
-            return;
-
-        controller.noteVisualizer.ScheduleFirstPlayConfirm(
-            source: collectable.transform,
-            track: this,
-            step: finalTargetStep,
-            dspTime: depositDsp,
-            noteDuration: durationTicks,
-            color: trackColor
-        );
-
-        controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
-
-        var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
-        tag.isPlaceholder = false;
-        tag.burstId = collectable.burstId;
-
-        var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
-        ml.LightUp(this.trackColor);
-
-        var vnm = markerGo.GetComponent<VisualNoteMarker>();
-        if (vnm != null)
+        collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>
         {
-            vnm.LightUp(this.trackColor);
-            vnm.Initialize(this.trackColor);
-        }
+            if (controller != null)
+                controller.NotifyCommitted(this, finalTargetStep);
+
+            if (controller == null || controller.noteVisualizer == null || markerGo == null)
+                return;
+
+            controller.noteVisualizer.ScheduleFirstPlayConfirm(
+                source: collectable.transform,
+                track: this,
+                step: finalTargetStep,
+                dspTime: depositDsp,
+                noteDuration: durationTicks,
+                color: trackColor);
+
+            controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
+
+            var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
+            tag.isPlaceholder = false;
+            tag.burstId = collectable.burstId;
+
+            var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
+            ml.LightUp(this.trackColor);
+
+            var vnm = markerGo.GetComponent<VisualNoteMarker>();
+            if (vnm != null)
+            {
+                vnm.LightUp(this.trackColor);
+                vnm.Initialize(this.trackColor);
             }
-);
-        if (_currentBurstArmed && collectable.burstId == currentBurstId) { 
-            _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1); 
-            if (_currentBurstRemaining == 0) 
+        });
+
+        if (_currentBurstArmed && collectable.burstId == currentBurstId)
+        {
+            _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1);
+            if (_currentBurstRemaining == 0)
                 _currentBurstArmed = false;
         }
-}
+    }
     // ---------------------------------------------------------------------
     // Manual Note Release integration
     // ---------------------------------------------------------------------
@@ -1299,91 +1117,27 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         controller?.NotifyCollected(this);
 
         // Burst energy meter: count at COMMIT time (release), not pickup time.
-        if (burstId != 0)
-        {
-            if (_burstCollected.TryGetValue(burstId, out var c))
-                _burstCollected[burstId] = c + 1;
-            else
-                _burstCollected[burstId] = 1;
+        IncrementBurstCollectedMeter(burstId);
 
-            if (controller != null && controller.noteVisualizer != null &&
-                _burstTotalSpawned.TryGetValue(burstId, out var total) && total > 0)
-            {
-                float frac = Mathf.Clamp01(_burstCollected[burstId] / (float)total);
-                controller.noteVisualizer.SetPlayheadEnergy01(frac);
-            }
-        }
-
-        // Snapshot leader bins BEFORE we write (used for cross-track nudge later)
-        int leaderBinsBeforeWrite = (controller != null) ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
-        if (burstId != 0 && !_burstLeaderBinsBeforeWrite.ContainsKey(burstId))
-        {
-            _burstLeaderBinsBeforeWrite[burstId] = leaderBinsBeforeWrite;
-            _burstWroteBin[burstId] = BinIndexForStep(stepAbs);
-        }
+        // Snapshot leader bins before first write (for cross-track nudge)
+        SnapshotBurstLeaderBins(burstId, stepAbs);
 
         // Replace-or-add: enforce one persistent note per (track, stepAbs) for stability.
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
-
         AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
 
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);
 
-        // Per-burst decrement + completion (mirrors OnCollectableCollected, but keyed off release).
+        // Per-burst decrement — on last note: fill bin and clean up
         if (burstId != 0 && _burstRemaining.TryGetValue(burstId, out var rem))
         {
             rem--;
             if (rem <= 0)
             {
-                int filledBin = targetBin;
-                if (_burstWroteBin.TryGetValue(burstId, out var b))
-                    filledBin = b;
-
-                SetBinFilled(filledBin, true);
-                controller?.NotifyBinFilled(this, filledBin);
-                controller?.ResyncLeaderBinsNow();
-
-                // VISUAL: snap the NoteVisualizer grid to include this newly-filled bin immediately
-                if (controller != null && controller.noteVisualizer != null && drumTrack != null)
-                {
-                    int bSize = Mathf.Max(1, drumTrack.totalSteps);
-                    int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
-                    int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
-                    controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * bSize);
-                }
-
-                // This track is now eligible to push the global frontier forward by 1 bin on its next burst.
-                if (controller != null)
-                    controller.AllowAdvanceNextBurst(this);
-
-                // Clear remaining placeholders and trigger ascension for committed markers.
-                if (drumTrack != null)
-                {
-                    int binCount = BinSize();
-                    int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
-                    float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
-                    int capturedBurstId = burstId;
-                    EnqueueNextFrame(() =>
-                    {
-                        if (controller != null && controller.noteVisualizer != null)
-                        {
-                            controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
-                            controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, ascendSeconds);
-                        }
-                    });
-                }
-
-                _burstRemaining.Remove(burstId);
-                _burstLeaderBinsBeforeWrite.Remove(burstId);
-                _burstWroteBin.Remove(burstId);
-                _burstTargetBin.Remove(burstId);
-
-                // Notify listeners (e.g. PhaseStar) that the burst is complete, same as the
-                // auto-collect path does in OnCollectableCollected. This ensures the bridge
-                // wait fires at *placement* time rather than at the _awaitingCollectableClear
-                // timeout (which fires even if the note hasn't been placed yet).
-                OnCollectableBurstCleared?.Invoke(this, burstId, true);
+                int filledBin = _burstWroteBin.TryGetValue(burstId, out var b) ? b : targetBin;
+                // removePlaceholders=true: manual-release leaves placeholder markers that need clearing
+                CompleteBurst(burstId, filledBin, hadNotes: true, ascendBinCount: BinSize(), removePlaceholders: true);
             }
             else
             {
@@ -1407,7 +1161,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public void NotifyNoteDiscarded(int burstId, int authoredAbsStep)
     {
         if (burstId == 0) return;
-
         if (!_burstRemaining.TryGetValue(burstId, out var rem)) return;
 
         rem--;
@@ -1417,47 +1170,23 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             return;
         }
 
-        // All notes in this burst have been resolved (committed or discarded).
-        // Clear remaining placeholders and trigger ascension for committed markers.
-        if (drumTrack != null)
+        // All notes resolved (committed or discarded).
+        // Defensive: also remove the discarded step's orphan marker.
+        int capturedDiscardedStep = authoredAbsStep;
+        EnqueueNextFrame(() =>
         {
-            int binCount = BinSize();
-            int effectiveLoops = ComputeEffectiveAscendLoops(binCount);
-            float ascendSeconds = drumTrack.GetLoopLengthInSeconds() * effectiveLoops;
-            int capturedBurstId = burstId;
-            int capturedDiscardedStep = authoredAbsStep;
-            EnqueueNextFrame(() =>
-            {
-                if (controller?.noteVisualizer != null)
-                {
-                    controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
-                    // Defensive: also explicitly remove the discarded step's marker if it
-                    // is still present and not in the loop (catches cases where burstId or
-                    // isPlaceholder was altered before cleanup ran).
-                    if (capturedDiscardedStep >= 0)
-                        controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep);
-                    controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, ascendSeconds);
-                }
-            });
-        }
+            if (controller?.noteVisualizer != null && capturedDiscardedStep >= 0)
+                controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep);
+        });
 
-        // Fill the bin only if at least one note was actually committed.
-        if (_burstWroteBin.TryGetValue(burstId, out var filledBin))
+        bool hadNotes = _burstWroteBin.ContainsKey(burstId);
+
+        if (hadNotes)
         {
-            SetBinFilled(filledBin, true);
-            controller?.NotifyBinFilled(this, filledBin);
-            controller?.ResyncLeaderBinsNow();
-
-            if (controller?.noteVisualizer != null && drumTrack != null)
-            {
-                int bSize = Mathf.Max(1, drumTrack.totalSteps);
-                int needBinsFromThisTrack = Mathf.Max(1, filledBin + 1);
-                int needLeaderBins = Mathf.Max(needBinsFromThisTrack, controller.GetMaxLoopMultiplier());
-                controller.noteVisualizer.RequestLeaderGridChange(needLeaderBins * bSize);
-            }
-
-            if (controller != null)
-                controller.AllowAdvanceNextBurst(this);
+            int filledBin = _burstWroteBin[burstId];
+            _gateReleasedBurstIds.Remove(burstId);
+            // removePlaceholders=true: discard path leaves placeholder markers that need clearing
+            CompleteBurst(burstId, filledBin, hadNotes: true, ascendBinCount: BinSize(), removePlaceholders: true);
         }
         else
         {
@@ -1468,18 +1197,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (GetBinCursor() > emptyBin)
                     SetBinCursor(emptyBin);
             }
+            _gateReleasedBurstIds.Remove(burstId);
+            CompleteBurst(burstId, filledBin: 0, hadNotes: false, ascendBinCount: BinSize(), removePlaceholders: true);
         }
-
-        // Capture before cleanup — _burstWroteBin entry exists iff at least one note was committed.
-        bool hadNotes = _burstWroteBin.ContainsKey(burstId);
-
-        _burstRemaining.Remove(burstId);
-        _burstLeaderBinsBeforeWrite.Remove(burstId);
-        _burstWroteBin.Remove(burstId);
-        _burstTargetBin.Remove(burstId);
-        _gateReleasedBurstIds.Remove(burstId);
-
-        OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
     }
 
     /// <summary>
@@ -1594,7 +1314,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         EnsureBinList();
 
         // IMPORTANT: filled is a content frontier; do NOT clamp by loopMultiplier either.
-        // (You can choose to clamp for “audible span” decisions elsewhere, but not for frontier detection.)
+        // (You can choose to clamp for "audible span" decisions elsewhere, but not for frontier detection.)
         for (int i = _binFilled.Count - 1; i >= 0; i--)
             if (_binFilled[i]) return i;
 
@@ -1633,7 +1353,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         InitializeBinChords(want);
 
         ResetBinCursor();
-        loopMultiplier = 1;                    // tracks don’t pre-expand; width grows on demand
+        loopMultiplier = 1;                    // tracks don't pre-expand; width grows on demand
         _totalSteps    = BinSize() * loopMultiplier;
     }
     public void ResetBinStateForNewPhase()
@@ -1927,451 +1647,369 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         BurstPlacementMode placementMode = BurstPlacementMode.Free,
         int trapSearchRadiusCells = 10,
         int trapBufferCells = 1,
-        int forcedTargetBin = -1) {
-    // --- ENTRY / ABORT REASONS ---
-    if (noteSet == null)
+        int forcedTargetBin = -1)
     {
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=noteSet_null maxToSpawn={maxToSpawn}");
-        return;
-    }
-    if (collectablePrefab == null)
-    {
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=collectablePrefab_null noteSet={noteSet} maxToSpawn={maxToSpawn}");
-        return;
-    }
-    if (controller == null || controller.noteVisualizer == null)
-    {
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=controller_or_noteVisualizer_null controllerNull={(controller == null)} noteVizNull={(controller != null && controller.noteVisualizer == null)} noteSet={noteSet} maxToSpawn={maxToSpawn}");
-        return;
-    }
-
-    // ------------------------------------------------------------
-    // BURST ID: choose exactly once; never change it mid-function.
-    // ------------------------------------------------------------
-    int burstId;
-    if (forcedBurstId > 0)
-    {
-        burstId = forcedBurstId;
-        _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);
-    }
-    else
-    {
-        burstId = ++_nextBurstId;
-    }
-    currentBurstId = burstId;
-
-    // When a new burst fires on this track, placeholders on OTHER tracks that
-    // belonged to their own prior bursts won't be cleaned up by this track's
-    // canonicalization pass — each track only sweeps itself. Force a canonicalize
-    // pass on every sibling track now so stale placeholders don't linger.
-    if (controller?.tracks != null && controller.noteVisualizer != null)
-    {
-        foreach (var sibling in controller.tracks)
+        // --- Entry guards ---
+        if (noteSet == null)
         {
-            if (sibling == null || sibling == this) continue;
-            controller.noteVisualizer.CanonicalizeTrackMarkers(sibling, sibling.currentBurstId);
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=noteSet_null maxToSpawn={maxToSpawn}");
+            return;
         }
-    }
-
-    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
-              $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
-              $"loopMul={loopMultiplier} pendingExpand={IsExpansionPending} MaxSpawnCount: {maxToSpawn}");
-
-    var nv = controller.noteVisualizer;
-    var stepList = noteSet.GetStepList();
-    var noteList = noteSet.GetNoteList();
-
-    if (stepList == null || stepList.Count == 0)
-    {
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=stepList_empty");
-        return;
-    }
-    if (noteList == null || noteList.Count == 0)
-    {
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=noteList_empty");
-        return;
-    }
-
-    _currentBurstArmed = true;
-    _currentBurstRemaining = 0;
-
-    int binSize = BinSize();
-
-    // ------------------------------------------------------------
-    // STEP NORMALIZATION (bin-local)
-    // ------------------------------------------------------------
-    int rawCount = stepList.Count;
-    bool hadOutOfRange = false;
-    var localSteps = new List<int>(rawCount);
-    var seenLocal = new HashSet<int>();
-
-    for (int i = 0; i < rawCount; i++)
-    {
-        int raw = stepList[i];
-        if (raw < 0) continue;
-        if (raw >= binSize) hadOutOfRange = true;
-
-        int local = raw % binSize;
-        if (seenLocal.Add(local)) localSteps.Add(local);
-    }
-
-    if (hadOutOfRange || localSteps.Count != rawCount)
-    {
-        Debug.LogWarning($"[TRK:STEP_NORMALIZE] track={name} burstId={burstId} binSize={binSize} " +
-                         $"rawSteps={rawCount} localUnique={localSteps.Count} hadOutOfRange={hadOutOfRange} " +
-                         $"sampleRaw={string.Join(",", stepList.Take(Mathf.Min(8, rawCount)))} " +
-                         $"sampleLocal={string.Join(",", localSteps.Take(Mathf.Min(8, localSteps.Count)))}");
-    }
-
-// ------------------------------------------------------------
-// TARGET BIN: pick exactly once.
-// forcedTargetBin beats density injection beats normal selection.
-// ------------------------------------------------------------
-    int targetBin;
-
-    if (forcedTargetBin >= 0)
-    {
-        // Clamp to current committed width to avoid accidental re-stage.
-        int clampedForcedBin = Mathf.Clamp(forcedTargetBin, 0, Mathf.Max(0, loopMultiplier - 1));
-        if (clampedForcedBin != forcedTargetBin)
-            Debug.LogWarning($"[TRK:BURST] forcedTargetBin={forcedTargetBin} clamped to {clampedForcedBin} " +
-                             $"(loopMul={loopMultiplier}) — possible expand/collapse conflict. track={name} burstId={burstId}");
-        targetBin = clampedForcedBin;
-    }
-    else if (_expansionCtrl != null && _expansionCtrl.OverrideNextSpawnBin >= 0)
-    {
-        targetBin = _expansionCtrl.ConsumeOverrideNextSpawnBin();
-    }
-    else
-    {
-        targetBin = controller != null
-            ? controller.GetBinForNextSpawn(this)
-            : GetNextBinForSpawn();
-    }
-    
-    if (targetBin >= loopMultiplier)
-    {
-        if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[TRK:BURST] OUTCOME=STAGE_EXPAND track={name} burstId={burstId} " +
-            $"targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
-
-        var stagedBurst = new TrackExpansionController.PendingBurstData
+        if (collectablePrefab == null)
         {
-            noteSet               = noteSet,
-            maxToSpawn            = maxToSpawn,
-            burstId               = burstId,
-            originWorld           = originWorld,
-            repelFromWorld        = repelFromWorld,
-            burstImpulse          = burstImpulse,
-            spreadAngleDeg        = spreadAngleDeg,
-            spawnJitterRadius     = spawnJitterRadius,
-            placementMode         = placementMode,
-            trapSearchRadiusCells = trapSearchRadiusCells,
-            trapBufferCells       = trapBufferCells,
-            intendedTargetBin     = targetBin,
-        };
-
-        Vector3 voidPos = originWorld ?? repelFromWorld ?? transform.position;
-
-        bool staged = _expansionCtrl.TryStageExpand(stagedBurst, targetBin, voidPos);
-
-        if (staged)
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=collectablePrefab_null noteSet={noteSet} maxToSpawn={maxToSpawn}");
+            return;
+        }
+        if (controller == null || controller.noteVisualizer == null)
         {
-            var _rpByVoice = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-            bool _isByVoice = _rpByVoice != null && _rpByVoice.configSelectionMode == RoleConfigSelectionMode.ByVoice;
-            if (!_isByVoice && controller != null && drumTrack != null)
-            {
-                Vector2Int gp = drumTrack.WorldToGridPosition(voidPos);
-                controller.BeginGravityVoidForPendingExpand(this, voidPos, gp);
-            }
-
-            foreach (var t in controller.tracks)
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
-                if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
-            }
-
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} reason=controller_or_noteVisualizer_null controllerNull={(controller == null)} noteVizNull={(controller != null && controller.noteVisualizer == null)} noteSet={noteSet} maxToSpawn={maxToSpawn}");
             return;
         }
 
-        // TryStageExpand rejected (another expansion already pending for this track).
-        // Fall through to SPAWN_NOW on an existing bin so collectables still appear.
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] STAGE_EXPAND rejected (already pending) → density spawn track={name} burstId={burstId}");
-        targetBin = Mathf.Clamp(GetNextBinForSpawn(), 0, Mathf.Max(0, loopMultiplier - 1));
+        // --- Burst ID: choose exactly once; never change it mid-function ---
+        int burstId = forcedBurstId > 0 ? forcedBurstId : ++_nextBurstId;
+        if (forcedBurstId > 0) _nextBurstId = Mathf.Max(_nextBurstId, forcedBurstId);
+        currentBurstId = burstId;
+
+        // Sweep sibling tracks for stale placeholders from their own prior bursts
+        if (controller?.tracks != null && controller.noteVisualizer != null)
+        {
+            foreach (var sibling in controller.tracks)
+            {
+                if (sibling == null || sibling == this) continue;
+                controller.noteVisualizer.CanonicalizeTrackMarkers(sibling, sibling.currentBurstId);
+            }
+        }
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRKDBG] {name} SpawnCollectableBurst: burstId={currentBurstId} noteSet={noteSet} " +
+                  $"stepCount={(noteSet?.GetStepList()?.Count ?? -1)} noteCount={(noteSet?.GetNoteList()?.Count ?? -1)} " +
+                  $"loopMul={loopMultiplier} pendingExpand={IsExpansionPending} MaxSpawnCount: {maxToSpawn}");
+
+        var stepList = noteSet.GetStepList();
+        var noteList = noteSet.GetNoteList();
+
+        if (stepList == null || stepList.Count == 0)
+        {
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=stepList_empty");
+            return;
+        }
+        if (noteList == null || noteList.Count == 0)
+        {
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=noteList_empty");
+            return;
+        }
+
+        _currentBurstArmed = true;
+        _currentBurstRemaining = 0;
+
+        int binSize = BinSize();
+
+        // --- Step normalization: deduplicate and clamp to bin-local space ---
+        int rawCount = stepList.Count;
+        bool hadOutOfRange = false;
+        var localSteps = new List<int>(rawCount);
+        var seenLocal = new HashSet<int>();
+
+        for (int i = 0; i < rawCount; i++)
+        {
+            int raw = stepList[i];
+            if (raw < 0) continue;
+            if (raw >= binSize) hadOutOfRange = true;
+            int local = raw % binSize;
+            if (seenLocal.Add(local)) localSteps.Add(local);
+        }
+
+        if (hadOutOfRange || localSteps.Count != rawCount)
+            Debug.LogWarning($"[TRK:STEP_NORMALIZE] track={name} burstId={burstId} binSize={binSize} " +
+                             $"rawSteps={rawCount} localUnique={localSteps.Count} hadOutOfRange={hadOutOfRange} " +
+                             $"sampleRaw={string.Join(",", stepList.Take(Mathf.Min(8, rawCount)))} " +
+                             $"sampleLocal={string.Join(",", localSteps.Take(Mathf.Min(8, localSteps.Count)))}");
+
+        // --- Target bin: forcedTargetBin > expansion override > controller selection ---
+        int targetBin;
+        if (forcedTargetBin >= 0)
+        {
+            targetBin = Mathf.Clamp(forcedTargetBin, 0, Mathf.Max(0, loopMultiplier - 1));
+            if (targetBin != forcedTargetBin)
+                Debug.LogWarning($"[TRK:BURST] forcedTargetBin={forcedTargetBin} clamped to {targetBin} (loopMul={loopMultiplier}) track={name} burstId={burstId}");
+        }
+        else if (_expansionCtrl != null && _expansionCtrl.OverrideNextSpawnBin >= 0)
+        {
+            targetBin = _expansionCtrl.ConsumeOverrideNextSpawnBin();
+        }
+        else
+        {
+            targetBin = controller != null ? controller.GetBinForNextSpawn(this) : GetNextBinForSpawn();
+        }
+
+        // --- Expansion staging: target bin exceeds committed loop width ---
+        if (targetBin >= loopMultiplier)
+        {
+            if (GameFlowManager.VerboseLogging) Debug.Log(
+                $"[TRK:BURST] OUTCOME=STAGE_EXPAND track={name} burstId={burstId} " +
+                $"targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
+
+            var stagedBurst = new TrackExpansionController.PendingBurstData
+            {
+                noteSet = noteSet, maxToSpawn = maxToSpawn, burstId = burstId,
+                originWorld = originWorld, repelFromWorld = repelFromWorld,
+                burstImpulse = burstImpulse, spreadAngleDeg = spreadAngleDeg,
+                spawnJitterRadius = spawnJitterRadius, placementMode = placementMode,
+                trapSearchRadiusCells = trapSearchRadiusCells, trapBufferCells = trapBufferCells,
+                intendedTargetBin = targetBin,
+            };
+
+            Vector3 voidPos = originWorld ?? repelFromWorld ?? transform.position;
+            bool staged = _expansionCtrl.TryStageExpand(stagedBurst, targetBin, voidPos);
+
+            if (staged)
+            {
+                var rpByVoice = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+                bool isByVoice = rpByVoice != null && rpByVoice.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+                if (!isByVoice && controller != null && drumTrack != null)
+                    controller.BeginGravityVoidForPendingExpand(this, voidPos, drumTrack.WorldToGridPosition(voidPos));
+
+                foreach (var t in controller.tracks)
+                {
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
+                    if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
+                }
+                return;
+            }
+
+            // Stage rejected (expansion already pending) — fall through to density spawn
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] STAGE_EXPAND rejected (already pending) → density spawn track={name} burstId={burstId}");
+            targetBin = Mathf.Clamp(GetNextBinForSpawn(), 0, Mathf.Max(0, loopMultiplier - 1));
+        }
+
+        // --- Backfill empty bins before the target so they don't stay silent after ascension ---
+        if (forcedTargetBin < 0)
+            BackfillEmptyBins(noteSet, targetBin, maxToSpawn, originWorld, repelFromWorld,
+                burstImpulse, spreadAngleDeg, spawnJitterRadius, placementMode,
+                trapSearchRadiusCells, trapBufferCells);
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
+
+        // --- Composition mode: step-sequenced spawning ---
+        if (controller != null && controller.noteCommitMode == NoteCommitMode.Composition)
+        {
+            EnqueueCompositionSpawns(noteSet, localSteps, targetBin, binSize, maxToSpawn,
+                originWorld, spawnJitterRadius, burstId);
+            return;
+        }
+
+        // --- Immediate spawn ---
+        ExecuteImmediateSpawn(noteSet, localSteps, stepList.Count, targetBin, binSize, maxToSpawn, burstId,
+            originWorld, repelFromWorld, spawnJitterRadius, placementMode, trapSearchRadiusCells, trapBufferCells);
     }
 
-    // Backfill: for any preceding bin (0..targetBin-1) with no persistent notes,
-    // fire a separate burst so those bins don't stay silent after ascension.
-    // forcedTargetBin >= 0 marks child calls and prevents recursion.
-    if (forcedTargetBin < 0 && targetBin > 0)
+    // Spawns a collectable for each preceding empty bin so they don't stay silent after ascension.
+    // Only called for top-level (non-forced) bursts to prevent infinite recursion.
+    private void BackfillEmptyBins(
+        NoteSet noteSet, int targetBin, int maxToSpawn,
+        Vector3? originWorld, Vector3? repelFromWorld,
+        float burstImpulse, float spreadAngleDeg, float spawnJitterRadius,
+        BurstPlacementMode placementMode, int trapSearchRadiusCells, int trapBufferCells)
     {
         for (int b = 0; b < targetBin; b++)
         {
             if (b < loopMultiplier && !HasAnyNoteInBin(b))
             {
-                SpawnCollectableBurst(
-                    noteSet,
-                    maxToSpawn,
-                    /* forcedBurstId= */ -1,
-                    originWorld,
-                    repelFromWorld,
-                    burstImpulse,
-                    spreadAngleDeg,
-                    spawnJitterRadius,
-                    placementMode,
-                    trapSearchRadiusCells,
-                    trapBufferCells,
-                    /* forcedTargetBin= */ b);
+                SpawnCollectableBurst(noteSet, maxToSpawn, -1,
+                    originWorld, repelFromWorld, burstImpulse, spreadAngleDeg, spawnJitterRadius,
+                    placementMode, trapSearchRadiusCells, trapBufferCells,
+                    forcedTargetBin: b);
             }
         }
     }
 
-    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
-
-    // --- Composition mode: step-sequenced spawn (one collectable per loop step) ---
-    if (controller != null && controller.noteCommitMode == NoteCommitMode.Composition)
+    // The SPAWN_NOW path: places collectables into the world for each step in localSteps.
+    private void ExecuteImmediateSpawn(
+        NoteSet noteSet, List<int> localSteps, int rawStepCount,
+        int targetBin, int binSize, int maxToSpawn, int burstId,
+        Vector3? originWorld, Vector3? repelFromWorld,
+        float spawnJitterRadius, BurstPlacementMode placementMode,
+        int trapSearchRadiusCells, int trapBufferCells)
     {
-        EnqueueCompositionSpawns(noteSet, localSteps, targetBin, binSize, maxToSpawn,
-            originWorld, spawnJitterRadius, burstId);
-        return;
-    }
+        int gridW = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
+        int gridH = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
 
-    // --- Attempt spawns ---
-    int spawnedCount = 0;
-    var usedAbsSteps = new HashSet<int>();
-
-    int gridW = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
-    int gridH = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
-
-    if (gridW <= 0 || gridH <= 0)
-    {
-        _currentBurstArmed = false;
-        _currentBurstRemaining = 0;
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=grid_invalid gridW={gridW} gridH={gridH}");
-        return;
-    }
-
-    if (_gfm == null) _gfm = GameFlowManager.Instance;
-    var dustGen = _gfm?.dustGenerator;
-
-    // redundant but keep (matches your structure)
-    if (gridW <= 0)
-    {
-        _currentBurstArmed = false;
-        _currentBurstRemaining = 0;
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=gridW_invalid gridW={gridW} drumTrackNull={(drumTrack == null)}");
-        return;
-    }
-
-
-    if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin &&
-        dustGen != null &&
-        drumTrack != null &&
-        originWorld.HasValue)
-    {
-        List <Vector2Int> trappedCandidates = BuildTrappedCandidatesNearOrigin(
-            dustGen,
-            drumTrack,
-            originWorld.Value,
-            gridW,
-            gridH,
-            trapSearchRadiusCells,
-            trapBufferCells
-        );
-
-        if ((trappedCandidates == null || trappedCandidates.Count == 0) && trapBufferCells > 0)
+        if (gridW <= 0 || gridH <= 0)
         {
-            trappedCandidates = BuildTrappedCandidatesNearOrigin(
-                dustGen,
-                drumTrack,
-                originWorld.Value,
-                gridW,
-                gridH,
-                trapSearchRadiusCells,
-                trapBufferCells - 1
-            );
-        }
-    }
-
-    int originX = -1;
-    if (originWorld.HasValue && drumTrack != null)
-    {
-        var og = drumTrack.WorldToGridPosition(originWorld.Value);
-        originX = og.x;
-        if (originX < 0 || originX >= gridW) originX = -1;
-    }
-
-    int imprintX = -1;
-    if (repelFromWorld.HasValue && drumTrack != null)
-    {
-        var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
-        imprintX = ig.x;
-        if (imprintX < 0 || imprintX >= gridW) imprintX = -1;
-    }
-
-    // --- choose anchor for 2D search ---
-    Vector2Int anchor = new Vector2Int(gridW / 2, gridH / 2);
-
-    if (originWorld.HasValue && drumTrack != null)
-    {
-        var og = drumTrack.WorldToGridPosition(originWorld.Value);
-        if (og.x >= 0 && og.x < gridW && og.y >= 0 && og.y < gridH) anchor = og;
-    }
-    else if (repelFromWorld.HasValue && drumTrack != null)
-    {
-        var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
-        if (ig.x >= 0 && ig.x < gridW && ig.y >= 0 && ig.y < gridH) anchor = ig;
-    }
-
-    var usedCellsThisBurst = new HashSet<Vector2Int>();
-
-    foreach (int step in localSteps)
-    {
-        if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
-
-        int note = noteSet.GetNoteForPhaseAndRole(this, step);
-        int dur;
-        if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
-            dur = CalculateNoteDurationFromSteps(step, noteSet);
-
-        int absStep = targetBin * binSize + step;
-
-        if (!usedAbsSteps.Add(absStep))
-        {
-            Debug.LogWarning($"[SPAWN:STEP-COLLISION] track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} step={step} -> absStep={absStep}");
-            continue;
+            _currentBurstArmed = false;
+            _currentBurstRemaining = 0;
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=grid_invalid gridW={gridW} gridH={gridH}");
+            return;
         }
 
-        if (dustGen == null || drumTrack == null)
-            continue;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var dustGen = _gfm?.dustGenerator;
+        var nv = controller.noteVisualizer;
 
-        int fullSteps = BinSize() * maxLoopMultiplier;
-        float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
-
-        Vector2Int chosenCell;
-        if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCellsThisBurst, out chosenCell, stepNorm))
-            continue;
-
-        usedCellsThisBurst.Add(chosenCell);
-        Vector3 spawnPos = drumTrack.GridToWorldPosition(chosenCell);
-
-        bool cellHasDust = dustGen != null && dustGen.HasDustAt(chosenCell);
-        // Always jail the landing cell — drift can take up to ~7 s (spawnArrivalSeconds * 1.4).
-        // Without this, dust that grows into an initially-empty cell causes physics depenetration
-        // the moment _rb.simulated = true, which teleports the collectable.
-        if (dustGen != null)
+        // Build trapped candidate list if placement mode requires it
+        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin &&
+            dustGen != null && drumTrack != null && originWorld.HasValue)
         {
-            const float jailHoldSeconds = 10f;
-            dustGen.CreateJailCenterForCollectable(chosenCell, jailHoldSeconds, ownerId: burstId);
+            List<Vector2Int> trappedCandidates = BuildTrappedCandidatesNearOrigin(
+                dustGen, drumTrack, originWorld.Value, gridW, gridH, trapSearchRadiusCells, trapBufferCells);
+
+            if ((trappedCandidates == null || trappedCandidates.Count == 0) && trapBufferCells > 0)
+            {
+                trappedCandidates = BuildTrappedCandidatesNearOrigin(
+                    dustGen, drumTrack, originWorld.Value, gridW, gridH, trapSearchRadiusCells, trapBufferCells - 1);
+            }
         }
 
-        if (originWorld.HasValue && spawnJitterRadius > 0f)
+        int originX = -1;
+        if (originWorld.HasValue && drumTrack != null)
         {
-            Vector2 j = UnityEngine.Random.insideUnitCircle * spawnJitterRadius;
-            spawnPos += (Vector3)j;
+            var og = drumTrack.WorldToGridPosition(originWorld.Value);
+            if (og.x >= 0 && og.x < gridW) originX = og.x;
         }
 
-        Vector3 spawnOrigin = originWorld ?? transform.position;
-
-        var go = Instantiate(collectablePrefab, spawnOrigin, Quaternion.identity, collectableParent);
-        if (!go) continue;
-
-        if (!go.TryGetComponent(out Collectable c))
+        int imprintX = -1;
+        if (repelFromWorld.HasValue && drumTrack != null)
         {
-            Destroy(go);
-            continue;
+            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
+            if (ig.x >= 0 && ig.x < gridW) imprintX = ig.x;
         }
 
-// assign burst metadata BEFORE intro flight
-        c.burstId = burstId;
-        c.intendedStep = absStep;
-        c.intendedBin = targetBin;
-        c.assignedInstrumentTrack = this;
-
-        _scratchSteps.Clear();
-        _scratchSteps.Add(absStep);
-
-        c.isTrappedInDust = cellHasDust;
-        if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
+        Vector2Int anchor = new Vector2Int(gridW / 2, gridH / 2);
+        if (originWorld.HasValue && drumTrack != null)
         {
-            c.OnDestroyed -= oldHandler;
-            _destroyHandlers.Remove(c);
+            var og = drumTrack.WorldToGridPosition(originWorld.Value);
+            if (og.x >= 0 && og.x < gridW && og.y >= 0 && og.y < gridH) anchor = og;
+        }
+        else if (repelFromWorld.HasValue && drumTrack != null)
+        {
+            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
+            if (ig.x >= 0 && ig.x < gridW && ig.y >= 0 && ig.y < gridH) anchor = ig;
         }
 
-        Action handler = () => OnCollectableDestroyed(c);
-        _destroyHandlers[c] = handler;
-        c.OnDestroyed += handler;
+        var usedAbsSteps = new HashSet<int>();
+        var usedCellsThisBurst = new HashSet<Vector2Int>();
+        int spawnedCount = 0;
 
-        // Marker + tether
-        var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
-        if (markerGO)
+        foreach (int step in localSteps)
         {
-            var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
-            tag.track = this;
-            tag.step = absStep;
-            tag.burstId = burstId;
-            tag.isPlaceholder = true;
+            if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
 
-            var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
-            ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-            c.BindMarkerAtSpawn(markerGO.transform, absStep);
+            int note = noteSet.GetNoteForPhaseAndRole(this, step);
+            int dur;
+            if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
+                dur = CalculateNoteDurationFromSteps(step, noteSet);
+
+            int absStep = targetBin * binSize + step;
+            if (!usedAbsSteps.Add(absStep))
+            {
+                Debug.LogWarning($"[SPAWN:STEP-COLLISION] track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} step={step} -> absStep={absStep}");
+                continue;
+            }
+
+            if (dustGen == null || drumTrack == null) continue;
+
+            int fullSteps = BinSize() * maxLoopMultiplier;
+            float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
+
+            Vector2Int chosenCell;
+            if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCellsThisBurst, out chosenCell, stepNorm))
+                continue;
+
+            usedCellsThisBurst.Add(chosenCell);
+            Vector3 spawnPos = drumTrack.GridToWorldPosition(chosenCell);
+
+            bool cellHasDust = dustGen.HasDustAt(chosenCell);
+            // Jail the landing cell for the collectable's arrival window to prevent dust-depenetration
+            if (dustGen != null)
+            {
+                const float jailHoldSeconds = 10f;
+                dustGen.CreateJailCenterForCollectable(chosenCell, jailHoldSeconds, ownerId: burstId);
+            }
+
+            if (originWorld.HasValue && spawnJitterRadius > 0f)
+                spawnPos += (Vector3)(UnityEngine.Random.insideUnitCircle * spawnJitterRadius);
+
+            Vector3 spawnOrigin = originWorld ?? transform.position;
+            var go = Instantiate(collectablePrefab, spawnOrigin, Quaternion.identity, collectableParent);
+            if (!go) continue;
+
+            if (!go.TryGetComponent(out Collectable c))
+            {
+                Destroy(go);
+                continue;
+            }
+
+            c.burstId = burstId;
+            c.intendedStep = absStep;
+            c.intendedBin = targetBin;
+            c.assignedInstrumentTrack = this;
+            c.isTrappedInDust = cellHasDust;
+
+            _scratchSteps.Clear();
+            _scratchSteps.Add(absStep);
+
+            if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
+            {
+                c.OnDestroyed -= oldHandler;
+                _destroyHandlers.Remove(c);
+            }
+            Action handler = () => OnCollectableDestroyed(c);
+            _destroyHandlers[c] = handler;
+            c.OnDestroyed += handler;
+
+            var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
+            if (markerGO)
+            {
+                var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
+                tag.track = this;
+                tag.step = absStep;
+                tag.burstId = burstId;
+                tag.isPlaceholder = true;
+
+                var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
+                ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
+                c.BindMarkerAtSpawn(markerGO.transform, absStep);
+            }
+
+            c.ApplyTrackVisuals(this);
+            c.BeginSpawnArrival(spawnOrigin, spawnPos, note, dur, this, noteSet, _scratchSteps);
+
+            spawnedCollectables.Add(go);
+            _currentBurstRemaining++;
+            spawnedCount++;
         }
-        c.ApplyTrackVisuals(this);
-// Begin intro flight from MineNode explosion site -> chosen grid spawn pos
-        c.BeginSpawnArrival(
-            spawnOrigin,
-            spawnPos,
-            note,
-            dur,
-            this,
-            noteSet,
-            _scratchSteps
-        );
-        spawnedCollectables.Add(go);
-        _currentBurstRemaining++;
-        spawnedCount++;
-    }
 
-    // --- Empty burst handling ---
-    if (spawnedCount <= 0)
-    {
-        _currentBurstArmed = false;
-        _currentBurstRemaining = 0;
+        // Empty burst — nothing spawned
+        if (spawnedCount <= 0)
+        {
+            _currentBurstArmed = false;
+            _currentBurstRemaining = 0;
+            controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
+            OnCollectableBurstCleared?.Invoke(this, burstId, false);
+            Debug.LogWarning($"[TRK:BURST] OUTCOME=SPAWN_EMPTY_CLEARED track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} steps={rawStepCount} gridW={gridW}");
+            return;
+        }
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
+
+        _burstRemaining[burstId] = spawnedCount;
+        _burstTotalSpawned[burstId] = spawnedCount;
+        _burstCollected[burstId] = 0;
+
+        SetBinAllocated(targetBin, true);
+        _burstTargetBin[burstId] = targetBin;
+
+        // Advance cursor past the allocated bin (ByVoice tracks suppress — cursor moves on chord-group fill)
+        var roleProfileForCursor = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        bool isByVoiceForCursor = roleProfileForCursor != null && roleProfileForCursor.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+        if (!isByVoiceForCursor)
+        {
+            if (GetBinCursor() <= targetBin) SetBinCursor(targetBin + 1);
+            if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
+        }
 
         controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-
-        OnCollectableBurstCleared?.Invoke(this, burstId, false);
-        Debug.LogWarning($"[TRK:BURST] OUTCOME=SPAWN_EMPTY_CLEARED track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} steps={stepList.Count} gridW={gridW}");
-        return;
     }
-
-    if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
-
-    _burstRemaining[burstId] = spawnedCount;
-    _burstTotalSpawned[burstId] = spawnedCount;
-    _burstCollected[burstId] = 0;
-
-    SetBinAllocated(targetBin, true);
-    _burstTargetBin[burstId] = targetBin; // track for rollback on 0-note discard
-
-// Keep cursor moving forward once we allocate a bin.
-// Without this, cursor can stay at 0 and repeatedly bias selection at boundaries.
-// ByVoice chord tracks suppress this advance — cursor only moves when the whole
-// chord group fills the bin (controller.NotifyBinFilled handles it).
-    {
-        var _roleProfileForCursor = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-        bool _isByVoice = _roleProfileForCursor != null && _roleProfileForCursor.configSelectionMode == RoleConfigSelectionMode.ByVoice;
-        if (!_isByVoice)
-        {
-            if (GetBinCursor() <= targetBin)
-                SetBinCursor(targetBin + 1);
-            if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier)
-                SetBinCursor(loopMultiplier);
-        }
-    }
-
-    controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-}
     private bool TryPickRandomSpawnCell(
         CosmicDustGenerator dustGen,
         DrumTrack drumTrack,
