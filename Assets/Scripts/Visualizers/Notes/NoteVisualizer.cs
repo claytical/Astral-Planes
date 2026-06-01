@@ -165,221 +165,6 @@ public partial class NoteVisualizer : MonoBehaviour
     }
     
 
-/// <summary>
-/// Finds the next closest *unlit* placeholder step for the given track, scanning forward from a given step.
-/// We interpret "next closest" as the smallest positive forward distance in the leader loop timeline.
-/// </summary>
-    private bool TryGetNextUnlitStep(InstrumentTrack track, double rawAbsStep, int totalAbsSteps, out int targetAbsStep)
-{
-    targetAbsStep = -1;
-    if (track == null) return false;
-    if (noteMarkers == null || noteMarkers.Count == 0) return false;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    double from = rawAbsStep % totalAbsSteps;
-    if (from < 0) from += totalAbsSteps;
-
-    int bestStep = -1;
-    double bestForward = double.MaxValue;
-
-    foreach (var kv in noteMarkers)
-    {
-        if (kv.Key.Item1 != track) continue;
-        int step = kv.Key.Item2;
-        if (step < 0) continue;
-
-        // FIX BUG 4: skip steps that are outside the current leader loop entirely —
-        // they belong to a stale/previous bin epoch and wrapping them causes ghost commits.
-        if (step >= totalAbsSteps) continue;
-
-        var tr = kv.Value;
-        if (!tr) continue;
-        var tag = tr.GetComponent<MarkerTag>();
-        if (tag == null || !tag.isPlaceholder) continue;
-
-        // No normalisation needed: step is already guaranteed to be in [0, totalAbsSteps).
-        double fwd = (step - from + totalAbsSteps) % totalAbsSteps;
-
-        if (fwd < bestForward)
-        {
-            bestForward = fwd;
-            bestStep = step;
-        }
-    }
-
-    if (bestStep < 0) return false;
-    targetAbsStep = bestStep;
-    return true;
-}
-    public void UpdateManualReleaseCueExcluding(
-    Transform vehicle, InstrumentTrack track,
-    double rawAbsStep, int floorAbsStep, int totalAbsSteps,
-    HashSet<int> excludedSteps)
-{
-    if (releaseCuePrefab == null || vehicle == null || track == null) return;
-    if (!isActiveAndEnabled) return;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-
-    if (!TryGetNextUnlitStepExcluding(track, rawAbsStep, totalAbsSteps, excludedSteps, out int targetAbs))
-    {
-        ClearManualReleaseCue(vehicle);
-        return;
-    }
-
-    // Reuse the existing arc/cue positioning logic from UpdateManualReleaseCue
-    Vector3 a = vehicle.position;
-    Vector3 b = (noteMarkers != null &&
-                 noteMarkers.TryGetValue((track, targetAbs), out var markerTr) && markerTr != null)
-        ? markerTr.position : a;
-
-    double fwd = (targetAbs - rawAbsStep + totalAbsSteps) % totalAbsSteps;
-    int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
-    int lookahead = Mathf.Clamp(Mathf.Max(releaseCueLookaheadSteps, binSize), 1, totalAbsSteps);
-
-    if (fwd > lookahead) { ClearManualReleaseCue(vehicle); return; }
-
-    float u = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Clamp01((float)(fwd / lookahead)));
-    Vector3 p = Vector3.Lerp(a, b, u);
-    if (releaseCueArcHeight != 0f) p.y += releaseCueArcHeight * 4f * u * (1f - u);
-
-    int id = vehicle.GetInstanceID();
-    if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
-    {
-        _releaseCuesByVehicle[id] = cue;
-    }
-    else
-    {
-        cue.transform.position = p;
-    }
-}
-    public void UpdateCarryHighlights(HashSet<InstrumentTrack> carried)
-    {
-        if (noteMarkers == null) return;
-        foreach (var kv in noteMarkers)
-        {
-            if (kv.Value == null) continue;
-            var tag = kv.Value.GetComponent<MarkerTag>();
-            if (tag == null || !tag.isPlaceholder) continue;
-            var ml = kv.Value.GetComponent<MarkerLight>();
-            if (ml == null) continue;
-            var track = kv.Key.Item1;
-            if (carried != null && carried.Contains(track))
-                ml.SetAvailable(track.trackColor);
-            else
-                ml.SetGrey(track.trackColor);
-        }
-    }
-
-    public bool TryGetNextUnlitStepExcluding(
-    InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
-    HashSet<int> excludedSteps, out int targetAbsStep)
-{
-    targetAbsStep = -1;
-    if (track == null) return false;
-    if (noteMarkers == null || noteMarkers.Count == 0) return false;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    // NOTE: Keep a single authoritative modulus domain for this search.
-    // loopMultiplier can expand the playable leader timeline beyond the caller-provided totalAbsSteps,
-    // so we must normalize 'from' and all wrap math against the same effectiveTotal used for candidate validation.
-    int effectiveTotal = Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()));
-    double from = rawAbsStep % effectiveTotal;
-    if (from < 0) from += effectiveTotal;
-
-    int bestStep = -1;
-    double bestForward = double.MaxValue;
-
-    foreach (var kv in noteMarkers)
-    {
-        if (kv.Key.Item1 != track) continue;
-        int step = kv.Key.Item2;
-        if (step < 0) continue;
-        if (step >= effectiveTotal)
-        {
-            continue;
-        }
-
-        if (excludedSteps != null && excludedSteps.Contains(step))
-        {
-            continue;
-        }
-
-        var tr = kv.Value;
-        if (!tr)
-        {
-            Debug.Log($"[UNLIT_SEARCH] track={track.name} step={step} SKIP: null transform");
-            continue;
-        }
-        var tag = tr.GetComponent<MarkerTag>();
-        bool isPlaceholder = tag != null && tag.isPlaceholder;
-        if (tag == null || !tag.isPlaceholder) continue;
-
-        double fwd = (step - from + effectiveTotal) % effectiveTotal;
-        if (fwd < bestForward)
-        {
-            bestForward = fwd;
-            bestStep = step;
-        }
-    }
-
-    if (bestStep < 0) return false;
-    targetAbsStep = bestStep;
-    return true;
-}
-
-    public bool TryGetNearestUnlitStepExcluding(
-    InstrumentTrack track, double rawAbsStep, int totalAbsSteps,
-    HashSet<int> excludedSteps, out int targetAbsStep, out double forwardSteps)
-{
-    targetAbsStep = -1;
-    forwardSteps = double.MaxValue;
-    if (track == null) return false;
-    if (noteMarkers == null || noteMarkers.Count == 0) return false;
-
-    totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-    // NOTE: Mirror next-step selection domain exactly so nearest-step callers observe identical wrapping behavior.
-    // This prevents mismatches where candidate filtering uses expanded leader length but distance math wraps by a smaller modulus.
-    int effectiveTotal = Mathf.Max(totalAbsSteps, track.loopMultiplier * (_drum != null ? _drum.totalSteps : track.BinSize()));
-    double from = rawAbsStep % effectiveTotal;
-    if (from < 0) from += effectiveTotal;
-
-    int bestStep = -1;
-    double bestDistance = double.MaxValue;
-    double bestForward = double.MaxValue;
-
-    foreach (var kv in noteMarkers)
-    {
-        if (kv.Key.Item1 != track) continue;
-        int step = kv.Key.Item2;
-        if (step < 0) continue;
-
-        if (step >= effectiveTotal) continue;
-        if (excludedSteps != null && excludedSteps.Contains(step)) continue;
-
-        var tr = kv.Value;
-        if (!tr) continue;
-        var tag = tr.GetComponent<MarkerTag>();
-        if (tag == null || !tag.isPlaceholder) continue;
-
-        double fwd = (step - from + effectiveTotal) % effectiveTotal;
-        double back = (from - step + effectiveTotal) % effectiveTotal;
-        double dist = Math.Min(fwd, back);
-
-        if (dist < bestDistance || (Math.Abs(dist - bestDistance) < 0.0001 && fwd < bestForward))
-        {
-            bestDistance = dist;
-            bestForward = fwd;
-            bestStep = step;
-        }
-    }
-
-    if (bestStep < 0) return false;
-    targetAbsStep = bestStep;
-    forwardSteps = bestForward;
-    return true;
-}
-
     public void ClearManualReleaseCue(Transform vehicle)
     {
         if (vehicle == null) return;
@@ -487,19 +272,13 @@ public partial class NoteVisualizer : MonoBehaviour
     }
     private void UpdatePlayheadParticleTrailWorld()
     {
-//        if (!playheadTrailEnabled) return;
         if (playheadParticles == null || playheadLine == null) return;
 
-        // Ensure "trail" behavior: particles remain in world when emitter moves.
         var main = playheadParticles.main;
         if (main.simulationSpace != ParticleSystemSimulationSpace.World)
             main.simulationSpace = ParticleSystemSimulationSpace.World;
 
-        // Emitter should live on the playhead line (it is a child, but we sample world pos anyway).
         Vector3 now = playheadParticles.transform.position;
-
-//        if (!float.IsNaN(playheadTrailWorldZOverride))
-//            now.z = playheadTrailWorldZOverride;
 
         // First frame after enable/reset: just seed the position.
         if (!_hasLastPlayheadParticleWorldPos)
@@ -768,154 +547,100 @@ public partial class NoteVisualizer : MonoBehaviour
     }
 
     void Update()
-{
-    if (!isInitialized || playheadLine == null)
-        return;
-
-    // Refresh once per frame; only reassigns when something actually changed.
-    if (!RefreshCoreRefs(force: false))
-        return;
-
-    if (_drum == null)
-        return;
-
-    if (!TickAnchorGuard(out double leaderStartDsp))
-        return;
-
-    TickPlayheadEnergy();
-    
-// --- Visual clock MUST match playheadLine clock ---
-// Use the leader loop length for both x-position AND step sampling.
-// GetLeaderSteps() returns the expanded step count (e.g. 32 for a 2-bin loop),
-// so stepDuration and currentStep stay in phase with the audio clock.
-    int drumTotalSteps = Mathf.Max(1, _drum.GetLeaderSteps());
-    float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
-
-// Seconds per step in the VISUAL loop timeline
-    float stepDuration = fullVisualLoopDuration / drumTotalSteps;
-
-// Position playhead line using the same loop duration
-    float globalElapsed = (float)(AudioSettings.dspTime - leaderStartDsp);
-    float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
-
-    float canvasWidth = GetScreenWidth();
-    float xPos = Mathf.Lerp(0f, canvasWidth, Mathf.Clamp01(globalNormalized));
-    playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
-
-    ProcessFirstPlayConfirmFx();
-    UpdateFirstPlayConfirmTasks();
-    //DisableBuiltInEmissionForTrail();
-    UpdatePlayheadParticleTrailWorld();
-
-// Leader time in [0, fullVisualLoopDuration)
-    float leaderT = (float)((AudioSettings.dspTime - leaderStartDsp) % fullVisualLoopDuration);
-    if (leaderT < 0f) leaderT += fullVisualLoopDuration;
-
-// Current step derived from the SAME timeline the playhead uses
-    int currentStep = Mathf.FloorToInt(leaderT / stepDuration);
-    currentStep = ((currentStep % drumTotalSteps) + drumTotalSteps) % drumTotalSteps;
-
-    stepColor = ComputeStepColor(currentStep);
-
-    bool shimmer = false;
-    float maxVelocity = 0f;
-
-    var controller = _gfm?.controller;
-    if (controller != null && controller.tracks != null)
     {
+        if (!isInitialized || playheadLine == null) return;
+        if (!RefreshCoreRefs(force: false)) return;
+        if (_drum == null) return;
+        if (!TickAnchorGuard(out double leaderStartDsp)) return;
+
+        TickPlayheadEnergy();
+        MovePlayheadLine(leaderStartDsp);
+        ProcessFirstPlayConfirmFx();
+        UpdateFirstPlayConfirmTasks();
+        UpdatePlayheadParticleTrailWorld();
+        ComputeCurrentStepState(leaderStartDsp, out int currentStep, out bool shimmer, out float maxVelocity);
+        stepColor = ComputeStepColor(currentStep);
+        UpdateParticleEmission(shimmer, maxVelocity);
+        UpdateNoteMarkerPositions();
+
+        int loopsNow = _drum.completedLoops;
+        if (loopsNow != _lastObservedCompletedLoops)
+            _lastObservedCompletedLoops = loopsNow;
+
+        TickAnimationTasks();
+    }
+
+    // Visual clock MUST match the audio clock: use leader loop length for both x-position and step sampling.
+    // GetLeaderSteps() returns the expanded step count (e.g. 32 for a 2-bin loop).
+    private void MovePlayheadLine(double leaderStartDsp)
+    {
+        int drumTotalSteps = Mathf.Max(1, _drum.GetLeaderSteps());
+        float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
+        float globalElapsed = (float)(AudioSettings.dspTime - leaderStartDsp);
+        float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
+        float xPos = Mathf.Lerp(0f, GetScreenWidth(), Mathf.Clamp01(globalNormalized));
+        playheadLine.anchoredPosition = new Vector2(xPos, playheadLine.anchoredPosition.y);
+    }
+
+    private void ComputeCurrentStepState(double leaderStartDsp,
+        out int currentStep, out bool shimmer, out float maxVelocity)
+    {
+        int drumTotalSteps = Mathf.Max(1, _drum.GetLeaderSteps());
+        float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
+        float stepDuration = fullVisualLoopDuration / drumTotalSteps;
+        float leaderT = (float)((AudioSettings.dspTime - leaderStartDsp) % fullVisualLoopDuration);
+        if (leaderT < 0f) leaderT += fullVisualLoopDuration;
+
+        currentStep = Mathf.FloorToInt(leaderT / stepDuration);
+        currentStep = ((currentStep % drumTotalSteps) + drumTotalSteps) % drumTotalSteps;
+
+        shimmer = false;
+        maxVelocity = 0f;
+        var controller = _gfm?.controller;
+        if (controller?.tracks == null) return;
         foreach (var track in controller.tracks)
         {
             if (track == null) continue;
-
-            float v = track.GetVelocityAtStep(currentStep);
-            maxVelocity = Mathf.Max(maxVelocity, v / 127f);
-
-            if (_ghostNoteSteps.TryGetValue(track, out var steps) && steps != null && steps.Contains(currentStep))
-            {
+            maxVelocity = Mathf.Max(maxVelocity, track.GetVelocityAtStep(currentStep) / 127f);
+            if (!shimmer && _ghostNoteSteps.TryGetValue(track, out var steps)
+                && steps != null && steps.Contains(currentStep))
                 shimmer = true;
-                break;
-            }
         }
     }
 
-    if (playheadParticles != null)
+    private void UpdateParticleEmission(bool shimmer, float maxVelocity)
     {
+        if (playheadParticles == null) return;
+
         var main = playheadParticles.main;
         var emission = playheadParticles.emission;
-        // Base factors from music (velocity) plus collection/ascension state
         float velFactor = Mathf.Clamp01(maxVelocity);
-        float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);   // fills as burst is collected
-        float chargeFactor = 1.0f + 1.5f * _lineCharge01;                 // extra particles as notes hit the top
+        float energyFactor = Mathf.Lerp(0.3f, 1.0f, _playheadEnergy01);
+        float chargeFactor = 1.0f + 1.5f * _lineCharge01;
 
         main.startSize = Mathf.Lerp(0.8f, 1.2f, velFactor) * energyFactor;
         emission.rateOverTime = Mathf.Lerp(10f, 50f, velFactor) * energyFactor * chargeFactor;
         emission.enabled = shimmer || _lineCharge01 > 0.05f || _playheadEnergy01 > 0.05f;
-// Decay pulse timer
+
         if (_releasePulseT > 0f)
             _releasePulseT = Mathf.Max(0f, _releasePulseT - Time.deltaTime);
 
-        float pulse01 = (releasePulseSeconds <= 0f) ? 0f : Mathf.Clamp01(_releasePulseT / releasePulseSeconds);
         var col = playheadParticles.colorOverLifetime;
-
         col.enabled = true;
-
-// Build a base gradient (your normal behavior)
-        float baseAlpha = 0.4f + velFactor * 0.5f;
-        float topAlpha = 0.1f;
-        float alphaBoost = 0.3f * (_playheadEnergy01 + _lineCharge01);
-
-        Color c0 = Color.white;
-        Color c1 = Color.cyan;
-
-// Pulse pushes both ends toward role pulse color
-        if (pulse01 > 0f)
-        {
-            var pulseColor = GetReleasePulseColor(_lastReleasePulseRole);
-            c0 = Color.Lerp(c0, pulseColor, pulse01);
-            c1 = Color.Lerp(c1, pulseColor, pulse01);
-            alphaBoost += 0.35f * pulse01; // optional: make it "flash" brighter
-        }
         Gradient g = new Gradient();
         g.SetKeys(
-            new[]
-            {
-                new GradientColorKey(stepColor, 0f),
-                new GradientColorKey(stepColor, 1f),
-            },
-            new[]
-            {
-                new GradientAlphaKey(0.85f, 0f),
-                new GradientAlphaKey(0.0f, 1f),
-            }
+            new[] { new GradientColorKey(stepColor, 0f), new GradientColorKey(stepColor, 1f) },
+            new[] { new GradientAlphaKey(0.85f, 0f), new GradientAlphaKey(0.0f, 1f) }
         );
         col.color = g;
-        // Fire a short extra burst when a burst completes / drums change
+
         if (_pendingReleasePulse)
         {
             _pendingReleasePulse = false;
-
-            // Emit a short pop; you can tune this count
             playheadParticles.Emit(30);
-
-            // Reset energy target so the bar "empties" after release
             _playheadEnergyTarget01 = 0f;
         }
     }
-
-    // --- Build step → world position maps per row (no lines; direct math) ---
-    // (kept as in your current code: map-building block remains commented out)
-    int longestSteps = GetDeclaredLongestSteps();
-    _ = longestSteps;
-
-    // Move any live markers to their updated step positions
-    UpdateNoteMarkerPositions();
-
-    int loopsNow = _drum.completedLoops;
-    if (loopsNow != _lastObservedCompletedLoops)
-        _lastObservedCompletedLoops = loopsNow;
-
-    TickAnimationTasks();
-}
 
     private Color ComputeStepColor(int step)
     {
@@ -954,16 +679,6 @@ public partial class NoteVisualizer : MonoBehaviour
 
         for (int i = 0; i < count; i++)
             set.Add((startStepInclusive + i) % total);
-    }
-    private void DisableBuiltInEmissionForTrail()
-    {
-        if (!playheadParticles) return;
-        var emission = playheadParticles.emission;
-        emission.enabled = false;
-
-        // Defensive: if enabled elsewhere, force it off.
-        emission.rateOverTime = 0f;
-        emission.rateOverDistance = 0f;
     }
     private bool RefreshCoreRefs(bool force = false)
     {
@@ -1039,13 +754,7 @@ public partial class NoteVisualizer : MonoBehaviour
         return worldCorners[0].y; // bottom-left corner
     }
     public Transform GetUIParent() => _uiParent;
-    int GetDeclaredLongestSteps()
-    {
-        if (!RefreshCoreRefs(false)) return 1;
-        int leaderBins  = Mathf.Max(1, _ctrl.GetCommittedLeaderBins());
-        int binSize     = Mathf.Max(1, _drum.totalSteps);
-        return leaderBins * binSize;
-    }
+
     public void CanonicalizeTrackMarkers(InstrumentTrack track, int currentBurstId)
     {
         if (track == null) return;
@@ -1332,25 +1041,26 @@ public partial class NoteVisualizer : MonoBehaviour
         noteMarkers[key] = marker.transform;
         Debug.Log($"[NV:MARKER_REGISTER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={marker.gameObject.GetInstanceID()} lit={shouldLight}");
 
-        if (shouldLight)
-        {
-            var vnm = marker.GetComponent<VisualNoteMarker>();
-            if (vnm != null) vnm.Initialize(track.trackColor);
+        ApplyMarkerVisuals(marker, track, shouldLight);
+        return marker;
+    }
 
-            var light = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
-            light.LightUp(track.trackColor);
+    private void ApplyMarkerVisuals(GameObject marker, InstrumentTrack track, bool isLit)
+    {
+        var vnm = marker.GetComponent<VisualNoteMarker>();
+        var ml = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
+        if (isLit)
+        {
+            if (vnm != null) vnm.Initialize(track.trackColor);
+            ml.LightUp(track.trackColor);
         }
         else
         {
-            var vnm = marker.GetComponent<VisualNoteMarker>();
             if (vnm != null) vnm.SetWaitingParticles(track.trackColor);
-
-            var ml = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
             ml.SetGrey(track.trackColor);
         }
-
-        return marker;
     }
+
     private void UpdateNoteMarkerPositions(bool forceXReflow = false)
     {
         // Snapshot to avoid "collection modified" issues if other code mutates noteMarkers this frame.
@@ -1454,14 +1164,10 @@ public partial class NoteVisualizer : MonoBehaviour
     public void RemoveAllPlaceholdersForBurst(InstrumentTrack track, int burstId)
     {
         var toRemove = new List<(InstrumentTrack, int)>();
-        foreach (var kv in noteMarkers)
+        foreach (var (step, _, tag) in IterateMarkersForTrack(track,
+            t => t.isPlaceholder && !t.isAscending && t.burstId == burstId))
         {
-            if (kv.Key.Item1 != track) continue;
-            if (kv.Value == null) continue;
-            var tag = kv.Value.GetComponent<MarkerTag>();
-            if (tag == null || !tag.isPlaceholder || tag.isAscending) continue;
-            if (tag.burstId != burstId) continue;
-            toRemove.Add(kv.Key);
+            toRemove.Add((track, step));
         }
         foreach (var key in toRemove)
         {
@@ -1469,48 +1175,6 @@ public partial class NoteVisualizer : MonoBehaviour
                 Destroy(tr.gameObject);
             noteMarkers.Remove(key);
         }
-    }
-    private IEnumerable<GameObject> GetMarkersForTrackAndBurst(InstrumentTrack track, int burstId)
-    {
-        foreach (var kv in noteMarkers)
-        {
-            if (kv.Key.Item1 != track) continue;
-            if (kv.Value == null) continue;
-
-            var tag = kv.Value.GetComponent<MarkerTag>();
-            if (tag != null && tag.burstId != burstId) continue;
-
-            yield return kv.Value.gameObject;
-        }
-    }
-    
-    /// Returns the loop step this marker is committed at — the noteMarkers dictionary
-    /// key, which is authoritative even when tag.step has drifted (e.g. after a
-    /// reverse-order manual release places a note into a different placeholder slot).
-    private int GetCommittedStepForMarker(InstrumentTrack track, GameObject go)
-    {
-        if (noteMarkers == null || go == null) return -1;
-        foreach (var kv in noteMarkers)
-        {
-            if (kv.Key.Item1 != track) continue;
-            if (kv.Value != null && kv.Value.gameObject == go)
-                return kv.Key.Item2;
-        }
-        return -1;
-    }
-
-    private List<GameObject> GetNoteMarkers(InstrumentTrack track)
-    {
-        var result = new List<GameObject>();
-        foreach (var kvp in noteMarkers)
-        {
-            if (kvp.Key.Item1 != track) continue;
-            var transform = kvp.Value;
-            if (transform == null) continue;
-            var go = transform.gameObject;
-            if (go != null) result.Add(go);
-        }
-        return result;
     }
     private void UpdateMarkerXPreserveYIfAscending(Rect rowRect, RectTransform row, InstrumentTrack track, int stepIndex, Transform marker)
     {
@@ -1795,9 +1459,8 @@ public partial class NoteVisualizer : MonoBehaviour
         _forcedLeaderSteps = (newLeaderSteps > 0) ? Mathf.Max(1, newLeaderSteps) : -1;
         
          if (_ctrl?.tracks == null) return;
-         foreach (var t in _ctrl.tracks) 
+         foreach (var t in _ctrl.tracks)
              if (t) RecomputeTrackLayout(t);
-         //UpdateNoteMarkerPositions(true);
     }
     float ComputeXLocalForTrack(Rect rowRect, InstrumentTrack track, int stepIndex, int binSize, int leaderBinsForPlacement)
     {
