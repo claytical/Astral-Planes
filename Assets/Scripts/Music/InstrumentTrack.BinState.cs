@@ -72,6 +72,30 @@ public partial class InstrumentTrack
     /// Track span should be derived from ALLOCATED bins (timeline stability),
     /// not FILLED bins (content). Filled bins control silence vs sound.
     /// </summary>
+    // Clears allocation, fill flag, completion time, and harmony state for every bin
+    // from fromBin (inclusive) up to maxLoopMultiplier. Used by both collapse paths.
+    private void ClearBinsAbove(int fromBin)
+    {
+        EnsureBinList();
+        for (int b = fromBin; b < maxLoopMultiplier; b++)
+        {
+            SetBinAllocated(b, false);
+            if (b < _binFilled.Count) _binFilled[b] = false;
+            if (_binCompletionTime != null && b < _binCompletionTime.Length) _binCompletionTime[b] = -1f;
+            Harmony_OnBinEmptied(b);
+        }
+    }
+
+    // Advances the bin cursor to at least targetBin+1, clamped to loopMultiplier.
+    // ByVoice tracks suppress cursor movement — their cursor advances via NotifyBinFilled.
+    private void AdvanceCursorPastBin(int targetBin)
+    {
+        var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        if (rp != null && rp.configSelectionMode == RoleConfigSelectionMode.ByVoice) return;
+        if (GetBinCursor() <= targetBin) SetBinCursor(targetBin + 1);
+        if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
+    }
+
     private int EffectiveLoopBins()
     {
         int maxBins = Mathf.Max(1, maxLoopMultiplier);

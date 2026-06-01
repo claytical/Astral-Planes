@@ -439,14 +439,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         EnsureBinList();
         // When targetMult=0 clear ALL bins (track was empty before SuperNode).
         // When targetMult>0 clear only the bins above the new count.
-        int clearFrom = targetMult;
-        for (int b = clearFrom; b < maxLoopMultiplier; b++)
-        {
-            SetBinAllocated(b, false);
-            if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
-            if (_binCompletionTime != null && b < _binCompletionTime.Length) _binCompletionTime[b] = -1f;
-            Harmony_OnBinEmptied(b);
-        }
+        ClearBinsAbove(targetMult);
 
         _totalSteps = BinSize() * loopMultiplier;
 
@@ -601,7 +594,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (GameFlowManager.VerboseLogging) Debug.Log($"[SYNC] {name} PLAYING bin={globalBin} loopMul={loopMultiplier} filled={IsBinFilled(globalBin)} hasNotes={HasAnyNoteInBin(globalBin)} leaderBins={leaderBins}");
 
         int trackBin = globalBin;
-        if (!HasAnyNoteInBin(trackBin)) return;
         float gain = 1f;
 
         if (localStep == 0)
@@ -730,14 +722,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             loopMultiplier = newMult;
 
             // Clear allocation/filled flags above the collapsed width so EffectiveLoopBins won't re-grow.
-            EnsureBinList();
-            for (int b = newMult; b < maxLoopMultiplier; b++)
-            {
-                SetBinAllocated(b, false);
-                if (b >= 0 && b < _binFilled.Count) _binFilled[b] = false;
-                if (_binCompletionTime != null && b < _binCompletionTime.Length) _binCompletionTime[b] = -1f;
-                Harmony_OnBinEmptied(b);
-            }
+            ClearBinsAbove(newMult);
 
             // Use this track's bin size rather than DrumTrack.totalSteps.
             // DrumTrack.totalSteps can represent a different timing grid (e.g. 16),
@@ -864,8 +849,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         for (int i = persistentLoopNotes.Count - 1; i >= 0; i--)
         {
-            var n = persistentLoopNotes[i];
-            int step = n.Item1;
+            var (step, _, _, _, _) = persistentLoopNotes[i];
             if (step >= start && step < end)
                 persistentLoopNotes.RemoveAt(i);
         }
@@ -1364,8 +1348,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Loop span: force a single bin wide loop (no hidden carryover)
         loopMultiplier = 1;
 
-        // If you track bin-fill flags, clear them here (only if you added it)
-         _binFilled.Clear();
+        _binFilled.Clear();
 
         // Burst/cursor snapshots (if present)
         _burstLeaderBinsBeforeWrite?.Clear();
@@ -1402,10 +1385,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         ResetBinStateForNewPhase();
         ResetBinsForPhase();
     }
-    public bool HasNoteSet()
-    {
-        return _currentNoteSet != null;
-    }
+
     public void SetNoteSet(NoteSet noteSet)
     {
         _currentNoteSet = noteSet;
@@ -1431,40 +1411,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (RemainingActiveWindowSec() <= 0f)
             Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
         midiVoice.PlayNoteTicks(note, durationTicks, velocity);
-    }
-    public void RetuneLoopToChord(Chord chord)
-    {
-        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
-
-        // Build allowed tones across range
-        var allowed = new List<int>();
-        for (int oct = -2; oct <= 3; oct++)
-        {
-            foreach (var iv in chord.intervals)
-            {
-                int n = chord.rootNote + iv + 12 * oct;
-                if (n >= lowestAllowedNote && n <= highestAllowedNote) allowed.Add(n);
-            }
-        }
-        if (allowed.Count == 0) return;
-        allowed.Sort();
-
-        int Closest(int target)
-        {
-            int best = allowed[0], dBest = Mathf.Abs(best - target);
-            for (int i = 1; i < allowed.Count; i++)
-            {
-                int d = Mathf.Abs(allowed[i] - target);
-                if (d < dBest) { dBest = d; best = allowed[i]; }
-            }
-            return best;
-        }
-
-        var modified = new List<(int step, int note, int dur, float vel)>(persistentLoopNotes.Count);
-        foreach (var (step, note, dur, vel, authoredRootMidi) in persistentLoopNotes)
-            modified.Add((step, Closest(note), dur, vel));
-
-        RebuildLoopFromModifiedNotes(modified, transform.position);
     }
 
     /// <summary>
@@ -1508,26 +1454,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
             }
 
-            var allowed = new List<int>();
-            for (int oct = -2; oct <= 3; oct++)
-            {
-                foreach (var iv in chord.intervals)
-                {
-                    int n = chord.rootNote + iv + 12 * oct;
-                    if (n >= lowestAllowedNote && n <= highestAllowedNote) allowed.Add(n);
-                }
-            }
-
+            var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
             if (allowed.Count == 0) { modified.Add((step, note, dur, vel)); continue; }
             allowed.Sort();
 
-            int best = allowed[0], bestDist = Mathf.Abs(best - note);
-            for (int i = 1; i < allowed.Count; i++)
-            {
-                int d = Mathf.Abs(allowed[i] - note);
-                if (d < bestDist) { bestDist = d; best = allowed[i]; }
-            }
-            modified.Add((step, best, dur, vel));
+            modified.Add((step, SnapToNearestChordTone(note, allowed), dur, vel));
         }
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
@@ -1948,28 +1879,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             _scratchSteps.Clear();
             _scratchSteps.Add(absStep);
 
-            if (_destroyHandlers.TryGetValue(c, out var oldHandler) && oldHandler != null)
-            {
-                c.OnDestroyed -= oldHandler;
-                _destroyHandlers.Remove(c);
-            }
-            Action handler = () => OnCollectableDestroyed(c);
-            _destroyHandlers[c] = handler;
-            c.OnDestroyed += handler;
-
-            var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
-            if (markerGO)
-            {
-                var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
-                tag.track = this;
-                tag.step = absStep;
-                tag.burstId = burstId;
-                tag.isPlaceholder = true;
-
-                var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
-                ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-                c.BindMarkerAtSpawn(markerGO.transform, absStep);
-            }
+            HookCollectableDestroyHandler(c);
+            PlaceAndBindPlaceholderMarker(nv, c, absStep, burstId);
 
             c.ApplyTrackVisuals(this);
             c.BeginSpawnArrival(spawnOrigin, spawnPos, note, dur, this, noteSet, _scratchSteps);
@@ -2000,13 +1911,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         _burstTargetBin[burstId] = targetBin;
 
         // Advance cursor past the allocated bin (ByVoice tracks suppress — cursor moves on chord-group fill)
-        var roleProfileForCursor = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-        bool isByVoiceForCursor = roleProfileForCursor != null && roleProfileForCursor.configSelectionMode == RoleConfigSelectionMode.ByVoice;
-        if (!isByVoiceForCursor)
-        {
-            if (GetBinCursor() <= targetBin) SetBinCursor(targetBin + 1);
-            if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
-        }
+        AdvanceCursorPastBin(targetBin);
 
         controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
     }
@@ -2178,15 +2083,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         SetBinAllocated(targetBin, true);
         _burstTargetBin[burstId] = targetBin;
-        {
-            var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-            bool _isByVoice = _rp != null && _rp.configSelectionMode == RoleConfigSelectionMode.ByVoice;
-            if (!_isByVoice)
-            {
-                if (GetBinCursor() <= targetBin)  SetBinCursor(targetBin + 1);
-                if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
-            }
-        }
+        AdvanceCursorPastBin(targetBin);
 
         // Subscribe to per-step events (idempotent).
         if (!_compositionStepListenerActive && drumTrack != null)
@@ -2235,31 +2132,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             c.assignedInstrumentTrack = this;
             c.isTrappedInDust        = launch.cellHasDust;
 
-            if (_destroyHandlers.TryGetValue(c, out var oldH) && oldH != null)
-            {
-                c.OnDestroyed -= oldH;
-                _destroyHandlers.Remove(c);
-            }
-            Action handler = () => OnCollectableDestroyed(c);
-            _destroyHandlers[c] = handler;
-            c.OnDestroyed += handler;
-
-            // Per-launch marker (appears as the collectable launches, not upfront).
-            if (nv != null)
-            {
-                var markerGO = nv.PlacePersistentNoteMarker(this, launch.absStep, lit: false, launch.burstId);
-                if (markerGO)
-                {
-                    var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
-                    tag.track         = this;
-                    tag.step          = launch.absStep;
-                    tag.burstId       = launch.burstId;
-                    tag.isPlaceholder = true;
-                    var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
-                    ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
-                    c.BindMarkerAtSpawn(markerGO.transform, launch.absStep);
-                }
-            }
+            HookCollectableDestroyHandler(c);
+            PlaceAndBindPlaceholderMarker(nv, c, launch.absStep, launch.burstId);
 
             c.ApplyTrackVisuals(this);
 
