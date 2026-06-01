@@ -922,6 +922,19 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
 
     private bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
+
+    private static void FillDisk(HashSet<Vector2Int> result, Vector2Int center, int r, int w, int h)
+    {
+        for (int dx = -r; dx <= r; dx++)
+        for (int dy = -r; dy <= r; dy++)
+        {
+            if (dx * dx + dy * dy > r * r) continue;
+            int x = center.x + dx; int y = center.y + dy;
+            if ((uint)x >= (uint)w || (uint)y >= (uint)h) continue;
+            result.Add(new Vector2Int(x, y));
+        }
+    }
+
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
 {
     if (drums == null) return;
@@ -937,15 +950,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     // Build new footprint (disk).
     var next = new HashSet<Vector2Int>();
-    for (int dx = -r; dx <= r; dx++)
-    for (int dy = -r; dy <= r; dy++)
-    {
-        if (dx * dx + dy * dy > r * r) continue;
-        int x = centerCell.x + dx;
-        int y = centerCell.y + dy;
-        if ((uint)x >= (uint)w || (uint)y >= (uint)h) continue;
-        next.Add(new Vector2Int(x, y));
-    }
+    FillDisk(next, centerCell, r, w, h);
 
     _tmpReleased.Clear();
     _tmpClaimed.Clear();
@@ -1223,40 +1228,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.InitializeVisuals(DustTimings);
             dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
-            // --- Role resolution ---
-            // Priority 1: cell has a live imprint with a real role (Voronoi, MineNode, void).
-            // Priority 2: no imprint → prefer the plurality role among solid imprinted neighbors
-            //             (maintains spatial cohesion with the Voronoi layout). Fall back to
-            //             least-dense when neighbors are split or absent (global balance).
-            MusicalRole excludedRole = MusicalRole.None;
-            if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
-                excludedRole = ex;
-
-            if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
-            {
-                if (existingImp.role == MusicalRole.None)
-                {
-                    regrowRole = MusicalRole.None;
-                }
-                else if (IsRoleActive(existingImp.role))
-                {
-                    regrowRole = existingImp.role;
-                }
-                else
-                {
-                    var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
-                    regrowRole = neighborRole != MusicalRole.None
-                        ? neighborRole
-                        : GetLeastDenseRoleExcluding(excludedRole);
-                }
-            }
-            else
-            {
-                var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
-                regrowRole = neighborRole != MusicalRole.None
-                    ? neighborRole
-                    : GetLeastDenseRoleExcluding(excludedRole);
-            }
+            regrowRole = ResolveRegrowRole(gp);
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
@@ -1703,6 +1675,23 @@ public partial class CosmicDustGenerator : MonoBehaviour
         return _gridState.AllSolidCount;
     }
     
+    private MusicalRole ResolveRegrowRole(Vector2Int gp)
+    {
+        MusicalRole excludedRole = MusicalRole.None;
+        if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
+            excludedRole = ex;
+
+        if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
+        {
+            if (existingImp.role == MusicalRole.None) return MusicalRole.None;
+            if (IsRoleActive(existingImp.role)) return existingImp.role;
+        }
+
+        // No imprint or imprint role is inactive: fall back to neighbor plurality / least dense.
+        var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
+        return neighborRole != MusicalRole.None ? neighborRole : GetLeastDenseRoleExcluding(excludedRole);
+    }
+
     /// <summary>
     /// Returns the role held by the plurality of solid imprinted neighbors within 1 cell.
     /// Ties broken by global density (least-dense wins). Returns None when no imprinted
@@ -1712,7 +1701,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         if (_imprints == null) return MusicalRole.None;
 
-        int bassC = 0, harmC = 0, leadC = 0, grooveC = 0;
+        int bassC = 0, harmC = 0, leadC = 0, grooveC = 0, rhythmC = 0;
         for (int dy = -1; dy <= 1; dy++)
         for (int dx = -1; dx <= 1; dx++)
         {
@@ -1724,23 +1713,25 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 || !IsRoleActive(imp.role)) continue;
             switch (imp.role)
             {
-                case MusicalRole.Bass:    bassC++;   break;
-                case MusicalRole.Harmony: harmC++;   break;
-                case MusicalRole.Lead:    leadC++;   break;
-                case MusicalRole.Groove:  grooveC++; break;
+                case MusicalRole.Bass:    bassC++;    break;
+                case MusicalRole.Harmony: harmC++;    break;
+                case MusicalRole.Lead:    leadC++;    break;
+                case MusicalRole.Groove:  grooveC++;  break;
+                case MusicalRole.Rhythm:  rhythmC++;  break;
             }
         }
 
-        int max = Mathf.Max(bassC, Mathf.Max(harmC, Mathf.Max(leadC, grooveC)));
+        int max = Mathf.Max(bassC, Mathf.Max(harmC, Mathf.Max(leadC, Mathf.Max(grooveC, rhythmC))));
         if (max == 0) return MusicalRole.None;
 
         // Among tied leaders, prefer the globally least-dense (secondary balance signal).
         MusicalRole best = MusicalRole.None;
         int bestDensity = int.MaxValue;
-        UpdatePluralityBest(MusicalRole.Bass,    bassC,   max, ref best, ref bestDensity);
-        UpdatePluralityBest(MusicalRole.Harmony, harmC,   max, ref best, ref bestDensity);
-        UpdatePluralityBest(MusicalRole.Lead,    leadC,   max, ref best, ref bestDensity);
-        UpdatePluralityBest(MusicalRole.Groove,  grooveC, max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Bass,    bassC,    max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Harmony, harmC,    max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Lead,    leadC,    max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Groove,  grooveC,  max, ref best, ref bestDensity);
+        UpdatePluralityBest(MusicalRole.Rhythm,  rhythmC,  max, ref best, ref bestDensity);
         return best;
     }
 
@@ -1784,12 +1775,18 @@ public partial class CosmicDustGenerator : MonoBehaviour
         return MusicalRole.None;
     }
 
+    private bool TryGetGeoConfig(MusicalRole role, out MazeRoleGeoConfig config)
+    {
+        config = null;
+        if (_roleGeoConfigs == null) return false;
+        for (int i = 0; i < _roleGeoConfigs.Count; i++)
+            if (_roleGeoConfigs[i].role == role) { config = _roleGeoConfigs[i]; return true; }
+        return false;
+    }
+
     private MazeGeoFeature ResolveGeoFeature(MusicalRole role, int roleIndex)
     {
-        if (_roleGeoConfigs != null)
-            for (int i = 0; i < _roleGeoConfigs.Count; i++)
-                if (_roleGeoConfigs[i].role == role)
-                    return _roleGeoConfigs[i].feature;
+        if (TryGetGeoConfig(role, out var cfg)) return cfg.feature;
 
         return _activePatternType switch
         {
@@ -1804,11 +1801,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     private MazeRoleGeoConfig ResolveGeoConfig(MusicalRole role)
     {
-        if (_roleGeoConfigs != null)
-            for (int i = 0; i < _roleGeoConfigs.Count; i++)
-                if (_roleGeoConfigs[i].role == role)
-                    return _roleGeoConfigs[i];
-        return null;
+        TryGetGeoConfig(role, out var cfg);
+        return cfg;
     }
 
     // Returns true if the role is present in the current motif's active role list.
