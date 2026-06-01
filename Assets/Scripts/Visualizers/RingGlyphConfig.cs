@@ -112,4 +112,14 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Duration of the spin-off exit in seconds (replaces rollOffDuration for gameplay rings).")]
     public float spinOffDuration = 0.45f;
+
+    [Header("Tilt Exit")]
+    [Tooltip("Target X-axis rotation (degrees) for the tilt-exit phase.")]
+    public float tiltXDegrees = 75f;
+
+    [Tooltip("Duration (seconds) for the ring to rotate from 0° to tiltXDegrees.")]
+    public float tiltXDuration = 1.0f;
+
+    [Tooltip("Duration (seconds) for the ring to scale from its current size to zero after the tilt.")]
+    public float scaleDownDuration = 0.5f;
 }

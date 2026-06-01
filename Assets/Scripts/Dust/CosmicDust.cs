@@ -74,6 +74,7 @@ public partial class CosmicDust : MonoBehaviour {
     private Color _displayTint = Color.white;
     [SerializeField] private Color _chargeColor = Color.white;
     [SerializeField] private Color _denyColor = Color.magenta;
+    private Color _hiddenHintColor; // Color.clear = no hint stored
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
     private const float kRegrowAlphaCap = 0.20f;
@@ -313,6 +314,7 @@ private Coroutine _jiggleRoutine;
     public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge, int maxUnits = -1)
     {
         Role = r;
+        if (r != MusicalRole.None) _hiddenHintColor = Color.clear;
         OnRoleChanged?.Invoke(Role);
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;
         SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
@@ -692,6 +694,7 @@ private Coroutine _jiggleRoutine;
         _stayForceUntil = 0f;
         _shrinkingFromStar = false;
         _growInOverride = -1f;
+        _hiddenHintColor = Color.clear;
         SetWorkSigned01(0f);
 
         // Restore captured prefab/base scale instead of Vector3.one
@@ -1055,21 +1058,29 @@ private Coroutine _jiggleRoutine;
 {
     float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
     if (dur <= 0f) return;
-
     CancelTintPulse(restoreToBase: false);
-
     _tintPulseToken++;
     int token = _tintPulseToken;
-    _tintPulseRoutine = StartCoroutine(DenyTintPulseRoutine(token, dur));
+    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
+    _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, denyTint, dur));
 }
 
-    private IEnumerator DenyTintPulseRoutine(int token, float seconds)
+    private void TriggerHiddenHintPulse()
+{
+    if (_hiddenHintColor.a <= 0f) return;
+    CancelTintPulse(restoreToBase: false);
+    _tintPulseToken++;
+    int token = _tintPulseToken;
+    _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, _hiddenHintColor, 0.5f));
+}
+
+    private IEnumerator TintPulseRoutine(int token, Color pulseColor, float seconds)
 {
     if (seconds <= 0f) yield break;
 
     _tintPulseActive = true;
 
-    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
+    Color denyTint = pulseColor;
     denyTint.a = _currentTint.a;
 
     float fadeIn  = Mathf.Clamp(seconds * 0.25f, 0.03f, 0.10f);
@@ -1243,6 +1254,7 @@ private Coroutine _jiggleRoutine;
         _denyColor = denyColor;
         _hasFeedbackColors = true;
     }
+    public void SetHiddenHintColor(Color c) { _hiddenHintColor = c; }
     private void OnDisable()
     {
         CancelTintPulse(restoreToBase: true);

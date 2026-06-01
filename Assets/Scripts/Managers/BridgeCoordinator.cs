@@ -72,9 +72,9 @@ public sealed class BridgeCoordinator
         var rings = _gameFlow.GetMotifRingGlyphApplicator();
         if (rings != null)
         {
-            float binDuration = _gameFlow.activeDrumTrack?.GetClipLengthInSeconds() ?? effectiveLoopSec;
+            float spinDur = rings.config?.spinOffDuration ?? 0.45f;
             yield return _gameFlow.StartCoroutine(
-                rings.SpinAndRollOffRecordRings(binDuration, rings.config?.rollOffDuration ?? 1.5f));
+                rings.SpinAndRollOffRecordRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
         }
 
         yield return _gameFlow.StartCoroutine(_gameFlow.SceneFlow.StartNextMotifInPhase());

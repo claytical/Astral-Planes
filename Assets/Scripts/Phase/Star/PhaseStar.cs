@@ -983,6 +983,16 @@ public partial class PhaseStar : MonoBehaviour
         return unified;
     }
 
+    // Returns true only when THIS star's own InstrumentTrack has live collectables,
+    // ignoring collectables from other tracks so concurrent same-bin stars aren't blocked.
+    private bool OwnTrackCollectablesInFlight()
+    {
+        var track = _cachedTrack ?? FindTrackByRole(_attunedRole);
+        if (track == null) return AnyCollectablesInFlightGlobal(); // unknown track — be conservative
+        track.PruneSpawnedCollectables();
+        return track.spawnedCollectables != null && track.spawnedCollectables.Count > 0;
+    }
+
     private static bool LegacyAnyCollectablesInFlightGlobal(GameFlowManager gfm)
     {
         if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
@@ -1003,7 +1013,7 @@ public partial class PhaseStar : MonoBehaviour
         _stateController ??= new PhaseStarStateController();
         if (!_stateController.CanArm(BuildInteractionSnapshot())) return;
 
-        if (AnyCollectablesInFlightGlobal())
+        if (OwnTrackCollectablesInFlight())
         {
             Disarm(PhaseStarDisarmReason.CollectablesInFlight);
             return;
@@ -1161,7 +1171,7 @@ public partial class PhaseStar : MonoBehaviour
 
     private void OnLoopBoundary_RearmIfNeeded()
     {
-        bool cif = AnyCollectablesInFlightGlobal();
+        bool cif = OwnTrackCollectablesInFlight();
         bool ep = AnyExpansionPendingGlobal();
 
         Debug.Log(
@@ -1174,7 +1184,7 @@ public partial class PhaseStar : MonoBehaviour
 
         if (HandleAwaitingCollectableClear()) return;
 
-        bool anyCollectables = AnyCollectablesInFlightGlobal();
+        bool anyCollectables = OwnTrackCollectablesInFlight();
         bool anyExpansion = AnyExpansionPendingGlobal();
         if (HandleGlobalGateCheck(anyCollectables, anyExpansion)) return;
 
@@ -1253,9 +1263,9 @@ public partial class PhaseStar : MonoBehaviour
         if (shouldDisarmForGate)
         {
             if (anyCollectables)
-                Debug.Log($"[PS:LB] AnyCollectablesInFlightGlobal True");
+                Debug.Log($"[PS:LB] OwnTrackCollectablesInFlight True");
             else
-                Debug.Log($"[PS:LB] Any Expanding Global True");
+                Debug.Log($"[PS:LB] AnyExpansionPending True");
 
             Disarm(anyCollectables ? PhaseStarDisarmReason.CollectablesInFlight : PhaseStarDisarmReason.ExpansionPending, _lockedTint);
             return true;

@@ -18,15 +18,15 @@ MonoBehaviour:
     loopSteps: 16
     events:
     - step: 0
-      midiNote: 36
+      midiNote: 60
       durSteps: 16
       velocity01: 0.78740156
     - step: 8
-      midiNote: 36
+      midiNote: 60
       durSteps: 16
       velocity01: 0.78740156
     - step: 12
-      midiNote: 48
+      midiNote: 72
       durSteps: 16
       velocity01: 0.78740156
     overlapPolicy: 1

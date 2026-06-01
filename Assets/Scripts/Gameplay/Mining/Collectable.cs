@@ -111,6 +111,9 @@ public class Collectable : MonoBehaviour
             if (kv.Key != excl && kv.Value > 0) return true;
         return false;
     }
+
+    public static bool AnyLiveForTrack(InstrumentTrack track)
+        => _s_liveByTrack.TryGetValue(track, out var count) && count > 0;
     private int _dustClaimOwnerId;
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());

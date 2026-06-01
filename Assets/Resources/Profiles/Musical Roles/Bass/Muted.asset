@@ -35,6 +35,6 @@ MonoBehaviour:
   evasionCells: 3
   configSelectionMode: 0
   chordVoiceColors: []
-  midiPreset: 2
+  midiPreset: 6
   ripeDuration: 512
   regrowthDelay: 0.8

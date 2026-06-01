@@ -42,3 +42,6 @@ MonoBehaviour:
   impactSfxVolume: 0.135
   spinOffExtraDegPerSec: 720
   spinOffDuration: 2
+  tiltXDegrees: 75
+  tiltXDuration: 3
+  scaleDownDuration: 3

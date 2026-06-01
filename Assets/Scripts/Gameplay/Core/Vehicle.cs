@@ -123,8 +123,11 @@ public partial class Vehicle : MonoBehaviour
 
     private InstrumentTrack _lockedTrack = null;
     private static int _s_vehiclesCarrying = 0;
+    private static readonly Dictionary<InstrumentTrack, int> _s_vehiclesCarryingByTrack = new();
 
     public static bool AnyVehicleCarrying() => _s_vehiclesCarrying > 0;
+    public static bool AnyVehicleCarryingTrack(InstrumentTrack track)
+        => _s_vehiclesCarryingByTrack.TryGetValue(track, out var count) && count > 0;
 
     public bool CanAcceptCollectable(InstrumentTrack track) =>
         _lockedTrack == null || _lockedTrack == track;
@@ -134,11 +137,16 @@ public partial class Vehicle : MonoBehaviour
         if (_lockedTrack != null) return;
         _lockedTrack = track;
         _s_vehiclesCarrying++;
+        if (track != null)
+            _s_vehiclesCarryingByTrack[track] =
+                (_s_vehiclesCarryingByTrack.TryGetValue(track, out int c) ? c : 0) + 1;
     }
 
     private void ReleaseTrackLock()
     {
         if (_lockedTrack == null) return;
+        if (_lockedTrack != null && _s_vehiclesCarryingByTrack.TryGetValue(_lockedTrack, out int c))
+            _s_vehiclesCarryingByTrack[_lockedTrack] = Mathf.Max(0, c - 1);
         _lockedTrack = null;
         _s_vehiclesCarrying = Mathf.Max(0, _s_vehiclesCarrying - 1);
     }

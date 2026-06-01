@@ -482,6 +482,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     HasDustAt(gp))
                 {
                     existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
+                    ApplyHiddenHintToDust(gp, existingDust);
                     var resistance = ResolveResistanceProfile(gp, imprintRole, context: "GrowVoidDustDisk:existing");
                     existingDust.clearing.drainResistance01 = resistance.drainResistance01;
                     continue;
@@ -651,6 +652,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 existingDust != null && HasDustAt(gp))
             {
                 existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
+                ApplyHiddenHintToDust(gp, existingDust);
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
                 existingDust.clearing.drainResistance01 = res.drainResistance01;
                 continue;
@@ -778,6 +780,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
+            if (role == MusicalRole.None) ApplyHiddenHintToDust(gp, dust);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.regrowAlphaCapped = true;
             dust.Begin();
@@ -874,6 +877,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// promotes that role into the active imprint so regrowth uses it.
     /// Returns true when a promotion occurred.
     /// </summary>
+    private void ApplyHiddenHintToDust(Vector2Int gp, CosmicDust dust)
+    {
+        if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var role) || role == MusicalRole.None)
+        {
+            dust.SetHiddenHintColor(Color.clear);
+            return;
+        }
+        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        dust.SetHiddenHintColor(profile != null ? profile.GetBaseColor() : Color.clear);
+    }
+
     private bool PromoteHiddenRole(Vector2Int gp)
     {
         if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var hiddenRole)) return false;
@@ -2013,6 +2027,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                             // inert gray cells and the star cannot drain them while dormant.
                             // Full charge (1f) — plow energy system requires non-zero units to chip.
                             dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, 1f);
+                            ApplyHiddenHintToDust(grid, dust);
                         }
 
                         // Use the role's shadow color as the deny feedback color.
@@ -2147,6 +2162,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 // Fully decayed: revert to gray, role becomes None for all external queries.
                 dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
+                ApplyHiddenHintToDust(gp, dust);
                 _ripenessByCell.Remove(gp);
             }
             else

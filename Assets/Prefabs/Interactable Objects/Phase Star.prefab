@@ -91,7 +91,7 @@ MonoBehaviour:
   diamondAngleSmoothTime: 0.06
   dimRgbMul: 0.08
   dimUsesFixedTint: 0
-  rejectFlashColor: {r: 0.9, g: 0.25, b: 0.05, a: 0.55}
+  rejectFlashColor: {r: 1, g: 1, b: 1, a: 0.55}
   rejectFlashSeconds: 0.12
   particles: {fileID: 382306593780773728}
   traceParticleState: 0
@@ -115,13 +115,13 @@ MonoBehaviour:
   tentacleGrowSpeed: 0.25
   tentacleRetractSpeed: 5
   tentacleFlowSpeed: 0.2
-  tentacleWidth: 0.03
+  tentacleWidth: 0.02
   dissolveDuration: 1
   fallbackTentaclesPerRole: 10
   tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120
-  growingRootAlpha: 0.69
+  growingRootAlpha: 0.427
   growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751
   sag: 0.8
