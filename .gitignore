@@ -9,7 +9,7 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
-/Aa]ssets/MidiPlayer/Demo/
+/[Aa]ssets/MidiPlayer/Demo/
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
 /[Mm]emoryCaptures/
@@ -54,6 +54,15 @@ ExportedObj/
 
 # Unity3D generated file on crash reports
 sysinfo.txt
+
+# OS metadata
+.DS_Store
+**/.DS_Store
+
+# Mono crash dumps
+mono_crash*.json
+mono_crash*.blob
+mono_crash.mem.*
 
 # Builds
 *.apk
