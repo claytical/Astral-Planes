@@ -15,10 +15,10 @@ public partial class PhaseStar
             return;
         }
 
-        if (AnyCollectablesInFlightGlobal())
+        if (OwnTrackCollectablesInFlight())
         {
             Disarm(PhaseStarDisarmReason.CollectablesInFlight, _lockedTint);
-            Trace("OnCollisionEnter2D: ignored poke because collectables are still in flight");
+            Trace("OnCollisionEnter2D: ignored poke because own-track collectables are still in flight");
             return;
         }
 
@@ -87,12 +87,14 @@ public partial class PhaseStar
             return;
         }
 
-        // Block expansion-triggering ejections while notes from other tracks are still live
-        // in the world — either carried by a vehicle or physically floating unresolved.
+        // Block expansion-triggering ejections while any notes are still live
+        // — carried by a vehicle, or floating unresolved from any track.
         if (_cachedTrack.GetBinCursor() >= _cachedTrack.loopMultiplier
-            && (Vehicle.AnyVehicleCarrying() || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
+            && (Vehicle.AnyVehicleCarryingTrack(_cachedTrack)
+                || Collectable.AnyLiveForTrack(_cachedTrack)
+                || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
         {
-            Trace("OnCollisionEnter2D: new-bin expansion blocked — notes from other tracks in play");
+            Trace("OnCollisionEnter2D: new-bin expansion blocked — notes still in play");
             return;
         }
 

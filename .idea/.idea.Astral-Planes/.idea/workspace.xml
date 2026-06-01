@@ -6,150 +6,21 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/MidiSet.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/MidiSet.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/Astral Planes_data.bytes" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/Astral Planes_data.bytes" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C3.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C3.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C4.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C4.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C6.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-C6.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-E2.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-E2.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-F2.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-F2.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-F3.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-F3.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-Gb4.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-Gb4.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-Gb5.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Acoustic-Bass-Gb5.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Bass-'74-Maple-Jazz.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/Bass-'74-Maple-Jazz.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-0.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-1.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-2.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-3.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_b-3.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-1.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_d-2.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-0.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-1.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_f-2.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd0.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd0.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd1.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/low1_gd2.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-036-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-040-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-043-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-048-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-053-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-058-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-031.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-031.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-056.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-056.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-081.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-081.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-102.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-102.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-118.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-118.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-127.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Resources/SoundfontsDB/Astral Planes/wave/modo-bass-70-062-127.wav.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Acoustic Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Acoustic Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Contact.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Contact.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Detroit Keys.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Detroit Keys.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Fender Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Fender Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Hip Hop Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Hip Hop Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Light Keys.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Light Keys.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Palm Guitar.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Palm Guitar.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm Guitar.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm Guitar.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rob Otto.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rob Otto.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Steel Jazz.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Steel Jazz.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Still Sky.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Still Sky.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Phase Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyphConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyphConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/bass-bounce.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Riffs/bass-bounce.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Collision.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Collision.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/TrackExpansionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/TrackExpansionController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -431,7 +302,7 @@
       <workItem from="1778544595359" duration="8125000" />
       <workItem from="1778601380265" duration="47828000" />
       <workItem from="1778783304035" duration="123989000" />
-      <workItem from="1779661810458" duration="150812000" />
+      <workItem from="1779661810458" duration="162944000" />
     </task>
     <servers />
   </component>

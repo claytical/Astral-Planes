@@ -288,15 +288,22 @@ public sealed class StarPool : MonoBehaviour
         _activeStars[role] = star;
         Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");
 
-        // If another role's MineNode is in flight, pause this star immediately so it
-        // cannot charge and eject before the active sequence resolves. It will resume
-        // via ResumeAll() when _mineNodePending clears.
+        // If another role's MineNode is in flight, only pause this star if its next ejection
+        // would expand its bin count — same-bin stars are allowed to run concurrently.
         if (_mineNodePending && role != _lastEjectedRole)
         {
-            star.Pause();
-            if (!_pausedStars.Contains(star))
-                _pausedStars.Add(star);
-            Debug.Log($"[StarPool] SpawnStarForRole: pre-paused {role} star (SiblingActive) — waiting for {_lastEjectedRole} mine sequence to resolve.");
+            var track = FindTrackForRole(role);
+            bool wouldExpand = track == null || track.GetBinCursor() >= track.loopMultiplier;
+            if (wouldExpand)
+            {
+                star.Pause();
+                if (!_pausedStars.Contains(star)) _pausedStars.Add(star);
+                Debug.Log($"[StarPool] SpawnStarForRole: pre-paused {role} star (expansion conflict) — waiting for {_lastEjectedRole} mine sequence to resolve.");
+            }
+            else
+            {
+                Debug.Log($"[StarPool] SpawnStarForRole: {role} star NOT pre-paused — same-bin ejection allowed concurrently.");
+            }
         }
 
         // Free the grid cell when the star is destroyed.
@@ -331,8 +338,8 @@ public sealed class StarPool : MonoBehaviour
             Debug.Log($"[StarPool] _activeStars.Remove({role}) skipped — active={(active == null ? "null" : active.name)} star={star.name} match={active == star}");
         }
 
-        // Pause all other Stars while this MineNode is being processed.
-        PauseAllExcept(star);
+        // Pause stars that would expand their bin on next ejection — same-bin stars stay active.
+        PauseExpansionConflicts(star);
 
         // Destroy the ejecting Star after a short exit animation.
         StartCoroutine(DestroyStarAfterDelay(star));
@@ -356,6 +363,37 @@ public sealed class StarPool : MonoBehaviour
             star.Pause();
             if (!_pausedStars.Contains(star)) _pausedStars.Add(star);
         }
+    }
+
+    // Only pause stars whose next ejection would expand their track's bin count.
+    // Stars that would stay in the same bin are left active so concurrent same-bin
+    // MineNodes can coexist for distinct InstrumentTracks.
+    private void PauseExpansionConflicts(PhaseStar except)
+    {
+        foreach (var kvp in _activeStars)
+        {
+            var star = kvp.Value;
+            if (star == null || star == except) continue;
+
+            var track = FindTrackForRole(kvp.Key);
+            if (track != null && track.GetBinCursor() < track.loopMultiplier)
+            {
+                Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star NOT paused — same-bin ejection allowed.");
+                continue;
+            }
+
+            star.Pause();
+            if (!_pausedStars.Contains(star)) _pausedStars.Add(star);
+            Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star paused — would expand bin.");
+        }
+    }
+
+    private InstrumentTrack FindTrackForRole(MusicalRole role)
+    {
+        if (_tracks == null) return null;
+        foreach (var t in _tracks)
+            if (t != null && t.assignedRole == role) return t;
+        return null;
     }
 
     private void ResumeAll()

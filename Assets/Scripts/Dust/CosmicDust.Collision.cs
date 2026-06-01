@@ -71,7 +71,10 @@ public partial class CosmicDust
         {
             _currentPluckVehicle = vehicle;
             _nextDustPluckTime = Time.time;
-            TriggerDenyTintPulse(1);
+            if (_hiddenHintColor.a > 0f)
+                TriggerHiddenHintPulse();
+            else
+                TriggerDenyTintPulse(1);
             TriggerJiggle();
         }
 

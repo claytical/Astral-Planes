@@ -148,35 +148,39 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     {
         if (ring.Root == null) yield break;
 
-        Vector3 startPos  = ring.Root.transform.position;
-        float   holdScale = config != null ? config.ringHoldScale          : 0.25f;
-        float   duration  = config != null ? config.spinOffDuration        : 0.45f;
-        float   extraDeg  = config != null ? config.spinOffExtraDegPerSec  : 720f;
+        float extraDeg   = config != null ? config.spinOffExtraDegPerSec : 720f;
+        float tiltDeg    = config != null ? config.tiltXDegrees          : 75f;
+        float tiltDur    = config != null ? config.tiltXDuration         : 1.0f;
+        float scaleDur   = config != null ? config.scaleDownDuration     : 0.5f;
 
-        float targetX = startPos.x - 20f;
-        var   gfm     = GameFlowManager.Instance;
-        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
-        {
-            float worldScale  = transform.lossyScale.x;
-            float outerRWorld = worldScale > 0f
-                ? worldScale * (RingInnerRadius(Mathf.Max(0, _gameplayRings.Count - 1)) + config.ringThickness)
-                : config.ringThickness;
-            targetX = area.left - outerRWorld * holdScale;
-        }
+        float spinDir    = baseRotDegPerSec >= 0f ? 1f : -1f;
+        float spinSpeed  = spinDir * (Mathf.Abs(baseRotDegPerSec) + extraDeg);
+        float currentZRot = ring.Root.transform.localEulerAngles.z;
 
-        float spinDir   = baseRotDegPerSec >= 0f ? 1f : -1f;
-        float spinSpeed = spinDir * (Mathf.Abs(baseRotDegPerSec) + extraDeg);
-
+        // Phase 1: tilt X axis to tiltDeg while continuing Z spin
         float elapsed = 0f;
-        while (elapsed < duration)
+        while (elapsed < tiltDur)
         {
             if (ring.Root == null) break;
             elapsed += Time.deltaTime;
-            float t   = Mathf.Clamp01(elapsed / duration);
-            var   pos = ring.Root.transform.position;
-            pos.x = Mathf.Lerp(startPos.x, targetX, t);
-            ring.Root.transform.position = pos;
-            ring.Root.transform.Rotate(0f, 0f, spinSpeed * Time.deltaTime);
+            float t = Mathf.Clamp01(elapsed / tiltDur);
+            currentZRot += spinSpeed * Time.deltaTime;
+            float xRot = Mathf.Lerp(0f, tiltDeg, t);
+            ring.Root.transform.localEulerAngles = new Vector3(xRot, 0f, currentZRot);
+            yield return null;
+        }
+
+        // Phase 2: scale to zero, continuing Z spin at tiltDeg
+        Vector3 startScale = ring.Root != null ? ring.Root.transform.localScale : Vector3.zero;
+        elapsed = 0f;
+        while (elapsed < scaleDur)
+        {
+            if (ring.Root == null) break;
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / scaleDur);
+            currentZRot += spinSpeed * Time.deltaTime;
+            ring.Root.transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+            ring.Root.transform.localEulerAngles = new Vector3(tiltDeg, 0f, currentZRot);
             yield return null;
         }
 
@@ -566,46 +570,71 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     {
         _recordFadingOut = true;  // stop per-ring rotation coroutines
 
-        Vector3 startPos = transform.position;
+        float tiltDeg     = config != null ? config.tiltXDegrees  : 75f;
+        float scaleDur    = config != null ? config.scaleDownDuration : 0.5f;
+        float speedBase   = config != null ? config.rotSpeedMax   : 300f;
+        Vector3 originalScale = transform.localScale;
 
-        float targetX = startPos.x - 20f;
-        var gfm = GameFlowManager.Instance;
-        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
+        // Capture each ring's current Z rotation and assign staggered exit speeds.
+        // Alternating direction + index spread creates the "deformed but in-sync" wobble.
+        var rings      = _recordRings.ToArray();
+        var ringZRots  = new float[rings.Length];
+        var ringSpeeds = new float[rings.Length];
+        for (int i = 0; i < rings.Length; i++)
         {
-            float worldScale  = transform.lossyScale.x;
-            float outerRWorld = worldScale > 0f
-                ? worldScale * (RingInnerRadius(Mathf.Max(0, _recordRings.Count - 1)) + config.ringThickness)
-                : config.ringThickness;
-            targetX = area.left - outerRWorld;
+            ringZRots[i]  = rings[i].Root != null ? rings[i].Root.transform.localEulerAngles.z : 0f;
+            float spd     = speedBase * (1f + i * 0.2f);
+            ringSpeeds[i] = i % 2 == 0 ? spd : -spd;
         }
 
-        // Phase 1: spin parent 360° clockwise over spinDuration
+        // Phase 1: spin parent 360° clockwise over spinDuration; rings spin independently
         float elapsed = 0f;
         while (elapsed < spinDuration)
         {
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / spinDuration);
             transform.rotation = Quaternion.Euler(0f, 0f, -360f * t);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
             yield return null;
         }
         transform.rotation = Quaternion.identity;
 
-        // Phase 2: translate parent off screen over rollDuration
+        // Phase 2: tilt X axis to tiltDeg over rollDuration; rings keep spinning
         elapsed = 0f;
         while (elapsed < rollDuration)
         {
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / rollDuration);
-            var pos = transform.position;
-            pos.x = Mathf.Lerp(startPos.x, targetX, t);
-            transform.position = pos;
+            transform.localEulerAngles = new Vector3(Mathf.Lerp(0f, tiltDeg, t), 0f, 0f);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
+            yield return null;
+        }
+
+        // Phase 3: scale to zero; rings keep spinning
+        elapsed = 0f;
+        while (elapsed < scaleDur)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / scaleDur);
+            transform.localScale = Vector3.Lerp(originalScale, Vector3.zero, t);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
             yield return null;
         }
 
         DestroyList(_recordRings);
         _recordFadingOut = false;
-        transform.position = startPos;
+        transform.localScale = originalScale;
         transform.rotation = Quaternion.identity;
+    }
+
+    private void AdvanceRingZRots(RingEntry[] rings, float[] zRots, float[] speeds)
+    {
+        for (int i = 0; i < rings.Length; i++)
+        {
+            if (rings[i].Root == null) continue;
+            zRots[i] += speeds[i] * Time.deltaTime;
+            rings[i].Root.transform.localEulerAngles = new Vector3(0f, 0f, zRots[i]);
+        }
     }
 
     /// <summary>Destroy all rings (both layers).</summary>
