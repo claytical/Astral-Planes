@@ -224,13 +224,9 @@ public partial class Vehicle : MonoBehaviour
                 enabled = false;
                 return;
             }
-            if (rb != null)
-            {
-                rb.gravityScale    = 0f;
-                // Safety: ensure we start truly at rest.
-                rb.linearVelocity = Vector2.zero;
-                rb.angularVelocity = 0f;
-            }
+            rb.gravityScale    = 0f;
+            rb.linearVelocity  = Vector2.zero;
+            rb.angularVelocity = 0f;
 
             if (audioManager == null)
             {
@@ -304,94 +300,8 @@ public partial class Vehicle : MonoBehaviour
         // --- Input hygiene: if Move() hasn't been called recently, treat as zero ---
         if (Time.time - _lastMoveStamp > vehicleConfig.inputTimeout) _moveInput = Vector2.zero;
 
-        // --- Pressure instability: proximity of nearest MineNode (Needle archetype) ---
-        if (profile.pressureInstabilityRadius > 0f && profile.pressureInstabilityStrength01 > 0f)
-        {
-            int pCount = Physics2D.OverlapCircleNonAlloc(rb.position, profile.pressureInstabilityRadius,
-                                                         _pressureHits, _mineNodeLayerMask);
-            if (pCount == 0)
-            {
-                _lastPressureFactor = 0f;
-            }
-            else
-            {
-                float minSqrDist = float.MaxValue;
-                for (int i = 0; i < pCount; i++)
-                {
-                    if (_pressureHits[i] == null) continue;
-                    float sqr = ((Vector2)_pressureHits[i].transform.position - rb.position).sqrMagnitude;
-                    if (sqr < minSqrDist) minSqrDist = sqr;
-                }
-                float minDist = Mathf.Sqrt(minSqrDist);
-                _lastPressureFactor = 1f - Mathf.InverseLerp(0f, profile.pressureInstabilityRadius, minDist);
-            }
-        }
-        else
-        {
-            _lastPressureFactor = 0f;
-        }
-
-        bool hasInput  = _moveInput.sqrMagnitude > 0.0001f;
-
-        // ---- movement ----
-        if (hasInput || boosting) {
-            Vector2 steerDir = hasInput ? _moveInput.normalized : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
-
-            // Directional authority: blend input direction toward current heading (Drifter/Plow).
-            // authority=1 (default) → immediate snap to input (unchanged). authority=0.2 → very slidey.
-            float authority = GetEffectiveAuthority();
-            Vector2 effectiveDir;
-            if (authority >= 1f || rb.linearVelocity.sqrMagnitude < 0.01f)
-                effectiveDir = steerDir;
-            else
-                effectiveDir = Vector2.Lerp(rb.linearVelocity.normalized, steerDir, authority).normalized;
-
-            Vector2 desiredVel = effectiveDir * arcadeMaxSpeed;
-            float accelUsed    = boosting ? profile.arcadeBoostAccel : profile.arcadeAccel;
-
-            if (accelUsed > 0f)
-            {
-                Vector2 dv      = desiredVel - rb.linearVelocity;
-                float   maxStep = accelUsed * dt;
-                Vector2 step    = (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
-                rb.linearVelocity += step;
-            }
-            
-        }
-        else
-        {
-            // MASS-DEPENDENT COAST/BRAKE when no input OR cannot thrust
-            Vector2 v = rb.linearVelocity;
-
-            // Viscous brake: F = -k * v  → a = -(k/m) v (heavier ships coast longer)
-            if (v.sqrMagnitude > 0f && profile.coastBrakeForce > 0f)
-                rb.AddForce(-v * profile.coastBrakeForce, ForceMode2D.Force);
-
-            // Snap to full rest near zero to kill jitter tails
-            if (v.magnitude < profile.stopSpeed && Mathf.Abs(rb.angularVelocity) < profile.stopAngularSpeed)
-            {
-                rb.linearVelocity        = Vector2.zero;
-                rb.angularVelocity = 0f;
-            }
-        }
-
-        // Plow drag: applied after acceleration so high-resistance cells create real terminal velocity
-        if (_plowVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
-            rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
-
-        // Fuel burn only while boosting
-        if (boosting && energyLevel > 0f && !_boostCostFree)
-        {
-            float burn = _burnRateMultiplier * profile.burnRate;
-            ConsumeEnergy(burn);
-        }
-
-        // Face travel direction
-        if (rb.linearVelocity.sqrMagnitude > 0.0001f)
-        {
-            float angleDeg = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
-            rb.rotation = angleDeg;
-        }
+        UpdatePressureInstability();
+        UpdateMovementAndFuel(dt);
 
 // Stats + audio
 
@@ -405,6 +315,74 @@ public partial class Vehicle : MonoBehaviour
     }
     
 }
+
+    private void UpdatePressureInstability()
+    {
+        if (profile.pressureInstabilityRadius <= 0f || profile.pressureInstabilityStrength01 <= 0f)
+        {
+            _lastPressureFactor = 0f;
+            return;
+        }
+        int pCount = Physics2D.OverlapCircleNonAlloc(rb.position, profile.pressureInstabilityRadius,
+                                                     _pressureHits, _mineNodeLayerMask);
+        if (pCount == 0) { _lastPressureFactor = 0f; return; }
+
+        float minSqrDist = float.MaxValue;
+        for (int i = 0; i < pCount; i++)
+        {
+            if (_pressureHits[i] == null) continue;
+            float sqr = ((Vector2)_pressureHits[i].transform.position - rb.position).sqrMagnitude;
+            if (sqr < minSqrDist) minSqrDist = sqr;
+        }
+        _lastPressureFactor = 1f - Mathf.InverseLerp(0f, profile.pressureInstabilityRadius, Mathf.Sqrt(minSqrDist));
+    }
+
+    private void UpdateMovementAndFuel(float dt)
+    {
+        bool hasInput = _moveInput.sqrMagnitude > 0.0001f;
+
+        if (hasInput || boosting)
+        {
+            Vector2 steerDir = hasInput
+                ? _moveInput.normalized
+                : (_lastNonZeroInput.sqrMagnitude > 0f ? _lastNonZeroInput : (Vector2)transform.up);
+
+            float authority = GetEffectiveAuthority();
+            Vector2 effectiveDir = (authority >= 1f || rb.linearVelocity.sqrMagnitude < 0.01f)
+                ? steerDir
+                : Vector2.Lerp(rb.linearVelocity.normalized, steerDir, authority).normalized;
+
+            Vector2 desiredVel = effectiveDir * arcadeMaxSpeed;
+            float   accelUsed  = boosting ? profile.arcadeBoostAccel : profile.arcadeAccel;
+            if (accelUsed > 0f)
+            {
+                Vector2 dv      = desiredVel - rb.linearVelocity;
+                float   maxStep = accelUsed * dt;
+                rb.linearVelocity += (dv.sqrMagnitude > maxStep * maxStep) ? dv.normalized * maxStep : dv;
+            }
+        }
+        else
+        {
+            Vector2 v = rb.linearVelocity;
+            if (v.sqrMagnitude > 0f && profile.coastBrakeForce > 0f)
+                rb.AddForce(-v * profile.coastBrakeForce, ForceMode2D.Force);
+            if (v.magnitude < profile.stopSpeed && Mathf.Abs(rb.angularVelocity) < profile.stopAngularSpeed)
+            {
+                rb.linearVelocity  = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+        }
+
+        // Plow drag: applied after acceleration so high-resistance cells create real terminal velocity
+        if (_plowVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
+            rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
+
+        if (boosting && energyLevel > 0f && !_boostCostFree)
+            ConsumeEnergy(_burnRateMultiplier * profile.burnRate);
+
+        if (rb.linearVelocity.sqrMagnitude > 0.0001f)
+            rb.rotation = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
+    }
 
     private void Update()
     {
@@ -491,6 +469,57 @@ public partial class Vehicle : MonoBehaviour
         // along the last travel direction so the tail keeps hanging naturally.
         return prev - _lastTravelDir * remaining;
     }
+    // ── Shared timing helpers ──────────────────────────────────────────────
+
+    private static double ComputeStepDuration(DrumTrack drum, int totalAbsSteps)
+    {
+        int total      = Mathf.Max(1, totalAbsSteps);
+        int binSize    = drum != null ? Mathf.Max(1, drum.totalSteps) : total;
+        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)binSize));
+        double loopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1.0) * leaderBins;
+        return loopLen / total;
+    }
+
+    private bool TryComputeArmedPulse(ArmedRelease a,
+        out float pulse01, out bool inWindow, out bool atExact)
+    {
+        pulse01 = 0f; inWindow = false; atExact = false;
+        if (a.note.track?.controller == null) return false;
+        if (!a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out _, out int totalRaw))
+            return false;
+        int    total    = Mathf.Max(1, totalRaw);
+        double fwdSteps = (a.targetAbsStep - rawAbs + total) % total;
+        double stepDur  = ComputeStepDuration(a.note.track.drumTrack, total);
+        double fwdDsp   = fwdSteps * stepDur;
+        double gapDsp   = Math.Max(0.001, a.gapDurationDsp);
+        pulse01  = 1f - Mathf.Clamp01((float)(fwdDsp / gapDsp));
+        inWindow = fwdDsp <= gapDsp;
+        atExact  = fwdSteps <= 0.025;
+        return true;
+    }
+
+    private void ResolvePlaybackNote(PendingCollectedNote p, int atStep, out int midi, out int dur)
+    {
+        bool compositionMode = p.track.controller != null &&
+                               p.track.controller.noteCommitMode == NoteCommitMode.Composition;
+        midi = compositionMode ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(atStep);
+        dur  = p.durationTicks;
+        int binSize   = Mathf.Max(1, p.track.BinSize());
+        int localStep = ((atStep % binSize) + binSize) % binSize;
+        var noteSet   = p.track.GetNoteSetForBin(p.track.BinIndexForStep(atStep));
+        if (noteSet != null && noteSet.TryGetTemplateTimingAtStep(localStep, out int authoredDur, out _))
+            dur = authoredDur;
+    }
+
+    private void DiscardPendingNote(PendingCollectedNote p)
+    {
+        _pendingNotes.Dequeue();
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+
     private void TickNoteTrail()
     {
         if (gfm == null) gfm = GameFlowManager.Instance;
@@ -521,28 +550,14 @@ public partial class Vehicle : MonoBehaviour
         if (_armedReleases.Count > 0)
         {
             var a = _armedReleases.Peek();
-            if (a.note.track != null && a.note.track.controller != null &&
-                a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsA, out _, out int totalA))
+            if (TryComputeArmedPulse(a, out pulse01, out inTimingWindow, out atExactStep))
             {
-                int total = Mathf.Max(1, totalA);
-                double fwdSteps = (a.targetAbsStep - rawAbsA) % total;
-                if (fwdSteps < 0) fwdSteps += total;
-
-                var aDrum         = a.note.track.drumTrack;
-                int aBinSize      = Mathf.Max(1, aDrum != null ? aDrum.totalSteps : total);
-                int aLeaderBins   = Mathf.Max(1, Mathf.CeilToInt(total / (float)aBinSize));
-                double aLoopLen   = (aDrum != null ? aDrum.GetLoopLengthInSeconds() : 1f) * aLeaderBins;
-                double stepDur    = aLoopLen / total;
-                double fwdDsp     = fwdSteps * stepDur;
-
-                pulse01 = 1f - Mathf.Clamp01((float)(fwdDsp / Math.Max(0.001, a.gapDurationDsp)));
-                inTimingWindow = fwdDsp <= Math.Max(0.001, a.gapDurationDsp);
-                atExactStep = fwdSteps <= 0.025;
-
                 if (a.note.track.IsExpansionPending)
                     pulse01 = Mathf.Min(pulse01, 0.3f);
 
-                int aTargetLocal = ((a.targetAbsStep % aBinSize) + aBinSize) % aBinSize;
+                var  aDrum        = a.note.track.drumTrack;
+                int  aBinSize     = aDrum != null ? Mathf.Max(1, aDrum.totalSteps) : 1;
+                int  aTargetLocal = ((a.targetAbsStep % aBinSize) + aBinSize) % aBinSize;
                 bool aMatchesAuthored = (a.note.authoredAbsStep < 0) || (a.targetAbsStep == a.note.authoredAbsStep);
                 isAuthoritative = aMatchesAuthored || (aTargetLocal == a.note.authoredLocalStep);
             }
@@ -567,11 +582,9 @@ public partial class Vehicle : MonoBehaviour
                 {
                     double fwdSteps = (nextStep - rawAbsP + total) % total;
 
-                    var pDrum       = p.track.drumTrack;
-                    int pBinSize    = Mathf.Max(1, pDrum.totalSteps);
-                    int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)pBinSize));
-                    double pLoopLen = pDrum.GetLoopLengthInSeconds() * pLeaderBins;
-                    double pStepDur = pLoopLen / total;
+                    var    pDrum    = p.track.drumTrack;
+                    int    pBinSize = pDrum != null ? Mathf.Max(1, pDrum.totalSteps) : 1;
+                    double pStepDur = ComputeStepDuration(pDrum, total);
                     double fwdDsp   = fwdSteps * pStepDur;
 
                     // Ring window is always effectiveArmSteps wide regardless of
@@ -679,18 +692,7 @@ public partial class Vehicle : MonoBehaviour
         {
             var a = _armedReleases.Peek();
             if (a.note.track?.controller == null) return;
-            if (!a.note.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out _, out int total)) return;
-            total = Mathf.Max(1, total);
-            var drum = a.note.track.drumTrack;
-            int binSize = drum != null ? drum.totalSteps : total;
-            int leaderBins = Mathf.Max(1, Mathf.CeilToInt(total / (float)binSize));
-            double loopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1.0) * leaderBins;
-            double stepDur = loopLen / total;
-            double fwdSteps = (a.targetAbsStep - rawAbs + total) % total;
-            double fwdDsp   = fwdSteps * stepDur;
-            float  pulse    = 1f - Mathf.Clamp01((float)(fwdDsp / System.Math.Max(0.001, a.gapDurationDsp)));
-            bool   inWin    = fwdDsp <= System.Math.Max(0.001, a.gapDurationDsp);
-            bool   atExact  = fwdSteps <= 0.025;
+            if (!TryComputeArmedPulse(a, out float pulse, out bool inWin, out bool atExact)) return;
             _vehicleTether.BindByStep(a.note.track, a.targetAbsStep, viz);
             _vehicleTether.SetReleaseProgress(pulse);
             _vehicleTether.SetTimingState(pulse, inWin, atExact);
@@ -703,11 +705,8 @@ public partial class Vehicle : MonoBehaviour
         if (p.track?.controller == null || p.track.drumTrack == null) return;
         if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP)) return;
 
-        int    tot         = Mathf.Max(1, totalP);
-        int    pBinSize    = Mathf.Max(1, p.track.drumTrack.totalSteps);
-        int    pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(tot / (float)pBinSize));
-        double pLoopLen    = p.track.drumTrack.GetLoopLengthInSeconds() * pLeaderBins;
-        double pStepDur    = pLoopLen / tot;
+        int    tot      = Mathf.Max(1, totalP);
+        double pStepDur = ComputeStepDuration(p.track.drumTrack, tot);
         double tetherWin   = vehicleConfig.EffectiveArmAheadSteps(pStepDur) * pStepDur;
         double graceDsp    = vehicleConfig.manualReleaseGracePeriodSteps * pStepDur;
         double playheadInLoop = rawAbsP % tot;
@@ -1567,33 +1566,21 @@ public partial class Vehicle : MonoBehaviour
     // Find nearest forward unlit placeholder that isn't already armed.
     if (viz == null || !viz.TryGetNextUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int targetAbsStep))
     {
-        bool compositionModeNoStep = p.track.controller != null && p.track.controller.noteCommitMode == NoteCommitMode.Composition;
-        int midiNoStep = compositionModeNoStep ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(floorAbs);
-        int durNoStep = p.durationTicks;
-        int binSzNoStep = Mathf.Max(1, p.track.BinSize());
-        int localStepNoStep = ((floorAbs % binSzNoStep) + binSzNoStep) % binSzNoStep;
-        var noteSetNoStep = p.track.GetNoteSetForBin(p.track.BinIndexForStep(floorAbs));
-        if (noteSetNoStep != null && noteSetNoStep.TryGetTemplateTimingAtStep(localStepNoStep, out int authoredDurNoStep, out _))
-            durNoStep = authoredDurNoStep;
+        ResolvePlaybackNote(p, floorAbs, out int midiNoStep, out int durNoStep);
         p.track.PlayOneShotMidi(midiNoStep, p.velocity127, durNoStep);
-        _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
-        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
-        CollectEnergy(p.collectable.amount * .25f);
+        DiscardPendingNote(p);
+        if (p.collectable != null) CollectEnergy(p.collectable.amount * .25f);
 
         //        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);
         CollectionSoundManager.Instance?.PlayReleaseFailure();
         return false;
     }
 
-    int binSize = Mathf.Max(1, p.track.drumTrack.totalSteps);
     double fwdToTarget = (targetAbsStep - rawAbs + effectiveTotal) % effectiveTotal;
 
     // Hoist stepDur here so effectiveArmSteps can use it for the minimum-seconds floor,
     // and so the arm-lock path below can reuse it without a second GetLoopLengthInSeconds call.
-    int leaderBins = Mathf.Max(1, Mathf.CeilToInt(effectiveTotal / (float)binSize));
-    double leaderLoopLen = p.track.drumTrack.GetLoopLengthInSeconds() * leaderBins;
-    double stepDur = leaderLoopLen / Mathf.Max((float)1.0, effectiveTotal);
+    double stepDur = ComputeStepDuration(p.track.drumTrack, effectiveTotal);
     float effectiveArmSteps = vehicleConfig.EffectiveArmAheadSteps(stepDur);
 
     bool inAheadWindow = fwdToTarget <= effectiveArmSteps;
@@ -1629,18 +1616,9 @@ public partial class Vehicle : MonoBehaviour
         if (!allowSacrifice) return false;
 
         Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
-        bool compositionMode = p.track.controller != null && p.track.controller.noteCommitMode == NoteCommitMode.Composition;
-        int midiToPlay = compositionMode ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
-        int durToPlay = p.durationTicks;
-        int binSz = Mathf.Max(1, p.track.BinSize());
-        int localStep = ((targetAbsStep % binSz) + binSz) % binSz;
-        var noteSet = p.track.GetNoteSetForBin(p.track.BinIndexForStep(targetAbsStep));
-        if (noteSet != null && noteSet.TryGetTemplateTimingAtStep(localStep, out int authoredDur, out _))
-            durToPlay = authoredDur;
+        ResolvePlaybackNote(p, targetAbsStep, out int midiToPlay, out int durToPlay);
         p.track.PlayOneShotMidi(midiToPlay, p.velocity127, durToPlay);
-        _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
-        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+        DiscardPendingNote(p);
         Vector3 blastPos = p.collectable != null ? p.collectable.transform.position : transform.position;
         viz?.BlastManualReleaseCueFailure(transform, blastPos, p.track.trackColor);
         if (p.collectable != null) CollectEnergy(p.collectable.amount * .25f);

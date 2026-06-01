@@ -30,19 +30,6 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float spawnArrivalNoiseStrength = 3.2f;
     [SerializeField] private float spawnArrivalNoiseFrequency = 1.2f;
     private Coroutine _spawnArrivalRoutine;
-// ---- Dust pocket (collectable visibility) ----
-    [Header("Dust Pocket (Visibility)")]
-    [SerializeField] private bool keepDustPocketOpen = true;
-
-// World radius of the pocket around the collectable (tune per phase later if desired)
-    [SerializeField] private float dustPocketRadiusWorld = 0.55f;
-
-// How often we refresh the pocket hold (seconds)
-    [SerializeField] private float dustPocketTickSeconds = 0.15f;
-
-// How long each refresh holds regrowth back (seconds)
-// (Must be >= dustPocketTickSeconds to be effective.)
-    [SerializeField] private float dustPocketHoldSeconds = 0.45f;
 // ---- Deposit timing knobs ----
     [Header("Deposit Timing")]
     [Tooltip("How long the tether travel should take under normal circumstances (seconds).")]
@@ -65,15 +52,11 @@ public class Collectable : MonoBehaviour
 
     [Tooltip("Minimum lead time so travel doesn't start 'late' due to frame jitter.")]
     [SerializeField] private float carryMinLeadSeconds = 0.02f;
-    private Coroutine _dustPocketRoutine;
     public int amount = 5;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
     public Transform ribbonMarker;           // assigned when spawned
-    // tether is now owned by Vehicle — removed from Collectable
     public int intendedStep = -1;       // set at spawn (authoritative target)
-
-    private bool isInitialized = false;
 
     [Header("Carry (Parented)")]
     [SerializeField] private CarrySettings carrySettings = new CarrySettings();
@@ -114,7 +97,6 @@ public class Collectable : MonoBehaviour
 
     public static bool AnyLiveForTrack(InstrumentTrack track)
         => _s_liveByTrack.TryGetValue(track, out var count) && count > 0;
-    private int _dustClaimOwnerId;
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
     private static readonly Collider2D[] _dustProbeHits = new Collider2D[16];
@@ -203,30 +185,11 @@ public class Collectable : MonoBehaviour
     public delegate void OnCollectedHandler(int duration, float force);
     public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
-/// <summary>
-    /// Lightweight spawn-time binding: stores the marker reference and resolved step
-    /// so the tether can be created later at vehicle pickup.
-    /// No tether GameObject is instantiated here.
-    /// </summary>
     public void BindMarkerAtSpawn(Transform marker, int anchorStep)
     {
         ribbonMarker = marker;
-        // intendedStep is already set before this call; anchorStep is stored
-        // implicitly via intendedStep. No tether creation.
-        Debug.Log($"[Collectable] BindMarkerAtSpawn track={assignedInstrumentTrack?.name} " +
-                  $"step={intendedStep} anchorStep={anchorStep} " +
-                  $"marker={(marker ? marker.name : "(null)")}");
     }
 
-    /// <summary>
-    /// Creates the tether at vehicle pickup time. Reuses the same tether-creation
-    /// logic from AttachTetherAtSpawn but is called from the collision/pickup path.
-    /// The metaphor: the vehicle claims the wild energy and connects it to the harvester.
-    /// </summary>
-    public void AttachTetherAtPickup()
-    {
-        // Tether is now owned by Vehicle (single global tether). Nothing to do here.
-    }
     [Header("Sequencer Link")]
     [Tooltip("Candidate step anchors this collectable may resolve to when attaching to the track ribbon.")]
     public List<int> sharedTargetSteps = new List<int>();
@@ -571,43 +534,12 @@ private IEnumerator SpawnArrivalRoutine(
     return wdir;
 }
 
-    private void StopDustPocket()
-    {
-        if (_dustPocketRoutine != null)
-        {
-            StopCoroutine(_dustPocketRoutine);
-            _dustPocketRoutine = null;
-        }
-    }
     private bool IsInsideDustStable(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen)
     {
         if (dt == null || dustGen == null) return IsPositionInsideDust(worldPos); // fallback if you must
         Vector2Int gp = dt.WorldToGridPosition(worldPos);
         return dustGen.HasDustAt(gp);
     }
-   
-    private void StopDustPocketRoutineIfRunning()
-    {
-        if (_dustPocketRoutine == null) return;
-        StopCoroutine(_dustPocketRoutine);
-        _dustPocketRoutine = null;
-    }
-    
-    private void ReleaseDustPocket()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var dustGen = _gfm != null ? _gfm.dustGenerator : null;
-        var drumTrack = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
-        if (dustGen == null || drumTrack == null) return;
-
-        float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
-        float radiusWorld = cellWorld * 0.10f;
-
-        // You implement this on the dust generator:
-       // dustGen.ReleaseTemporaryDiskHold(transform.position, radiusWorld, phaseNow);
-    }
-
-
     public static bool IsCellFreeStatic(Vector2Int cell)
     {
         lock (_lock)
@@ -842,17 +774,10 @@ private IEnumerator SpawnArrivalRoutine(
 
         StartCoroutine(DarkTimeoutRoutine(track));
         if (_rb == null) TryGetComponent(out _rb);
-        _dustClaimOwnerId = GetInstanceID();
         _rng ??= new System.Random(StableSeed());
         StartCoroutine(MovementRoutine());
         TryBindLoopBoundary();
         HandleLoopBoundaryIdea(); // seed an initial idea immediately
-
-        // DustPocketRoutine is intentionally NOT started here.
-        // The jail hollow is carved once at spawn by CreateJailCenterForCollectable.
-        // After the vehicle releases the collectable, it navigates existing corridors
-        // without carving — DustPocketRoutine would call CarveTemporaryDiskFromCollectable
-        // on every tick, which erodes the maze as the collectable wanders.
 
         // --- Occupancy initialization (Mode A: never overlap another collectable) ---
         ClearReservation();
@@ -873,13 +798,8 @@ private IEnumerator SpawnArrivalRoutine(
             if (dustGen != null)
                 dustGen.CreateJailCenterForCollectable(_currentCell, holdSeconds: 0f, ownerId: GetInstanceID());
         }
-        Debug.Log($"[DBG] Collectable BurstID {burstId} Track: {assignedInstrumentTrack.name} Parent: {transform.parent?.name}");
     }
 
-    void Start()
-    {
-        isInitialized = true;
-    }
     private IEnumerator DarkTimeoutRoutine(InstrumentTrack track)
     {
         var drums = track != null ? track.drumTrack : null;
@@ -908,69 +828,20 @@ private IEnumerator SpawnArrivalRoutine(
 {
     _inCarry = true;
 
-    // non-physical immediately
+    // Physics already disabled by CarryAndDepositRoutine; guard for safety.
     if (_rb != null) _rb.simulated = false;
     if (TryGetComponent(out Collider2D col)) col.enabled = false;
-    
-    // ----- Parent to vehicle ("children in back seat") -----
-    if (_collector != null)
-    {
-        _carryParent = _collector;
 
-        transform.SetParent(_carryParent, worldPositionStays: true);
-
-        Vector3 jitter = (carrySettings.localOffsetJitter > 0f)
-            ? (Vector3)(UnityEngine.Random.insideUnitCircle * carrySettings.localOffsetJitter)
-            : Vector3.zero;
-
-        transform.localPosition = carrySettings.localOffset + jitter;
-        transform.localRotation = Quaternion.identity;
-    }
-
-    // ----- DSP timing -----
     double dspNow = AudioSettings.dspTime;
 
     // If deposit time is already passed (or basically now), snap immediately.
     if (depositDspTime <= dspNow + 0.00075)
     {
-        transform.SetParent(null, worldPositionStays: true);
-        _carryParent = null;
-
         if (ribbonMarker) transform.position = ribbonMarker.position;
         onArrived?.Invoke();
-
         _inCarry = false;
         yield break;
     }
-
-    // Decide travel duration purely as a function of remaining DSP time.
-    // (No step math, no deltaTime.)
-    double timeUntilDeposit = depositDspTime - dspNow;
-
-    float desiredTravel = Mathf.Clamp(depositTravelSeconds, minDepositTravelSeconds, maxDepositTravelSeconds);
-
-    // Travel cannot exceed available time.
-    float travelSeconds = Mathf.Clamp(desiredTravel, 0.02f, (float)timeUntilDeposit);
-
-    // Compute launch time. If too close, push launch forward (shrinks carry) but STILL land on time.
-    double travelStartDsp = depositDspTime - travelSeconds;
-
-    // Ensure we don't start "late" due to frame timing.
-    double minLaunch = dspNow + carryMinLeadSeconds;  // you already have this knob
-    if (travelStartDsp < minLaunch)
-        travelStartDsp = minLaunch;
-
-    // Recompute travelSeconds from the clamped launch so u maps correctly.
-    travelSeconds = (float)(depositDspTime - travelStartDsp);
-    if (travelSeconds < 0.02f) travelSeconds = 0.02f; // guard; snap will still enforce landing
-
-    // ----- Hold as child until launch moment (DSP-driven) -----
-    while (_carryParent != null && AudioSettings.dspTime < travelStartDsp)
-        yield return null;
-
-    // ----- Detach and travel -----
-    transform.SetParent(null, worldPositionStays: true);
-    _carryParent = null;
 
     // Wait for DSP deposit time then snap to marker.
     while (AudioSettings.dspTime < depositDspTime)
@@ -1023,22 +894,6 @@ private IEnumerator SpawnArrivalRoutine(
     {
         _handled = false;
         _destroyNotified = false;
-        // Do not restart DustPocketRoutine on re-enable; collectables no longer carve dust.
-    }
-    private void StopDustPocketAndReleaseClaims()
-    {
-        if (_dustPocketRoutine != null)
-        {
-            StopCoroutine(_dustPocketRoutine);
-            _dustPocketRoutine = null;
-        }
-
-        // If you have an owner id / claim owner string, release it here.
-        // Example patterns you likely already have:
-        // dustGen?.ReleaseClaimsForOwner(_dustClaimOwnerId);
-        // or dustClaims?.ReleaseOwner(ownerString);
-
-        _dustClaimOwnerId = 0;
     }
 
     private void OnDestroy()
@@ -1050,7 +905,6 @@ private IEnumerator SpawnArrivalRoutine(
         UnbindLoopBoundary();
         UnregisterOccupant();
         UnregisterCarryOrbit();
-        StopDustPocket();
         GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
         NotifyDestroyedOnce();
     }
@@ -1059,14 +913,10 @@ private IEnumerator SpawnArrivalRoutine(
     {
         ClearReservation();
         UnbindLoopBoundary();
-        StopDustPocketRoutineIfRunning();
         UnregisterOccupant();
-        StopDustPocket();
-        ReleaseDustPocket();
         GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
-
         NotifyDestroyedOnce();
-    } // pooling-safe
+    }
     
     private void OnCollisionEnter2D(Collision2D coll)
     {
@@ -1231,16 +1081,6 @@ private IEnumerator SpawnArrivalRoutine(
         }
     }
 
-    private void BeginCarryAndDepositAtDsp(
-        double depositDspTime,
-        int durationTicks,
-        float force,
-        Action onArrived)
-    {
-        if (_carryRoutine != null) StopCoroutine(_carryRoutine);
-        _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
-    }
-
     private IEnumerator CarryAndDepositRoutine(
         double depositDspTime,
         int durationTicks,
@@ -1394,8 +1234,7 @@ private IEnumerator SpawnArrivalRoutine(
                 _rb.bodyType = RigidbodyType2D.Dynamic;
         }
 
-        // We are now "collected": stop dust pocket & claims and enter carry mode immediately.
-        StopDustPocketAndReleaseClaims();
+        // We are now "collected": enter carry mode immediately.
         RegisterCarryOrbit();
 
         // ------------------------------------------------------------
@@ -1451,30 +1290,6 @@ private IEnumerator SpawnArrivalRoutine(
         (intendedStep >= 0) ? (((intendedStep % baseSteps) + baseSteps) % baseSteps) :
         0;
     assignedInstrumentTrack.PlayQuantizedNoteForStep(stepToReportBase, assignedNote, noteDurationTicks, force);
-// ----- TRACE: collision timing vs transport -----
-    double dspNowDbg = AudioSettings.dspTime;
-    double loopLenDbg = drumTrack.GetLoopLengthInSeconds();
-    double transportStartDbg = drumTrack.leaderStartDspTime > 0 ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
-
-    int baseStepsDbg = Mathf.Max(1, drumTrack.totalSteps);
-    int leaderStepsDbg = Mathf.Max(1, drumTrack.GetLeaderSteps());
-    int mulDbg = Mathf.Max(1, Mathf.RoundToInt(leaderStepsDbg / (float)baseStepsDbg));
-
-    double loopStartDbg = EffectiveLoopStart(transportStartDbg, loopLenDbg, dspNowDbg);
-    double tPosDbg = (dspNowDbg - loopStartDbg) % loopLenDbg; if (tPosDbg < 0) tPosDbg += loopLenDbg;
-
-    double baseStepDurDbg = loopLenDbg / baseStepsDbg;
-    double leaderStepDurDbg = loopLenDbg / leaderStepsDbg;
-
-    int playheadBaseStepDbg = (int)Math.Floor(tPosDbg / baseStepDurDbg) % baseStepsDbg;
-    int playheadLeaderStepDbg = (int)Math.Floor(tPosDbg / leaderStepDurDbg) % leaderStepsDbg;
-
-    int reportedBase = stepToReportBase;
-    int reportedLeader = reportedBase * mulDbg;
-
-    double reportedBasePos = (reportedBase * baseStepDurDbg) % loopLenDbg;
-    double reportedLeaderPos = (reportedLeader * leaderStepDurDbg) % loopLenDbg;
-
     float velocity127 = ComputeHitVelocity127(vehicle);
 
     // Confirm should happen at collision point (immediate), not at deposit.
@@ -1503,17 +1318,11 @@ private IEnumerator SpawnArrivalRoutine(
         if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
         _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
 
-        // Vehicle claims the energy — form the tether to the harvester now.
-        AttachTetherAtPickup();
-
         return;
     }
 
-
     // Write to the track immediately (so loop state updates now).
     assignedInstrumentTrack.OnCollectableCollected(this, stepToReportBase, noteDurationTicks, velocity127);
-    Debug.Log($"[WRITE_TRACE] track={name} got stepBase={stepToReportBase} totalSteps={drumTrack.totalSteps} " +
-              $"leaderSteps={drumTrack.GetLeaderSteps()} dspNow={AudioSettings.dspTime:F6}");
 
     // Non-physical carry: disable RB sim, disable collider, stop explode permanence
     if (_rb == null) TryGetComponent(out _rb);
@@ -1524,9 +1333,6 @@ private IEnumerator SpawnArrivalRoutine(
     var explode = GetComponent<Explode>();
     if (explode != null) explode.Permanent(false);
 
-    // Vehicle claims the energy — form the tether to the harvester now.
-    AttachTetherAtPickup();
-
     // ------------------------------------------------------------
     // VISUAL DEPOSIT: schedule at next occurrence of the chosen base step
     // ------------------------------------------------------------
@@ -1535,8 +1341,8 @@ private IEnumerator SpawnArrivalRoutine(
     loopLen = drumTrack.GetLoopLengthInSeconds();
     if (loopLen <= 0.0)
     {
-        BeginCarryAndDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         Debug.LogWarning($"[COLLECT] loopLen <= 0 while scheduling deposit; fallback travel. name={name}");
+        BeginCarryThenDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         return;
     }
 
@@ -1546,7 +1352,7 @@ private IEnumerator SpawnArrivalRoutine(
     if (transportStart <= 0.0)
     {
         Debug.LogWarning($"[COLLECT] No valid transportStart; carrying without timed deposit. name={name}");
-        BeginCarryAndDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
+        BeginCarryThenDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         return;
     }
 
@@ -1559,15 +1365,8 @@ private IEnumerator SpawnArrivalRoutine(
     while ((depositDsp - dspNow) < minNeeded)
         depositDsp += loopLen;
 
-    BeginCarryAndDepositAtDsp(depositDsp, noteDurationTicks, force, onArrived: null);
-
-    // Optional debug: confirm phase alignment (can remove later)
-    double baseStepDur = loopLen / baseSteps;
-    int playheadBaseStep = (int)Math.Floor(((dspNow - loopStart + loopLen) % loopLen) / baseStepDur) % baseSteps;
-
-    Debug.Log($"[COLLECT] baseStep={stepToReportBase} playheadBaseStep={playheadBaseStep}/{baseSteps} " +
-              $"depositIn={(depositDsp - dspNow):F3}s loopLen={loopLen:F3}s tPos={(dspNow - loopStart):F3}s name={name}");
-} 
+    BeginCarryThenDepositAtDsp(depositDsp, noteDurationTicks, force, onArrived: null);
+}
     private float ComputeHitVelocity127(Vehicle vehicle)
     {
         if (vehicle == null) return 127f;
@@ -1599,12 +1398,7 @@ private IEnumerator SpawnArrivalRoutine(
         // Optional: more resolution at low/mid hits.
         x = Mathf.Pow(x, 0.7f);
 
-        float v127 = Mathf.Lerp(60f, 120f, x);
-
-        Debug.Log($"[COLLECT:HIT] approach={approachSpeed:F2} maxA={maxApproach:F2} x={x:F2} v127={v127:F1} " +
-                  $"vehSpeed={vRb.linearVelocity.magnitude:F2} arcadeMaxSpeed={vehicle.arcadeMaxSpeed:F2}");
-
-        return v127;
+        return Mathf.Lerp(60f, 120f, x);
     }
 
     // Called by Vehicle when a manually-released queued note is consumed.

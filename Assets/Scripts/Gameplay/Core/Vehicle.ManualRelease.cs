@@ -146,24 +146,13 @@ public partial class Vehicle
             return;
         }
 
+        ResolvePlaybackNote(p, targetAbsStep, out int chosenMidi, out int resolvedDurationTicks);
         bool compositionMode = p.track.controller != null &&
                                p.track.controller.noteCommitMode == NoteCommitMode.Composition;
-        int chosenMidi = compositionMode
-            ? p.collectedMidi
-            : p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
-
         // Pre-quantize in Performance mode so SFX and loop commit use the same final pitch.
         // Composition mode keeps the raw note (octave-fit only, no chord snap — by design).
         if (!compositionMode)
             chosenMidi = p.track.QuantizeNoteForStep(targetAbsStep, chosenMidi, p.authoredRootMidi);
-
-        int resolvedDurationTicks = p.durationTicks;
-        int binSize = Mathf.Max(1, p.track.BinSize());
-        int targetBin = p.track.BinIndexForStep(targetAbsStep);
-        int localStep = ((targetAbsStep % binSize) + binSize) % binSize;
-        var noteSetForBin = p.track.GetNoteSetForBin(targetBin);
-        if (noteSetForBin != null && noteSetForBin.TryGetTemplateTimingAtStep(localStep, out int authoredDurationTicks, out _))
-            resolvedDurationTicks = authoredDurationTicks;
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;
@@ -220,21 +209,14 @@ public partial class Vehicle
                 TryResolveManualReleaseTargetStep(p, rawAbsP, totalP, out int resolvedTargetStep, out _))
             {
                 targetStep = resolvedTargetStep;
-                int pBinSize = Mathf.Max(1, drum != null ? drum.totalSteps : leaderSteps);
-                int pLeaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)pBinSize));
-                double pLoopLen = (drum != null ? drum.GetLoopLengthInSeconds() : 1f) * pLeaderBins;
-                double pStepDur = pLoopLen / Mathf.Max(1, leaderSteps);
                 double fwdSteps = (targetStep - rawAbsP + totalP) % totalP;
-                gapDsp = Math.Max(0.001, fwdSteps * pStepDur);
+                gapDsp = Math.Max(0.001, fwdSteps * ComputeStepDuration(drum, leaderSteps));
             }
         }
 
         if (targetStep < 0 || drum == null) return;
 
-        int binSize = Mathf.Max(1, drum.totalSteps);
-        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
-        double loopLen = drum.GetLoopLengthInSeconds() * leaderBins;
-        double stepDur = loopLen / Mathf.Max(1, leaderSteps);
+        double stepDur = ComputeStepDuration(drum, leaderSteps);
 
         int gapStepsNow = Mathf.Max(1, Mathf.RoundToInt((float)(gapDsp / stepDur)));
 
