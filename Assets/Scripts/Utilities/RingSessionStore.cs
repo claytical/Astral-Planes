@@ -23,7 +23,7 @@ public static class RingSessionStore
 
         string path = FilePath(snap.PhaseIndex, snap.MotifIndex);
         File.WriteAllText(path, JsonUtility.ToJson(snap, true));
-        Debug.Log($"[RingSessionStore] Saved → {path}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[RingSessionStore] Saved → {path}");
     }
 
     public static List<MotifSnapshot> LoadAllRingsFromDisk()
@@ -46,7 +46,7 @@ public static class RingSessionStore
             try { result.Add(JsonUtility.FromJson<MotifSnapshot>(File.ReadAllText(file))); }
             catch (Exception e) { Debug.LogWarning($"[RingSessionStore] Failed to load {file}: {e.Message}"); }
         }
-        Debug.Log($"[RingSessionStore] Loaded {result.Count} rings from {dir}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[RingSessionStore] Loaded {result.Count} rings from {dir}");
         return result;
     }
 }

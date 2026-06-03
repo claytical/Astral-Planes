@@ -26,12 +26,12 @@ public class Boundaries : MonoBehaviour
 
     void Awake()
     {
-        Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
     }
 
     void OnEnable()
     {
-        Debug.Log($"[BOUNDARIES] OnEnable on {gameObject.name}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[BOUNDARIES] OnEnable on {gameObject.name}");
     }
 
     void Start()
@@ -74,7 +74,7 @@ public class Boundaries : MonoBehaviour
                 new Vector2(screenHalfWidth * 2f, bottomBoundary.size.y);
         }
 
-        Debug.Log($"[BOUNDARIES] Boundaries constructed");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[BOUNDARIES] Boundaries constructed");
 
         WrapEnabled = wrapEnabled;
 
@@ -110,7 +110,7 @@ public class Boundaries : MonoBehaviour
         }
 
         yield return null;
-        Debug.Log("[BOUNDARIES] Aligning to NoteViz");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[BOUNDARIES] Aligning to NoteViz");
         AlignBottomToVisualizer(GameFlowManager.Instance.noteViz);
         // Re-lock DrumTrack play area now that Canvas layout is final and the anchor Y is valid.
         GameFlowManager.Instance?.activeDrumTrack?.RefreshPlayAreaLock();
@@ -128,7 +128,7 @@ public class Boundaries : MonoBehaviour
         if (thickness <= 0f) thickness = 1f;
 
         float topY = viz.GetTopWorldY();
-        Debug.Log($"[BOUNDARIES] NoteViz at {topY}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[BOUNDARIES] NoteViz at {topY}");
 
         float centerY = topY - (thickness * 0.5f);
 

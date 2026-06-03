@@ -587,7 +587,7 @@ public class PlayerPrefsX
 		if (bytes.Length > 0)
 		{
 			ArrayType arrayType = (ArrayType)bytes[0];
-			Debug.Log(key + " is a " + arrayType.ToString() + " array");
+			if (GameFlowManager.VerboseLogging) Debug.Log(key + " is a " + arrayType.ToString() + " array");
 		}
 	}
 

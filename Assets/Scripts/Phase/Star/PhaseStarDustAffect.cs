@@ -144,7 +144,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     {
         _acquisitionEnabled = enabled;
         _navigator?.SetHuntingEnabled(enabled && _tentaclesActive);
-        Debug.Log($"[PhaseStarDust] acquisition enabled={_acquisitionEnabled} tentaclesActive={_tentaclesActive} reason={reason}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStarDust] acquisition enabled={_acquisitionEnabled} tentaclesActive={_tentaclesActive} reason={reason}");
     }
 
     public void BeginRetractionForActiveTentacles()
@@ -1129,7 +1129,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void LogTentacleTransition(Tentacle tentacle, TentacleState state, string reason)
     {
-        Debug.Log($"[PhaseStarDustAffect] tentacle.role={tentacle.role} state={state} targetCell={tentacle.targetCell} reason={reason}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStarDustAffect] tentacle.role={tentacle.role} state={state} targetCell={tentacle.targetCell} reason={reason}");
     }
 
     private bool IsTargetValid(Vector2Int cell, MusicalRole role, Tentacle requester, out string reason)

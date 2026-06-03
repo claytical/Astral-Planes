@@ -305,7 +305,7 @@ public partial class PhaseStar : MonoBehaviour
         if (!zapReady)
         {
             if (_tracePhaseStar)
-                Debug.Log($"[PhaseStar] TransitionDormantToActive blocked (not zap-ready). state={_state} zapState={_zapProgressState} zapped={zappedCount}/{requiredZapCount} descriptorValid={_plannedEjectionDescriptor.IsValid} requiredSetAvailable={_requiredZapNoteSetAvailable}", this);
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] TransitionDormantToActive blocked (not zap-ready). state={_state} zapState={_zapProgressState} zapped={zappedCount}/{requiredZapCount} descriptorValid={_plannedEjectionDescriptor.IsValid} requiredSetAvailable={_requiredZapNoteSetAvailable}", this);
             return;
         }
 
@@ -359,7 +359,7 @@ public partial class PhaseStar : MonoBehaviour
 
             if (_tracePhaseStar)
             {
-                Debug.Log($"[PhaseStar] Dormant wait precheck hasDust={hasDust} hasDelivery={hasDelivery} hasEjectable={hasEjectable}", this);
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Dormant wait precheck hasDust={hasDust} hasDelivery={hasDelivery} hasEjectable={hasEjectable}", this);
             }
 
             // Wake on stable acquisition preconditions only.
@@ -602,7 +602,7 @@ public partial class PhaseStar : MonoBehaviour
         }
 
         OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
-        Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
     }
 
     private void OnAllTentaclesRetracted()
@@ -708,7 +708,7 @@ public partial class PhaseStar : MonoBehaviour
             // ArmCohortsOnLoopBoundary and ResyncLeaderBinsNow. Resetting to 1 on
             // every star spawn would clobber the expanded 2-bin state mid-loop.
             WireBinSource(_drum);
-            Debug.Log($"[PhaseStar] loop={_drum.GetLoopLengthInSeconds():0.##}s  targets={_targets?.Count ?? 0}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] loop={_drum.GetLoopLengthInSeconds():0.##}s  targets={_targets?.Count ?? 0}");
 
         }
 
@@ -756,7 +756,7 @@ public partial class PhaseStar : MonoBehaviour
         _attunedRole = role;
         cravingNavigator?.SetAttunedRole(role);
         dust?.SetAttunedRole(role);
-        Debug.Log($"[PhaseStar] Attuned to {role}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Attuned to {role}");
 
         // Prime before first zap so requiredZapCount isn't still 1 when the first dust clears.
         if (_assignedMotif != null && zappedCount == 0)
@@ -1114,7 +1114,7 @@ public partial class PhaseStar : MonoBehaviour
         visuals?.HideAll();
         dust?.SetTentaclesActive(false);
         DisableColliders();
-        Debug.Log($"[PhaseStar] Burst in flight — hidden in place at {transform.position}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Burst in flight — hidden in place at {transform.position}");
     }
     
     private void RelocateToAvailableCell()
@@ -1131,7 +1131,7 @@ public partial class PhaseStar : MonoBehaviour
     {
         _isArmed = false;
         _disarmReason = reason;
-        Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
 
         DisableColliders();
 
@@ -1174,7 +1174,7 @@ public partial class PhaseStar : MonoBehaviour
         bool cif = OwnTrackCollectablesInFlight();
         bool ep = AnyExpansionPendingGlobal();
 
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[PS:LB] star={name} state={_state} armed={_isArmed} disarm={_disarmReason} " +
             $"awaitClr={_awaitingCollectableClear} " +
             $"activeNode={(_activeNode ? _activeNode.name : null)} ejectInFlight={_ejectionInFlight} CIF={cif} EP={ep}");
@@ -1198,7 +1198,7 @@ public partial class PhaseStar : MonoBehaviour
 
         if (AnyCollectablesInFlightGlobal() && (_activeNode != null || _activeSuperNode != null || _ejectionInFlight))
         {
-            Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
+            if (GameFlowManager.VerboseLogging) Debug.Log("[PS:LB/AWAIT] -> stay disarmed (awaitClr + CIF + active node)");
             Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
             return true;
         }
@@ -1218,7 +1218,7 @@ public partial class PhaseStar : MonoBehaviour
             if (waitedLoops >= CollectableClearTimeoutLoops)
                 timedOut = true;
 
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
         }
 
@@ -1234,7 +1234,7 @@ public partial class PhaseStar : MonoBehaviour
 
         if (!timedOut)
         {
-            Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
             Disarm(PhaseStarDisarmReason.NodeResolving, _lockedTint);
             return true;
         }
@@ -1251,7 +1251,7 @@ public partial class PhaseStar : MonoBehaviour
             return true;
         }
 
-        Debug.Log($"[PS:LB] Recovery -> Dormant wait");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] Recovery -> Dormant wait");
         EnterDormantWaitState();
         return true;
     }
@@ -1263,9 +1263,9 @@ public partial class PhaseStar : MonoBehaviour
         if (shouldDisarmForGate)
         {
             if (anyCollectables)
-                Debug.Log($"[PS:LB] OwnTrackCollectablesInFlight True");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] OwnTrackCollectablesInFlight True");
             else
-                Debug.Log($"[PS:LB] AnyExpansionPending True");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] AnyExpansionPending True");
 
             Disarm(anyCollectables ? PhaseStarDisarmReason.CollectablesInFlight : PhaseStarDisarmReason.ExpansionPending, _lockedTint);
             return true;
@@ -1276,7 +1276,7 @@ public partial class PhaseStar : MonoBehaviour
         // re-arm path and never reach ArmNext().
         if (anyExpansion && ZapProgress01 >= 1f && _isArmed)
         {
-            Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] EP true but star is ready — holding armed");
             return true;
         }
 
@@ -1345,7 +1345,7 @@ public partial class PhaseStar : MonoBehaviour
     
     private void DBG(string msg)
     {
-        Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} interaction=({_interactionState.ToDebugString()}) " +
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} interaction=({_interactionState.ToDebugString()}) " +
                   $"preview={(_previewVisual != null ? 1 : 0)} " +
                   $"activeNode={(_activeNode != null ? _activeNode.name : "null")} lockedTint={_lockedTint}");
     }
@@ -1564,7 +1564,7 @@ public partial class PhaseStar : MonoBehaviour
     private void Trace(string msg)
     {
         if (_tracePhaseStar)
-            Debug.Log($"[PhaseStar] {msg}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] {msg}");
     }
 
     private void LogState(string where)
@@ -1572,7 +1572,7 @@ public partial class PhaseStar : MonoBehaviour
         if (_isDisposing || this == null || !_tracePhaseStar) return;
 
         string targetRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[PhaseStar][{where}] state={_state} interaction=({_interactionState.ToDebugString()}) " +
             $"role={targetRole} attunedRole={_attunedRole} charge={GetTotalCharge():0.00}");
     }

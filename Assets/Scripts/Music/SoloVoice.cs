@@ -210,7 +210,7 @@ public class SoloVoice : MonoBehaviour
                 int midi = FoldIntoRange(n.note, lowestAllowedNote, highestAllowedNote);
                 float v01 = Mathf.Clamp01(n.velocity); // IMPORTANT: 0..1
                 pool.Add(new PoolNote { midi = midi, vel01 = v01 });
-                Debug.Log($"[SOLO] Adding {midi} at {v01}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[SOLO] Adding {midi} at {v01}");
             }
         }
 

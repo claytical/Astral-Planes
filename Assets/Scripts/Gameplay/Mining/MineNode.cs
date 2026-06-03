@@ -252,13 +252,13 @@ public class MineNode : MonoBehaviour
         if (_hasBeenStruck) return;
         _hasBeenStruck = true;
         State = MineNodeState.Fleeing;
-        Debug.Log($"[MineNode] {name} — transitioning to Fleeing.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — transitioning to Fleeing.");
     }
 
     private void HandleExpiry()
     {
         if (_depletedHandled || _resolvedFired) return;
-        Debug.Log($"[MineNode] {name} — expired after {_loopsSinceSpawn} loops.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — expired after {_loopsSinceSpawn} loops.");
 
         var explode = GetComponent<Explode>();
         if (explode != null) explode.ExpireExplode();
@@ -278,7 +278,7 @@ public class MineNode : MonoBehaviour
         if (_depletedHandled || _resolvedFired) return;
         WasEscaped = true;
         SetBehaviorIntent(MineNodeBehaviorIntent.Escaping);
-        Debug.Log($"[MineNode] {name} — escaped through boundary.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — escaped through boundary.");
         FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy(waitForFullEscape: true));
     }
@@ -441,7 +441,7 @@ public class MineNode : MonoBehaviour
         }
 
         if (debugSweepContainment)
-            Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} target={target}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} target={target}");
     }
 
     private bool ShouldSkipBoundaryClampThisTick()
@@ -944,7 +944,7 @@ public class MineNode : MonoBehaviour
 
     private void TriggerExplosion()
     {
-        Debug.Log($"Triggering Explosion in Mine Node");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"Triggering Explosion in Mine Node");
         var explosion = GetComponent<Explode>();
         if (explosion != null) explosion.Permanent(false);
         FireResolvedOnce();
@@ -996,13 +996,13 @@ public class MineNode : MonoBehaviour
 
     private void OnDisable()
     {
-        Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})");
         if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
     }
 
     private void OnDestroy()
     {
-        Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})");
         if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
         if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
     }

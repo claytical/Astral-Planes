@@ -402,7 +402,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 c.a = visibleAlpha;
                 if (dx == 0 && dy == outerRadiusCells) // pick a consistent sample
                 {
-                    Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_RING] rIn={innerRadiusCellsExclusive} rOut={outerRadiusCells} d={d:F2} u={u:F2} a={c.a:F2}");
                 }            
                 // Vehicle pocket is a hard exclusion — no imprint, no spawn, no visual update.
                 if (IsNearAnyVehicle(gp, vehicleCells, vehicleNoSpawnRadiusCells)) continue;
@@ -768,7 +768,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         if (veto1_spawnBlocked || veto1_vehicle || veto1_claim)
         {
-            Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
@@ -778,7 +778,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Keep-clear at end: allow visuals, but never become solid/colliding.
         if (veto1_keep)
         {
-            Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
             SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
             if (dust != null) SetDustCollision(dust, false);
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
@@ -1074,7 +1074,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 cell =>
                 {
                     TryGetDustAt(cell, out var d); 
-                    Debug.Log($"[DUST] {d.name} with {GetCellVisualColor(cell)}");
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST] {d.name} with {GetCellVisualColor(cell)}");
                     return d;
                 },
                 GetCellVisualColor);
@@ -2338,7 +2338,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 }
             }
         }
-        Debug.Log($"[PHANTOM] Scan complete. Found {phantoms} phantom colliders.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PHANTOM] Scan complete. Found {phantoms} phantom colliders.");
     }
 
     [ContextMenu("Debug: Audit Colored Dust vs Star Visibility")]
@@ -2388,12 +2388,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 float delta = Mathf.Max(Mathf.Abs(cur.r - gray.r), Mathf.Max(Mathf.Abs(cur.g - gray.g), Mathf.Abs(cur.b - gray.b)));
                 if (delta > 0.15f)
                 {
-                    Debug.Log($"[DUST-AUDIT] ({x},{y}) Role=None but tint delta={delta:F2} from mazeTint — likely diffusion bleed", go);
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST-AUDIT] ({x},{y}) Role=None but tint delta={delta:F2} from mazeTint — likely diffusion bleed", go);
                     roleNoneVisuallyTinted++;
                 }
             }
         }
 
-        Debug.Log($"[DUST-AUDIT] Done. role+zeroEnergy={roleZeroEnergy}  collider+spriteOff={colliderOnSpriteOff}  diffusionBleed={roleNoneVisuallyTinted}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST-AUDIT] Done. role+zeroEnergy={roleZeroEnergy}  collider+spriteOff={colliderOnSpriteOff}  diffusionBleed={roleNoneVisuallyTinted}");
     }
 }

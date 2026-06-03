@@ -111,7 +111,7 @@ public partial class CosmicDustGenerator
             for (int i = 0; i < occupied.Count; i++)
                 _hiddenImprints[occupied[i]] = onlyRole;
 
-            Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
             return;
         }
 
@@ -132,7 +132,7 @@ public partial class CosmicDustGenerator
         }
 
         string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-        Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
     }
 
     private static List<Vector2Int> BuildOccupiedCells(List<(Vector2Int cell, Vector3 world)> cells)
@@ -387,7 +387,7 @@ public partial class CosmicDustGenerator
 
         string geoSummary = string.Join(", ", System.Linq.Enumerable.Range(0, rolesList.Count)
             .Select(ri => $"{rolesList[ri]}={ResolveGeoFeature(rolesList[ri], ri)}"));
-        Debug.Log($"[MAZE] SelectRoleSeedsWithGeo: pattern={_activePatternType}, seeds={filled}, geoFeatures=({geoSummary})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] SelectRoleSeedsWithGeo: pattern={_activePatternType}, seeds={filled}, geoFeatures=({geoSummary})");
 
         return (seedCells, seedRoles, filled);
     }
@@ -485,7 +485,7 @@ public partial class CosmicDustGenerator
         _isBootstrappingMaze = true;
         if (_mazeAlreadyGenerated)
         {
-            Debug.Log($"[MAZE] Maze is already generated, skipping.");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] Maze is already generated, skipping.");
             yield break;
         }
 
@@ -511,7 +511,7 @@ public partial class CosmicDustGenerator
         EnsureCellGrid();
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
-        Debug.Log($"[MAZE] Maze grid size: {w}x{h}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] Maze grid size: {w}x{h}");
 
         _activeMazePattern = phaseTransitionManager?.currentMotif?.mazePattern;
         _runtimeVoidOnlyDustCreation = false;
@@ -542,7 +542,7 @@ public partial class CosmicDustGenerator
         }
 
         var mazeResult = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
-        Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
 
         _mazePatternCells = new HashSet<Vector2Int>(mazeResult.Count);
         foreach (var (cell, _) in mazeResult)
@@ -553,7 +553,7 @@ public partial class CosmicDustGenerator
         cellsToFill.AddRange(mazeResult);
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
-        Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
         if (_spawnRoutine != null) {
             StopCoroutine(_spawnRoutine);
             _spawnRoutine = null;

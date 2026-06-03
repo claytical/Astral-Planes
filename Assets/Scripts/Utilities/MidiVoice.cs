@@ -34,7 +34,7 @@ public class MidiVoice : MonoBehaviour
 
     public void SetPreset(int value)
     {
-        Debug.Log($"[MidiVoice] Setting preset to {value}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MidiVoice] Setting preset to {value}");
         preset = value;
 
         // Prime the channel immediately so the first note doesn't inherit the MPTK default (0),
@@ -90,7 +90,7 @@ public class MidiVoice : MonoBehaviour
     /// </summary>
     private void PlayNoteTicks(int note, int durationTicks, float velocity, bool trimToActiveWindow = true)
     {
-        Debug.Log($"[NOTE TICK] Value: {note} Duration: {durationTicks} Velocity: {velocity} ");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[NOTE TICK] Value: {note} Duration: {durationTicks} Velocity: {velocity} ");
         if (midiStreamPlayer == null || drumTrack == null || drumTrack.drumLoopBPM <= 0f)
         {
             if (!_warnedMissingDrums)
@@ -112,7 +112,7 @@ public class MidiVoice : MonoBehaviour
             {
                 int maxMs = Mathf.Max(10, Mathf.FloorToInt(remainSec * 1000f));
                 if (durationMs != Mathf.Min(durationMs, maxMs))
-                    Debug.Log($"[MIDI:TRIM] note={note} durationMs={durationMs} → {maxMs} (remainSec={remainSec:F3})");
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[MIDI:TRIM] note={note} durationMs={durationMs} → {maxMs} (remainSec={remainSec:F3})");
                 durationMs = Mathf.Min(durationMs, maxMs);
             }
         }

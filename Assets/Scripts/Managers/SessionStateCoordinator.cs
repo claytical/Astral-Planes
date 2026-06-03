@@ -80,7 +80,7 @@ public sealed class SessionStateCoordinator
     public void StartShipSelectionPhase()
     {
         SetCurrentState(GameState.Selection);
-        Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
     }
 
     public bool CheckAllPlayersOutOfEnergy()
@@ -135,7 +135,7 @@ public sealed class SessionStateCoordinator
         {
             if (lp == null) continue;
             var go = lp.gameObject;
-            Debug.Log($"[GFM] Destroying LocalPlayer GameObject '{go.name}'");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] Destroying LocalPlayer GameObject '{go.name}'");
             UnityEngine.Object.Destroy(go);
         }
 

@@ -226,7 +226,7 @@ public partial class DrumTrack : MonoBehaviour
         // - DrumTrack simply clamps and applies it.
         int prev = _binCount;
         _binCount = Mathf.Max(1, bins);
-        Debug.Log($"[DRUM:SET_BIN_COUNT] id={GetInstanceID()} {prev} → {_binCount}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM:SET_BIN_COUNT] id={GetInstanceID()} {prev} → {_binCount}");
     }
     private AudioClip ChooseEntryClip()
     {
@@ -273,7 +273,7 @@ public partial class DrumTrack : MonoBehaviour
 
     _lastMotifSetBy = who;
     _motifSetSerial++;
-    Debug.Log($"[DRUM][MOTIF][SET#{_motifSetSerial}] by {who}: incoming motif={incomingId}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][MOTIF][SET#{_motifSetSerial}] by {who}: incoming motif={incomingId}");
 
     // ------------------------------------------------------------
     // 1) Snapshot old state BEFORE overwrite
@@ -354,7 +354,7 @@ public partial class DrumTrack : MonoBehaviour
         _pendingTotalSteps = (motif != null) ? motif.stepsPerLoop : totalSteps;
         _pendingTimingValid = true;
 
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[DRUM][MOTIF] ApplyMotif(DEFERRED TIMING) by {who}: motif={(motif ? motif.motifId : "null")} " +
             $"steps {oldSteps}->{_pendingTotalSteps} bpm {oldBpm}->{_pendingBpm} " +
             $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport} " +
@@ -375,7 +375,7 @@ public partial class DrumTrack : MonoBehaviour
 
         _pendingTimingValid = false;
 
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
             $"entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
             $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromEnergy} bpm={drumLoopBPM} steps={totalSteps} " +
@@ -502,7 +502,7 @@ public partial class DrumTrack : MonoBehaviour
     _pendingDrumLoopArmed = false;
     _pendingDrumLoop = null;
 
-    Debug.Log($"[DRUM] Armed drum loop swap for dsp={swapDsp:F3} clip={newClip.name}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM] Armed drum loop swap for dsp={swapDsp:F3} clip={newClip.name}");
 }
 
     // 1) Late-bind motif is ONE-SHOT (only when _motif==null). It will NOT re-apply repeatedly.
@@ -550,7 +550,7 @@ public partial class DrumTrack : MonoBehaviour
         var m = ptm != null ? ptm.currentMotif : null;
         if (m != null)
         {
-            Debug.Log($"[DRUM][MOTIF] Late-bind applying PTM motif={m.motifId}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][MOTIF] Late-bind applying PTM motif={m.motifId}");
             ApplyMotif(m, armAtNextBoundary: true, who: "DrumTrack/LateBind", restartTransport: false);
         }
     }
@@ -953,7 +953,7 @@ public partial class DrumTrack : MonoBehaviour
             int w = _spawnGrid.gridWidth;
             float worldW = tile * (w - 1);
             float scrW = GetScreenWorldWidth();
-            Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / Mathf.Max(0.0001f, scrW):F3}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[GridScale] tile={tile:F3}, worldWide(grid)={worldW:F3}, screenWide={scrW:F3}, ratio={worldW / Mathf.Max(0.0001f, scrW):F3}");
         }
 
         if (_started) return;
@@ -997,7 +997,7 @@ public partial class DrumTrack : MonoBehaviour
         {
             if (ReferenceEquals(_motif, bootMotif))
             {
-                Debug.Log($"[BOOT] DrumTrack.ManualStart: motif already applied by PTM ({_motif.motifId}); skipping ApplyMotif.");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[BOOT] DrumTrack.ManualStart: motif already applied by PTM ({_motif.motifId}); skipping ApplyMotif.");
             }
             else
             {
@@ -1049,12 +1049,12 @@ public partial class DrumTrack : MonoBehaviour
 
         if (_motif != null)
         {
-            Debug.Log($"[BOOT] Drum transport started (motif): clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[BOOT] Drum transport started (motif): clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
         }
         else
         {
             // We don't know bpm/steps in fallback mode; keep whatever inspector/default values were set.
-            Debug.Log($"[BOOT] Drum transport started (fallback): clip={initialClip.name} dspStart={dspStart:F3} (PTM motif missing)");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[BOOT] Drum transport started (fallback): clip={initialClip.name} dspStart={dspStart:F3} (PTM motif missing)");
         }
     }
     public void ResetBeatSequencingState(string who)
@@ -1066,7 +1066,7 @@ public partial class DrumTrack : MonoBehaviour
         _burnTier = 0f;
         _lastIntensity01 = 0f;
 
-        Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
     }
     private void AutoSizeSpawnGridIfEnabled() { 
         if (!config.autoSizeSpawnGridToScreen) return; 
@@ -1100,14 +1100,14 @@ public partial class DrumTrack : MonoBehaviour
         // Any cached world mapping based on old grid dims must be invalidated.
         InvalidateGridWorldCache();
 
-        Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
     }   
 
     public void RequestPhaseStar(Vector2Int? cellHint = null)
     {
         if (_starPool != null)
         {
-            Debug.Log("[SpawnGuard] StarPool already active; abort.");
+            if (GameFlowManager.VerboseLogging) Debug.Log("[SpawnGuard] StarPool already active; abort.");
             return;
         }
 
@@ -1138,7 +1138,7 @@ public partial class DrumTrack : MonoBehaviour
         _starPool.Initialize(this, motif, profileAsset, targets);
 
         OnPhaseStarSpawned?.Invoke(profileAsset);
-        Debug.Log("[DrumTrack] StarPool created and initialized.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[DrumTrack] StarPool created and initialized.");
     }
 
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust)
@@ -1388,7 +1388,7 @@ public partial class DrumTrack : MonoBehaviour
         if (_pendingDrumLoopDspStart > 0.0)
         {
             // If you want, you can remember a "next-next" clip here. For now: ignore.
-            Debug.Log($"[DRUM] ScheduleDrumLoopChange ignored; swap already scheduled for dsp={_pendingDrumLoopDspStart:F3} new={newLoop.name}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM] ScheduleDrumLoopChange ignored; swap already scheduled for dsp={_pendingDrumLoopDspStart:F3} new={newLoop.name}");
             return;
         }
 

@@ -14,7 +14,7 @@ public static class ShipMusicalProfileLoader
             .LoadAll<ShipMusicalProfile>("ShipProfiles")
             .ToDictionary(profile => profile.shipName, profile => profile);
 
-        Debug.Log($"Loaded {_profilesByName.Count} ShipMusicalProfiles.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"Loaded {_profilesByName.Count} ShipMusicalProfiles.");
     }
 
     public static ShipMusicalProfile GetProfile(string shipName)

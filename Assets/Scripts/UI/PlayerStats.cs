@@ -19,7 +19,7 @@ public class PlayerStats : MonoBehaviour
         }
         else {Debug.LogWarning("There is no vehicle attached to this object.");}
         
-        Debug.Log("Energy collected should be displayed.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("Energy collected should be displayed.");
     }
     public void UpdateFuel(float currentEnergy, float maxEnergy)
     {

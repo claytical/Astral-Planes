@@ -138,7 +138,7 @@ public class NoteSetFactory : MonoBehaviour
         return silent;
     }
 
-    Debug.Log(
+    if (GameFlowManager.VerboseLogging) Debug.Log(
         $"[NoteSetFactory] RIFF MODE track=’{track.name}’ cfg=’{cfg.name}’ riffAsset=’{cfg.riff.name}’ " +
         $"events={riff.events.Count} riff.authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} " +
         $"totalSteps={totalSteps} debugKey={debugKey} binIndex={binIndex}"
@@ -158,7 +158,7 @@ public class NoteSetFactory : MonoBehaviour
     while (normalizedTarget < authoredAnchor)       normalizedTarget += 12;
     int delta = normalizedTarget - authoredAnchor + riff.octaveShift * 12;
 
-    Debug.Log(
+    if (GameFlowManager.VerboseLogging) Debug.Log(
         $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} authoredAnchor={authoredAnchor} " +
         $"targetRoot={targetRoot} delta={delta} (riff.authoredRootMidi was {riff.authoredRootMidi})"
     );

@@ -77,7 +77,7 @@ public class HarmonyDirector : MonoBehaviour
     {
         if (steps == 0)
         {
-            Debug.Log("[CHORD][HD] AdvanceChordAndRetuneAll called with steps=0; ignoring");
+            if (GameFlowManager.VerboseLogging) Debug.Log("[CHORD][HD] AdvanceChordAndRetuneAll called with steps=0; ignoring");
             return;
         }
         if (profile == null)
@@ -93,7 +93,7 @@ public class HarmonyDirector : MonoBehaviour
 
         int old = cursor;
         cursor = (cursor + steps) % profile.chordSequence.Count;
-        Debug.Log($"[CHORD][HD] Advance {steps} → cursor {old} → {cursor} (seq len {profile.chordSequence.Count})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD] Advance {steps} → cursor {old} → {cursor} (seq len {profile.chordSequence.Count})");
 
         ApplyChordToAllTracks(cursor);
     }
@@ -111,7 +111,7 @@ public class HarmonyDirector : MonoBehaviour
             ptm.currentMotif != null &&
             ptm.currentMotif.chordProgression != null)
         {
-            Debug.Log($"[CHORD][HD] Initializing from motif '{ptm.currentMotif.name}' profile '{ptm.currentMotif.chordProgression.name}'.");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD] Initializing from motif '{ptm.currentMotif.name}' profile '{ptm.currentMotif.chordProgression.name}'.");
             SetActiveProfile(ptm.currentMotif.chordProgression, applyImmediately: true);
         }
     }
@@ -229,7 +229,7 @@ public class HarmonyDirector : MonoBehaviour
         }
     }
     private void CommitNextChordNow() {
-        Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
         _forceCommitNextBoundary = true;
     }
     private void ApplyChordToAllTracks(int chordIndex)
@@ -239,11 +239,11 @@ public class HarmonyDirector : MonoBehaviour
         if (seq == null || seq.Count == 0) return;
 
         var chord = seq[chordIndex % seq.Count];
-        Debug.Log($"[CHORD][HD] RetuneAll (per-bin) baselineChord[{chordIndex}]={chord.rootNote}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD] RetuneAll (per-bin) baselineChord[{chordIndex}]={chord.rootNote}");
         foreach (var tr in GameFlowManager.Instance.controller.tracks)
         {
-            Debug.Log($"Applying progression retune on track={tr.name} role={tr.assignedRole}");
-            Debug.Log($"[CHORD][HD] Retuned track={tr.name} role={tr.assignedRole} mode=RetuneLoopToCurrentProgression");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"Applying progression retune on track={tr.name} role={tr.assignedRole}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD] Retuned track={tr.name} role={tr.assignedRole} mode=RetuneLoopToCurrentProgression");
             // IMPORTANT: Retune to per-bin chord assignments, not a single global chord.
             // Using RetuneLoopToChord(...) here flattens bin harmony (e.g., I-II -> I-I).
             tr.RetuneLoopToCurrentProgression();
@@ -265,7 +265,7 @@ public class HarmonyDirector : MonoBehaviour
         }
 
         // === Phase/Chord COMMIT path (system-driven) ===
-        Debug.Log($"[CHORD][HD][Boundary] forceCommit={_forceCommitNextBoundary} pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD][Boundary] forceCommit={_forceCommitNextBoundary} pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
         if (_forceCommitNextBoundary || _hasPendingProfileSwap)
         {
             bool appliedProfileSwap = false;

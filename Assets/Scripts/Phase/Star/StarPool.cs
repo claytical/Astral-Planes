@@ -115,7 +115,7 @@ public sealed class StarPool : MonoBehaviour
         BuildPhasePlan();
         SubscribeToTracks();
 
-        Debug.Log($"[StarPool] Initialized — total ejections={_remainingEjectionsTotal}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Initialized — total ejections={_remainingEjectionsTotal}");
     }
 
     public void DespawnAll()
@@ -140,7 +140,7 @@ public sealed class StarPool : MonoBehaviour
         _pendingGateCheck = false;
         _ejectedBurstWasEmpty = false;
         _remainingEjectionsTotal = 0;
-        Debug.Log("[StarPool] DespawnAll complete.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] DespawnAll complete.");
     }
 
     // ── Safety bubble (replaces PhaseStar static) ────────────────────────────
@@ -190,7 +190,7 @@ public sealed class StarPool : MonoBehaviour
     {
         _remainingEjectionsTotal = _activeMotif?.nodesPerStar ?? 1;
         _nodesCapturedThisMotif = 0;
-        Debug.Log($"[StarPool] BuildPhasePlan: total ejections={_remainingEjectionsTotal} roles=[{string.Join(",", _activeMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>())}]");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] BuildPhasePlan: total ejections={_remainingEjectionsTotal} roles=[{string.Join(",", _activeMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>())}]");
     }
 
     // ── Tick: reactive Star spawning ──────────────────────────────────────────
@@ -221,7 +221,7 @@ public sealed class StarPool : MonoBehaviour
 
             if (canSpawn)
             {
-                Debug.Log($"[StarPool] Tick spawn-check role={role} minePending={_mineNodePending} unresolved={HasUnresolvedMineNodeSequence()} slotEmpty={slotEmpty} alreadySpawning={alreadySpawning} hasDust={hasDust} remainingEjections={_remainingEjectionsTotal}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Tick spawn-check role={role} minePending={_mineNodePending} unresolved={HasUnresolvedMineNodeSequence()} slotEmpty={slotEmpty} alreadySpawning={alreadySpawning} hasDust={hasDust} remainingEjections={_remainingEjectionsTotal}");
                 _spawningThisFrame.Add(role);
                 SpawnStarForRole(role);
             }
@@ -286,7 +286,7 @@ public sealed class StarPool : MonoBehaviour
         star.EnterInMaze(targetWorldPos);
 
         _activeStars[role] = star;
-        Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");
 
         // If another role's MineNode is in flight, only pause this star if its next ejection
         // would expand its bin count — same-bin stars are allowed to run concurrently.
@@ -298,11 +298,11 @@ public sealed class StarPool : MonoBehaviour
             {
                 star.Pause();
                 if (!_pausedStars.Contains(star)) _pausedStars.Add(star);
-                Debug.Log($"[StarPool] SpawnStarForRole: pre-paused {role} star (expansion conflict) — waiting for {_lastEjectedRole} mine sequence to resolve.");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] SpawnStarForRole: pre-paused {role} star (expansion conflict) — waiting for {_lastEjectedRole} mine sequence to resolve.");
             }
             else
             {
-                Debug.Log($"[StarPool] SpawnStarForRole: {role} star NOT pre-paused — same-bin ejection allowed concurrently.");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] SpawnStarForRole: {role} star NOT pre-paused — same-bin ejection allowed concurrently.");
             }
         }
 
@@ -315,7 +315,7 @@ public sealed class StarPool : MonoBehaviour
 
     private void OnStarEjected(PhaseStar star, MusicalRole role)
     {
-        Debug.Log($"[StarPool] OnStarEjected role={role} remainingHarvests={_remainingEjectionsTotal}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] OnStarEjected role={role} remainingHarvests={_remainingEjectionsTotal}");
 
         _lastEjectingStar = star;
         _lastEjectedRole = role;
@@ -331,11 +331,11 @@ public sealed class StarPool : MonoBehaviour
         if (_activeStars.TryGetValue(role, out var active) && active == star)
         {
             _activeStars.Remove(role);
-            Debug.Log($"[StarPool] _activeStars.Remove({role}) — ejecting star={star.name}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] _activeStars.Remove({role}) — ejecting star={star.name}");
         }
         else
         {
-            Debug.Log($"[StarPool] _activeStars.Remove({role}) skipped — active={(active == null ? "null" : active.name)} star={star.name} match={active == star}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] _activeStars.Remove({role}) skipped — active={(active == null ? "null" : active.name)} star={star.name} match={active == star}");
         }
 
         // Pause stars that would expand their bin on next ejection — same-bin stars stay active.
@@ -378,13 +378,13 @@ public sealed class StarPool : MonoBehaviour
             var track = FindTrackForRole(kvp.Key);
             if (track != null && track.GetBinCursor() < track.loopMultiplier)
             {
-                Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star NOT paused — same-bin ejection allowed.");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star NOT paused — same-bin ejection allowed.");
                 continue;
             }
 
             star.Pause();
             if (!_pausedStars.Contains(star)) _pausedStars.Add(star);
-            Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star paused — would expand bin.");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] PauseExpansionConflicts: {kvp.Key} star paused — would expand bin.");
         }
     }
 
@@ -403,7 +403,7 @@ public sealed class StarPool : MonoBehaviour
             if (star != null) star.Resume();
         }
         _pausedStars.Clear();
-        Debug.Log("[StarPool] Resumed all paused Stars.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] Resumed all paused Stars.");
     }
 
     // ── Collectable burst tracking ────────────────────────────────────────────
@@ -441,12 +441,12 @@ public sealed class StarPool : MonoBehaviour
         bool wasExpired   = hasRef && star.LastNodeWasExpired;
         bool wasEscaped   = hasRef && star.LastNodeWasEscaped;
         bool wasCaptured  = hasRef && star.LastNodeWasCaptured;
-        Debug.Log($"[StarPool] MineNode resolved role={role} captured={wasCaptured} escaped={wasEscaped} expired={wasExpired} superNode={wasSuperNode} emptyBurst={_ejectedBurstWasEmpty} CIF={AnyCollectablesInFlight()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] MineNode resolved role={role} captured={wasCaptured} escaped={wasEscaped} expired={wasExpired} superNode={wasSuperNode} emptyBurst={_ejectedBurstWasEmpty} CIF={AnyCollectablesInFlight()}");
 
         if (wasCaptured)
         {
             _nodesCapturedThisMotif++;
-            Debug.Log($"[StarPool] Node captured — capturedThisMotif={_nodesCapturedThisMotif}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Node captured — capturedThisMotif={_nodesCapturedThisMotif}");
         }
 
         // Clear the gate immediately for:
@@ -456,7 +456,7 @@ public sealed class StarPool : MonoBehaviour
         if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired || wasEscaped))
         {
             if (wasExpired || wasEscaped)
-                Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — no harvest, spawning next star (remainingHarvests={_remainingEjectionsTotal})");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — no harvest, spawning next star (remainingHarvests={_remainingEjectionsTotal})");
 
             _mineNodeResolved = false;
             _mineNodePending = false;
@@ -475,7 +475,7 @@ public sealed class StarPool : MonoBehaviour
         // Pre-ejection expansion bursts arrive before the MineNode is destroyed, so
         // _mineNodeResolved is still false when they clear.
         bool isMineBurst = isEjectedTrack && _mineNodeResolved;
-        Debug.Log($"[StarPool] HandleCollectableBurstCleared track={track.assignedRole} burstId={burstId} hadNotes={hadNotes} isEjected={isEjectedTrack} mineResolved={_mineNodeResolved} isMineBurst={isMineBurst} unresolved={HasUnresolvedMineNodeSequence()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] HandleCollectableBurstCleared track={track.assignedRole} burstId={burstId} hadNotes={hadNotes} isEjected={isEjectedTrack} mineResolved={_mineNodeResolved} isMineBurst={isMineBurst} unresolved={HasUnresolvedMineNodeSequence()}");
 
         // Detect the empty-burst race: SpawnCollectableBurst fires OnCollectableBurstCleared
         // synchronously with hadNotes=false BEFORE TriggerExplosion sets _mineNodeResolved.
@@ -488,11 +488,11 @@ public sealed class StarPool : MonoBehaviour
             if (hadNotes)
             {
                 _remainingEjectionsTotal = Mathf.Max(0, _remainingEjectionsTotal - 1);
-                Debug.Log($"[StarPool] Harvest complete — remainingHarvests={_remainingEjectionsTotal}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Harvest complete — remainingHarvests={_remainingEjectionsTotal}");
             }
             else
             {
-                Debug.Log($"[StarPool] Mine burst had no notes — not counted as harvest, spawning next star");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Mine burst had no notes — not counted as harvest, spawning next star");
             }
         }
 
@@ -504,7 +504,7 @@ public sealed class StarPool : MonoBehaviour
         {
             _mineNodeResolved = false;
             _mineNodePending = false;
-            Debug.Log($"[StarPool] Mine burst cleared — _mineNodePending=false");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Mine burst cleared — _mineNodePending=false");
         }
 
         if (HasUnresolvedMineNodeSequence())
@@ -572,12 +572,12 @@ public sealed class StarPool : MonoBehaviour
     {
         if (_remainingEjectionsTotal > 0)
         {
-            Debug.Log($"[StarPool] CheckBridgeGate: {_remainingEjectionsTotal} ejections remaining — blocked");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: {_remainingEjectionsTotal} ejections remaining — blocked");
             return;
         }
-        if (_activeStars.Values.Any(s => s != null)) { Debug.Log($"[StarPool] CheckBridgeGate: activeStars still live — blocked"); return; }
-        if (_pausedStars.Any(s => s != null)) { Debug.Log($"[StarPool] CheckBridgeGate: pausedStars still live — blocked"); return; }
-        if (HasUnresolvedMineNodeSequence()) { Debug.Log($"[StarPool] CheckBridgeGate: CIF — blocked"); return; }
+        if (_activeStars.Values.Any(s => s != null)) { if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: activeStars still live — blocked"); return; }
+        if (_pausedStars.Any(s => s != null)) { if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: pausedStars still live — blocked"); return; }
+        if (HasUnresolvedMineNodeSequence()) { if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: CIF — blocked"); return; }
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var gfm = _gfm;
@@ -587,12 +587,12 @@ public sealed class StarPool : MonoBehaviour
         // the player had no successful interaction — restart the same motif instead of bridging.
         if (_nodesCapturedThisMotif == 0 && AllTracksEmpty())
         {
-            Debug.Log($"[StarPool] CheckBridgeGate: zero captures, empty loops — restarting motif.");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: zero captures, empty loops — restarting motif.");
             BuildPhasePlan();
             return;
         }
 
-        Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 captured={_nodesCapturedThisMotif} — triggering bridge.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 captured={_nodesCapturedThisMotif} — triggering bridge.");
         gfm.BeginMotifBridge("StarPool");
     }
 

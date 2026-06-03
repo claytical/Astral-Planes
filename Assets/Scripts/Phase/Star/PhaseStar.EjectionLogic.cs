@@ -216,7 +216,7 @@ public partial class PhaseStar
 
         Disarm(PhaseStarDisarmReason.NodeResolving, ejectedTrack.trackColor);
 
-        Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
         if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
             SpawnSuperNodeCommon(contact, ejectedTrack);
@@ -339,7 +339,7 @@ public partial class PhaseStar
 
         if (!fullyExpanded)
         {
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[SuperNodeGate] NO: not fully expanded. " +
                 $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
             );
@@ -349,7 +349,7 @@ public partial class PhaseStar
         var planned = track.GetCurrentNoteSet();
         if (planned == null)
         {
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[SuperNodeGate] NO: planned noteSet is null. " +
                 $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
             );
@@ -358,7 +358,7 @@ public partial class PhaseStar
 
         bool saturated = track.IsSaturatedForRepeatingNoteSet(planned);
 
-        Debug.Log(
+        if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[SuperNodeGate] {(saturated ? "YES" : "NO")}: " +
             $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
             $"saturated={saturated}"
@@ -395,7 +395,7 @@ public partial class PhaseStar
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
         if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
             _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
-        Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
     }
@@ -420,7 +420,7 @@ public partial class PhaseStar
         if (cfg.riff != null && cfg.riff.riff.events != null && cfg.riff.riff.events.Count > 0)
         {
             noteCount = cfg.riff.riff.events.Count;
-            Debug.Log($"[PhaseStar:ZapCount] role={role} voiceIndex={track.voiceIndex} riff={cfg.riff.name} events={noteCount}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapCount] role={role} voiceIndex={track.voiceIndex} riff={cfg.riff.name} events={noteCount}");
             return true;
         }
 

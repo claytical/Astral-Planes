@@ -141,16 +141,16 @@ public partial class NoteVisualizer : MonoBehaviour
     public void RegisterCollectedMarker(InstrumentTrack track, int burstId, int step, GameObject markerGo)
     {
         if (!track || !markerGo) return;
-        Debug.Log($"[RegisterCollected] {track.name} burstId={burstId} step={step}, markerGo y={markerGo.transform.position.y:F1}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[RegisterCollected] {track.name} burstId={burstId} step={step}, markerGo y={markerGo.transform.position.y:F1}");
         if (noteMarkers.TryGetValue((track, step), out var existing) && existing && existing.gameObject != markerGo)
         {
-            Debug.Log($"  → DESTROYING old marker at step {step}, was at y={existing.position.y:F1}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"  → DESTROYING old marker at step {step}, was at y={existing.position.y:F1}");
             Destroy(existing.gameObject);
         }
 
         noteMarkers[(track, step)] = markerGo.transform;
         _stepBurst[(track, step)]  = burstId;
-        Debug.Log($"[NV:STEP_BURST_SET] track={track.name} step={step} burstId={burstId} markerId={markerGo.GetInstanceID()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:STEP_BURST_SET] track={track.name} step={step} burstId={burstId} markerId={markerGo.GetInstanceID()}");
 
         var tag = markerGo.GetComponent<MarkerTag>();
         if (!tag) tag = markerGo.AddComponent<MarkerTag>();
@@ -760,7 +760,7 @@ public partial class NoteVisualizer : MonoBehaviour
         if (track == null) return;
 
         int trackIndex = Array.IndexOf(_ctrl.tracks, track);
-        Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId}");
         if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
         var row = trackRows[trackIndex];
 
@@ -785,7 +785,7 @@ public partial class NoteVisualizer : MonoBehaviour
         }
         foreach (var k in toRemove)
         {
-            Debug.Log($"[CANONICALIZE TRACK MARKERS] Remove {k.Item1}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] Remove {k.Item1}");
             noteMarkers.Remove(k);
         }
     }
@@ -793,7 +793,7 @@ public partial class NoteVisualizer : MonoBehaviour
     private void NormalizeTagsOnRow(RectTransform row, InstrumentTrack track, HashSet<int> loopSteps, int currentBurstId)
     {
         var tags = row.GetComponentsInChildren<MarkerTag>(includeInactive: true);
-        Debug.Log($"[CANONICALIZE TRACK MARKERS] Tags: {tags.Length}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] Tags: {tags.Length}");
 
         foreach (var tag in tags)
         {
@@ -847,11 +847,11 @@ public partial class NoteVisualizer : MonoBehaviour
 
             if (tag.isPlaceholder)
             {
-                Debug.Log($"[CANONICALIZE TRACK MARKERS] Placeholder Tag: {tag.gameObject.name}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] Placeholder Tag: {tag.gameObject.name}");
 
                 if (tag.burstId != currentBurstId)
                 {
-                    Debug.Log($"[CANONICALIZE TRACK MARKERS] Placeholder Tag: {tag.gameObject.name} BurstID is not Current BurstID");
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] Placeholder Tag: {tag.gameObject.name} BurstID is not Current BurstID");
 #if UNITY_EDITOR
                     if (!Application.isPlaying) UnityEngine.Object.DestroyImmediate(tag.gameObject);
                     else UnityEngine.Object.Destroy(tag.gameObject);
@@ -903,7 +903,7 @@ public partial class NoteVisualizer : MonoBehaviour
     }
     public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
     {
-        Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
         var key = (track, stepIndex);
 
         EnsureTrackRowsForAllTracks();
@@ -943,7 +943,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
         if (_animatingSteps.Contains(key))
         {
-            Debug.Log($"[NoteViz] [Reuse-WhileAnimating] step {stepIndex} is animating → keep existing, no new spawn");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] [Reuse-WhileAnimating] step {stepIndex} is animating → keep existing, no new spawn");
             result = existing.gameObject;
             return true;
         }
@@ -966,7 +966,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
             var ml = existing.GetComponent<MarkerLight>() ?? existing.gameObject.AddComponent<MarkerLight>();
             ml.SetGrey(track.trackColor);
-            Debug.Log($"[NV:MARKER_PLACEHOLDER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={existing.gameObject.GetInstanceID()} placeholder=True");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:MARKER_PLACEHOLDER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={existing.gameObject.GetInstanceID()} placeholder=True");
         }
 
         result = existing.gameObject;
@@ -982,7 +982,7 @@ public partial class NoteVisualizer : MonoBehaviour
         var adopt = TryAdoptExistingAt(track, stepIndex, row);
         if (!adopt) return false;
 
-        Debug.Log($"[NoteViz] Found note to adopt. This shouldn’t happen.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] Found note to adopt. This shouldn’t happen.");
         noteMarkers[key] = adopt;
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, adopt);
 
@@ -1004,7 +1004,7 @@ public partial class NoteVisualizer : MonoBehaviour
             ml.SetGrey(track.trackColor);
         }
 
-        Debug.Log($"[NoteViz] ADOPT marker track={track.name} step={stepIndex} lit={lit} burst={burstId} go={adopt.gameObject.GetInstanceID()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] ADOPT marker track={track.name} step={stepIndex} lit={lit} burst={burstId} go={adopt.gameObject.GetInstanceID()}");
         result = adopt.gameObject;
         return true;
     }
@@ -1017,7 +1017,7 @@ public partial class NoteVisualizer : MonoBehaviour
         int binSize = Mathf.Max(1, track.BinSize());
         int leaderBinsForPlacement = GetLeaderBinsForPlacement(track, totalSteps, binSize);
         float xLocal = ComputeXLocalForTrack(rowRect, track, stepIndex, binSize, leaderBinsForPlacement);
-        Debug.Log($"xLocal : {xLocal} for track {track.name} stepIndex {stepIndex} lit={shouldLight}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"xLocal : {xLocal} for track {track.name} stepIndex {stepIndex} lit={shouldLight}");
 
         float bottomWorldY = GetBottomWorldY();
         float bottomLocalY = row.InverseTransformPoint(new Vector3(0f, bottomWorldY, 0f)).y;
@@ -1039,7 +1039,7 @@ public partial class NoteVisualizer : MonoBehaviour
         if (burstId >= 0) newTag.burstId = burstId;
 
         noteMarkers[key] = marker.transform;
-        Debug.Log($"[NV:MARKER_REGISTER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={marker.gameObject.GetInstanceID()} lit={shouldLight}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:MARKER_REGISTER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={marker.gameObject.GetInstanceID()} lit={shouldLight}");
 
         ApplyMarkerVisuals(marker, track, shouldLight);
         return marker;

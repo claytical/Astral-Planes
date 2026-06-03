@@ -195,7 +195,7 @@ public partial class Vehicle : MonoBehaviour
             gfm = GameFlowManager.Instance;
             _mineNodeLayerMask = LayerMask.GetMask("MineNode");
             var col = GetComponent<Collider2D>();
-            Debug.Log(
+            if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[VEHICLE:INIT] '{name}' layer={gameObject.layer} " +
                 $"col={(col ? col.GetType().Name : "NULL")} col.isTrigger={(col ? col.isTrigger : false)} " +
                 $"rb={(rb ? rb.bodyType.ToString() : "NULL")}",
@@ -1604,10 +1604,10 @@ public partial class Vehicle : MonoBehaviour
             inGraceWindow = vehicleConfig.manualReleaseGracePeriodSteps > 0f &&
                             backFromTarget <= vehicleConfig.manualReleaseGracePeriodSteps;
             pass = true;
-            Debug.Log($"[RELEASE_RETARGET] oldTarget rejected, newTarget={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} PASS=True");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[RELEASE_RETARGET] oldTarget rejected, newTarget={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} PASS=True");
         }
     }
-    Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={effectiveArmSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[RELEASE_GATE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} back={backFromTarget:F2} window={effectiveArmSteps:F1} grace={vehicleConfig.manualReleaseGracePeriodSteps:F1} effectiveTotal={effectiveTotal} PASS={pass}");
 
     if (!pass)
     {
@@ -1615,7 +1615,7 @@ public partial class Vehicle : MonoBehaviour
         // can be armed on a later tick when its step enters the window.
         if (!allowSacrifice) return false;
 
-        Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[SACRIFICE] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} — note sacrificed outside timing window");
         ResolvePlaybackNote(p, targetAbsStep, out int midiToPlay, out int durToPlay);
         p.track.PlayOneShotMidi(midiToPlay, p.velocity127, durToPlay);
         DiscardPendingNote(p);
@@ -1662,7 +1662,7 @@ public partial class Vehicle : MonoBehaviour
     }
 
     // Defensive guard: all non-pass paths should have returned above.
-    Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={effectiveArmSteps:F1} PASS=False commitSkipped=True");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={effectiveArmSteps:F1} PASS=False commitSkipped=True");
     return false;
 }
 }
