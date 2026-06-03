@@ -108,7 +108,7 @@ public partial class PhaseStar
         {
             TransitionZapState(ZapProgressState.Zapping, role, $"refresh:{reason}");
         }
-        Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
         return true;
     }
 
@@ -142,7 +142,7 @@ public partial class PhaseStar
         _zapProgressState = next;
         ApplyDustAcquisitionPolicy($"zap-transition:{reason}");
         bool acquisitionEnabled = MayAcquireDustTargets();
-        Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");
     }
 
     public void OnCoordinatorLockOwnedByAnotherStar()

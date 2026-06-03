@@ -17,7 +17,7 @@ public static class MusicalRoleProfileLibrary
             }
         }
 
-        Debug.Log($"Loaded {_roleToProfile.Count} MusicalRoleProfiles.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"Loaded {_roleToProfile.Count} MusicalRoleProfiles.");
     }
 
     public static MusicalRoleProfile GetProfile(MusicalRole role)

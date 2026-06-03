@@ -51,7 +51,7 @@ public class PhaseTransitionManager : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[CHAPTER] All phases exhausted (loopChapters=false holdOnLast={holdOnLastChapter}); by {who}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] All phases exhausted (loopChapters=false holdOnLast={holdOnLastChapter}); by {who}");
                 if (holdOnLastChapter)
                     next = count - 1; // restart last phase's motifs from top
                 else
@@ -81,15 +81,15 @@ public class PhaseTransitionManager : MonoBehaviour
 
         if (oldIndex != currentPhaseIndex)
         {
-            Debug.Log($"[CHAPTER] phase {oldIndex}→{currentPhaseIndex} by {who}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] phase {oldIndex}→{currentPhaseIndex} by {who}");
             OnPhaseChanged?.Invoke();
         }
         else
         {
-            Debug.Log($"[CHAPTER] Re-start phase {currentPhaseIndex} by {who}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] Re-start phase {currentPhaseIndex} by {who}");
         }
 
-        Debug.Log($"[MOTIF] Chapter init/apply: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MOTIF] Chapter init/apply: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex} by {who}");
 
         ApplyMotifToAudioAndTracks(
             oldMotif,
@@ -119,7 +119,7 @@ public class PhaseTransitionManager : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[MOTIF] Exhausted chapter motifs (loop=false) phase={currentPhaseIndex} by {who}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[MOTIF] Exhausted chapter motifs (loop=false) phase={currentPhaseIndex} by {who}");
                 return null;
             }
         }
@@ -127,7 +127,7 @@ public class PhaseTransitionManager : MonoBehaviour
         currentMotifIndex = next;
         currentMotif = _chapterMotifs[currentMotifIndex];
 
-        Debug.Log($"[MOTIF] Advance by {who}: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex}/{_chapterMotifs.Count}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MOTIF] Advance by {who}: motif={(currentMotif ? currentMotif.motifId : "null")} idx={currentMotifIndex}/{_chapterMotifs.Count}");
 
         ApplyMotifToAudioAndTracks(
             oldMotif,
@@ -157,7 +157,7 @@ public class PhaseTransitionManager : MonoBehaviour
         currentMotifIndex = motifIdx;
         currentMotif      = _chapterMotifs[motifIdx];
 
-        Debug.Log($"[MOTIF] JumpToMotifIndex {motifIdx}: motif={(currentMotif ? currentMotif.motifId : "null")} by {who}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MOTIF] JumpToMotifIndex {motifIdx}: motif={(currentMotif ? currentMotif.motifId : "null")} by {who}");
 
         ApplyMotifToAudioAndTracks(
             prev,
@@ -201,7 +201,7 @@ public class PhaseTransitionManager : MonoBehaviour
         _chapterMotifs = phase.motifs;
         _chapterLoops  = phase.loopMotifs;
 
-        Debug.Log($"[CHAPTER] Loaded phase {idx} '{phase.phaseName}' with {_chapterMotifs.Count} motif(s), loop={_chapterLoops}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] Loaded phase {idx} '{phase.phaseName}' with {_chapterMotifs.Count} motif(s), loop={_chapterLoops}");
     }
 
     private void ApplyMotifToAudioAndTracks(

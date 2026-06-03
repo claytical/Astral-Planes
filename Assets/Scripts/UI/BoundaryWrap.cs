@@ -405,7 +405,7 @@ public class BoundaryWrap : MonoBehaviour
         {
             mine.ReflectCarveDir(reflectX: axis == WrapAxis.Horizontal);
             if (debugMineBoundaryLog)
-                Debug.Log($"[BoundaryWrap] Mine hard clamp fallback on {side} for {mine.name} at t={Time.time:F3}.", this);
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[BoundaryWrap] Mine hard clamp fallback on {side} for {mine.name} at t={Time.time:F3}.", this);
         }
     }
 
@@ -440,7 +440,7 @@ public class BoundaryWrap : MonoBehaviour
         _lastMineBounceTime[rb] = now;
 
         if (debugMineBoundaryLog)
-            Debug.Log($"[BoundaryWrap] Mine soft rebound {rb.name} side={side} pre={preVel} post={postVel} n={normal} pen={penetration:F3}", this);
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[BoundaryWrap] Mine soft rebound {rb.name} side={side} pre={preVel} post={postVel} n={normal} pen={penetration:F3}", this);
 
         return true;
     }

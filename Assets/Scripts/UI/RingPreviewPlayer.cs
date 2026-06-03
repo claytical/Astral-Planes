@@ -127,7 +127,7 @@ public class RingPreviewPlayer : MonoBehaviour
             if (roleProf != null && kvp.Value < 16)
             {
                 _channelPresets[kvp.Value] = roleProf.midiPreset;
-                Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {roleProf.midiPreset}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {roleProf.midiPreset}");
             }
         }
 

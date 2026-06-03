@@ -55,7 +55,7 @@ public partial class NoteVisualizer
     public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color, float noteDuration)
     {
         if (track == null || source == null) return;
-        Debug.Log($"[CONFIRM_SCHED] track={track.name} step={step} dsp={dspTime:F6} now={AudioSettings.dspTime:F6} dt={(dspTime-AudioSettings.dspTime):F4}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CONFIRM_SCHED] track={track.name} step={step} dsp={dspTime:F6} now={AudioSettings.dspTime:F6} dt={(dspTime-AudioSettings.dspTime):F4}");
         _firstPlayRequests.Add(new FirstPlayConfirmRequest
         {
             source = source,

@@ -143,7 +143,7 @@ public partial class GameFlowManager : MonoBehaviour
         var prebuilt = track.GetNoteSetForBin(targetBin);
         if (prebuilt != null)
         {
-            Debug.Log($"[GFM:GenerateNotes] track={track.name} bin={targetBin} -> returning prebuilt NoteSet (cfg deterministic)");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM:GenerateNotes] track={track.name} bin={targetBin} -> returning prebuilt NoteSet (cfg deterministic)");
             return prebuilt;
         }
 
@@ -236,7 +236,7 @@ public partial class GameFlowManager : MonoBehaviour
     float hardTimeout = 8f;
     float startTime = Time.time;
 
-    Debug.Log("[GFM] [SETUP] Begin. Trying initial TryFillTracksBundleIfMissing.");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Begin. Trying initial TryFillTracksBundleIfMissing.");
     TryFillTracksBundleIfMissing();
 
     yield return new WaitUntil(() =>
@@ -256,7 +256,7 @@ public partial class GameFlowManager : MonoBehaviour
         yield break;
     }
 
-    Debug.Log("[GFM] [SETUP] Core refs present." +
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Core refs present." +
               $"\n  Drum: {activeDrumTrack}" +
               $"\n  Ctrl: {controller}" +
               $"\n  Viz : {noteViz}" +
@@ -270,19 +270,19 @@ public partial class GameFlowManager : MonoBehaviour
         .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
         .ToList();
 
-    Debug.Log("[GFM] [SETUP] Ship profiles resolved: " +
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Ship profiles resolved: " +
               string.Join(", ", shipProfiles.Select(sp => sp ? sp.name : "<null>")));
     // ------------------------------------------------------------
     // STEP 1: Configure tracks from selected ships
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips BEGIN");
     controller.ConfigureTracksFromShips(shipProfiles);
-    Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips END");
 
     // ------------------------------------------------------------
     // STEP 1b: Load first chapter / motif and preconfigure track note sets
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 1b] StartChapter BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1b] StartChapter BEGIN");
     if (PhaseLibraryStartConfig.HasPendingStart)
     {
         phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
@@ -293,32 +293,32 @@ public partial class GameFlowManager : MonoBehaviour
     {
         phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
     }
-    Debug.Log("[GFM] [STEP 1b] StartChapter END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1b] StartChapter END");
 
     // ------------------------------------------------------------
     // STEP 2: Initialize graph-facing systems
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony BEGIN");
     noteViz.Initialize();
     harmony.Initialize(activeDrumTrack, controller);
-    Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony END");
 
     // ------------------------------------------------------------
     // STEP 3: Start timing/grid authorities
     // IMPORTANT:
     // Keep these before player launch so grid/audio transport are valid.
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust BEGIN");
     activeDrumTrack.ManualStart();
     dustGenerator.ManualStart();
-    Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust END");
 
     // ------------------------------------------------------------
     // STEP 4: Launch players so vehicle world positions exist for maze pocket carving
     // DO NOT mark the game state Playing yet — we want the first maze bootstrap
     // to complete before the session is considered live.
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 4] Launch players BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 4] Launch players BEGIN");
     foreach (var lp in localPlayers)
     {
         if (lp == null)
@@ -327,10 +327,10 @@ public partial class GameFlowManager : MonoBehaviour
             continue;
         }
 
-        Debug.Log($"[GFM] [STEP 4] Launching player: {lp.name}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] [STEP 4] Launching player: {lp.name}");
         lp.Launch();
     }
-    Debug.Log("[GFM] [STEP 4] Launch players END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 4] Launch players END");
 
     // Give launched players one frame to settle transforms/registration before maze generation
     yield return null;
@@ -338,23 +338,23 @@ public partial class GameFlowManager : MonoBehaviour
     // ------------------------------------------------------------
     // STEP 5: Apply harmony profile for the current motif
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile BEGIN");
     var phase = phaseTransitionManager.currentPhase;
-    Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
+    if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
 
     if (phaseTransitionManager.currentMotif != null)
         harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
 
-    Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
 
     // ------------------------------------------------------------
     // STEP 6: Build first maze + spawn PhaseStar
     // IMPORTANT:
     // This completes BEFORE we mark the run as Playing.
     // ------------------------------------------------------------
-    Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar BEGIN");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar BEGIN");
     yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-    Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar END");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar END");
 
     // One more frame so any maze-ready/spawn side effects settle before live play starts
     yield return null;
@@ -366,7 +366,7 @@ public partial class GameFlowManager : MonoBehaviour
 
     _setupDone = true;
     _setupInFlight = false;
-    Debug.Log("[GFM] [SETUP] Completed successfully.");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Completed successfully.");
 
     yield break;
 }
@@ -803,7 +803,7 @@ public partial class GameFlowManager : MonoBehaviour
         }
 
         if (killed > 0)
-            Debug.Log($"[BRIDGE] CleanupAllNoteTethers destroyed={killed}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[BRIDGE] CleanupAllNoteTethers destroyed={killed}");
     }
 
     // Coordinator facade helpers
@@ -846,7 +846,7 @@ public partial class GameFlowManager : MonoBehaviour
     {
         if (motif == null || !motif.spawnVehicleTrap)
         {
-            Debug.Log($"[TRAP] SpawnVehicleTraps skipped: motif={motif?.motifId ?? "null"} spawnVehicleTrap={motif?.spawnVehicleTrap}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRAP] SpawnVehicleTraps skipped: motif={motif?.motifId ?? "null"} spawnVehicleTrap={motif?.spawnVehicleTrap}");
             return;
         }
         if (dustGenerator == null || activeDrumTrack == null)
@@ -862,14 +862,14 @@ public partial class GameFlowManager : MonoBehaviour
             ? vehicles
             : new List<Vehicle>(FindObjectsOfType<Vehicle>());
 
-        Debug.Log($"[TRAP] SpawnVehicleTraps motif={motif.motifId} shape={motif.trapShape} radius={motif.trapRadius} vehicles={allVehicles.Count}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRAP] SpawnVehicleTraps motif={motif.motifId} shape={motif.trapShape} radius={motif.trapRadius} vehicles={allVehicles.Count}");
 
         for (int i = 0; i < allVehicles.Count; i++)
         {
             var v = allVehicles[i];
             if (v == null || !v.isActiveAndEnabled) continue;
             Vector2Int center = activeDrumTrack.WorldToGridPosition(v.transform.position);
-            Debug.Log($"[TRAP] Spawning trap around vehicle[{i}] at grid {center}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRAP] Spawning trap around vehicle[{i}] at grid {center}");
 
             if (motif.trapShape == TrapShape.Circle)
             {
@@ -887,7 +887,7 @@ public partial class GameFlowManager : MonoBehaviour
                     vehicleNoSpawnRadiusCells: 0,
                     innerRadiusCellsExclusive: inner,
                     hideRole: true);
-                Debug.Log($"[TRAP] GrowVoidDustDiskFromGrid processed={processed} center={center} outer={motif.trapRadius} inner={inner}");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[TRAP] GrowVoidDustDiskFromGrid processed={processed} center={center} outer={motif.trapRadius} inner={inner}");
             }
             else
             {

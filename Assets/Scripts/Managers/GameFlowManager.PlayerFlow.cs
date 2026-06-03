@@ -18,7 +18,7 @@ public partial class GameFlowManager
         SessionState.CheckAllPlayersReady(
             beginTutorial: () =>
             {
-                Debug.Log("[TUTORIAL] Begin Tutorial Sequence");
+                if (GameFlowManager.VerboseLogging) Debug.Log("[TUTORIAL] Begin Tutorial Sequence");
                 ControlTutorialDirector.Instance.BeginPrimaryTutorialSequence();
             },
             beginGameplay: BeginGameAfterTutorial);

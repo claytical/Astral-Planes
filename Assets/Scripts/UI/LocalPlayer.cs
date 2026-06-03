@@ -163,7 +163,7 @@ public class LocalPlayer : MonoBehaviour
             GameFlowManager.Instance.harmony                          // HarmonyDirector bound
     );
         
-    Debug.Log("[CRASH TEST] Track Ready");
+    if (GameFlowManager.VerboseLogging) Debug.Log("[CRASH TEST] Track Ready");
         
     var gfm = GameFlowManager.Instance;
 
@@ -452,7 +452,7 @@ public class LocalPlayer : MonoBehaviour
         float v = value.Get<float>();
         if (v > 0) plane?.TurnOnBoost(v);
         else plane?.TurnOffBoost();
-        Debug.Log($"[VEHICLE] Thrusting stopped at {v}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[VEHICLE] Thrusting stopped at {v}");
 
     }
 

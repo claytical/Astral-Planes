@@ -46,7 +46,7 @@ public sealed class SceneFlowCoordinator
 
     public IEnumerator QuitToSelection()
     {
-        Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={_gameFlow.demoMode})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={_gameFlow.demoMode})");
         yield return _session.DestroyPlayersForSelection();
 
         _gameFlow.ClearVehicles();
@@ -79,7 +79,7 @@ public sealed class SceneFlowCoordinator
     {
         if (!grid) return;
         _gameFlow.SetPlayerStatsGrid(grid);
-        Debug.Log($"[GFM] Registered PlayerStatsGrid from scene '{grid.gameObject.scene.name}'.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] Registered PlayerStatsGrid from scene '{grid.gameObject.scene.name}'.");
     }
 
     public void UnregisterPlayerStatsGrid(Transform grid)
@@ -87,7 +87,7 @@ public sealed class SceneFlowCoordinator
         if (_gameFlow.PlayerStatsGrid == grid)
         {
             _gameFlow.ClearPlayerStatsGrid();
-            Debug.Log("[GFM] PlayerStatsGrid unregistered (scene unload?).");
+            if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] PlayerStatsGrid unregistered (scene unload?).");
         }
     }
 
@@ -101,7 +101,7 @@ public sealed class SceneFlowCoordinator
         _gameFlow.dustGenerator = a.dustGenerator;
         _gameFlow.spawnGrid = a.spawnGrid;
 
-        Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
+        if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] Tracks bundle registered from Generated Track scene.");
         BindSceneVoicesToTimingAuthority();
     }
 
