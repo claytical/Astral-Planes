@@ -155,14 +155,46 @@ public class BoundaryWrap : MonoBehaviour
         var rb = other.attachedRigidbody;
         if (rb == null) return;
 
-        if (!_vehicleCache.TryGetValue(rb, out var vehicle) || vehicle == null) return;
+        if (_vehicleCache.TryGetValue(rb, out var vehicle) && vehicle != null)
+        {
+            HandleVehicleMembrane(rb, vehicle);
+            return;
+        }
 
-        HandleVehicleMembrane(rb, vehicle);
+        if (rb.GetComponent<Collectable>() != null)
+            PushCollectableInward(rb);
+    }
+
+    private void PushCollectableInward(Rigidbody2D rb)
+    {
+        if (_self == null) return;
+        Vector2 inward = GetBoundaryInwardNormal();
+        float outwardSpeed = Vector2.Dot(rb.linearVelocity, -inward);
+        if (outwardSpeed > 0f)
+            rb.linearVelocity += inward * outwardSpeed;
+
+        Vector2 pos = rb.position;
+        switch (side)
+        {
+            case BoundarySide.Left:   if (pos.x < _self.bounds.max.x) pos.x = _self.bounds.max.x; break;
+            case BoundarySide.Right:  if (pos.x > _self.bounds.min.x) pos.x = _self.bounds.min.x; break;
+            case BoundarySide.Bottom: if (pos.y < _self.bounds.max.y) pos.y = _self.bounds.max.y; break;
+            case BoundarySide.Top:    if (pos.y > _self.bounds.min.y) pos.y = _self.bounds.min.y; break;
+        }
+        rb.position = pos;
     }
 
     private void HandleVehicleMembrane(Rigidbody2D rb, Vehicle vehicle)
     {
         if (_self == null || oppositeBoundary == null) return;
+
+        // When wrap is off, hard-clamp the vehicle to the inner edge every tick so
+        // slow approaches can't drift through the trigger undetected.
+        if (!Boundaries.WrapEnabled)
+        {
+            ClampVehicleToInnerEdge(rb);
+            return;
+        }
 
         float now = Time.time;
         if (_lastWrapTime.TryGetValue(rb, out float last) && now - last < WrapCooldown)
@@ -194,10 +226,8 @@ public class BoundaryWrap : MonoBehaviour
         {
             _lastWrapTime[rb] = now;
             WrapVehicle(rb, vehicle);
-
             if (warpPrefab != null)
                 Instantiate(warpPrefab, vehicle.transform.position, Quaternion.identity);
-
             return;
         }
 
@@ -225,6 +255,31 @@ public class BoundaryWrap : MonoBehaviour
         else
             vel.y = newOutwardSpeed * outwardSign;
 
+        rb.linearVelocity = vel;
+    }
+
+    private void ClampVehicleToInnerEdge(Rigidbody2D rb)
+    {
+        Vector2 pos = rb.position;
+        Vector2 vel = rb.linearVelocity;
+
+        switch (side)
+        {
+            case BoundarySide.Left:
+                if (pos.x < _self.bounds.max.x) { pos.x = _self.bounds.max.x; vel.x = Mathf.Max(0f, vel.x); }
+                break;
+            case BoundarySide.Right:
+                if (pos.x > _self.bounds.min.x) { pos.x = _self.bounds.min.x; vel.x = Mathf.Min(0f, vel.x); }
+                break;
+            case BoundarySide.Bottom:
+                if (pos.y < _self.bounds.max.y) { pos.y = _self.bounds.max.y; vel.y = Mathf.Max(0f, vel.y); }
+                break;
+            case BoundarySide.Top:
+                if (pos.y > _self.bounds.min.y) { pos.y = _self.bounds.min.y; vel.y = Mathf.Min(0f, vel.y); }
+                break;
+        }
+
+        rb.position = pos;
         rb.linearVelocity = vel;
     }
 

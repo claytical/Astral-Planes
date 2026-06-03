@@ -5878,7 +5878,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 100
+      scalar: 25
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -9830,6 +9830,7 @@ MonoBehaviour:
   explosion: {fileID: 2567590292593330884, guid: ac7ca5ccdd7494bbe9493a7e2327bb65,
     type: 3}
   preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1

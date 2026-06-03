@@ -425,11 +425,8 @@ public class MineNode : MonoBehaviour
         if (!hit.hit) return;
 
         Vector2 wallNormal = hit.normal.sqrMagnitude > 0.0001f ? hit.normal.normalized : Vector2.zero;
-        float inset = Mathf.Max(0.0005f, Mathf.Min(Mathf.Max(0f, maxCorrectionPerTick), 0.02f));
-        Vector2 target = hit.impactPoint - wallNormal * inset;
-        Vector2 correction = target - _rb.position;
-        Vector2 clampedCorrection = Vector2.ClampMagnitude(correction, Mathf.Max(0f, maxCorrectionPerTick));
-        _rb.position += clampedCorrection;
+        Vector2 target = hit.impactPoint - wallNormal * 0.02f;
+        _rb.position = target;
         didContainmentThisTick = true;
         _hardCorrectionsThisTick++;
 
@@ -444,7 +441,7 @@ public class MineNode : MonoBehaviour
         }
 
         if (debugSweepContainment)
-            Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} correctionDist={clampedCorrection.magnitude:F4}");
+            Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} target={target}");
     }
 
     private bool ShouldSkipBoundaryClampThisTick()

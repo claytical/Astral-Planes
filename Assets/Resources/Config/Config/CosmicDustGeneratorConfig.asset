@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f0e6e17942e84ba79421b9f7eb03db9, type: 3}
+  m_Name: CosmicDustGeneratorConfig
+  m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGeneratorConfig
+  cellClearanceWorld: 0
+  dustFootprintMul: 1.15
+  maxSpawnMillisPerFrame: 1.2
+  hexGrowInSeconds: 0.45
+  regrowCellsPerStep: 1
+  regrowColliderEnableDelaySeconds: 0.2
+  regrowVetoRetryDelaySeconds: 0.5
+  regrowVetoBoxMul: 0.85
+  regrowVetoMaxHits: 8
+  voidDustGrowInSeconds: 0.4
+  zapFadeSeconds: 1.5
+  zapRegrowDelaySeconds: -1
+  mineNodeErodePerTick: 10
+  mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.25}
+  toroidal: 0
+  enableTintDiffusion: 1
+  tintDiffusionInterval: 0.12
+  tintDiffusionMaxCellsPerTick: 256
+  tintDiffusionRadius: 1
+  tintDiffusionStrength: 0.25
+  tintDiffusionPropagateOnChange: 1
+  tintDiffusionMinDelta: 0.0025
+  tintDirtyMarkRadius: 1

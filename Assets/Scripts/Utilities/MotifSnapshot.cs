@@ -41,7 +41,7 @@ public struct SerializableMusicalRoleScore
 // =============================================================================
 // MotifSnapshot
 // =============================================================================
-// Captures everything needed to reconstruct coral geometry and musical context
+// Captures everything needed to reconstruct motif geometry and musical context
 // for one completed motif. Fully serializable via JsonUtility / JSON file.
 //
 // RUNTIME ACCESS PATTERN
@@ -165,7 +165,7 @@ public class MotifSnapshot
     public List<NoteEntry> CollectedNotes = new();
 
     // -------------------------------------------------------------------------
-    // Coral geometry
+    // Motif geometry
     // -------------------------------------------------------------------------
 
     public List<TrackBinData> TrackBins = new();

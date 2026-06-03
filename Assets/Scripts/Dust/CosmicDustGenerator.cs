@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -16,9 +15,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private Dictionary<Vector2Int, MusicalRole> _hiddenImprints = new();
     private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
     private bool _cellGridReady;
-    [Header("Maze Collision Shape")]
-    [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
-    public float cellClearanceWorld = 0f;
+    [Header("Config")]
+    [SerializeField] public CosmicDustGeneratorConfig config;
+    public bool toroidal => config != null ? config.toroidal : false;
+    public float cellClearanceWorld => config != null ? config.cellClearanceWorld : 0f;
     private bool _mazeAlreadyGenerated = false;
     private bool _regrowthSuppressed = false;
     struct DustImprint
@@ -38,20 +38,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private readonly HashSet<string> _loggedInvalidResistanceContexts = new HashSet<string>();
     [Header("Dust Visual Timings")]
     [SerializeField] private DustVisualTimingSettings dustVisualTimingSettings;
-    private CosmicDust.DustVisualTimings DustTimings => dustVisualTimingSettings != null
+    private DustVisualTimings DustTimings => dustVisualTimingSettings != null
         ? dustVisualTimingSettings.Timings
-        : CosmicDust.DustVisualTimings.Default;
+        : DustVisualTimings.Default;
     
     // --- Extracted controllers (refactor targets) ---
     private CosmicDustExclusionMap _exclusions = new CosmicDustExclusionMap();
     private CosmicDustTintDiffusionSystem _tintDiffusionSystem;
     private readonly List<Vector2Int> _tmpReleased = new List<Vector2Int>(512);
     private readonly List<Vector2Int> _tmpClaimed  = new List<Vector2Int>(512);
-    [Header("MineNode Erosion")]
-    [SerializeField] private int mineNodeErodePerTick = 10;
-    [Header("Dust Visual Footprint")]
-    [Range(0.8f, 1.6f)]
-    public float dustFootprintMul = 1.15f;
 
     [Header("Tile Sizing")]
     [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox
@@ -68,48 +63,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private readonly DustGridState _gridState = new();
     private Dictionary<GameObject, Vector2Int> _goToCell = new Dictionary<GameObject, Vector2Int>(1024);
 
-    [Header("Regrow Step Gate")]
-    [Tooltip("How many cells are allowed to transition from PendingRegrow -> Solid per drum step.")]
-    [SerializeField] private int regrowCellsPerStep = 1;
-    [Tooltip("Seconds to wait after a cell becomes visible again before enabling its collider.")]
-    [SerializeField] private float regrowColliderEnableDelaySeconds = 0.20f;
-
-    [Header("Void Grow Visuals")]
-    [Tooltip("Sprite scale-in and tint fade duration for gravity void dust. Decoupled from remaining bin time so the visual is consistently organic.")]
-    [Range(0.1f, 2f)] [SerializeField] private float voidDustGrowInSeconds = 0.40f;
-
-    [Header("Zap Clear Tuning")]
-    [Tooltip("Visual fade duration used when star zap logic clears a dust cell.")]
-    [SerializeField] private float zapFadeSeconds = 1.5f;
-    [Tooltip("Delay before a zapped cell is queued for regrow (-1 uses role/default timing).")]
-    [SerializeField] private float zapRegrowDelaySeconds = -1f;
 
     private Dictionary<Vector2Int, bool> _fillMap = new();
     private MazePatternConfig _activeMazePattern;
     private readonly DustRegrowthScheduler _regrowthScheduler = new();
     private readonly MazeTopologyService _mazeTopologyService = new();
-    [SerializeField] private Color _mazeTint = new Color(0.7f, 0.7f, 0.7f, .25f);
-    [Header("Topology")]
-    [Tooltip("When enabled, the dust grid wraps toroidally — cells at one edge connect to the opposite edge.")]
-    [SerializeField] public bool toroidal = false;
     private PhaseStarBehaviorProfile _activeProfile;
-    [Header("Tint Diffusion (Option 2)")]
-    [Tooltip("If enabled, recently modified dust cells will gradually blend toward their neighbors over time (local diffusion).")]
-    [SerializeField] private bool enableTintDiffusion = true;
-    [Tooltip("Seconds between diffusion passes. Lower = smoother but more CPU.")]
-    [Range(0.02f, 0.5f)] [SerializeField] private float tintDiffusionInterval = 0.12f;
-    [Tooltip("Maximum number of dirty cells processed per diffusion pass (prevents spikes).")]
-    [Range(16, 2048)] [SerializeField] private int tintDiffusionMaxCellsPerTick = 256;
-    [Tooltip("Neighborhood radius used for diffusion averaging (1 = 8-neighborhood).")]
-    [Range(0, 3)] [SerializeField] private int tintDiffusionRadius = 1;
-    [Tooltip("How strongly each pass nudges a cell toward the neighborhood average (0–1).")]
-    [Range(0f, 1f)] [SerializeField] private float tintDiffusionStrength = 0.25f;
-    [Tooltip("When a cell changes materially due to diffusion, enqueue its immediate neighbors to propagate blending.")]
-    [SerializeField] private bool tintDiffusionPropagateOnChange = true;
-    [Tooltip("Minimum per-channel delta required to apply a diffusion step (skips tiny changes).")]
-    [Range(0f, 0.05f)] [SerializeField] private float tintDiffusionMinDelta = 0.0025f;
-    [Tooltip("How far out to mark cells dirty when a tint-affecting event occurs (imprint, regrow, removal).")]
-    [Range(0, 3)] [SerializeField] private int tintDirtyMarkRadius = 1;
 
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
@@ -129,10 +88,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
-    [SerializeField] private float maxSpawnMillisPerFrame = 1.2f; // tune for target HW
     public event Action<Vector2Int?> OnMazeReady;
 
-    [SerializeField] private float hexGrowInSeconds = 0.45f;        // visual "grow in" time per hex
     private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
 
     // ---------------------------------------------------------------------------
@@ -167,14 +124,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
         get => tileDiameterWorld;
         set => tileDiameterWorld = value;
     }
-    [Header("Regrow Veto (Vehicle Overlap)")] 
-    [Tooltip("If a vehicle overlaps a cell, regrow/spawn is deferred to prevent collider penetration shoves.")] 
+    [Header("Regrow Veto (Vehicle Overlap)")]
+    [Tooltip("If a vehicle overlaps a cell, regrow/spawn is deferred to prevent collider penetration shoves.")]
     [SerializeField] private LayerMask vehicleMask;
-    [SerializeField] private float regrowVetoRetryDelaySeconds = 0.5f;
-    [Tooltip("Overlap box size as a fraction of cellWorldSize.")] 
-    [Range(0.25f, 1.25f)] 
-    [SerializeField] private float regrowVetoBoxMul = 0.85f; 
-    [SerializeField] private int regrowVetoMaxHits = 8; 
     
     private Collider2D[] _vehicleVetoHits;    
 
@@ -464,7 +416,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
                     _hiddenImprints[gp] = imprintRole;
                     spawnRole = MusicalRole.None;
-                    spawnColor = _mazeTint;
+                    spawnColor = config.mazeTint;
                     spawnColor.a = c.a;
                 }
 
@@ -481,7 +433,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     existingGo.TryGetComponent<CosmicDust>(out var existingDust) && existingDust != null &&
                     HasDustAt(gp))
                 {
-                    existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
+                    existingDust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, c.a);
                     ApplyHiddenHintToDust(gp, existingDust);
                     var resistance = ResolveResistanceProfile(gp, imprintRole, context: "GrowVoidDustDisk:existing");
                     existingDust.clearing.drainResistance01 = resistance.drainResistance01;
@@ -571,7 +523,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 _imprints[gp] = new DustImprint
                 {
                     role              = MusicalRole.None,
-                    color             = _mazeTint,
+                    color             = config.mazeTint,
                     carveResistance01 = 0f,
                     drainResistance01 = 0f,
                     maxEnergyUnits    = 1,
@@ -605,7 +557,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             _imprints[gp] = new DustImprint
             {
                 role              = MusicalRole.None,
-                color             = _mazeTint,
+                color             = config.mazeTint,
                 carveResistance01 = 0f,
                 drainResistance01 = 0f,
                 maxEnergyUnits    = 1,
@@ -641,7 +593,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
                 _hiddenImprints[gp] = role;
                 spawnRole = MusicalRole.None;
-                spawnColor = _mazeTint;
+                spawnColor = config.mazeTint;
                 spawnColor.a = c.a;
             }
 
@@ -651,7 +603,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
                 existingDust != null && HasDustAt(gp))
             {
-                existingDust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, c.a);
+                existingDust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, c.a);
                 ApplyHiddenHintToDust(gp, existingDust);
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
                 existingDust.clearing.drainResistance01 = res.drainResistance01;
@@ -776,7 +728,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.PrepareForReuse();
             dust.InitializeVisuals(DustTimings);
 
-            dust.SetGrowInDuration(voidDustGrowInSeconds);
+            dust.SetGrowInDuration(config.voidDustGrowInSeconds);
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
@@ -787,15 +739,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
             EnsureDustSpriteRendererEnabled(dust);
 
             // Organic grow-in: start at maze gray and fade to role color over the full visual duration.
-            Color dormantStart = _mazeTint;
+            Color dormantStart = config.mazeTint;
             dormantStart.a = tintWithAlpha.a;
             dust.ApplyTintVisual(dormantStart);
-            dust.StartCoroutine(dust.TintFadeIn(voidDustGrowInSeconds, dormantStart, tintWithAlpha));
+            dust.StartCoroutine(dust.TintFadeIn(config.voidDustGrowInSeconds, dormantStart, tintWithAlpha));
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);
         }
-        float enableDelay = Mathf.Max(regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
+        float enableDelay = Mathf.Max(config.regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
         yield return new WaitForSeconds(enableDelay);
 
         if (dust != null)
@@ -1026,14 +978,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
 }
     private void Start()
     {
-        if (_vehicleVetoHits == null || _vehicleVetoHits.Length != regrowVetoMaxHits) 
-            _vehicleVetoHits = new Collider2D[Mathf.Max(1, regrowVetoMaxHits)];
+        if (_vehicleVetoHits == null || _vehicleVetoHits.Length != config.regrowVetoMaxHits) 
+            _vehicleVetoHits = new Collider2D[Mathf.Max(1, config.regrowVetoMaxHits)];
         // In some scenes the generator may be instantiated before the GameFlowManager
         // is fully ready. We do a best-effort bind here, and also lazily re-bind elsewhere.
         EnsureImprints();
         TryEnsureRefs();
         EnsureCellGrid();
-        _regrowthScheduler.Initialize(regrowCellsPerStep, regrowColliderEnableDelaySeconds);
+        _regrowthScheduler.Initialize(config.regrowCellsPerStep, config.regrowColliderEnableDelaySeconds);
         EnsureRegrowController();
         // Init extracted systems (no pooling/legacy queues required).
         if (_tintDiffusionSystem == null)
@@ -1077,13 +1029,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
             setCellPendingRegrow: gp => SetCellState(gp, DustCellState.PendingRegrow),
             commitRegrowCell: gp => CommitRegrowCell(gp),
 
-            getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, regrowVetoRetryDelaySeconds),
-            getRegrowCellsPerStep: () => Mathf.Max(0, regrowCellsPerStep)
+            getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
+            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep)
         );
     }
     private bool IsVehicleOverlappingCellWorld(Vector3 cellWorld, float cellWorldSize)
     {
-        Vector2 size = Vector2.one * Mathf.Max(0.001f, cellWorldSize * regrowVetoBoxMul);
+        Vector2 size = Vector2.one * Mathf.Max(0.001f, cellWorldSize * config.regrowVetoBoxMul);
 
         // NOTE: even if vehicleMask is broad/misconfigured, we only veto if a Vehicle is present.
         int hits = Physics2D.OverlapBoxNonAlloc(cellWorld, size, 0f, _vehicleVetoHits, vehicleMask);
@@ -1169,10 +1121,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         float cellWorld = Mathf.Max(0.001f, drums.GetCellWorldSize());
         Vector2 center = drums.GridToWorldPosition(gp);
-        Vector2 size = Vector2.one * (cellWorld * regrowVetoBoxMul);
+        Vector2 size = Vector2.one * (cellWorld * config.regrowVetoBoxMul);
 
-        if (_vehicleVetoHits == null || _vehicleVetoHits.Length != regrowVetoMaxHits)
-            _vehicleVetoHits = new Collider2D[Mathf.Max(1, regrowVetoMaxHits)];
+        if (_vehicleVetoHits == null || _vehicleVetoHits.Length != config.regrowVetoMaxHits)
+            _vehicleVetoHits = new Collider2D[Mathf.Max(1, config.regrowVetoMaxHits)];
 
         int hits = Physics2D.OverlapBoxNonAlloc(center, size, 0f, _vehicleVetoHits, vehicleMask);
         if (hits <= 0) return false;
@@ -1232,7 +1184,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
-            Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : _mazeTint;
+            Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : config.mazeTint;
 
             // Write / update the imprint so future regrows of this cell remember the role.
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
@@ -1251,6 +1203,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
+            if (regrowRole == MusicalRole.None)
+                ApplyHiddenHintToDust(gp, dust);
+
             Color denyColor = Color.darkGray;
             if (roleProfile != null)
             {
@@ -1264,8 +1219,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
 
         // Let the visual settle before collisions are reintroduced.
-        if (regrowColliderEnableDelaySeconds > 0f)
-            yield return new WaitForSeconds(regrowColliderEnableDelaySeconds);
+        if (config.regrowColliderEnableDelaySeconds > 0f)
+            yield return new WaitForSeconds(config.regrowColliderEnableDelaySeconds);
 
         // Abort if conditions changed.
         if (_permanentClearCells.Contains(gp))
@@ -1364,7 +1319,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         _goToCell[go] = gp;
 
         go.transform.position = drums.GridToWorldPosition(gp);
-        d.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), dustFootprintMul, cellClearanceWorld);
+        d.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), config.dustFootprintMul, cellClearanceWorld);
 
         bool blocks =
             d.terrainCollider != null &&
@@ -1438,10 +1393,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Role imprint is not mutated on clear; stars consume current state discretely.
     // - Regrow uses zap tuning (delay can be explicit or role/default when -1).
     // - Void-grown exception does NOT apply: zap can regrow void-grown cells when scheduling allows.
-    // - Visual fade duration comes from zapFadeSeconds tuning.
+    // - Visual fade duration comes from config.zapFadeSeconds tuning.
     public void ZapCell(Vector2Int cell)
     {
-        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, zapFadeSeconds, true, zapRegrowDelaySeconds, true);
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, true, config.zapRegrowDelaySeconds, true);
         ClearCellByInteraction(cell, req);
     }
 
@@ -1517,7 +1472,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
 
         // Default: current phase maze tint (PhaseStarBehaviorProfile.mazeColor).
-        return _mazeTint;
+        return config.mazeTint;
     }
 
     private DustResistanceProfile ResolveResistanceProfile(Vector2Int cell, MusicalRole fallbackRole, string context)
@@ -1568,13 +1523,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         profile.drainResistance01 = drain;
         return profile;
     }
-
-    public bool TryGetCellPosition(GameObject go, out Vector2Int gridPos)
-    {
-        _goToCell ??= new Dictionary<GameObject, Vector2Int>(1024);
-        return _goToCell.TryGetValue(go, out gridPos);
-    }
-
     public float GetLiveCarveResistance01(Vector2Int cell)
     {
         if (!TryGetDustAt(cell, out var dust) || dust == null) return 0f;
@@ -1683,8 +1631,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
         {
-            if (existingImp.role == MusicalRole.None) return MusicalRole.None;
-            if (IsRoleActive(existingImp.role)) return existingImp.role;
+            if (existingImp.role == MusicalRole.None)
+            {
+                // Gray-start cell: consult hidden imprint before giving up.
+                if (_hiddenImprints != null && _hiddenImprints.TryGetValue(gp, out var hidden)
+                    && hidden != MusicalRole.None && IsRoleActive(hidden))
+                    return hidden;
+                // No active hidden imprint — fall through to neighbor/density logic.
+            }
+            else if (IsRoleActive(existingImp.role))
+                return existingImp.role;
         }
 
         // No imprint or imprint role is inactive: fall back to neighbor plurality / least dense.
@@ -1751,7 +1707,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     public Color MazeColor()
     {
-        return _mazeTint;
+        return config.mazeTint;
     }
     public void ApplyActiveRoles(IReadOnlyList<MusicalRole> roles)
     {
@@ -1821,7 +1777,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         _loggedInvalidResistanceContexts.Clear();
 
         // Authoritative default: phase-authored maze tint.
-//        _mazeTint = profile.mazeColor;
+//        config.mazeTint = profile.mazeColor;
 
         // If dust already exists (e.g., generator persists between phases), immediately
         // nudge visuals to match the new profile so we don't leave any tiles at prefab/default.
@@ -1850,13 +1806,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
                     // Skip cells that carry a role imprint — their color is authoritative
                     // (set by BuildMazeRoleImprints / MineNode carve). Overwriting them with
-                    // _mazeTint (a flat gray) would erase the 4-color Voronoi layout.
+                    // config.mazeTint (a flat gray) would erase the 4-color Voronoi layout.
                     var gp = new Vector2Int(x, y);
                     if (_imprints != null && _imprints.TryGetValue(gp, out var imp)
                         && imp.role != MusicalRole.None)
                         continue;
 
-                    StartCoroutine(d.RetintOver(seconds, _mazeTint));
+                    StartCoroutine(d.RetintOver(seconds, config.mazeTint));
                 }
             }
             return;
@@ -1876,7 +1832,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 // In the fallback path we don't have grid coords, but we can check dust.Role.
                 if (d.Role != MusicalRole.None) continue;
 
-                StartCoroutine(d.RetintOver(seconds, _mazeTint));
+                StartCoroutine(d.RetintOver(seconds, config.mazeTint));
             }
         }
     }
@@ -1957,7 +1913,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             while (i < cells.Count)
             {
                 float frameStart  = Time.realtimeSinceStartup;
-                float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+                float frameBudget = Mathf.Max(0f, config.maxSpawnMillisPerFrame) / 1000f;
 
                 while (i < cells.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
                 {
@@ -1993,13 +1949,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     if (hex.TryGetComponent<CosmicDust>(out var dust))
                     {
                         dust.SetTrackBundle(this, drums);
-                        dust.SetCellSizeDrivenScale(cellWorldSize, dustFootprintMul, cellClearanceWorld);
+                        dust.SetCellSizeDrivenScale(cellWorldSize, config.dustFootprintMul, cellClearanceWorld);
 
                         dust.PrepareForReuse();
                         dust.InitializeVisuals(DustTimings);
-                        dust.SetGrowInDuration(hexGrowInSeconds);
+                        dust.SetGrowInDuration(config.hexGrowInSeconds);
 
-                        // GetCellVisualColor reads from _imprints if available, otherwise _mazeTint.
+                        // GetCellVisualColor reads from _imprints if available, otherwise config.mazeTint.
                         Color cellColor = GetCellVisualColor(grid);
                         var resistance = ResolveResistanceProfile(grid, MusicalRole.None, context: "SpawnDust");
                         dust.clearing.drainResistance01 = resistance.drainResistance01;
@@ -2007,7 +1963,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                         // Apply role AND color together so dust.Role is set from birth.
                         // SetTint alone leaves dust.Role = None, which means RetintExisting
                         // cannot distinguish role-colored cells from plain maze cells and
-                        // would overwrite them with the flat _mazeTint (gray).
+                        // would overwrite them with the flat config.mazeTint (gray).
                         if (_imprints != null && _imprints.TryGetValue(grid, out var spawnImprint)
                             && spawnImprint.role != MusicalRole.None)
                         {
@@ -2073,7 +2029,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             while (j < spawnedDust.Count)
             {
                 float frameStart  = Time.realtimeSinceStartup;
-                float frameBudget = Mathf.Max(0f, maxSpawnMillisPerFrame) / 1000f;
+                float frameBudget = Mathf.Max(0f, config.maxSpawnMillisPerFrame) / 1000f;
 
                 while (j < spawnedDust.Count && (Time.realtimeSinceStartup - frameStart) < frameBudget)
                 {
@@ -2155,7 +2111,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (ripeness <= 0f)
             {
                 // Fully decayed: revert to gray, role becomes None for all external queries.
-                dust.ApplyRoleAndCharge(MusicalRole.None, _mazeTint, dust.Charge01);
+                dust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, dust.Charge01);
                 ApplyHiddenHintToDust(gp, dust);
                 _ripenessByCell.Remove(gp);
             }
@@ -2170,7 +2126,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 else if (profile != null)
                     roleColor = profile.GetBaseColor();
                 Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
-                Color gray = new Color(_mazeTint.r, _mazeTint.g, _mazeTint.b, dust.Charge01);
+                Color gray = new Color(config.mazeTint.r, config.mazeTint.g, config.mazeTint.b, dust.Charge01);
                 float effectiveRipeness = Mathf.Max(ripeness, dust.Charge01);
                 dust.SetTint(Color.Lerp(gray, full, effectiveRipeness));
             }
@@ -2179,17 +2135,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     private void ProcessTintDiffusion(float dt)
     {
-        if (!enableTintDiffusion) return;
+        if (!config.enableTintDiffusion) return;
         if (_tintDiffusionSystem == null) return;
         _tintDiffusionSystem.Tick(
             dt: dt,
-            enabled: enableTintDiffusion,
-            maxCellsPerTick: tintDiffusionMaxCellsPerTick,
-            neighborRadius: tintDiffusionRadius,
-            strength: tintDiffusionStrength,
-            minDelta: tintDiffusionMinDelta,
-            propagateOnChange: tintDiffusionPropagateOnChange,
-            intervalSeconds: tintDiffusionInterval);
+            enabled: config.enableTintDiffusion,
+            maxCellsPerTick: config.tintDiffusionMaxCellsPerTick,
+            neighborRadius: config.tintDiffusionRadius,
+            strength: config.tintDiffusionStrength,
+            minDelta: config.tintDiffusionMinDelta,
+            propagateOnChange: config.tintDiffusionPropagateOnChange,
+            intervalSeconds: config.tintDiffusionInterval);
     }
     private void RemoveActiveAt(Vector2Int grid, GameObject go) {
         // Logical authority: the moment a cell is cleared, it stops contributing to the maze.
@@ -2208,7 +2164,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
 
         // Diffusion prep: removing dust can expose the base tint and create hard seams.
-        MarkTintDirty(grid, tintDirtyMarkRadius);
+        MarkTintDirty(grid, config.tintDirtyMarkRadius);
 
         // (no composite collider rebuild)
     }
@@ -2428,7 +2384,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (st == DustCellState.Solid && d.Role == MusicalRole.None)
             {
                 Color cur = d.CurrentTint;
-                Color gray = _mazeTint;
+                Color gray = config.mazeTint;
                 float delta = Mathf.Max(Mathf.Abs(cur.r - gray.r), Mathf.Max(Mathf.Abs(cur.g - gray.g), Mathf.Abs(cur.b - gray.b)));
                 if (delta > 0.15f)
                 {

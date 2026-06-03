@@ -90,6 +90,7 @@ public class MidiVoice : MonoBehaviour
     /// </summary>
     private void PlayNoteTicks(int note, int durationTicks, float velocity, bool trimToActiveWindow = true)
     {
+        Debug.Log($"[NOTE TICK] Value: {note} Duration: {durationTicks} Velocity: {velocity} ");
         if (midiStreamPlayer == null || drumTrack == null || drumTrack.drumLoopBPM <= 0f)
         {
             if (!_warnedMissingDrums)

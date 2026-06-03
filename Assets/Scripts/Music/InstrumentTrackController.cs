@@ -15,13 +15,12 @@ public enum NoteCommitMode { Performance, Composition }
 
 public class InstrumentTrackController : MonoBehaviour
 {
-    [Header("Note Commit Mode")]
-    [Tooltip("Performance: all collectables spawn at once; root-note fallback on mistimed release. Composition: collectables spawn step-by-step; collected note always placed at the release step.")]
-    public NoteCommitMode noteCommitMode = NoteCommitMode.Performance;
+    [Header("Config")]
+    [SerializeField] public InstrumentTrackControllerConfig config;
+    public NoteCommitMode noteCommitMode => config != null ? config.noteCommitMode : NoteCommitMode.Performance;
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
-    [SerializeField] private float cohortWindowFraction = 0.5f; // e.g., lower half of the leader loop (0..16 when leader is 32)
     private bool _chordEventsSubscribed;
     private Vector2Int _gravityVoidCenterGP;
     private bool _gravityVoidHasCenterGP;
@@ -34,8 +33,6 @@ public class InstrumentTrackController : MonoBehaviour
     [SerializeField] private GameObject gravityVoidPrefab;
     [Tooltip("Optional parent for the spawned gravity void instance.")]
     [SerializeField] private Transform gravityVoidParent;
-    [Tooltip("Scale multiplier applied to the spawned void instance.")]
-    [SerializeField] private float gravityVoidScale = 1f;
     private GameObject _gravityVoidInstance;
     private ParticleSystem[] _gravityVoidParticles;
     // Cache prefab alpha per particle system so alpha doesn't compound.
@@ -43,30 +40,11 @@ public class InstrumentTrackController : MonoBehaviour
 // ---------------------------------------------------------------------
 // SFX: Collection "Pickup Tick" (A2)
 // ---------------------------------------------------------------------
-    [Header("SFX: Collection (Pickup Tick)")]
     [SerializeField] private AudioSource pickupSfxSource;
-
-    [SerializeField, Range(0f, 2f)]
-    private float pickupTickVolume = 1.15f;
-
-    [SerializeField, Range(0f, 0.15f)]
-    private float pickupTickPitchJitter = 0.03f;
-
-    [Tooltip("Fallback clip if role-specific clips are not set.")]
-    [SerializeField] private AudioClip pickupTickDefault;
-
-    [SerializeField] private AudioClip pickupTickBass;
-    [SerializeField] private AudioClip pickupTickLead;
-    [SerializeField] private AudioClip pickupTickHarmony;
-    [SerializeField] private AudioClip pickupTickGroove;
 
 // Optionally track current outer radius for VFX scaling.
     private int _gravityVoidCurrentOuterR;
 
-    [Header("Gravity Void Rings")]
-    [SerializeField, Min(1)] private int voidRingWidthCells = 2;
-    [Header("Gravity Void → Dust Imprint")]
-    [SerializeField] private float gravityVoidImprintTickSeconds = 0.05f;
     private Coroutine _gravityVoidRoutine;
     private InstrumentTrack _gravityVoidOwner;
     private Vector3 _gravityVoidCenterWorld;
@@ -89,23 +67,7 @@ public class InstrumentTrackController : MonoBehaviour
     // SFX: Commit "Placement Stinger" (A3)
     // Fired when the carried note visually lands on the loop / marker lights.
     // ---------------------------------------------------------------------
-    [Header("SFX: Commit (Placement Stinger)")]
     [SerializeField] private AudioSource commitSfxSource;
-
-    [SerializeField, Range(0f, 2f)]
-    private float commitStingerVolume = 1.25f;
-
-    [SerializeField, Range(0f, 0.15f)]
-    private float commitStingerPitchJitter = 0.02f;
-
-    [Tooltip("Fallback clip if role-specific commit clips are not set.")]
-    [SerializeField] private AudioClip commitStingerDefault;
-
-    [SerializeField] private AudioClip commitStingerBass;
-    [SerializeField] private AudioClip commitStingerLead;
-    [SerializeField] private AudioClip commitStingerHarmony;
-    [SerializeField] private AudioClip commitStingerGroove;
-    [SerializeField] private AudioClip commitStingerDrums;
     private GameFlowManager gfm;
 
     private float GetSecondsRemainingInCurrentBin() {
@@ -179,11 +141,11 @@ public class InstrumentTrackController : MonoBehaviour
 {
     switch (role)
     {
-        case MusicalRole.Bass:    return pickupTickBass    != null ? pickupTickBass    : pickupTickDefault;
-        case MusicalRole.Lead:    return pickupTickLead    != null ? pickupTickLead    : pickupTickDefault;
-        case MusicalRole.Harmony: return pickupTickHarmony != null ? pickupTickHarmony : pickupTickDefault;
-        case MusicalRole.Groove:  return pickupTickGroove  != null ? pickupTickGroove  : pickupTickDefault;
-        default:                  return pickupTickDefault;
+        case MusicalRole.Bass:    return config.pickupTickBass    != null ? config.pickupTickBass    : config.pickupTickDefault;
+        case MusicalRole.Lead:    return config.pickupTickLead    != null ? config.pickupTickLead    : config.pickupTickDefault;
+        case MusicalRole.Harmony: return config.pickupTickHarmony != null ? config.pickupTickHarmony : config.pickupTickDefault;
+        case MusicalRole.Groove:  return config.pickupTickGroove  != null ? config.pickupTickGroove  : config.pickupTickDefault;
+        default:                  return config.pickupTickDefault;
     }
 }
 
@@ -198,10 +160,10 @@ public class InstrumentTrackController : MonoBehaviour
         if (clip == null) return; // nothing configured yet
 
         float prevPitch = pickupSfxSource.pitch;
-        if (pickupTickPitchJitter > 0f)
-            pickupSfxSource.pitch = 1f + Random.Range(-pickupTickPitchJitter, pickupTickPitchJitter);
+        if (config.pickupTickPitchJitter > 0f)
+            pickupSfxSource.pitch = 1f + Random.Range(-config.pickupTickPitchJitter, config.pickupTickPitchJitter);
 
-        pickupSfxSource.PlayOneShot(clip, pickupTickVolume);
+        pickupSfxSource.PlayOneShot(clip, config.pickupTickVolume);
         pickupSfxSource.pitch = prevPitch;
     }
     public void NotifyCollected(InstrumentTrack track)
@@ -296,7 +258,7 @@ public class InstrumentTrackController : MonoBehaviour
             int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
             int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
             int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
-            _gravityVoidMaxRadiusRuntime = _gravityVoidBubbleInnerR + totalRings * voidRingWidthCells;
+            _gravityVoidMaxRadiusRuntime = _gravityVoidBubbleInnerR + totalRings * config.voidRingWidthCells;
         }
 
         _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
@@ -349,13 +311,13 @@ public class InstrumentTrackController : MonoBehaviour
             activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
 
         int N = activeRoles.Count;
-        int W = voidRingWidthCells;
+        int W = config.voidRingWidthCells;
         int ringsPerSubseq = Mathf.Max(1, N / 2);
         int totalBins = (_gravityVoidOwner != null) ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier) : 1;
 
         int completedRings = 0;
         int lastBurstBin = -1;
-        float tick = Mathf.Max(0.01f, gravityVoidImprintTickSeconds);
+        float tick = Mathf.Max(0.01f, config.gravityVoidImprintTickSeconds);
 
         while (_gravityVoidOwner != null)
         {
@@ -608,8 +570,8 @@ public class InstrumentTrackController : MonoBehaviour
         var parent = (gravityVoidParent != null) ? gravityVoidParent : transform;
         _gravityVoidInstance = Instantiate(gravityVoidPrefab, worldPos, Quaternion.identity, parent);
 
-        if (gravityVoidScale != 1f)
-            _gravityVoidInstance.transform.localScale *= gravityVoidScale;
+        if (config.gravityVoidScale != 1f)
+            _gravityVoidInstance.transform.localScale *= config.gravityVoidScale;
 
         _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
 
@@ -639,7 +601,7 @@ public class InstrumentTrackController : MonoBehaviour
     if (_gravityVoidParticles == null) return;
 
     // ----- OPTIONAL: scale VFX outward to match current radius -----
-    // This assumes your prefab ring looks correct at "max" scale = gravityVoidScale.
+    // This assumes your prefab ring looks correct at "max" scale = config.gravityVoidScale.
     // We scale from a small minimum up to full based on current outer radius.
     if (_gravityVoidInstance != null && _gravityVoidMaxRadiusRuntime > 0)
     {
@@ -649,9 +611,9 @@ public class InstrumentTrackController : MonoBehaviour
         const float minFrac = 0.15f;
         float s = Mathf.Lerp(minFrac, 1f, frac);
 
-        // Preserve your authored prefab scale + gravityVoidScale multiplier.
+        // Preserve your authored prefab scale + config.gravityVoidScale multiplier.
         // We apply a uniform multiplier on top.
-        Vector3 baseScale = Vector3.one * gravityVoidScale;
+        Vector3 baseScale = Vector3.one * config.gravityVoidScale;
         _gravityVoidInstance.transform.localScale = baseScale * s;
     }
 
@@ -974,7 +936,7 @@ public class InstrumentTrackController : MonoBehaviour
         }
 
         int start = 0;
-        int endLeader = Mathf.Max(1, Mathf.RoundToInt(leaderSteps * Mathf.Clamp01(cohortWindowFraction)));
+        int endLeader = Mathf.Max(1, Mathf.RoundToInt(leaderSteps * Mathf.Clamp01(config.cohortWindowFraction)));
 
         foreach (var t in tracks)
         {

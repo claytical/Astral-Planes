@@ -18,6 +18,12 @@ public class Boundaries : MonoBehaviour
     [SerializeField] private float innerSettleBuffer = 0.08f;
     [SerializeField] private float settleSpeedThreshold = 1.0f;
 
+    [Header("Wrap")]
+    [SerializeField] private bool wrapEnabled = true;
+
+    public static bool WrapEnabled { get; private set; } = true;
+    public static void SetWrapEnabled(bool enabled) => WrapEnabled = enabled;
+
     void Awake()
     {
         Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
@@ -69,6 +75,8 @@ public class Boundaries : MonoBehaviour
         }
 
         Debug.Log($"[BOUNDARIES] Boundaries constructed");
+
+        WrapEnabled = wrapEnabled;
 
         AddWrap(leftBoundary,   BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Left,   rightBoundary);
         AddWrap(rightBoundary,  BoundaryWrap.WrapAxis.Horizontal, BoundaryWrap.BoundarySide.Right,  leftBoundary); 

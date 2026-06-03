@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54f921a8293fc4b2f8f45f592f020f24, type: 3}
+  m_Name: DrumTrackConfig
+  m_EditorClassIdentifier: Assembly-CSharp::DrumTrackConfig
+  referenceWidthPx: 1920
+  referenceColumns: 40
+  uiBottomPaddingPx: 160
+  gridPadding: 0.2
+  autoSizeSpawnGridToScreen: 1
+  lockPlayAreaAfterInit: 1
+  timingWindowSteps: 4
+  sessionBurnEmaAlpha: 0.25
+  burnMultipleAtFullIntensity: 2.5
+  singleTrackIntensityCeiling: 0.45
+  tanksPerLoopAtFullIntensity: 0.35
+  intensityHysteresis: 0.08

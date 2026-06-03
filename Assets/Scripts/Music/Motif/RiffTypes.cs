@@ -32,6 +32,5 @@ public struct Riff
     public List<RiffNoteEvent> events;
 
     public RiffOverlapPolicy overlapPolicy;
-    public bool clampToTrackRange;
     public int octaveShift;        // applied post-transpose
 }

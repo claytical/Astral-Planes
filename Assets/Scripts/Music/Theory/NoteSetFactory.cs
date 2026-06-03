@@ -76,7 +76,7 @@ public class NoteSetFactory : MonoBehaviour
     if (motifChordCount > 0)
     {
         int authoredFirst = motif.chordProgression.chordSequence[0].rootNote;
-        int delta = rootMidi - authoredFirst;
+        int chordDelta = rootMidi - authoredFirst;
 
         chordSeq = new List<Chord>(motifChordCount);
         for (int i = 0; i < motifChordCount; i++)
@@ -84,7 +84,7 @@ public class NoteSetFactory : MonoBehaviour
             var c = motif.chordProgression.chordSequence[i];
             chordSeq.Add(new Chord
             {
-                rootNote = c.rootNote + delta,
+                rootNote = c.rootNote + chordDelta,
                 intervals = (c.intervals != null && c.intervals.Count > 0)
                     ? new List<int>(c.intervals)
                     : new List<int> { 0, 4, 7 }
@@ -100,29 +100,21 @@ public class NoteSetFactory : MonoBehaviour
         };
     }
 
-// ------------------------------------------------------------
-// 1) RIFF MODE: no fallthrough into generative mode
-// Uses EXACT authored event list (no bin replication)
-// ------------------------------------------------------------
-if (cfg != null && cfg.useRiffAsAuthoritativeScore)
-{
     int totalSteps = GetAuthoritativeStepsPerLoop(track);
 
-    // Hard fail fast if the ref isn't wired.
     if (cfg.riff == null)
     {
         Debug.LogError(
-            $"[NoteSetFactory] Riff-authoritative enabled but cfg.riff is null. " +
-            $"track='{track?.name}' cfg='{cfg?.name}' motif='{motif?.name}' debugKey={debugKey}"
+            $"[NoteSetFactory] cfg.riff is null. " +
+            $"track=’{track?.name}’ cfg=’{cfg?.name}’ motif=’{motif?.name}’ debugKey={debugKey}"
         );
-
         var silent = new NoteSet
         {
             assignedInstrumentTrack = track,
             rootMidi = rootMidi,
             chordRegion = chordSeq,
-            behaviorsSeed = new List<NoteBehavior>(),
-            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()        };
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()
+        };
         silent.Initialize(track, totalSteps);
         return silent;
     }
@@ -132,24 +124,22 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     if (riff.events == null || riff.events.Count == 0)
     {
         Debug.LogError(
-            $"[NoteSetFactory] Riff-authoritative enabled but riff has no events. " +
-            $"track='{track?.name}' riffAsset='{cfg.riff.name}' debugKey={debugKey}"
+            $"[NoteSetFactory] Riff has no events. " +
+            $"track=’{track?.name}’ riffAsset=’{cfg.riff.name}’ debugKey={debugKey}"
         );
-
         var silent = new NoteSet
         {
             assignedInstrumentTrack = track,
             rootMidi = rootMidi,
             chordRegion = chordSeq,
-            behaviorsSeed = new List<NoteBehavior>(),
-            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()        };
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()
+        };
         silent.Initialize(track, totalSteps);
         return silent;
     }
 
-    // Debug: proves we’re actually reading the asset you think we are.
     Debug.Log(
-        $"[NoteSetFactory] RIFF MODE track='{track.name}' cfg='{cfg.name}' riffAsset='{cfg.riff.name}' " +
+        $"[NoteSetFactory] RIFF MODE track=’{track.name}’ cfg=’{cfg.name}’ riffAsset=’{cfg.riff.name}’ " +
         $"events={riff.events.Count} riff.authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} " +
         $"totalSteps={totalSteps} debugKey={debugKey} binIndex={binIndex}"
     );
@@ -157,13 +147,9 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     const int stepsPerBar = 16;
     const int beatsPerBar = 4;
     const int ticksPerQuarter = 480;
-    int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar); // 120 ticks/step
+    int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar);
 
-    // Transpose riff notes to the current bin's chord root. normalizedTarget is clamped
-    // into the authored anchor's octave [authoredAnchor, authoredAnchor+11] so chord
-    // progressions that store roots in a different register don't cause octave jumps.
-    // authoredRootMidi = targetRoot (stored below) keeps QuantizeNoteToBinChord rootDelta = 0.
-    int authoredAnchor = (chordSeq != null && chordSeq.Count > 0) ? chordSeq[0].rootNote : rootMidi;
+    int authoredAnchor = riff.authoredRootMidi > 0 ? riff.authoredRootMidi : rootMidi;
     int targetRoot = (chordSeq != null && chordSeq.Count > 0)
         ? chordSeq[binIndex % chordSeq.Count].rootNote
         : rootMidi;
@@ -180,22 +166,33 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     var ordered = riff.events.OrderBy(e => e.step).ToList();
     var riffPersistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(ordered.Count);
 
+    // Pre-pass: find the highest transposed note and compute a uniform octave
+    // shift so it fits within the track range. Applying the same shift to every
+    // note preserves the relative intervals inside the riff; per-note ShiftIntoRange
+    // below is kept as a safety net for extreme cases.
+    int maxTransposed = int.MinValue;
+    for (int i = 0; i < ordered.Count; i++)
+    {
+        var e = ordered[i];
+        if (e.step >= 0 && e.step < totalSteps && e.midiNote + delta > maxTransposed)
+            maxTransposed = e.midiNote + delta;
+    }
+    int blockShift = (maxTransposed > int.MinValue)
+        ? ShiftIntoRange(maxTransposed, track.lowestAllowedNote, track.highestAllowedNote) - maxTransposed
+        : 0;
+
     for (int i = 0; i < ordered.Count; i++)
     {
         var e = ordered[i];
 
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
-        int midi = e.midiNote + delta; // (normalizedBinChordRoot - authoredAnchor) + octaveShift
+        int midi = e.midiNote + delta + blockShift;
 
-        if (riff.clampToTrackRange)
-            midi = Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote);
+        midi = ShiftIntoRange(midi, track.lowestAllowedNote, track.highestAllowedNote);
 
         int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
-
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;
-        // Store targetRoot as authoredRootMidi so QuantizeNoteToBinChord computes
-        // rootDelta = 0 at collection time (note is already at the right chord root).
         riffPersistent.Add((step, midi, durTicks, vel127, targetRoot));
     }
 
@@ -204,107 +201,13 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
         assignedInstrumentTrack = track,
         rootMidi = rootMidi,
         chordRegion = chordSeq,
-        behaviorsSeed = new List<NoteBehavior>(),
         persistentTemplate = riffPersistent
     };
 
     riffNs.Initialize(track, totalSteps);
     return riffNs;
 }
-    // ------------------------------------------------------------
-    // 2) GENERATIVE MODE (unchanged): only runs when NOT riff-authoritative
-    // ------------------------------------------------------------
-    var scale  = PickWeighted(cfg.scales, rng);
-    var pat    = PickWeighted(cfg.patterns, rng);
-    var rhythm = PickWeighted(cfg.rhythms, rng);
 
-    var chosenFnsGen = (cfg.chordFunctions != null && cfg.chordFunctions.Count > 0)
-        ? PickK(cfg.chordFunctions, Mathf.Max(1, cfg.chordsPerRegion), rng)
-        : new List<string> { "I" };
-
-    if (motifChordCount <= 0)
-        chordSeq = RealizeChordFunctions(chosenFnsGen, rootMidi, scale);
-
-    if (chordSeq == null || chordSeq.Count == 0)
-    {
-        chordSeq = new List<Chord>
-        {
-            new Chord { rootNote = rootMidi, intervals = new List<int> { 0, 4, 7 } }
-        };
-    }
-
-    var rp = RhythmPatterns.Patterns[rhythm];
-    int total = GetAuthoritativeStepsPerLoop(track);
-    var steps = ExpandWithinDomainFrom16(rp.Offsets, rp.LoopMultiplier, total);
-    if (steps.Count == 0) steps.Add(0);
-
-    var v = cfg.variation;
-    var notes = new List<int>(steps.Count);
-
-    for (int i = 0; i < steps.Count; i++)
-    {
-        if (rng.NextDouble() < v.restProb)
-        {
-            notes.Add(int.MinValue);
-            continue;
-        }
-
-        var chord = chordSeq[(i * chordSeq.Count) / Mathf.Max(1, steps.Count)];
-
-        var midi = GeneratePitchForStrategy(
-            pat,
-            chord,
-            scale,
-            v,
-            rng,
-            track.lowestAllowedNote,
-            track.highestAllowedNote
-        );
-
-        if (rng.NextDouble() < v.extensionBias)
-            midi = AddExtension(midi, chord, rng);
-
-        if (rng.NextDouble() < v.octaveMoveProb)
-            midi += 12 * (rng.Next(0, 2) == 0 ? -1 : 1);
-
-        notes.Add(Mathf.Clamp(midi, track.lowestAllowedNote, track.highestAllowedNote));
-    }
-    var persistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(steps.Count);
-    var proxy = new NoteSet { scale = scale, rhythmStyle = rhythm };
-
-    for (int i = 0; i < steps.Count; i++)
-    {
-        int step = steps[i];
-        int midi = notes[i];
-        if (midi == int.MinValue) continue;
-
-        int dur = track.CalculateNoteDurationFromSteps(step, proxy);
-        dur = (int)(dur * Mathf.Lerp(0.85f, 1.15f, (float)rng.NextDouble()) * v.durJitter);
-        float vel = Mathf.Lerp(80, 115, (float)rng.NextDouble());
-        persistent.Add((step, midi, dur, vel, int.MinValue));
-        
-    }
-
-    var behaviors = (cfg.behaviors != null && cfg.behaviors.Count > 0)
-        ? PickUpTo(cfg.behaviors, Mathf.Max(0, cfg.maxBehaviorsStack), rng)
-        : new List<NoteBehavior>();
-
-    var ns = new NoteSet
-    {
-        assignedInstrumentTrack = track,
-        rootMidi = rootMidi,
-        scale = scale,
-        patternStrategy = pat,
-        rhythmStyle = rhythm,
-        chordRegion = chordSeq,
-        behaviorsSeed = behaviors,
-        persistentTemplate = persistent
-    };
-
-    ns.Initialize(track, total);
-    return ns;
-}
-    
     private int GetAuthoritativeStepsPerLoop(InstrumentTrack track)
     {
         // DrumTrack is the runtime authority for step-domain (matches BinSize/leader semantics).
@@ -322,6 +225,14 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     /// Attempts to place a desired root MIDI note inside the track's playable range by octave-shifting.
     /// If the range is too narrow or shifting cannot land inside, clamps as a last resort.
     /// </summary>
+    private static int ShiftIntoRange(int midi, int lo, int hi)
+    {
+        if (hi <= lo) return lo;
+        while (midi < lo && midi + 12 <= hi) midi += 12;
+        while (midi > hi && midi - 12 >= lo) midi -= 12;
+        return Mathf.Clamp(midi, lo, hi);
+    }
+
     private int ResolveRootMidiInRange(int desiredRootMidi, int lo, int hi)
     {
         if (lo > hi)
@@ -356,444 +267,4 @@ if (cfg != null && cfg.useRiffAsAuthoritativeScore)
     }
 
 
-    // --- BeatMood integration helpers ---
-    
-    /// <summary>
-    /// Adjusts the list of step positions according to the BeatMood's stepDensityMultiplier.
-    /// Multiplier < 1 => fewer steps (sparser). Multiplier > 1 => more steps (denser, via duplication).
-    /// Always returns a non-empty, sorted list.
-    /// </summary>
-   
-    T PickWeighted<T>(List<Weighted<T>> list, System.Random rng)
-    {
-        if (list == null || list.Count == 0) throw new Exception("Empty weighted list");
-        float sum = list.Sum(w => Mathf.Max(0f, w.weight));
-        if (sum <= 0f) return list[rng.Next(list.Count)].item;
-
-        float r = (float)rng.NextDouble() * sum;
-        float acc = 0f;
-        foreach (var w in list)
-        {
-            float ww = Mathf.Max(0f, w.weight);
-            acc += ww;
-            if (r <= acc) return w.item;
-        }
-        return list[list.Count - 1].item;
-    }
-
-    List<T> PickK<T>(List<Weighted<T>> list, int k, System.Random rng)
-    {
-        if (list == null || list.Count == 0) return new List<T>();
-        k = Mathf.Clamp(k, 1, list.Count);
-        // weighted sample w/o replacement: shuffle by weight*rand and take first k
-        var shuffled = list
-            .Select(w => (w.item, key: (float)rng.NextDouble() * Mathf.Max(0.0001f, w.weight)))
-            .OrderByDescending(t => t.key)
-            .Take(k)
-            .Select(t => t.item)
-            .ToList();
-        return shuffled;
-    }
-
-    List<NoteBehavior> PickUpTo(List<Weighted<NoteBehavior>> list, int max, System.Random rng)
-    {
-        if (list == null || list.Count == 0 || max <= 0) return new List<NoteBehavior>();
-        int k = Mathf.Clamp(Mathf.RoundToInt((float)rng.NextDouble() * max), 0, Mathf.Min(max, list.Count));
-        if (k == 0) return new List<NoteBehavior>();
-        return PickK(list, k, rng);
-    }
-    /// <summary>
-    /// Expands a rhythm offset pattern authored in a 16-step reference grid into the current step domain.
-    /// - If totalSteps == 16: offsets are used directly.
-    /// - If totalSteps == 32: offsets are scaled (e.g., 4 -> 8) so musical positions remain comparable.
-    /// - loopMult repeats the pattern within the domain, but always returns steps in [0..totalSteps-1].
-    /// This prevents the "multi-bar steps >= 16 then modulo-collapse" duplication bug.
-    /// </summary>
-    List<int> ExpandWithinDomainFrom16(int[] offsets16, int loopMult, int totalSteps)
-    {
-        totalSteps = Mathf.Max(1, totalSteps);
-        int repeats = Mathf.Max(1, loopMult);
-
-        var steps = new HashSet<int>();
-        if (offsets16 == null || offsets16.Length == 0)
-        {
-            steps.Add(0);
-            return steps.OrderBy(s => s).ToList();
-        }
-
-        // Scale 16-based offsets into the active domain.
-        // We mod into domain to guarantee [0..totalSteps-1] and avoid any implicit "bar" semantics.
-        float scale = totalSteps / 16f;
-
-        // Repeat the same pattern within the domain by phase-shifting it.
-        // If repeats == 1, it's just the base pattern.
-        // If repeats > 1, we distribute repeats evenly around the loop.
-        for (int r = 0; r < repeats; r++)
-        {
-            int phaseShift = Mathf.RoundToInt((r * totalSteps) / (float)repeats);
-
-            for (int i = 0; i < offsets16.Length; i++)
-            {
-                int o16 = offsets16[i];
-                // Keep authored values stable even if they exceed 0..15 (defensive).
-                int scaled = Mathf.RoundToInt(o16 * scale);
-                int s = (phaseShift + scaled) % totalSteps;
-                if (s < 0) s += totalSteps;
-                steps.Add(s);
-            }
-        }
-
-        // Ensure non-empty and sorted
-        if (steps.Count == 0) steps.Add(0);
-        return steps.OrderBy(s => s).ToList();
-    }
-    List<Chord> RealizeChordFunctions(List<string> fns, int rootMidi, ScaleType scale)
-    {
-        // simple diatonic mapping; expand as you wish
-        var map = new Dictionary<string, (int deg, string quality)> {
-            {"I",(0,"Major")}, {"ii",(1,"Minor")}, {"iii",(2,"Minor")},
-            {"IV",(3,"Major")},{"V",(4,"Major")}, {"vi",(5,"Minor")}, {"vii°",(6,"Diminished")},
-            {"bVII",(6,"Major")}
-        };
-
-        int root = rootMidi;
-        var chords = new List<Chord>();
-        foreach (var fn in fns)
-        {
-            if (!map.TryGetValue(fn, out var t)) continue;
-            int[] scaleInts = ScalePatterns.Patterns[scale];
-            int rel = Mathf.Clamp(t.deg, 0, scaleInts.Length - 1);
-            int chordRoot = root + scaleInts[rel];
-
-            int[] ivals = t.quality switch
-            {
-                "Minor"      => new[] {0,3,7},
-                "Major"      => new[] {0,4,7},
-                "Diminished" => new[] {0,3,6},
-                _            => new[] {0,4,7}
-            };
-            chords.Add(new Chord { rootNote = chordRoot, intervals = ivals.ToList() });
-        }
-        if (chords.Count == 0)
-            chords.Add(new Chord { rootNote = root, intervals = new List<int>{0,4,7} });
-
-        return chords;
-    }
-
-    int GeneratePitchForStrategy(
-        PatternStrategy pat,
-        Chord chord,
-        ScaleType scale,
-        VariationProfile v,
-        System.Random rng,
-        int lo,
-        int hi)
-    {
-        // Defensive: ensure range is sane
-        if (lo > hi)
-        {
-            int tmp = lo;
-            lo = hi;
-            hi = tmp;
-        }
-
-        // ---- 1) Build chord tones in [lo, hi] ----
-
-        var chordBaseTones = new List<int>();
-
-        if (chord.intervals != null && chord.intervals.Count > 0)
-        {
-            foreach (var iv in chord.intervals)
-                chordBaseTones.Add(chord.rootNote + iv);
-        }
-        else
-        {
-            // Fallback: simple major triad on the root
-            chordBaseTones.Add(chord.rootNote);
-            chordBaseTones.Add(chord.rootNote + 4);
-            chordBaseTones.Add(chord.rootNote + 7);
-        }
-
-        var chordTonesInRange = ProjectChordTonesIntoRange(chordBaseTones, lo, hi);
-        if (chordTonesInRange.Count == 0)
-            chordTonesInRange.Add(Mathf.Clamp(chord.rootNote, lo, hi));
-
-        chordTonesInRange = chordTonesInRange
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-
-        // ---- 2) Build diatonic scale tones in [lo, hi] ----
-
-        var scalePitches = BuildScalePitchesInRange(chord.rootNote, scale, lo, hi);
-        if (scalePitches.Count == 0)
-            scalePitches.AddRange(chordTonesInRange);
-
-        scalePitches = scalePitches
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-
-        // ---- 3) Small helpers to pick notes ----
-
-        int PickFrom(List<int> list)
-        {
-            if (list == null || list.Count == 0)
-                return Mathf.Clamp(chord.rootNote, lo, hi);
-            return list[rng.Next(list.Count)];
-        }
-
-        int PickNear(List<int> list, int target)
-        {
-            if (list == null || list.Count == 0)
-                return Mathf.Clamp(target, lo, hi);
-
-            int best = list[0];
-            int bestDist = Mathf.Abs(best - target);
-
-            for (int i = 1; i < list.Count; i++)
-            {
-                int d = Mathf.Abs(list[i] - target);
-                if (d < bestDist)
-                {
-                    best = list[i];
-                    bestDist = d;
-                }
-            }
-
-            // Occasionally choose a slightly different neighbor for variation.
-            if (list.Count > 1 && rng.NextDouble() < 0.35)
-            {
-                int alt = list[rng.Next(list.Count)];
-                if (Mathf.Abs(alt - target) <= bestDist + 2)
-                    best = alt;
-            }
-
-            return best;
-        }
-
-        // ---- 4) PatternStrategy → pitch behavior ----
-
-        int midi;
-        int midRange = (lo + hi) / 2;
-        var chordSorted = chordTonesInRange;
-        var scaleSorted = scalePitches;
-
-        switch (pat)
-        {
-            // Arpeggio families: chord-focused
-            case PatternStrategy.Arpeggiated:
-                midi = PickFrom(chordSorted);
-                break;
-
-            case PatternStrategy.ArpUp:
-            {
-                int half = Mathf.Max(1, chordSorted.Count / 2);
-                var upper = chordSorted.Skip(half).ToList();
-                if (upper.Count == 0) upper = chordSorted;
-                midi = PickFrom(upper);
-                break;
-            }
-
-            case PatternStrategy.ArpDown:
-            {
-                int half = Mathf.Max(1, chordSorted.Count / 2);
-                var lower = chordSorted.Take(half).ToList();
-                if (lower.Count == 0) lower = chordSorted;
-                midi = PickFrom(lower);
-                break;
-            }
-
-            case PatternStrategy.ArpPingPong:
-                // Randomly hit either lowest or highest chord tone
-                midi = (rng.NextDouble() < 0.5)
-                    ? chordSorted[0]
-                    : chordSorted[chordSorted.Count - 1];
-                break;
-
-            // Static / drone
-            case PatternStrategy.StaticRoot:
-            case PatternStrategy.Drone:
-                midi = chordSorted[0]; // lowest chord tone
-                break;
-
-            // Bass-y motion
-            case PatternStrategy.FifthJump:
-            {
-                int rootCandidate = Mathf.Clamp(chord.rootNote, lo, hi);
-                int fifthCandidate = Mathf.Clamp(chord.rootNote + 7, lo, hi);
-                midi = (rng.NextDouble() < 0.5) ? rootCandidate : fifthCandidate;
-                break;
-            }
-
-            case PatternStrategy.WalkingBass:
-            {
-                // Prefer lower third of scale
-                int cutoff = lo + (hi - lo) / 3;
-                var low = scaleSorted.Where(p => p <= cutoff).ToList();
-                if (low.Count == 0) low = scaleSorted;
-                midi = PickFrom(low);
-                break;
-            }
-
-            case PatternStrategy.ScaleWalk:
-                // Any diatonic pitch in range
-                midi = PickFrom(scaleSorted);
-                break;
-
-            // Melodic foreground
-            case PatternStrategy.MelodicPhrase:
-                midi = PickNear(scaleSorted, midRange);
-                break;
-
-            case PatternStrategy.NeighborOrnament:
-            {
-                midi = PickNear(scaleSorted, midRange);
-                // Add a small neighbor step with decent probability
-                if (rng.NextDouble() < 0.6)
-                {
-                    int step = (rng.Next(0, 2) == 0 ? -1 : 1) *
-                               (rng.NextDouble() < 0.7 ? 1 : 2); // ±1 or ±2 semitones
-                    midi += step;
-                }
-                break;
-            }
-
-            case PatternStrategy.Ostinato:
-            {
-                // Repeated chord tone in mid register
-                int idx = Mathf.Clamp(chordSorted.Count / 2, 0, chordSorted.Count - 1);
-                midi = chordSorted[idx];
-                break;
-            }
-
-            case PatternStrategy.CallAndResponse:
-            {
-                // Sometimes mid, sometimes upper register scale tones
-                if (rng.NextDouble() < 0.5)
-                {
-                    midi = PickNear(scaleSorted, midRange);
-                }
-                else
-                {
-                    var upper = scaleSorted.Where(p => p >= midRange).ToList();
-                    if (upper.Count == 0) upper = scaleSorted;
-                    midi = PickFrom(upper);
-                }
-                break;
-            }
-
-            case PatternStrategy.ChordalStab:
-                // High chord tone / top of voicing
-                midi = chordSorted[chordSorted.Count - 1];
-                break;
-
-            // Percussive / supporting loop
-            case PatternStrategy.PercussiveLoop:
-                // Any chord tone; pitch is less critical
-                midi = PickFrom(chordSorted);
-                break;
-
-            // Hook / rhythmic figure that should pop a bit
-            case PatternStrategy.SyncopatedHook:
-            {
-                var upper = scaleSorted.Where(p => p >= midRange).ToList();
-                if (upper.Count == 0) upper = scaleSorted;
-                midi = PickFrom(upper);
-                break;
-            }
-
-            case PatternStrategy.HemiolaFigure:
-            {
-                // Strong chord tone near mid-high register
-                int target = midRange + (hi - lo) / 6;
-                midi = PickNear(chordSorted, target);
-                break;
-            }
-
-            case PatternStrategy.Randomized:
-            default:
-            {
-                // Randomly choose either a chord tone or a scale tone
-                if (rng.NextDouble() < 0.5)
-                    midi = PickFrom(chordSorted);
-                else
-                    midi = PickFrom(scaleSorted);
-                break;
-            }
-        }
-
-        return Mathf.Clamp(midi, lo, hi);
-    }
-    List<int> ProjectChordTonesIntoRange(List<int> chordBaseTones, int lo, int hi)
-{
-    var result = new List<int>();
-    if (chordBaseTones == null || chordBaseTones.Count == 0) return result;
-
-    foreach (int baseMidi in chordBaseTones)
-    {
-        for (int oct = -4; oct <= 4; oct++)
-        {
-            int candidate = baseMidi + 12 * oct;
-            if (candidate >= lo && candidate <= hi)
-                result.Add(candidate);
-        }
-    }
-
-    return result;
-}
-
-    List<int> BuildScalePitchesInRange(int rootMidi, ScaleType scale, int lo, int hi)
-{
-    int[] degrees;
-    switch (scale)
-    {
-        case ScaleType.Minor:
-            degrees = new[] { 0, 2, 3, 5, 7, 8, 10 };
-            break;
-        case ScaleType.Dorian:
-            degrees = new[] { 0, 2, 3, 5, 7, 9, 10 };
-            break;
-        case ScaleType.Phrygian:
-            degrees = new[] { 0, 1, 3, 5, 7, 8, 10 };
-            break;
-        case ScaleType.Lydian:
-            degrees = new[] { 0, 2, 4, 6, 7, 9, 11 };
-            break;
-        case ScaleType.Mixolydian:
-            degrees = new[] { 0, 2, 4, 5, 7, 9, 10 };
-            break;
-        case ScaleType.Locrian:
-            degrees = new[] { 0, 1, 3, 5, 6, 8, 10 };
-            break;
-        case ScaleType.Major:
-        default:
-            degrees = new[] { 0, 2, 4, 5, 7, 9, 11 };
-            break;
-    }
-
-    var result = new List<int>();
-
-    for (int oct = -4; oct <= 4; oct++)
-    {
-        int baseOct = rootMidi + 12 * oct;
-        foreach (int d in degrees)
-        {
-            int candidate = baseOct + d;
-            if (candidate >= lo && candidate <= hi)
-                result.Add(candidate);
-        }
-    }
-
-    return result;
-}
-
-    int AddExtension(int midi, Chord chord, System.Random rng)
-    {
-        int[] ext = {14, 17, 21}; // 9th/11th/13th
-        int choice = ext[rng.Next(ext.Length)];
-        int target = chord.rootNote + choice;
-        return Mathf.Abs(target - midi) < 5 ? target : midi;
-    }
-    
 }

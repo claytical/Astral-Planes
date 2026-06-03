@@ -161,37 +161,7 @@ public class MazePatternConfig : ScriptableObject
 
     [Header("Porous Border")]
     public PorousBorderParams porousBorder = new();
-
-    public bool TryGetActive<T>(out T patternParams) where T : class
-    {
-        object activePatternParams = patternType switch
-        {
-            MazePatternType.ClearBoxes => clearBoxes,
-            MazePatternType.CellularAutomata => cellularAutomata,
-            MazePatternType.RingChokepoints => ring,
-            MazePatternType.DrunkenStrokes => drunkenStrokes,
-            MazePatternType.DiagonalLanes => diagonalLanes,
-            MazePatternType.Tunnels => tunnels,
-            _ => null,
-        };
-
-        if (activePatternParams is T typedPatternParams)
-        {
-            patternParams = typedPatternParams;
-            return true;
-        }
-
-        patternParams = null;
-        return false;
-    }
-
-    [System.Obsolete("Use TryGetActive<T>(out T patternParams) to avoid runtime casting.")]
-    public object GetActivePatternParams()
-    {
-        _ = TryGetActive<object>(out object patternParams);
-        return patternParams;
-    }
-
+    
     public void Validate()
     {
         dustTiming ??= new DustTimingParams();

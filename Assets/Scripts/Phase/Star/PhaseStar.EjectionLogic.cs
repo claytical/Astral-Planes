@@ -424,7 +424,7 @@ public partial class PhaseStar
             return true;
         }
 
-        Debug.LogWarning($"[PhaseStar:ZapCount] riff empty/null for role={role} cfg={cfg} riff={cfg.riff?.name ?? "null"} useRiff={cfg.useRiffAsAuthoritativeScore}");
+        Debug.LogWarning($"[PhaseStar:ZapCount] riff empty/null for role={role} cfg={cfg} riff={cfg.riff?.name ?? "null"}");
         return false;
     }
 

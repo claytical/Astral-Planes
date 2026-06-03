@@ -149,10 +149,21 @@ public partial class Vehicle
         ResolvePlaybackNote(p, targetAbsStep, out int chosenMidi, out int resolvedDurationTicks);
         bool compositionMode = p.track.controller != null &&
                                p.track.controller.noteCommitMode == NoteCommitMode.Composition;
-        // Pre-quantize in Performance mode so SFX and loop commit use the same final pitch.
-        // Composition mode keeps the raw note (octave-fit only, no chord snap — by design).
+
+        int spawnBin  = p.track.BinIndexForStep(p.authoredAbsStep);
+        int targetBin = p.track.BinIndexForStep(targetAbsStep);
+        bool crossBinComposition = compositionMode && spawnBin != targetBin;
+
+        // Performance mode: always quantize so SFX and loop commit use the same final pitch.
+        // Composition cross-bin: use the authored note for the target step — quantizing the
+        // collected note isn't enough because the collected note can be a chord tone of the
+        // target chord (e.g. C in F major) and pass IsNoteInChord unchanged, sounding like
+        // the wrong bin. Using the authored note ensures each step gets its intended melody.
+        // Same-bin Composition: keep the raw collected note (already a chord tone of that bin).
         if (!compositionMode)
             chosenMidi = p.track.QuantizeNoteForStep(targetAbsStep, chosenMidi, p.authoredRootMidi);
+        else if (crossBinComposition)
+            chosenMidi = p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;
@@ -162,12 +173,22 @@ public partial class Vehicle
         if (p.collectable != null) p.collectable.MarkAsReportedCollected();
         if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
 
+        // Cross-bin: store the target bin's chord root so RetuneLoopToCurrentProgression
+        // computes rootDelta=0 for this note (correct anchor, no mis-retune later).
+        int commitAuthoredRoot = p.authoredRootMidi;
+        if (crossBinComposition)
+        {
+            var targetNs = p.track.GetNoteSetForBin(targetBin);
+            if (targetNs?.chordRegion != null && targetNs.chordRegion.Count > 0)
+                commitAuthoredRoot = targetNs.chordRegion[targetBin % targetNs.chordRegion.Count].rootNote;
+        }
+
         p.track.CommitManualReleasedNote(
             stepAbs: targetAbsStep,
             midiNote: chosenMidi,
             durationTicks: resolvedDurationTicks,
             velocity127: commitVel,
-            authoredRootMidi: p.authoredRootMidi,
+            authoredRootMidi: commitAuthoredRoot,
             burstId: p.burstId,
             lightMarkerNow: true,
             skipChordQuantize: true   // already quantized above (Composition mode: octave-fit only regardless)

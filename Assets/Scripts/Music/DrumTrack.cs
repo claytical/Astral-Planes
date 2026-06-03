@@ -20,15 +20,6 @@ public partial class DrumTrack : MonoBehaviour
     private int _beatSeqGateSpamGuard = 0;
     private string _lastMotifSetBy = "never";
     private int _motifSetSerial = 0;
-// --- Session-relative intensity (aggregate across all players) ---
-    [SerializeField, Tooltip("EMA smoothing for the session baseline (aggregate energy burn per loop). Higher adapts faster.")]
-    private float sessionBurnEmaAlpha = 0.25f;
-
-    [SerializeField, Tooltip("How many multiples above baseline maps to full intensity (>=1). 2.5 means 2.5x baseline => intensity 1.")]
-    private float burnMultipleAtFullIntensity = 2.5f;
-
-    [SerializeField, Tooltip("Intensity ceiling when exactly 1 instrument track has notes in the upcoming bin (0=low clip only, 1=uncapped). 2+ tracks always uncap.")]
-    private float singleTrackIntensityCeiling = 0.45f;
     private float _lateBindMotifTimer = 0f;
     private const float kLateBindMotifInterval = 1.0f;
     private float _lastTotalSpentSample = -1f; // baseline sample of TOTAL spent tanks (cumulative)
@@ -39,9 +30,10 @@ public partial class DrumTrack : MonoBehaviour
     public float drumLoopBPM = 120f;
     [HideInInspector]
     public int totalSteps = 16;
-    public float gridPadding = 0f;
-    public float timingWindowSteps = .25f; // Can shrink to 0.5 or less as game progresses
     public AudioSource drumAudioSource;
+    [Header("Config")]
+    [SerializeField] public DrumTrackConfig config;
+    public float timingWindowSteps => config != null ? config.timingWindowSteps : 0.25f;
     [HideInInspector]
     public double startDspTime;
     private AudioSource _drumA; // primary deck
@@ -56,23 +48,8 @@ public partial class DrumTrack : MonoBehaviour
     [HideInInspector]
     public int currentStep;
 
-    [Header("Grid Sizing (Pixel-driven)")]
-    [Tooltip("Reference screen width used to derive a default cell pixel size (e.g., 1920).")]
-    [SerializeField]
-    private int referenceWidthPx = 1920;
-
-    [Tooltip("Reference grid columns used with referenceWidthPx to derive cell pixel size (e.g., 36).")]
-    [SerializeField]
-    private int referenceColumns = 36;
-
-    [Tooltip("Bottom UI padding in pixels to exclude from the grid area (e.g., 160).")] [SerializeField]
-    private int uiBottomPaddingPx = 160;
-
-    [Tooltip("Optional RectTransform whose top world-Y overrides uiBottomPaddingPx for grid bottom — set to NoteVisualizer RT for pixel-perfect alignment with the physical boundary.")]
+    [Tooltip("Optional RectTransform whose top world-Y overrides DrumTrackConfig.uiBottomPaddingPx for grid bottom — set to NoteVisualizer RT for pixel-perfect alignment with the physical boundary.")]
     [SerializeField] private RectTransform _playAreaBottomAnchor;
-
-    [Tooltip("If true, DrumTrack will resize SpawnGrid at runtime to fill the usable screen.")] [SerializeField]
-    private bool autoSizeSpawnGridToScreen = true;
 
     public int completedLoops { get; private set; } = 0;
     private float _loopLengthInSeconds, _phaseStartTime;
@@ -114,11 +91,6 @@ public partial class DrumTrack : MonoBehaviour
     private int _lastStepIdx = -1;
     private bool _driveFromEnergy;
 
-    [SerializeField, Tooltip("How many 'spent tanks' per loop counts as full intensity (E). Tune while testing.")]
-    private float tanksPerLoopAtFullIntensity = 0.35f;
-
-    [SerializeField, Tooltip("Optional: minimum change in intensity01 required before allowing a new target profile.")]
-    private float intensityHysteresis = 0.08f;
 
     private float _lastSpentTanksSample = -1f; // baseline at last boundary
     private float _lastIntensity01 = 0f; // for hysteresis
@@ -137,7 +109,6 @@ public partial class DrumTrack : MonoBehaviour
         public float height => top - bottom;
     }
     [Header("Play Area Mapping")]
-    [SerializeField] private bool lockPlayAreaAfterInit = true;
 
     private PlayArea _lockedPlayArea;
     private bool _hasLockedPlayArea = false;
@@ -157,7 +128,7 @@ public partial class DrumTrack : MonoBehaviour
 
 	public bool TryGetPlayAreaWorld(out PlayArea area)
 	{
-        if (lockPlayAreaAfterInit && _hasLockedPlayArea)
+        if (config.lockPlayAreaAfterInit && _hasLockedPlayArea)
         {
             area = _lockedPlayArea;
             return true;
@@ -200,16 +171,16 @@ public partial class DrumTrack : MonoBehaviour
 		}
 
 		// Optional padding to keep spawns away from the very edge of the screen.
-		if (gridPadding > 0f)
+		if (config.gridPadding > 0f)
 		{
-			left   += gridPadding;
-			right  -= gridPadding;
-			bottom += gridPadding;
-			top    -= gridPadding;
+			left   += config.gridPadding;
+			right  -= config.gridPadding;
+			bottom += config.gridPadding;
+			top    -= config.gridPadding;
 		}
 
-		// Reserve a bottom viewport band for UI derived from uiBottomPaddingPx.
-		float uiBotV = Screen.height > 0 ? Mathf.Clamp01(uiBottomPaddingPx / (float)Screen.height) : 0f;
+		// Reserve a bottom viewport band for UI derived from config.uiBottomPaddingPx.
+		float uiBotV = Screen.height > 0 ? Mathf.Clamp01(config.uiBottomPaddingPx / (float)Screen.height) : 0f;
 		if (uiBotV > 0f)
 		{
 			// For orthographic cameras map the viewport fraction from world origin,
@@ -235,7 +206,7 @@ public partial class DrumTrack : MonoBehaviour
 		area.right = right;
 		area.bottom = bottom;
 		area.top = top;
-        if (lockPlayAreaAfterInit && !_hasLockedPlayArea)
+        if (config.lockPlayAreaAfterInit && !_hasLockedPlayArea)
         {
             _lockedPlayArea = area;
             _hasLockedPlayArea = true;
@@ -864,7 +835,7 @@ public partial class DrumTrack : MonoBehaviour
 
         const float kIntensitySmooth = 0.35f;
         intensity01 = Mathf.Lerp(_lastIntensity01, rawIntensity, kIntensitySmooth);
-        if (Mathf.Abs(intensity01 - _lastIntensity01) < intensityHysteresis)
+        if (Mathf.Abs(intensity01 - _lastIntensity01) < config.intensityHysteresis)
             intensity01 = _lastIntensity01;
         _lastIntensity01 = intensity01;
 
@@ -873,7 +844,7 @@ public partial class DrumTrack : MonoBehaviour
 
     // Per-bin ceiling: clamps intensity based on how many tracks have filled bins.
     // Does NOT update _lastIntensity01 so energy-burn history is preserved across empty bins.
-    // 0 filled tracks → ceiling 0, 1 → singleTrackIntensityCeiling, 2+ → uncapped.
+    // 0 filled tracks → ceiling 0, 1 → config.singleTrackIntensityCeiling, 2+ → uncapped.
     private void ApplyPerBinIntensityCeiling(ref float intensity01)
     {
         var ctrl = _gfm?.controller;
@@ -887,7 +858,7 @@ public partial class DrumTrack : MonoBehaviour
             if (track.HasAnyNoteInBin(upcomingBin)) filledCount++;
         }
         float ceiling = filledCount == 0 ? 0f
-                      : filledCount == 1 ? singleTrackIntensityCeiling
+                      : filledCount == 1 ? config.singleTrackIntensityCeiling
                       : 1f;
         intensity01 = Mathf.Min(intensity01, ceiling);
     }
@@ -1098,7 +1069,7 @@ public partial class DrumTrack : MonoBehaviour
         Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
     }
     private void AutoSizeSpawnGridIfEnabled() { 
-        if (!autoSizeSpawnGridToScreen) return; 
+        if (!config.autoSizeSpawnGridToScreen) return; 
         if (_spawnGrid == null) return;
 
         // Grid dimensions are fixed to the reference resolution so that dust tile world-size
@@ -1108,16 +1079,16 @@ public partial class DrumTrack : MonoBehaviour
         // Previously cols/rows were derived from actual screen pixels, which caused dust to
         // appear spaced out on high-res laptops (more cells → larger tile world size) and
         // packed on the Steam Deck (fewer cells → smaller tile world size).
-        if (referenceWidthPx <= 0 || referenceColumns <= 0)
+        if (config.referenceWidthPx <= 0 || config.referenceColumns <= 0)
         {
-            Debug.LogWarning("[GridAutoSize] referenceWidthPx or referenceColumns not set; skipping auto-size.");
+            Debug.LogWarning("[GridAutoSize] config.referenceWidthPx or config.referenceColumns not set; skipping auto-size.");
             return;
         }
 
-        float cellPx  = referenceWidthPx / (float)referenceColumns; // e.g. 1920/36 ≈ 53.33
-        int   refCols = referenceColumns;
+        float cellPx  = config.referenceWidthPx / (float)config.referenceColumns; // e.g. 1920/36 ≈ 53.33
+        int   refCols = config.referenceColumns;
         // Derive reference row count from the reference height (1080) minus the reference UI padding.
-        int   refUsableH = 1080 - Mathf.Max(0, uiBottomPaddingPx);
+        int   refUsableH = 1080 - Mathf.Max(0, config.uiBottomPaddingPx);
         int   refRows    = Mathf.Max(1, Mathf.RoundToInt(refUsableH / cellPx));
 
         int sh = Mathf.Max(1, Screen.height);
@@ -1259,7 +1230,7 @@ public partial class DrumTrack : MonoBehaviour
         float z          = -cam.transform.position.z;
         Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
         Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
-        return (topRight.x - gridPadding) - (bottomLeft.x + gridPadding);
+        return (topRight.x - config.gridPadding) - (bottomLeft.x + config.gridPadding);
     }
     public int GetSpawnGridWidth()
     {
@@ -1308,7 +1279,7 @@ public partial class DrumTrack : MonoBehaviour
     {
         if (!TryGetPlayAreaWorld(out var area))
         {
-            if (lockPlayAreaAfterInit && _hasLockedPlayArea)
+            if (config.lockPlayAreaAfterInit && _hasLockedPlayArea)
                 area = _lockedPlayArea;
             else
                 return Vector2.zero;
@@ -1328,7 +1299,7 @@ public partial class DrumTrack : MonoBehaviour
 
         if (!TryGetPlayAreaWorld(out var area))
         {
-            if (lockPlayAreaAfterInit && _hasLockedPlayArea)
+            if (config.lockPlayAreaAfterInit && _hasLockedPlayArea)
                 area = _lockedPlayArea;
             else
                 return;
@@ -1349,7 +1320,7 @@ public partial class DrumTrack : MonoBehaviour
     {
         if (!TryGetPlayAreaWorld(out var area))
         {
-            if (lockPlayAreaAfterInit && _hasLockedPlayArea)
+            if (config.lockPlayAreaAfterInit && _hasLockedPlayArea)
                 area = _lockedPlayArea;
             else
                 return Vector2Int.zero;

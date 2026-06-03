@@ -204,6 +204,7 @@ public class Collectable : MonoBehaviour
     [SerializeField] private float dustAdjacencyProbe = 0.42f; // radius used to detect nearby dust
     [SerializeField] private int   neighborRadiusCells = 1;    // how far from current cell to consider neighbors (4-neighbors)
 
+    private Camera _cam;
     private Rigidbody2D _rb;
     private float _speed;
     private System.Random _rng;
@@ -245,6 +246,12 @@ private IEnumerator SpawnArrivalRoutine(
     NoteSet noteSet,
     List<int> steps)
 {
+    // Set the note fields immediately so GetNote() returns the correct value
+    // even if the vehicle collects this collectable during the drift animation.
+    assignedNote            = note;
+    noteDurationTicks       = duration;
+    assignedInstrumentTrack = track;
+
     transform.position = originWorld;
     if (_rb == null) TryGetComponent(out _rb);
 
@@ -270,6 +277,16 @@ private IEnumerator SpawnArrivalRoutine(
     float t = 0f;
 
     Vector2 end2 = (Vector2)(Vector3)targetWorld;
+    // Clamp convergence target inside the viewport so the drift never converges off-screen.
+    if (_cam == null) _cam = Camera.main;
+    if (_cam != null)
+    {
+        const float arrivalMargin = 1.5f;
+        Vector2 vMin = _cam.ViewportToWorldPoint(Vector3.zero);
+        Vector2 vMax = _cam.ViewportToWorldPoint(Vector3.one);
+        end2.x = Mathf.Clamp(end2.x, vMin.x + arrivalMargin, vMax.x - arrivalMargin);
+        end2.y = Mathf.Clamp(end2.y, vMin.y + arrivalMargin, vMax.y - arrivalMargin);
+    }
 
     // Per-instance noise seeds so simultaneous collectables don't wiggle in sync.
     float noiseSeedX = UnityEngine.Random.value * 100f;
@@ -715,9 +732,22 @@ private IEnumerator SpawnArrivalRoutine(
         if (step.sqrMagnitude > maxStep * maxStep)
             step = step.normalized * maxStep;
 
-        _rb.MovePosition(cur + step);
+        Vector2 nextPos = cur + step;
+        ClampToViewport(ref nextPos);
+        _rb.MovePosition(nextPos);
     }
 }
+
+    private void ClampToViewport(ref Vector2 pos)
+    {
+        if (_cam == null) _cam = Camera.main;
+        if (_cam == null) return;
+        const float pad = 0.4f;
+        Vector2 mn = _cam.ViewportToWorldPoint(Vector3.zero);
+        Vector2 mx = _cam.ViewportToWorldPoint(Vector3.one);
+        pos.x = Mathf.Clamp(pos.x, mn.x + pad, mx.x - pad);
+        pos.y = Mathf.Clamp(pos.y, mn.y + pad, mx.y - pad);
+    }
 
     public int GetNote() => assignedNote;
     public bool IsDark { get; private set; } = false;
