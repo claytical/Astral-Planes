@@ -51,7 +51,7 @@ public partial class CosmicDustGenerator
         if (dust != null)
         {
             dust.SetTrackBundle(this, drums);
-            dust.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), dustFootprintMul, cellClearanceWorld);
+            dust.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), config.dustFootprintMul, cellClearanceWorld);
             dust.HideVisualsInstant();
             SetDustCollision(dust, false);
         }

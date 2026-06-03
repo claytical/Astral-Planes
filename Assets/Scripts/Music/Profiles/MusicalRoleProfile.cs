@@ -97,6 +97,12 @@ public class MusicalRoleProfile : ScriptableObject
 
     [Header("Presets")] public int midiPreset;
 
+    [Header("MIDI Range")]
+    [Tooltip("Lowest MIDI note this role's preset can play musically. Notes below this are octave-shifted up.")]
+    public int lowestNote = 36;
+    [Tooltip("Highest MIDI note this role's preset can play musically. Notes above this are octave-shifted down.")]
+    public int highestNote = 84;
+
     [Header("Ripeness / Decay")]
     [Tooltip("How long (seconds) the revealed role color stays visible before fading back to gray. Must be > 0.")]
     public float ripeDuration = 8f;

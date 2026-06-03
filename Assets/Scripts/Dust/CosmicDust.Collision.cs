@@ -3,24 +3,8 @@ using UnityEngine;
 
 public partial class CosmicDust
 {
-    [Serializable]
-    public struct DustPluckSettings
-    {
-        [Header("Dust Musical Swell")]
-        [Tooltip("How long contact needs to build before plucks reach full intensity.")]
-        [Range(0.1f, 4f)] public float swellSeconds;
-        [Tooltip("Short/long pluck lengths used at low/high contact intensity.")]
-        [Min(1)] public int minDurationTicks;
-        [Min(1)] public int maxDurationTicks;
-        [Tooltip("Soft/loud pluck velocities used at low/high contact intensity.")]
-        [Range(1f, 127f)] public float minVelocity127;
-        [Range(1f, 127f)] public float maxVelocity127;
-        [Tooltip("Time between plucks. Max applies at first contact, min after sustained pressure.")]
-        [Min(0.01f)] public float minCooldownSeconds;
-        [Min(0.01f)] public float maxCooldownSeconds;
-    }
 
-    [SerializeField] private DustPluckSettings pluck = new DustPluckSettings
+    [SerializeField] private DustPluckSettings pluck = new()
     {
         swellSeconds = 1.4f,
         minDurationTicks = 360,

@@ -16,9 +16,9 @@ MonoBehaviour:
   dustColors:
     baseColor: {r: 0.6039216, g: 0.3882353, b: 0.9490196, a: 0.6509804}
     shadowColor: {r: 0.48424336, g: 0.27727836, b: 0.6320754, a: 1}
-  baseAlpha: 0.65
+  baseAlpha: 0.825
   maxEnergyUnits: 5
-  carveResistance01: 0.7
+  carveResistance01: 0.78
   drainResistance01: 0.25
   mineNodeSpeed: 0.35
   mineNodeLocomotionProfile: {fileID: 11400000, guid: e36f28096af234af1ba66f20d16b8c64,
@@ -36,5 +36,7 @@ MonoBehaviour:
   configSelectionMode: 0
   chordVoiceColors: []
   midiPreset: 2
+  lowestNote: 35
+  highestNote: 72
   ripeDuration: 512
   regrowthDelay: 0.8

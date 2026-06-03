@@ -126,15 +126,6 @@ public sealed class CosmicDustExclusionMap
         }
     }
 
-    /// <summary>
-    /// Clear the PhaseStar pocket completely. Returns released cells.
-    /// </summary>
-    public void ClearStarPocket(List<Vector2Int> released)
-    {
-        released?.Clear();
-        foreach (var c in _starCells) released?.Add(c);
-        _starCells.Clear();
-    }
 
     // ------------------------
     // Internals

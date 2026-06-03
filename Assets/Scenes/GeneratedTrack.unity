@@ -10703,14 +10703,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 32
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -10725,8 +10721,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!114 &342701842
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11250,14 +11244,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 16
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -11272,8 +11262,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!4 &627412778
 Transform:
   m_ObjectHideFlags: 0
@@ -11378,14 +11366,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 16
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -11400,8 +11384,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!114 &652946509
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11664,35 +11646,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
-  cellClearanceWorld: 0
-  defaultMazeHardness01: 0.232
-  dustVisualTimingSettings: {fileID: 0}
-  mineNodeErodePerTick: 10
-  dustFootprintMul: 1
+  config: {fileID: 11400000, guid: 587d53622e0ba4950b2686c0a418ab89, type: 2}
+  dustVisualTimingSettings: {fileID: 11400000, guid: 99b1bf1eb1b214eed942252efa203990,
+    type: 2}
   tileDiameterWorld: 1
-  regrowCellsPerStep: 1
-  regrowColliderEnableDelaySeconds: 0.2
-  voidDustGrowInSeconds: 0.4
-  zapFadeSeconds: 1.5
-  zapRegrowDelaySeconds: -1
-  _mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.2901961}
-  toroidal: 0
-  enableTintDiffusion: 1
-  tintDiffusionInterval: 0.12
-  tintDiffusionMaxCellsPerTick: 256
-  tintDiffusionRadius: 1
-  tintDiffusionStrength: 0.25
-  tintDiffusionPropagateOnChange: 1
-  tintDiffusionMinDelta: 0.0025
-  tintDirtyMarkRadius: 1
-  maxSpawnMillisPerFrame: 1.2
-  hexGrowInSeconds: 0.45
   vehicleMask:
     serializedVersion: 2
     m_Bits: 0
-  regrowVetoRetryDelaySeconds: 0.08
-  regrowVetoBoxMul: 0.85
-  regrowVetoMaxHits: 8
   dustClaims: {fileID: 869126482}
 --- !u!114 &869126482
 MonoBehaviour:
@@ -11989,14 +11949,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 32
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -12011,8 +11967,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!1 &1190942844
 GameObject:
   m_ObjectHideFlags: 0
@@ -12406,27 +12360,16 @@ MonoBehaviour:
   mineNodePrefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8,
     type: 3}
   logBeatSeqGates: 1
-  sessionBurnEmaAlpha: 0.25
-  burnMultipleAtFullIntensity: 2.5
-  singleTrackIntensityCeiling: 0.45
   drumLoopBPM: 120
   totalSteps: 32
-  gridPadding: 0
-  timingWindowSteps: 4
   drumAudioSource: {fileID: 1354683685}
+  config: {fileID: 11400000, guid: 77e8883fee1ac43e8bd75dfebdb12a8d, type: 2}
   startDspTime: 0
   SessionPhases: []
   activeMineNodes: []
   currentStep: 0
-  referenceWidthPx: 1920
-  referenceColumns: 40
-  uiBottomPaddingPx: 140
   _playAreaBottomAnchor: {fileID: 45202785}
-  autoSizeSpawnGridToScreen: 1
   _starPool: {fileID: 0}
-  tanksPerLoopAtFullIntensity: 0.35
-  intensityHysteresis: 0.08
-  lockPlayAreaAfterInit: 1
 --- !u!4 &1354683683
 Transform:
   m_ObjectHideFlags: 0
@@ -12461,7 +12404,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d477bd438cd9324ca89a2934c7d01ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  noteCommitMode: 0
+  config: {fileID: 11400000, guid: 9191c4153e8434f44aea21205472c0f8, type: 2}
   tracks:
   - {fileID: 342701841}
   - {fileID: 1690824280}
@@ -12471,32 +12414,11 @@ MonoBehaviour:
   - {fileID: 1889521212}
   - {fileID: 996539888}
   noteVisualizer: {fileID: 45202786}
-  cohortWindowFraction: 0.5
   gravityVoidPrefab: {fileID: 9142743768792165380, guid: 3c8cf7e4f7b0f479b9cd36dffc6bdbe5,
     type: 3}
   gravityVoidParent: {fileID: 1354683683}
-  gravityVoidScale: 1
   pickupSfxSource: {fileID: 480221064}
-  pickupTickVolume: 1
-  pickupTickPitchJitter: 0.0663
-  pickupTickDefault: {fileID: 8300000, guid: 664d9d8e8f8740945a1e4b4c6d430394, type: 3}
-  pickupTickBass: {fileID: 0}
-  pickupTickLead: {fileID: 0}
-  pickupTickHarmony: {fileID: 0}
-  pickupTickGroove: {fileID: 0}
-  voidRingWidthCells: 2
-  gravityVoidImprintTickSeconds: 0.05
   commitSfxSource: {fileID: 480221064}
-  commitStingerVolume: 1.25
-  commitStingerPitchJitter: 0.02
-  commitStingerDefault: {fileID: 8300000, guid: 775b86890cb5041ee89cf2f109f69e40,
-    type: 3}
-  commitStingerBass: {fileID: 0}
-  commitStingerLead: {fileID: 8300000, guid: 51ad531b2be9b4e89a5cb1d4de4429c5, type: 3}
-  commitStingerHarmony: {fileID: 8300000, guid: 0f35a54cb48d4445a9396b3c1df83269,
-    type: 3}
-  commitStingerGroove: {fileID: 0}
-  commitStingerDrums: {fileID: 0}
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -12678,6 +12600,7 @@ GameObject:
   - component: {fileID: 1355805403}
   - component: {fileID: 1355805402}
   - component: {fileID: 1355805401}
+  - component: {fileID: 1355805404}
   m_Layer: 0
   m_Name: Ring Glyph
   m_TagString: Untagged
@@ -12828,6 +12751,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1355805404
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355805400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 928fcb3b030a0458da21bf77631c0c9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BinRingController
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -13326,6 +13261,7 @@ MonoBehaviour:
   returnToPlaySpeed: 8
   innerSettleBuffer: 0.08
   settleSpeedThreshold: 1
+  wrapEnabled: 0
 --- !u!1 &1532169429
 GameObject:
   m_ObjectHideFlags: 0
@@ -13582,14 +13518,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 32
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -13604,8 +13536,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!1 &1596281810
 GameObject:
   m_ObjectHideFlags: 0
@@ -13973,14 +13903,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 16
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -13995,8 +13921,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!4 &1690824281
 Transform:
   m_ObjectHideFlags: 0
@@ -14743,14 +14667,10 @@ MonoBehaviour:
   drumTrack: {fileID: 1354683682}
   authoredRootMidi: 0
   loopMultiplier: 1
-  maxLoopMultiplier: 4
-  ascendLoopCount: 32
-  ascensionLoopsPerExtraBin: 2
-  rootShiftNotesByChord: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
   spawnedCollectables: []
   currentBurstId: 0
   _binFilled: 
-  _maxBins: 4
   _binFillOrder: 
   _binChordIndex: 
   _nextFillOrdinal: 1
@@ -14765,8 +14685,6 @@ MonoBehaviour:
   spawnBlockedMask:
     serializedVersion: 2
     m_Bits: 0
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25
 --- !u!1 &1975552306
 GameObject:
   m_ObjectHideFlags: 0
@@ -15013,18 +14931,18 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2009313293}
+  - component: {fileID: 2009313295}
   - component: {fileID: 2009313292}
   - component: {fileID: 2009313290}
   - component: {fileID: 2009313294}
   - component: {fileID: 2009313291}
-  - component: {fileID: 2009313295}
   m_Layer: 0
   m_Name: Glyph Generator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &2009313290
 MonoBehaviour:
   m_ObjectHideFlags: 0

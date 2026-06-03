@@ -1,44 +1,9 @@
 using System;
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 public partial class CosmicDust : MonoBehaviour {
-    [Serializable]
-    public struct DustVisualSettings {
-        [Header("Sizing (prefab baseline)")]
-        public Vector3 prefabReferenceScale; // authored prefab baseline (cell-driven scale overrides at runtime)
-        public ParticleSystem particleSystem;
-
-        public SpriteRenderer sprite;
-    }
-    [System.Serializable]
-    public struct DustVisualTimings
-    {
-        [Min(0.01f)] public float regrowSpriteScaleInSeconds; // regrow sprite scale 0->1
-        [Min(0.01f)] public float clearSpriteScaleOutSeconds; // clear sprite scale 1->0
-        [Min(0.01f)] public float regrowParticleGrowInSeconds; // particle emission/alpha ramp on regrow
-        [Min(0.01f)] public float clearFadeOutSeconds; // clear tint/alpha fade out (if used)
-
-        public static DustVisualTimings Default => new DustVisualTimings
-        {
-            regrowSpriteScaleInSeconds = 0.20f,
-            clearSpriteScaleOutSeconds = 0.20f,
-            regrowParticleGrowInSeconds = 1.00f,
-            clearFadeOutSeconds = 0.20f
-        };
-
-        public DustVisualTimings Sanitized()
-        {
-            var sanitized = this;
-            sanitized.regrowSpriteScaleInSeconds = Mathf.Max(0.01f, sanitized.regrowSpriteScaleInSeconds);
-            sanitized.clearSpriteScaleOutSeconds = Mathf.Max(0.01f, sanitized.clearSpriteScaleOutSeconds);
-            sanitized.regrowParticleGrowInSeconds = Mathf.Max(0.01f, sanitized.regrowParticleGrowInSeconds);
-            sanitized.clearFadeOutSeconds = Mathf.Max(0.01f, sanitized.clearFadeOutSeconds);
-            return sanitized;
-        }
-    }
 
     private DustVisualTimings _timings;
     private bool _visualTimingsInitialized;
@@ -80,34 +45,22 @@ public partial class CosmicDust : MonoBehaviour {
     private const float kRegrowAlphaCap = 0.20f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
     private const float kSolidAlphaFloor = .55f;
-    [Serializable]
-    public struct DustInteractionSettings
-    {
-        [Header("Energy Drain")]
-        [Min(0f)] public float energyDrainPerSecond;
-    }
     // Interaction-mode contract (implemented by CosmicDustGenerator):
     // Carve: resistance-aware depletion used by Vehicle/MineNode interactions.
     // Zap: discrete PhaseStar consume-and-clear path.
     // Both modes converge on shared clear/regrow visuals here (Dissipate/Hide + Begin),
     // while the generator controls mode flags (imprint mutation, regrow scheduling, void-grow exceptions, fade duration source).
-    [Serializable]
-    public struct DustClearingSettings
-    {
-        [Tooltip("Energy drain resistance when a vehicle boosts through. 0 = full drain rate, 1 = no drain.")]
-        [Range(0f, 1f)] public float drainResistance01;
-    }
-    [SerializeField] public DustVisualSettings visual = new DustVisualSettings
+    [SerializeField] public DustVisualSettings visual = new()
     {
         prefabReferenceScale   = new Vector3(0.75f, 0.75f, 1f),
     };
 
-    [SerializeField] private DustInteractionSettings interaction = new DustInteractionSettings
+    [SerializeField] private DustInteractionSettings interaction = new()
     {
         energyDrainPerSecond  = 0.01f
     };
 
-    [SerializeField] public DustClearingSettings clearing = new DustClearingSettings();
+    [SerializeField] public DustClearingSettings clearing = new();
     [Header("Shader Params")]
     [SerializeField] private bool useWorkShaderParams = true;
     private MaterialPropertyBlock _mpb;
@@ -364,20 +317,7 @@ private Coroutine _jiggleRoutine;
 
         return actual;
     }
-
-    // Deprecated shim — converts a 0-1 charge fraction to integer units and delegates to ChipEnergy.
-    // Does NOT call the generator on depletion — callers are responsible for post-depletion cleanup.
-    private float DrainCharge(float amount)
-    {
-        if (amount <= 0f) return 0f;
-        int chipAmount = Mathf.RoundToInt(amount * _maxEnergyUnits);
-        // Guard against sub-unit precision: always chip at least 1 when amount is nonzero.
-        if (chipAmount <= 0 && _currentEnergyUnits > 0) chipAmount = 1;
-        int actual = ChipEnergy(chipAmount);
-        return (float)actual / Mathf.Max(1, _maxEnergyUnits);
-    }
     
-    [Obsolete("Compatibility wrapper. Prefer visual-controller driven spawn presentation.")]
     public void Begin()
     {
         if (!gameObject.activeInHierarchy)
@@ -402,7 +342,6 @@ private Coroutine _jiggleRoutine;
     /// e.g. after MineNode tinting. ApplyRoleAndCharge alone only updates the sprite;
     /// particles keep their birth color until explicitly refreshed.
     /// </summary>
-    [Obsolete("Compatibility wrapper. Prefer state/event-driven updates via CosmicDustVisualController.")]
     public void SyncParticleColor()
     {
         if (useWorkShaderParams)
@@ -458,7 +397,6 @@ private Coroutine _jiggleRoutine;
         if (restoreToBase)
             RestoreDisplayToBaseTint();
     }
-    [Obsolete("Compatibility wrapper. Prefer state/event-driven tint updates via CosmicDustVisualController.")]
     public void SetTint(Color tint)
     {
         SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
@@ -547,8 +485,6 @@ private Coroutine _jiggleRoutine;
 
         OnCollisionStateChanged?.Invoke(enabled);
     }
-
-
     public bool IsVisuallyPresentForTargeting(float minEffectiveAlpha = 0.05f, float minAbsScale = 0.01f)
     {
         if (visual.sprite == null || !visual.sprite.enabled)
@@ -597,7 +533,6 @@ private Coroutine _jiggleRoutine;
             Debug.LogWarning($"[{nameof(CosmicDust)}] Collider enabled while sprite renderer is disabled on '{name}'. Re-enabling visuals.", this);
 #endif
     }
-    [Obsolete("Compatibility wrapper. Prefer visual-controller driven clear presentation.")]
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
     {
         if (_isDespawned) return;
@@ -683,7 +618,6 @@ private Coroutine _jiggleRoutine;
         if (_jiggleRoutine      != null) { StopCoroutine(_jiggleRoutine);      _jiggleRoutine      = null; }
         CancelTintPulse(restoreToBase: false);
     }
-
     public void PrepareForReuse()
     {
         StopAllVisualCoroutines();
@@ -939,7 +873,7 @@ private Coroutine _jiggleRoutine;
         // _dustSpriteBaseVisualScale is also zeroed. TickVehicleCompression (Update) reads
         // _dustSpriteBaseVisualScale and writes it to srt.localScale every frame; if only the
         // transform is zeroed here, TickVehicleCompression will immediately restore a non-zero
-        // scale after RestoreNonCoralRenderersAfterBridge re-enables the SpriteRenderer.
+        // scale after the bridge completes and the SpriteRenderer is re-enabled.
         if (visual.sprite != null)
         {
             SetBaseSpriteScale(Vector3.zero);

@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3bc321787bb34636b13f499912c4c0c, type: 3}
+  m_Name: InstrumentTrackControllerConfig
+  m_EditorClassIdentifier: Assembly-CSharp::InstrumentTrackControllerConfig
+  noteCommitMode: 1
+  pickupTickVolume: 1.15
+  pickupTickPitchJitter: 0.066
+  pickupTickDefault: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
+  pickupTickBass: {fileID: 0}
+  pickupTickLead: {fileID: 0}
+  pickupTickHarmony: {fileID: 0}
+  pickupTickGroove: {fileID: 0}
+  commitStingerVolume: 1.25
+  commitStingerPitchJitter: 0.02
+  commitStingerDefault: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8,
+    type: 3}
+  commitStingerBass: {fileID: 0}
+  commitStingerLead: {fileID: 0}
+  commitStingerHarmony: {fileID: 0}
+  commitStingerGroove: {fileID: 0}
+  commitStingerDrums: {fileID: 0}
+  gravityVoidScale: 1
+  voidRingWidthCells: 1
+  gravityVoidImprintTickSeconds: 0.05
+  cohortWindowFraction: 0.5

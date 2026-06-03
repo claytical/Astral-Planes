@@ -92,7 +92,7 @@ public partial class CosmicDustGenerator
             _imprints[gp] = new DustImprint
             {
                 role               = MusicalRole.None,
-                color              = _mazeTint,
+                color              = config.mazeTint,
                 carveResistance01  = 0f,
                 drainResistance01  = 0f,
                 maxEnergyUnits     = 1,

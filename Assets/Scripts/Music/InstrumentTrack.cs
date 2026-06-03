@@ -112,8 +112,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public MusicalRole assignedRole;
     public int voiceIndex { get; private set; }
     public void SetVoiceIndex(int index) => voiceIndex = index;
-    public int lowestAllowedNote = 36; // 🎵 Lowest MIDI note allowed for this track
-    public int highestAllowedNote = 84; // 🎵 Highest MIDI note
+    private MusicalRoleProfile _activeProfile;
+    public int lowestAllowedNote => _activeProfile?.lowestNote ?? MusicalRoleProfileLibrary.GetProfile(assignedRole)?.lowestNote ?? 36;
+    public int highestAllowedNote => _activeProfile?.highestNote ?? MusicalRoleProfileLibrary.GetProfile(assignedRole)?.highestNote ?? 84;
     public InstrumentTrackController controller; // 🎛️ Reference to main controller
     public MidiStreamPlayer midiStreamPlayer; // Plays MIDI notes
     public DrumTrack drumTrack;
@@ -125,16 +126,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public int Bank   => bank;
     public int authoredRootMidi;
     public int loopMultiplier = 1;
-    public int maxLoopMultiplier = 4;
-    [Header("Ascension Fuse")]
-    [Tooltip("How many extended loops markers for this track take to reach the line of ascension after a burst is armed.")]
-    public int ascendLoopCount = 4;
-    [SerializeField]
-    private int ascensionLoopsPerExtraBin = 2;
+    [Header("Config")]
+    [SerializeField] public InstrumentTrackConfig config;
+    public int maxLoopMultiplier => config != null ? config.maxLoopMultiplier : 4;
+    public bool rootShiftNotesByChord => config != null ? config.rootShiftNotesByChord : true;
     private NoteSet[] _binNoteSets;
-    [Header("Harmony")]
-    [Tooltip("If enabled, notes are treated as authored relative to chord index 0 (the 'I' chord), then root-shifted by the current chord before quantization. This makes progressions like I–IV–V change the bass/lead pitch even when the authored notes are static.")]
-    public bool rootShiftNotesByChord = true;
     public List<GameObject> spawnedCollectables = new List<GameObject>(); // Track all spawned Collectables
     private GameFlowManager _gfm;
     private int _currentBurstRemaining = 0;
@@ -163,7 +159,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     // -1 means not yet filled. Sized and reset in parallel with _binFilled.
     private float[] _binCompletionTime;
     private bool _waitingForDrumReady;
-    [SerializeField] private int _maxBins = 4;                // keep in sync with your loop multiplier
     [SerializeField] private List<int> _binFillOrder = null;  // 0 = unfilled; 1,2,3,... = ordinal it was filled
     [SerializeField] private List<int> _binChordIndex = null; // -1 = unassigned; else index into ChordProgressionProfile.chordSequence
     [SerializeField] private int _nextFillOrdinal = 1;
@@ -232,8 +227,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     int  _lastCommittedBar = -1;
     int  _lastCommittedBoundarySerial = -1;
     [SerializeField] private LayerMask spawnBlockedMask; // set to include Vehicle + PhaseStar
-    [SerializeField] private int spawnPickMaxTries = 80;
-    [SerializeField] [Range(0f, 1f)] private float spawnColumnBandFraction = 0.25f; // fraction of grid width to search per step column band
 
     // ---- LoopPattern bridge (no state duplication) ----
     internal bool LoopCacheDirtyPending
@@ -339,13 +332,18 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public int GetAuthoredNoteAtAbsStep(int absStep)
     {
         int binSz = BinSize();
-        if (binSz <= 0) return authoredRootMidi;
+        // authoredRootMidi defaults to 0 when unset; use lowestAllowedNote as a safe floor.
+        int fallback = authoredRootMidi > 0 ? authoredRootMidi : lowestAllowedNote;
+        if (binSz <= 0) return fallback;
         int binIndex = absStep / binSz;
         int localStep = absStep % binSz;
         var noteSet = GetNoteSetForBin(binIndex);
         if (noteSet != null)
-            return noteSet.GetNoteForPhaseAndRole(this, localStep);
-        return authoredRootMidi;
+        {
+            int n = noteSet.GetNoteForPhaseAndRole(this, localStep);
+            return n > 0 ? n : fallback;
+        }
+        return fallback;
     }
 
     /// <summary>
@@ -803,34 +801,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                   $"count={(ascensionCohort.stepsRemaining != null ? ascensionCohort.stepsRemaining.Count : 0)} armed={ascensionCohort.armed}");
     }
 
-    public int CalculateNoteDurationFromSteps(int stepIndex, NoteSet noteSet)
-    {
-        List<int> allowedSteps = noteSet.GetStepList();
-        int totalSteps = GetTotalSteps();
-
-        if (allowedSteps == null || allowedSteps.Count == 0) { 
-            int fallbackTicksPerStep = Mathf.RoundToInt(480f / (Mathf.Max(1, totalSteps) / 4f)); 
-            Debug.LogWarning($"[TRK:DURATION] {name} CalculateNoteDurationFromSteps: empty step list for noteSet={noteSet}, stepIndex={stepIndex}. Returning single-step fallback duration."); 
-            return Mathf.Max(fallbackTicksPerStep / 2, 60);
-        }
-        // Find the next onset after stepIndex. If none exists (stepIndex is past the last
-        // step), wrap around to the first step in the next loop.
-        int nextStep = -1; 
-        for (int i = 0; i < allowedSteps.Count; i++) { 
-            if (allowedSteps[i] > stepIndex) { nextStep = allowedSteps[i]; break; }
-        } if (nextStep < 0) nextStep = allowedSteps[0]; // wraparound — safe because Count > 0
-
-        int stepsUntilNext = (nextStep - stepIndex + totalSteps) % totalSteps;
-        if (stepsUntilNext == 0) stepsUntilNext = totalSteps;
-
-        int ticksPerStep = Mathf.RoundToInt(480f / (totalSteps / 4f)); // 480 per quarter note
-        int baseDuration = stepsUntilNext * ticksPerStep;
-
-        RhythmPattern pattern = RhythmPatterns.Patterns[noteSet.rhythmStyle];
-        int adjusted = Mathf.RoundToInt(baseDuration * pattern.DurationMultiplier);
-
-        return Mathf.Max(adjusted, ticksPerStep / 2); // ensure audibility
-    }
     public NoteSet GetCurrentNoteSet()
     {
         return _currentNoteSet;
@@ -895,6 +865,25 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         // 5) Commit note to the audible loop
         int note = collectable.GetNote();
         int authoredRootMidi = LookUpAuthoredRootMidi(finalTargetStep);
+        if (authoredRootMidi == int.MinValue)
+        {
+            int resolveBin = BinIndexForStep(finalTargetStep);
+            var resolveNs  = GetNoteSetForBin(resolveBin);
+            if (resolveNs?.chordRegion != null && resolveNs.chordRegion.Count > 0)
+            {
+                authoredRootMidi = resolveNs.chordRegion[resolveBin % resolveNs.chordRegion.Count].rootNote;
+            }
+            else
+            {
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                var hd = _gfm?.harmony;
+                int chordIdx = Harmony_GetChordIndexForBin(resolveBin);
+                if (chordIdx >= 0 && hd != null && hd.TryGetChordAt(chordIdx, out var resolvedChord))
+                    authoredRootMidi = resolvedChord.rootNote;
+            }
+            if (authoredRootMidi == int.MinValue)
+                authoredRootMidi = GetAuthoredRootMidiInRegister(note);
+        }
         CollectNote(finalTargetStep, note, durationTicks, force, authoredRootMidi);
 
         int targetBin = BinIndexForStep(finalTargetStep);
@@ -1261,9 +1250,22 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// </summary>
     private int ComputeEffectiveAscendLoops(int binCount)
     {
-        int ascendByConfig = ascendLoopCount + Mathf.Max(0, binCount - 1) * ascensionLoopsPerExtraBin;
-        int leaderBins = (controller != null) ? Mathf.Max(1, controller.GetCommittedLeaderBins()) : 1;
+        int baseAscend = ResolveAscendLoopsFromMotif();
+        if (baseAscend <= 0) baseAscend = config != null ? config.defaultAscendLoops : 4;
+        int perExtraBin = config != null ? config.ascensionLoopsPerExtraBin : 2;
+        int ascendByConfig = baseAscend + Mathf.Max(0, binCount - 1) * perExtraBin;
+        int leaderBins = controller != null ? Mathf.Max(1, controller.GetCommittedLeaderBins()) : 1;
         return Mathf.Max(1, Mathf.CeilToInt((float)ascendByConfig / leaderBins)) * leaderBins;
+    }
+
+    private int ResolveAscendLoopsFromMotif()
+    {
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif?.roleNoteConfigs == null) return -1;
+        foreach (var cfg in motif.roleNoteConfigs)
+            if (cfg != null && cfg.ascendLoops > 0 && cfg.role == assignedRole)
+                return cfg.ascendLoops;
+        return -1;
     }
 
     private int GetAuthoredRootMidiInRegister(int referenceMidi)
@@ -1280,6 +1282,12 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
     public void PlayOneShotMidi(int midiNote, float velocity127, int durationTicks = -1)
     {
+        if (midiNote < lowestAllowedNote || midiNote > highestAllowedNote)
+        {
+            Debug.LogWarning($"[TRK] PlayOneShotMidi skipping out-of-range note {midiNote} " +
+                             $"(range=[{lowestAllowedNote},{highestAllowedNote}]) on {name}");
+            return;
+        }
         int dur = (durationTicks > 0) ? durationTicks : 120;
         PlayNote127(midiNote, dur, velocity127);
     }
@@ -1422,8 +1430,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
 
-        var modified = new List<(int step, int note, int dur, float vel)>(persistentLoopNotes.Count);
-        foreach (var (step, note, dur, vel, _) in persistentLoopNotes)
+        var modified = new List<(int step, int note, int dur, float vel, int authoredRoot)>(persistentLoopNotes.Count);
+        foreach (var (step, note, dur, vel, authoredRoot) in persistentLoopNotes)
         {
             int bin = BinIndexForStep(step);
 
@@ -1433,9 +1441,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             var ns = GetNoteSetForBin(bin);
             var region = (!forceHarmonyDirector) ? ns?.chordRegion : null;
             Chord chord;
+            Chord baseChord = default;
             if (region != null && region.Count > 0)
             {
-                chord = region[bin % region.Count];
+                chord    = region[bin % region.Count];
+                baseChord = region[0];
             }
             else
             {
@@ -1444,9 +1454,10 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 var hd = _gfm?.harmony;
                 if (chordIdx < 0 || hd == null || !hd.TryGetChordAt(chordIdx, out chord))
                 {
-                    modified.Add((step, note, dur, vel));
+                    modified.Add((step, note, dur, vel, authoredRoot));
                     continue;
                 }
+                if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
             }
 
             if (step % BinSize() == 0)
@@ -1455,10 +1466,14 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             }
 
             var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
-            if (allowed.Count == 0) { modified.Add((step, note, dur, vel)); continue; }
+            if (allowed.Count == 0) { modified.Add((step, note, dur, vel, authoredRoot)); continue; }
             allowed.Sort();
 
-            modified.Add((step, SnapToNearestChordTone(note, allowed), dur, vel));
+            int rootDelta = (authoredRoot != int.MinValue) ? chord.rootNote - authoredRoot : chord.rootNote - baseChord.rootNote;
+            int shifted   = IsNoteInChord(note, chord) ? note : (note + rootDelta);
+            shifted = ShiftByOctavesIntoTrackRange(shifted);
+            int retuned = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+            modified.Add((step, retuned, dur, vel, authoredRoot));
         }
 
         RebuildLoopFromModifiedNotes(modified, transform.position);
@@ -1475,6 +1490,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         int qNote = skipChordQuantize ? ShiftByOctavesIntoTrackRange(note) : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
+        if (qNote < lowestAllowedNote || qNote > highestAllowedNote)
+            Debug.LogError($"[TRK:COMMIT_OOB] track={name} step={stepIndex} rawNote={note} qNote={qNote} range=[{lowestAllowedNote},{highestAllowedNote}] skipQuantize={skipChordQuantize} authoredRoot={authoredRootMidi}\n{System.Environment.StackTrace}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
         _noteCommitTimes[stepIndex] = Time.time;
 
@@ -1828,7 +1845,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             int note = noteSet.GetNoteForPhaseAndRole(this, step);
             int dur;
             if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
-                dur = CalculateNoteDurationFromSteps(step, noteSet);
+                dur = 480;
 
             int absStep = targetBin * binSize + step;
             if (!usedAbsSteps.Add(absStep))
@@ -1933,14 +1950,14 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         int xBandCenter = -1;
         int xBandHalf   = 0;
-        bool useBand = preferredXNorm >= 0f && spawnColumnBandFraction > 0f;
+        bool useBand = preferredXNorm >= 0f && config.spawnColumnBandFraction > 0f;
         if (useBand)
         {
             xBandCenter = Mathf.Clamp(Mathf.RoundToInt(preferredXNorm * (w - 1)), 0, w - 1);
-            xBandHalf   = Mathf.Max(1, Mathf.RoundToInt(spawnColumnBandFraction * 0.5f * w));
+            xBandHalf   = Mathf.Max(1, Mathf.RoundToInt(config.spawnColumnBandFraction * 0.5f * w));
         }
 
-        int maxTries = Mathf.Max(8, spawnPickMaxTries);
+        int maxTries = Mathf.Max(8, config.spawnPickMaxTries);
 
         // First pass: constrained to step column band (skipped if no band preference).
         if (useBand)
@@ -2032,7 +2049,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             int note = noteSet.GetNoteForPhaseAndRole(this, step);
             int dur;
             if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
-                dur = CalculateNoteDurationFromSteps(step, noteSet);
+                dur = 480;
 
             float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
 
@@ -2304,7 +2321,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
       _totalSteps = loopMultiplier * BinSize();
     }
     
-    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float)> modified, Vector3 _)
+    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float, int)> modified, Vector3 _)
     {
         Debug.LogWarning(
             $"[TRK:CLEAR_LOOP] track={name} fn=RebuildLoopFromModifiedNotes " +
@@ -2328,11 +2345,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (modified != null)
         {
-            foreach (var (step, note, dur, vel) in modified)
+            foreach (var (step, note, dur, vel, authoredRoot) in modified)
             {
                 // skipChordQuantize=true: notes in `modified` are already at their final pitch;
                 // re-quantizing here would double-process them and produce wrong results.
-                AddNoteToLoop(step, note, dur, vel, true, skipChordQuantize: true);
+                AddNoteToLoop(step, note, dur, vel, true, authoredRoot, skipChordQuantize: true);
                 if (savedCommitTimes.TryGetValue(step, out float originalTime))
                     _noteCommitTimes[step] = originalTime;
             }

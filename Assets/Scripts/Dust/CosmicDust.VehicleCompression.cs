@@ -12,28 +12,8 @@ public partial class CosmicDust
     private float _lastNoseContactTime = -999f;
     private float _noseVisibleUntil = -999f;
 
-    [Serializable]
-    public struct NoseCompressionSettings
-    {
-        [Header("Vehicle Nose Compression")]
-        public bool enabled;
-        [Range(0f, 0.75f)] public float compressAmount;
-        [Range(0f, 0.5f)] public float bulgeAmount;
-        [Tooltip("Maximum world-space visual offset while compressed.")]
-        [Min(0f)] public float maxOffsetWorld;
-        [Tooltip("Distance from vehicle center used to sample nose contact.")]
-        [Min(0f)] public float probeWorld;
-        [Tooltip("Vehicle speed (world units/sec) that yields full compression target.")]
-        [Min(0.01f)] public float speedForFull;
-        [Range(0f, 1f)] public float boostBonus;
-        [Min(0f)] public float contactGraceSeconds;
-        [Min(0f)] public float minimumVisibleSeconds;
-        [Tooltip("Lower = slower, more cushioned. Higher = snappier.")]
-        [Min(0.01f)] public float attackSharpness;
-        [Min(0.01f)] public float releaseSharpness;
-    }
 
-    [SerializeField] private NoseCompressionSettings noseCompression = new NoseCompressionSettings
+    [SerializeField] private NoseCompressionSettings noseCompression = new()
     {
         enabled = true,
         compressAmount = 0.22f,

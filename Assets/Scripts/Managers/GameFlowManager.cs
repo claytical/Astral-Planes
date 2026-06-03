@@ -30,9 +30,6 @@ public partial class GameFlowManager : MonoBehaviour
     [Tooltip("If true, bridge/cinematic is pending and should gate spawns and re-arm.")]
     public bool BridgePending => SessionState?.BridgePending ?? false;
     
-    [Header("Coral (New Spiral)")]
-    [SerializeField] private MotifCoralVisualizer motifCoralVisualizer;
-
     [Header("Glyph (2D Bridge Visualizer)")]
     [SerializeField] private GlyphApplicator motifGlyphApplicator;
 
@@ -40,12 +37,7 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
     [SerializeField] private BinRingController binRingController;
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
-    [SerializeField] private bool useSpiralCoralDuringBridge = true;
-    [SerializeField] private Transform coralRoot; // scene object root
     private float _bridgeDrumStartVolume = 1f;
-// Optional: fade using renderer alpha (Standard shader)
-    [SerializeField] private bool fadeSpiralCoralDuringBridge = true;
-    [SerializeField, Min(0f)] private float spiralCoralFadeTarget = 0.65f;
     [Header("Phase-In FX")]
     [Tooltip("Particle system prefab instantiated at each vehicle position when a new " +
              "phase begins.  Should be a short burst (self-destruct or timed).")]
@@ -106,12 +98,6 @@ public partial class GameFlowManager : MonoBehaviour
     public BridgeCoordinator BridgeFlow { get; private set; }
     public SceneFlowCoordinator SceneFlow { get; private set; }
     
-    public void RegisterMotifCoralVisualizer(MotifCoralVisualizer vis)
-    {
-        motifCoralVisualizer = vis;
-        Debug.Log($"[CORAL:MOTIF] Registered MotifCoralVisualizer: {vis?.name}");
-    }
-
     public void RegisterGlyphApplicator(GlyphApplicator applicator)
     {
         motifGlyphApplicator = applicator;
@@ -484,7 +470,7 @@ public partial class GameFlowManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Averages the stick input from all active LocalPlayers for use in coral bridge steering.
+    /// Averages the stick input from all active LocalPlayers for use in bridge steering.
     /// Returns Vector2.zero if no players are present. Result is clamped to magnitude 1.
     /// </summary>
     

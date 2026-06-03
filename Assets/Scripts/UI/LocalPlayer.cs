@@ -237,7 +237,7 @@ public class LocalPlayer : MonoBehaviour
     }
 
     /// <summary>Returns the current smoothed stick input (magnitude 0–1).
-    /// Used by the coral bridge animation to steer the sculpture in real time.</summary>
+    /// Used by the bridge animation to steer the sculpture in real time.</summary>
     public Vector2 GetMoveInput() => _virtualStick;
 
     public string GetSelectedShipName()

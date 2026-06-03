@@ -144,11 +144,7 @@ public class CollectableParticles : MonoBehaviour
         particleSystem.Stop();
 
     }
-    public void RegisterTether(NoteTether tether, float pull = 0.7f)
-{
-    _tetherRef = tether;
-    pullStrength = pull;
-}
+
     public void SetDripDirection(Vector3 worldDir, float baseSpeed, float gravity = 0f)
     {
         if (!particleSystem) return;

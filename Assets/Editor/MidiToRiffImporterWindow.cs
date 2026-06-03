@@ -137,7 +137,6 @@ private void ImportAndCreateAsset()
             .ThenBy(n => n.midiNote)
             .ToList(),
         overlapPolicy = _clampDurToNextOnset ? RiffOverlapPolicy.ClampToNextOnset : RiffOverlapPolicy.AllowOverlap,
-        clampToTrackRange = false,
         octaveShift = 0
     };
 

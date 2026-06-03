@@ -237,6 +237,12 @@ public class PhaseTransitionManager : MonoBehaviour
             if (!track) continue;
             if (currentMotif == null) continue;
 
+            // Set the motif's intended profile BEFORE generating NoteSets so that
+            // NoteSet generation and commit-time ShiftByOctavesIntoTrackRange both
+            // use the same highestAllowedNote (avoids octave-note collapse at commit).
+            var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier, track.voiceIndex);
+            track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
+
             NoteSet bin0NoteSet = null;
             for (int b = 0; b < track.maxLoopMultiplier; b++)
             {
@@ -251,9 +257,6 @@ public class PhaseTransitionManager : MonoBehaviour
 
             track.authoredRootMidi = currentMotif.keyRootMidi;
             track.SetNoteSet(bin0NoteSet);
-
-            var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier, track.voiceIndex);
-            track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
         }
     }
 

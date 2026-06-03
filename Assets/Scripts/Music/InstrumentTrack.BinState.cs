@@ -131,7 +131,7 @@ public partial class InstrumentTrack
 
         _binFilled[bin] = filled;
 
-        // Record wall-clock completion time for the coral visualizer.
+        // Record wall-clock completion time for the bridge visualizer.
         if (filled && _binCompletionTime != null && bin < _binCompletionTime.Length)
             _binCompletionTime[bin] = Time.time;
 

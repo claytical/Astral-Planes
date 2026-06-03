@@ -116,6 +116,19 @@ public partial class InstrumentTrack
         return best;
     }
 
+    private static bool IsNoteInChord(int midiNote, Chord chord)
+    {
+        if (chord.intervals == null || chord.intervals.Count == 0) return false;
+        int notePc = ((midiNote       % 12) + 12) % 12;
+        int rootPc = ((chord.rootNote % 12) + 12) % 12;
+        for (int i = 0; i < chord.intervals.Count; i++)
+        {
+            int ivPc = ((chord.intervals[i] % 12) + 12) % 12;
+            if (notePc == ((rootPc + ivPc) % 12)) return true;
+        }
+        return false;
+    }
+
     private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi = int.MinValue) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
@@ -153,21 +166,7 @@ public partial class InstrumentTrack
     if (Mathf.Abs(rootDelta) > 3)
         Debug.LogWarning($"[QUANTIZE:DELTA] track={name} step={stepIndex} note={midiNote} chord.root={chord.rootNote} authoredRoot={authoredRootMidi} rootDelta={rootDelta}");
 
-    bool noteAlreadyInTargetChord = false;
-    if (chord.intervals != null && chord.intervals.Count > 0)
-    {
-        int notePc = ((midiNote % 12) + 12) % 12;
-        int chordRootPc = ((chord.rootNote % 12) + 12) % 12;
-        for (int i = 0; i < chord.intervals.Count; i++)
-        {
-            int ivPc = ((chord.intervals[i] % 12) + 12) % 12;
-            if (notePc == ((chordRootPc + ivPc) % 12))
-            {
-                noteAlreadyInTargetChord = true;
-                break;
-            }
-        }
-    }
+    bool noteAlreadyInTargetChord = IsNoteInChord(midiNote, chord);
 
     // If note already fits this chord, preserve it and only octave-fit into track range.
     // Otherwise apply root-delta transposition for bin/chord movement.

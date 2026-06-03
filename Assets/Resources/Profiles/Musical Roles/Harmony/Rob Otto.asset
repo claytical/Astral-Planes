@@ -16,7 +16,7 @@ MonoBehaviour:
   dustColors:
     baseColor: {r: 0.50980395, g: 0.9490196, b: 0.65882355, a: 1}
     shadowColor: {r: 0, g: 0.5566038, b: 0.12223455, a: 1}
-  baseAlpha: 0.65
+  baseAlpha: 0.5
   maxEnergyUnits: 4
   carveResistance01: 0.55
   drainResistance01: 0.4
@@ -36,5 +36,7 @@ MonoBehaviour:
   configSelectionMode: 0
   chordVoiceColors: []
   midiPreset: 11
+  lowestNote: 24
+  highestNote: 84
   ripeDuration: 256
   regrowthDelay: 0.6
