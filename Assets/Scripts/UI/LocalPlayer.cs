@@ -236,9 +236,50 @@ public class LocalPlayer : MonoBehaviour
         return plane?.energyLevel ?? 0f;
     }
 
-    /// <summary>Returns the current smoothed stick input (magnitude 0–1).
-    /// Used by the bridge animation to steer the sculpture in real time.</summary>
-    public Vector2 GetMoveInput() => _virtualStick;
+    public Vector2 GetMoveInput()
+    {
+        // During gameplay, _virtualStick is maintained by FixedUpdate.
+        // During the tutorial (before the vehicle exists) the Play action map isn't active,
+        // so we read the device state directly instead.
+        if (plane != null) return _virtualStick;
+
+        if (_playerInput != null)
+        {
+            foreach (var device in _playerInput.devices)
+            {
+                if (device is Gamepad gp)
+                    return Vector2.ClampMagnitude(gp.leftStick.ReadValue(), 1f);
+            }
+        }
+
+        if (Keyboard.current != null)
+        {
+            var dir = Vector2.zero;
+            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)    dir.y += 1f;
+            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed)  dir.y -= 1f;
+            if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)  dir.x -= 1f;
+            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed) dir.x += 1f;
+            return Vector2.ClampMagnitude(dir, 1f);
+        }
+
+        return Vector2.zero;
+    }
+
+    public float GetThrustInput()
+    {
+        // Same issue: Thrust is in the Play map. Read the device directly during tutorial.
+        if (_playerInput != null)
+        {
+            foreach (var device in _playerInput.devices)
+            {
+                if (device is Gamepad gp)
+                    return gp.rightTrigger.ReadValue();
+            }
+        }
+        return Keyboard.current != null && Keyboard.current.spaceKey.isPressed ? 1f : 0f;
+    }
+
+    public bool GetChooseInput() => _confirmAction?.IsPressed() ?? false;
 
     public string GetSelectedShipName()
     {

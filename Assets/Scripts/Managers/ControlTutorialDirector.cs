@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,7 +13,8 @@ public class ControlTutorialDirector : MonoBehaviour
         Hidden,
         PressAnyAuto,
         JoinSouth,
-        TutorialSequenceTimed
+        TutorialSequenceTimed,
+        TutorialSequenceInputGated
     }
 
     [Header("Primary (global)")]
@@ -27,6 +29,7 @@ public class ControlTutorialDirector : MonoBehaviour
     [SerializeField] private bool pressAnyLoop = true;
 
     [SerializeField, Min(0.1f)] private float tutorialStepSeconds = 1.2f; // Drift -> Boost -> Charge timing
+    [SerializeField] private bool useInputGatedTutorial = true;
 
     [SerializeField] private Vector3 primaryFullScale    = Vector3.one;
     [SerializeField] private Vector3 primaryCompactScale = new Vector3(0.5f, 0.5f, 1f);
@@ -41,6 +44,7 @@ public class ControlTutorialDirector : MonoBehaviour
 
     // Mini instances per LocalPlayer (these live inside player UI, not global).
     private readonly Dictionary<LocalPlayer, ControlTutorialHighlight> _mini = new();
+    private List<LocalPlayer> _tutorialPlayers = new();
 
     private void Awake()
     {
@@ -159,7 +163,9 @@ public class ControlTutorialDirector : MonoBehaviour
         primaryInstance.gameObject.SetActive(true);
 
         primaryInstance.transform.localScale =
-            (_desiredMode == PrimaryMode.TutorialSequenceTimed || _desiredMode == PrimaryMode.JoinSouth)
+            (_desiredMode == PrimaryMode.TutorialSequenceTimed ||
+             _desiredMode == PrimaryMode.TutorialSequenceInputGated ||
+             _desiredMode == PrimaryMode.JoinSouth)
                 ? primaryFullScale
                 : primaryCompactScale;
 
@@ -189,12 +195,41 @@ public class ControlTutorialDirector : MonoBehaviour
                 break;
 
             case PrimaryMode.TutorialSequenceTimed:
-                
                 primaryInstance.SetVisible(true);
                 _primaryTutorialRunning = true;
                 primaryInstance.StartTimedTutorial(stepSeconds: tutorialStepSeconds, immediateFirst: true);
                 break;
+
+            case PrimaryMode.TutorialSequenceInputGated:
+                primaryInstance.SetVisible(true);
+                _primaryTutorialRunning = true;
+                primaryInstance.StartInputGatedTutorial(BuildInputGatedPredicates(), immediateFirst: true);
+                break;
         }
+    }
+
+    private Func<bool>[] BuildInputGatedPredicates()
+    {
+        var sequence = primaryInstance ? primaryInstance.TutorialSequence : null;
+        if (sequence == null || sequence.Length == 0) return Array.Empty<Func<bool>>();
+
+        var players = _tutorialPlayers;
+        var predicates = new Func<bool>[sequence.Length];
+        for (int i = 0; i < sequence.Length; i++)
+        {
+            var instr = sequence[i];
+            predicates[i] = instr switch
+            {
+                ControlTutorialHighlight.Instruction.Drift =>
+                    () => players.Any(p => p && p.GetMoveInput().magnitude > 0.35f),
+                ControlTutorialHighlight.Instruction.Boost =>
+                    () => players.Any(p => p && p.GetMoveInput().magnitude > 0.35f && p.GetThrustInput() > 0.35f),
+                ControlTutorialHighlight.Instruction.Release =>
+                    () => players.Any(p => p && p.GetChooseInput()),
+                _ => () => true
+            };
+        }
+        return predicates;
     }
 
     // ======================================================================
@@ -283,10 +318,14 @@ public class ControlTutorialDirector : MonoBehaviour
     /// Called when all players confirmed in TrackSelection.
     public void BeginPrimaryTutorialSequence()
     {
-        // Clear minis visually, but keep them alive for later if needed.
         SendToAllMinis(m => m.Clear(immediate: true, hideText: true));
+        _tutorialPlayers = new List<LocalPlayer>(_mini.Keys);
 
-        _desiredMode = PrimaryMode.TutorialSequenceTimed;
+        _desiredMode = useInputGatedTutorial
+            ? PrimaryMode.TutorialSequenceInputGated
+            : PrimaryMode.TutorialSequenceTimed;
+
+        _primaryTutorialRunning = true;
         ApplyDesiredPrimaryMode();
     }
 

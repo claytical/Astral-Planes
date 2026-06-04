@@ -76,6 +76,10 @@ public class ControlTutorialHighlight : MonoBehaviour
     [SerializeField, Min(0.1f)] private float labelScaleLerpSpeed = 14f;
     [SerializeField] private bool deactivateLabelWhenHidden = true;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip stepConfirmClip;
+    [SerializeField, Range(0f, 1f)] private float stepConfirmVolume = 1f;
+
     [Header("Behavior")]
     [SerializeField] private bool hideTextOnClear = true;
     // ------------------------------------------------------------
@@ -119,8 +123,16 @@ public class ControlTutorialHighlight : MonoBehaviour
     private Coroutine _pressAnyAutoCo;
     private Coroutine _timedTutorialCo;
 
+    private bool _inputGatedActive;
+    private Coroutine _inputGatedCo;
+    private AudioSource _audioSource;
+
+    public Instruction[] TutorialSequence => tutorialSequence;
+
     private void Awake()
     {
+        _audioSource = GetComponent<AudioSource>();
+        if (!_audioSource) _audioSource = gameObject.AddComponent<AudioSource>();
         CacheBaseScale(stickImage, ref _stickBaseScale);
         CacheBaseScale(boostImage, ref _boostBaseScale);
 
@@ -388,6 +400,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     public void SkipCurrentTimedStep()
     {
         if (!_tutorialActive) return;
+        if (_inputGatedActive) return;
 
         // Stop the running timed coroutine
         if (_timedTutorialCo != null)
@@ -464,6 +477,53 @@ public class ControlTutorialHighlight : MonoBehaviour
         }
 
         _timedTutorialCo = null;
+    }
+
+    // ============================================================
+    // Input-gated tutorial (each step waits for its specific input)
+    // ============================================================
+    public void StartInputGatedTutorial(Func<bool>[] stepPredicates, bool immediateFirst = true)
+    {
+        StopAllModes();
+        _tutorialActive = true;
+        _tutorialIndex = -1;
+        _inputGatedActive = true;
+        if (_inputGatedCo != null) StopCoroutine(_inputGatedCo);
+        _inputGatedCo = StartCoroutine(InputGatedTutorialRoutine(stepPredicates, immediateFirst));
+    }
+
+    private IEnumerator InputGatedTutorialRoutine(Func<bool>[] predicates, bool immediateFirst)
+    {
+        if (!gameObject.activeInHierarchy) gameObject.SetActive(true);
+
+        if (immediateFirst) AdvanceTutorial(immediate: true);
+
+        while (_tutorialActive && _inputGatedActive && gameObject.activeInHierarchy)
+        {
+            if (_tutorialIndex >= (tutorialSequence?.Length ?? 0)) break;
+
+            Func<bool> predicate = (_tutorialIndex >= 0 && _tutorialIndex < (predicates?.Length ?? 0))
+                ? predicates[_tutorialIndex] : null;
+
+            if (predicate != null)
+                yield return new WaitUntil(() => !_inputGatedActive || !gameObject.activeInHierarchy || predicate());
+
+            if (!_inputGatedActive) break;
+
+            if (stepConfirmClip && _audioSource)
+                _audioSource.PlayOneShot(stepConfirmClip, stepConfirmVolume);
+
+            // Brief cooldown so the next step's predicate can't fire before the player sees it
+            yield return new WaitForSecondsRealtime(0.5f);
+
+            if (!_inputGatedActive) break;
+
+            bool done = AdvanceTutorial(immediate: false);
+            if (done) break;
+        }
+
+        _inputGatedActive = false;
+        _inputGatedCo = null;
     }
 
     // ============================================================
@@ -597,7 +657,7 @@ public class ControlTutorialHighlight : MonoBehaviour
                 HighlightButton(ButtonId.Boost, immediate);
                 break;
             case Instruction.Release:
-                HighlightButton(ButtonId.East, immediate);
+                HighlightButton(ButtonId.South, immediate);
                 break;
         }
     }
@@ -652,9 +712,11 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         _tutorialActive = false;
         _tutorialIndex = -1;
+        _inputGatedActive = false;
 
         if (_pressAnyAutoCo != null) { StopCoroutine(_pressAnyAutoCo); _pressAnyAutoCo = null; }
         if (_timedTutorialCo != null) { StopCoroutine(_timedTutorialCo); _timedTutorialCo = null; }
+        if (_inputGatedCo != null) { StopCoroutine(_inputGatedCo); _inputGatedCo = null; }
     }
 
     private void HighlightButton(ButtonId button, bool immediate)
