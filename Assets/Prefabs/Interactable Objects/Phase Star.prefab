@@ -118,7 +118,7 @@ MonoBehaviour:
   tentacleWidth: 0.02
   dissolveDuration: 1
   fallbackTentaclesPerRole: 10
-  tentacleMaterial: {fileID: 2100000, guid: 8d41fd89271934566b9e692abf712d06, type: 2}
+  tentacleMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120
   growingRootAlpha: 0.427

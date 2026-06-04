@@ -982,10 +982,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             var vnm = markerGo.GetComponent<VisualNoteMarker>();
             if (vnm != null)
-            {
-                vnm.LightUp(this.trackColor);
                 vnm.Initialize(this.trackColor);
-            }
         });
 
         if (_currentBurstArmed && collectable.burstId == currentBurstId)

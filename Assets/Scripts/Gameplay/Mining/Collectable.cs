@@ -883,7 +883,7 @@ private IEnumerator SpawnArrivalRoutine(
     _inCarry = false;
 
     var ml = ribbonMarker ? ribbonMarker.GetComponent<MarkerLight>() : null;
-    if (ml) ml.LightUp(Color.white);
+    if (ml) ml.PulseOnly();
 
     ReportedCollected = true;
     NotifyDestroyedOnce();
