@@ -43,6 +43,12 @@ public class MarkerLight : MonoBehaviour
         StartCoroutine(Pulse());
     }
 
+    public void PulseOnly()
+    {
+        StopAllCoroutines();
+        StartCoroutine(Pulse());
+    }
+
     private IEnumerator Pulse()
     {
         float t = 0f;

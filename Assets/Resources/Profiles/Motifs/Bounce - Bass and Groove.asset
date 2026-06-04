@@ -37,8 +37,8 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   roleGeoConfigs: []
-  chordProgression: {fileID: 11400000, guid: 2dbd76c1bfa6c49569e90a5939007775, type: 2}
-  alternateChordProgressionProfile: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7,
+  chordProgression: {fileID: 11400000, guid: 4430fcc89b9fa405185bfb16e06e8d8b, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1,
     type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 8d0238b52ba48444aa574c56f55c92ef, type: 2}
