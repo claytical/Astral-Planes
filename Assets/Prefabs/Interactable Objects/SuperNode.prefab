@@ -4847,9 +4847,9 @@ GameObject:
   - component: {fileID: 4264311372790930814}
   - component: {fileID: 2233781314832999817}
   - component: {fileID: 817086377908567222}
-  - component: {fileID: 5035915469394830760}
   - component: {fileID: 235213639117587724}
-  - component: {fileID: 3066111148328127152}
+  - component: {fileID: 5035915469394830760}
+  - component: {fileID: 2426459410995401578}
   m_Layer: 0
   m_Name: SuperNode
   m_TagString: Untagged
@@ -4887,13 +4887,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SuperNode
   soloVoice: {fileID: 0}
   drumTrack: {fileID: 0}
-  despawnOnNextBoundary: 1
-  shardPrefab: {fileID: 1781116594832268, guid: f072cfe6654ac4a589c30645d3cf65ac,
-    type: 3}
+  kiteSteering: {fileID: 817086377908567222}
+  particles: {fileID: 605457678206509348}
   bodyMinImpactSpeed: 2
   bodyGraceSeconds: 0.15
-  kiteSteering: {fileID: 817086377908567222}
-  groupRotationDegPerSec: 0
+  dimmedAlpha: 0.25
+  groupRotationDegPerSec: 30
+  shardPrefab: {fileID: 1781116594832268, guid: f072cfe6654ac4a589c30645d3cf65ac,
+    type: 3}
+  trackNodePrefab: {fileID: 7191138306149319062, guid: e77d38a2ac6cc49958f436413b40097e,
+    type: 3}
+  ascendLoopsOverride: 3
 --- !u!114 &817086377908567222
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4909,14 +4913,35 @@ MonoBehaviour:
   rb: {fileID: 5035915469394830760}
   superNode: {fileID: 2233781314832999817}
   drumTrack: {fileID: 0}
-  boltForce: 12
-  spinDuration: 1
-  hesitationDuration: 1
-  hesitationDamping: 4
+  speed: 2.5
+  acceleration: 6
+  turnRateDegPerSec: 80
+  waypointArrivalRadius: 1.5
+  waypointChangeInterval: 4
+  waypointMargin: 2
   edgeSoftnessWorld: 1.25
-  bindLifetimeToLoop: 1
-  lifetimeSeconds: 4
-  vehicleRefreshInterval: 0.25
+--- !u!114 &235213639117587724
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8730078499695705973}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Explode
+  explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
+    type: 3}
+  preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
+  lifetime: 0
+  randomizeLifetimer: 0
+  tintExplosions: 1
+  explosionTint: {r: 1, g: 1, b: 1, a: 1}
+  multiplyWithAuthoredColor: 1
+  tintTrails: 1
 --- !u!50 &5035915469394830760
 Rigidbody2D:
   serializedVersion: 5
@@ -4944,28 +4969,7 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &235213639117587724
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8730078499695705973}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a5ee3188eaa9874d9195c450cd16cb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Explode
-  explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
-    type: 3}
-  preExplosion: {fileID: 0}
-  lifetime: 0
-  randomizeLifetimer: 0
-  tintExplosions: 1
-  explosionTint: {r: 1, g: 1, b: 1, a: 1}
-  multiplyWithAuthoredColor: 1
-  tintTrails: 1
---- !u!58 &3066111148328127152
+--- !u!58 &2426459410995401578
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -5000,4 +5004,4 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.3
+  m_Radius: 0.53

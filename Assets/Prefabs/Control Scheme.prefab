@@ -644,11 +644,11 @@ RectTransform:
   - {fileID: 6506567910312980477}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0}
-  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 561, y: 343}
-  m_Pivot: {x: 0.5, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1743201695570324546
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -687,6 +687,8 @@ MonoBehaviour:
   labelAttentionScale: 0.06
   labelScaleLerpSpeed: 14
   deactivateLabelWhenHidden: 1
+  stepConfirmClip: {fileID: 0}
+  stepConfirmVolume: 1
   hideTextOnClear: 1
 --- !u!1 &5602812254947766409
 GameObject:

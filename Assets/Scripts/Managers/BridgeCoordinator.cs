@@ -47,34 +47,23 @@ public sealed class BridgeCoordinator
             remainingInLoop = Mathf.Max(0.1f, effectiveLoopSec - Mathf.Clamp(elapsed, 0f, effectiveLoopSec));
         }
 
-        _motifSnapshots.Add(motifSnap);
-        RingSessionStore.SaveRingToDisk(motifSnap);
-
-        // Suppress any queued bin-completion ring so the record is the only thing shown.
-        _gameFlow.GetBinRingController()?.CancelPendingDraw();
-        _gameFlow.GetMotifRingGlyphApplicator()?.ClearGameplayRings();
-        _gameFlow.GetMotifRingGlyphApplicator()?.AnimateApply(motifSnap);
-
         if (_gameFlow.dustGenerator != null)
             _gameFlow.dustGenerator.HardStopRegrowthForBridge(hideTransientDust: true);
 
         if (_gameFlow.dustGenerator != null)
             _gameFlow.dustGenerator.BeginSlowFadeAllDust(remainingInLoop);
 
-        foreach (var v in _gameFlow.GetVehicles())
-            v?.SetBoostFree(true);
+        _motifSnapshots.Add(motifSnap);
+        RingSessionStore.SaveRingToDisk(motifSnap);
 
-        yield return new WaitForSeconds(effectiveLoopSec);
-
-        foreach (var v in _gameFlow.GetVehicles())
-            v?.SetBoostFree(false);
+        _gameFlow.GetBinRingController()?.CancelPendingDraw();
 
         var rings = _gameFlow.GetMotifRingGlyphApplicator();
         if (rings != null)
         {
             float spinDur = rings.config?.spinOffDuration ?? 0.45f;
             yield return _gameFlow.StartCoroutine(
-                rings.SpinAndRollOffRecordRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
+                rings.SpinAndRollOffActiveRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
         }
 
         yield return _gameFlow.StartCoroutine(_gameFlow.SceneFlow.StartNextMotifInPhase());
@@ -153,11 +142,16 @@ public sealed class BridgeCoordinator
             if (c != null) Object.Destroy(c.gameObject);
 
         foreach (var n in Object.FindObjectsOfType<MineNode>())
-            if (n != null) Object.Destroy(n.gameObject);
+        {
+            if (n == null) continue;
+            var explode = n.GetComponent<Explode>();
+            if (explode != null) explode.Permanent();
+            else Object.Destroy(n.gameObject);
+        }
 
         if (_gameFlow.activeDrumTrack?._starPool != null)
         {
-            _gameFlow.activeDrumTrack._starPool.DespawnAll();
+            _gameFlow.activeDrumTrack._starPool.ExplodeAndClearAll();
             Object.Destroy(_gameFlow.activeDrumTrack._starPool.gameObject);
             _gameFlow.activeDrumTrack._starPool = null;
         }

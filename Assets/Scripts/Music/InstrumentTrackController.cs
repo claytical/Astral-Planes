@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using MidiPlayerTK;
+using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
 public struct TransportFrame
 {
@@ -640,6 +641,116 @@ public class InstrumentTrackController : MonoBehaviour
     {
         _binExtensionSignaled?.Clear();
     }
+
+    public void SpawnSuperNodeBinRings(InstrumentTrack track, int fromBin, int toBin)
+    {
+        if (track == null || fromBin >= toBin) return;
+        var gfm  = GameFlowManager.Instance;
+        var drum = gfm?.activeDrumTrack;
+        var ring = gfm?.GetMotifRingGlyphApplicator();
+        if (ring == null) return;
+
+        int totalSteps = drum != null ? drum.totalSteps : 16;
+        ring.ClearGameplayRings();
+        for (int b = fromBin; b < toBin; b++)
+            ring.SpawnBinRing(track.assignedRole, b, track.trackColor,
+                              track.GetBinNoteEntries(b), totalSteps, track);
+    }
+
+    public void CheckAndTriggerAllTracksMaxed()
+    {
+        if (tracks == null) return;
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) return;
+        if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
+        var motif = gfm.phaseTransitionManager?.currentMotif;
+        var alt   = motif?.alternateChordProgressionProfile;
+        if (alt == null) return;
+
+        var activeRoles = motif.GetActiveRoles();
+        if (activeRoles == null || activeRoles.Count == 0) return;
+
+        // Only check tracks whose role is active in the current motif.
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+            if (!activeRoles.Contains(t.assignedRole)) continue;
+            if (t.loopMultiplier < t.maxLoopMultiplier) return;
+        }
+
+        gfm.harmony?.SetActiveProfile(alt, applyImmediately: true);
+        gfm.BeginMotifBridge("AllTracksMaxed");
+    }
+
+    public void StageAltChordIfAllTracksMaxed()
+    {
+        if (tracks == null) return;
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) return;
+        var motif = gfm.phaseTransitionManager?.currentMotif;
+        var alt   = motif?.alternateChordProgressionProfile;
+        if (alt == null) return;
+
+        var activeRoles = motif.GetActiveRoles();
+        if (activeRoles == null || activeRoles.Count == 0) return;
+
+        foreach (var t in tracks)
+        {
+            if (t == null) continue;
+            if (!activeRoles.Contains(t.assignedRole)) continue;
+            if (t.loopMultiplier < t.maxLoopMultiplier) return;
+        }
+
+        gfm.harmony?.SetActiveProfile(alt, applyImmediately: false);
+    }
+
+    public void StartSuperNodeCompletionSequence(InstrumentTrack track, int fromBin, int toBin,
+                                                   int ascendLoopsOverride, int binSz, DrumTrack drum)
+    {
+        if (track == null || fromBin >= toBin) return;
+        StartCoroutine(SuperNodeCompletionCoroutine(track, fromBin, toBin, ascendLoopsOverride, binSz, drum));
+    }
+
+    private IEnumerator SuperNodeCompletionCoroutine(InstrumentTrack track, int fromBin, int toBin,
+                                                      int ascendLoopsOverride, int binSz, DrumTrack drum)
+    {
+        yield return WaitForNextLoopBoundary(drum);
+
+        // N+1 boundary: visual cleanup loop — explode remaining gameplay objects and fade dust
+        // before the record appears next loop.
+        var gfm = GameFlowManager.Instance;
+        if (gfm != null)
+        {
+            foreach (var n in Object.FindObjectsOfType<MineNode>())
+            {
+                if (n == null) continue;
+                var ex = n.GetComponent<Explode>();
+                if (ex != null) ex.Permanent();
+                else Object.Destroy(n.gameObject);
+            }
+            gfm.activeDrumTrack?._starPool?.ExplodeAndClearAll();
+            gfm.dustGenerator?.HardStopRegrowthForBridge(hideTransientDust: true);
+            gfm.dustGenerator?.BeginSlowFadeAllDust(Mathf.Max(1f, GetEffectiveLoopLengthInSeconds()));
+        }
+
+        noteVisualizer?.TriggerStepRangeAscend(track, fromBin * binSz, toBin * binSz, ascendLoopsOverride);
+
+        yield return WaitForNextLoopBoundary(drum);
+
+        // N+2 boundary: record appears with alt chord.
+        CheckAndTriggerAllTracksMaxed();
+    }
+
+    private IEnumerator WaitForNextLoopBoundary(DrumTrack drum)
+    {
+        if (drum == null) yield break;
+        bool fired = false;
+        System.Action onBoundary = () => fired = true;
+        drum.OnLoopBoundary += onBoundary;
+        yield return new WaitUntil(() => fired);
+        drum.OnLoopBoundary -= onBoundary;
+    }
+
     void Start()
     {
         _gfm = GameFlowManager.Instance;

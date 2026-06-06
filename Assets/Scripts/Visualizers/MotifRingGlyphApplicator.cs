@@ -49,16 +49,21 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         public MeshRenderer  Fill;
         public LineRenderer  Contour;
         public Color         BaseColor;
-        public int[]         FullTris;       // saved before mesh triangles are cleared
-        public List<Vector2> ContourPoints;  // polyline passed to AnimateSingleRing
+        public int[]         FullTris;
+        public List<Vector2> ContourPoints;
+        public int           BinIndex;
+        public MusicalRole   Role;
     }
 
     private readonly List<RingEntry> _gameplayRings = new();
     private readonly List<RingEntry> _recordRings   = new();
 
-    private bool _recordFadingOut;
-    private bool _gameplayFadingOut;
-    private int  _revealPendingCount;
+    private bool    _recordFadingOut;
+    private bool    _gameplayFadingOut;    // stops rotation coroutines; set during spin-off
+    private bool    _clearingGameplayRings; // stops deformation coroutines; set only in ClearGameplayRings
+    private bool    _superNodeMode;
+    private Vector3 _fitScale;
+    private int     _pendingDeformationCount;
 
     private struct NoteAnimInfo
     {
@@ -79,9 +84,12 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     // ── Gameplay ring API ────────────────────────────────────────────────────
 
     /// <summary>
-    /// Spawn one ring for a just-completed bin: a filled annulus with a
-    /// note-tug contour at its outer rim. No travel dots for gameplay rings.
+    /// Spawn one flat circle ring for a just-completed bin. Deformation fires
+    /// separately via <see cref="BeginBinRingDeformation"/> when the playhead
+    /// reaches the bin's start step.
     /// </summary>
+    public void SetSuperNodeMode(bool active) => _superNodeMode = active;
+
     public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
                               List<MotifSnapshot.NoteEntry> notes, int totalSteps,
                               InstrumentTrack track = null)
@@ -93,13 +101,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float outerR = innerR + config.ringThickness;
         int   segs   = Mathf.Max(16, config.segments);
 
-        // Start flat — dips tween in as each note's dot arrives.
         var entry = BuildRingEntry($"GameplayRing_Bin{binIndex}_{role}",
             innerR, outerR, segs, color, role, binIndex,
             new List<MotifSnapshot.NoteEntry>(), totalSteps);
         _gameplayRings.Add(entry);
 
-        // Rotation speed = 360° per bin duration so one revolution = one loop pass.
         var   drum            = GameFlowManager.Instance?.activeDrumTrack;
         float stepDurationSec = 0f;
         drum?.TryGetNextBaseStepDsp(out _, out stepDurationSec);
@@ -112,13 +118,125 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             entry.Fill.GetComponent<MeshFilter>().sharedMesh,
             entry.FullTris, segs, delay: 0f, config.ringAppearDuration));
 
-        _revealPendingCount++;
-        StartCoroutine(AnimateNoteReveal(
-            entry, notes, totalSteps, outerR,
-            role, binIndex, color, rotDeg, binDurationSec, track,
+        // Draw in the flat circle contour, then rotate persistently.
+        StartCoroutine(AnimateSingleRing(
+            entry.Contour, entry.ContourPoints,
+            0f, config.ringAppearDuration,
+            entry.Root.transform, rotDeg,
+            new List<NoteAnimInfo>(), null,
             shouldStop: () => _gameplayFadingOut));
 
         RefreshPlayAreaFit(_gameplayRings.Count);
+    }
+
+    /// <summary>
+    /// Fire the drum-step-synced deformation sequence for the ring that was
+    /// spawned for <paramref name="binIndex"/>. Called by BinRingController
+    /// when the playhead reaches the bin's start step.
+    /// </summary>
+    public void BeginBinRingDeformation(int binIndex, List<MotifSnapshot.NoteEntry> notes,
+        int totalSteps, InstrumentTrack track, MusicalRole role, Color color)
+    {
+        // Match on both binIndex AND role — multiple roles can share the same binIndex.
+        int ringIdx = _gameplayRings.FindIndex(r => r.BinIndex == binIndex && r.Role == role);
+        if (ringIdx < 0 || config == null) return;
+        float innerR = RingInnerRadius(ringIdx);
+        float outerR = innerR + config.ringThickness;
+        _pendingDeformationCount++;
+        StartCoroutine(DeformBinRingCoroutine(
+            _gameplayRings[ringIdx], notes, totalSteps, track, role, color, outerR));
+    }
+
+    private IEnumerator DeformBinRingCoroutine(
+        RingEntry ring, List<MotifSnapshot.NoteEntry> notes,
+        int totalSteps, InstrumentTrack track, MusicalRole role, Color color, float outerR)
+    {
+        if (ring.Root == null) { _pendingDeformationCount--; yield break; }
+
+        int   binSteps    = Mathf.Max(1, totalSteps);
+        var   drumRef     = GameFlowManager.Instance?.activeDrumTrack;
+        int   leaderSteps = drumRef != null ? drumRef.GetLeaderSteps() : binSteps;
+
+        float stepDur = 0f;
+        drumRef?.TryGetNextBaseStepDsp(out _, out stepDur);
+        int leadSteps = stepDur > 0.001f
+            ? Mathf.Max(1, Mathf.RoundToInt(config.noteTravelDuration / stepDur))
+            : (config != null ? config.noteLaunchLeadSteps : 2);
+
+        float tugR = outerR * (1f - config.tugDepthFraction);
+
+        var sortedNotes = notes == null
+            ? new List<MotifSnapshot.NoteEntry>()
+            : notes.OrderBy(n => n.Step % leaderSteps).ToList();
+
+        var      revealedNotes = new List<MotifSnapshot.NoteEntry>();
+        Coroutine contourTween = null;
+        bool      contourSettled = sortedNotes.Count == 0;
+
+        // shouldStop: only hard-clear kills deformation; spin-off lets it finish naturally.
+        System.Func<bool> shouldStop = () => _clearingGameplayRings || ring.Root == null;
+
+        foreach (var note in sortedNotes)
+        {
+            if (shouldStop()) break;
+
+            int   noteLeaderStep = note.Step % leaderSteps;
+            int   triggerStep    = (noteLeaderStep - leadSteps + leaderSteps) % leaderSteps;
+            int   localStep      = note.Step % binSteps;
+            float angle          = localStep / (float)binSteps * Mathf.PI * 2f;
+            var   tugLocal       = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f);
+
+            Transform markerTr = null;
+            if (noteVisualizer?.noteMarkers != null && track != null)
+                noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
+
+            var capturedNote = note;
+            StartCoroutine(WaitAndLaunchDot(
+                ring.Root.transform, tugLocal, note.TrackColor,
+                markerTr, outerR, angle,
+                drumRef, triggerStep, config.noteTravelDuration, shouldStop,
+                onLaunch: () =>
+                {
+                    revealedNotes.Add(capturedNote);
+                    var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
+                        role, ring.BinIndex, color, revealedNotes, binSteps, outerR, config);
+                    var targetPts = targetPoly?.Points;
+                    if (targetPts != null)
+                    {
+                        contourSettled = false;
+                        if (contourTween != null) StopCoroutine(contourTween);
+                        contourTween = StartCoroutine(
+                            TweenContour(ring.Contour, targetPts, config.noteTravelDuration,
+                                onComplete: () => contourSettled = true));
+                    }
+                }));
+        }
+
+        while (!contourSettled || revealedNotes.Count < sortedNotes.Count)
+        {
+            if (shouldStop()) { _pendingDeformationCount--; yield break; }
+            yield return null;
+        }
+
+        _pendingDeformationCount--;
+
+        // Hide record after deformation — only when all concurrent deformations are done
+        // and we are not in spin-off or SuperNode mode.
+        if (!_superNodeMode && !_gameplayFadingOut && !_clearingGameplayRings
+            && _pendingDeformationCount == 0)
+        {
+            float dur        = config != null ? config.ringAppearDuration * 0.5f : 0.1f;
+            Vector3 startScale = transform.localScale;
+            float elapsed    = 0f;
+            while (elapsed < dur && !_clearingGameplayRings)
+            {
+                elapsed += Time.deltaTime;
+                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
+                yield return null;
+            }
+            if (!_clearingGameplayRings)
+                transform.localScale = Vector3.zero;
+        }
     }
 
     /// <summary>Fade and destroy all gameplay rings.</summary>
@@ -288,12 +406,17 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             ringTransform.localScale = new Vector3(holdScale, holdScale, 1f);
     }
 
-    /// <summary>Destroy all gameplay rings immediately.</summary>
+    /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
     public void ClearGameplayRings()
     {
-        _gameplayFadingOut = true;
+        _clearingGameplayRings   = true;
+        _gameplayFadingOut       = true;
+        _superNodeMode           = false;
+        _pendingDeformationCount = 0;
         DestroyList(_gameplayRings);
-        _gameplayFadingOut = false;
+        _gameplayFadingOut       = false;
+        _clearingGameplayRings   = false;
+        transform.localScale     = Vector3.zero;
     }
 
     // ── Record ring API ──────────────────────────────────────────────────────
@@ -307,7 +430,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         StopAllCoroutines();
         _recordFadingOut   = false;
         _gameplayFadingOut = false;
-        DestroyList(_recordRings);
+        foreach (Transform child in transform)
+            Destroy(child.gameObject);
+        _recordRings.Clear();
+        _gameplayRings.Clear();
 
         if (snapshot == null || config == null) return;
 
@@ -627,6 +753,70 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         transform.rotation = Quaternion.identity;
     }
 
+    /// <summary>
+    /// Spin-and-roll-off the accumulated gameplay rings (used at bridge time).
+    /// Restores visibility first if the record was hidden after the last deformation.
+    /// </summary>
+    public IEnumerator SpinAndRollOffActiveRings(float spinDuration, float rollDuration)
+    {
+        // Restore visibility if record was hidden after deformation.
+        if (transform.localScale.sqrMagnitude < 0.0001f)
+            transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
+
+        _gameplayFadingOut = true;  // stop per-ring rotation coroutines
+
+        float   tiltDeg       = config != null ? config.tiltXDegrees     : 75f;
+        float   scaleDur      = config != null ? config.scaleDownDuration : 0.5f;
+        float   speedBase     = config != null ? config.rotSpeedMax       : 300f;
+        Vector3 originalScale = transform.localScale;
+
+        var rings      = _gameplayRings.ToArray();
+        var ringZRots  = new float[rings.Length];
+        var ringSpeeds = new float[rings.Length];
+        for (int i = 0; i < rings.Length; i++)
+        {
+            ringZRots[i]  = rings[i].Root != null ? rings[i].Root.transform.localEulerAngles.z : 0f;
+            float spd     = speedBase * (1f + i * 0.2f);
+            ringSpeeds[i] = i % 2 == 0 ? spd : -spd;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < spinDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / spinDuration);
+            transform.rotation = Quaternion.Euler(0f, 0f, -360f * t);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
+            yield return null;
+        }
+        transform.rotation = Quaternion.identity;
+
+        elapsed = 0f;
+        while (elapsed < rollDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / rollDuration);
+            transform.localEulerAngles = new Vector3(Mathf.Lerp(0f, tiltDeg, t), 0f, 0f);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < scaleDur)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / scaleDur);
+            transform.localScale = Vector3.Lerp(originalScale, Vector3.zero, t);
+            AdvanceRingZRots(rings, ringZRots, ringSpeeds);
+            yield return null;
+        }
+
+        DestroyList(_gameplayRings);
+        _gameplayFadingOut   = false;
+        transform.localScale = Vector3.zero;
+        transform.rotation   = Quaternion.identity;
+    }
+
     private void AdvanceRingZRots(RingEntry[] rings, float[] zRots, float[] speeds)
     {
         for (int i = 0; i < rings.Length; i++)
@@ -640,7 +830,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// <summary>Destroy all rings (both layers).</summary>
     public void Clear()
     {
-        _revealPendingCount = 0;
         foreach (Transform child in transform) Destroy(child.gameObject);
         _recordRings.Clear();
         _gameplayRings.Clear();
@@ -651,6 +840,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float s = Mathf.Min(width, height);
         transform.position   = new Vector3(cx, cy, transform.position.z);
         transform.localScale = new Vector3(s, s, 1f);
+        _fitScale = transform.localScale;
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -677,6 +867,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             (area.bottom + area.top) * 0.5f,
             transform.position.z);
         transform.localScale = new Vector3(scale, scale, 1f);
+        _fitScale = transform.localScale;
     }
 
     private RingEntry BuildRingEntry(
@@ -733,6 +924,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             BaseColor     = color,
             FullTris      = fullTris,
             ContourPoints = pts,
+            BinIndex      = binIndex,
+            Role          = role,
         };
     }
 
@@ -995,10 +1188,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             ApplyContourPoints(ring.Contour, currentPts);
 
         if (shouldStop() || ring.Root == null)
-        {
-            _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
             yield break;
-        }
 
         // ── Phase 2: Rotate at bin tempo; launch dots before each note's beat ────
         var drumRef     = GameFlowManager.Instance?.activeDrumTrack;
@@ -1069,11 +1259,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float effectiveBinDur = (binDurationSec > 0.01f ? binDurationSec : 2f) + travelBuffer;
         while (binElapsed < effectiveBinDur && !shouldStop())
         {
-            if (ring.Root == null)
-            {
-                _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
-                yield break;
-            }
+            if (ring.Root == null) yield break;
             ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             binElapsed += Time.deltaTime;
             yield return null;
@@ -1082,11 +1268,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         // Don't advance to Phase 3 until every note has fired and the last curvature tween settles.
         while ((!contourSettled || revealedNotes.Count < sortedNotes.Count) && !shouldStop())
         {
-            if (ring.Root == null)
-            {
-                _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
-                yield break;
-            }
+            if (ring.Root == null) yield break;
             ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
@@ -1094,8 +1276,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         // ── Phase 3: Press ────────────────────────────────────────────────────────
         if (!shouldStop() && ring.Root != null)
             yield return BounceToHoldScale(ring.Root.transform, delay: 0f);
-
-        _revealPendingCount = Mathf.Max(0, _revealPendingCount - 1);
 
         // ── Phase 4: Spin off ─────────────────────────────────────────────────────
         if (!shouldStop())
@@ -1223,6 +1403,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < duration)
         {
+            if (ringTransform == null) { Destroy(go); yield break; }
             elapsed += Time.deltaTime;
             go.transform.position = Vector3.Lerp(
                 startWorld,
@@ -1230,6 +1411,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 Mathf.Clamp01(elapsed / duration));
             yield return null;
         }
+
+        if (ringTransform == null) { Destroy(go); yield break; }
 
         // Impact: dot has reached the ring surface — start the note and contour deformation.
         if (config?.impactSfx != null)
@@ -1246,6 +1429,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         elapsed = 0f;
         while (elapsed < duration)
         {
+            if (ringTransform == null) { Destroy(go); yield break; }
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             go.transform.position = ringTransform.TransformPoint(

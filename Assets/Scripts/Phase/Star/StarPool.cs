@@ -33,6 +33,7 @@ public sealed class StarPool : MonoBehaviour
     private int _remainingEjectionsTotal;
     // Nodes the Vehicle successfully captured (burst had notes placed into the loop) this motif.
     private int _nodesCapturedThisMotif;
+    public int NodesCapturedThisMotif => _nodesCapturedThisMotif;
 
     // ── Active Stars ──────────────────────────────────────────────────────────
     // At most one live Star per role.
@@ -141,6 +142,37 @@ public sealed class StarPool : MonoBehaviour
         _ejectedBurstWasEmpty = false;
         _remainingEjectionsTotal = 0;
         if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] DespawnAll complete.");
+    }
+
+    public void ExplodeAndClearAll()
+    {
+        foreach (var star in _activeStars.Values)
+        {
+            if (star == null) continue;
+            var explode = star.GetComponent<Explode>();
+            if (explode != null) explode.Permanent();
+            else Destroy(star.gameObject);
+        }
+        _activeStars.Clear();
+
+        foreach (var star in _pausedStars)
+        {
+            if (star == null) continue;
+            var explode = star.GetComponent<Explode>();
+            if (explode != null) explode.Permanent();
+            else Destroy(star.gameObject);
+        }
+        _pausedStars.Clear();
+
+        _lastEjectingStar = null;
+        currentEjectingStarId = -1;
+        _lastEjectedRole = MusicalRole.None;
+        _mineNodePending = false;
+        _mineNodeResolved = false;
+        _pendingGateCheck = false;
+        _ejectedBurstWasEmpty = false;
+        _remainingEjectionsTotal = 0;
+        if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] ExplodeAndClearAll complete.");
     }
 
     // ── Safety bubble (replaces PhaseStar static) ────────────────────────────

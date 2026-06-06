@@ -38,7 +38,7 @@ MonoBehaviour:
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   roleGeoConfigs: []
   chordProgression: {fileID: 11400000, guid: 4430fcc89b9fa405185bfb16e06e8d8b, type: 2}
-  alternateChordProgressionProfile: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1,
+  alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
     type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 8d0238b52ba48444aa574c56f55c92ef, type: 2}
