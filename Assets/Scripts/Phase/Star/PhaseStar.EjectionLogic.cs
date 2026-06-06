@@ -265,18 +265,19 @@ public partial class PhaseStar
         var shardTracks = new System.Collections.Generic.List<InstrumentTrack>();
         if (ctrl?.tracks != null)
             foreach (var t in ctrl.tracks)
-                if (t != null && t != targetTrack && activeRoles.Contains(t.assignedRole)
+                if (t != null && t != targetTrack
+                    && activeRoles.Contains(t.assignedRole)
                     && t.loopMultiplier < t.maxLoopMultiplier)
                     shardTracks.Add(t);
 
-        var hd            = _gfm?.harmony;
-        var originalProg  = _assignedMotif?.chordProgression;
         var alternateProg = _assignedMotif?.alternateChordProgressionProfile;
-        ChordProgressionProfile progToStage =
-            (hd != null && alternateProg != null && hd.ActiveProfile == alternateProg)
-                ? originalProg
-                : alternateProg;
-        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, progToStage);
+
+        var starPool = _gfm != null ? FindAnyObjectByType<StarPool>() : null;
+        int captured   = starPool?.NodesCapturedThisMotif ?? 0;
+        int total      = Mathf.Max(1, _assignedMotif?.nodesPerStar ?? 1);
+        float difficulty01 = 1f - Mathf.Clamp01((float)captured / total);
+
+        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg, difficulty01);
         go.GetComponent<Explode>()?.SetTint(spawnTint);
 
         _activeSuperNode = sn;
@@ -331,40 +332,35 @@ public partial class PhaseStar
     private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
     {
         if (track == null) return false;
-
         if (_assignedMotif?.alternateChordProgressionProfile == null) return false;
 
-        int maxBins = Mathf.Max(1, track.maxLoopMultiplier);
+        int  maxBins       = Mathf.Max(1, track.maxLoopMultiplier);
         bool fullyExpanded = track.loopMultiplier >= maxBins;
 
         if (!fullyExpanded)
         {
             if (GameFlowManager.VerboseLogging) Debug.Log(
-                $"[SuperNodeGate] NO: not fully expanded. " +
-                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
+                $"[SuperNodeGate] NO: track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
             );
             return false;
         }
 
-        var planned = track.GetCurrentNoteSet();
-        if (planned == null)
-        {
-            if (GameFlowManager.VerboseLogging) Debug.Log(
-                $"[SuperNodeGate] NO: planned noteSet is null. " +
-                $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
-            );
-            return false;
-        }
-
-        bool saturated = track.IsSaturatedForRepeatingNoteSet(planned);
+        // Only spawn if there is at least one other active-role track still below max.
+        // If all tracks are already maxed, CheckAndTriggerAllTracksMaxed should handle completion.
+        var activeRoles = _assignedMotif.GetActiveRoles();
+        var ctrl = _gfm?.controller;
+        bool anyShards = false;
+        if (ctrl?.tracks != null)
+            foreach (var t in ctrl.tracks)
+                if (t != null && t != track && activeRoles.Contains(t.assignedRole) && t.loopMultiplier < t.maxLoopMultiplier)
+                { anyShards = true; break; }
 
         if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[SuperNodeGate] {(saturated ? "YES" : "NO")}: " +
-            $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins} " +
-            $"saturated={saturated}"
+            $"[SuperNodeGate] {(anyShards ? "YES" : "NO (no shards available)")}: " +
+            $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
         );
 
-        return saturated;
+        return anyShards;
     }
 
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)

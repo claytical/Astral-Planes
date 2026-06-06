@@ -1124,6 +1124,42 @@ public partial class NoteVisualizer : MonoBehaviour
         );
     }
 
+    /// <summary>
+    /// Triggers timed ascension for all markers in [stepStart, stepEnd) on the given track.
+    /// Used by SuperNodeTrackNode after an instant fill to set up the race-against-time decay.
+    /// Notes re-committed by the player after this call are preserved automatically via
+    /// the NoteAscensionDirector's commitTimeAtStart guard.
+    /// </summary>
+    public void TriggerStepRangeAscend(InstrumentTrack track, int stepStart, int stepEnd, int ascendLoopsOverride)
+    {
+        if (ascensionDirector == null || _drum == null || track == null) return;
+        float loopLen = _drum.GetLoopLengthInSeconds();
+        if (loopLen <= 0f) return;
+        float totalSeconds = loopLen * ascendLoopsOverride;
+
+        ascensionDirector.TriggerBurstAscend(
+            track,
+            burstId: int.MinValue,
+            totalSeconds,
+            (t, _) => GetMarkersInStepRange(t, stepStart, stepEnd),
+            ascendLoopsOverride,
+            GetCommittedStepForMarker
+        );
+    }
+
+    private IEnumerable<GameObject> GetMarkersInStepRange(InstrumentTrack track, int stepStart, int stepEnd)
+    {
+        if (noteMarkers == null) yield break;
+        foreach (var kvp in noteMarkers)
+        {
+            if (kvp.Key.Item1 != track) continue;
+            int step = kvp.Key.Item2;
+            if (step < stepStart || step >= stepEnd) continue;
+            var go = kvp.Value?.gameObject;
+            if (go != null) yield return go;
+        }
+    }
+
     private int ResolveAscendLoopsForTrack(InstrumentTrack track)
     {
         if (track == null) return -1;

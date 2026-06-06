@@ -1320,15 +1320,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motifCoralVisualizer: {fileID: 0}
   motifGlyphApplicator: {fileID: 0}
   motifRingGlyphApplicator: {fileID: 0}
   binRingController: {fileID: 0}
   motifBridgeHoldSeconds: 4
-  useSpiralCoralDuringBridge: 1
-  coralRoot: {fileID: 0}
-  fadeSpiralCoralDuringBridge: 1
-  spiralCoralFadeTarget: 0.65
   vehiclePhaseInFxPrefab: {fileID: 4807525718738022760, guid: 5962a9437261f4908b0f4999318283dd,
     type: 3}
   vehiclePhaseInDelaySeconds: 1.2
@@ -1387,6 +1382,7 @@ MonoBehaviour:
   pressAnyStepSeconds: 0.5
   pressAnyLoop: 1
   tutorialStepSeconds: 4
+  useInputGatedTutorial: 1
   primaryFullScale: {x: 1, y: 1, z: 1}
   primaryCompactScale: {x: 0.5, y: 0.5, z: 1}
 --- !u!1 &1241868050

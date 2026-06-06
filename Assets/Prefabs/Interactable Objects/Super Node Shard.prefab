@@ -31,7 +31,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -49,11 +49,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SuperNodeShard
   _renderer: {fileID: 2442014530722922072}
-  _explode: {fileID: 8668376557347016044}
-  spawnGraceSeconds: 0.15
-  minImpactSpeed: 2
   selfRotationDegPerSec: 180
-  dustTintRadius: 10
   highlightScale: 1.25
   dimmedAlpha: 0.35
   highlightLerpSpeed: 8
@@ -72,6 +68,8 @@ MonoBehaviour:
   explosion: {fileID: 8945044521599370396, guid: a46dedf9e99b84460882464378799d7c,
     type: 3}
   preExplosion: {fileID: 2567590292593330884, guid: 33a2b2f200d00462d98bf2d2315a21a3,
+    type: 3}
+  expireExplosion: {fileID: 2567590292593330884, guid: d6d402ac52fd3498994ea02348b39251,
     type: 3}
   lifetime: 0
   randomizeLifetimer: 0
@@ -130,7 +128,7 @@ SpriteRenderer:
   m_MaskInteraction: 2
   m_Sprite: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.7490196}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

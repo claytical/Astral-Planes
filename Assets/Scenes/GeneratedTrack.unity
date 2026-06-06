@@ -433,7 +433,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -10696,8 +10696,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 0
-  lowestAllowedNote: 27
-  highestAllowedNote: 67
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
   drumTrack: {fileID: 1354683682}
@@ -11138,7 +11136,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -11153,7 +11151,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: showSynthParameter
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -11237,8 +11235,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 1
-  lowestAllowedNote: 48
-  highestAllowedNote: 84
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1849649912}
   drumTrack: {fileID: 1354683682}
@@ -11359,8 +11355,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 3
-  lowestAllowedNote: 40
-  highestAllowedNote: 68
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
   drumTrack: {fileID: 1354683682}
@@ -11942,8 +11936,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 5
-  lowestAllowedNote: 40
-  highestAllowedNote: 68
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}
   drumTrack: {fileID: 1354683682}
@@ -13511,8 +13503,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 5
-  lowestAllowedNote: 40
-  highestAllowedNote: 68
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}
   drumTrack: {fileID: 1354683682}
@@ -13779,7 +13769,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -13896,8 +13886,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 2
-  lowestAllowedNote: 48
-  highestAllowedNote: 76
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
   drumTrack: {fileID: 1354683682}
@@ -14377,7 +14365,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -14488,7 +14476,7 @@ PrefabInstance:
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
       propertyPath: volumeGlobal
-      value: 1
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 114320350483668748, guid: f1aa4788763f8854c9826e449686c328,
         type: 3}
@@ -14660,8 +14648,6 @@ MonoBehaviour:
     stepsRemainingSerialized: 
     armed: 0
   assignedRole: 5
-  lowestAllowedNote: 40
-  highestAllowedNote: 68
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}
   drumTrack: {fileID: 1354683682}

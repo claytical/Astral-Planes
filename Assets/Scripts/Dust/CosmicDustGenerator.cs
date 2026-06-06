@@ -14,6 +14,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
     Dictionary<Vector2Int, DustImprint> _imprints;
     private Dictionary<Vector2Int, MusicalRole> _hiddenImprints = new();
     private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
+    // Cells carved by non-vehicle objects (e.g. SuperNodeTrackNode) that must regrow as MusicalRole.None
+    // (gray) without revealing their hidden imprint. Cleared in CommitRegrowCell after role is resolved.
+    private readonly HashSet<Vector2Int> _forceGrayRegrow = new();
     private bool _cellGridReady;
     [Header("Config")]
     [SerializeField] public CosmicDustGeneratorConfig config;
@@ -1181,6 +1184,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
             regrowRole = ResolveRegrowRole(gp);
+            _forceGrayRegrow.Remove(gp);
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
@@ -1383,6 +1387,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Regrow is normally scheduled, except for permanent clear systems that explicitly disable it.
     // - Void-grown exception applies: vehicle carve removes void-grow imprint so regrow can re-resolve role.
     // - Visual fade duration is caller-provided (resistance/tuning aware).
+    public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, float regrowDelaySeconds = 2f)
+    {
+        if (!IsInBounds(cell)) return;
+        _forceGrayRegrow.Add(cell);
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: false);
+    }
+
     public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, float regrowDelaySeconds = -1f, bool runPreExplode = true)
     {
         var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, regrowDelaySeconds, runPreExplode);
@@ -1633,11 +1644,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             if (existingImp.role == MusicalRole.None)
             {
-                // Gray-start cell: consult hidden imprint before giving up.
-                if (_hiddenImprints != null && _hiddenImprints.TryGetValue(gp, out var hidden)
-                    && hidden != MusicalRole.None && IsRoleActive(hidden))
-                    return hidden;
-                // No active hidden imprint — fall through to neighbor/density logic.
+                // Gray-start cell: consult hidden imprint before giving up,
+                // unless a non-vehicle carve has requested the cell stay gray.
+                if (!_forceGrayRegrow.Contains(gp))
+                {
+                    if (_hiddenImprints != null && _hiddenImprints.TryGetValue(gp, out var hidden)
+                        && hidden != MusicalRole.None && IsRoleActive(hidden))
+                        return hidden;
+                }
+                // No active hidden imprint (or force-gray suppressed it) — fall through to neighbor/density logic.
             }
             else if (IsRoleActive(existingImp.role))
                 return existingImp.role;

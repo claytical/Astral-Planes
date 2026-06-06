@@ -3,12 +3,10 @@ using UnityEngine;
 // =========================================================================
 //  BinRingController
 //
-//  Spawns a ring immediately when a bin fills — no loop-boundary delay.
-//  Each ring manages its own full lifecycle (appear → rotate → press →
-//  spin-off) inside AnimateNoteReveal on the applicator.
-//
-//  At bridge time, CancelPendingDraw() is a no-op; AnimateApply on the
-//  applicator calls StopAllCoroutines + ClearGameplayRings itself.
+//  When a bin fills: spawn a flat circle ring, then immediately start the
+//  deformation sequence. WaitAndLaunchDot handles per-note step-sync
+//  internally, so deformation dots fire at the correct beat even if the
+//  bridge fires before the bin's start step comes around.
 // =========================================================================
 public class BinRingController : MonoBehaviour
 {
@@ -29,6 +27,8 @@ public class BinRingController : MonoBehaviour
         _tracks         = tracks;
         _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
 
+        _ringApplicator?.ClearGameplayRings();
+
         if (_tracks != null)
             foreach (var t in _tracks)
                 if (t != null) t.OnBinFilled += OnBinFilled;
@@ -38,8 +38,7 @@ public class BinRingController : MonoBehaviour
 
     private void Teardown()
     {
-        if (_drumTrack != null)
-            _drumTrack = null;
+        _drumTrack = null;
 
         if (_tracks != null)
         {
@@ -51,10 +50,6 @@ public class BinRingController : MonoBehaviour
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Called by BridgeCoordinator before AnimateApply. Rings self-manage;
-    /// AnimateApply handles cleanup via StopAllCoroutines + ClearGameplayRings.
-    /// </summary>
     public void CancelPendingDraw() { }
 
     // ── Event handlers ───────────────────────────────────────────────────────
@@ -66,15 +61,16 @@ public class BinRingController : MonoBehaviour
         if (_ringApplicator == null) return;
         if (!track.IsBinFilled(binIndex)) return;
 
-        // Clear the previous bin's ring immediately so only the current bin is shown.
-        // Old ring coroutines exit via the ring.Root == null guard in their next frame.
-        _ringApplicator.ClearGameplayRings();
-
         int totalSteps = (_drumTrack != null && _drumTrack.totalSteps > 0)
             ? _drumTrack.totalSteps : 16;
 
+        var notes = track.GetBinNoteEntries(binIndex);
+
         _ringApplicator.SpawnBinRing(
             track.assignedRole, binIndex, track.trackColor,
-            track.GetBinNoteEntries(binIndex), totalSteps, track);
+            notes, totalSteps, track);
+
+        _ringApplicator.BeginBinRingDeformation(
+            binIndex, notes, totalSteps, track, track.assignedRole, track.trackColor);
     }
 }
