@@ -89,6 +89,17 @@ public class ControlTutorialHighlight : MonoBehaviour
     [SerializeField] private float boostRotationMaxX = 50f;
     [SerializeField] private float buttonPressScale  = 0.85f;
     [SerializeField] private float pivotLerpSpeed    = 8f;
+
+    [Header("Root Fade + Alpha Pulse")]
+    [SerializeField] private float rootFadeInSeconds    = 0.35f;
+    [SerializeField] private float rootFadeOutSeconds   = 0.25f;
+    [SerializeField] private float rootAlphaPulseAmount = 0.07f;
+    [SerializeField] private float rootAlphaPulseSpeed  = 1.5f;
+
+    [Header("Fly Movement (Drift step)")]
+    [SerializeField] private float flyMaxDistance   = 150f;
+    [SerializeField] private float flyPositionSpeed = 6f;
+
     // ------------------------------------------------------------
     // live input (pushed each frame by ControlTutorialDirector)
     // ------------------------------------------------------------
@@ -147,6 +158,13 @@ public class ControlTutorialHighlight : MonoBehaviour
     private Coroutine _inputGatedCo;
     private AudioSource _audioSource;
 
+    // root fade + position animation
+    private CanvasGroup   _rootCanvasGroup;
+    private float         _rootAlpha       = 0f;
+    private float         _rootAlphaTarget = 0f;
+    private RectTransform _rootRectTransform;
+    private Vector2       _originPosition;
+
     public Instruction[] TutorialSequence => tutorialSequence;
 
     private Instruction CurrentInstruction =>
@@ -172,6 +190,13 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         var pivot = controlSchemePivot ? controlSchemePivot : transform;
         _pivotBaseScale = pivot.localScale;
+
+        _rootRectTransform     = GetComponent<RectTransform>();
+        _rootCanvasGroup       = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+        _rootCanvasGroup.alpha = 0f;
+        _rootAlpha             = 0f;
+        _rootAlphaTarget       = 0f;
+        _originPosition        = _rootRectTransform ? _rootRectTransform.anchoredPosition : Vector2.zero;
 
         if (instructionText)
         {
@@ -260,6 +285,8 @@ public class ControlTutorialHighlight : MonoBehaviour
         ApplyVisuals(startImage,  _startBaseScale,  _startW);
         UpdateLabelVisuals();
         UpdatePivotFeedback();
+        UpdateRootAlpha();
+        UpdatePositionAnimation();
     }
 
     public void SetLiveInput(Vector2 stick, float thrust, bool buttonHeld)
@@ -277,10 +304,14 @@ public class ControlTutorialHighlight : MonoBehaviour
         float targetRotX  = 0f;
         float targetScale = 1f;
 
-        if (instr == Instruction.Drift || instr == Instruction.Boost)
+        if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)
+        {
             targetRotZ = _liveStick.x * stickRotationMaxZ;
+            if (instr == Instruction.Drift)
+                targetRotX = -_liveStick.y * stickRotationMaxZ * 0.5f;
+        }
 
-        if (instr == Instruction.Boost)
+        if (instr == Instruction.Boost || instr == Instruction.Release)
             targetRotX = _liveThrust * boostRotationMaxX;
 
         if (instr == Instruction.Release && _liveButtonHeld)
@@ -390,6 +421,9 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (immediate)
         {
+            _rootAlpha = 0f; _rootAlphaTarget = 0f;
+            if (_rootCanvasGroup) _rootCanvasGroup.alpha = 0f;
+            if (_rootRectTransform) _rootRectTransform.anchoredPosition = _originPosition;
             _labelTargetAlpha = 0f;
             if (instructionText) instructionText.text = "";
             SetLabelAlphaImmediate(0f);
@@ -399,7 +433,8 @@ public class ControlTutorialHighlight : MonoBehaviour
             return;
         }
 
-        // Non-immediate: fade label out and keep this GO alive long enough to see it.
+        // Non-immediate: fade root and label out, then disable.
+        FadeRootOut();
         if (instructionText) instructionText.text = "";
         Clear(immediate: false, hideText: true);
         FadeLabelTo(0f, labelFadeOutSeconds);
@@ -426,7 +461,7 @@ public class ControlTutorialHighlight : MonoBehaviour
             AdvanceTutorial(immediate: true);
     }
 
-    public bool AdvanceTutorial(bool immediate = false)
+    public bool AdvanceTutorial(bool immediate = false, bool additive = false)
     {
         if (!_tutorialActive) return true;
 
@@ -444,7 +479,7 @@ public class ControlTutorialHighlight : MonoBehaviour
             return true;
         }
 
-        HighlightInstruction(tutorialSequence[_tutorialIndex], immediate);
+        HighlightInstruction(tutorialSequence[_tutorialIndex], immediate, additive);
         return false;
     }
 
@@ -486,6 +521,9 @@ public class ControlTutorialHighlight : MonoBehaviour
     public void StartTimedTutorial(float stepSeconds = 1.2f, bool immediateFirst = true)
     {
         StopAllModes();
+        CacheOriginPosition();
+        _rootAlpha = 0f; _rootAlphaTarget = 0f;
+        if (_rootCanvasGroup) _rootCanvasGroup.alpha = 0f;
         _lastStepSeconds = Mathf.Max(0.05f, stepSeconds);
 
         _tutorialActive = true;
@@ -548,6 +586,9 @@ public class ControlTutorialHighlight : MonoBehaviour
     public void StartInputGatedTutorial(Func<bool>[] stepPredicates, bool immediateFirst = true)
     {
         StopAllModes();
+        CacheOriginPosition();
+        _rootAlpha = 0f; _rootAlphaTarget = 0f;
+        if (_rootCanvasGroup) _rootCanvasGroup.alpha = 0f;
         _tutorialActive = true;
         _tutorialIndex = -1;
         _inputGatedActive = true;
@@ -576,13 +617,29 @@ public class ControlTutorialHighlight : MonoBehaviour
             if (stepConfirmClip && _audioSource)
                 _audioSource.PlayOneShot(stepConfirmClip, stepConfirmVolume);
 
-            // Brief cooldown so the next step's predicate can't fire before the player sees it
-            yield return new WaitForSecondsRealtime(0.5f);
+            bool isLastStep = _tutorialIndex >= (tutorialSequence?.Length ?? 0) - 1;
 
-            if (!_inputGatedActive) break;
+            if (isLastStep)
+            {
+                FadeRootOut();
+                yield return new WaitForSecondsRealtime(rootFadeOutSeconds + 0.05f);
+                if (!_inputGatedActive) break;
+                AdvanceTutorial(immediate: false);
+                break;
+            }
+            else
+            {
+                bool isAdditive = _tutorialIndex >= 0
+                    && _tutorialIndex < (tutorialSequence?.Length ?? 0)
+                    && tutorialSequence[_tutorialIndex] == Instruction.Drift
+                    && _tutorialIndex + 1 < (tutorialSequence?.Length ?? 0)
+                    && tutorialSequence[_tutorialIndex + 1] == Instruction.Boost;
 
-            bool done = AdvanceTutorial(immediate: false);
-            if (done) break;
+                bool done = AdvanceTutorial(immediate: false, additive: isAdditive);
+                if (done) break;
+
+                yield return new WaitForSecondsRealtime(0.35f);
+            }
         }
 
         _inputGatedActive = false;
@@ -607,6 +664,7 @@ public class ControlTutorialHighlight : MonoBehaviour
             instructionText.text = text;
             FadeLabelTo(1f, labelFadeInSeconds);
         }
+        FadeRootIn();
         if (_pressAnyAutoCo != null) StopCoroutine(_pressAnyAutoCo);
         _pressAnyAutoCo = StartCoroutine(PressAnyAutoRoutine(Mathf.Max(0.05f, stepSeconds), loop, immediateFirst));
     }
@@ -680,6 +738,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     public void ShowWaitingFor(ButtonId button, bool immediate = false, string overrideText = null)
     {
         StopAllModes();
+        FadeRootIn();
 
         if (instructionText)
         {
@@ -695,7 +754,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     // ============================================================
     // Instruction -> Label + Stick/Boost/Both mapping.
     // ============================================================
-    public void HighlightInstruction(Instruction instruction, bool immediate = false)
+    public void HighlightInstruction(Instruction instruction, bool immediate = false, bool additive = false)
     {
         // leaving press-any
         _pressAnyActive = false;
@@ -707,8 +766,8 @@ public class ControlTutorialHighlight : MonoBehaviour
             FadeLabelTo(1f, labelFadeInSeconds);
         }
 
-        // Always snap-clear previous highlights so the old step doesn't bleed into the new one
-        Clear(immediate: true, hideText: false);
+        if (!additive)
+            Clear(immediate: immediate, hideText: false);
 
         switch (instruction)
         {
@@ -723,6 +782,8 @@ public class ControlTutorialHighlight : MonoBehaviour
                 HighlightButton(ButtonId.South, immediate);
                 break;
         }
+
+        FadeRootIn();
     }
 
     // ============================================================
@@ -774,6 +835,54 @@ public class ControlTutorialHighlight : MonoBehaviour
     // ============================================================
     // Internals
     // ============================================================
+    private void CacheOriginPosition()
+    {
+        if (_rootRectTransform)
+            _originPosition = _rootRectTransform.anchoredPosition;
+    }
+
+    private void FadeRootIn()  => _rootAlphaTarget = 1f;
+    private void FadeRootOut() => _rootAlphaTarget = 0f;
+
+    private void UpdateRootAlpha()
+    {
+        if (!_rootCanvasGroup) return;
+        float dt = Time.unscaledDeltaTime;
+        float fadeSeconds = (_rootAlphaTarget >= _rootAlpha)
+            ? Mathf.Max(0.0001f, rootFadeInSeconds)
+            : Mathf.Max(0.0001f, rootFadeOutSeconds);
+        float k = 1f - Mathf.Exp(-(1f / fadeSeconds) * dt);
+        _rootAlpha = Mathf.Lerp(_rootAlpha, _rootAlphaTarget, k);
+        float pulse = Mathf.Sin(_t * rootAlphaPulseSpeed * Mathf.PI * 2f) * rootAlphaPulseAmount;
+        _rootCanvasGroup.alpha = Mathf.Clamp01(_rootAlpha + _rootAlpha * pulse);
+    }
+
+    private void UpdatePositionAnimation()
+    {
+        if (!_rootRectTransform) return;
+        var instr = CurrentInstruction;
+
+        if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)
+        {
+            // Stick x is inverted: (1,0) moves widget left, (-1,0) moves right
+            Vector2 raw = _originPosition + new Vector2(-_liveStick.x, _liveStick.y) * flyMaxDistance;
+            var parentRT = _rootRectTransform.parent as RectTransform;
+            if (parentRT != null)
+            {
+                Rect r = parentRT.rect;
+                raw.x = Mathf.Clamp(raw.x, r.xMin, r.xMax);
+                raw.y = Mathf.Clamp(raw.y, r.yMin, r.yMax);
+            }
+            float k = 1f - Mathf.Exp(-flyPositionSpeed * Time.unscaledDeltaTime);
+            _rootRectTransform.anchoredPosition = Vector2.Lerp(_rootRectTransform.anchoredPosition, raw, k);
+        }
+        else
+        {
+            float k = 1f - Mathf.Exp(-flyPositionSpeed * Time.unscaledDeltaTime);
+            _rootRectTransform.anchoredPosition = Vector2.Lerp(_rootRectTransform.anchoredPosition, _originPosition, k);
+        }
+    }
+
     private void StopAllModes()
     {
         _pressAnyActive = false;

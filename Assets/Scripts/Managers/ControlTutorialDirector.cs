@@ -90,7 +90,9 @@ public class ControlTutorialDirector : MonoBehaviour
         {
             case "Main":
                 _primaryTutorialRunning = false;
-                _desiredMode = PrimaryMode.PressAnyAuto;
+                _desiredMode = RingSessionStore.LoadAllRingsFromDisk().Count == 0
+                    ? PrimaryMode.PressAnyAuto
+                    : PrimaryMode.Hidden;
                 break;
 
             case "TrackSelection":
