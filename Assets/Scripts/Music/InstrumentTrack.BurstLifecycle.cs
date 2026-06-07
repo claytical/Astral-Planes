@@ -34,11 +34,11 @@ public partial class InstrumentTrack
     // Shared terminal step for all three note-resolution paths:
     // OnCollectableCollected, CommitManualReleasedNote, NotifyNoteDiscarded.
     //
-    // Handles: bin fill, visualizer grid snap, cursor unlock, ascend fuse,
-    // dict cleanup, and the burst-cleared event.
+    // Handles: bin fill, harmony advancement, visualizer grid snap, cursor unlock,
+    // ascend fuse, dict cleanup, and the burst-cleared event.
     //
     // Caller responsibilities that stay outside:
-    //   OnCollectableCollected  — TriggerPlayheadReleasePulse, Harmony_OnBinFilled,
+    //   OnCollectableCollected  — TriggerPlayheadReleasePulse,
     //                             _burstTotalSpawned/Collected cleanup, AdvanceBinCursor,
     //                             AdvanceOtherTrackCursors
     //   CommitManualReleasedNote — nothing extra
@@ -48,6 +48,8 @@ public partial class InstrumentTrack
         if (hadNotes)
         {
             SetBinFilled(filledBin, true);
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            Harmony_OnBinFilled(filledBin, _gfm?.harmony?.ProgressionLength ?? 0);
             controller?.NotifyBinFilled(this, filledBin);
             controller?.ResyncLeaderBinsNow();
 

@@ -89,6 +89,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// separately via <see cref="BeginBinRingDeformation"/> when the playhead
     /// reaches the bin's start step.
     /// </summary>
+    // Called by SuperNodeTrackNode.Collect() before InstantFillAllBins fires OnBinFilled.
+    // Ring spawning for the new bins happens via the OnBinFilled event path — not via any
+    // explicit SpawnBinRing loop here.
     public void SetSuperNodeMode(bool active) => _superNodeMode = active;
 
     public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
@@ -435,8 +438,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     public void AnimateApply(MotifSnapshot snapshot)
     {
         StopAllCoroutines();
-        _recordFadingOut   = false;
-        _gameplayFadingOut = false;
+        _recordFadingOut         = false;
+        _gameplayFadingOut       = false;
+        _superNodeMode           = false;
+        _pendingDeformationCount = 0;
         foreach (Transform child in transform)
             Destroy(child.gameObject);
         _recordRings.Clear();
@@ -838,6 +843,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         DestroyList(_gameplayRings);
         _gameplayFadingOut       = false;
         _spinOffPending          = false;
+        _superNodeMode           = false;
         _pendingDeformationCount = 0;
         transform.localScale     = Vector3.zero;
         transform.rotation       = Quaternion.identity;

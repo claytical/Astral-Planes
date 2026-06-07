@@ -82,6 +82,26 @@ public class ControlTutorialHighlight : MonoBehaviour
 
     [Header("Behavior")]
     [SerializeField] private bool hideTextOnClear = true;
+
+    [Header("3D Pivot Feedback")]
+    [SerializeField] private Transform controlSchemePivot;
+    [SerializeField] private float stickRotationMaxZ = 30f;
+    [SerializeField] private float boostRotationMaxX = 50f;
+    [SerializeField] private float buttonPressScale  = 0.85f;
+    [SerializeField] private float pivotLerpSpeed    = 8f;
+    // ------------------------------------------------------------
+    // live input (pushed each frame by ControlTutorialDirector)
+    // ------------------------------------------------------------
+    private Vector2 _liveStick;
+    private float   _liveThrust;
+    private bool    _liveButtonHeld;
+
+    // smoothed pivot state
+    private float   _smoothRotZ;
+    private float   _smoothRotX;
+    private float   _smoothScale = 1f;
+    private Vector3 _pivotBaseScale = Vector3.one;
+
     // ------------------------------------------------------------
     // label fade/scale state
     // ------------------------------------------------------------
@@ -129,6 +149,11 @@ public class ControlTutorialHighlight : MonoBehaviour
 
     public Instruction[] TutorialSequence => tutorialSequence;
 
+    private Instruction CurrentInstruction =>
+        (_tutorialActive && _tutorialIndex >= 0 && _tutorialIndex < (tutorialSequence?.Length ?? 0))
+            ? tutorialSequence[_tutorialIndex]
+            : Instruction.None;
+
     private void Awake()
     {
         _audioSource = GetComponent<AudioSource>();
@@ -144,6 +169,9 @@ public class ControlTutorialHighlight : MonoBehaviour
         CacheBaseScale(arrowsImage, ref _arrowsBaseScale);
         CacheBaseScale(startImage,  ref _startBaseScale);
         CacheLabelBaseScale();
+
+        var pivot = controlSchemePivot ? controlSchemePivot : transform;
+        _pivotBaseScale = pivot.localScale;
 
         if (instructionText)
         {
@@ -231,6 +259,41 @@ public class ControlTutorialHighlight : MonoBehaviour
         ApplyVisuals(arrowsImage, _arrowsBaseScale, _arrowsW);
         ApplyVisuals(startImage,  _startBaseScale,  _startW);
         UpdateLabelVisuals();
+        UpdatePivotFeedback();
+    }
+
+    public void SetLiveInput(Vector2 stick, float thrust, bool buttonHeld)
+    {
+        _liveStick      = stick;
+        _liveThrust     = thrust;
+        _liveButtonHeld = buttonHeld;
+    }
+
+    private void UpdatePivotFeedback()
+    {
+        var instr = CurrentInstruction;
+
+        float targetRotZ  = 0f;
+        float targetRotX  = 0f;
+        float targetScale = 1f;
+
+        if (instr == Instruction.Drift || instr == Instruction.Boost)
+            targetRotZ = _liveStick.x * stickRotationMaxZ;
+
+        if (instr == Instruction.Boost)
+            targetRotX = _liveThrust * boostRotationMaxX;
+
+        if (instr == Instruction.Release && _liveButtonHeld)
+            targetScale = buttonPressScale;
+
+        float k = 1f - Mathf.Exp(-pivotLerpSpeed * Time.unscaledDeltaTime);
+        _smoothRotZ  = Mathf.Lerp(_smoothRotZ,  targetRotZ,  k);
+        _smoothRotX  = Mathf.Lerp(_smoothRotX,  targetRotX,  k);
+        _smoothScale = Mathf.Lerp(_smoothScale, targetScale, k);
+
+        var pivot = controlSchemePivot ? controlSchemePivot : transform;
+        pivot.localRotation = Quaternion.Euler(_smoothRotX, 0f, _smoothRotZ);
+        pivot.localScale    = _pivotBaseScale * _smoothScale;
     }
     private void UpdateLabelVisuals()
     {
@@ -689,6 +752,12 @@ public class ControlTutorialHighlight : MonoBehaviour
 
             ResetVisual(arrowsImage, _arrowsBaseScale);
             ResetVisual(startImage,  _startBaseScale);
+
+            _smoothRotZ = _smoothRotX = 0f;
+            _smoothScale = 1f;
+            var pivot = controlSchemePivot ? controlSchemePivot : transform;
+            pivot.localRotation = Quaternion.identity;
+            pivot.localScale    = _pivotBaseScale;
         }
 
         if (instructionText)

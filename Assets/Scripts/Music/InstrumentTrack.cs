@@ -899,10 +899,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             {
                 int filledBin = _burstWroteBin.TryGetValue(collectable.burstId, out var b) ? b : targetBin;
 
-                // Unique to auto-collect: playhead pulse + harmony hook
+                // Unique to auto-collect: playhead pulse
                 controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
-                if (_gfm == null) _gfm = GameFlowManager.Instance;
-                Harmony_OnBinFilled(filledBin, _gfm?.harmony?.ProgressionLength ?? 0);
 
                 // Unique to auto-collect: extra dict cleanup before shared completion
                 _burstTotalSpawned.Remove(collectable.burstId);

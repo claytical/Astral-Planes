@@ -59,7 +59,6 @@ public class BinRingController : MonoBehaviour
         if (_ringApplicator == null)
             _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
         if (_ringApplicator == null) return;
-        if (!track.IsBinFilled(binIndex)) return;
 
         int totalSteps = (_drumTrack != null && _drumTrack.totalSteps > 0)
             ? _drumTrack.totalSteps : 16;

@@ -33,6 +33,10 @@ MonoBehaviour:
   pauseDuration: 0.35
   burstSpeedMultiplier: 2
   evasionCells: 3
+  collectableDriftSpeedMultiplier: 0.5
+  collectableOpenSpaceRelocateInterval: -1
+  collectableOpenSpaceSprintMultiplier: 1
+  collectableOpenSpaceSprintDuration: 0
   configSelectionMode: 0
   chordVoiceColors: []
   midiPreset: 1

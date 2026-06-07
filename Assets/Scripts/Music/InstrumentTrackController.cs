@@ -642,21 +642,6 @@ public class InstrumentTrackController : MonoBehaviour
         _binExtensionSignaled?.Clear();
     }
 
-    public void SpawnSuperNodeBinRings(InstrumentTrack track, int fromBin, int toBin)
-    {
-        if (track == null || fromBin >= toBin) return;
-        var gfm  = GameFlowManager.Instance;
-        var drum = gfm?.activeDrumTrack;
-        var ring = gfm?.GetMotifRingGlyphApplicator();
-        if (ring == null) return;
-
-        int totalSteps = drum != null ? drum.totalSteps : 16;
-        ring.ClearGameplayRings();
-        for (int b = fromBin; b < toBin; b++)
-            ring.SpawnBinRing(track.assignedRole, b, track.trackColor,
-                              track.GetBinNoteEntries(b), totalSteps, track);
-    }
-
     public void CheckAndTriggerAllTracksMaxed()
     {
         if (tracks == null) return;
