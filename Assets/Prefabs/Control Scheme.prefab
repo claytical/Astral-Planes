@@ -622,6 +622,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1012707233219409261}
   - component: {fileID: 1743201695570324546}
+  - component: {fileID: 2987831516447571478}
   m_Layer: 5
   m_Name: Control Scheme
   m_TagString: Untagged
@@ -687,9 +688,36 @@ MonoBehaviour:
   labelAttentionScale: 0.06
   labelScaleLerpSpeed: 14
   deactivateLabelWhenHidden: 1
-  stepConfirmClip: {fileID: 0}
+  stepConfirmClip: {fileID: 8300000, guid: cdec88e5cf531a34fa7ffb2147d99e85, type: 3}
   stepConfirmVolume: 1
   hideTextOnClear: 1
+  controlSchemePivot: {fileID: 0}
+  stickRotationMaxZ: 30
+  boostRotationMaxX: 50
+  buttonPressScale: 0.85
+  pivotLerpSpeed: 8
+  rootFadeInSeconds: 0.35
+  rootFadeOutSeconds: 0.25
+  rootAlphaPulseAmount: 0.07
+  rootAlphaPulseSpeed: 1.5
+  flyMaxDistance: 150
+  flyPositionSpeed: 6
+  butterflyAmplitudeX: 80
+  butterflyAmplitudeY: 40
+  butterflyFrequency: 1.2
+  butterflyPositionSpeed: 6
+--- !u!225 &2987831516447571478
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5229850974763342113}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &5602812254947766409
 GameObject:
   m_ObjectHideFlags: 0
