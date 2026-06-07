@@ -17,6 +17,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // Cells carved by non-vehicle objects (e.g. SuperNodeTrackNode) that must regrow as MusicalRole.None
     // (gray) without revealing their hidden imprint. Cleared in CommitRegrowCell after role is resolved.
     private readonly HashSet<Vector2Int> _forceGrayRegrow = new();
+    // Cells cleared by PhaseStar zap must regrow gray so the Vehicle must re-carve to reveal the role.
+    private readonly HashSet<Vector2Int> _zapForceGrayCells = new();
     private bool _cellGridReady;
     [Header("Config")]
     [SerializeField] public CosmicDustGeneratorConfig config;
@@ -1183,7 +1185,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.InitializeVisuals(DustTimings);
             dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
-            regrowRole = ResolveRegrowRole(gp);
+            regrowRole = _zapForceGrayCells.Remove(gp) ? MusicalRole.None : ResolveRegrowRole(gp);
             _forceGrayRegrow.Remove(gp);
 
             // --- Color from role profile (authoritative source) ---
@@ -1407,6 +1409,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Visual fade duration comes from config.zapFadeSeconds tuning.
     public void ZapCell(Vector2Int cell)
     {
+        _zapForceGrayCells.Add(cell);
         var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, true, config.zapRegrowDelaySeconds, true);
         ClearCellByInteraction(cell, req);
     }

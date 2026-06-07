@@ -110,14 +110,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
-  minContactTime: 0.01
+  minContactTime: 0.1
   colorTransitionTime: 0.5
   tentacleGrowSpeed: 0.25
-  tentacleRetractSpeed: 5
+  tentacleRetractSpeed: 3
   tentacleFlowSpeed: 0.2
   tentacleWidth: 0.02
   dissolveDuration: 1
-  fallbackTentaclesPerRole: 10
+  fallbackTentaclesPerRole: 8
   tentacleMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120

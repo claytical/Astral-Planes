@@ -101,10 +101,15 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private PhaseStarCravingNavigator _navigator;
     private MusicalRole _attunedRole = MusicalRole.None;
 
+    [Header("Zap Stagger")]
+    [Tooltip("Minimum seconds between successive tentacle activations. Set to 0 to disable stagger (old batch behavior).")]
+    [SerializeField, Min(0f)] private float interTentacleStartInterval = 1.5f;
+
     private bool _tentaclesActive;
     private bool _acquisitionEnabled = true;
     private bool _isRetractAllInProgress;
     private readonly List<Tentacle> _tentacles = new();
+    private float _lastTentacleStartTime = 0f;
 
     private float _keepClearTimer;
     private readonly Dictionary<Vector2Int, Tentacle> _reservedCells = new();
@@ -174,6 +179,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         foreach (var tentacle in _tentacles)
             ResetTentacleState(tentacle, starPos, destroyVisual: false);
 
+        _lastTentacleStartTime = 0f;
         TryNotifyAllTentaclesRetracted();
     }
     
@@ -309,10 +315,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
-        // Acquire targets for all currently-idle tentacles. Activation gating remains in PhaseStar
-        // (required zap count + retract completion), so over-targeting here is safe and avoids
-        // single-tentacle starvation/order races.
-        int assignableCount = 0;
+        // Stagger: only activate one tentacle per interval so zaps are spread out over time.
+        if (interTentacleStartInterval > 0f && Time.time - _lastTentacleStartTime < interTentacleStartInterval)
+            return;
 
         var idleTentacles = new List<Tentacle>();
         foreach (var tentacle in _tentacles)
@@ -322,19 +327,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
         if (idleTentacles.Count == 0) return;
 
-        assignableCount = idleTentacles.Count;
-        int batchCount = Mathf.Min(assignableCount, idleTentacles.Count);
-        if (batchCount <= 0) return;
-
         var excluded = BuildExcludedCells(requester: null);
-        var seededTargets = new List<Vector2Int>(batchCount);
-        if (_navigator.TryGetTargetsForRole(_attunedRole, batchCount, excluded, out var targetCells) && targetCells != null)
+        var seededTargets = new List<Vector2Int>(1);
+        if (_navigator.TryGetTargetsForRole(_attunedRole, 1, excluded, out var targetCells) && targetCells != null)
             seededTargets.AddRange(targetCells);
 
         int targetCursor = 0;
-        for (int i = 0; i < batchCount; i++)
+        foreach (var tentacle in idleTentacles)
         {
-            var tentacle = idleTentacles[i];
             Vector2Int cell;
             bool hasCell = false;
 
@@ -346,19 +346,20 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                 if (!TryReserveCell(tentacle, cell))
                     continue;
                 BeginGrowingTentacle(tentacle, cell, drum, transform.position);
-                excluded.Add(cell);
+                _lastTentacleStartTime = Time.time;
                 hasCell = true;
                 break;
             }
 
-            if (hasCell) continue;
+            if (hasCell) break; // Only one activation per interval
 
             if (_navigator.TryGetTargetForRole(tentacle.role, out cell) &&
                 IsTargetValid(cell, tentacle.role, tentacle, out _) &&
                 TryReserveCell(tentacle, cell))
             {
                 BeginGrowingTentacle(tentacle, cell, drum, transform.position);
-                excluded.Add(cell);
+                _lastTentacleStartTime = Time.time;
+                break; // Only one activation per interval
             }
         }
     }
