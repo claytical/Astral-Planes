@@ -59,9 +59,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private readonly List<RingEntry> _recordRings   = new();
 
     private bool    _recordFadingOut;
-    private bool    _gameplayFadingOut;    // stops rotation coroutines; set during spin-off
+    private bool    _gameplayFadingOut;    // stops rotation coroutines; set when spin animation begins
     private bool    _clearingGameplayRings; // stops deformation coroutines; set only in ClearGameplayRings
     private bool    _superNodeMode;
+    private bool    _spinOffPending;       // spin is imminent; prevents per-deformation hide during wait
     private Vector3 _fitScale;
     private int     _pendingDeformationCount;
 
@@ -125,6 +126,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             entry.Root.transform, rotDeg,
             new List<NoteAnimInfo>(), null,
             shouldStop: () => _gameplayFadingOut));
+
+        // Reset deformation count when the record was hidden — starts a fresh session.
+        if (transform.localScale.sqrMagnitude < 0.0001f)
+            _pendingDeformationCount = 0;
 
         RefreshPlayAreaFit(_gameplayRings.Count);
     }
@@ -222,19 +227,19 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
         // Hide record after deformation — only when all concurrent deformations are done
         // and we are not in spin-off or SuperNode mode.
-        if (!_superNodeMode && !_gameplayFadingOut && !_clearingGameplayRings
+        if (!_superNodeMode && !_gameplayFadingOut && !_clearingGameplayRings && !_spinOffPending
             && _pendingDeformationCount == 0)
         {
-            float dur        = config != null ? config.ringAppearDuration * 0.5f : 0.1f;
+            float dur        = config != null ? config.scaleDownDuration : 0.5f;
             Vector3 startScale = transform.localScale;
             float elapsed    = 0f;
-            while (elapsed < dur && !_clearingGameplayRings)
+            while (elapsed < dur && !_clearingGameplayRings && !_gameplayFadingOut)
             {
                 elapsed += Time.deltaTime;
                 transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
                 yield return null;
             }
-            if (!_clearingGameplayRings)
+            if (!_clearingGameplayRings && !_gameplayFadingOut)
                 transform.localScale = Vector3.zero;
         }
     }
@@ -409,9 +414,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
     public void ClearGameplayRings()
     {
+        StopAllCoroutines(); // prevent ghost decrements from old deformation coroutines
         _clearingGameplayRings   = true;
         _gameplayFadingOut       = true;
         _superNodeMode           = false;
+        _spinOffPending          = false;
         _pendingDeformationCount = 0;
         DestroyList(_gameplayRings);
         _gameplayFadingOut       = false;
@@ -759,11 +766,28 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     /// </summary>
     public IEnumerator SpinAndRollOffActiveRings(float spinDuration, float rollDuration)
     {
-        // Restore visibility if record was hidden after deformation.
-        if (transform.localScale.sqrMagnitude < 0.0001f)
-            transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
+        // Prevent per-deformation scale-to-zero while waiting, but keep rings rotating so
+        // the record stays animated during the wait (rings look live, not frozen).
+        _spinOffPending = true;
 
-        _gameplayFadingOut = true;  // stop per-ring rotation coroutines
+        // Wait for any in-flight deformations so the final ring fully deforms before spin-off.
+        if (_pendingDeformationCount > 0)
+        {
+            float maxWait = spinDuration + rollDuration;
+            float waited  = 0f;
+            while (_pendingDeformationCount > 0 && waited < maxWait && !_clearingGameplayRings)
+            {
+                waited += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        // Deformations settled (or timed out): now stop rotation and begin spin animation.
+        _gameplayFadingOut = true;
+        _spinOffPending    = false;
+
+        // Restore to full scale — handles both "hidden after deformation" and "mid-fade interrupted".
+        transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
 
         float   tiltDeg       = config != null ? config.tiltXDegrees     : 75f;
         float   scaleDur      = config != null ? config.scaleDownDuration : 0.5f;
@@ -812,9 +836,11 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         }
 
         DestroyList(_gameplayRings);
-        _gameplayFadingOut   = false;
-        transform.localScale = Vector3.zero;
-        transform.rotation   = Quaternion.identity;
+        _gameplayFadingOut       = false;
+        _spinOffPending          = false;
+        _pendingDeformationCount = 0;
+        transform.localScale     = Vector3.zero;
+        transform.rotation       = Quaternion.identity;
     }
 
     private void AdvanceRingZRots(RingEntry[] rings, float[] zRots, float[] speeds)
