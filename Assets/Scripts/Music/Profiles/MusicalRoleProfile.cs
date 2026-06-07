@@ -89,6 +89,19 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Darting (Lead): grid-cell radius within which a Vehicle triggers directional evasion. Keep small (2–4) for 1v1 pursuit — fires only on close approach.")]
     [Range(0f, 10f)] public float evasionCells = 3f;
 
+    [Header("Collectable Behavior")]
+    [Tooltip("Multiplies the duration-derived drift speed for autonomous collectables. 1 = default. Does not affect MineNode speed.")]
+    [Range(0.3f, 3.0f)] public float collectableDriftSpeedMultiplier = 1.0f;
+
+    [Tooltip("Seconds between open-space idea re-evaluations (relocation desire). -1 = only at loop boundary (default). Lower = more restless.")]
+    [Min(-1f)] public float collectableOpenSpaceRelocateInterval = -1f;
+
+    [Tooltip("Speed multiplier applied immediately after the collectable commits to a new open-space idea direction. 1 = no sprint.")]
+    [Range(1f, 5f)] public float collectableOpenSpaceSprintMultiplier = 1.0f;
+
+    [Tooltip("How long (seconds) the sprint lasts before returning to normal drift speed. 0 = no sprint.")]
+    [Min(0f)] public float collectableOpenSpaceSprintDuration = 0f;
+
     [Header("Chord Voices")]
     [Tooltip("ByBin: configs rotate by bin index (default for all roles). ByVoice: configs are pinned by voiceIndex — voice 0 always uses config[0], voice 1 uses config[1], etc.")]
     public RoleConfigSelectionMode configSelectionMode = RoleConfigSelectionMode.ByBin;

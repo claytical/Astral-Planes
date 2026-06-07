@@ -217,9 +217,9 @@ public class MotifSnapshot
         public bool  IsMatched;
 
         /// <summary>
-        /// Normalized collection speed for this note within its bin.
-        /// 0 = collected first (fastest), 1 = collected last (slowest).
-        /// Drives ring tug depth in MotifRingGlyphGenerator.
+        /// Normalized step position within the bin (0 = first step, 1 = last step).
+        /// Drives ring tug-dip width in MotifRingGlyphGenerator: later-position notes
+        /// get slightly wider dips than earlier-position notes.
         /// </summary>
         public float CommitTime01;
 

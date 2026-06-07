@@ -60,6 +60,26 @@ public class ControlTutorialDirector : MonoBehaviour
             SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
+    private void Update()
+    {
+        if (!_primaryTutorialRunning || !primaryInstance || _tutorialPlayers.Count == 0) return;
+
+        Vector2 bestStick  = Vector2.zero;
+        float   bestThrust = 0f;
+        bool    anyButton  = false;
+
+        foreach (var p in _tutorialPlayers)
+        {
+            if (!p) continue;
+            Vector2 s = p.GetMoveInput();
+            if (s.magnitude > bestStick.magnitude) bestStick = s;
+            bestThrust = Mathf.Max(bestThrust, p.GetThrustInput());
+            anyButton |= p.GetChooseInput();
+        }
+
+        primaryInstance.SetLiveInput(bestStick, bestThrust, anyButton);
+    }
+
     private void OnSceneLoaded(Scene s, LoadSceneMode mode)
     {
         // New scene => the old primary instance is gone (scene unload). Rebuild it from prefab + anchor.

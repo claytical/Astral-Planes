@@ -197,12 +197,7 @@ public class Collectable : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float minSpeed = 0.8f;     // world units/sec for longest notes
     [SerializeField] private float maxSpeed = 3.5f;     // world units/sec for shortest notes
-    [SerializeField] private float arriveRadius = 0.05f;
-    [SerializeField] private float chooseNextEvery = 0.15f; // seconds between neighbor picks while en route
-    [SerializeField] private float lingerLongNote = 0.25f;  // extra pause for long notes at each node
-    [SerializeField] private float lingerShortNote = 0.02f; // minimal pause for short notes
     [SerializeField] private float dustAdjacencyProbe = 0.42f; // radius used to detect nearby dust
-    [SerializeField] private int   neighborRadiusCells = 1;    // how far from current cell to consider neighbors (4-neighbors)
 
     private Camera _cam;
     private Rigidbody2D _rb;
@@ -214,6 +209,9 @@ public class Collectable : MonoBehaviour
     private float _leadRefreshTimer = 0f;
     private bool _grooveBurstActive = true;
     private float _groovePhaseTimer = 0f;
+    private float _openSpaceRelocateTimer = 0f;
+    private bool  _isSprinting = false;
+    private float _sprintTimer = 0f;
 
     public void BeginSpawnArrival(
     Vector3 originWorld,
@@ -611,7 +609,7 @@ private IEnumerator SpawnArrivalRoutine(
         // Invert so long notes are slow: v = lerp(maxSpeed -> minSpeed, duration01)
         float d = Duration01();
         float base_ = Mathf.Lerp(maxSpeed, minSpeed, d);
-        float roleMul = _roleProfile != null ? _roleProfile.behaviorSpeedMultiplier : 1f;
+        float roleMul = _roleProfile != null ? _roleProfile.collectableDriftSpeedMultiplier : 1f;
         return base_ * roleMul;
     }
 
@@ -683,24 +681,59 @@ private IEnumerator SpawnArrivalRoutine(
             }
         }
 
+        // Open-space relocation: periodically re-evaluate idea and sprint toward it.
+        if (!insideDust && _roleProfile != null && _roleProfile.collectableOpenSpaceRelocateInterval > 0f)
+        {
+            _openSpaceRelocateTimer -= Time.fixedDeltaTime;
+            if (_openSpaceRelocateTimer <= 0f)
+            {
+                _openSpaceRelocateTimer = _roleProfile.collectableOpenSpaceRelocateInterval;
+                HandleLoopBoundaryIdea();
+                if (_roleProfile.collectableOpenSpaceSprintDuration > 0f)
+                {
+                    _isSprinting = true;
+                    _sprintTimer = _roleProfile.collectableOpenSpaceSprintDuration;
+                }
+            }
+        }
+
+        // Tick sprint timer.
+        if (_isSprinting)
+        {
+            _sprintTimer -= Time.fixedDeltaTime;
+            if (_sprintTimer <= 0f) _isSprinting = false;
+        }
+
+        float effectiveSpeed = _speed;
+        if (_isSprinting && _roleProfile != null)
+            effectiveSpeed *= _roleProfile.collectableOpenSpaceSprintMultiplier;
+
 // ------------------------------------------------------------
 // LOOP-BOUNDARY IDEA BIAS
 // - On each leader loop boundary, we choose an "idea direction".
 // - Each FixedUpdate, we gently bias motion toward that direction.
 // ------------------------------------------------------------
-        _ideaDirSmoothed = Vector2.Lerp(_ideaDirSmoothed, _ideaDir, Mathf.Clamp01(Time.fixedDeltaTime * ideaTurnLerp));
+        if (_isSprinting)
+            _ideaDirSmoothed = _ideaDir; // snap immediately — the dash should feel decisive
+        else
+            _ideaDirSmoothed = Vector2.Lerp(_ideaDirSmoothed, _ideaDir, Mathf.Clamp01(Time.fixedDeltaTime * ideaTurnLerp));
+
         if (_ideaDirSmoothed.sqrMagnitude > 0.0001f)
         {
-            Vector2 ideaStep = _ideaDirSmoothed.normalized * (_speed * ideaBiasStrength * Time.fixedDeltaTime);
+            Vector2 ideaStep = _ideaDirSmoothed.normalized * (effectiveSpeed * ideaBiasStrength * Time.fixedDeltaTime);
             step += ideaStep;
         }
 
-        float t = Time.time;
-        float nx = Mathf.PerlinNoise(seedA, t * 0.35f) * 2f - 1f;
-        float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
-        Vector2 turb = new Vector2(nx, ny);
-        if (turb.sqrMagnitude > 0.0001f)
-            step += turb.normalized * (microTurbulenceStrength * _speed * Time.fixedDeltaTime);
+        // Suppress turbulence during sprint so the dash reads clearly.
+        if (!_isSprinting)
+        {
+            float t = Time.time;
+            float nx = Mathf.PerlinNoise(seedA, t * 0.35f) * 2f - 1f;
+            float ny = Mathf.PerlinNoise(seedB, t * 0.35f) * 2f - 1f;
+            Vector2 turb = new Vector2(nx, ny);
+            if (turb.sqrMagnitude > 0.0001f)
+                step += turb.normalized * (microTurbulenceStrength * effectiveSpeed * Time.fixedDeltaTime);
+        }
 
         // Bass: BPM-synced vertical bob — note drifts with the pulse of the music.
         if (_role == MusicalRole.Bass && dt != null)
@@ -728,7 +761,7 @@ private IEnumerator SpawnArrivalRoutine(
         if (insideDust)
             step *= TRAPPED_DRIFT_MUL;
 
-        float maxStep = _speed * Time.fixedDeltaTime;
+        float maxStep = effectiveSpeed * Time.fixedDeltaTime;
         if (step.sqrMagnitude > maxStep * maxStep)
             step = step.normalized * maxStep;
 

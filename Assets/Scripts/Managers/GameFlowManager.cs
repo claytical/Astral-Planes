@@ -69,7 +69,6 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
     private bool _setupInFlight, _setupDone;
-    private float _motifStartTime = 0f;
     private GameState currentState = GameState.Begin;
     private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
