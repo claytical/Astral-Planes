@@ -17,7 +17,7 @@ GameObject:
   - component: {fileID: 4561843143948562615}
   - component: {fileID: 7086731306890036074}
   m_Layer: 7
-  m_Name: Mine Node
+  m_Name: Discovery
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -53,16 +53,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   coreSprite: {fileID: 2442014530722922072}
   outlineSprite: {fileID: 2442014530722922072}
-  maxStrength: 100
+  maxStrength: 150
   pruneCarvedPathOnLoopBoundary: 0
   pruneMinPathCount: 8
   driftSpeedMultiplier: 0.1
   locomotionArchetypeProfiles:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  defaultLocomotionProfile: {fileID: 0}
+  - {fileID: 11400000, guid: e36f28096af234af1ba66f20d16b8c64, type: 2}
+  - {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7, type: 2}
+  - {fileID: 11400000, guid: f19ac05ceb9f240339b920df3ef68d58, type: 2}
+  - {fileID: 11400000, guid: 729b36cbed0cf40df8012d4b5b1866b2, type: 2}
+  defaultLocomotionProfile: {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7,
+    type: 2}
   decisionArchetypeLibrary: {fileID: 11400000, guid: 46dd6f329391c4fb99c7adfc5229116b,
     type: 2}
   locomotionVariantOverride: 
@@ -78,7 +79,7 @@ MonoBehaviour:
   debugSweepContainment: 0
   assertSingleHardCorrectionPerTick: 1
   expireAfterLoops: 3
-  expireBlastRadiusCells: 5
+  expireBlastRadiusCells: 10
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -222,7 +223,7 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 1
+  m_Mass: 0.75
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 0
@@ -247,7 +248,7 @@ PolygonCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 4f9a8579567c44bca851216f69dc127e, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

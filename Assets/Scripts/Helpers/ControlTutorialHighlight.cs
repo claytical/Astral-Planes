@@ -306,9 +306,9 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)
         {
-            targetRotZ = _liveStick.x * stickRotationMaxZ;
-            if (instr == Instruction.Drift)
-                targetRotX = -_liveStick.y * stickRotationMaxZ * 0.5f;
+            targetRotZ = -_liveStick.x * stickRotationMaxZ;
+ //           if (instr == Instruction.Drift)
+ //               targetRotX = -_liveStick.y * stickRotationMaxZ * 0.5f;
         }
 
         if (instr == Instruction.Boost || instr == Instruction.Release)
@@ -864,8 +864,7 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)
         {
-            // Stick x is inverted: (1,0) moves widget left, (-1,0) moves right
-            Vector2 raw = _originPosition + new Vector2(-_liveStick.x, _liveStick.y) * flyMaxDistance;
+            Vector2 raw = _originPosition + new Vector2(_liveStick.x, _liveStick.y) * flyMaxDistance;
             var parentRT = _rootRectTransform.parent as RectTransform;
             if (parentRT != null)
             {
