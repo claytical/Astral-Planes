@@ -100,16 +100,13 @@ public partial class CosmicDustGenerator
             };
         }
 
-        foreach (var (gp, _) in cells)
-            _hiddenImprints.Remove(gp);
-
         var occupied = BuildOccupiedCells(cells);
 
         if (rolesList.Count == 1)
         {
             MusicalRole onlyRole = rolesList[0];
             for (int i = 0; i < occupied.Count; i++)
-                _hiddenImprints[occupied[i]] = onlyRole;
+                SetHiddenRole(occupied[i], onlyRole);
 
             if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
             return;
@@ -124,15 +121,18 @@ public partial class CosmicDustGenerator
         for (int i = 0; i < actualSeedCount; i++)
             counts[seedRoles[i]] = 0;
 
-        foreach (var kv in _hiddenImprints)
+        int hiddenCount = 0;
+        foreach (var kv in _imprints)
         {
-            if (!counts.ContainsKey(kv.Value))
-                counts[kv.Value] = 0;
-            counts[kv.Value]++;
+            if (kv.Value.hiddenRole == MusicalRole.None) continue;
+            hiddenCount++;
+            if (!counts.ContainsKey(kv.Value.hiddenRole))
+                counts[kv.Value.hiddenRole] = 0;
+            counts[kv.Value.hiddenRole]++;
         }
 
         string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={_hiddenImprints.Count}, seeds={actualSeedCount}, distribution=({summary})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={hiddenCount}, seeds={actualSeedCount}, distribution=({summary})");
     }
 
     private static List<Vector2Int> BuildOccupiedCells(List<(Vector2Int cell, Vector3 world)> cells)
@@ -229,7 +229,7 @@ public partial class CosmicDustGenerator
                 }
             }
 
-            _hiddenImprints[gp] = seedRoles[bestSeed];
+            SetHiddenRole(gp, seedRoles[bestSeed]);
         }
     }
 
@@ -413,7 +413,7 @@ public partial class CosmicDustGenerator
                 for (int i = 0; i < occupied.Count; i++)
                 {
                     Vector2Int gp = occupied[i];
-                    if (!_hiddenImprints.TryGetValue(gp, out MusicalRole assigned) || assigned != role)
+                    if (!_imprints.TryGetValue(gp, out var geoImp) || geoImp.hiddenRole != role)
                         continue;
 
                     float minOwnSeedDistSq = float.MaxValue;
@@ -435,7 +435,7 @@ public partial class CosmicDustGenerator
                         if (d < bestOtherDist) { bestOtherDist = d; bestOtherSeed = s; }
                     }
                     if (bestOtherSeed >= 0)
-                        _hiddenImprints[gp] = seedRoles[bestOtherSeed];
+                        SetHiddenRole(gp, seedRoles[bestOtherSeed]);
                 }
             }
             else if (feature == MazeGeoFeature.Glade)
@@ -452,7 +452,7 @@ public partial class CosmicDustGenerator
 
                 var territory = new List<Vector2Int>();
                 for (int i = 0; i < occupied.Count; i++)
-                    if (_hiddenImprints.TryGetValue(occupied[i], out MusicalRole r2) && r2 == role)
+                    if (_imprints.TryGetValue(occupied[i], out var gladeImp) && gladeImp.hiddenRole == role)
                         territory.Add(occupied[i]);
 
                 if (territory.Count == 0) continue;
@@ -468,7 +468,7 @@ public partial class CosmicDustGenerator
                     for (int i = 0; i < territory.Count; i++)
                     {
                         if ((territory[i] - center).sqrMagnitude <= gladeRadiusSq)
-                            _hiddenImprints[territory[i]] = softRole;
+                            SetHiddenRole(territory[i], softRole);
                     }
                 }
             }
@@ -574,7 +574,6 @@ public partial class CosmicDustGenerator
         const int vehicleHoleRadiusCells = 2;
 
         CarvePermanentDisk(starCell, starHoleRadiusCells);
-        BuildStarPocketSet(starCell, starHoleRadiusCells);
         if (vehicleCells != null)
         {
             foreach (var vehCell in vehicleCells)
@@ -585,28 +584,4 @@ public partial class CosmicDustGenerator
         _isBootstrappingMaze = false;
     }
 
-    private void BuildStarPocketSet(Vector2Int starCell, int radiusCells)
-    {
-        _starClearCells.Clear();
-
-        if (drums == null) return;
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-
-        for (int dx = -radiusCells; dx <= radiusCells; dx++)
-        {
-            for (int dy = -radiusCells; dy <= radiusCells; dy++)
-            {
-                var gp = new Vector2Int(starCell.x + dx, starCell.y + dy);
-
-                if ((uint)gp.x >= (uint)w || (uint)gp.y >= (uint)h)
-                    continue;
-
-                if (dx * dx + dy * dy > radiusCells * radiusCells)
-                    continue;
-
-                _starClearCells.Add(gp);
-            }
-        }
-    }
 }
