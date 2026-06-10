@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd00e28313c0446baaeebe34dc651322, type: 3}
+  m_Name: Final Rings
+  m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
+  innerRadius: 0.1
+  ringThickness: 0.03
+  ringSpacing: 0.3
+  fitPaddingFraction: 0.05
+  ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  ringAlpha: 0.339
+  lineWidth: 0.02
+  segments: 256
+  tugDepthFraction: 0.25
+  tugHalfWidthRad: 0.75
+  ringDrawInDuration: 0.5
+  ringStaggerDelay: 0.08
+  rotSpeedBase: 25
+  rotSpeedMax: 174
+  fadeOutDuration: 0.5
+  noteDotRadius: 0.01
+  noteTravelDuration: 1
+  ringHoldScale: 0.25
+  bouncePressScale: 0.12
+  bouncePressDuration: 0.25
+  bounceSettleDuration: 0.35
+  rollOffDuration: 2
+  ringAppearDuration: 0.1
+  noteLaunchLeadSteps: 2
+  launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
+  launchSfxVolume: 0.115
+  impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
+  impactSfxVolume: 0.135
+  spinOffExtraDegPerSec: 720
+  spinOffDuration: 2
+  tiltXDegrees: 75
+  tiltXDuration: 3
+  scaleDownDuration: 3

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dd00e28313c0446baaeebe34dc651322, type: 3}
-  m_Name: RingGlyphConfig
+  m_Name: In Game Ring Glyph
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
   ringThickness: 0.03
