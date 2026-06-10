@@ -252,140 +252,124 @@ public partial class DrumTrack : MonoBehaviour
     }
 
     private void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)
-{
-    // ------------------------------------------------------------
-    // 0) Spam detection + provenance
-    // ------------------------------------------------------------
-    string incomingId = motif ? motif.motifId : "null";
-    double dspNow = AudioSettings.dspTime;
-
-    // Detect "motif spam": same motif being applied again within ~1–2 loops.
-    if (_lastApplyMotifId == incomingId && _lastApplyMotifDsp > 0 && (dspNow - _lastApplyMotifDsp) < 10.0)
     {
-        Debug.LogWarning(
-            $"[DRUM][MOTIF][SPAM] Reapplying motif={incomingId} within {(dspNow - _lastApplyMotifDsp):F3}s by {who}\n" +
-            Environment.StackTrace
-        );
+        string incomingId = motif ? motif.motifId : "null";
+        TrackMotifApplication(incomingId, who);
+
+        MotifProfile oldMotif = _motif;
+        bool motifChanged = oldMotif != motif;
+        bool stepsChanged = motif != null && oldMotif != null && oldMotif.stepsPerLoop != motif.stepsPerLoop;
+        bool bpmChanged   = motif != null && oldMotif != null && Mathf.Abs(oldMotif.bpm - motif.bpm) > 0.001f;
+        int  oldSteps     = oldMotif?.stepsPerLoop ?? totalSteps;
+        float oldBpm      = oldMotif?.bpm ?? drumLoopBPM;
+
+        CommitMotifRefs(motif, motifChanged, restartTransport, stepsChanged, bpmChanged);
+        AudioClip clip = ChooseEntryClip();
+        armAtNextBoundary = ResolveTimingCommit(motif, armAtNextBoundary, motifChanged, stepsChanged, bpmChanged,
+                                                restartTransport, oldSteps, oldBpm, clip, who);
+        ScheduleClipChange(clip, armAtNextBoundary, restartTransport, who);
     }
 
-    _lastApplyMotifId = incomingId;
-    _lastApplyMotifDsp = dspNow;
-
-    _lastMotifSetBy = who;
-    _motifSetSerial++;
-    if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][MOTIF][SET#{_motifSetSerial}] by {who}: incoming motif={incomingId}");
-
-    // ------------------------------------------------------------
-    // 1) Snapshot old state BEFORE overwrite
-    // ------------------------------------------------------------
-    MotifProfile oldMotif = _motif;
-
-    int oldSteps = (oldMotif != null) ? oldMotif.stepsPerLoop : totalSteps;
-    float oldBpm = (oldMotif != null) ? oldMotif.bpm : drumLoopBPM;
-
-    bool motifChanged = (oldMotif != motif);
-
-    bool stepsChanged = (oldMotif != null && motif != null && oldMotif.stepsPerLoop != motif.stepsPerLoop);
-    bool bpmChanged   = (oldMotif != null && motif != null && Mathf.Abs(oldMotif.bpm - motif.bpm) > 0.001f);
-
-    // ------------------------------------------------------------
-    // 2) Apply motif refs (idempotent with respect to counters when same motif)
-    // ------------------------------------------------------------
-    _motif = motif;
-    _entryLoops          = (_motif != null) ? _motif.entryDrumLoops : null;
-    _intensityLoops      = (_motif != null) ? _motif.intensityDrumLoops : null;
-    _intensityThresholds = (_motif != null) ? _motif.intensityThresholds : null;
-
-    _driveFromEnergy = (_motif != null) && _motif.driveBeatsFromEnergy;
-    // Only (re)open the entry window and reset intensity sampling when motif actually changed,
-    // OR when we explicitly restart transport (hard reset semantics).
-    if (motifChanged || restartTransport)
+    private void TrackMotifApplication(string incomingId, string who)
     {
-        _entryLoopsRemaining = (_motif != null) ? Mathf.Max(0, _motif.entryLoopCount) : 0;
-
-        // Reset intensity sampling for new motif (prevents "stuck at 0" after first motif).
-        _lastSpentTanksSample = -1f;
-        _lastTotalSpentSample = -1f;
-        _burnBaselineEma = 0f;
-        _burnTier = 0f;
-        // Preserve intensity when timing is identical — same BPM and step count means the drum
-        // clips loop at the same rate, so there's no perceptual discontinuity to reset from.
-        if (stepsChanged || bpmChanged)
-            _lastIntensity01 = 0f;
-    }
-    // else: same motif being reapplied; do NOT reset entry/intensity counters.
-
-    // Asset sanity warnings (always useful; does not mutate state)
-    if (_motif != null)
-    {
-        if (!_motif.driveBeatsFromEnergy)
-            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has driveBeatsFromEnergy=FALSE. Beat intensity will never run.");
-
-        int entryCt = _motif.entryDrumLoops != null ? _motif.entryDrumLoops.Count : 0;
-        int intCt   = _motif.intensityDrumLoops != null ? _motif.intensityDrumLoops.Count : 0;
-
-        if (entryCt == 0)
-            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 entryDrumLoops.");
-        if (intCt == 0)
-            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 intensityDrumLoops. Intensity changes cannot occur.");
-    }
-
-    // Choose clip for this motif (clip choice can be immediate even if timing is pending).
-    AudioClip clip = ChooseEntryClip();
-
-    // ------------------------------------------------------------
-    // 3) Timing commit policy (preserve your existing transport-safety rules)
-    // ------------------------------------------------------------
-    if (_started && (stepsChanged || bpmChanged) && !restartTransport)
-    {
-        // If caller asked for an unarmed swap, force arming (safe boundary).
-        if (!armAtNextBoundary)
+        double dspNow = AudioSettings.dspTime;
+        if (_lastApplyMotifId == incomingId && _lastApplyMotifDsp > 0 && (dspNow - _lastApplyMotifDsp) < 10.0)
         {
             Debug.LogWarning(
-                $"[DRUM][MOTIF] Timing changed (steps {oldSteps}->{(motif ? motif.stepsPerLoop : oldSteps)}, " +
-                $"bpm {oldBpm}->{(motif ? motif.bpm : oldBpm)}) but armAtNextBoundary==false and restartTransport==false. " +
-                $"Forcing armAtNextBoundary=true to avoid transport mismatch."
+                $"[DRUM][MOTIF][SPAM] Reapplying motif={incomingId} within {(dspNow - _lastApplyMotifDsp):F3}s by {who}\n" +
+                Environment.StackTrace
             );
-            armAtNextBoundary = true;
         }
-
-        // Defer timing changes until the swap actually commits.
-        _pendingBpm = (motif != null) ? motif.bpm : drumLoopBPM;
-        _pendingTotalSteps = (motif != null) ? motif.stepsPerLoop : totalSteps;
-        _pendingTimingValid = true;
-
-        if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[DRUM][MOTIF] ApplyMotif(DEFERRED TIMING) by {who}: motif={(motif ? motif.motifId : "null")} " +
-            $"steps {oldSteps}->{_pendingTotalSteps} bpm {oldBpm}->{_pendingBpm} " +
-            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport} " +
-            $"motifChanged={motifChanged}"
-        );
+        _lastApplyMotifId  = incomingId;
+        _lastApplyMotifDsp = dspNow;
+        _lastMotifSetBy    = who;
+        _motifSetSerial++;
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][MOTIF][SET#{_motifSetSerial}] by {who}: incoming motif={incomingId}");
     }
-    else
+
+    private void CommitMotifRefs(MotifProfile motif, bool motifChanged, bool restartTransport, bool stepsChanged, bool bpmChanged)
     {
-        // Safe to apply timing immediately when:
-        // - we haven't started (ManualStart will schedule), OR
-        // - restartTransport==true (immediate reschedule), OR
-        // - no timing change.
-        if (_motif != null)
+        _motif               = motif;
+        _entryLoops          = _motif?.entryDrumLoops;
+        _intensityLoops      = _motif?.intensityDrumLoops;
+        _intensityThresholds = _motif?.intensityThresholds;
+        _driveFromEnergy     = _motif != null && _motif.driveBeatsFromEnergy;
+
+        // Only reset entry window and intensity sampling when the motif actually changed,
+        // OR when restartTransport forces hard-reset semantics.
+        if (motifChanged || restartTransport)
         {
-            drumLoopBPM = _motif.bpm;
-            totalSteps  = _motif.stepsPerLoop;
+            _entryLoopsRemaining  = _motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
+            _lastSpentTanksSample = -1f;
+            _lastTotalSpentSample = -1f;
+            _burnBaselineEma      = 0f;
+            _burnTier             = 0f;
+            // Preserve intensity when timing is identical — same BPM/steps means no perceptual
+            // discontinuity and resetting would cause a spurious intensity dip.
+            if (stepsChanged || bpmChanged)
+                _lastIntensity01 = 0f;
         }
 
-        _pendingTimingValid = false;
-
-        if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
-            $"entryLoops={(_entryLoops != null ? _entryLoops.Count : 0)} intensityLoops={(_intensityLoops != null ? _intensityLoops.Count : 0)} " +
-            $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromEnergy} bpm={drumLoopBPM} steps={totalSteps} " +
-            $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} restart={restartTransport} " +
-            $"motifChanged={motifChanged}"
-        );
+        if (_motif == null) return;
+        if (!_motif.driveBeatsFromEnergy)
+            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has driveBeatsFromEnergy=FALSE. Beat intensity will never run.");
+        int entryCt = _motif.entryDrumLoops?.Count ?? 0;
+        int intCt   = _motif.intensityDrumLoops?.Count ?? 0;
+        if (entryCt == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 entryDrumLoops.");
+        if (intCt   == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 intensityDrumLoops. Intensity changes cannot occur.");
     }
 
-    ScheduleClipChange(clip, armAtNextBoundary, restartTransport, who);
-}
+    // Applies deferred or immediate timing depending on transport state.
+    // Returns the (possibly forced) armAtNextBoundary value for ScheduleClipChange.
+    private bool ResolveTimingCommit(MotifProfile motif, bool armAtNextBoundary, bool motifChanged,
+        bool stepsChanged, bool bpmChanged, bool restartTransport,
+        int oldSteps, float oldBpm, AudioClip clip, string who)
+    {
+        if (_started && (stepsChanged || bpmChanged) && !restartTransport)
+        {
+            // Timing changed while transport is running — must arm at boundary to avoid mismatch.
+            if (!armAtNextBoundary)
+            {
+                Debug.LogWarning(
+                    $"[DRUM][MOTIF] Timing changed (steps {oldSteps}->{(motif ? motif.stepsPerLoop : oldSteps)}, " +
+                    $"bpm {oldBpm}->{(motif ? motif.bpm : oldBpm)}) but armAtNextBoundary==false and restartTransport==false. " +
+                    $"Forcing armAtNextBoundary=true to avoid transport mismatch."
+                );
+                armAtNextBoundary = true;
+            }
+
+            _pendingBpm         = motif != null ? motif.bpm : drumLoopBPM;
+            _pendingTotalSteps  = motif != null ? motif.stepsPerLoop : totalSteps;
+            _pendingTimingValid = true;
+
+            if (GameFlowManager.VerboseLogging) Debug.Log(
+                $"[DRUM][MOTIF] ApplyMotif(DEFERRED TIMING) by {who}: motif={(motif ? motif.motifId : "null")} " +
+                $"steps {oldSteps}->{_pendingTotalSteps} bpm {oldBpm}->{_pendingBpm} " +
+                $"clip={(clip ? clip.name : "null")} armAtNextBoundary={armAtNextBoundary} " +
+                $"restart={restartTransport} motifChanged={motifChanged}"
+            );
+        }
+        else
+        {
+            // Safe to commit timing immediately: not yet started, restartTransport, or no timing change.
+            if (_motif != null)
+            {
+                drumLoopBPM = _motif.bpm;
+                totalSteps  = _motif.stepsPerLoop;
+            }
+            _pendingTimingValid = false;
+
+            if (GameFlowManager.VerboseLogging) Debug.Log(
+                $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
+                $"entryLoops={_entryLoops?.Count ?? 0} intensityLoops={_intensityLoops?.Count ?? 0} " +
+                $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromEnergy} " +
+                $"bpm={drumLoopBPM} steps={totalSteps} clip={(clip ? clip.name : "null")} " +
+                $"armAtNextBoundary={armAtNextBoundary} restart={restartTransport} motifChanged={motifChanged}"
+            );
+        }
+
+        return armAtNextBoundary;
+    }
 
     // Applies clip to the transport: hard-restarts decks if restartTransport, otherwise arms a pending swap.
     private void ScheduleClipChange(AudioClip clip, bool armAtNextBoundary, bool restartTransport, string who)
