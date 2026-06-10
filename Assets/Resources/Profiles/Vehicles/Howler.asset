@@ -26,13 +26,13 @@ MonoBehaviour:
   mass: 0.8
   impactSpeedCap: 32
   hitVelocityMultiplier: 1
-  capacity: 150
-  burnRate: 1
+  capacity: 250
+  burnRate: 0.95
   plowHalfWidthCells: 0
+  vehicleKeepClearRadiusCells: 0
   plowDepthCells: 3
   plowMinSpeed: 2
   plowChipAmount: 3
-  vehicleKeepClearRadiusCells: 0
   carveResistanceBypass01: 0
   carveVelocityDrainPerCell: 0.12
   directionalAuthority01: 0.9

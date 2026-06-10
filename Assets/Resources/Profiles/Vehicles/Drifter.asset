@@ -24,15 +24,15 @@ MonoBehaviour:
   stopAngularSpeed: 5
   inputDeadzone: 0.2
   mass: 2
-  impactSpeedCap: 15
+  impactSpeedCap: 16
   hitVelocityMultiplier: 1
   capacity: 100
   burnRate: 0.25
   plowHalfWidthCells: 1
+  vehicleKeepClearRadiusCells: 0
   plowDepthCells: 2
   plowMinSpeed: 2
   plowChipAmount: 1
-  vehicleKeepClearRadiusCells: 0
   carveResistanceBypass01: 0
   carveVelocityDrainPerCell: 0
   directionalAuthority01: 0.6

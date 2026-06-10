@@ -10,7 +10,7 @@ public class HarmonyDirector : MonoBehaviour
     public ChordProgressionProfile ActiveProfile => profile;
     [SerializeField] private int cursor = 0;
 
-    private bool _armedChordAdvance, _previewActiveThisLoop, _heldThroughBoundary, _previewStartedInsideWindow, _hasPendingProfileSwap;
+    private bool _hasPendingProfileSwap;
     private int  _pendingCharges = 0, _lastPreviewLoopIdx    = -1, _ringsArmedThisLoop    = 0, _globalBuiltCount = 1, _previewChordIdx = -1;   // the palette index we're previewing this loop
 
     private readonly Dictionary<InstrumentTrack, List<int>> _trackSeq = new();
@@ -251,10 +251,7 @@ public class HarmonyDirector : MonoBehaviour
     }
     private void ResetLoopFlags()
     {
-        _previewActiveThisLoop     = false;
-        _previewStartedInsideWindow= false;
-        _heldThroughBoundary       = false;
-        _ringsArmedThisLoop        = 0;
+        _ringsArmedThisLoop = 0;
     }
     private void OnLoopBoundary()
     {

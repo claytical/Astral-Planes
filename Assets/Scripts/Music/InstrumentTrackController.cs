@@ -1052,124 +1052,91 @@ public class InstrumentTrackController : MonoBehaviour
         }
     }
     public int GetBinForNextSpawn(InstrumentTrack track)
-{
-    if (track == null)
-        return 0;
-
-    int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
-
-    // ByVoice chord tracks advance only when the whole chord group fills a bin
-    // (via NotifyBinFilled → AdvanceBinCursor). Return the cursor directly —
-    // no frontier comparison, no advance token needed.
-    var byVoiceCheck = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-    if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
     {
-        int cursor = track.GetBinCursor();
-        if (track.maxLoopMultiplier > 0) cursor = cursor % track.maxLoopMultiplier;
-        return Mathf.Clamp(cursor, 0, trackMaxBinIndex);
+        if (track == null) return 0;
+        int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
+
+        // ByVoice chord tracks advance only when the whole chord group fills a bin — use cursor directly.
+        var byVoiceCheck = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        {
+            int cursor = track.GetBinCursor();
+            if (track.maxLoopMultiplier > 0) cursor %= track.maxLoopMultiplier;
+            return Mathf.Clamp(cursor, 0, trackMaxBinIndex);
+        }
+
+        // If expansion is already staged, redirect to density injection so SpawnCollectableBurst
+        // doesn't reject a frontier proposal and silently drop the burst.
+        if (track.IsExpansionPending)
+            return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
+
+        bool allowAdvance = ConsumeAllowAdvanceNextBurst(track); // consume exactly once
+        int globalFrontier = ComputeGlobalFrontier();
+        if (globalFrontier < 0) return 0;
+
+        int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
+        int trackFrontier = FrontierForTrack(track);
+
+        // If this track is behind the global frontier, hole-fill up to the frontier.
+        if (trackFrontier < clampedGlobalFrontier)
+            return TryFindHoleFillBin(track, clampedGlobalFrontier);
+
+        // Not allowed to advance — use next local bin deterministically.
+        if (!allowAdvance)
+            return Mathf.Clamp(track.GetNextBinForSpawn(), 0, trackMaxBinIndex);
+
+        // Allowed to advance: wrap cursor into capacity.
+        int cursorTarget = track.GetBinCursor();
+        if (track.maxLoopMultiplier > 0) cursorTarget %= track.maxLoopMultiplier;
+        cursorTarget = Mathf.Clamp(cursorTarget, 0, trackMaxBinIndex);
+
+        // Cursor is pushing beyond global frontier.
+        if (cursorTarget > clampedGlobalFrontier)
+        {
+            if (cursorTarget > trackMaxBinIndex)
+                return FindUnfilledOrDensityBin(track, trackMaxBinIndex);
+            return cursorTarget;
+        }
+
+        // Decide whether to advance based on whether cursor bin is already filled.
+        int proposed = track.IsBinFilled(cursorTarget) ? (clampedGlobalFrontier + 1) : cursorTarget;
+        if (proposed > trackMaxBinIndex)
+            return FindUnfilledOrDensityBin(track, trackMaxBinIndex);
+        return proposed;
     }
 
-    // If expansion is already staged, advancing the frontier would propose bin N again,
-    // which SpawnCollectableBurst would reject (TryStageExpand returns false) and drop
-    // the burst entirely. Redirect to density injection in an existing filled bin instead.
-    if (track.IsExpansionPending)
-        return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
-
-    // Consume exactly once (IMPORTANT).
-    bool allowAdvance = ConsumeAllowAdvanceNextBurst(track);
-
-    // Helper: frontier = furthest bin that is either allocated OR filled,
-    // plus a cursor-based view, but CLAMPED to track capacity.
-    int FrontierFor(InstrumentTrack t)
+    // Frontier = furthest bin that is allocated OR filled, cross-checked with cursor estimate.
+    private int FrontierForTrack(InstrumentTrack t)
     {
         if (t == null) return -1;
-
         int highest = Mathf.Max(t.GetHighestFilledBin(), t.GetHighestAllocatedBin());
-
-        // Cursor points to NEXT bin to write. Convert to "last touched" estimate.
-        int cursorBased = t.GetBinCursor() - 1;
-
-        // Clamp cursorBased into valid bin range; do NOT let it grow unbounded.
-        cursorBased = Mathf.Clamp(cursorBased, -1, Mathf.Max(0, t.maxLoopMultiplier - 1));
-
+        int cursorBased = Mathf.Clamp(t.GetBinCursor() - 1, -1, Mathf.Max(0, t.maxLoopMultiplier - 1));
         return Mathf.Max(highest, cursorBased);
     }
 
-    // 1) Compute global frontier across all tracks.
-    int globalFrontier = -1;
-    if (tracks != null)
+    private int ComputeGlobalFrontier()
     {
-        for (int i = 0; i < tracks.Length; i++)
-        {
-            var t = tracks[i];
-            if (!t) continue;
-            globalFrontier = Mathf.Max(globalFrontier, FrontierFor(t));
-        }
+        int frontier = -1;
+        if (tracks != null)
+            for (int i = 0; i < tracks.Length; i++)
+                if (tracks[i]) frontier = Mathf.Max(frontier, FrontierForTrack(tracks[i]));
+        return frontier;
     }
 
-    if (globalFrontier < 0)
-        return 0;
-
-    int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
-
-    // 2) Track-local frontier
-    int trackFrontier = FrontierFor(track);
-
-    // 3) If this track is behind the global frontier, fill holes up to the frontier.
-    if (trackFrontier < clampedGlobalFrontier)
+    private int TryFindHoleFillBin(InstrumentTrack track, int upTo)
     {
-        for (int b = 0; b <= clampedGlobalFrontier; b++)
-        {
-            if (!track.IsBinAllocated(b))
-                return b;
-        }
-        return clampedGlobalFrontier;
+        for (int b = 0; b <= upTo; b++)
+            if (!track.IsBinAllocated(b)) return b;
+        return upTo;
     }
 
-    // 4) If we are NOT allowed to advance frontier, choose next local bin deterministically.
-    // This is where you want bin0 again when all bins are filled/allocated.
-    if (!allowAdvance)
+    private int FindUnfilledOrDensityBin(InstrumentTrack track, int trackMaxBinIndex)
     {
-        int local = Mathf.Clamp(track.GetNextBinForSpawn(), 0, trackMaxBinIndex);
-        return local;
-    }
-
-    // 5) Allowed to advance: normally use cursor, but WRAP it into capacity.
-    int cursorTarget = track.GetBinCursor();
-    if (track.maxLoopMultiplier > 0)
-        cursorTarget = cursorTarget % track.maxLoopMultiplier;
-    cursorTarget = Mathf.Clamp(cursorTarget, 0, trackMaxBinIndex);
-
-    // If cursorTarget is beyond global frontier, it is an attempt to push frontier.
-    if (cursorTarget > clampedGlobalFrontier)
-    {
-        // If pushing would exceed capacity, inject density deterministically.
-        if (cursorTarget > trackMaxBinIndex)
-        {
-            // Before density-injecting, complete any allocated-but-unfilled bin (missed note).
-            for (int b = 0; b <= trackMaxBinIndex; b++)
-                if (track.IsBinAllocated(b) && !track.IsBinFilled(b))
-                    return b;
-            return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
-        }
-        return cursorTarget;
-    }
-
-    // Otherwise, decide whether to advance based on whether cursor bin is filled.
-    bool cursorFilled = track.IsBinFilled(cursorTarget);
-    int proposed = (cursorFilled) ? (clampedGlobalFrontier + 1) : cursorTarget;
-
-    // If advancing would exceed capacity, complete any unfilled bin before density injection.
-    if (proposed > trackMaxBinIndex)
-    {
+        // Complete any allocated-but-unfilled bin before falling back to density injection.
         for (int b = 0; b <= trackMaxBinIndex; b++)
-            if (track.IsBinAllocated(b) && !track.IsBinFilled(b))
-                return b;
+            if (track.IsBinAllocated(b) && !track.IsBinFilled(b)) return b;
         return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
     }
-
-    return proposed;
-}
 
     private void ResetAllCursorsAndGuards(bool clearLoops=false)
         {

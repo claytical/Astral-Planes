@@ -16,8 +16,7 @@ public class LocalPlayer : MonoBehaviour
     public float friction = 0.5f;
     
     private Color _color;
-    private bool _isReady, _decelerate, _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
-    private Vector2 _moveInput;
+    private bool _isReady, _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
     private PlayerSelect _selection;
     private PlayerStatsTracking _playerStats;
     private PlayerStats _ui;
@@ -49,7 +48,6 @@ public class LocalPlayer : MonoBehaviour
 
     private Vector2 _smoothedDelta;
     private float _angleVel; // SmoothDampAngle velocity
-    private bool _usingMouse;
     private bool _gamepadDriving; // true while a gamepad stick is (or was last) driving _virtualStick
     private InputAction _moveAction;
 
@@ -100,8 +98,6 @@ public class LocalPlayer : MonoBehaviour
 
         GameObject ps = Instantiate(playerSelect);
         _selection = ps.GetComponent<PlayerSelect>();
-
-        StartRumble(.1f, 1, .5f);
 
         // Spawn mini controller and attach it near the player’s selection UI (exactly once)
         if (miniTutorialPrefab != null && _selection != null)
@@ -538,12 +534,4 @@ public class LocalPlayer : MonoBehaviour
 
         OnNavigatePrevious?.Invoke();
     }
-
-
-    private void StartRumble(float lowFreq, float highFreq, float duration)
-    {
-//        if (GetComponent<PlayerInput>().devices[0] is Gamepad pad)
-//            GameFlowManager.Instance.TriggerRumbleForAll(lowFreq, highFreq, duration);
-    }
-    
 }

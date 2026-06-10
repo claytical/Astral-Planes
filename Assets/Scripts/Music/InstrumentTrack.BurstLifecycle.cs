@@ -39,7 +39,7 @@ public partial class InstrumentTrack
     //
     // Caller responsibilities that stay outside:
     //   OnCollectableCollected  — TriggerPlayheadReleasePulse,
-    //                             _burstTotalSpawned/Collected cleanup, AdvanceBinCursor,
+    //                             burst collected/total accounting, AdvanceBinCursor,
     //                             AdvanceOtherTrackCursors
     //   CommitManualReleasedNote — nothing extra
     //   NotifyNoteDiscarded     — bin rollback on 0-note discard, _gateReleasedBurstIds cleanup
@@ -80,14 +80,11 @@ public partial class InstrumentTrack
             }
         });
 
-        _burstRemaining.Remove(burstId);
-        _burstLeaderBinsBeforeWrite.Remove(burstId);
-        _burstWroteBin.Remove(burstId);
-        _burstTargetBin.Remove(burstId);
+        _bursts.Remove(burstId);
 
         if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[TRKDBG] {name} CompleteBurst: burstId={burstId} hadNotes={hadNotes} " +
-            $"(_burstRemaining={_burstRemaining?.Count ?? -1})");
+            $"(_bursts={_bursts?.Count ?? -1})");
 
         OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
     }
@@ -97,10 +94,10 @@ public partial class InstrumentTrack
     private void SnapshotBurstLeaderBins(int burstId, int targetStep)
     {
         if (burstId == 0) return;
-        if (_burstLeaderBinsBeforeWrite.ContainsKey(burstId)) return;
-        int leaderBins = controller != null ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
-        _burstLeaderBinsBeforeWrite[burstId] = leaderBins;
-        _burstWroteBin[burstId] = BinIndexForStep(targetStep);
+        if (!_bursts.TryGetValue(burstId, out var state)) return;
+        if (state.leaderBins != 0) return; // already snapshotted
+        state.leaderBins = controller != null ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
+        state.wroteBin = BinIndexForStep(targetStep);
     }
 
     // Looks up the authored MIDI root stored in the per-bin NoteSet for a given absolute step.
@@ -118,15 +115,12 @@ public partial class InstrumentTrack
     private void IncrementBurstCollectedMeter(int burstId)
     {
         if (burstId == 0) return;
-        if (_burstCollected.TryGetValue(burstId, out var c))
-            _burstCollected[burstId] = c + 1;
-        else
-            _burstCollected[burstId] = 1;
+        if (!_bursts.TryGetValue(burstId, out var state)) return;
+        state.collected++;
 
-        if (controller != null && controller.noteVisualizer != null &&
-            _burstTotalSpawned.TryGetValue(burstId, out var total) && total > 0)
+        if (controller != null && controller.noteVisualizer != null && state.totalSpawned > 0)
         {
-            float frac = Mathf.Clamp01(_burstCollected[burstId] / (float)total);
+            float frac = Mathf.Clamp01(state.collected / (float)state.totalSpawned);
             controller.noteVisualizer.SetPlayheadEnergy01(frac);
         }
     }

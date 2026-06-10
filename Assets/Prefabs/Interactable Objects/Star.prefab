@@ -115,13 +115,13 @@ MonoBehaviour:
   tentacleGrowSpeed: 0.25
   tentacleRetractSpeed: 3
   tentacleFlowSpeed: 0.2
-  tentacleWidth: 0.02
+  tentacleWidth: 0.08
   dissolveDuration: 1
   fallbackTentaclesPerRole: 8
-  tentacleMaterial: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  tentacleMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120
-  growingRootAlpha: 0.427
+  growingRootAlpha: 0.669
   growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751
   sag: 0.8
@@ -135,6 +135,7 @@ MonoBehaviour:
   shimmerLifetime: 0.35
   shimmerSize: 0.04
   shimmerAlpha: 0.45
+  interTentacleStartInterval: 1.5
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
