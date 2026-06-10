@@ -22,7 +22,7 @@ MonoBehaviour:
   segments: 256
   tugDepthFraction: 0.192
   tugHalfWidthRad: 0.75
-  ringDrawInDuration: 0.5
+  ringDrawInDuration: 0
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 100
@@ -34,3 +34,14 @@ MonoBehaviour:
   bouncePressDuration: 0.25
   bounceSettleDuration: 0.35
   rollOffDuration: 2
+  ringAppearDuration: 0.1
+  noteLaunchLeadSteps: 2
+  launchSfx: {fileID: 0}
+  launchSfxVolume: 0.6
+  impactSfx: {fileID: 0}
+  impactSfxVolume: 0.6
+  spinOffExtraDegPerSec: 720
+  spinOffDuration: 0.45
+  tiltXDegrees: 75
+  tiltXDuration: 1
+  scaleDownDuration: 0.5

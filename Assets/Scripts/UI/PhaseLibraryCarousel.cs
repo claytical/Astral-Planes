@@ -34,6 +34,9 @@ public class PhaseLibraryCarousel : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float unselectedAlpha = 0.25f;
 
+    [Tooltip("Caps each slot so no ring exceeds this world-space radius. Matches SolarSystemRecordDisplay.")]
+    [SerializeField] private float maxRecordRadius = 0.5f;
+
     [Tooltip("Shown when no ring records exist yet. Hide when rings are present.")]
     [SerializeField] private GameObject pressToStartCue;
 
@@ -103,8 +106,9 @@ public class PhaseLibraryCarousel : MonoBehaviour
             slots[i].gameObject.SetActive(inBounds);
             if (!inBounds) continue;
 
+            slots[i].maxDisplayRadius = maxRecordRadius;
             if (i == center) slots[i].AnimateApply(_rings[dataIdx]);
-            else             slots[i].ApplyStatic(_rings[dataIdx], unselectedAlpha);
+            else             slots[i].ApplyVinyl(_rings[dataIdx], unselectedAlpha);
         }
     }
 
