@@ -457,7 +457,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
 
         // Guard: if the highest bin is allocated but not yet filled, an expansion burst
         // may have been enqueued via EnqueueNextFrame and hasn't spawned yet.
-        // HasOutstandingNotesInRange won't catch it because _burstSteps isn't populated
+        // HasOutstandingNotesInRange won't catch it because burst steps aren't populated
         // until the next frame. Defer one boundary so the burst has time to register.
         foreach (var t in ctrl.tracks)
         {

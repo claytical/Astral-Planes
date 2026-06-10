@@ -179,7 +179,7 @@ public class Collectable : MonoBehaviour
 
     /// <summary>
     /// Call before manually consuming a collectable so OnCollectableDestroyed does not
-    /// double-decrement _burstRemaining. The commit path already handles burst accounting.
+    /// double-decrement burst remaining. The commit path already handles burst accounting.
     /// </summary>
     public void MarkAsReportedCollected() => ReportedCollected = true;
     public delegate void OnCollectedHandler(int duration, float force);
@@ -360,7 +360,7 @@ private IEnumerator SpawnArrivalRoutine(
 }
     public void OnManualReleaseDiscarded()
     {
-        // Mark as handled so OnCollectableDestroyed doesn't double-decrement _burstRemaining.
+        // Mark as handled so OnCollectableDestroyed doesn't double-decrement burst remaining.
         ReportedCollected = true;
 
         // stop trail follow
@@ -1343,9 +1343,7 @@ private IEnumerator SpawnArrivalRoutine(
         }
     }
 
-    // ------------------------------------------------------------
     // SUCCESS PATH: immediate confirmation + immediate loop write
-    // ------------------------------------------------------------
     float force = vehicle.GetForceAsMidiVelocity();
     vehicle.CollectEnergy(amount);
     int stepToReportBase =
@@ -1354,54 +1352,52 @@ private IEnumerator SpawnArrivalRoutine(
         0;
     assignedInstrumentTrack.PlayQuantizedNoteForStep(stepToReportBase, assignedNote, noteDurationTicks, force);
     float velocity127 = ComputeHitVelocity127(vehicle);
-
-    // Confirm should happen at collision point (immediate), not at deposit.
     OnCollected?.Invoke(noteDurationTicks, force);
 
-    // Manual-release path: enqueue onto the vehicle and do NOT auto-write/deposit.
-    if (vehicle != null && vehicle.ManualNoteReleaseEnabled)
+    if (vehicle.ManualNoteReleaseEnabled)
     {
-        assignedInstrumentTrack.OnCollectablePickedUpForManualRelease(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
-
-        // Carry-only: disable physics/collider; the vehicle will consume/destroy this on release.
-        if (_rb == null) TryGetComponent(out _rb);
-        if (_rb != null) _rb.simulated = false;
-        if (TryGetComponent(out Collider2D c2d)) c2d.enabled = false;
-
-        var ex = GetComponent<Explode>();
-        if (ex != null) ex.Permanent(false);
-
-        // Trail follow: stay in world space, lerp toward the vehicle-managed trail slot.
-        transform.SetParent(null, worldPositionStays: true);
-        _trailWorldTarget = transform.position;
-        _trailFollowActive = true;
-        _trailReleasePulse01 = 0f;
-        _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-        if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
-        if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
-        _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
-
+        HandleManualPickup(vehicle, stepToReportBase, velocity127);
         return;
     }
 
-    // Write to the track immediately (so loop state updates now).
-    assignedInstrumentTrack.OnCollectableCollected(this, stepToReportBase, noteDurationTicks, velocity127);
+    HandleAutoDeposit(stepToReportBase, velocity127, force, baseSteps, drumTrack);
+}
 
-    // Non-physical carry: disable RB sim, disable collider, stop explode permanence
+private void HandleManualPickup(Vehicle vehicle, int stepToReportBase, float velocity127)
+{
+    assignedInstrumentTrack.OnCollectablePickedUpForManualRelease(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
+
     if (_rb == null) TryGetComponent(out _rb);
     if (_rb != null) _rb.simulated = false;
+    if (TryGetComponent(out Collider2D c2d)) c2d.enabled = false;
 
+    var ex = GetComponent<Explode>();
+    if (ex != null) ex.Permanent(false);
+
+    transform.SetParent(null, worldPositionStays: true);
+    _trailWorldTarget = transform.position;
+    _trailFollowActive = true;
+    _trailReleasePulse01 = 0f;
+    _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+    if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
+    if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
+    _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
+}
+
+private void HandleAutoDeposit(int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)
+{
+    assignedInstrumentTrack.OnCollectableCollected(this, stepToReportBase, noteDurationTicks, velocity127);
+
+    if (_rb == null) TryGetComponent(out _rb);
+    if (_rb != null) _rb.simulated = false;
     if (TryGetComponent(out Collider2D col)) col.enabled = false;
 
     var explode = GetComponent<Explode>();
     if (explode != null) explode.Permanent(false);
 
-    // ------------------------------------------------------------
-    // VISUAL DEPOSIT: schedule at next occurrence of the chosen base step
-    // ------------------------------------------------------------
-    // Re-sample time in case the above took a frame; also recompute effective boundary.
-    dspNow  = AudioSettings.dspTime;
-    loopLen = drumTrack.GetLoopLengthInSeconds();
+    // Re-sample time now that the track write has occurred.
+    double dspNow = AudioSettings.dspTime;
+    double loopLen = drumTrack.GetLoopLengthInSeconds();
     if (loopLen <= 0.0)
     {
         Debug.LogWarning($"[COLLECT] loopLen <= 0 while scheduling deposit; fallback travel. name={name}");
@@ -1409,21 +1405,18 @@ private IEnumerator SpawnArrivalRoutine(
         return;
     }
 
-    transportStart = drumTrack.leaderStartDspTime;
+    double transportStart = drumTrack.leaderStartDspTime;
     if (transportStart <= 0.0) transportStart = drumTrack.startDspTime;
-
     if (transportStart <= 0.0)
     {
-        Debug.LogWarning($"[COLLECT] No valid transportStart; carrying without timed deposit. name={name}");
+        Debug.LogWarning($"[COLLECT] No valid transportStart; fallback travel. name={name}");
         BeginCarryThenDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
         return;
     }
 
-    loopStart = EffectiveLoopStart(transportStart, loopLen, dspNow);
-
+    double loopStart = EffectiveLoopStart(transportStart, loopLen, dspNow);
     double depositDsp = NextDepositDspForBaseStep(loopStart, loopLen, baseSteps, stepToReportBase, dspNow);
 
-    // Ensure we have enough time for travel; if not, push to next loop.
     double minNeeded = minDepositTravelSeconds + 0.01;
     while ((depositDsp - dspNow) < minNeeded)
         depositDsp += loopLen;

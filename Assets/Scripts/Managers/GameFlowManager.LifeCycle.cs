@@ -27,8 +27,6 @@ public partial class GameFlowManager
         if (Instance == this)
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            if (phaseTransitionManager != null)
-                phaseTransitionManager.OnMotifChanged -= OnMotifChangedHandler;
         }
     }
 

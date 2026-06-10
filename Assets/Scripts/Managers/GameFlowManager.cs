@@ -9,19 +9,6 @@ using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
 
-public static class SessionGenome
-{
-    private static int sessionSeed;
-    public static System.Random For(string scope) =>
-        new System.Random(HashCode.Combine(sessionSeed, scope.GetHashCode()));
-
-    // Call this once per play session (e.g., GameFlowManager start)
-    public static void BootNewSessionSeed(int seed)
-    {
-        sessionSeed = seed;
-    }
-}
-
 public enum GameState { Begin, Selection, Playing, GameOver }
 
 public partial class GameFlowManager : MonoBehaviour
@@ -37,7 +24,6 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
     [SerializeField] private BinRingController binRingController;
     [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
-    private float _bridgeDrumStartVolume = 1f;
     [Header("Phase-In FX")]
     [Tooltip("Particle system prefab instantiated at each vehicle position when a new " +
              "phase begins.  Should be a short burst (self-destruct or timed).")]
@@ -75,19 +61,13 @@ public partial class GameFlowManager : MonoBehaviour
 
     // Scratch list for dust regrow veto (prevents collider "trap" when a cell regrows under a vehicle).
     private readonly List<Vector2Int> _vehicleCellsScratch = new List<Vector2Int>(8);
-    private float _vehicleScanCooldown = 0f;
     public List<InstrumentTrack> _activeTracks = new();
-    private bool _remixArmed = false;                  // true once previous star’s set is completed
-    private bool _nextPhaseLoopArmed = false;
-    private bool hasGameOverStarted = false;
-
     [Header("Phase Bridge Audio")]
     [Tooltip("Seconds to fade out the outgoing motif during the bridge cinematic.")]
     [SerializeField] private float phaseBridgeFadeOutSeconds = 1.0f;
 
     [Tooltip("Seconds to fade in the next motif after the new phase begins.")]
     [SerializeField] private float phaseBridgeFadeInSeconds  = 0.6f;
-    private readonly Dictionary<InstrumentTrack, float> _bridgeMidiStartVolumes = new();
     public bool GhostCycleInProgress
     {
         get => SessionState?.GhostCycleInProgress ?? false;
@@ -186,13 +166,9 @@ public partial class GameFlowManager : MonoBehaviour
     {
         sceneHandlers = new()
         {
-            // { "GeneratedTrack", HandleTrackSceneSetup },  // remove this
             { "TrackFinished", HandleTrackFinishedSceneSetup },
             { "TrackSelection", HandleTrackSelectionSceneSetup },
         };
-
-        if (phaseTransitionManager != null)
-            phaseTransitionManager.OnMotifChanged += OnMotifChangedHandler;
     }
     
     public void QuitToSelection()
@@ -210,189 +186,115 @@ public partial class GameFlowManager : MonoBehaviour
         SceneFlow.UnregisterPlayerStatsGrid(grid);
     }
     private IEnumerator HandleTrackSceneSetupAsync()
-{
-    _setupInFlight = true;
-    vehicles.Clear();
-
-    var activeScene = SceneManager.GetActiveScene().name;
-    if (activeScene != "GeneratedTrack")
     {
-        Debug.LogWarning($"[GFM] HandleTrackSceneSetupAsync invoked but active scene is '{activeScene}'. Aborting.");
-        _setupInFlight = false;
-        yield break;
-    }
+        _setupInFlight = true;
+        vehicles.Clear();
 
-    // Filter out destroyed players
-    localPlayers = localPlayers.Where(p => p != null).ToList();
-    if (localPlayers.Count == 0)
-    {
-        Debug.LogError("[GFM] No local players available during GeneratedTrack setup.");
-        _setupInFlight = false;
-        yield break;
-    }
-
-    // --- GATING / CORE REFS ---
-    float hardTimeout = 8f;
-    float startTime = Time.time;
-
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Begin. Trying initial TryFillTracksBundleIfMissing.");
-    TryFillTracksBundleIfMissing();
-
-    yield return new WaitUntil(() =>
-        HaveAllCoreRefs() || Time.time - startTime > hardTimeout
-    );
-
-    // Final attempt
-    TryFillTracksBundleIfMissing();
-
-    if (!HaveAllCoreRefs())
-    {
-        Debug.LogError("[GFM] Track setup timed out — missing core refs." +
-                       $"\nDrum:{activeDrumTrack} Ctrl:{controller} " +
-                       $"\nDust:{dustGenerator} Viz:{noteViz} Harm:{harmony} PTM:{phaseTransitionManager}" +
-                       $"\nGrid:{spawnGrid} UIGrid:{playerStatsGrid}");
-        _setupInFlight = false;
-        yield break;
-    }
-
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Core refs present." +
-              $"\n  Drum: {activeDrumTrack}" +
-              $"\n  Ctrl: {controller}" +
-              $"\n  Viz : {noteViz}" +
-              $"\n  Harm: {harmony}" +
-              $"\n  PTM : {phaseTransitionManager}" +
-              $"\n  Grid: {spawnGrid}" +
-              $"\n  UI  : {playerStatsGrid}");
-
-    // Precompute ship profiles for logging
-    var shipProfiles = localPlayers
-        .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
-        .ToList();
-
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Ship profiles resolved: " +
-              string.Join(", ", shipProfiles.Select(sp => sp ? sp.name : "<null>")));
-    // ------------------------------------------------------------
-    // STEP 1: Configure tracks from selected ships
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips BEGIN");
-    controller.ConfigureTracksFromShips(shipProfiles);
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1] ConfigureTracksFromShips END");
-
-    // ------------------------------------------------------------
-    // STEP 1b: Load first chapter / motif and preconfigure track note sets
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1b] StartChapter BEGIN");
-    if (PhaseLibraryStartConfig.HasPendingStart)
-    {
-        phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
-        phaseTransitionManager.JumpToMotifIndex(PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
-        PhaseLibraryStartConfig.Consume();
-    }
-    else
-    {
-        phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
-    }
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 1b] StartChapter END");
-
-    // ------------------------------------------------------------
-    // STEP 2: Initialize graph-facing systems
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony BEGIN");
-    noteViz.Initialize();
-    harmony.Initialize(activeDrumTrack, controller);
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 2] Init NoteViz/Harmony END");
-
-    // ------------------------------------------------------------
-    // STEP 3: Start timing/grid authorities
-    // IMPORTANT:
-    // Keep these before player launch so grid/audio transport are valid.
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust BEGIN");
-    activeDrumTrack.ManualStart();
-    dustGenerator.ManualStart();
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 3] ManualStart Drum/Dust END");
-
-    // ------------------------------------------------------------
-    // STEP 4: Launch players so vehicle world positions exist for maze pocket carving
-    // DO NOT mark the game state Playing yet — we want the first maze bootstrap
-    // to complete before the session is considered live.
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 4] Launch players BEGIN");
-    foreach (var lp in localPlayers)
-    {
-        if (lp == null)
+        if (SceneManager.GetActiveScene().name != "GeneratedTrack")
         {
-            Debug.LogWarning("[GFM] [STEP 4] Skipping null LocalPlayer.");
-            continue;
+            Debug.LogWarning($"[GFM] HandleTrackSceneSetupAsync invoked outside GeneratedTrack. Aborting.");
+            _setupInFlight = false;
+            yield break;
         }
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] [STEP 4] Launching player: {lp.name}");
-        lp.Launch();
+        localPlayers = localPlayers.Where(p => p != null).ToList();
+        if (localPlayers.Count == 0)
+        {
+            Debug.LogError("[GFM] No local players available during GeneratedTrack setup.");
+            _setupInFlight = false;
+            yield break;
+        }
+
+        // Wait for scene refs to register (with hard timeout).
+        float startTime = Time.time;
+        TryFillTracksBundleIfMissing();
+        yield return new WaitUntil(() => HaveAllCoreRefs() || Time.time - startTime > 8f);
+        TryFillTracksBundleIfMissing();
+
+        if (!HaveAllCoreRefs())
+        {
+            Debug.LogError("[GFM] Track setup timed out — missing core refs." +
+                           $"\nDrum:{activeDrumTrack} Ctrl:{controller} " +
+                           $"\nDust:{dustGenerator} Viz:{noteViz} Harm:{harmony} PTM:{phaseTransitionManager}" +
+                           $"\nGrid:{spawnGrid} UIGrid:{playerStatsGrid}");
+            _setupInFlight = false;
+            yield break;
+        }
+
+        var shipProfiles = localPlayers
+            .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
+            .ToList();
+
+        ConfigureSessionSystems(shipProfiles);  // steps 1–3: tracks, chapter, viz, timing authorities
+
+        LaunchPlayers();                         // step 4
+        yield return null;                       // one frame for vehicles to register
+
+        ApplyInitialHarmonyProfile();            // step 5
+
+        yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));  // step 6
+        yield return null;                       // let maze side-effects settle
+
+        currentState = GameState.Playing;
+        _setupDone = true;
+        _setupInFlight = false;
+        if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Completed successfully.");
     }
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 4] Launch players END");
 
-    // Give launched players one frame to settle transforms/registration before maze generation
-    yield return null;
+    private void ConfigureSessionSystems(System.Collections.Generic.List<ShipMusicalProfile> shipProfiles)
+    {
+        if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Ship profiles: " +
+            string.Join(", ", shipProfiles.Select(sp => sp ? sp.name : "<null>")));
 
-    // ------------------------------------------------------------
-    // STEP 5: Apply harmony profile for the current motif
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile BEGIN");
-    var phase = phaseTransitionManager.currentPhase;
-    if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] [STEP 5] currentPhase = {phase}");
+        // Step 1 — configure track voices from ship selections
+        controller.ConfigureTracksFromShips(shipProfiles);
 
-    if (phaseTransitionManager.currentMotif != null)
-        harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
+        // Step 1b — load first chapter/motif
+        if (PhaseLibraryStartConfig.HasPendingStart)
+        {
+            phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
+            phaseTransitionManager.JumpToMotifIndex(PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
+            PhaseLibraryStartConfig.Consume();
+        }
+        else
+        {
+            phaseTransitionManager.StartChapter(phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
+        }
 
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 5] harmony.SetActiveProfile END");
+        // Step 2 — graph-facing systems
+        noteViz.Initialize();
+        harmony.Initialize(activeDrumTrack, controller);
 
-    // ------------------------------------------------------------
-    // STEP 6: Build first maze + spawn PhaseStar
-    // IMPORTANT:
-    // This completes BEFORE we mark the run as Playing.
-    // ------------------------------------------------------------
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar BEGIN");
-    yield return StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [STEP 6] StartNextPhaseMazeAndStar END");
+        // Step 3 — timing/grid authorities (must precede player launch)
+        activeDrumTrack.ManualStart();
+        dustGenerator.ManualStart();
+    }
 
-    // One more frame so any maze-ready/spawn side effects settle before live play starts
-    yield return null;
+    private void LaunchPlayers()
+    {
+        foreach (var lp in localPlayers)
+        {
+            if (lp == null) { Debug.LogWarning("[GFM] Skipping null LocalPlayer during launch."); continue; }
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] Launching player: {lp.name}");
+            lp.Launch();
+        }
+    }
 
-    // ------------------------------------------------------------
-    // STEP 7: Now the session is live
-    // ------------------------------------------------------------
-    currentState = GameState.Playing;
-
-    _setupDone = true;
-    _setupInFlight = false;
-    if (GameFlowManager.VerboseLogging) Debug.Log("[GFM] [SETUP] Completed successfully.");
-
-    yield break;
-}
+    private void ApplyInitialHarmonyProfile()
+    {
+        if (phaseTransitionManager.currentMotif != null)
+            harmony.SetActiveProfile(phaseTransitionManager.currentMotif.chordProgression, applyImmediately: true);
+    }
     public float GetTotalSpentEnergyTanks()
     {
         float total = 0f;
-
-        if (vehicles != null && vehicles.Count > 0)
+        if (vehicles == null) return total;
+        for (int i = 0; i < vehicles.Count; i++)
         {
-            for (int i = 0; i < vehicles.Count; i++)
-            {
-                var v = vehicles[i];
-                if (v == null || !v.isActiveAndEnabled) continue;
-                total += v.GetCumulativeSpentTanks();
-            }
-            return total;
-        }
-
-        // Fallback: scene scan (consistent with your dust-regrow logic).
-        var vs = FindObjectsOfType<Vehicle>();
-        for (int i = 0; i < vs.Length; i++)
-        {
-            var v = vs[i];
+            var v = vehicles[i];
             if (v == null || !v.isActiveAndEnabled) continue;
             total += v.GetCumulativeSpentTanks();
         }
-
         return total;
     }
     public void RegisterVehicle(Vehicle v)
@@ -436,7 +338,6 @@ public partial class GameFlowManager : MonoBehaviour
     private void HandleTrackSelectionSceneSetup()
     {
         currentState = GameState.Selection;
-        hasGameOverStarted = false;
         localPlayers = localPlayers.Where(p => p != null).ToList();
         foreach (var player in localPlayers)
         {
@@ -460,10 +361,6 @@ public partial class GameFlowManager : MonoBehaviour
             visualizer.GetUIParent().gameObject.SetActive(false);
         }
 
-        foreach (var snapshot in activeDrumTrack.SessionPhases) { 
-            //                galaxy.AddSnapshot(snapshot);
-        }
-      
         yield return new WaitForSeconds(2f);
         StartCoroutine(TransitionToScene("TrackFinished"));
     }
@@ -569,29 +466,15 @@ public partial class GameFlowManager : MonoBehaviour
         yield break;
     }
 
-    // 2) Gather vehicle grid cells (carve pockets).
+    // 2) Gather vehicle grid cells (carve pockets around active vehicles).
     _vehicleCellsScratch.Clear();
-
-    if (vehicles != null && vehicles.Count > 0)
-    {
+    if (vehicles != null)
         for (int i = 0; i < vehicles.Count; i++)
         {
             var v = vehicles[i];
             if (v == null || !v.isActiveAndEnabled) continue;
             _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
         }
-    }
-    else
-    {
-        var vs = FindObjectsOfType<Vehicle>();
-        for (int i = 0; i < vs.Length; i++)
-        {
-            var v = vs[i];
-            if (v == null || !v.isActiveAndEnabled) continue;
-            _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
-        }
-    }
-
     dust.SetReservedVehicleCells(_vehicleCellsScratch);
 
     // 3) Apply phase profile to dust generator before maze generation.
@@ -607,47 +490,7 @@ public partial class GameFlowManager : MonoBehaviour
 
     // 4) Build maze; vehicle trap ring cells are injected into the stagger list so they
     //    grow in simultaneously with maze cells rather than appearing as a separate event.
-    var trapMotif = phaseTransitionManager?.currentMotif;
-    System.Action<List<(Vector2Int, Vector3)>> trapCallback = null;
-    if (trapMotif != null && trapMotif.spawnVehicleTrap && dustGenerator != null && activeDrumTrack != null)
-    {
-        trapCallback = cellsToFill =>
-        {
-            var allVehicles = vehicles != null && vehicles.Count > 0
-                ? vehicles
-                : new List<Vehicle>(FindObjectsOfType<Vehicle>());
-            foreach (var v in allVehicles)
-            {
-                if (v == null || !v.isActiveAndEnabled) continue;
-                Vector2Int center = activeDrumTrack.WorldToGridPosition(v.transform.position);
-                if (trapMotif.trapShape == TrapShape.Circle)
-                {
-                    int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
-                    dustGenerator.InjectTrapCellsIntoStagger(
-                        cellsToFill, center, trapMotif.trapRadius, inner,
-                        trapMotif.trapRole);
-                }
-                else
-                {
-                    int r = trapMotif.trapRadius;
-                    var perim = new List<Vector2Int>(r * 8);
-                    for (int dx = -r; dx <= r; dx++)
-                    {
-                        perim.Add(new Vector2Int(center.x + dx, center.y + r));
-                        perim.Add(new Vector2Int(center.x + dx, center.y - r));
-                    }
-                    for (int dy = -r + 1; dy <= r - 1; dy++)
-                    {
-                        perim.Add(new Vector2Int(center.x - r, center.y + dy));
-                        perim.Add(new Vector2Int(center.x + r, center.y + dy));
-                    }
-                    dustGenerator.InjectTrapCellsFromList(
-                        cellsToFill, perim,
-                        trapMotif.trapRole);
-                }
-            }
-        };
-    }
+    var trapCallback = BuildTrapCallback(phaseTransitionManager?.currentMotif);
     yield return StartCoroutine(
         dust.GenerateMazeForPhaseWithPaths(
             starCell,
@@ -657,32 +500,64 @@ public partial class GameFlowManager : MonoBehaviour
         )
     );
 
-    // ── 5) Vehicle phase-in FX ────────────────────────────────────────────────
-    // Trigger a particle burst at each active vehicle position so the player
-    // gets a clear "new phase begins" signal before the star enters.
-    if (vehiclePhaseInFxPrefab != null)
-    {
-        var activeVehicles = vehicles != null && vehicles.Count > 0
-            ? vehicles
-            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
-
-        foreach (var v in activeVehicles)
-        {
-            if (v == null || !v.isActiveAndEnabled) continue;
-            var fx = Instantiate(vehiclePhaseInFxPrefab, v.transform.position, Quaternion.identity);
-            fx.Play();
-            // Auto-destroy after the longest reasonable burst duration.
-            Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
-        }
-    }
-
-    // Hold briefly so the FX reads before the star starts walking in.
+    // 5) Vehicle phase-in FX (gives player a visual "new phase" cue before the star walks in)
+    SpawnPhaseInFX();
     if (vehiclePhaseInDelaySeconds > 0f)
         yield return new WaitForSeconds(vehiclePhaseInDelaySeconds);
 
-    // ── 6) Start the star (vehicle traps already growing from step 4 callback) ──
+    // 6) Start the star (vehicle traps already growing from step 4 callback)
     drums.RequestPhaseStar(starCell);
     dust.ResetMazeGenerationFlag();
+}
+
+private System.Action<List<(Vector2Int, Vector3)>> BuildTrapCallback(MotifProfile trapMotif)
+{
+    if (trapMotif == null || !trapMotif.spawnVehicleTrap || dustGenerator == null || activeDrumTrack == null)
+        return null;
+
+    return cellsToFill =>
+    {
+        var allVehicles = vehicles ?? new List<Vehicle>();
+        foreach (var v in allVehicles)
+        {
+            if (v == null || !v.isActiveAndEnabled) continue;
+            Vector2Int center = activeDrumTrack.WorldToGridPosition(v.transform.position);
+            if (trapMotif.trapShape == TrapShape.Circle)
+            {
+                int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
+                dustGenerator.InjectTrapCellsIntoStagger(cellsToFill, center, trapMotif.trapRadius, inner, trapMotif.trapRole);
+            }
+            else
+            {
+                int r = trapMotif.trapRadius;
+                var perim = new List<Vector2Int>(r * 8);
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    perim.Add(new Vector2Int(center.x + dx, center.y + r));
+                    perim.Add(new Vector2Int(center.x + dx, center.y - r));
+                }
+                for (int dy = -r + 1; dy <= r - 1; dy++)
+                {
+                    perim.Add(new Vector2Int(center.x - r, center.y + dy));
+                    perim.Add(new Vector2Int(center.x + r, center.y + dy));
+                }
+                dustGenerator.InjectTrapCellsFromList(cellsToFill, perim, trapMotif.trapRole);
+            }
+        }
+    };
+}
+
+private void SpawnPhaseInFX()
+{
+    if (vehiclePhaseInFxPrefab == null) return;
+    var activeVehicles = vehicles ?? new List<Vehicle>();
+    foreach (var v in activeVehicles)
+    {
+        if (v == null || !v.isActiveAndEnabled) continue;
+        var fx = Instantiate(vehiclePhaseInFxPrefab, v.transform.position, Quaternion.identity);
+        fx.Play();
+        Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
+    }
 }
     private void Update()
     {
@@ -690,35 +565,13 @@ public partial class GameFlowManager : MonoBehaviour
         if (dustGenerator == null || activeDrumTrack == null) return;
 
         _vehicleCellsScratch.Clear();
-
-        // Prefer an explicit list if your flow populates it; otherwise fall back to scene scan.
-        Vehicle[] vs = null;
-        if (vehicles != null && vehicles.Count > 0)
+        if (vehicles != null)
         {
-            // Filter nulls/inactive.
             for (int i = 0; i < vehicles.Count; i++)
             {
                 var v = vehicles[i];
                 if (v == null || !v.isActiveAndEnabled) continue;
                 _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
-            }
-        }
-        else
-        {
-            _vehicleScanCooldown -= Time.deltaTime;
-            if (_vehicleScanCooldown <= 0f)
-            {
-                vs = FindObjectsOfType<Vehicle>();
-                _vehicleScanCooldown = 1f;
-            }
-            if (vs != null)
-            {
-                for (int i = 0; i < vs.Length; i++)
-                {
-                    var v = vs[i];
-                    if (v == null || !v.isActiveAndEnabled) continue;
-                    _vehicleCellsScratch.Add(activeDrumTrack.WorldToGridPosition(v.transform.position));
-                }
             }
         }
         dustGenerator.SetReservedVehicleCells(_vehicleCellsScratch);
@@ -822,9 +675,7 @@ public partial class GameFlowManager : MonoBehaviour
     public void PlayVehiclePhaseInFx()
     {
         if (vehiclePhaseInFxPrefab == null) return;
-        var activeVehicles = vehicles != null && vehicles.Count > 0
-            ? vehicles
-            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+        var activeVehicles = vehicles ?? new List<Vehicle>();
 
         foreach (var v in activeVehicles)
         {
@@ -833,12 +684,6 @@ public partial class GameFlowManager : MonoBehaviour
             fx.Play();
             Destroy(fx.gameObject, Mathf.Max(fx.main.duration + fx.main.startLifetime.constantMax, 4f));
         }
-    }
-
-    private void OnMotifChangedHandler(MotifProfile oldMotif, MotifProfile newMotif)
-    {
-        // Trap ring is injected during GenerateMazeForPhaseWithPaths (onBeforeGrowth callback).
-        // Do not respawn here — that would cause a late instant-spawn on motif advance.
     }
 
     public void SpawnVehicleTraps(MotifProfile motif)
@@ -857,9 +702,7 @@ public partial class GameFlowManager : MonoBehaviour
         var roleProfile = MusicalRoleProfileLibrary.GetProfile(motif.trapRole);
         Color roleColor = roleProfile != null ? roleProfile.GetBaseColor() : Color.white;
 
-        var allVehicles = vehicles != null && vehicles.Count > 0
-            ? vehicles
-            : new List<Vehicle>(FindObjectsOfType<Vehicle>());
+        var allVehicles = vehicles ?? new List<Vehicle>();
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[TRAP] SpawnVehicleTraps motif={motif.motifId} shape={motif.trapShape} radius={motif.trapRadius} vehicles={allVehicles.Count}");
 

@@ -143,28 +143,32 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _lastBarIndex  = -1;
     private int _nextBurstId = 0;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
-    private readonly Dictionary<int,int> _burstRemaining = new(); // burstId -> remaining
-    private readonly HashSet<int> _gateReleasedBurstIds = new(); // burst ids whose spawn gate has been released without note-discard
-    private readonly Dictionary<int,int> _burstTotalSpawned = new(); // burstId -> total spawned
-    private readonly Dictionary<int,int> _burstCollected    = new(); // burstId -> collected count
+    private readonly HashSet<int> _gateReleasedBurstIds = new();
     private bool _pendingCollapse;
     private int  _collapseTargetMultiplier = 1;
     private bool _hookedBoundaryForCollapse;
     private bool _ascendQueued;
-    private readonly Dictionary<int, HashSet<int>> _burstSteps = new(); // burstId -> steps for that burst
-    private int? _pendingLoopMultiplier;   // supports expand or collapse
+    private int? _pendingLoopMultiplier;
     public int currentBurstId;
     [SerializeField] private List<bool> _binFilled = new();
-    // Wall-clock time (Time.time) at which each bin was marked filled.
-    // -1 means not yet filled. Sized and reset in parallel with _binFilled.
     private float[] _binCompletionTime;
     private bool _waitingForDrumReady;
-    [SerializeField] private List<int> _binFillOrder = null;  // 0 = unfilled; 1,2,3,... = ordinal it was filled
-    [SerializeField] private List<int> _binChordIndex = null; // -1 = unassigned; else index into ChordProgressionProfile.chordSequence
+    [SerializeField] private List<int> _binFillOrder = null;
+    [SerializeField] private List<int> _binChordIndex = null;
     [SerializeField] private int _nextFillOrdinal = 1;
-    private readonly Dictionary<int, int> _burstLeaderBinsBeforeWrite = new(); // burstId -> leaderBins
-    private readonly Dictionary<int, int> _burstWroteBin             = new(); // burstId -> targetBin (cursor bin)
-    private readonly Dictionary<int, int> _burstTargetBin            = new(); // burstId -> allocated bin (for rollback on 0-note discard)
+
+    // All per-burst tracking lives here — replaces 7 parallel dictionaries.
+    private sealed class BurstState
+    {
+        public int remaining;
+        public int collected;
+        public int totalSpawned;
+        public int targetBin;
+        public int leaderBins;  // snapshot before first note write (0 = not yet snapshotted)
+        public int wroteBin = -1; // bin written by first note (-1 = no note written yet)
+        public readonly HashSet<int> steps = new();
+    }
+    private readonly Dictionary<int, BurstState> _bursts = new();
     private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
 
     // ---- Composition Mode: step-sequenced burst spawning ----
@@ -619,22 +623,15 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
     {
         steps = null;
-        return _burstSteps != null && _burstSteps.TryGetValue(burstId, out steps) && steps != null && steps.Count > 0;
+        return _bursts.TryGetValue(burstId, out var s) && (steps = s.steps) != null && steps.Count > 0;
     }
 
-    /// <summary>
-    /// Returns true if any burst with outstanding notes (collectables not yet committed or
-    /// discarded) has at least one step in [stepStart, stepEnd).
-    /// Used by NoteAscensionDirector to defer loop collapse when notes are in transit.
-    /// </summary>
     public bool HasOutstandingNotesInRange(int stepStart, int stepEnd)
     {
-        if (_burstRemaining == null || _burstSteps == null) return false;
-        foreach (var kv in _burstRemaining)
+        foreach (var kv in _bursts)
         {
-            if (kv.Value <= 0) continue;
-            if (!_burstSteps.TryGetValue(kv.Key, out var steps) || steps == null) continue;
-            foreach (int step in steps)
+            if (kv.Value.remaining <= 0) continue;
+            foreach (int step in kv.Value.steps)
                 if (step >= stepStart && step < stepEnd) return true;
         }
         return false;
@@ -677,11 +674,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         spawnedCollectables.Clear();
-        // IMPORTANT: don't leave the controller stuck because remaining counts still think something is pending.
-        // If you track remaining per-burst, clear that too.
-        _burstRemaining?.Clear();
-        _burstSteps?.Clear();
-        _burstTargetBin?.Clear();
+        _bursts?.Clear();
 
         // Clear any pending composition-mode launches and unsubscribe the step listener.
         _pendingCompositionLaunches.Clear();
@@ -807,9 +800,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
     private void RegisterBurstStep(int burstId, int step)
     {
-        if (!_burstSteps.TryGetValue(burstId, out var set))
-            _burstSteps[burstId] = set = new HashSet<int>();
-        set.Add(step);
+        if (_bursts.TryGetValue(burstId, out var s))
+            s.steps.Add(step);
     }
     public void ClearBinNotesKeepAllocated(int binIdx)
     {
@@ -840,11 +832,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
         controller.NotifyCollected(this);
-
-        // 1) Track burst energy meter
         IncrementBurstCollectedMeter(collectable.burstId);
 
-        // 2) Free the vacated grid cell
         if (drumTrack != null)
         {
             Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
@@ -852,88 +841,79 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
         }
 
-        // 3) Resolve authoritative target step (never time-based)
         int finalTargetStep = ResolveTargetStep(collectable, reportedStep);
         if (finalTargetStep < 0) return;
 
         if (reportedStep >= 0 && collectable.intendedStep >= 0 && reportedStep != collectable.intendedStep)
             Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep} burstId={collectable.burstId}");
 
-        // 4) Snapshot leader bins before first write (for cross-track nudge)
         SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
 
-        // 5) Commit note to the audible loop
         int note = collectable.GetNote();
-        int authoredRootMidi = LookUpAuthoredRootMidi(finalTargetStep);
-        if (authoredRootMidi == int.MinValue)
-        {
-            int resolveBin = BinIndexForStep(finalTargetStep);
-            var resolveNs  = GetNoteSetForBin(resolveBin);
-            if (resolveNs?.chordRegion != null && resolveNs.chordRegion.Count > 0)
-            {
-                authoredRootMidi = resolveNs.chordRegion[resolveBin % resolveNs.chordRegion.Count].rootNote;
-            }
-            else
-            {
-                if (_gfm == null) _gfm = GameFlowManager.Instance;
-                var hd = _gfm?.harmony;
-                int chordIdx = Harmony_GetChordIndexForBin(resolveBin);
-                if (chordIdx >= 0 && hd != null && hd.TryGetChordAt(chordIdx, out var resolvedChord))
-                    authoredRootMidi = resolvedChord.rootNote;
-            }
-            if (authoredRootMidi == int.MinValue)
-                authoredRootMidi = GetAuthoredRootMidiInRegister(note);
-        }
-        CollectNote(finalTargetStep, note, durationTicks, force, authoredRootMidi);
+        CollectNote(finalTargetStep, note, durationTicks, force, ResolveAuthoredRootMidi(finalTargetStep, note));
 
         int targetBin = BinIndexForStep(finalTargetStep);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
         RegisterBurstStep(collectable.burstId, finalTargetStep);
         spawnedCollectables?.Remove(collectable.gameObject);
 
-        // 6) Per-burst decrement — on last note: fill bin and clean up
-        if (collectable.burstId != 0 && _burstRemaining.TryGetValue(collectable.burstId, out var rem))
+        FinalizeAutoCollect(collectable, targetBin);
+        ScheduleNoteDeposit(collectable, finalTargetStep, reportedStep, durationTicks, force);
+
+        if (_currentBurstArmed && collectable.burstId == currentBurstId)
         {
-            rem--;
-            if (rem <= 0)
-            {
-                int filledBin = _burstWroteBin.TryGetValue(collectable.burstId, out var b) ? b : targetBin;
-
-                // Unique to auto-collect: playhead pulse
-                controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
-
-                // Unique to auto-collect: extra dict cleanup before shared completion
-                _burstTotalSpawned.Remove(collectable.burstId);
-                _burstCollected.Remove(collectable.burstId);
-
-                // Unique to auto-collect: cursor advance (ByVoice tracks suppress this)
-                var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
-                if (rp == null || rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
-                    AdvanceBinCursor(1);
-
-                // Precompute extendedLeader before CompleteBurst removes the dicts
-                bool extendedLeader =
-                    _burstLeaderBinsBeforeWrite.TryGetValue(collectable.burstId, out var Lbefore) &&
-                    _burstWroteBin.TryGetValue(collectable.burstId, out var wroteBin) &&
-                    wroteBin >= Lbefore;
-
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} reportedStep={reportedStep} remainingOnTrack={spawnedCollectables.Count} binCursor={_binCursor}");
-
-                CompleteBurst(collectable.burstId, filledBin, hadNotes: true, ascendBinCount: loopMultiplier);
-
-                // Unique to auto-collect: advance sibling cursors if this burst extended the leader
-                if (extendedLeader && controller != null)
-                    controller.AdvanceOtherTrackCursors(this, 1);
-            }
-            else
-            {
-                _burstRemaining[collectable.burstId] = rem;
-            }
+            _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1);
+            if (_currentBurstRemaining == 0)
+                _currentBurstArmed = false;
         }
+    }
 
-        // 7) Place marker and schedule deposit animation
+    private int ResolveAuthoredRootMidi(int finalTargetStep, int note)
+    {
+        int authoredRootMidi = LookUpAuthoredRootMidi(finalTargetStep);
+        if (authoredRootMidi != int.MinValue) return authoredRootMidi;
+
+        int resolveBin = BinIndexForStep(finalTargetStep);
+        var resolveNs  = GetNoteSetForBin(resolveBin);
+        if (resolveNs?.chordRegion != null && resolveNs.chordRegion.Count > 0)
+            return resolveNs.chordRegion[resolveBin % resolveNs.chordRegion.Count].rootNote;
+
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        int chordIdx = Harmony_GetChordIndexForBin(resolveBin);
+        if (chordIdx >= 0 && _gfm?.harmony != null && _gfm.harmony.TryGetChordAt(chordIdx, out var chord))
+            return chord.rootNote;
+
+        return GetAuthoredRootMidiInRegister(note);
+    }
+
+    private void FinalizeAutoCollect(Collectable collectable, int targetBin)
+    {
+        if (collectable.burstId == 0 || !_bursts.TryGetValue(collectable.burstId, out var state)) return;
+
+        state.remaining--;
+        if (state.remaining > 0) return;
+
+        int filledBin = state.wroteBin >= 0 ? state.wroteBin : targetBin;
+        controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
+
+        var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        if (rp == null || rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
+            AdvanceBinCursor(1);
+
+        bool extendedLeader = state.leaderBins > 0 && state.wroteBin >= state.leaderBins;
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} binCursor={_binCursor}");
+
+        CompleteBurst(collectable.burstId, filledBin, hadNotes: true, ascendBinCount: loopMultiplier);
+
+        if (extendedLeader && controller != null)
+            controller.AdvanceOtherTrackCursors(this, 1);
+    }
+
+    private void ScheduleNoteDeposit(Collectable collectable, int finalTargetStep, int reportedStep, int durationTicks, float force)
+    {
         GameObject markerGo = null;
-        if (controller != null && controller.noteVisualizer != null)
+        if (controller?.noteVisualizer != null)
             markerGo = controller.noteVisualizer.PlacePersistentNoteMarker(this, finalTargetStep, lit: false, burstId: collectable.burstId);
 
         if (markerGo != null)
@@ -946,28 +926,23 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         const float minTravel  = 0.02f;
 
         double now = AudioSettings.dspTime;
-        float dt = Mathf.Max(0f, (float)(depositDsp - now));
+        float dt       = Mathf.Max(0f, (float)(depositDsp - now));
         float travelSec = Mathf.Clamp(Mathf.Min(travelHard, dt), minTravel, travelHard);
         float orbitSec  = Mathf.Clamp(dt - travelSec, 0f, orbitMax);
         if (orbitSec < 0.05f) orbitSec = 0f;
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal={reportedStep} intendedBin={collectable.intendedBin} depositDsp={depositDsp:F6} now={now:F6} dt={(depositDsp - now):F4}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal={reportedStep} depositDsp={depositDsp:F6} dt={(depositDsp - now):F4}");
 
         collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>
         {
             if (controller != null)
                 controller.NotifyCommitted(this, finalTargetStep);
 
-            if (controller == null || controller.noteVisualizer == null || markerGo == null)
-                return;
+            if (controller == null || controller.noteVisualizer == null || markerGo == null) return;
 
             controller.noteVisualizer.ScheduleFirstPlayConfirm(
-                source: collectable.transform,
-                track: this,
-                step: finalTargetStep,
-                dspTime: depositDsp,
-                noteDuration: durationTicks,
-                color: trackColor);
+                source: collectable.transform, track: this, step: finalTargetStep,
+                dspTime: depositDsp, noteDuration: durationTicks, color: trackColor);
 
             controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
 
@@ -979,16 +954,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             ml.LightUp(this.trackColor);
 
             var vnm = markerGo.GetComponent<VisualNoteMarker>();
-            if (vnm != null)
-                vnm.Initialize(this.trackColor);
+            if (vnm != null) vnm.Initialize(this.trackColor);
         });
-
-        if (_currentBurstArmed && collectable.burstId == currentBurstId)
-        {
-            _currentBurstRemaining = Mathf.Max(0, _currentBurstRemaining - 1);
-            if (_currentBurstRemaining == 0)
-                _currentBurstArmed = false;
-        }
     }
     // ---------------------------------------------------------------------
     // Manual Note Release integration
@@ -1097,19 +1064,13 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);
 
-        // Per-burst decrement — on last note: fill bin and clean up
-        if (burstId != 0 && _burstRemaining.TryGetValue(burstId, out var rem))
+        if (burstId != 0 && _bursts.TryGetValue(burstId, out var state))
         {
-            rem--;
-            if (rem <= 0)
+            state.remaining--;
+            if (state.remaining <= 0)
             {
-                int filledBin = _burstWroteBin.TryGetValue(burstId, out var b) ? b : targetBin;
-                // removePlaceholders=true: manual-release leaves placeholder markers that need clearing
+                int filledBin = state.wroteBin >= 0 ? state.wroteBin : targetBin;
                 CompleteBurst(burstId, filledBin, hadNotes: true, ascendBinCount: BinSize(), removePlaceholders: true);
-            }
-            else
-            {
-                _burstRemaining[burstId] = rem;
             }
         }
     }
@@ -1129,17 +1090,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public void NotifyNoteDiscarded(int burstId, int authoredAbsStep)
     {
         if (burstId == 0) return;
-        if (!_burstRemaining.TryGetValue(burstId, out var rem)) return;
+        if (!_bursts.TryGetValue(burstId, out var state)) return;
 
-        rem--;
-        if (rem > 0)
-        {
-            _burstRemaining[burstId] = rem;
-            return;
-        }
+        state.remaining--;
+        if (state.remaining > 0) return;
 
-        // All notes resolved (committed or discarded).
-        // Defensive: also remove the discarded step's orphan marker.
         int capturedDiscardedStep = authoredAbsStep;
         EnqueueNextFrame(() =>
         {
@@ -1147,33 +1102,29 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep);
         });
 
-        bool hadNotes = _burstWroteBin.ContainsKey(burstId);
+        bool hadNotes = state.wroteBin >= 0;
+        _gateReleasedBurstIds.Remove(burstId);
 
         if (hadNotes)
         {
-            int filledBin = _burstWroteBin[burstId];
-            _gateReleasedBurstIds.Remove(burstId);
-            // removePlaceholders=true: discard path leaves placeholder markers that need clearing
-            CompleteBurst(burstId, filledBin, hadNotes: true, ascendBinCount: BinSize(), removePlaceholders: true);
+            CompleteBurst(burstId, state.wroteBin, hadNotes: true, ascendBinCount: BinSize(), removePlaceholders: true);
         }
         else
         {
-            // 0 notes committed — roll back the bin so the next burst retries it without expansion.
-            if (_burstTargetBin.TryGetValue(burstId, out int emptyBin))
+            if (state.targetBin >= 0)
             {
-                SetBinAllocated(emptyBin, false);
-                if (GetBinCursor() > emptyBin)
-                    SetBinCursor(emptyBin);
+                SetBinAllocated(state.targetBin, false);
+                if (GetBinCursor() > state.targetBin)
+                    SetBinCursor(state.targetBin);
             }
-            _gateReleasedBurstIds.Remove(burstId);
             CompleteBurst(burstId, filledBin: 0, hadNotes: false, ascendBinCount: BinSize(), removePlaceholders: true);
         }
     }
 
     /// <summary>
-    /// Releases the StarPool spawn gate for a burst without touching _burstRemaining.
+    /// Releases the StarPool spawn gate for a burst without decrementing its remaining count.
     /// Called by DarkTimeoutRoutine when a collectable's TTL expires but the GO lives on.
-    /// The gate fires once per burst (idempotent); _burstRemaining is decremented only when
+    /// The gate fires once per burst (idempotent); remaining is decremented only when
     /// the player actually places or discards each note via the normal commit path.
     /// </summary>
     public void ReleaseSpawnGate(int burstId)
@@ -1353,9 +1304,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         _binFilled.Clear();
 
-        // Burst/cursor snapshots (if present)
-        _burstLeaderBinsBeforeWrite?.Clear();
-        _burstWroteBin?.Clear();
         _expansionCtrl?.ResetForNewPhase();
         
     }
@@ -1371,7 +1319,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
             $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
             $"spawnedNotesCount={(_spawnedNotes != null ? _spawnedNotes.Count : -1)} " +
-            $"burstRemainingCount={(_burstRemaining != null ? _burstRemaining.Count : -1)}\n" +
+            $"burstRemainingCount={_bursts?.Count ?? -1}\n" +
             Environment.StackTrace);
 
         persistentLoopNotes?.Clear();
@@ -1380,10 +1328,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         _loopNotes?.Clear();
         _spawnedNotes?.Clear();
 
-        _burstSteps?.Clear();
-        _burstRemaining?.Clear();
-        _burstTotalSpawned?.Clear();
-        _burstCollected?.Clear();
+        _bursts?.Clear();
 
         ResetBinStateForNewPhase();
         ResetBinsForPhase();
@@ -1915,12 +1860,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
 
-        _burstRemaining[burstId] = spawnedCount;
-        _burstTotalSpawned[burstId] = spawnedCount;
-        _burstCollected[burstId] = 0;
+        _bursts[burstId] = new BurstState { remaining = spawnedCount, totalSpawned = spawnedCount, targetBin = targetBin };
 
         SetBinAllocated(targetBin, true);
-        _burstTargetBin[burstId] = targetBin;
 
         // Advance cursor past the allocated bin (ByVoice tracks suppress — cursor moves on chord-group fill)
         AdvanceCursorPastBin(targetBin);
@@ -2088,13 +2030,10 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
 
         // Burst bookkeeping (mirrors existing SPAWN_NOW path).
-        _burstRemaining[burstId]    = queued;
-        _burstTotalSpawned[burstId] = queued;
-        _burstCollected[burstId]    = 0;
-        _currentBurstRemaining      = queued;
+        _bursts[burstId] = new BurstState { remaining = queued, totalSpawned = queued, targetBin = targetBin };
+        _currentBurstRemaining = queued;
 
         SetBinAllocated(targetBin, true);
-        _burstTargetBin[burstId] = targetBin;
         AdvanceCursorPastBin(targetBin);
 
         // Subscribe to per-step events (idempotent).
@@ -2140,7 +2079,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             c.burstId                = launch.burstId;
             c.intendedStep           = launch.absStep;
-            c.intendedBin            = _burstTargetBin.TryGetValue(launch.burstId, out var bin) ? bin : 0;
+            c.intendedBin            = _bursts.TryGetValue(launch.burstId, out var bs) ? bs.targetBin : 0;
             c.assignedInstrumentTrack = this;
             c.isTrappedInDust        = launch.cellHasDust;
 
@@ -2247,21 +2186,16 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
         Debug.LogWarning($"[COLLECT:LOST] {name} burstId={c.burstId} intendedStep={c.intendedStep}");
         // Decrement remaining just like a collection would, so the burst can clear.
-        if (_burstRemaining.TryGetValue(c.burstId, out var rem)) {
-            rem--; 
-            if (rem <= 0) { 
-                _burstRemaining.Remove(c.burstId); 
-                _burstTotalSpawned.Remove(c.burstId); 
-//                _burstCollected.Remove(c.burstId);
-                // Check whether any notes were actually written for this burst.
-                int collected = 0; 
-                _burstCollected.TryGetValue(c.burstId, out collected); 
-                _burstCollected.Remove(c.burstId);
-                if (collected > 0) { 
+        if (_bursts.TryGetValue(c.burstId, out var state)) {
+            state.remaining--;
+            if (state.remaining <= 0) {
+                int collected = state.collected;
+                _bursts.Remove(c.burstId);
+                if (collected > 0) {
                     // At least one note was harvested — treat bin as partially filled
                     // and let the normal progression continue.
-                    if (_burstWroteBin.TryGetValue(c.burstId, out var filledBin))
-                        SetBinFilled(filledBin, true);
+                    if (state.wroteBin >= 0)
+                        SetBinFilled(state.wroteBin, true);
                     if (controller != null) controller.AllowAdvanceNextBurst(this);
                     {
                         var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
@@ -2269,24 +2203,16 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                             AdvanceBinCursor(1);
                     }
                     OnCollectableBurstCleared?.Invoke(this, c.burstId, true);
-                } 
-                else { 
+                }
+                else {
                     // Zero notes collected: the entire burst was lost.
                     // Do NOT mark the bin filled, do NOT advance the cursor, and do NOT
                     // fire OnCollectableBurstCleared — the star should re-arm for this
                     // bin rather than bridging on an empty loop.
                     Debug.LogWarning($"[COLLECT:LOST_BURST] {name} burstId={c.burstId} all collectables lost with zero notes written. Bin will not be marked filled; star will re-arm.");
-                    // Clean up remaining burst tracking state.
-                    _burstWroteBin.Remove(c.burstId); 
-                    _burstLeaderBinsBeforeWrite.Remove(c.burstId);
-                    // Notify controller that collectables are cleared so the star can
-                    // re-arm, but do not advance bin state.
                     if (controller != null) controller.AllowAdvanceNextBurst(this);
                     OnCollectableBurstCleared?.Invoke(this, c.burstId, false);
                 }
-            }
-            else { 
-                _burstRemaining[c.burstId] = rem;
             }
         }
     }
