@@ -40,6 +40,12 @@ public sealed class BridgeCoordinator
             ? Mathf.Max(1f, _gameFlow.controller.GetEffectiveLoopLengthInSeconds())
             : Mathf.Max(1f, _gameFlow.GetMotifBridgeHoldSeconds());
 
+        // Snapshot now so DrumTrack's leaderStartDspTime advancing at the loop boundary
+        // mid-animation doesn't shift the target into the next cycle.
+        double loopBoundaryDsp = (_gameFlow.activeDrumTrack != null && _gameFlow.activeDrumTrack.leaderStartDspTime > 0)
+            ? _gameFlow.activeDrumTrack.leaderStartDspTime + effectiveLoopSec
+            : 0;
+
         float remainingInLoop = effectiveLoopSec;
         if (_gameFlow.activeDrumTrack != null && _gameFlow.activeDrumTrack.leaderStartDspTime > 0)
         {
@@ -65,6 +71,12 @@ public sealed class BridgeCoordinator
             yield return _gameFlow.StartCoroutine(
                 rings.SpinAndRollOffActiveRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
         }
+
+        // Let all bins finish their final cycle before clearing the loop.
+        // If the ring animation already outlasted the loop, this is a no-op.
+        if (loopBoundaryDsp > 0)
+            while (AudioSettings.dspTime < loopBoundaryDsp)
+                yield return null;
 
         yield return _gameFlow.StartCoroutine(_gameFlow.SceneFlow.StartNextMotifInPhase());
         _session.SetGhostCycleInProgress(false);

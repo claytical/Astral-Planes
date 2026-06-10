@@ -899,11 +899,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SolarSystemRecordDisplay
   orbitRadius: 3.5
-  orbitTiltDegrees: 55
+  orbitTiltDegrees: 0
   orbitSpeedBase: 1
   orbitSpeedVariance: 1.5
   recordScale: 1
-  ringConfig: {fileID: 11400000, guid: 4341091ede319449faea4a5d91ac9786, type: 2}
+  ringConfig: {fileID: 11400000, guid: 12b97f17125134b98b3adf0f6c52dc75, type: 2}
   lineMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
