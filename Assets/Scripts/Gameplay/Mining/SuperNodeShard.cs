@@ -33,7 +33,7 @@ public class SuperNodeShard : MonoBehaviour
         transform.localRotation = Quaternion.Euler(0f, 0f, initialAngleRad * Mathf.Rad2Deg);
 
         if (track != null && _renderer != null)
-            _renderer.color = track.trackColor;
+            _renderer.color = track.DisplayColor;
 
         SetHighlighted(false, instant: true);
     }

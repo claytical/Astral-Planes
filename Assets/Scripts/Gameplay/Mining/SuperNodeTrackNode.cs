@@ -138,8 +138,8 @@ public class SuperNodeTrackNode : MonoBehaviour
 
         if (track != null)
         {
-            if (_renderer != null) _renderer.color = track.trackColor;
-            _explode?.SetTint(track.trackColor);
+            if (_renderer != null) _renderer.color = track.DisplayColor;
+            _explode?.SetTint(track.DisplayColor);
         }
 
         if (drum != null)

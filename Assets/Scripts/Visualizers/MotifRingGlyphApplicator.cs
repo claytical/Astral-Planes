@@ -498,7 +498,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         var trackByQColor = new Dictionary<Color, InstrumentTrack>();
         if (tracks != null)
             foreach (var tr in tracks)
-                if (tr != null) { Color32 q = tr.trackColor; trackByQColor[(Color)q] = tr; }
+                if (tr != null) { Color32 q = tr.DisplayColor; trackByQColor[(Color)q] = tr; }
 
         int segs    = Mathf.Max(16, config.segments);
         int binSize = Mathf.Max(1, snapshot.TotalSteps);

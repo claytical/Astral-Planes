@@ -59,11 +59,11 @@ public class CollectableParticles : MonoBehaviour
     var noise = particleSystem.noise;
 
     // Color/gradient (track tint with a soft white core)
-    Color c = track.trackColor;
+    Color c = track.DisplayColor;
     if (coreParticleSystem != null)
     {
         ParticleSystem.MainModule core = coreParticleSystem.main;
-        core.startColor = track.trackColor;
+        core.startColor = track.DisplayColor;
     }
 
     var g = new Gradient();

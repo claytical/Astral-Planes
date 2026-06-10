@@ -105,6 +105,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     [Header("Track Settings")]
     public Color trackColor;
+    // Canonical display color: prefers the MusicalRoleProfile's voice color so spawned
+    // objects match the profile palette rather than the raw Inspector field.
+    public Color DisplayColor => MusicalRoleProfileLibrary.GetProfile(assignedRole)?.GetColorForVoice(voiceIndex) ?? trackColor;
     public GameObject collectablePrefab; // Prefab to spawn
     public Transform collectableParent; // Parent object for organization
     public AscensionCohort ascensionCohort;
@@ -502,7 +505,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 step: n.stepIndex,
                 note: n.note,
                 velocity: n.velocity,
-                trackColor: trackColor,
+                trackColor: DisplayColor,
                 binIndex: binIndex,
                 isMatched: true,
                 commitTime01: commitTime01));
@@ -942,7 +945,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             controller.noteVisualizer.ScheduleFirstPlayConfirm(
                 source: collectable.transform, track: this, step: finalTargetStep,
-                dspTime: depositDsp, noteDuration: durationTicks, color: trackColor);
+                dspTime: depositDsp, noteDuration: durationTicks, color: DisplayColor);
 
             controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
 
@@ -951,10 +954,10 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             tag.burstId = collectable.burstId;
 
             var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
-            ml.LightUp(this.trackColor);
+            ml.LightUp(this.DisplayColor);
 
             var vnm = markerGo.GetComponent<VisualNoteMarker>();
-            if (vnm != null) vnm.Initialize(this.trackColor);
+            if (vnm != null) vnm.Initialize(this.DisplayColor);
         });
     }
     // ---------------------------------------------------------------------
@@ -1451,9 +1454,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 tag.step = stepIndex;
                 tag.isPlaceholder = false;
                 var vnm = noteMarker.GetComponent<VisualNoteMarker>(); 
-                if (vnm != null) vnm.Initialize(trackColor);
+                if (vnm != null) vnm.Initialize(DisplayColor);
                 var ml = noteMarker.GetComponent<MarkerLight>() ?? noteMarker.AddComponent<MarkerLight>();
-                ml.LightUp(trackColor);
+                ml.LightUp(DisplayColor);
             }
         }
         else
@@ -2049,7 +2052,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             Vector3 effectPos = originWorld ?? transform.position;
             _compositionSpawnEffect = Instantiate(compositionSpawnEffectPrefab, effectPos, Quaternion.identity);
             var main = _compositionSpawnEffect.main;
-            main.startColor = new ParticleSystem.MinMaxGradient(trackColor);
+            main.startColor = new ParticleSystem.MinMaxGradient(DisplayColor);
             main.stopAction = ParticleSystemStopAction.Destroy;
             _compositionSpawnEffect.Play();
         }

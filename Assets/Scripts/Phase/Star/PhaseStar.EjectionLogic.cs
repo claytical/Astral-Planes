@@ -133,7 +133,7 @@ public partial class PhaseStar
         _ejectionInFlight = true;
         visuals?.EjectParticles(behaviorProfile?.ejectionPrefab);
 
-        Color spawnTint = _previewVisual != null ? _previewColor : usedTrack.trackColor;
+        Color spawnTint = _previewVisual != null ? _previewColor : usedTrack.DisplayColor;
         _lockedTint = spawnTint;
 
         var node = DirectSpawnMineNode(contactPoint, usedTrack, spawnTint);
@@ -214,7 +214,7 @@ public partial class PhaseStar
         visuals?.HideAll();
         dust?.ResetTentacles();
 
-        Disarm(PhaseStarDisarmReason.NodeResolving, ejectedTrack.trackColor);
+        Disarm(PhaseStarDisarmReason.NodeResolving, ejectedTrack.DisplayColor);
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
@@ -258,7 +258,7 @@ public partial class PhaseStar
             Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
             return;
         }
-        Color spawnTint = targetTrack != null ? targetTrack.trackColor : Color.white;
+        Color spawnTint = targetTrack != null ? targetTrack.DisplayColor : Color.white;
 
         var activeRoles = _assignedMotif?.GetActiveRoles() ?? new System.Collections.Generic.List<MusicalRole>();
         var ctrl        = _gfm?.controller;
@@ -313,7 +313,7 @@ public partial class PhaseStar
         _lastImpactDir = (starPos - vehiclePos).normalized;
         _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
 
-        Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.trackColor);
+        Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.DisplayColor);
         ActivateSafetyBubble();
         if (_cachedIsSuperNode)
             SpawnSuperNodeCommon(contact, _cachedTrack);

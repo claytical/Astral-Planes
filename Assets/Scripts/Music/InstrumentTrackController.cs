@@ -187,19 +187,9 @@ public class InstrumentTrackController : MonoBehaviour
         _gravityVoidCenterGP = centerGP;
         _gravityVoidHasCenterGP = true;
 
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole);
-        if (roleProfile != null)
-        {
-            _gravityVoidDustImprintTint = roleProfile.GetBaseColor();
-            _gravityVoidParticleTint = roleProfile.GetBaseColor();
-            _gravityVoidParticleTint.a = 1f; // prefab alpha is authoritative
-        }
-        else
-        {
-            _gravityVoidDustImprintTint = ownerTrack.trackColor;
-            _gravityVoidParticleTint = ownerTrack.trackColor;
-            _gravityVoidParticleTint.a = 1f;
-        }
+        var c = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole)?.GetBaseColor() ?? ownerTrack.DisplayColor;
+        _gravityVoidDustImprintTint = c;
+        _gravityVoidParticleTint    = new Color(c.r, c.g, c.b, 1f);
 
         // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
@@ -302,71 +292,35 @@ public class InstrumentTrackController : MonoBehaviour
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var dustGen = _gfm?.dustGenerator;
-        if (dustGen == null) yield break;
+        if (_gfm?.dustGenerator == null) yield break;
 
-        // Get motif-active roles (falls back to all 4 if no motif).
         var pool = _gfm?.activeDrumTrack?._starPool;
         IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
         if (activeRoles == null || activeRoles.Count == 0)
             activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
 
-        int N = activeRoles.Count;
-        int W = config.voidRingWidthCells;
+        int N            = activeRoles.Count;
+        int W            = config.voidRingWidthCells;
         int ringsPerSubseq = Mathf.Max(1, N / 2);
-        int totalBins = (_gravityVoidOwner != null) ? Mathf.Max(1, _gravityVoidOwner.loopMultiplier) : 1;
-
         int completedRings = 0;
-        int lastBurstBin = -1;
-        float tick = Mathf.Max(0.01f, config.gravityVoidImprintTickSeconds);
+        int lastBurstBin   = -1;
+        float tick         = Mathf.Max(0.01f, config.gravityVoidImprintTickSeconds);
 
         while (_gravityVoidOwner != null)
         {
             SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
             int playheadBin = GetTransportFrame().playheadBin;
-
             if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
             {
-                lastBurstBin = playheadBin;
-
+                lastBurstBin   = playheadBin;
                 int ringsThisBin = (playheadBin == 0) ? N : ringsPerSubseq;
-                float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+                float growIn     = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
 
-                _vehicleCellsScratch.Clear();
-                var vehicles = FindObjectsOfType<Vehicle>();
-                for (int i = 0; i < vehicles.Length; i++)
-                {
-                    var v = vehicles[i];
-                    if (v != null && v.isActiveAndEnabled && gfm?.activeDrumTrack != null)
-                        _vehicleCellsScratch.Add(gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
-                }
+                CollectVehicleGridCells();
+                ImprintVoidRings(activeRoles, N, W, ringsThisBin, completedRings, growIn);
 
-                for (int r = 0; r < ringsThisBin; r++)
-                {
-                    int globalRingIdx = completedRings + r;
-                    int innerR = _gravityVoidBubbleInnerR + globalRingIdx * W;
-                    int outerR = innerR + W;
-                    var ringRole    = activeRoles[globalRingIdx % N];
-                    var roleProfile = MusicalRoleProfileLibrary.GetProfile(ringRole);
-
-                    dustGen.GrowVoidDustDiskFromGrid(
-                        centerGP:                  _gravityVoidCenterGP,
-                        outerRadiusCells:          outerR,
-                        imprintRole:               ringRole,
-                        hueRgb:                    roleProfile?.GetBaseColor() ?? _gravityVoidDustImprintTint,
-                        energyAtCenter01:          1f,
-                        falloffExp:                0.3f,
-                        growInSeconds:             growIn,
-                        fillWedges01To4:           4,
-                        vehicleCells:              _vehicleCellsScratch,
-                        vehicleNoSpawnRadiusCells: 1,
-                        maxCellsThisCall:          -1,
-                        innerRadiusCellsExclusive: innerR
-                    );
-                }
-
-                completedRings += ringsThisBin;
+                completedRings           += ringsThisBin;
                 _gravityVoidCurrentOuterR = _gravityVoidBubbleInnerR + completedRings * W;
             }
 
@@ -374,6 +328,50 @@ public class InstrumentTrackController : MonoBehaviour
         }
 
         _gravityVoidRoutine = null;
+    }
+
+    private void CollectVehicleGridCells()
+    {
+        _vehicleCellsScratch.Clear();
+        var vehicleList = _gfm?.GetVehicles();
+        if (vehicleList == null || gfm?.activeDrumTrack == null) return;
+        foreach (var v in vehicleList)
+        {
+            if (v != null && v.isActiveAndEnabled)
+                _vehicleCellsScratch.Add(gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
+        }
+    }
+
+    private void ImprintVoidRings(
+        IReadOnlyList<MusicalRole> activeRoles, int N, int W,
+        int ringsThisBin, int completedRingsBefore, float growIn)
+    {
+        var dustGen = _gfm?.dustGenerator;
+        if (dustGen == null) return;
+
+        for (int r = 0; r < ringsThisBin; r++)
+        {
+            int globalRingIdx = completedRingsBefore + r;
+            int innerR        = _gravityVoidBubbleInnerR + globalRingIdx * W;
+            int outerR        = innerR + W;
+            var ringRole      = activeRoles[globalRingIdx % N];
+            var roleProfile   = MusicalRoleProfileLibrary.GetProfile(ringRole);
+
+            dustGen.GrowVoidDustDiskFromGrid(
+                centerGP:                  _gravityVoidCenterGP,
+                outerRadiusCells:          outerR,
+                imprintRole:               ringRole,
+                hueRgb:                    roleProfile?.GetBaseColor() ?? _gravityVoidDustImprintTint,
+                energyAtCenter01:          1f,
+                falloffExp:                0.3f,
+                growInSeconds:             growIn,
+                fillWedges01To4:           4,
+                vehicleCells:              _vehicleCellsScratch,
+                vehicleNoSpawnRadiusCells: 1,
+                maxCellsThisCall:          -1,
+                innerRadiusCellsExclusive: innerR
+            );
+        }
     }
 
     private InstrumentTrack GetTrackForRole(MusicalRole role)

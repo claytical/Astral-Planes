@@ -797,7 +797,7 @@ private IEnumerator SpawnArrivalRoutine(
 
         if (energySprite != null)
         {
-            var c = track.trackColor;
+            var c = track.DisplayColor;
             c.a = Mathf.Clamp01(maxAlpha);
             energySprite.color = c;
 
@@ -807,7 +807,7 @@ private IEnumerator SpawnArrivalRoutine(
 
         var explode = GetComponent<Explode>();
         if (explode != null)
-            explode.SetTint(track.trackColor, multiply: true);
+            explode.SetTint(track.DisplayColor, multiply: true);
     }
 
     private void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
