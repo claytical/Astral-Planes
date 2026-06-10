@@ -665,9 +665,9 @@ public partial class Vehicle : MonoBehaviour
                 _vehicleTether = go.GetComponent<NoteTether>() ?? go.AddComponent<NoteTether>();
                 Color col = Color.white;
                 if (_pendingNotes.Count > 0 && _pendingNotes.Peek().track != null)
-                    col = _pendingNotes.Peek().track.trackColor;
+                    col = _pendingNotes.Peek().track.DisplayColor;
                 else if (_armedReleases.Count > 0 && _armedReleases.Peek().note.track != null)
-                    col = _armedReleases.Peek().note.track.trackColor;
+                    col = _armedReleases.Peek().note.track.DisplayColor;
                 _vehicleTether.SetEndpoints(null, null, col);
             }
 
@@ -781,7 +781,7 @@ public partial class Vehicle : MonoBehaviour
 
         Color roleColor = _vehicleDefaultColor;
         if (cueTrack != null)
-            roleColor = cueTrack.trackColor;
+            roleColor = cueTrack.DisplayColor;
 
         float tint01 = 0f;
         if (cueTrack != null && pulse01 > 0f)
@@ -1620,7 +1620,7 @@ public partial class Vehicle : MonoBehaviour
         p.track.PlayOneShotMidi(midiToPlay, p.velocity127, durToPlay);
         DiscardPendingNote(p);
         Vector3 blastPos = p.collectable != null ? p.collectable.transform.position : transform.position;
-        viz?.BlastManualReleaseCueFailure(transform, blastPos, p.track.trackColor);
+        viz?.BlastManualReleaseCueFailure(transform, blastPos, p.track.DisplayColor);
         if (p.collectable != null) CollectEnergy(p.collectable.amount * .25f);
         return false;
     }

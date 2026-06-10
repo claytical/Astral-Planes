@@ -157,9 +157,9 @@ public partial class NoteVisualizer
             if (ml == null) continue;
             var track = kv.Key.Item1;
             if (carried != null && carried.Contains(track))
-                ml.SetAvailable(track.trackColor);
+                ml.SetAvailable(track.DisplayColor);
             else
-                ml.SetGrey(track.trackColor);
+                ml.SetGrey(track.DisplayColor);
         }
     }
 

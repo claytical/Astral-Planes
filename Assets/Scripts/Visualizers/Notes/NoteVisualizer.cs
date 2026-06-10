@@ -161,7 +161,7 @@ public partial class NoteVisualizer : MonoBehaviour
         tag.isPlaceholder = false;   // ← lit now
         tag.isAscending = false;
         var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>(); 
-        ml.LightUp(track.trackColor);
+        ml.LightUp(track.DisplayColor);
     }
     
 
@@ -199,7 +199,7 @@ public partial class NoteVisualizer : MonoBehaviour
         if (noteMarkers == null) return;
         if (!noteMarkers.TryGetValue((track, stepAbs), out var tr) || tr == null) return;
         var ml = tr.GetComponent<MarkerLight>();
-        if (ml != null) ml.LightUp(track.trackColor);
+        if (ml != null) ml.LightUp(track.DisplayColor);
     }
     public void Initialize()
         {
@@ -660,7 +660,7 @@ public partial class NoteVisualizer : MonoBehaviour
             float w = v / 127f;
             totalW += w;
 
-            Color c = tr.trackColor;
+            Color c = tr.DisplayColor;
             sum += new Vector3(c.r, c.g, c.b) * w;
         }
 
@@ -813,7 +813,7 @@ public partial class NoteVisualizer : MonoBehaviour
                     var key = (track, tag.step);
                     noteMarkers[key] = tag.transform;
                     var ml = tag.GetComponent<MarkerLight>() ?? tag.gameObject.AddComponent<MarkerLight>();
-                    ml.SetGrey(track.trackColor);
+                    ml.SetGrey(track.DisplayColor);
                     continue;
                 }
 
@@ -965,7 +965,7 @@ public partial class NoteVisualizer : MonoBehaviour
             if (burstId >= 0) tag.burstId = burstId;
 
             var ml = existing.GetComponent<MarkerLight>() ?? existing.gameObject.AddComponent<MarkerLight>();
-            ml.SetGrey(track.trackColor);
+            ml.SetGrey(track.DisplayColor);
             if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:MARKER_PLACEHOLDER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={existing.gameObject.GetInstanceID()} placeholder=True");
         }
 
@@ -1001,7 +1001,7 @@ public partial class NoteVisualizer : MonoBehaviour
             if (burstId >= 0) tag.burstId = burstId;
 
             var ml = adopt.GetComponent<MarkerLight>() ?? adopt.gameObject.AddComponent<MarkerLight>();
-            ml.SetGrey(track.trackColor);
+            ml.SetGrey(track.DisplayColor);
         }
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] ADOPT marker track={track.name} step={stepIndex} lit={lit} burst={burstId} go={adopt.gameObject.GetInstanceID()}");
@@ -1051,13 +1051,13 @@ public partial class NoteVisualizer : MonoBehaviour
         var ml = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
         if (isLit)
         {
-            if (vnm != null) vnm.Initialize(track.trackColor);
-            ml.LightUp(track.trackColor);
+            if (vnm != null) vnm.Initialize(track.DisplayColor);
+            ml.LightUp(track.DisplayColor);
         }
         else
         {
-            if (vnm != null) vnm.SetWaitingParticles(track.trackColor);
-            ml.SetGrey(track.trackColor);
+            if (vnm != null) vnm.SetWaitingParticles(track.DisplayColor);
+            ml.SetGrey(track.DisplayColor);
         }
     }
 

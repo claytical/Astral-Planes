@@ -66,10 +66,10 @@ public class BinRingController : MonoBehaviour
         var notes = track.GetBinNoteEntries(binIndex);
 
         _ringApplicator.SpawnBinRing(
-            track.assignedRole, binIndex, track.trackColor,
+            track.assignedRole, binIndex, track.DisplayColor,
             notes, totalSteps, track);
 
         _ringApplicator.BeginBinRingDeformation(
-            binIndex, notes, totalSteps, track, track.assignedRole, track.trackColor);
+            binIndex, notes, totalSteps, track, track.assignedRole, track.DisplayColor);
     }
 }

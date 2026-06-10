@@ -119,7 +119,7 @@ public sealed class BridgeCoordinator
                     step: n.stepIndex,
                     note: n.note,
                     velocity: n.velocity,
-                    trackColor: track.trackColor,
+                    trackColor: track.DisplayColor,
                     binIndex: binIndex,
                     isMatched: true,
                     commitTime01: commitTime01));
@@ -130,7 +130,7 @@ public sealed class BridgeCoordinator
             {
                 snapshot.TrackBins.Add(new MotifSnapshot.TrackBinData
                 {
-                    TrackColor = track.trackColor,
+                    TrackColor = track.DisplayColor,
                     Role = track.assignedRole,
                     BinIndex = b,
                     IsFilled = track.IsBinFilled(b),

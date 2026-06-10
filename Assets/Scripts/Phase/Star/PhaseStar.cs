@@ -672,7 +672,10 @@ public partial class PhaseStar : MonoBehaviour
         }
 
         if (fallbackTrack != null)
-            return new Color(fallbackTrack.trackColor.r, fallbackTrack.trackColor.g, fallbackTrack.trackColor.b, 1f);
+        {
+            var c = fallbackTrack.DisplayColor;
+            return new Color(c.r, c.g, c.b, 1f);
+        }
 
         return Color.white;
     }
