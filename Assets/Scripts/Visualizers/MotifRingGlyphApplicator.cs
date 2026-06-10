@@ -34,6 +34,10 @@ public class MotifRingGlyphApplicator : MonoBehaviour
              "by ring index rather than by fill duration. Use on library cards for a spherical look.")]
     public bool sphericalRotation = false;
 
+    [Tooltip("When GameFlowManager is unavailable (carousel, solar system), cap the display so no ring " +
+             "exceeds this world-space radius. 0 = no cap.")]
+    public float maxDisplayRadius = 0f;
+
     [Tooltip("NoteVisualizer whose noteMarkers provide travel-dot start positions for gameplay rings.")]
     [SerializeField] private NoteVisualizer noteVisualizer;
 
@@ -680,6 +684,109 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         RefreshPlayAreaFit(_recordRings.Count);
     }
 
+    /// <summary>
+    /// Render rings from a snapshot instantly (no draw-in) as a flat spinning vinyl disc.
+    /// Used for non-highlighted carousel slots that should look like rotating records rather
+    /// than static or spherical displays. Each ring spins on its local Z-axis.
+    /// </summary>
+    public void ApplyVinyl(MotifSnapshot snapshot, float alphaScale = 1f)
+    {
+        StopAllCoroutines();
+        _recordFadingOut   = false;
+        _gameplayFadingOut = false;
+        DestroyList(_recordRings);
+
+        if (snapshot == null || config == null) return;
+
+        var seen     = new HashSet<(int, MusicalRole)>();
+        var ringKeys = new List<(int binIndex, MusicalRole role, Color color, float fillDur)>();
+
+        var fillDurs = new Dictionary<(int, float, float, float), float>();
+        foreach (var bin in snapshot.TrackBins)
+        {
+            Color c = bin.TrackColor;
+            var   k = (bin.BinIndex, c.r, c.g, c.b);
+            if (!fillDurs.TryGetValue(k, out float ex) || bin.FillDurationSeconds > ex)
+                fillDurs[k] = bin.FillDurationSeconds;
+        }
+
+        foreach (var bin in snapshot.TrackBins
+                     .Where(b => b.IsFilled || b.CollectedSteps.Count > 0)
+                     .OrderBy(b => b.BinIndex).ThenBy(b => (int)b.Role))
+        {
+            var key = (bin.BinIndex, bin.Role);
+            if (!seen.Add(key)) continue;
+            Color c2 = bin.TrackColor;
+            fillDurs.TryGetValue((bin.BinIndex, c2.r, c2.g, c2.b), out float fd);
+            ringKeys.Add((bin.BinIndex, bin.Role, c2, fd));
+        }
+
+        if (ringKeys.Count == 0)
+        {
+            var seenLegacy = new HashSet<(int, float, float, float)>();
+            foreach (var n in snapshot.CollectedNotes.OrderBy(n => n.BinIndex))
+            {
+                Color c = n.TrackColor;
+                var   ck = (n.BinIndex, c.r, c.g, c.b);
+                if (!seenLegacy.Add(ck)) continue;
+                ringKeys.Add((n.BinIndex, MusicalRole.None, c, 0f));
+            }
+        }
+
+        if (ringKeys.Count == 0) return;
+
+        int segs = Mathf.Max(16, config.segments);
+
+        for (int i = 0; i < ringKeys.Count; i++)
+        {
+            var (binIndex, role, color, fillDur) = ringKeys[i];
+            float innerR = RingInnerRadius(i);
+            float outerR = innerR + config.ringThickness;
+
+            var ringNotes = snapshot.CollectedNotes
+                .Where(n => n.BinIndex == binIndex
+                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
+                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
+                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
+                .ToList();
+
+            var entry = BuildRingEntry($"VinylRing_Bin{binIndex}_{role}",
+                innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps);
+            _recordRings.Add(entry);
+
+            var mesh = entry.Fill.GetComponent<MeshFilter>().sharedMesh;
+            mesh.SetTriangles(entry.FullTris, 0);
+            mesh.RecalculateBounds();
+
+            entry.Contour.positionCount = entry.ContourPoints.Count;
+            for (int j = 0; j < entry.ContourPoints.Count; j++)
+                entry.Contour.SetPosition(j, new Vector3(
+                    entry.ContourPoints[j].x, entry.ContourPoints[j].y, 0f));
+
+            float rotDeg = Mathf.Clamp(config.rotSpeedBase * Mathf.Max(fillDur, 0.1f), 0f, config.rotSpeedMax);
+            if (i % 2 == 1) rotDeg = -rotDeg;
+            StartCoroutine(SpinRingContinuous(entry.Root.transform, rotDeg));
+        }
+
+        if (alphaScale < 1f)
+        {
+            var mpbs = MakeMpbs(_recordRings.Count);
+            ApplyAlpha(_recordRings.ToArray(), alphaScale, mpbs);
+        }
+
+        RefreshPlayAreaFit(_recordRings.Count);
+    }
+
+    private IEnumerator SpinRingContinuous(Transform t, float rotDegPerSec)
+    {
+        while (!_recordFadingOut)
+        {
+            if (t == null) yield break;
+            t.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            yield return null;
+        }
+    }
+
     /// <summary>Fade all record rings to transparent, then destroy.</summary>
     public IEnumerator FadeOutAndClear(float duration)
     {
@@ -883,23 +990,34 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private void RefreshPlayAreaFit(int ringCount)
     {
         if (config == null || ringCount == 0) return;
+
         var gfm = GameFlowManager.Instance;
-        if (gfm?.activeDrumTrack == null) return;
-        if (!gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area)) return;
+        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
+        {
+            float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
+            if (outerRadius <= 0f) return;
 
-        float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
-        if (outerRadius <= 0f) return;
+            float targetRadius = area.height * (0.5f - config.fitPaddingFraction);
+            if (targetRadius <= 0f) return;
 
-        float targetRadius = area.height * (0.5f - config.fitPaddingFraction);
-        if (targetRadius <= 0f) return;
+            float scale = targetRadius / outerRadius;
+            transform.position   = new Vector3(
+                (area.left + area.right) * 0.5f,
+                (area.bottom + area.top) * 0.5f,
+                transform.position.z);
+            transform.localScale = new Vector3(scale, scale, 1f);
+            _fitScale            = transform.localScale;
+            return;
+        }
 
-        float scale = targetRadius / outerRadius;
-        transform.position   = new Vector3(
-            (area.left + area.right) * 0.5f,
-            (area.bottom + area.top) * 0.5f,
-            transform.position.z);
-        transform.localScale = new Vector3(scale, scale, 1f);
-        _fitScale = transform.localScale;
+        if (maxDisplayRadius > 0f)
+        {
+            float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
+            if (outerRadius <= 0f) return;
+            float scale      = Mathf.Min(1f, maxDisplayRadius / outerRadius);
+            transform.localScale = Vector3.one * scale;
+            _fitScale            = transform.localScale;
+        }
     }
 
     private RingEntry BuildRingEntry(

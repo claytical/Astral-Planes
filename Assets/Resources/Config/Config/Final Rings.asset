@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Final Rings
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
-  ringThickness: 0.03
+  ringThickness: 0.3
   ringSpacing: 0.3
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
-  ringAlpha: 0.339
-  lineWidth: 0.02
+  ringAlpha: 0.2
+  lineWidth: 0.01
   segments: 256
   tugDepthFraction: 0.25
   tugHalfWidthRad: 0.75
-  ringDrawInDuration: 0.5
+  ringDrawInDuration: 0
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 174

@@ -1971,6 +1971,11 @@ PrefabInstance:
       propertyPath: previewPlayer
       value: 
       objectReference: {fileID: 195574612}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: maxRecordRadius
+      value: 1.75
+      objectReference: {fileID: 0}
     - target: {fileID: 3751250523553378462, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: midiStreamPlayer
@@ -1979,17 +1984,17 @@ PrefabInstance:
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_LocalScale.x
-      value: 2.0729365
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_LocalScale.y
-      value: 2.0729365
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_LocalScale.z
-      value: 2.0729365
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
