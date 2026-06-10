@@ -12,13 +12,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public GameObject dustPrefab;
     public Transform activeDustRoot;
     Dictionary<Vector2Int, DustImprint> _imprints;
-    private Dictionary<Vector2Int, MusicalRole> _hiddenImprints = new();
     private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
-    // Cells carved by non-vehicle objects (e.g. SuperNodeTrackNode) that must regrow as MusicalRole.None
-    // (gray) without revealing their hidden imprint. Cleared in CommitRegrowCell after role is resolved.
-    private readonly HashSet<Vector2Int> _forceGrayRegrow = new();
-    // Cells cleared by PhaseStar zap must regrow gray so the Vehicle must re-carve to reveal the role.
-    private readonly HashSet<Vector2Int> _zapForceGrayCells = new();
+    private readonly Dictionary<Vector2Int, CellFlags> _cellFlags = new();
     private bool _cellGridReady;
     [Header("Config")]
     [SerializeField] public CosmicDustGeneratorConfig config;
@@ -34,6 +29,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
         public float drainResistance01;
         public int   maxEnergyUnits;
         public MusicalRole role;
+        public MusicalRole hiddenRole; // permanent Voronoi ground-truth; None = not set
+    }
+
+    [Flags]
+    private enum CellFlags
+    {
+        None            = 0,
+        ForceGrayRegrow = 1 << 0,
+        ZapForceGray    = 1 << 1,
+        VoidGrow        = 1 << 2,
+        PlayerCarved    = 1 << 3,
     }
     private struct DustResistanceProfile
     {
@@ -79,23 +85,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
-    // Cells spawned by GrowVoidDustDiskFromGrid.
-    // IMPORTANT: This set only affects vehicle carve behavior. Zap/drain clear paths can
-    // still regrow these cells when their tuning says they should, so do not reuse this
-    // set as a global "never regrow" rule.
-    private readonly HashSet<Vector2Int> _voidGrowCells = new HashSet<Vector2Int>();
     // Ripeness: cells currently showing their true role color after a player carve.
     private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
-    // Cells carved by the vehicle plow — only these start ripe on regrowth.
-    private readonly HashSet<Vector2Int> _playerCarvedCells = new();
     // Reusable snapshot buffer for TickRipeness to avoid per-frame allocation.
     private List<Vector2Int> _ripenessKeys;
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
     public event Action<Vector2Int?> OnMazeReady;
-
-    private readonly HashSet<Vector2Int> _starClearCells = new HashSet<Vector2Int>();
 
     // ---------------------------------------------------------------------------
     // Role density tracking
@@ -412,14 +409,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 // Vehicle pocket is a hard exclusion — no imprint, no spawn, no visual update.
                 if (IsNearAnyVehicle(gp, vehicleCells, vehicleNoSpawnRadiusCells)) continue;
 
-                // When hideRole is true, store role in _hiddenImprints and spawn gray so
-                // PhaseStar cannot detect the cell until the vehicle reveals it by carving.
+                // When hideRole is true, spawn gray so PhaseStar cannot detect the cell
+                // until the vehicle reveals it by carving. hiddenRole is baked into the imprint.
                 MusicalRole spawnRole = imprintRole;
                 Color spawnColor = c;
+                MusicalRole storedHidden = MusicalRole.None;
                 if (hideRole && imprintRole != MusicalRole.None)
                 {
-                    _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
-                    _hiddenImprints[gp] = imprintRole;
+                    storedHidden = imprintRole;
                     spawnRole = MusicalRole.None;
                     spawnColor = config.mazeTint;
                     spawnColor.a = c.a;
@@ -429,7 +426,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 _imprints[gp] = new DustImprint
                 {
                     color = spawnColor,
-                    role = spawnRole
+                    role = spawnRole,
+                    hiddenRole = storedHidden,
                 };
                 processed++;
 
@@ -455,7 +453,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp))
                     continue;
 
-                _voidGrowCells.Add(gp);
+                SetCellFlag(gp, CellFlags.VoidGrow);
                 _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
             }
         }
@@ -492,7 +490,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     // Appends trap ring/disk cells directly into the maze stagger list so they grow in
     // alongside every other cell. Call from the onBeforeGrowth callback inside
-    // GenerateMazeForPhaseWithPaths — _imprints and _hiddenImprints are already initialised at
+    // GenerateMazeForPhaseWithPaths — _imprints is already initialised at
     // that point and will not be cleared again before the stagger runs.
     public void InjectTrapCellsIntoStagger(
         List<(Vector2Int, Vector3)> cellsToFill,
@@ -503,8 +501,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         if (drums == null || cellsToFill == null || outerRadiusCells <= 0) return;
         EnsureCellGrid();
-        _imprints      ??= new Dictionary<Vector2Int, DustImprint>(2048);
-        _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>(2048);
 
         int rOuterSq = outerRadiusCells * outerRadiusCells;
         int rInnerSq = innerRadiusCellsExclusive >= 0 ? innerRadiusCellsExclusive * innerRadiusCellsExclusive : -1;
@@ -521,10 +518,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 if (!IsInBounds(gp)) continue;
                 if (_permanentClearCells.Contains(gp)) continue;
 
-                // Hidden role — revealed only when the vehicle carves this cell.
-                if (hiddenRole != MusicalRole.None)
-                    _hiddenImprints[gp] = hiddenRole;
-
                 _imprints[gp] = new DustImprint
                 {
                     role              = MusicalRole.None,
@@ -533,6 +526,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     drainResistance01 = 0f,
                     maxEnergyUnits    = 1,
                     healDelay         = 0f,
+                    hiddenRole        = hiddenRole,
                 };
 
                 Vector3 worldPos = drums.GridToWorldPosition(gp);
@@ -548,16 +542,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         if (drums == null || cellsToFill == null || trapCells == null) return;
         EnsureCellGrid();
-        _imprints      ??= new Dictionary<Vector2Int, DustImprint>(256);
-        _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
+        _imprints ??= new Dictionary<Vector2Int, DustImprint>(256);
 
         foreach (var gp in trapCells)
         {
             if (!IsInBounds(gp)) continue;
             if (_permanentClearCells.Contains(gp)) continue;
-
-            if (hiddenRole != MusicalRole.None)
-                _hiddenImprints[gp] = hiddenRole;
 
             _imprints[gp] = new DustImprint
             {
@@ -567,6 +557,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 drainResistance01 = 0f,
                 maxEnergyUnits    = 1,
                 healDelay         = 0f,
+                hiddenRole        = hiddenRole,
             };
 
             Vector3 worldPos = drums.GridToWorldPosition(gp);
@@ -593,16 +584,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             MusicalRole spawnRole = role;
             Color spawnColor = c;
+            MusicalRole hiddenRole2 = MusicalRole.None;
             if (hideRole && role != MusicalRole.None)
             {
-                _hiddenImprints ??= new Dictionary<Vector2Int, MusicalRole>();
-                _hiddenImprints[gp] = role;
+                hiddenRole2 = role;
                 spawnRole = MusicalRole.None;
                 spawnColor = config.mazeTint;
                 spawnColor.a = c.a;
             }
 
-            _imprints[gp] = new DustImprint { color = spawnColor, role = spawnRole };
+            _imprints[gp] = new DustImprint { color = spawnColor, role = spawnRole, hiddenRole = hiddenRole2 };
 
             if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
                 existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
@@ -621,7 +612,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (IsDustSpawnBlocked(gp)) continue;
             if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp)) continue;
 
-            _voidGrowCells.Add(gp);
+            SetCellFlag(gp, CellFlags.VoidGrow);
             _regrowthScheduler.VoidGrowCoroutines[gp] =
                 StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
         }
@@ -669,7 +660,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     public void RevealHiddenDustByRole(Vector2Int centerGP, int radiusCells, MusicalRole role)
     {
-        if (radiusCells <= 0 || _gridState.CellState == null || _hiddenImprints == null) return;
+        if (radiusCells <= 0 || _gridState.CellState == null) return;
 
         var profile = MusicalRoleProfileLibrary.GetProfile(role);
         if (profile == null) return;
@@ -682,7 +673,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (dx * dx + dy * dy > rSq) continue;
             var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
             if (!IsInBounds(gp)) continue;
-            if (!_hiddenImprints.TryGetValue(gp, out var hiddenRole) || hiddenRole != role) continue;
+            if (!_imprints.TryGetValue(gp, out var hiddenImp) || hiddenImp.hiddenRole != role) continue;
             if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid) continue;
             if (!TryGetDustAt(gp, out var dust) || dust.Role != MusicalRole.None) continue;
 
@@ -836,24 +827,24 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     private void ApplyHiddenHintToDust(Vector2Int gp, CosmicDust dust)
     {
-        if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var role) || role == MusicalRole.None)
+        if (_imprints == null || !_imprints.TryGetValue(gp, out var imp) || imp.hiddenRole == MusicalRole.None)
         {
             dust.SetHiddenHintColor(Color.clear);
             return;
         }
-        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        var profile = MusicalRoleProfileLibrary.GetProfile(imp.hiddenRole);
         dust.SetHiddenHintColor(profile != null ? profile.GetBaseColor() : Color.clear);
     }
 
     private bool PromoteHiddenRole(Vector2Int gp)
     {
-        if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var hiddenRole)) return false;
         if (_imprints == null || !_imprints.TryGetValue(gp, out var imp)) return false;
+        if (imp.hiddenRole == MusicalRole.None) return false;
         if (imp.role != MusicalRole.None) return false; // already colored — no-op
 
-        imp.role = hiddenRole;
+        imp.role = imp.hiddenRole;
         _imprints[gp] = imp;
-        // _hiddenImprints entry is kept as permanent Voronoi ground-truth for the motif lifetime.
+        // hiddenRole is kept as permanent Voronoi ground-truth for the motif lifetime.
         // RestoreVoronoiImprint() uses it to revert MineNode paint when a vehicle carves the cell.
         return true;
     }
@@ -866,10 +857,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     private bool RestoreVoronoiImprint(Vector2Int gp)
     {
-        if (_hiddenImprints == null || !_hiddenImprints.ContainsKey(gp)) return false;
+        if (_imprints == null || !_imprints.TryGetValue(gp, out var imp) || imp.hiddenRole == MusicalRole.None) return false;
 
         // Clear any MineNode paint so PromoteHiddenRole can re-apply the Voronoi role.
-        if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.role != MusicalRole.None)
+        if (imp.role != MusicalRole.None)
         {
             imp.role = MusicalRole.None;
             _imprints[gp] = imp;
@@ -879,6 +870,29 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
 
     private bool IsKeepClearCell(Vector2Int cell) => dustClaims != null && dustClaims.IsBlocked(cell);
+
+    private void SetHiddenRole(Vector2Int gp, MusicalRole role)
+    {
+        _imprints.TryGetValue(gp, out var imp);
+        imp.hiddenRole = role;
+        _imprints[gp] = imp;
+    }
+
+    private bool HasCellFlag(Vector2Int cell, CellFlags flag) =>
+        _cellFlags.TryGetValue(cell, out var f) && (f & flag) != 0;
+    private void SetCellFlag(Vector2Int cell, CellFlags flag)
+    {
+        _cellFlags.TryGetValue(cell, out var f);
+        _cellFlags[cell] = f | flag;
+    }
+    private bool ClearCellFlag(Vector2Int cell, CellFlags flag)
+    {
+        if (!_cellFlags.TryGetValue(cell, out var f)) return false;
+        var next = f & ~flag;
+        if (next == CellFlags.None) _cellFlags.Remove(cell);
+        else _cellFlags[cell] = next;
+        return (f & flag) != 0;
+    }
 
     private static void FillDisk(HashSet<Vector2Int> result, Vector2Int center, int r, int w, int h)
     {
@@ -1178,22 +1192,24 @@ public partial class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Regrowing);
         CosmicDust dust = null;
         MusicalRole regrowRole = MusicalRole.None;
-        _playerCarvedCells.Remove(gp);
+        ClearCellFlag(gp, CellFlags.PlayerCarved);
         if (go.TryGetComponent<CosmicDust>(out dust) && dust != null)
         {
             dust.PrepareForReuse();
             dust.InitializeVisuals(DustTimings);
             dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
-            regrowRole = _zapForceGrayCells.Remove(gp) ? MusicalRole.None : ResolveRegrowRole(gp);
-            _forceGrayRegrow.Remove(gp);
+            regrowRole = ClearCellFlag(gp, CellFlags.ZapForceGray) ? MusicalRole.None : ResolveRegrowRole(gp);
+            ClearCellFlag(gp, CellFlags.ForceGrayRegrow);
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : config.mazeTint;
 
             // Write / update the imprint so future regrows of this cell remember the role.
+            // Preserve hiddenRole (permanent Voronoi ground-truth) across the rewrite.
             _imprints ??= new Dictionary<Vector2Int, DustImprint>();
+            _imprints.TryGetValue(gp, out var existingImp);
             _imprints[gp] = new DustImprint
             {
                 color               = regrowTint,
@@ -1201,7 +1217,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 drainResistance01   = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f,
                 maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : 1,
                 role                = regrowRole,
-                healDelay           = 0f
+                healDelay           = 0f,
+                hiddenRole          = existingImp.hiddenRole,
             };
 
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
@@ -1392,7 +1409,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, float regrowDelaySeconds = 2f)
     {
         if (!IsInBounds(cell)) return;
-        _forceGrayRegrow.Add(cell);
+        SetCellFlag(cell, CellFlags.ForceGrayRegrow);
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: false);
     }
 
@@ -1409,7 +1426,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Visual fade duration comes from config.zapFadeSeconds tuning.
     public void ZapCell(Vector2Int cell)
     {
-        _zapForceGrayCells.Add(cell);
+        SetCellFlag(cell, CellFlags.ZapForceGray);
         var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, true, config.zapRegrowDelaySeconds, true);
         ClearCellByInteraction(cell, req);
     }
@@ -1498,8 +1515,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (_imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.role != MusicalRole.None)
             role = imp.role;
 
-        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole) && hiddenRole != MusicalRole.None)
-            role = hiddenRole;
+        if (_imprints != null && _imprints.TryGetValue(cell, out var hiddenImp2) && hiddenImp2.hiddenRole != MusicalRole.None)
+            role = hiddenImp2.hiddenRole;
 
         // Live profile is always authoritative when a role is known.
         if (role != MusicalRole.None)
@@ -1649,11 +1666,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
             {
                 // Gray-start cell: consult hidden imprint before giving up,
                 // unless a non-vehicle carve has requested the cell stay gray.
-                if (!_forceGrayRegrow.Contains(gp))
+                if (!HasCellFlag(gp, CellFlags.ForceGrayRegrow))
                 {
-                    if (_hiddenImprints != null && _hiddenImprints.TryGetValue(gp, out var hidden)
-                        && hidden != MusicalRole.None && IsRoleActive(hidden))
-                        return hidden;
+                    if (existingImp.hiddenRole != MusicalRole.None && IsRoleActive(existingImp.hiddenRole))
+                        return existingImp.hiddenRole;
                 }
                 // No active hidden imprint (or force-gray suppressed it) — fall through to neighbor/density logic.
             }
@@ -1744,8 +1760,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     public MusicalRole GetZoneRole(Vector2Int cell)
     {
-        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var r))
-            return r;
+        if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
+            return imp.hiddenRole;
         return MusicalRole.None;
     }
 
@@ -1873,10 +1889,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
         }
         _imprints?.Clear();
-        _hiddenImprints?.Clear();
-        _voidGrowCells.Clear();
+        _cellFlags.Clear();
         _ripenessByCell.Clear();
-        _playerCarvedCells.Clear();
         _gridState.AllSolidCount    = 0;
         _targetSolidCount = -1;
         _gridState.RegrowingCount   = 0;
@@ -1943,9 +1957,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     if (_permanentClearCells.Contains(grid)) continue;
                     if (IsKeepClearCell(grid)) continue;
                     // Skip cells already queued for void-growth (e.g. vehicle trap ring spawned
-                    // via onBeforeGrowth callback). _voidGrowCells is populated synchronously so
+                    // via onBeforeGrowth callback). VoidGrow flag is set synchronously so
                     // this check is race-free regardless of coroutine scheduling order.
-                    if (_voidGrowCells.Contains(grid)) continue;
+                    if (HasCellFlag(grid, CellFlags.VoidGrow)) continue;
                     if (TryGetCellState(grid, out var existSt) &&
                         (existSt == DustCellState.Solid || existSt == DustCellState.Regrowing)) continue;
                     if (IsDustSpawnBlocked(grid)) continue;
@@ -2115,14 +2129,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 continue;
             }
 
-            if (_hiddenImprints == null || !_hiddenImprints.TryGetValue(gp, out var trueRole)
-                || trueRole == MusicalRole.None)
+            if (_imprints == null || !_imprints.TryGetValue(gp, out var ripeImp)
+                || ripeImp.hiddenRole == MusicalRole.None)
             {
                 _ripenessByCell.Remove(gp);
                 continue;
             }
 
-            var profile = MusicalRoleProfileLibrary.GetProfile(trueRole);
+            var profile = MusicalRoleProfileLibrary.GetProfile(ripeImp.hiddenRole);
             float duration = profile != null ? Mathf.Max(0.01f, profile.ripeDuration) : 8f;
             float ripeness = _ripenessByCell[gp] - (1f / duration) * dt;
 

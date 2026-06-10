@@ -110,16 +110,16 @@ public partial class CosmicDustGenerator
         if (!RestoreVoronoiImprint(cell))
             PromoteHiddenRole(cell);
 
-        _playerCarvedCells.Add(cell);
+        SetCellFlag(cell, CellFlags.PlayerCarved);
 
-        bool wasVoidCell = _voidGrowCells.Remove(cell);
+        bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
         if (wasVoidCell) _imprints?.Remove(cell);
 
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
 
-        if (_hiddenImprints != null && _hiddenImprints.TryGetValue(cell, out var hiddenRole))
+        if (_imprints != null && _imprints.TryGetValue(cell, out var carveImp) && carveImp.hiddenRole != MusicalRole.None)
         {
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(hiddenRole);
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(carveImp.hiddenRole);
             if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
                 RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
         }
