@@ -210,9 +210,9 @@ public class ControlTutorialDirector : MonoBehaviour
             case PrimaryMode.JoinSouth:
                 primaryInstance.SetVisible(true);
                 primaryInstance.ShowWaitingFor(
-                    ControlTutorialHighlight.ButtonId.East,
+                    ControlTutorialHighlight.ButtonId.South,
                     immediate: true,
-                    overrideText: "press"
+                    overrideText: "join"
                 );
                 break;
 

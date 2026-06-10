@@ -689,7 +689,7 @@ MonoBehaviour:
   labelScaleLerpSpeed: 14
   deactivateLabelWhenHidden: 1
   stepConfirmClip: {fileID: 8300000, guid: cdec88e5cf531a34fa7ffb2147d99e85, type: 3}
-  stepConfirmVolume: 1
+  stepConfirmVolume: 0.716
   hideTextOnClear: 1
   controlSchemePivot: {fileID: 0}
   stickRotationMaxZ: 30
@@ -702,10 +702,6 @@ MonoBehaviour:
   rootAlphaPulseSpeed: 1.5
   flyMaxDistance: 150
   flyPositionSpeed: 6
-  butterflyAmplitudeX: 80
-  butterflyAmplitudeY: 40
-  butterflyFrequency: 1.2
-  butterflyPositionSpeed: 6
 --- !u!225 &2987831516447571478
 CanvasGroup:
   m_ObjectHideFlags: 0

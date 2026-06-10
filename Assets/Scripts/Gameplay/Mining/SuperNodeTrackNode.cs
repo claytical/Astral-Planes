@@ -46,7 +46,6 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     [Header("Collection")]
     [SerializeField] private float spawnGraceSeconds  = 0.2f;
-    [SerializeField] private float minImpactSpeed     = 1.5f;
     [SerializeField] private int   ascendLoopsOverride = 3;
 
     [Header("Dust Carving")]
@@ -88,6 +87,7 @@ public class SuperNodeTrackNode : MonoBehaviour
     private float _wobblePhase;
 
     private static readonly RaycastHit2D[] _lookaheadBuffer = new RaycastHit2D[8];
+    private static readonly Collider2D[]   _fleeBuffer      = new Collider2D[16];
 
     private static readonly Vector2[] _scanDirs = new Vector2[]
     {
@@ -262,7 +262,7 @@ public class SuperNodeTrackNode : MonoBehaviour
 
         // Forward lookahead
         Vector2 rayStart = pos + dir * 0.25f;
-        int count = Physics2D.RaycastNonAlloc(rayStart, dir, _lookaheadBuffer, lookaheadDistance * 2f);
+        int count = Physics2D.Raycast(rayStart, dir, ContactFilter2D.noFilter, _lookaheadBuffer, lookaheadDistance * 2f);
         for (int i = 0; i < count; i++)
         {
             var hit = _lookaheadBuffer[i];
@@ -288,7 +288,7 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     private bool QuickDustCheck(Vector2 pos, Vector2 dir, float distance)
     {
-        int count = Physics2D.RaycastNonAlloc(pos + dir * 0.1f, dir, _lookaheadBuffer, distance);
+        int count = Physics2D.Raycast(pos + dir * 0.1f, dir, ContactFilter2D.noFilter, _lookaheadBuffer, distance);
         for (int i = 0; i < count; i++)
         {
             var hit = _lookaheadBuffer[i];
@@ -361,7 +361,7 @@ public class SuperNodeTrackNode : MonoBehaviour
     private bool HasNonMatchingDustAhead(Vector2 pos, Vector2 dir)
     {
         Vector2 rayStart = pos + dir * 0.25f;
-        int count = Physics2D.RaycastNonAlloc(rayStart, dir, _lookaheadBuffer, lookaheadDistance);
+        int count = Physics2D.Raycast(rayStart, dir, ContactFilter2D.noFilter, _lookaheadBuffer, lookaheadDistance);
         for (int i = 0; i < count; i++)
         {
             var hit = _lookaheadBuffer[i];
@@ -377,12 +377,12 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     private Vehicle GetNearestVehicleWithin(Vector2 pos, float radius)
     {
-        var cols      = Physics2D.OverlapCircleAll(pos, radius);
+        int count = Physics2D.OverlapCircle(pos, radius, ContactFilter2D.noFilter, _fleeBuffer);
         Vehicle nearest  = null;
         float   nearestSq = radius * radius;
-        foreach (var c in cols)
+        for (int i = 0; i < count; i++)
         {
-            var v = c.GetComponentInParent<Vehicle>();
+            var v = _fleeBuffer[i]?.GetComponentInParent<Vehicle>();
             if (v == null) continue;
             float dsq = ((Vector2)v.transform.position - pos).sqrMagnitude;
             if (dsq < nearestSq) { nearestSq = dsq; nearest = v; }
@@ -393,10 +393,7 @@ public class SuperNodeTrackNode : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (_collected || Time.time - _spawnTime < spawnGraceSeconds) return;
-        var vehicle = other.GetComponentInParent<Vehicle>();
-        if (vehicle == null) return;
-        var vrb = vehicle.GetComponent<Rigidbody2D>();
-        if (vrb != null && vrb.linearVelocity.magnitude >= minImpactSpeed)
+        if (other.GetComponentInParent<Vehicle>() != null)
             Collect();
     }
 
