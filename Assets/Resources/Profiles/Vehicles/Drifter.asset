@@ -35,7 +35,7 @@ MonoBehaviour:
   plowChipAmount: 1
   carveResistanceBypass01: 0
   carveVelocityDrainPerCell: 0
-  directionalAuthority01: 0.6
+  directionalAuthority01: 0.45
   plowSteeringPenalty01: 0
   pressureInstabilityRadius: 0
   pressureInstabilityStrength01: 0

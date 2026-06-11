@@ -9,14 +9,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2614095863033673403}
-  - component: {fileID: 1970310610805977373}
-  - component: {fileID: 3138199776794840757}
   - component: {fileID: 6267414685674281640}
+  - component: {fileID: 1970310610805977373}
   - component: {fileID: 964252887607637339}
   - component: {fileID: -5305570869300527016}
   - component: {fileID: -7412268372019161615}
-  - component: {fileID: 5276421355233068979}
+  - component: {fileID: 3138199776794840757}
   - component: {fileID: -3677806035115411118}
+  - component: {fileID: 6837367512167904952}
   m_Layer: 0
   m_Name: Howler
   m_TagString: Vehicle
@@ -40,6 +40,38 @@ Transform:
   - {fileID: 3778538305823564081}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6267414685674281640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: 6265dc9ba4a1d45328e5a0fd84c9504c, type: 2}
+  vehicleConfig: {fileID: 11400000, guid: 5eac3be187b634316af147683372ab22, type: 2}
+  capacity: 70
+  arcadeMaxSpeed: 14
+  vehicleKeepClearRadiusCells: 1
+  soulSprite: {fileID: 2059141339769553833}
+  gravityVoidMask:
+    serializedVersion: 2
+    m_Bits: 0
+  dustLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  energyLevel: 70
+  boosting: 0
+  trail: {fileID: 5973205746167519599, guid: 4f48472fa779ab944bdf83b19c9fc7c7, type: 3}
+  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
+  playerStatsUI: {fileID: 0}
+  playerStats: {fileID: 0}
+  rb: {fileID: 0}
+  releaseCue: {fileID: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
   serializedVersion: 2
@@ -95,67 +127,11 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.5, y: 0.77}
+  m_Size: {x: 0.35, y: 0.54}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!50 &3138199776794840757
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 1.25
-  m_LinearDamping: 0
-  m_AngularDamping: 0
-  m_GravityScale: 0
-  m_Material: {fileID: 6200000, guid: 8a0d22cb4d4334705936f438fc6e3428, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 1
-  m_Constraints: 0
---- !u!114 &6267414685674281640
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  profile: {fileID: 11400000, guid: 6265dc9ba4a1d45328e5a0fd84c9504c, type: 2}
-  vehicleConfig: {fileID: 11400000, guid: 5eac3be187b634316af147683372ab22, type: 2}
-  capacity: 70
-  arcadeMaxSpeed: 14
-  soulSprite: {fileID: 2059141339769553833}
-  gravityVoidMask:
-    serializedVersion: 2
-    m_Bits: 0
-  energyLevel: 70
-  boosting: 0
-  trail: {fileID: 5973205746167519599, guid: 4f48472fa779ab944bdf83b19c9fc7c7, type: 3}
-  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
-  playerStatsUI: {fileID: 0}
-  playerStats: {fileID: 0}
-  rb: {fileID: 0}
-  vehicleKeepClearRadiusCells: 1
-  releaseCue: {fileID: 0}
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -171,6 +147,7 @@ MonoBehaviour:
   explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
     type: 3}
   preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1
@@ -287,7 +264,59 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10eade318f31ba248b72c13c52f1c81c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!60 &5276421355233068979
+--- !u!50 &3138199776794840757
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1.25
+  m_LinearDamping: 0
+  m_AngularDamping: 0
+  m_GravityScale: 0
+  m_Material: {fileID: 6200000, guid: 8a0d22cb4d4334705936f438fc6e3428, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 1
+  m_Constraints: 0
+--- !u!114 &-3677806035115411118
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
+  circleMaxRadius: 0.65
+  circleMinRadius: 0.35
+  circleAlphaMin: 0.5
+  circleAlphaMax: 0.9
+  circleSortingLayer: Default
+  circleSortingOrder: -1
+  circleLerpSpeed: 10
+  circleSprite: {fileID: 0}
+  stepBarSprite: {fileID: 0}
+  stepBarWidth: 0.8
+  stepBarHeight: 0.07
+  stepBarYOffset: -0.55
+  stepBarSortingOrder: 3
+--- !u!60 &6837367512167904952
 PolygonCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -325,88 +354,45 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.5, y: 0.77}
-    newSize: {x: 0.5, y: 0.77}
+    oldSize: {x: 0.35, y: 0.54}
+    newSize: {x: 0.35, y: 0.54}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.29, y: -0.42999998}
-      - {x: 0.29, y: -0.25}
-      - {x: 0.16, y: -0.02}
-      - {x: 0.049999997, y: 0.35}
-      - {x: 0.049999997, y: 0.42999998}
-      - {x: -0.03, y: 0.42999998}
-      - {x: -0.03, y: 0.42}
-      - {x: -0.08, y: 0.17999999}
-      - {x: -0.22, y: -0.14999999}
-      - {x: -0.29, y: -0.25}
-      - {x: -0.29, y: -0.42999998}
-      - {x: -0.21, y: -0.42999998}
-      - {x: -0.19999999, y: -0.38}
-      - {x: 0.06, y: -0.32999998}
-      - {x: 0.24, y: -0.42999998}
-    - - {x: -0.049999997, y: -0.19}
-      - {x: -0.04, y: -0.17999999}
-      - {x: 0.049999997, y: -0.17999999}
-      - {x: 0.06, y: -0.19}
-      - {x: 0.22, y: -0.29999998}
-      - {x: 0.22999999, y: -0.29}
-      - {x: 0.089999996, y: -0.17999999}
-      - {x: -0.07, y: -0.14999999}
-      - {x: -0.24, y: -0.29}
-      - {x: -0.21, y: -0.29999998}
-    - - {x: -0.06, y: -0.26}
-      - {x: -0.04, y: -0.26999998}
-      - {x: -0.03, y: -0.26}
-      - {x: 0.01, y: -0.26}
-      - {x: 0.02, y: -0.26999998}
-      - {x: 0.049999997, y: -0.26}
-      - {x: 0.03, y: -0.25}
-      - {x: 0.02, y: -0.26}
-      - {x: -0.04, y: -0.25}
-    - - {x: -0.06, y: -0.02}
-      - {x: -0.06, y: 0}
-      - {x: -0.04, y: 0.03}
-      - {x: -0.03, y: 0.099999994}
-      - {x: -0.04, y: 0}
-      - {x: -0.099999994, y: -0.07}
-      - {x: -0.08, y: -0.07}
-    - - {x: 0.049999997, y: 0}
-      - {x: 0.04, y: 0.11}
-      - {x: 0.03, y: 0.08}
-      - {x: 0.049999997, y: 0.049999997}
-      - {x: 0.06, y: 0}
-      - {x: 0.089999996, y: -0.049999997}
-      - {x: 0.099999994, y: -0.04}
-  m_UseDelaunayMesh: 0
---- !u!114 &-3677806035115411118
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
-  circleMaxRadius: 0.65
-  circleMinRadius: 0.35
-  circleAlphaMin: 0.5
-  circleAlphaMax: 0.9
-  circleSortingLayer: Default
-  circleSortingOrder: -1
-  circleLerpSpeed: 10
-  circleSprite: {fileID: 0}
-  stepBarSprite: {fileID: 0}
-  stepBarWidth: 0.8
-  stepBarHeight: 0.07
-  stepBarYOffset: -0.55
-  stepBarSortingOrder: 3
+    - - {x: 0.065, y: -0.17}
+      - {x: 0.175, y: -0.22}
+      - {x: 0.175, y: -0.13}
+      - {x: 0.13499999, y: -0.06}
+      - {x: 0.024999999, y: 0.01}
+      - {x: -0.044999998, y: 0.01}
+      - {x: -0.175, y: -0.08}
+      - {x: -0.175, y: -0.26999998}
+      - {x: -0.145, y: -0.26999998}
+      - {x: -0.035, y: -0.17999999}
+      - {x: -0.044999998, y: -0.14999999}
+      - {x: -0.085, y: -0.14}
+    - - {x: 0.055, y: -0.14}
+      - {x: 0.024999999, y: -0.17}
+      - {x: 0.024999999, y: -0.19999999}
+      - {x: 0.145, y: -0.26999998}
+      - {x: 0.175, y: -0.26999998}
+      - {x: 0.175, y: -0.21}
+      - {x: 0.105, y: -0.14999999}
+    - - {x: -0.005, y: -0.11}
+      - {x: 0.024999999, y: -0.099999994}
+      - {x: 0.024999999, y: -0.07}
+      - {x: -0.005, y: -0.06}
+      - {x: -0.024999999, y: -0.08}
+    - - {x: -0.024999999, y: 0.26999998}
+      - {x: -0.035, y: 0.19}
+      - {x: -0.015, y: 0.17}
+      - {x: 0.015, y: 0.17}
+      - {x: 0.035, y: 0.19}
+      - {x: 0.024999999, y: 0.26999998}
+  m_UseDelaunayMesh: 1
 --- !u!1 &7076781707541423879
 GameObject:
   m_ObjectHideFlags: 0
@@ -494,7 +480,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.5, y: 0.77}
+  m_Size: {x: 0.35, y: 0.54}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1

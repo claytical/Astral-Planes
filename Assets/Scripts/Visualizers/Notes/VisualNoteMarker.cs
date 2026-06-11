@@ -8,10 +8,18 @@ public class VisualNoteMarker : MonoBehaviour
     public ParticleSystem preCaptureParticles;
     public bool IsLit { get; set; }
 
+    private ParticleSystemRenderer _capturedRenderer;
+    private int _baseParticleSortOrder;
+
     void Awake()
     {
         if (_spriteRenderer == null)
             _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (capturedParticles != null)
+        {
+            _capturedRenderer = capturedParticles.GetComponent<ParticleSystemRenderer>();
+            if (_capturedRenderer != null) _baseParticleSortOrder = _capturedRenderer.sortingOrder;
+        }
     }
     public void ApplyLitColor(Color color)
     {
@@ -25,6 +33,7 @@ public class VisualNoteMarker : MonoBehaviour
             _spriteRenderer.color = c;
         }
 
+        if (_capturedRenderer != null) _capturedRenderer.sortingOrder = _baseParticleSortOrder;
         ApplyParticleColor(capturedParticles, color);
         if (preCaptureParticles != null)
             preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -53,6 +62,7 @@ public class VisualNoteMarker : MonoBehaviour
             capturedParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             capturedParticles.Play();
         }
+        if (_capturedRenderer != null) _capturedRenderer.sortingOrder = _baseParticleSortOrder + 1;
         if (preCaptureParticles != null)
             preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
@@ -71,6 +81,7 @@ public class VisualNoteMarker : MonoBehaviour
             _spriteRenderer.color = c;
         }
 
+        if (_capturedRenderer != null) _capturedRenderer.sortingOrder = _baseParticleSortOrder;
         if (preCaptureParticles != null)
             preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 

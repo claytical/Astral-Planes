@@ -194,17 +194,31 @@ MonoBehaviour:
   spawnArrivalSeconds: 1
   spawnArrivalEase:
     serializedVersion: 2
-    m_Curve: []
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
   spawnArrivalConeAngleDeg: 25
   spawnArrivalNoiseStrength: 3.2
   spawnArrivalNoiseFrequency: 1.2
-  keepDustPocketOpen: 1
-  dustPocketRadiusWorld: 0.55
-  dustPocketTickSeconds: 0.15
-  dustPocketHoldSeconds: 0.45
   depositTravelSeconds: 1.6
   minDepositTravelSeconds: 1
   maxDepositTravelSeconds: 2.2
@@ -242,12 +256,7 @@ MonoBehaviour:
   sharedTargetSteps: 
   minSpeed: 0.8
   maxSpeed: 5
-  arriveRadius: 0.05
-  chooseNextEvery: 0.15
-  lingerLongNote: 0.25
-  lingerShortNote: 0.02
   dustAdjacencyProbe: 0.42
-  neighborRadiusCells: 1
 --- !u!114 &8925877091113225264
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -280,6 +289,7 @@ MonoBehaviour:
   explosion: {fileID: 8455937364993888704, guid: 08a87ae8892458741b1a98e7dba483ec,
     type: 3}
   preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1
@@ -360,7 +370,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.15
+  m_Radius: 0.20
 --- !u!1 &325708082459754982
 GameObject:
   m_ObjectHideFlags: 0

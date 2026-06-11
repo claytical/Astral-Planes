@@ -9,11 +9,16 @@ public class MarkerLight : MonoBehaviour
 
     private Color _base;
     private Vector3 _startScale;
+    private int _baseSortOrder;
 
     void Awake()
     {
         if (sr == null) sr = GetComponentInChildren<SpriteRenderer>();
-        if (sr != null) _base = sr.color;
+        if (sr != null)
+        {
+            _base = sr.color;
+            _baseSortOrder = sr.sortingOrder;
+        }
         _startScale = transform.localScale;
     }
 
@@ -23,6 +28,7 @@ public class MarkerLight : MonoBehaviour
         Color c = sr.color;
         c.a = .75f;
         sr.color = c;
+        sr.sortingOrder = _baseSortOrder + 1;
     }
     public void SetAvailable(Color color)
     {
@@ -30,12 +36,14 @@ public class MarkerLight : MonoBehaviour
         Color c = color;
         c.a = 0.75f;
         sr.color = c;
+        sr.sortingOrder = _baseSortOrder + 1;
     }
 
     public void LightUp(Color trackColor)
     {
         if (sr == null) return;
         sr.color = trackColor;
+        sr.sortingOrder = _baseSortOrder;
         var vnm = GetComponent<VisualNoteMarker>();
         if (vnm != null)
             vnm.ApplyLitColor(trackColor);

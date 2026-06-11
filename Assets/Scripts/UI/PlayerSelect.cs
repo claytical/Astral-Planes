@@ -7,7 +7,7 @@ using TMPro;
 public class PlayerSelect : MonoBehaviour
 {
     public Image planeIcon;
-    public Fuel fuel;
+    public VehicleStatDisplay statDisplay;
     public GameObject controlsAndStats;
     public GameObject tutorialControls;
     public Image border;
@@ -57,34 +57,35 @@ public class PlayerSelect : MonoBehaviour
     }
     private void SetStats(Vehicle vehicle)
     {
-        if (fuel == null)
-        {
-            return;
-        }
+        if (statDisplay == null) return;
 
         ShipMusicalProfile profile = vehicle.profile;
+        float speed, agility, power, fuel;
 
-        const float maxCapacityForUI = 250f;
-        const float accelTopEndForUI = 20f;
-        const float speedTopEndForUI = 20f;
-        const float boostTopEndForUI = 150f;
+        if (profile != null)
+        {
+            speed   = profile.arcadeMaxSpeed / 20f;
+            agility = profile.directionalAuthority01;
+            power   = profile.plowChipAmount
+                      * (profile.plowHalfWidthCells * 2 + 1)
+                      * (1f + profile.carveResistanceBypass01)
+                      / 15f;
+            fuel    = (profile.capacity / profile.burnRate) / 700f;
+        }
+        else
+        {
+            speed   = vehicle.arcadeMaxSpeed / 20f;
+            agility = 0.5f;
+            power   = 0.5f;
+            fuel    = vehicle.capacity / 50f;
+        }
 
-        float capacity = profile != null ? profile.capacity : vehicle.capacity;
-        float burnRate = profile != null ? profile.burnRate : 1f;
-        float accel = profile != null ? profile.arcadeAccel : 0f;
-        float maxSpeed = profile != null ? profile.arcadeMaxSpeed : vehicle.arcadeMaxSpeed;
-        float boostAccel = profile != null ? profile.arcadeBoostAccel : 0f;
-
-        float capacityRatio = capacity / maxCapacityForUI;
-        float accelRatio = accel / accelTopEndForUI;
-        float speedRatio = maxSpeed / speedTopEndForUI;
-        float boostRatio = boostAccel / boostTopEndForUI;
-
-        string[] burnTiers = { "drifting", "measured", "committed", "forceful", "relentless", "all-consuming" };
-        int burnTier = Mathf.Clamp(Mathf.CeilToInt(burnRate * 3f), 1, 6);
-        string burnRateLabel = burnTiers[burnTier - 1];
-
-        fuel.UpdateSelectStats(capacityRatio, accelRatio, speedRatio, boostRatio, burnRateLabel);
+        statDisplay.SetStats(
+            Mathf.Clamp01(speed),
+            Mathf.Clamp01(agility),
+            Mathf.Clamp01(power),
+            Mathf.Clamp01(fuel)
+        );
     }
 
     private void ApplyVisuals()

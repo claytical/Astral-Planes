@@ -12615,6 +12615,7 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: 4341091ede319449faea4a5d91ac9786, type: 2}
   lineMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   sphericalRotation: 0
+  maxDisplayRadius: 0
   noteVisualizer: {fileID: 45202786}
   noteTravelDotPrefab: {fileID: 8455937364993888704, guid: 89c7f4bb7ac2442f4985c3faadfde648,
     type: 3}
@@ -12856,7 +12857,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: now, push through.
+  m_text: push through.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
