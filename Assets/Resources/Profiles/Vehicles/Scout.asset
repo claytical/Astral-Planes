@@ -15,7 +15,7 @@ MonoBehaviour:
   shipName: Scout
   description: 
   arcadeMaxSpeed: 18
-  arcadeAccel: 0
+  arcadeAccel: 6
   arcadeBoostAccel: 140
   arcadeLinearDamping: 0.08
   arcadeAngularDamping: 0.5
@@ -24,13 +24,21 @@ MonoBehaviour:
   stopAngularSpeed: 5
   inputDeadzone: 0.2
   mass: 0.9
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
   capacity: 200
   burnRate: 1
   plowHalfWidthCells: 1
+  vehicleKeepClearRadiusCells: 0
   plowDepthCells: 2
   plowMinSpeed: 2
-  plowChipAmount: 1
-  vehicleKeepClearRadiusCells: 0
+  plowChipAmount: 2
+  carveResistanceBypass01: 0
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 1
+  plowSteeringPenalty01: 0
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
   soulMinScale: 0.3
   soulMaxScale: 1.2
   soulScaleLerpSpeed: 14

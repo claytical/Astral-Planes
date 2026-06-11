@@ -13,19 +13,34 @@ MonoBehaviour:
   m_Name: Scuttle
   m_EditorClassIdentifier: 
   shipName: Scuttle
-  allowedMidiPresets: 0c000000
   description: Chaotic fun. Drops scattershot rhythms and sharp accents.
   arcadeMaxSpeed: 12
-  arcadeAccel: 0
+  arcadeAccel: 6
   arcadeBoostAccel: 80
   arcadeLinearDamping: 0.35
   arcadeAngularDamping: 0.5
-  requireBoostForThrust: 1
   coastBrakeForce: 2.2
   stopSpeed: 0.03
   stopAngularSpeed: 5
   inputDeadzone: 0.2
-  envScaleFloor: 0.6
   mass: 1.1
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
   capacity: 100
-  burnEfficiency: 0.95
+  burnRate: 1
+  plowHalfWidthCells: 1
+  vehicleKeepClearRadiusCells: 0
+  plowDepthCells: 2
+  plowMinSpeed: 2
+  plowChipAmount: 3
+  carveResistanceBypass01: 0
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 1
+  plowSteeringPenalty01: 0
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
+  soulMinScale: 0.3
+  soulMaxScale: 1.2
+  soulScaleLerpSpeed: 14
+  soulAlphaMin: 0
+  soulAlphaMax: 0.85

@@ -9,8 +9,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2614095863033673403}
-  - component: {fileID: 1970310610805977373}
   - component: {fileID: 6267414685674281640}
+  - component: {fileID: 1970310610805977373}
   - component: {fileID: 964252887607637339}
   - component: {fileID: 7119975083311327178}
   - component: {fileID: -8058789835656915631}
@@ -39,6 +39,38 @@ Transform:
   - {fileID: 2130882035544020587}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6267414685674281640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5120608187766906454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: bdb1431dc92e34997a403d7c5c34162b, type: 2}
+  vehicleConfig: {fileID: 11400000, guid: 5eac3be187b634316af147683372ab22, type: 2}
+  capacity: 80
+  arcadeMaxSpeed: 14
+  vehicleKeepClearRadiusCells: 1
+  soulSprite: {fileID: 5580386508361132524}
+  gravityVoidMask:
+    serializedVersion: 2
+    m_Bits: 0
+  dustLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  energyLevel: 80
+  boosting: 0
+  trail: {fileID: 5973205746167519599, guid: 953239f7f217f244caa872490dea92e6, type: 3}
+  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
+  playerStatsUI: {fileID: 0}
+  playerStats: {fileID: 0}
+  rb: {fileID: 0}
+  releaseCue: {fileID: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
   serializedVersion: 2
@@ -99,35 +131,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &6267414685674281640
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5120608187766906454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  profile: {fileID: 11400000, guid: bdb1431dc92e34997a403d7c5c34162b, type: 2}
-  vehicleConfig: {fileID: 0}
-  capacity: 80
-  arcadeMaxSpeed: 14
-  soulSprite: {fileID: 5580386508361132524}
-  gravityVoidMask:
-    serializedVersion: 2
-    m_Bits: 0
-  energyLevel: 80
-  boosting: 0
-  trail: {fileID: 5973205746167519599, guid: 953239f7f217f244caa872490dea92e6, type: 3}
-  thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
-  playerStatsUI: {fileID: 0}
-  playerStats: {fileID: 0}
-  rb: {fileID: 0}
-  vehicleKeepClearRadiusCells: 1
-  releaseCue: {fileID: 0}
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -143,6 +146,7 @@ MonoBehaviour:
   explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
     type: 3}
   preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   shipName: Sandwave
   description: Earthy and grounded. Driven by groove and plucked rhythm.
-  arcadeMaxSpeed: 11
+  arcadeMaxSpeed: 14
   arcadeAccel: 16
   arcadeBoostAccel: 100
   arcadeLinearDamping: 0.25
