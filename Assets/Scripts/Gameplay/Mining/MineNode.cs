@@ -58,8 +58,8 @@ public class MineNode : MonoBehaviour
     public bool didContainmentThisTick { get; private set; }
 
     [Header("Expiry")]
-    [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
-    [SerializeField, Min(0)] private int expireAfterLoops = 3;
+    [Tooltip("Fallback only — overridden at runtime by RoleMotifNoteSetConfig.mineNodeExpireAfterLoops. 0 = never.")]
+    [SerializeField, Min(0)] private int expireAfterLoops = 0;
     [Tooltip("Radius in grid cells within which hidden dust matching this node's role is revealed on expiry.")]
     [SerializeField, Min(0)] private int expireBlastRadiusCells = 5;
 
@@ -138,6 +138,7 @@ public class MineNode : MonoBehaviour
         _spawnCell = spawnCell;
         _role = track != null ? track.assignedRole : default;
         _noteSet = noteSet;
+        expireAfterLoops = noteSet?.expireAfterLoops ?? 0;
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);

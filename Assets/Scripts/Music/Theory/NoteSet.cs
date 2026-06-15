@@ -7,6 +7,7 @@ public class NoteSet
     public InstrumentTrack assignedInstrumentTrack;
     public List<Chord> chordRegion;
     public List<(int step, int note, int duration, float vel, int authoredRootMidi)> persistentTemplate;
+    public int expireAfterLoops = 0;
 
     private readonly Dictionary<int, (int note, int dur, float vel, int authoredRootMidi)> _templateByStep
         = new Dictionary<int, (int note, int dur, float vel, int authoredRootMidi)>();

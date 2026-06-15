@@ -15,7 +15,7 @@ public class GlowPulseText : MonoBehaviour
     void Start()
     {
         _tmpText = GetComponent<TextMeshProUGUI>();
-        _textMaterial = _tmpText.fontMaterial;
+//        _textMaterial = _tmpText.fontMaterial;
 
         if (!_textMaterial.HasProperty(glowProperty))
         {

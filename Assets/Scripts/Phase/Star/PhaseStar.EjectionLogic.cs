@@ -25,18 +25,23 @@ public partial class PhaseStar
         if (AnyExpansionPendingGlobal())
         {
             Trace("OnCollisionEnter2D: expansion pending — ignoring poke, star stays armed");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=expansion-pending " +
+                      $"anyVehicleCarrying={Vehicle.AnyVehicleCarrying()} pendingTracks=({DebugExpansionPendingTracks()})");
             return;
         }
 
         if (_state != PhaseStarState.WaitingForPoke)
         {
             Trace($"OnCollision: ignored, state={_state}");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bad-state state={_state} isArmed={_isArmed} ejectionInFlight={_ejectionInFlight}");
             return;
         }
 
         if (_ejectionInFlight)
         {
             Trace("OnCollision: ignored, busy flags");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=ejection-in-flight " +
+                      $"activeNode={(_activeNode ? _activeNode.name : "null")} activeSuperNode={(_activeSuperNode ? _activeSuperNode.name : "null")}");
             return;
         }
         if (!IsEjectionReady())
@@ -61,18 +66,22 @@ public partial class PhaseStar
             else
             {
                 Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=dominant-not-ejectable " +
+                          $"zapState={_zapProgressState} dominantRole={dominantRoleForDescriptor} charge01={GetChargeNormalized01(dominantRoleForDescriptor):F2}");
                 return;
             }
         }
         if (_activeNode != null)
         {
             Trace("OnCollision: ignored, activeNode != null");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=active-node activeNode={_activeNode.name}");
             return;
         }
 
         if (Time.frameCount == _lastPokeFrame)
         {
             Trace("OnCollision: ignored, same frame");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=same-frame frame={Time.frameCount}");
             return;
         }
 
@@ -95,12 +104,21 @@ public partial class PhaseStar
                 || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
         {
             Trace("OnCollisionEnter2D: new-bin expansion blocked — notes still in play");
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bin-full-notes-in-play " +
+                      $"track={_cachedTrack.name} binCursor={_cachedTrack.GetBinCursor()} loopMultiplier={_cachedTrack.loopMultiplier} " +
+                      $"vehicleCarryingThisTrack={Vehicle.AnyVehicleCarryingTrack(_cachedTrack)} " +
+                      $"liveOnThisTrack={Collectable.AnyLiveForTrack(_cachedTrack)} " +
+                      $"liveOnOtherTracks={Collectable.AnyLiveFromOtherTracks(_cachedTrack)}");
             return;
         }
 
         if (_previewRole != MusicalRole.None)
         {
-            if (_disarmReason == PhaseStarDisarmReason.SiblingActive) return;
+            if (_disarmReason == PhaseStarDisarmReason.SiblingActive)
+            {
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
+                return;
+            }
             EjectActivePreviewShardAndFlow(coll);
             return;
         }
@@ -277,13 +295,39 @@ public partial class PhaseStar
         int total      = Mathf.Max(1, _assignedMotif?.nodesPerStar ?? 1);
         float difficulty01 = 1f - Mathf.Clamp01((float)captured / total);
 
-        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg, difficulty01);
         go.GetComponent<Explode>()?.SetTint(spawnTint);
 
         _activeSuperNode = sn;
         sn.OnResolved += () =>
         {
             _activeSuperNode = null;
+
+            // Mirror SuperNodeTrackNode.Collect() for the initiating/fully-expanded track —
+            // shard tracks (if any) handle their own InstantFillAllBins via their
+            // SuperNodeTrackNode.Collect(), but targetTrack itself is never a shard, so it
+            // needs the same "fill + advance" treatment here.
+            if (targetTrack != null)
+            {
+                var rings = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
+                rings?.SetSuperNodeMode(true);
+
+                int pre = targetTrack.loopMultiplier;
+                targetTrack.InstantFillAllBins(toMaxCapacity: true);
+                int post = targetTrack.loopMultiplier;
+
+                if (post > pre)
+                {
+                    int binSz = targetTrack.BinSize();
+                    targetTrack.controller?.StartSuperNodeCompletionSequence(
+                        targetTrack, pre, post, /*ascendLoopsOverride*/ 3, binSz, _drum);
+                }
+                else
+                {
+                    targetTrack.controller?.CheckAndTriggerAllTracksMaxed();
+                }
+
+                targetTrack.controller?.StageAltChordIfAllTracksMaxed();
+            }
 
             OnMineNodeResolved?.Invoke(this, _attunedRole);
 
@@ -300,6 +344,11 @@ public partial class PhaseStar
             Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
             LogState("OnSuperNodeResolved");
         };
+
+        // Initialize AFTER subscribing — when shardTracks is empty, Initialize() resolves
+        // synchronously (FireResolvedOnce inside Initialize), and the subscriber above must
+        // already be attached to receive that event.
+        sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg, difficulty01);
 
         PrepareNextDirective();
     }
@@ -345,8 +394,9 @@ public partial class PhaseStar
             return false;
         }
 
-        // Only spawn if there is at least one other active-role track still below max.
-        // If all tracks are already maxed, CheckAndTriggerAllTracksMaxed should handle completion.
+        // Shard tracks (other active-role tracks still below max) are optional bonus content,
+        // not a prerequisite — SuperNode fires once this track is fully expanded and an
+        // alternate chord progression exists, even for single-active-role motifs.
         var activeRoles = _assignedMotif.GetActiveRoles();
         var ctrl = _gfm?.controller;
         bool anyShards = false;
@@ -356,11 +406,11 @@ public partial class PhaseStar
                 { anyShards = true; break; }
 
         if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[SuperNodeGate] {(anyShards ? "YES" : "NO (no shards available)")}: " +
+            $"[SuperNodeGate] YES ({(anyShards ? "with shards" : "no shards available")}): " +
             $"track={track.name} role={track.assignedRole} loopMul={track.loopMultiplier} maxBins={maxBins}"
         );
 
-        return anyShards;
+        return true;
     }
 
     private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)

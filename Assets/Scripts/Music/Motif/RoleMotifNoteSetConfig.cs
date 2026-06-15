@@ -18,6 +18,10 @@ public class RoleMotifNoteSetConfig : ScriptableObject
     [Min(0)]
     public int mineNodeTintBudget = 20;
 
+    [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
+    [Min(0)]
+    public int mineNodeExpireAfterLoops = 0;
+
     [Header("Note Ascension")]
     [Tooltip("How many drum loops collected notes take to rise to the ascension line. 0 = use NoteAscensionDirector default.")]
     [Min(0)]

@@ -97,6 +97,18 @@ public partial class Collectable : MonoBehaviour
 
     public static bool AnyLiveForTrack(InstrumentTrack track)
         => _s_liveByTrack.TryGetValue(track, out var count) && count > 0;
+
+    // Guards against double-decrementing _s_liveByTrack when a collectable is removed from
+    // play via a non-Destroy path (e.g. DarkTimeoutRoutine) and later actually destroyed
+    // (e.g. ForceDestroyCollectablesInFlight / FreezeGameplayForBridge).
+    private bool _countedAsLive;
+    private void MarkNoLongerLive()
+    {
+        if (!_countedAsLive) return;
+        _countedAsLive = false;
+        if (assignedInstrumentTrack != null && _s_liveByTrack.TryGetValue(assignedInstrumentTrack, out int lc))
+            _s_liveByTrack[assignedInstrumentTrack] = Mathf.Max(0, lc - 1);
+    }
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
     private static readonly Collider2D[] _dustProbeHits = new Collider2D[16];
@@ -254,8 +266,11 @@ public partial class Collectable : MonoBehaviour
         _roleProfile = MusicalRoleProfileLibrary.GetProfile(_role);
         _orbitalChirality = (GetInstanceID() & 1) == 0 ? 1f : -1f;
         if (assignedInstrumentTrack != null)
+        {
             _s_liveByTrack[assignedInstrumentTrack] =
                 (_s_liveByTrack.TryGetValue(assignedInstrumentTrack, out int lc) ? lc : 0) + 1;
+            _countedAsLive = true;
+        }
 
         ApplyTrackVisuals(track);
         if (assignedInstrumentTrack == null)
@@ -299,9 +314,7 @@ public partial class Collectable : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (assignedInstrumentTrack != null &&
-            _s_liveByTrack.TryGetValue(assignedInstrumentTrack, out int lc))
-            _s_liveByTrack[assignedInstrumentTrack] = Mathf.Max(0, lc - 1);
+        MarkNoLongerLive();
         ClearReservation();
         UnbindLoopBoundary();
         UnregisterOccupant();

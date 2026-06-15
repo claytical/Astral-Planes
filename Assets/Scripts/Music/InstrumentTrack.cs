@@ -481,6 +481,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     }
     
     public bool IsExpansionPending => _expansionCtrl?.IsExpansionPending ?? false;
+    public string DebugExpansionState() => _expansionCtrl?.DebugPendingState() ?? "no-ctrl";
     public List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
     }

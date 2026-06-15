@@ -168,5 +168,10 @@ public partial class Collectable
         track.spawnedCollectables?.Remove(gameObject);
         if (burstId != 0)
             track.ReleaseSpawnGate(burstId);
+
+        // No longer reachable via spawnedCollectables (and thus not reachable via
+        // ForceDestroyCollectablesInFlight) — stop counting toward _s_liveByTrack so
+        // AnyLiveForTrack/AnyLiveFromOtherTracks don't stay stuck true for the rest of the session.
+        MarkNoLongerLive();
     }
 }

@@ -200,7 +200,7 @@ public class ControlTutorialHighlight : MonoBehaviour
 
         if (instructionText)
         {
-            _labelBaseScale = instructionText.rectTransform.localScale;
+            _labelBaseScale = instructionText.transform.localScale;
 
             // If none wired, try auto-find on label object (safe, optional)
             if (!instructionGroup)
@@ -220,7 +220,7 @@ public class ControlTutorialHighlight : MonoBehaviour
     private void CacheLabelBaseScale()
     {
         if (instructionText)
-            _labelBaseScale = instructionText.rectTransform.localScale;
+            _labelBaseScale = instructionText.transform.localScale;
     }
     private void OnDisable()
     {

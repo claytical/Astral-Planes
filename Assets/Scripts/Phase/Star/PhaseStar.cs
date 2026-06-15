@@ -962,6 +962,22 @@ public partial class PhaseStar : MonoBehaviour
         return (tc != null && tc.AnyExpansionPending());
     }
 
+    /// <summary>Diagnostic-only: lists each track with IsExpansionPending==true and its flag breakdown.</summary>
+    string DebugExpansionPendingTracks()
+    {
+        var tc = _gfm != null ? _gfm.controller : null;
+        if (tc == null || tc.tracks == null) return "no-controller";
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var t in tc.tracks)
+        {
+            if (t == null || !t.IsExpansionPending) continue;
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append(t.name).Append('[').Append(t.DebugExpansionState()).Append(']');
+        }
+        return sb.Length > 0 ? sb.ToString() : "none";
+    }
+
     private void SetVisual(VisualMode mode, Color tint)
     {
         if (!visuals) visuals = GetComponentInChildren<PhaseStarVisuals2D>(true);

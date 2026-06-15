@@ -137,7 +137,11 @@ public class TrackExpansionController
     // ----------------------------------------------------------
     public bool IsExpansionPending =>
         PendingExpandForBurst || _pendingBurstAfterExpand.HasValue || HookedBoundaryForExpand;
-    
+
+    /// <summary>Read-only snapshot of the expansion-pending flags, for diagnostic logging.</summary>
+    public string DebugPendingState() =>
+        $"pendingExpand={PendingExpandForBurst} pendingBurst={_pendingBurstAfterExpand.HasValue} hookedBoundary={HookedBoundaryForExpand}";
+
     // ----------------------------------------------------------
     // Staging (called from SpawnCollectableBurst when targetBin >= loopMultiplier)
     // ----------------------------------------------------------
