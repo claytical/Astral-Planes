@@ -1030,7 +1030,6 @@ GameObject:
   - component: {fileID: 1014060962}
   - component: {fileID: 1014060966}
   - component: {fileID: 1014060965}
-  - component: {fileID: 1014060967}
   m_Layer: 5
   m_Name: Title
   m_TagString: TitleText
@@ -1158,22 +1157,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1014060961}
   m_CullTransparentMesh: 1
---- !u!114 &1014060967
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1014060961}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee14a14ab5c93428e8714f28b7b3dfa0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  minGlow: 0.01
-  maxGlow: 0.7
-  speed: 0.5
-  glowProperty: _GlowPower
 --- !u!1 &1520127268
 GameObject:
   m_ObjectHideFlags: 0

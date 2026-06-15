@@ -100,8 +100,6 @@ public class NoteSetFactory : MonoBehaviour
         };
     }
 
-    int totalSteps = GetAuthoritativeStepsPerLoop(track);
-
     if (cfg.riff == null)
     {
         Debug.LogError(
@@ -113,13 +111,19 @@ public class NoteSetFactory : MonoBehaviour
             assignedInstrumentTrack = track,
             rootMidi = rootMidi,
             chordRegion = chordSeq,
-            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(),
+            expireAfterLoops = cfg.mineNodeExpireAfterLoops
         };
-        silent.Initialize(track, totalSteps);
+        silent.Initialize(track, GetAuthoritativeStepsPerLoop(track));
         return silent;
     }
 
     var riff = cfg.riff.riff;
+
+    int drumSteps  = GetAuthoritativeStepsPerLoop(track);
+    int totalSteps = (riff.loopSteps > 0 && riff.loopSteps > drumSteps)
+        ? riff.loopSteps
+        : drumSteps;
 
     if (riff.events == null || riff.events.Count == 0)
     {
@@ -132,7 +136,8 @@ public class NoteSetFactory : MonoBehaviour
             assignedInstrumentTrack = track,
             rootMidi = rootMidi,
             chordRegion = chordSeq,
-            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>()
+            persistentTemplate = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(),
+            expireAfterLoops = cfg.mineNodeExpireAfterLoops
         };
         silent.Initialize(track, totalSteps);
         return silent;
@@ -201,7 +206,8 @@ public class NoteSetFactory : MonoBehaviour
         assignedInstrumentTrack = track,
         rootMidi = rootMidi,
         chordRegion = chordSeq,
-        persistentTemplate = riffPersistent
+        persistentTemplate = riffPersistent,
+        expireAfterLoops = cfg.mineNodeExpireAfterLoops
     };
 
     riffNs.Initialize(track, totalSteps);

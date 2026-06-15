@@ -255,9 +255,26 @@ public class PhaseTransitionManager : MonoBehaviour
 
             if (bin0NoteSet == null) continue;
 
+            // If the riff spans more than one base loop, start the track at the matching
+            // multiplier so GetLeaderSteps() reaches every authored step.
+            var drum = gfm.activeDrumTrack;
+            int drumBaseSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 0;
+            if (drumBaseSteps > 0 && cfg?.riff != null)
+            {
+                int riffLoopSteps = cfg.riff.riff.loopSteps;
+                if (riffLoopSteps > drumBaseSteps && riffLoopSteps % drumBaseSteps == 0)
+                {
+                    int requiredMul = Mathf.Clamp(riffLoopSteps / drumBaseSteps, 1, track.maxLoopMultiplier);
+                    if (track.loopMultiplier < requiredMul)
+                        track.loopMultiplier = requiredMul;
+                }
+            }
+
             track.authoredRootMidi = currentMotif.keyRootMidi;
             track.SetNoteSet(bin0NoteSet);
         }
+
+        controller.ResyncLeaderBinsNow();
     }
 
 }
