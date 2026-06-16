@@ -932,14 +932,6 @@ MonoBehaviour:
         m_Action: Join
         m_Flags: 0
       - m_Name: 
-        m_Id: 5b7db92f-3023-4e16-a1c3-f2f4be57c357
-        m_Path: <Keyboard>/anyKey
-        m_Interactions: 
-        m_Processors: 
-        m_Groups: 
-        m_Action: Join
-        m_Flags: 0
-      - m_Name: 
         m_Id: 529c4061-3fc2-4643-8a1c-177a8adad720
         m_Path: <Gamepad>/buttonEast
         m_Interactions: 
