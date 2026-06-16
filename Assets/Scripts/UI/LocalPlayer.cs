@@ -282,25 +282,23 @@ public class LocalPlayer : MonoBehaviour
         return _selection?.GetCurrentShipName();
     }
 
+    private void Awake()
+    {
+        _playerInput = GetComponent<PlayerInput>();
+        if (_playerInput == null) return;
+
+        foreach (var dev in _playerInput.devices)
+            Debug.Log($"[LocalPlayer.Awake] {dev.name} | product={dev.description.product} | interface={dev.description.interfaceName} | id={dev.deviceId}");
+    }
+
     IEnumerator Start()
     {
         yield return null; // wait one frame so input system "settles"
         _suppressChoose = false;
         DontDestroyOnLoad(this);
-
-        _playerInput = GetComponent<PlayerInput>();
-
-        // Guard against duplicate spawns from Steam virtual/physical device pairs:
-        // if another LocalPlayer already owns one of our devices, self-destruct.
-        if (HasDuplicateDevice())
-        {
-            Destroy(gameObject);
-            yield break;
-        }
-
         GameFlowManager.Instance.RegisterPlayer(this);
 
-        _moveAction  = _playerInput.actions["Move"]; // must match your action name
+        _moveAction = _playerInput.actions["Move"]; // must match your action name
 
         // IMPORTANT: Only create selection UI in TrackSelection.
         // Main scene should NOT spawn PlayerSelect/minis.
@@ -345,22 +343,6 @@ public class LocalPlayer : MonoBehaviour
                     plane.SetReleaseButtonHeld(false);
             };
         }
-    }
-
-    private bool HasDuplicateDevice()
-    {
-        if (_playerInput == null || _playerInput.devices.Count == 0) return false;
-        foreach (var existing in GameFlowManager.Instance.localPlayers)
-        {
-            if (existing == null || existing == this) continue;
-            var other = existing.GetComponent<PlayerInput>();
-            if (other == null) continue;
-            foreach (var myDev in _playerInput.devices)
-                foreach (var otherDev in other.devices)
-                    if (myDev == otherDev)
-                        return true;
-        }
-        return false;
     }
 
     private void OnDisable()
