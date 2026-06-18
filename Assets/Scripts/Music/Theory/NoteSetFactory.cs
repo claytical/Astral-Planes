@@ -42,7 +42,7 @@ public class NoteSetFactory : MonoBehaviour
         return null;
     }
 
-    var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.GetInstanceID()}-b{binIndex}-n{entropy}"); string key = $"{motif.name}/{track.assignedRole}/bin{binIndex}";
+    var rng  = SessionGenome.For($"{motif.name}-{track.assignedRole}-{track.InstanceId}-b{binIndex}-n{entropy}"); string key = $"{motif.name}/{track.assignedRole}/bin{binIndex}";
     return GenerateFromMotifConfig(track, motif, cfg, rng, key, binIndex);
 }
     private NoteSet GenerateFromMotifConfig(

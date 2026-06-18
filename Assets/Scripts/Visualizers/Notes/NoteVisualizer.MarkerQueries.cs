@@ -134,10 +134,11 @@ public partial class NoteVisualizer
         Vector3 p = Vector3.Lerp(a, b, u);
         if (releaseCueArcHeight != 0f) p.y += releaseCueArcHeight * 4f * u * (1f - u);
 
-        int id = vehicle.GetInstanceID();
-        if (!_releaseCuesByVehicle.TryGetValue(id, out var cue) || cue == null)
+        var v = vehicle.GetComponent<Vehicle>();
+        if (v == null) return;
+        if (!_releaseCuesByVehicle.TryGetValue(v, out var cue) || cue == null)
         {
-            _releaseCuesByVehicle[id] = cue;
+            _releaseCuesByVehicle[v] = cue;
         }
         else
         {

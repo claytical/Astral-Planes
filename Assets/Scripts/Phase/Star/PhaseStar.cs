@@ -37,6 +37,9 @@ public enum PhaseStarState
 }
 public partial class PhaseStar : MonoBehaviour
 {
+    private static int _nextId;
+    internal readonly int InstanceId = System.Threading.Interlocked.Increment(ref _nextId);
+
     // -------------------- Serialized config --------------------
     [Header("Profiles & Prefs")]
 

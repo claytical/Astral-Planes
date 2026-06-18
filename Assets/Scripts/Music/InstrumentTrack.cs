@@ -40,6 +40,9 @@ public class AscensionCohort
 
 public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 {
+    private static int _nextId;
+    internal readonly int InstanceId = System.Threading.Interlocked.Increment(ref _nextId);
+
     private TrackExpansionController _expansionCtrl;
     string IExpansionHost.TrackName => name;
     int  IExpansionHost.LoopMultiplier     => loopMultiplier;
@@ -1468,7 +1471,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             // Using -1 here was the original intent (loop-owned), but it breaks ascension.
             int burst = currentBurstId;
             noteMarker = controller?.noteVisualizer?.PlacePersistentNoteMarker(this, stepIndex, lit: lit, burstId: burst);
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:ADD_NOTE] track={name} step={stepIndex} qNote={qNote} reusedMarker=False lit={lit} newMarkerId={(noteMarker!=null?noteMarker.GetInstanceID():-1)}");
         }
 
         if (noteMarker != null) _spawnedNotes.Add(noteMarker);

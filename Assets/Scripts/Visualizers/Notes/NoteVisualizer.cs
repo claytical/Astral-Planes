@@ -111,7 +111,7 @@ public partial class NoteVisualizer : MonoBehaviour
     private readonly List<BlastTask> _blastTasks = new();
     private readonly List<RushTask> _rushTasks = new();
 
-    private readonly Dictionary<int, GameObject> _releaseCuesByVehicle = new();
+    private readonly Dictionary<Vehicle, GameObject> _releaseCuesByVehicle = new();
 
     private struct FirstPlayConfirmRequest
     {
@@ -150,7 +150,6 @@ public partial class NoteVisualizer : MonoBehaviour
 
         noteMarkers[(track, step)] = markerGo.transform;
         _stepBurst[(track, step)]  = burstId;
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:STEP_BURST_SET] track={track.name} step={step} burstId={burstId} markerId={markerGo.GetInstanceID()}");
 
         var tag = markerGo.GetComponent<MarkerTag>();
         if (!tag) tag = markerGo.AddComponent<MarkerTag>();
@@ -168,10 +167,11 @@ public partial class NoteVisualizer : MonoBehaviour
     public void ClearManualReleaseCue(Transform vehicle)
     {
         if (vehicle == null) return;
-        int id = vehicle.GetInstanceID();
-        if (_releaseCuesByVehicle.TryGetValue(id, out var cue) && cue != null)
+        var v = vehicle.GetComponent<Vehicle>();
+        if (v == null) return;
+        if (_releaseCuesByVehicle.TryGetValue(v, out var cue) && cue != null)
             Destroy(cue);
-        _releaseCuesByVehicle.Remove(id);
+        _releaseCuesByVehicle.Remove(v);
     }
 
     public void BlastManualReleaseCue(Transform vehicle)
@@ -966,7 +966,6 @@ public partial class NoteVisualizer : MonoBehaviour
 
             var ml = existing.GetComponent<MarkerLight>() ?? existing.gameObject.AddComponent<MarkerLight>();
             ml.SetGrey(track.DisplayColor);
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:MARKER_PLACEHOLDER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={existing.gameObject.GetInstanceID()} placeholder=True");
         }
 
         result = existing.gameObject;
@@ -1004,7 +1003,6 @@ public partial class NoteVisualizer : MonoBehaviour
             ml.SetGrey(track.DisplayColor);
         }
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] ADOPT marker track={track.name} step={stepIndex} lit={lit} burst={burstId} go={adopt.gameObject.GetInstanceID()}");
         result = adopt.gameObject;
         return true;
     }
@@ -1039,7 +1037,6 @@ public partial class NoteVisualizer : MonoBehaviour
         if (burstId >= 0) newTag.burstId = burstId;
 
         noteMarkers[key] = marker.transform;
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[NV:MARKER_REGISTER] track={track.name} step={stepIndex} burstIdParam={burstId} markerId={marker.gameObject.GetInstanceID()} lit={shouldLight}");
 
         ApplyMarkerVisuals(marker, track, shouldLight);
         return marker;
@@ -1301,18 +1298,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
     }
 
-    if (debugNotOwned.Count > 0)
-    {
-        Debug.LogWarning($"[NoteViz] {(dryRun ? "FOUND" : "CLEANING")} not-owned markers track={track.name} :: " +
-                         string.Join(", ", debugNotOwned.Select(o => o ? o.GetInstanceID().ToString() : "null")));
-    }
-
-    if (debugUntaggedUnowned.Count > 0)
-    {
-        Debug.LogWarning($"[NoteViz] {(dryRun ? "FOUND" : "CLEANING")} UNTAGGED+UNOWNED markers track={track.name} :: " +
-                         string.Join(", ", debugUntaggedUnowned.Select(o => o ? o.GetInstanceID().ToString() : "null")));
-    }
-
+ 
     if (!dryRun)
     {
         foreach (var go in toDestroy)
@@ -1421,7 +1407,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
             var dictKey = (track, step);
             if (noteMarkers.TryGetValue(dictKey, out var oldTf) && oldTf && oldTf != tf)
-                Debug.LogWarning($"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
+               // Debug.LogWarning($"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
 
             noteMarkers[dictKey] = tf;
         }
@@ -1464,7 +1450,7 @@ public partial class NoteVisualizer : MonoBehaviour
             bool isAnimatingNow = _animatingSteps != null && _animatingSteps.Contains((track, step));
             if (isAnimatingNow)
             {
-                Debug.LogWarning($"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
+//                Debug.LogWarning($"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
                 continue;
             }
 
